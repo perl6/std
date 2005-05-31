@@ -21,7 +21,7 @@ class File;
 # spec, see the thread rooted at <20050502192508.GF24107@sike.forum2.org>
 # on p6-l.
 
-multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO {
+multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO is primitive {
     die "fancy open modes not supported yet" if $a & any($r, $w, $rw);
     my $mode;
     $mode = "a" if $a;
@@ -36,7 +36,7 @@ multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool 
     Pugs::Internals::hSetBinaryMode($fh, bool::true) if
         $layer ~~ rx:P5/:raw\b/;
 
-    return $fh;
+    $fh;
 }
 
 
@@ -44,12 +44,12 @@ class Pipe;
 
 # Easy to use, unidirectional pipe. Uses the shell.
 
-multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO {
+multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO is primitive {
     die "Pipe::open is unidirectional" if all($r, $w);
     $r = bool::true if none($r, $w);
     my ($in, $out, $err, undef) =
         Pugs::Internals::runInteractiveCommand($command);
     close $err;
     close  ($r ?? $in :: $out);
-    return ($r ?? $out :: $in);
+    ($r ?? $out :: $in);
 }
