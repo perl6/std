@@ -30,10 +30,10 @@ multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool 
     $mode ||= "r";
 
     # XXX failures
-    my $fh = pugs::guts::openFile($filename, $mode);
+    my $fh = Pugs::Internals::openFile($filename, $mode);
 
     # XXX layers :)
-    pugs::guts::hSetBinaryMode($fh, bool::true) if
+    Pugs::Internals::hSetBinaryMode($fh, bool::true) if
         $layer ~~ rx:P5/:raw\b/;
 
     $fh;
@@ -48,8 +48,8 @@ multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO is primitiv
     die "Pipe::open is unidirectional" if all($r, $w);
     $r = bool::true if none($r, $w);
     my ($in, $out, $err, undef) =
-        pugs::guts::runInteractiveCommand($command);
+        Pugs::Internals::runInteractiveCommand($command);
     close $err;
-    close ($r ?? $in :: $out);
+    close  ($r ?? $in :: $out);
     ($r ?? $out :: $in);
 }
