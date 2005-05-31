@@ -2,15 +2,11 @@ module Prelude-0.0.1;
 
 use v6;
 
-=kwid
-
-There are a couple of things going on here.
-
-* These are perl6 implementations of "builtins"
-* They sometimes use Pugs internals to do the job
-* Some of this isn't specced yet (need S29 work).
-
-=cut
+# There are a couple of things going on here.
+# 
+# * These are perl6 implementations of "builtins"
+# * They sometimes use Pugs internals to do the job
+# * Some of this isn't specced yet (need S29 work).
 
 class File;
 
@@ -25,8 +21,7 @@ class File;
 # spec, see the thread rooted at <20050502192508.GF24107@sike.forum2.org>
 # on p6-l.
 
-# FIXME: rename to "open" once namespaces work better
-sub openfile (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO {
+multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO {
     die "fancy open modes not supported yet" if $a & any($r, $w, $rw);
     my $mode;
     $mode = "a" if $a;
@@ -49,8 +44,7 @@ class Pipe;
 
 # Easy to use, unidirectional pipe. Uses the shell.
 
-# FIXME: rename to "open" once namespaces work better
-sub openpipe(Str $command, Bool +$r is copy, Bool +$w) returns IO {
+multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO {
     die "Pipe::open is unidirectional" if all($r, $w);
     $r = bool::true if none($r, $w);
     my ($in, $out, $err, undef) =
@@ -59,6 +53,3 @@ sub openpipe(Str $command, Bool +$r is copy, Bool +$w) returns IO {
     close  ($r ?? $in :: $out);
     return ($r ?? $out :: $in);
 }
-
-
-
