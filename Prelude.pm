@@ -50,7 +50,7 @@ class Pipe;
 # Easy to use, unidirectional pipe. Uses the shell.
 
 # FIXME: rename to "open" once namespaces work better
-sub openpipe(Str $command, Bool +$r, Bool +$w) returns IO {
+sub openpipe(Str $command, Bool +$r is copy, Bool +$w) returns IO {
     die "Pipe::open is unidirectional" if all($r, $w);
     $r = bool::true if none($r, $w);
     my ($in, $out, $err, undef) =
