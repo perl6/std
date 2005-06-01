@@ -53,3 +53,20 @@ multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO is primitiv
     close  ($r ?? $in :: $out);
     ($r ?? $out :: $in);
 }
+
+# Bidirectional pipe. Potenially dangerous. Uses the shell.
+
+multi sub open2 (Str $command) returns List is primitive {
+    my ($in, $out, $err, $pid) =
+        Pugs::Internals::runInteractiveCommand($command);
+    close $err;
+    ($in, $out, $pid);
+}
+
+# Tridirectional pipe. Potenially dangerous. Uses the shell.
+
+multi sub open3 (Str $command) returns List is primitive {
+    my ($in, $out, $err, $pid) =
+        Pugs::Internals::runInteractiveCommand($command);
+    ($in, $out, $err, $pid);
+}
