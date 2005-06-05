@@ -21,7 +21,7 @@ class File;
 # spec, see the thread rooted at <20050502192508.GF24107@sike.forum2.org>
 # on p6-l.
 
-multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO is primitive is unsafe {
+multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO is primitive is unsafe is export {
     die "fancy open modes not supported yet" if $a & any($r, $w, $rw);
     my $mode;
     $mode = "a" if $a;
