@@ -71,8 +71,8 @@ multi sub open3 (Str $command) returns List is primitive is unsafe {
     ($in, $out, $err, $pid);
 }
 
-
 class Control::Basic;
+
 
 # multi-lingual eval.
 
@@ -97,6 +97,7 @@ multi sub eval (Str ?$code = $CALLER::_, Str +$lang = 'Perl6')
     }
 }
 
+
 # S29:
 # Behaves like, and replaces Perl 5 C<do EXPR>, with optional C<$lang>
 # support.
@@ -104,3 +105,33 @@ multi sub evalfile (Str $filename : Str +$lang = 'Perl6')
         is primitive is unsafe {
     eval(slurp $filename, $lang);
 }
+
+
+class Control::Caller;
+
+has Str $.package;
+has Str $.file;
+has Int $.line;
+has Str $.subname;  # FIXME: ratify; S06 calls this "sub".
+has Str $.subtype;
+has Str $.params;   # FIXME: needs attention; don't use yet.
+
+multi sub caller (: Int ?$level = 1) is primitive is export is safe {
+    # selection code here :)
+
+    my @caller = Pugs::Internals::caller($level);
+
+    # FIXME: why doesn't this work?
+    # this is here just because of an icky pugsbug.
+    #my %idx = <package file line subname subtype params> Y 0 .. 5; # ugly.
+    #Control::Caller.new( map { ; $_ => @caller[ %idx{$_} ] }, keys %idx );
+    #( map { say( $_ => @caller[ %idx{$_} ] ) }, keys %idx );
+    Control::Caller.new(
+        package => @caller[0],
+        file    => @caller[1],
+        line    => @caller[2],
+        subname => @caller[3],
+        subtype => @caller[4],
+        params  => @caller[5] );
+}
+
