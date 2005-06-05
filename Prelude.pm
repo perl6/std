@@ -86,14 +86,14 @@ class Control::Basic;
 
 # XXX: mark everything except :lang<YAML> unsafe
 # (maybe :lang<YAML> doesn't quite belong here?)
-multi sub eval (: Str $code = $CALLER::_, Str +$lang = 'Perl6')
+multi sub eval (Str ?$code = $CALLER::_, Str +$lang = 'Perl6')
         is primitive is unsafe {
     given $lang {
-        when 'Perl6'   { Pugs::Internals::eval($code) }
-        when 'Perl5'   { Pugs::Internals::eval_perl5($code) }
-        when 'Haskell' { Pugs::Internals::eval_haskell($code) }
-        when 'Parrot'  { Pugs::Internals::eval_parrot($code) }
-        when 'YAML'    { Pugs::Internals::eval_yaml($code) }
+        when 'Perl6'   { Pugs::Internals::eval($code) };
+        when 'Perl5'   { Pugs::Internals::eval_perl5($code) };
+        when 'Haskell' { Pugs::Internals::eval_haskell($code) };
+        when 'Parrot'  { Pugs::Internals::eval_parrot($code) };
+        when 'YAML'    { Pugs::Internals::eval_yaml($code) };
     }
 }
 
