@@ -119,19 +119,38 @@ has Str $.params;   # FIXME: needs attention; don't use yet.
 multi sub caller (: Int ?$level = 1) is primitive is export is safe {
     # selection code here :)
 
-    my @caller = Pugs::Internals::caller($level);
+    my @caller  = Pugs::Internals::caller($level);
 
     # FIXME: why doesn't this work?
     # this is here just because of an icky pugsbug.
     #my %idx = <package file line subname subtype params> Y 0 .. 5; # ugly.
     #Control::Caller.new( map { ; $_ => @caller[ %idx{$_} ] }, keys %idx );
     #( map { say( $_ => @caller[ %idx{$_} ] ) }, keys %idx );
-    Control::Caller.new(
+
+    # and another horribleness: why is retEval giving me [undef] on fail and not ()?
+    #say "caller($level): " ~ @caller.perl ~ ((scalar @caller > 1) ?? "ok" :: "nok");
+    (scalar @caller > 1) ?? Control::Caller.new(
         package => @caller[0],
         file    => @caller[1],
         line    => @caller[2],
         subname => @caller[3],
         subtype => @caller[4],
-        params  => @caller[5] );
+        params  => @caller[5] ) :: undef;
 }
 
+
+class Carp;
+
+multi sub longmess (: ?$e = '') returns Str is primitive is safe {
+    my($mess, $i);
+    $mess = "$e at $?CALLER::POSITION";
+
+    #while Control::Caller::caller(++$i) -> $caller {
+    #   $mess ~= "\n\t{$caller.package}::{$caller.subname}() at {$caller.file} line {$caller.line}";
+    #}
+    loop {
+        my $caller = Control::Caller::caller(++$i) err last;
+        $mess ~= "\n\t{$caller.package}::{$caller.subname}() at {$caller.file} line {$caller.line}";
+    }
+    $mess;
+}
