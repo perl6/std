@@ -112,14 +112,13 @@ class Control::Caller;
 has Str $.package;
 has Str $.file;
 has Int $.line;
-has Str $.subname;  # FIXME: ratify; S06 calls this "sub".
+has Str $.subname;
 has Str $.subtype;
+has Code $.sub;
 has Str $.params;   # FIXME: needs attention; don't use yet.
 
-multi sub caller (: Int ?$level = 1) is primitive is export is safe {
-    # selection code here :)
-
-    my @caller  = Pugs::Internals::caller($level);
+multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label) is primitive is export is safe {
+    my @caller = Pugs::Internals::caller($kind, $skip, $label);
 
     # FIXME: why doesn't this work?
     # this is here just because of an icky pugsbug.
@@ -127,15 +126,14 @@ multi sub caller (: Int ?$level = 1) is primitive is export is safe {
     #Control::Caller.new( map { ; $_ => @caller[ %idx{$_} ] }, keys %idx );
     #( map { say( $_ => @caller[ %idx{$_} ] ) }, keys %idx );
 
-    # and another horribleness: why is retEval giving me [undef] on fail and not ()?
-    #say "caller($level): " ~ @caller.perl ~ ((scalar @caller > 1) ?? "ok" :: "nok");
-    (scalar @caller > 1) ?? Control::Caller.new(
-        package => @caller[0],
-        file    => @caller[1],
-        line    => @caller[2],
-        subname => @caller[3],
-        subtype => @caller[4],
-        params  => @caller[5] ) :: undef;
+    @caller.elems ?? Control::Caller.new(
+        'package' => @caller[0],
+        'file'    => @caller[1],
+        'line'    => @caller[2],
+        'subname' => @caller[3],
+        'subtype' => @caller[4],
+        'sub'     => @caller[5],
+    ) :: undef;
 }
 
 
@@ -149,7 +147,7 @@ multi sub longmess (: ?$e = '') returns Str is primitive is safe {
     #   $mess ~= "\n\t{$caller.package}::{$caller.subname}() at {$caller.file} line {$caller.line}";
     #}
     loop {
-        my $caller = Control::Caller::caller(++$i) err last;
+        my $caller = Control::Caller::caller(skip => $i++) err last;
         $mess ~= "\n\t{$caller.package}::{$caller.subname}() at {$caller.file} line {$caller.line}";
     }
     $mess;
