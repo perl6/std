@@ -64,6 +64,8 @@ multi sub open2 (Str $command) returns List is primitive is unsafe {
 }
 
 # Tridirectional pipe. Potenially dangerous. Uses the shell.
+# Please remember to update t/pugsrun/11-safemode.t if you change the fully
+# qualified name of open3.
 
 multi sub open3 (Str $command) returns List is primitive is unsafe {
     my ($in, $out, $err, $pid) =
@@ -139,6 +141,8 @@ multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label) is primitive 
 
 class Carp;
 
+# Please remember to update t/pugsrun/11-safemode.t if you change the fully
+# qualified name of longmess.
 multi sub longmess (: ?$e = '') returns Str is primitive is safe {
     my($mess, $i);
     $mess = "$e at $?CALLER::POSITION";
