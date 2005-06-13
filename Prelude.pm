@@ -92,6 +92,7 @@ multi sub eval (Str ?$code = $CALLER::_, Str +$lang = 'Perl6')
         when 'perl5'   { Pugs::Internals::eval_perl5($code) };
         when 'haskell' { Pugs::Internals::eval_haskell($code) };
         when 'parrot'  { Pugs::Internals::eval_parrot($code) };
+        when 'pir'     { Pugs::Internals::eval_parrot($code) };
         when 'yaml'    { Pugs::Internals::eval_yaml($code) };
     }
 }
