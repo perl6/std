@@ -119,7 +119,7 @@ has Str $.subtype;
 has Code $.sub;
 has Str $.params;   # FIXME: needs attention; don't use yet.
 
-multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label) is primitive is export is safe {
+multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label) returns Control::Caller is primitive is export is safe {
     my @caller = Pugs::Internals::caller($kind, $skip, $label);
 
     # FIXME: why doesn't this work?
