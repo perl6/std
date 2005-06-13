@@ -83,19 +83,16 @@ class Control::Basic;
 # only required language, but supporting C<Perl5> is I<strongly>
 # recommended.
 
-# XXX: don't call me yet, the Prim.hs side of this isn't done.
-# migrating all of eval takes updating lots of code.
-
-# XXX: mark everything except :lang<YAML> unsafe
+# safety of the individual methods is defined in Pugs.Prim.hs
 # (maybe :lang<YAML> doesn't quite belong here?)
 multi sub eval (Str ?$code = $CALLER::_, Str +$lang = 'Perl6')
-        is primitive is unsafe {
-    given $lang {
-        when 'Perl6'   { Pugs::Internals::eval($code) };
-        when 'Perl5'   { Pugs::Internals::eval_perl5($code) };
-        when 'Haskell' { Pugs::Internals::eval_haskell($code) };
-        when 'Parrot'  { Pugs::Internals::eval_parrot($code) };
-        when 'YAML'    { Pugs::Internals::eval_yaml($code) };
+        is primitive is safe is export {
+    given lc $lang {
+        when 'perl6'   { Pugs::Internals::eval($code) };
+        when 'perl5'   { Pugs::Internals::eval_perl5($code) };
+        when 'haskell' { Pugs::Internals::eval_haskell($code) };
+        when 'parrot'  { Pugs::Internals::eval_parrot($code) };
+        when 'yaml'    { Pugs::Internals::eval_yaml($code) };
     }
 }
 
@@ -156,3 +153,4 @@ multi sub longmess (: ?$e = '') returns Str is primitive is safe {
     }
     $mess;
 }
+
