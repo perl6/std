@@ -157,3 +157,15 @@ multi sub longmess (: ?$e = '') returns Str is primitive is safe {
     $mess;
 }
 
+# Support for =$fh
+class IO {
+    method next () { ./readline() }
+}
+
+# Support for ="some_file"
+# I'm not sure where this is specced, but when I migrated &prefix:<=> from
+# meaning the same as &readline to $obj.next(), ="some_file" worked, so I added
+# the .next() declaration here.  --iblech
+class Str {
+    method next ($self: ) { =open($self) }
+}
