@@ -159,7 +159,7 @@ multi sub longmess (: ?$e = '') returns Str is primitive is safe {
 
 # Support for =$fh
 class IO {
-    method next () { ./readline() }
+    method next () is primitive { ./readline() }
 }
 
 # Support for ="some_file"
@@ -167,7 +167,7 @@ class IO {
 # meaning the same as &readline to $obj.next(), ="some_file" worked, so I added
 # the .next() declaration here.  --iblech
 class Str {
-    method next ($self: ) { =open($self) }
+    method next ($self: ) is primitive { =open($self) }
 }
 
 # BEGIN { open "..." } should die, as compile-time IO handles are invalid at
