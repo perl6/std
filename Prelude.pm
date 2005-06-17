@@ -169,3 +169,13 @@ class IO {
 class Str {
     method next ($self: ) { =open($self) }
 }
+
+# BEGIN { open "..." } should die, as compile-time IO handles are invalid at
+# runtime.
+# Please remember to edit Pugs.Parser, too, if you rename this sub.
+sub Pugs::Internals::check_for_io_leak (Code $usersub) {
+    my $ret = $usersub();
+    die "BEGIN and CHECK blocks may not return IO handles, as they'd be\n" ~
+        "invalid at runtime." if $ret.isa(IO);
+    return $ret;
+}
