@@ -2,6 +2,8 @@ module Prelude-0.0.1;
 
 use v6;
 
+our %*INC;
+
 # There are a couple of things going on here.
 # 
 # * These are perl6 implementations of "builtins"
