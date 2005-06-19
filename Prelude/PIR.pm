@@ -33,3 +33,15 @@ sub sleep (Num $seconds) returns Num {
 sub exit (Int ?$status = 0) {
     Pugs::Internals::exit $status;
 }
+
+sub pi () returns Num {
+    3.14159265358979323846264338327950288419716939937510;
+}
+
+sub lcfirst (Str $str) returns Str {
+    lc(substr $str, 0, 1) ~ substr $str, 1, chars($str) - 1;
+}
+
+sub ucfirst (Str $str) returns Str {
+    uc(substr $str, 0, 1) ~ substr $str, 1, chars($str) - 1;
+}
