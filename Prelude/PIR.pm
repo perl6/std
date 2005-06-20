@@ -45,3 +45,15 @@ sub lcfirst (Str $str) returns Str is primitive {
 sub ucfirst (Str $str) returns Str is primitive {
     uc(substr $str, 0, 1) ~ substr $str, 1, chars($str) - 1;
 }
+
+sub shift (@a) is primative {
+    my $top = +@a -1;
+    return undef if $top < 0;
+    my $e = @a[0];
+    my $i = 0;
+    while $i < $top {
+	@a[$i++] = @a[$i];
+    }
+    pop(@a);
+    return $e;
+}
