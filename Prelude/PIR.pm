@@ -46,7 +46,7 @@ sub ucfirst (Str $str) returns Str is primitive {
     uc(substr $str, 0, 1) ~ substr $str, 1, chars($str) - 1;
 }
 
-sub shift (@a) is primative {
+sub shift (@a) is primitive {
     my $top = +@a -1;
     return undef if $top < 0;
     my $e = @a[0];
@@ -56,4 +56,62 @@ sub shift (@a) is primative {
     }
     pop(@a);
     return $e;
+}
+
+# splice entirely untested.
+sub splice (@a, ?$offset=0, ?$length, *@list) is primitive {
+    my $off = $offset;
+    my $len = $length;
+    my $size = +@a;
+
+    $off += $size if $off < 0;
+    if $off > $size {
+	warn "splice() offset past end of array\n";
+	$off = $size;
+    }
+    # $off is now ready
+
+    $len = $size - $off if !defined($len);
+    $len = $size + $len - $off if $len < 0;
+    $len = 0 if $len < 0;
+    # $len is now ready
+
+    my $listlen = +@list;
+    my $size_change = $listlen - $len;
+    my @result;
+
+    if $size_change > 0 {
+	my $i = $size + $size_change -1;
+	my $final = $off + $size_change;
+	while $i >= $final {
+	    @a[$i] = @a[$i-$size_change];
+	    $i--;
+	}
+    } elsif $size_change < 0 {
+	my $i = $off;
+	my $final = $size + $size_change -1;
+	while $i <= $final {
+	    push(@result,$a[$i]);
+	    @a[$i] = @a[$i-$size_change];
+	    $i++;
+	}
+	# +@a = $size + $size_change;
+	#   doesnt exist yet, so...
+	my $n = 0;
+	while $n-- > $size_change {
+	    pop(@a);
+	}
+    }
+
+    if $listlen > 0 {
+	my $i = 0;
+	while $i < $listlen {
+	    @a[$off+$i] = @list[$i];
+	}
+    }
+
+    # return want.List ?? *@result :: pop(@result)
+    # return want.List ?? *@result :: +@result ?? @result[-1] :: undef;
+    # return *@result;
+    return @result;
 }
