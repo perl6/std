@@ -25,13 +25,13 @@ sub chop (Str $str is rw) returns Str is primitive {
 
 sub sleep (Num $seconds) returns Num is primitive {
     my $time = time;
-    Pugs::Internals::sleep $seconds;
+    Perl6::Internals::sleep $seconds;
     my $seconds_slept = time() - $time;
     $seconds_slept;
 }
 
 sub exit (Int ?$status = 0) is primitive {
-    Pugs::Internals::exit $status;
+    Perl6::Internals::exit $status;
 }
 
 sub pi () returns Num is primitive {
