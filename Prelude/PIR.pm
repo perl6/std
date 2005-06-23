@@ -34,6 +34,13 @@ sub exit (Int ?$status = 0) is primitive {
     Perl6::Internals::exit $status;
 }
 
+sub Perl6::Internals::eval_parrot (Str $code) is primitive {
+    my $sub = substr($code, 0, 1) eq "."
+        ?? Perl6::Internals::compile_pir($code)
+        :: Perl6::Internals::compile_pir(".sub pugs_eval_parrot\n$code\n.end\n");
+    $sub();
+}
+
 sub pi () returns Num is primitive {
     3.14159265358979323846264338327950288419716939937510;
 }
