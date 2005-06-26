@@ -160,15 +160,15 @@ class Carp {
 
 # Support for =$fh
 class IO {
-    method next () is primitive { ./readline() }
+    method shift () is primitive { ./readline() }
 }
 
 # Support for ="some_file"
 # I'm not sure where this is specced, but when I migrated &prefix:<=> from
-# meaning the same as &readline to $obj.next(), ="some_file" worked, so I added
-# the .next() declaration here.  --iblech
+# meaning the same as &readline to $obj.shift(), ="some_file" worked, so I
+# added the .shift() declaration here.  --iblech
 class Str {
-    method next ($self: ) is primitive { =open($self) }
+    method shift ($self: ) is primitive { =open($self) }
 }
 
 # BEGIN { open "..." } should die, as compile-time IO handles are invalid at
