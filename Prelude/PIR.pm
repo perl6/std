@@ -4,12 +4,12 @@
 # our &prefix:<?> := &true doesn't work yet.
 sub prefix:<?> ($var) returns Bool is primitive { true $var }
 
-sub chomp (Str $str is rw) returns Str is primitive {
+sub chomp (Str $str) returns Str is primitive {
+    # XXX return $str but newline("\n")
     if substr($str, -1, 1) eq "\n" {
-        $str = substr $str, 0, chars($str) - 1;
-        "\n";
+        substr $str, 0, chars($str) - 1;
     } else {
-        undef;
+        $str;
     }
 }
 
