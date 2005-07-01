@@ -181,7 +181,7 @@ sub Pugs::Internals::check_for_io_leak (Code $usersub) is primitive is safe {
     $ret;
 }
 
-sub Pugs::Internals::but_block ($obj, Code $code) {
+sub Pugs::Internals::but_block ($obj, Code $code) is primitive is safe {
     $code($obj);
     $obj;
 }
