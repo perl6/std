@@ -185,3 +185,5 @@ sub Pugs::Internals::but_block ($obj, Code $code) is primitive is safe {
     $code($obj);
     $obj;
 }
+
+say "hello, world!";
