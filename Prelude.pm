@@ -20,7 +20,7 @@ class File {
     # spec, see the thread rooted at <20050502192508.GF24107@sike.forum2.org>
     # on p6-l.
 
-    multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO is primitive is unsafe is export {
+    multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO is primitive is unsafe is builtin {
         die "fancy open modes not supported yet" if $a & any($r, $w, $rw);
         my $mode;
         $mode = "a" if $a;
@@ -84,7 +84,7 @@ class Control::Basic {
     # safety of the individual methods is defined in Pugs.Prim.hs
     # (maybe :lang<YAML> doesn't quite belong here?)
     multi sub eval (Str ?$code = $CALLER::_, Str +$lang = 'Perl6')
-            is primitive is safe is export {
+            is primitive is safe is builtin {
         given lc $lang {
             when 'perl6'   { Pugs::Internals::eval($code) };
             when 'perl5'   { Pugs::Internals::eval_perl5($code) };
@@ -117,7 +117,7 @@ class Control::Caller {
     has Code $.sub;
     has Str $.params;   # FIXME: needs attention; don't use yet.
 
-    multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label) returns Control::Caller is primitive is export is safe {
+    multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label) returns Control::Caller is primitive is builtin is safe {
         my @caller = Pugs::Internals::caller($kind, $skip, $label);
 
         # FIXME: why doesn't this work?

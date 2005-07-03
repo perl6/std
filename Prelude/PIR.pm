@@ -2,9 +2,9 @@
 # XXX -- for some reason, compilation doesn't work if the above line is uncommented.
 
 # our &prefix:<?> := &true doesn't work yet.
-sub prefix:<?> ($var) returns Bool is primitive { true $var }
+sub prefix:<?> ($var) returns Bool is builtin is primitive { true $var }
 
-sub chomp (Str $str) returns Str is primitive {
+sub chomp (Str $str) returns Str is builtin is primitive {
     # XXX return $str but newline("\n")
     if substr($str, -1, 1) eq "\n" {
         substr $str, 0, chars($str) - 1;
@@ -13,7 +13,7 @@ sub chomp (Str $str) returns Str is primitive {
     }
 }
 
-sub chop (Str $str is rw) returns Str is primitive {
+sub chop (Str $str is rw) returns Str is builtin is primitive {
     if chars($str) == 0 {
         undef;
     } else {
@@ -23,37 +23,37 @@ sub chop (Str $str is rw) returns Str is primitive {
     }
 }
 
-sub sleep (Num $seconds) returns Num is primitive {
+sub sleep (Num $seconds) returns Num is builtin is primitive {
     my $time = time;
     Perl6::Internals::sleep $seconds;
     my $seconds_slept = time() - $time;
     $seconds_slept;
 }
 
-sub exit (Int ?$status = 0) is primitive {
+sub exit (Int ?$status = 0) is builtin is primitive {
     Perl6::Internals::exit $status;
 }
 
-sub Perl6::Internals::eval_parrot (Str $code) is primitive {
+sub Perl6::Internals::eval_parrot (Str $code) is builtin is primitive {
     my $sub = substr($code, 0, 1) eq "."
         ?? Perl6::Internals::compile_pir($code)
         :: Perl6::Internals::compile_pir(".sub pugs_eval_parrot\n$code\n.end\n");
     $sub();
 }
 
-sub pi () returns Num is primitive {
+sub pi () returns Num is builtin is primitive {
     3.14159265358979323846264338327950288419716939937510;
 }
 
-sub lcfirst (Str $str) returns Str is primitive {
+sub lcfirst (Str $str) returns Str is builtin is primitive {
     lc(substr $str, 0, 1) ~ substr $str, 1, chars($str) - 1;
 }
 
-sub ucfirst (Str $str) returns Str is primitive {
+sub ucfirst (Str $str) returns Str is builtin is primitive {
     uc(substr $str, 0, 1) ~ substr $str, 1, chars($str) - 1;
 }
 
-sub shift (@a) is primitive {
+sub shift (@a) is builtin is primitive {
     my $top = +@a -1;
     return undef if $top < 0;
     my $e = @a[0];
@@ -66,7 +66,7 @@ sub shift (@a) is primitive {
 }
 
 # splice entirely untested.
-sub splice (@a, ?$offset=0, ?$length, *@list) is primitive {
+sub splice (@a, ?$offset=0, ?$length, *@list) is builtin is primitive {
     my $off = $offset;
     my $len = $length;
     my $size = +@a;
