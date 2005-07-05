@@ -183,3 +183,55 @@ sub Pugs::Internals::but_block ($obj, Code $code) is primitive is safe {
     $code($obj);
     $obj;
 }
+
+# (Unspecced) facade class supplying localtime
+class Time::Local {
+
+    has Int  $.year;    # eg., 2005; "pre-Gregorian dates are inaccurate" - GHC System.Time
+    has Int  $.month;   # 1 to 12 - NOTE 1-based
+    has Int  $.day;     # 1 to 31
+    has Int  $.hour;    # 0 to 23
+    has Int  $.min;     # 0 to 59
+    has Int  $.sec;     # 0 to 61 (up to two leap seconds)
+    has Int  $.picosec;
+    has Int  $.wday;    # 1 to 7, Sunday == 1
+    has Int  $.yday;    # 0 to 365 (up to one leap day)
+    has Str  $.tzname;  # string, eg, JDT
+    has Int  $.tz;      # variation from UTC in seconds
+    has Bool $.is_dst;
+
+    sub localtime(Int ?$sec is copy, Int ?$pico = 0 is copy) returns Time::Local is primitive is builtin is safe {
+        if not defined $sec {
+            my $now = time;
+            $sec = int $now;
+            $pico = ($now - $sec) * 10^12;
+        }
+        my $res;
+        # XXX: waiting on a better want
+        #if want ~~ rx:P5/^Scalar/ {
+        #    $res = Pugs::Internals::localtime(bool::true, $sec, $pico);
+        #} else {
+            my @tm = Pugs::Internals::localtime(bool::false, $sec, $pico);
+
+            # FIXME: this is how it oughta look, with @ids being class level.
+            #my @ids = <year month day hour min sec picosec wday yday tzname tz is_dst>; # XXX: this should be a class variable!
+            #Time::Local.new( pairs zip @ids, @tm );
+
+            $res = Time::Local.new(
+                year    => @tm[0],
+                month   => @tm[1],
+                day     => @tm[2],
+                hour    => @tm[3],
+                min     => @tm[4],
+                sec     => @tm[5],
+                picosec => @tm[6],
+                wday    => @tm[7],
+                yday    => @tm[8],
+                tzname  => @tm[9],
+                tz      => @tm[10],
+                is_dst  => @tm[11],
+            );
+        #}
+        $res;
+    }
+}
