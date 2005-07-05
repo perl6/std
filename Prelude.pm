@@ -204,7 +204,7 @@ class Time::Local {
         if not defined $sec {
             my $now = time;
             $sec = int $now;
-            $pico = ($now - $sec) * 10^12;
+            $pico = ($now - $sec) * 10**12;
         }
         my $res;
         # XXX: waiting on a better want
