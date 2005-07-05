@@ -200,12 +200,11 @@ class Time::Local {
     has Int  $.tz;      # variation from UTC in seconds
     has Bool $.is_dst;
 
-    sub localtime(Int ?$sec is copy, Int ?$pico = 0 is copy) returns Time::Local is primitive is builtin is safe {
-        if not defined $sec {
-            my $now = time;
-            $sec = int $now;
-            $pico = ($now - $sec) * 10**12;
-        }
+    multi sub localtime(Rat ?$when = time) returns Time::Local is primitive is builtin is safe {
+        localtime(int $when, ($when - int $when) * 10**12);
+    }
+    
+    multi sub localtime(Int $sec, Int ?$pico = 0) returns Time::Local is primitive is builtin is safe {
         my $res;
         # XXX: waiting on a better want
         #if want ~~ rx:P5/^Scalar/ {
