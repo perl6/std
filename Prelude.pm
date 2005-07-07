@@ -9,6 +9,10 @@ use v6;
 # * Some of this isn't specced yet (need S29 work).
 
 class File {
+    my $SEEK_START = 0;
+    my $SEEK_CUR   = 1;
+    my $SEEK_END   = 2;
+
     # Simple file open. Unlike perl5 open, it isn't very dwimmy.
 
     ### XXX: NOTE ###
@@ -36,6 +40,10 @@ class File {
             $layer ~~ rx:P5/:raw\b/;
 
         $fh;
+    }
+
+    multi method seek ($self: Int $position, Int ?$whence = $File::SEEK_START) returns Bool is primitive is unsafe is builtin {
+        Pugs::Internals::hSeek($seek, $position, $whence);
     }
 }
 
