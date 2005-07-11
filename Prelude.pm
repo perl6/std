@@ -1,5 +1,6 @@
 module Prelude-0.0.1;
 
+#use Test;
 use v6;
 
 # There are a couple of things going on here.
@@ -230,6 +231,28 @@ class Time::Local {
         $res;
     }
 }
+
+multi sub Num::round_gen(Int $n, Code $corner) returns Int { $n }
+multi sub Num::round_gen(Num $n, Code $corner) returns Int {
+    if (int($n) == $n) {
+	return int($n);
+    } else {
+	return $corner($n);
+    }
+}
+
+sub Num::do_round($n) { ($n < 0) ?? int( $n - 0.5) :: int( $n + 0.5); }
+sub Num::round { Num::round_gen($^n, &Num::do_round) }
+
+sub Num::truncate { int($^n) }
+&Num::trunc ::= &Num::truncate;
+
+sub Num::do_ceil($n) { ($n < 0) ?? (-int(-$n)) :: int($n + 1) }
+sub Num::ceiling { Num::round_gen($^n, &Num::do_ceil) }
+&Num::ceil ::= &Num::ceiling;
+
+sub Num::do_floor($n) { ($n < 0) ?? (-int(1-$n)) :: int($n) }
+sub Num::floor { Num::round_gen($^n, &Num::do_floor) }
 
 sub *sprintf ($fmt,*@args) {
     my $flen = $fmt.chars;
