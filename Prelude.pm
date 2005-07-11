@@ -189,6 +189,25 @@ class IO {
 # added the .shift() declaration here.  --iblech
 class Str {
     method shift ($self: ) is primitive { =open($self) }
+
+    method trans(Str $self:*%intable) is primitive {
+
+      my sub expand(Str $string) {
+        if ($string ~~ /(<-[\-]>+)\-(<-[\-]>+)/) {
+          (~ $/[0])..(~ $/[1]);
+        } else {
+          $string;
+        }
+      }
+
+# If in dout use brute force.
+
+    my %transtable = map{;zip(split('',$_.key),split('',$_.value))}
+                   map{;expand $_.key => expand $_.value} %intable;
+
+    [~] map { %transtable{$_} // $_ } $self.split('');
+  }
+
 }
 
 sub Pugs::Internals::but_block ($obj, Code $code) is primitive is safe {
