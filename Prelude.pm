@@ -1,13 +1,26 @@
 module Prelude-0.0.1;
 
-#use Test;
 use v6;
 
-# There are a couple of things going on here.
-# 
-# * These are perl6 implementations of "builtins"
-# * They sometimes use Pugs internals to do the job
-# * Some of this isn't specced yet (need S29 work).
+=kwid
+
+There are a couple of things going on here.
+
+* These are perl6 implementations of /builtins/
+* They sometimes use Pugs internals to do the job
+* Some of this had not been specced yet (need S29 work).
+
+All functions in this file needs to have the `is primitive`
+When writing primitives, please do *not* use &return, because
+that messes up PIR generation.  To return a value, arrange
+it to be the last evaluated expression.
+
+Please declare either `is safe` or `is unsafe`, too.
+
+For functions exported to the global `*` namespace, please use
+the `is builtin` trait.
+
+=cut
 
 class File {
     my $SEEK_START = 0;
@@ -232,29 +245,41 @@ class Time::Local {
     }
 }
 
-multi sub Num::round_gen(Int $n, Code $corner) returns Int { $n }
-multi sub Num::round_gen(Num $n, Code $corner) returns Int {
-    if (int($n) == $n) {
-	return int($n);
-    } else {
-	return $corner($n);
-    }
+multi sub Num::round_gen(Int $n, Code $corner) returns Int is safe {
+    $n
+}
+multi sub Num::round_gen(Num $n, Code $corner) returns Int is safe {
+    (int($n) == $n) ?? int($n) :: $corner($n);
 }
 
-sub Num::do_round($n) { ($n < 0) ?? int( $n - 0.5) :: int( $n + 0.5); }
-sub Num::round { Num::round_gen($^n, &Num::do_round) }
+sub Num::do_round($n) is primitive is safe {
+    ($n < 0) ?? int( $n - 0.5) :: int($n + 0.5);
+}
+sub Num::round($n) is primitive is safe {
+    Num::round_gen($n, &Num::do_round)
+}
 
-sub Num::truncate { int($^n) }
-&Num::trunc ::= &Num::truncate;
+sub Num::truncate($n) is primitive is safe {
+    int($n)
+}
+our &Num::trunc ::= &Num::truncate;
 
-sub Num::do_ceil($n) { ($n < 0) ?? (-int(-$n)) :: int($n + 1) }
-sub Num::ceiling { Num::round_gen($^n, &Num::do_ceil) }
-&Num::ceil ::= &Num::ceiling;
+sub Num::do_ceil($n) is primitive is safe {
+    ($n < 0) ?? (-int(-$n)) :: int($n + 1)
+}
+sub Num::ceiling is primitive is safe {
+    Num::round_gen($^n, &Num::do_ceil)
+}
+our &Num::ceil ::= &Num::ceiling;
 
-sub Num::do_floor($n) { ($n < 0) ?? (-int(1-$n)) :: int($n) }
-sub Num::floor { Num::round_gen($^n, &Num::do_floor) }
+sub Num::do_floor($n) is primitive is safe {
+    ($n < 0) ?? (-int(1-$n)) :: int($n)
+}
+sub Num::floor is primitive is safe {
+    Num::round_gen($^n, &Num::do_floor)
+}
 
-sub *sprintf ($fmt,*@args) {
+sub sprintf ($fmt, *@args) is primitive is builtin is safe {
     my $flen = $fmt.chars;
     my $fi = 0;
     my $ai = 0;
@@ -307,9 +332,9 @@ sub *sprintf ($fmt,*@args) {
 	    }
 	}
     }
-    return $str;
+    $str;
 }
 
-sub Scalar::as ($obj, $fmt) {
+sub Scalar::as ($obj, $fmt) is primitive is safe {
     sprintf($fmt,$obj);
 }
