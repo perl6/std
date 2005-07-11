@@ -190,7 +190,7 @@ class IO {
 class Str {
     method shift ($self: ) is primitive { =open($self) }
 
-    method trans(Str $self:*%intable) is primitive {
+    method trans(Str $self:*%intable) is primitive is safe {
 
       my sub expand(Str $string) {
         if ($string ~~ /(<-[\-]>+)\-(<-[\-]>+)/) {
