@@ -230,3 +230,63 @@ class Time::Local {
         $res;
     }
 }
+
+sub *sprintf ($fmt,*@args) {
+    my $flen = $fmt.chars;
+    my $fi = 0;
+    my $ai = 0;
+    my $str = "";
+    while ($fi < $flen) {
+	# optional non-conversion text
+	my $idx = index($fmt,"%",$fi);
+	if $idx < 0 {
+	    $str ~= substr($fmt,$fi);
+	    last;
+	} else {
+	    my $len = $idx - $fi;
+	    $str ~= substr($fmt,$fi, $len) if $len > 0;
+	    $fi = $idx;
+	}
+
+	# a conversion
+	my $start = $fi;
+	$fi++;
+	while !(substr($fmt,$fi,1)
+		~~ any<% c s d u o x e f g X E G b p n i D U O F>) {
+	    $fi++;
+	}
+	my $specifier = substr($fmt,$fi,1); $fi++;
+	my $conversion = substr($fmt,$start,$fi - $start);
+
+	# FIXME -- when next; works, do if $spec eq "%" { ...; next; }
+	my $arg;
+	if $specifier ne '%' {
+	    die "Insufficient arguments to sprintf" if $ai >= +@args;
+	    $arg = @args[$ai];
+	    $ai++;
+	}
+
+	given $specifier {
+	    when '%' {
+		$str ~= '%';
+	    }
+	    when any(<c d u o x X b i D U O>) {
+		$str ~= Pugs::Internals::sprintf($conversion,int($arg));
+	    }
+	    when 's' {
+		$str ~= Pugs::Internals::sprintf($conversion,"$arg");
+	    }
+	    when any(<e f g E G F>) {
+		$str ~= Pugs::Internals::sprintf($conversion,1.0*$arg);
+	    }
+	    default {
+		die "sprintf does not yet implement %{$specifier}";
+	    }
+	}
+    }
+    return $str;
+}
+
+sub Scalar::as ($obj, $fmt) {
+    sprintf($fmt,$obj);
+}
