@@ -193,8 +193,8 @@ class Str {
     method trans(Str $self:*%intable) is primitive is safe {
 
       my sub expand(Str $string) {
-        if ($string ~~ /(<-[\-]>+)\-(<-[\-]>+)/) {
-          (~ $/[0])..(~ $/[1]);
+        if ($string ~~ m:P5/([^-]+)\-([^-]+)/) {
+          (~ $0)..(~ $1);
         } else {
           $string;
         }
