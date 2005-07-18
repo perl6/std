@@ -336,17 +336,23 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
 	}
 
 	given $specifier {
-	    when '%' {
-		$str ~= '%';
-	    }
-	    when any(<c d u o x X b i D U O>) {
+	    when any(<c d u o x b i>) {
 		$str ~= Pugs::Internals::sprintf($conversion,int($arg));
 	    }
 	    when 's' {
 		$str ~= Pugs::Internals::sprintf($conversion,"$arg");
 	    }
-	    when any(<e f g E G F>) {
+	    when any(<e f g>) {
 		$str ~= Pugs::Internals::sprintf($conversion,1.0*$arg);
+	    }
+	    when any(<X D U O>) {
+		$str ~= uc Pugs::Internals::sprintf(lc($conversion),int($arg));
+	    }
+	    when any(<E G F>) {
+		$str ~= uc Pugs::Internals::sprintf(lc($conversion),1.0*$arg);
+	    }
+	    when '%' {
+		$str ~= '%';
 	    }
 	    default {
 		die "sprintf does not yet implement %{$specifier}";
