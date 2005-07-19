@@ -287,16 +287,16 @@ class Num {
     sub do_ceil($n) is primitive is safe {
         ($n < 0) ?? (-int(-$n)) :: int($n + 1)
     }
-    sub ceiling is primitive is safe {
-        round_gen($^n, &do_ceil)
+    sub ceiling($n) is primitive is safe {
+        round_gen($n, &do_ceil)
     }
     our &ceil ::= &ceiling;
 
     sub do_floor($n) is primitive is safe {
         ($n < 0) ?? (-int(1-$n)) :: int($n)
     }
-    sub floor is primitive is safe {
-        round_gen($^n, &do_floor)
+    sub floor($n) is primitive is safe {
+        round_gen($n, &do_floor)
     }
 }
 
