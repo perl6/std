@@ -365,3 +365,7 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
 sub Scalar::as ($obj, $fmt) is primitive is safe {
     sprintf($fmt,$obj);
 }
+
+sub Rule::pattern(Rule $obj) is primitive is safe {
+    Pugs::Internals::rule_pattern($obj);
+}
