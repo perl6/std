@@ -39,12 +39,13 @@ class File {
     # on p6-l.
 
     multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO is primitive is unsafe is builtin {
-        die "fancy open modes not supported yet" if $a & any($r, $w, $rw);
+        die "fancy open modes not supported yet" if $a and ($r or $w or $rw);
+
         my $mode;
         $mode = "a" if $a;
         $mode = "w" if $w;
-        $mode = "rw" if $rw || $r & $w;
-        $mode ||= "r";
+        $mode = "rw" if $rw or ($r and $w);
+        $mode //= "r";
 
         # XXX failures
         my $fh = Pugs::Internals::openFile($filename, $mode);
