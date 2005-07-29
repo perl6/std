@@ -370,3 +370,6 @@ sub Scalar::as ($obj, $fmt) is primitive is safe {
 sub Rule::pattern(Rule $obj) is primitive is safe {
     Pugs::Internals::rule_pattern($obj);
 }
+sub Rule::adverbs(Rule $obj) is primitive is safe {
+    Pugs::Internals::rule_adverbs($obj);
+}
