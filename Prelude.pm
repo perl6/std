@@ -367,6 +367,8 @@ sub Scalar::as ($obj, $fmt) is primitive is safe {
     sprintf($fmt,$obj);
 }
 
+
+# These are unspecced, and will likely go away at some point.
 sub Rule::pattern(Rule $obj) is primitive is safe {
     Pugs::Internals::rule_pattern($obj);
 }
