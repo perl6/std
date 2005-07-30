@@ -183,16 +183,25 @@ class Carp {
     }
 }
 
+role Iter {
+    multi sub prefix:<=> (Iter $self: ) { $self.shift() }
+    
+    method shift   () { ... }
+    method next    () { ... }
+    method current () { ... }
+}
+
 # Support for =$fh
-class IO {
+class IO does Iter {
     method shift () is primitive { ./readline() }
+    method next  () is primitive { ./shift() }
 }
 
 # Support for ="some_file"
 # I'm not sure where this is specced, but when I migrated &prefix:<=> from
 # meaning the same as &readline to $obj.shift(), ="some_file" worked, so I
 # added the .shift() declaration here.  --iblech
-class Str {
+class Str does Iter {
     method shift ($self: ) is primitive { =open($self) }
 
     method trans (Str $self: *%intable) is primitive is safe {
