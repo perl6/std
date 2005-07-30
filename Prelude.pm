@@ -38,7 +38,8 @@ class File {
     # spec, see the thread rooted at <20050502192508.GF24107@sike.forum2.org>
     # on p6-l.
 
-    multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw, Bool +$a) returns IO is primitive is unsafe is builtin {
+    multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw,
+            Bool +$a) returns IO is primitive is unsafe is builtin {
         die "fancy open modes not supported yet" if $a and ($r or $w or $rw);
 
         my $mode;
@@ -57,7 +58,8 @@ class File {
         $fh;
     }
 
-    multi method seek ($self: Int $position, Int ?$whence = $File::SEEK_START) returns Bool is primitive is unsafe is builtin {
+    multi method seek ($self: Int $position, Int ?$whence = $File::SEEK_START)
+            returns Bool is primitive is unsafe is builtin {
         Pugs::Internals::hSeek($seek, $position, $whence);
     }
 }
@@ -66,7 +68,8 @@ class File {
 class Pipe {
     # Easy to use, unidirectional pipe. Uses the shell.
 
-    multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO is primitive is unsafe {
+    multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO
+            is primitive is unsafe {
         die "Pipe::open is unidirectional" if all($r, $w);
         $r = bool::true if none($r, $w);
         my ($in, $out, $err, undef) =
@@ -124,7 +127,7 @@ class Control::Basic {
     # S29:
     # Behaves like, and replaces Perl 5 C<do EXPR>, with optional C<$lang>
     # support.
-    multi sub evalfile (Str $filename : Str +$lang = 'Perl6')
+    multi sub evalfile (Str $filename: Str +$lang = 'Perl6')
             is primitive is unsafe {
         eval(slurp $filename, $lang);
     }
@@ -140,7 +143,8 @@ class Control::Caller {
     has Code $.sub;
     has Str $.params;   # FIXME: needs attention; don't use yet.
 
-    multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label) returns Control::Caller is primitive is builtin is safe {
+    multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label)
+            returns Control::Caller is primitive is builtin is safe {
         my @caller = Pugs::Internals::caller($kind, $skip, $label);
 
         # FIXME: why doesn't this work?
@@ -191,24 +195,22 @@ class IO {
 class Str {
     method shift ($self: ) is primitive { =open($self) }
 
-    method trans(Str $self:*%intable) is primitive is safe {
-
-      my sub expand(Str $string) {
-        if ($string ~~ m:P5/([^-]+)\-([^-]+)/) {
-          (~ $0)..(~ $1);
-        } else {
-          $string;
+    method trans (Str $self: *%intable) is primitive is safe {
+        my sub expand(Str $string) {
+            if ($string ~~ m:P5/([^-]+)\-([^-]+)/) {
+                (~ $0)..(~ $1);
+            } else {
+                $string;
+            }
         }
-      }
 
-# If in dout use brute force.
-
-    my %transtable = map{;zip(split('',$_.key),split('',$_.value))}
-                   map{;expand $_.key => expand $_.value} %intable;
-
-    [~] map { %transtable{$_} // $_ } $self.split('');
-  }
-
+        # If in doubt use brute force.
+        my %transtable = map {;zip(split('',$_.key),split('',$_.value))}
+                         map {;expand $_.key => expand $_.value}
+                         %intable;
+    
+        [~] map { %transtable{$_} // $_ } $self.split('');
+    }
 }
 
 sub Pugs::Internals::but_block ($obj, Code $code) is primitive is safe {
@@ -218,8 +220,8 @@ sub Pugs::Internals::but_block ($obj, Code $code) is primitive is safe {
 
 # (Unspecced) facade class supplying localtime
 class Time::Local {
-
-    has Int  $.year;    # eg., 2005; "pre-Gregorian dates are inaccurate" - GHC System.Time
+    has Int  $.year;    # eg., 2005; "pre-Gregorian dates are inaccurate" - GHC
+                        # System.Time
     has Int  $.month;   # 1 to 12 - NOTE 1-based
     has Int  $.day;     # 1 to 31
     has Int  $.hour;    # 0 to 23
@@ -232,7 +234,8 @@ class Time::Local {
     has Int  $.tz;      # variation from UTC in seconds
     has Bool $.is_dst;
 
-    multi sub localtime(Num ?$when = time) returns Time::Local is primitive is builtin is safe {
+    multi sub localtime(Num ?$when = time) returns Time::Local
+            is primitive is builtin is safe {
         my $res;
         my $sec = int $when;
         my $pico = ($when - int $when) * 10**12;
