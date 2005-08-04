@@ -186,15 +186,15 @@ class Carp {
 role Iter {
     multi sub prefix:<=> (Iter $self: ) { $self.shift() }
     
-    method shift   () { ... }
-    method next    () { ... }
-    method current () { ... }
+    method shift   ($self: ) { ... }
+    method next    ($self: ) { ... }
+    method current ($self: ) { ... }
 }
 
 # Support for =$fh
 class IO does Iter {
-    method shift () is primitive { ./readline() }
-    method next  () is primitive { ./shift() }
+    method shift   ($self: ) is primitive { $self.readline() }
+    method next    ($self: ) is primitive { $self.shift() }
 }
 
 # Support for ="some_file"
