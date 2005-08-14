@@ -22,82 +22,6 @@ the `is builtin` trait.
 
 =cut
 
-class File {
-    my $SEEK_START = 0;
-    my $SEEK_CUR   = 1;
-    my $SEEK_END   = 2;
-
-    # Simple file open. Unlike perl5 open, it isn't very dwimmy.
-
-    ### XXX: NOTE ###
-    # this is intended to eventually replace Prim.hs's open (or be replaced by
-    # it, since that would probably be faster)
-
-    # also, the signature for this sub is nowhere near finalized; it should
-    # support asynch/exclusive/other stuff. For lots of discussion but no final
-    # spec, see the thread rooted at <20050502192508.GF24107@sike.forum2.org>
-    # on p6-l.
-
-    multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw,
-            Bool +$a) returns IO is primitive is unsafe is builtin {
-        die "fancy open modes not supported yet" if $a and ($r or $w or $rw);
-
-        my $mode;
-        $mode = "a" if $a;
-        $mode = "w" if $w;
-        $mode = "rw" if $rw or ($r and $w);
-        $mode //= "r";
-
-        # XXX failures
-        my $fh = Pugs::Internals::openFile($filename, $mode);
-
-        # XXX layers :)
-        Pugs::Internals::hSetBinaryMode($fh, bool::true) if
-            $layer ~~ rx:P5/:raw\b/;
-
-        $fh;
-    }
-
-    multi method seek ($self: Int $position, Int ?$whence = $File::SEEK_START)
-            returns Bool is primitive is unsafe is builtin {
-        Pugs::Internals::hSeek($seek, $position, $whence);
-    }
-}
-
-
-class Pipe {
-    # Easy to use, unidirectional pipe. Uses the shell.
-
-    multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO
-            is primitive is unsafe {
-        die "Pipe::open is unidirectional" if all($r, $w);
-        $r = bool::true if none($r, $w);
-        my ($in, $out, $err, undef) =
-            Pugs::Internals::runInteractiveCommand($command);
-        close $err;
-        close  ($r ?? $in :: $out);
-        ($r ?? $out :: $in);
-    }
-
-    # Bidirectional pipe. Potenially dangerous. Uses the shell.
-
-    multi sub open2 (Str $command) returns List is primitive is unsafe {
-        my ($in, $out, $err, $pid) =
-            Pugs::Internals::runInteractiveCommand($command);
-        close $err;
-        ($in, $out, $pid);
-    }
-
-    # Tridirectional pipe. Potenially dangerous. Uses the shell.
-    # Please remember to update t/pugsrun/11-safemode.t if you change the fully
-    # qualified name of open3.
-
-    multi sub open3 (Str $command) returns List is primitive is unsafe {
-        my ($in, $out, $err, $pid) =
-            Pugs::Internals::runInteractiveCommand($command);
-        ($in, $out, $err, $pid);
-    }
-}
 
 class Control::Basic {
     # multi-lingual eval.
@@ -183,6 +107,106 @@ class Carp {
     }
 }
 
+
+
+role Rule {}
+class Pugs::Internals::VRule does Rule {}
+
+
+
+# These macros cannot be "is primitive".
+macro rxbare_ ($pat) is builtin is safe {
+    "pugs_internals_rxbare/$pat/";
+}
+macro rx_ (%mods,$pat,$qo,$qc) is builtin is safe {
+    my $adverbs = join("",map {':'~$_} %mods.keys);
+    "pugs_internals_rx$adverbs$qo$pat$qc";
+}
+macro m_ (%mods,$pat,$qo,$qc) is builtin is safe {
+    my $adverbs = join("",map {':'~$_} %mods.keys);
+    "pugs_internals_m$adverbs$qo$pat$qc";
+}
+
+
+
+class File {
+    my $SEEK_START = 0;
+    my $SEEK_CUR   = 1;
+    my $SEEK_END   = 2;
+
+    # Simple file open. Unlike perl5 open, it isn't very dwimmy.
+
+    ### XXX: NOTE ###
+    # this is intended to eventually replace Prim.hs's open (or be replaced by
+    # it, since that would probably be faster)
+
+    # also, the signature for this sub is nowhere near finalized; it should
+    # support asynch/exclusive/other stuff. For lots of discussion but no final
+    # spec, see the thread rooted at <20050502192508.GF24107@sike.forum2.org>
+    # on p6-l.
+
+    multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw,
+            Bool +$a) returns IO is primitive is unsafe is builtin {
+        die "fancy open modes not supported yet" if $a and ($r or $w or $rw);
+
+        my $mode;
+        $mode = "a" if $a;
+        $mode = "w" if $w;
+        $mode = "rw" if $rw or ($r and $w);
+        $mode //= "r";
+
+        # XXX failures
+        my $fh = Pugs::Internals::openFile($filename, $mode);
+
+        # XXX layers :)
+        Pugs::Internals::hSetBinaryMode($fh, bool::true) if
+            $layer ~~ rx:P5/:raw\b/;
+
+        $fh;
+    }
+
+    multi method seek ($self: Int $position, Int ?$whence = $File::SEEK_START)
+            returns Bool is primitive is unsafe is builtin {
+        Pugs::Internals::hSeek($seek, $position, $whence);
+    }
+}
+
+
+class Pipe {
+    # Easy to use, unidirectional pipe. Uses the shell.
+
+    multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO
+            is primitive is unsafe {
+        die "Pipe::open is unidirectional" if all($r, $w);
+        $r = bool::true if none($r, $w);
+        my ($in, $out, $err, undef) =
+            Pugs::Internals::runInteractiveCommand($command);
+        close $err;
+        close  ($r ?? $in :: $out);
+        ($r ?? $out :: $in);
+    }
+
+    # Bidirectional pipe. Potenially dangerous. Uses the shell.
+
+    multi sub open2 (Str $command) returns List is primitive is unsafe {
+        my ($in, $out, $err, $pid) =
+            Pugs::Internals::runInteractiveCommand($command);
+        close $err;
+        ($in, $out, $pid);
+    }
+
+    # Tridirectional pipe. Potenially dangerous. Uses the shell.
+    # Please remember to update t/pugsrun/11-safemode.t if you change the fully
+    # qualified name of open3.
+
+    multi sub open3 (Str $command) returns List is primitive is unsafe {
+        my ($in, $out, $err, $pid) =
+            Pugs::Internals::runInteractiveCommand($command);
+        ($in, $out, $err, $pid);
+    }
+}
+
+
 role Iter {
     multi sub prefix:<=> (Iter $self: ) { $self.shift() }
     
@@ -221,6 +245,7 @@ class Str does Iter {
         [~] map { %transtable{$_} // $_ } $self.split('');
     }
 }
+
 
 sub Pugs::Internals::but_block ($obj, Code $code) is primitive is safe {
     $code($obj);
@@ -385,7 +410,3 @@ sub Hash::as ($obj, $fmt, $comma) is primitive is safe {
     join($comma, map -> $k,$v { sprintf($fmt,$k,$v) } $obj.kv );
 }
 
-
-
-role Rule {}
-class Pugs::Internals::VRule does Rule {}
