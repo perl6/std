@@ -378,6 +378,14 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
 sub Scalar::as ($obj, $fmt) is primitive is safe {
     sprintf($fmt,$obj);
 }
+sub List::as ($obj, $fmt, $comma) is primitive is safe {
+    join($comma, map -> $v { sprintf($fmt,$v) } @$obj );
+}
+sub Hash::as ($obj, $fmt, $comma) is primitive is safe {
+    join($comma, map -> $k,$v { sprintf($fmt,$k,$v) } $obj.kv );
+}
+
+
 
 role Rule {}
 class Pugs::Internals::VRule does Rule {}
