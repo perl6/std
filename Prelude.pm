@@ -111,20 +111,28 @@ class Carp {
 
 role Rule {}
 class Pugs::Internals::VRule does Rule {}
+class Rul does Rule is builtin {
+    has $.f;
+}
+# This infix:<~~> doesnt work yet.
+multi sub infix:<~~> ($x, Rul $r) is primitive is safe is builtin {$r.f.($x)}
+multi sub infix:<~~> (Rul $r, $x) is primitive is safe is builtin {$r.f.($x)}
 
-
-
+sub rx_common_($hook,%mods,$pat,$qo,$qc) is builtin is safe {
+    my $adverbs = join("",map {':'~$_} %mods.keys);
+    # Use of Rul awaits working infix:<~~> .
+    #'Rul.new(:f(sub($_s_){$_s_ ~~ '~"$hook$adverbs$qo$pat$qc}))";
+    "$hook$adverbs$qo$pat$qc";
+}
 # These macros cannot be "is primitive".
 macro rxbare_ ($pat) is builtin is safe {
-    "pugs_internals_rxbare/$pat/";
+    rx_common_("pugs_internals_rxbare",hash(),$pat,"/","/");
 }
 macro rx_ (%mods,$pat,$qo,$qc) is builtin is safe {
-    my $adverbs = join("",map {':'~$_} %mods.keys);
-    "pugs_internals_rx$adverbs$qo$pat$qc";
+    rx_common_("pugs_internals_rx",%mods,$pat,$qo,$qc);
 }
 macro m_ (%mods,$pat,$qo,$qc) is builtin is safe {
-    my $adverbs = join("",map {':'~$_} %mods.keys);
-    "pugs_internals_m$adverbs$qo$pat$qc";
+    rx_common_("pugs_internals_m",%mods,$pat,$qo,$qc);
 }
 
 
