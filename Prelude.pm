@@ -118,12 +118,64 @@ class Rul does Rule is builtin {
 multi sub infix:<~~> ($x, Rul $r) is primitive is safe is builtin {$r.f.($x)}
 multi sub infix:<~~> (Rul $r, $x) is primitive is safe is builtin {$r.f.($x)}
 
-sub rx_common_($hook,%mods,$pat,$qo,$qc) is builtin is safe {
-    my $adverbs = join("",map {':'~$_} %mods.keys);
+
+sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
+    state(%modifiers_known, %modifiers_supported_p5, %modifiers_supported_p6);
+    FIRST {
+	%modifiers_known = map {;($_ => 1)}
+        <perl5 p5 P5 i ignorecase w words g global c continue p pos
+	once bytes codes graphs langs x nth ov overlap ex exhaustive
+	rw keepall e each any parsetree stringify>;
+	%modifiers_supported_p6 = map {;($_ => 1)}
+	<i ignorecase w words g global  stringify>;
+	%modifiers_supported_p5 = map {;($_ => 1)}
+	<perl5 p5 P5 i ignorecase g global  stringify>;
+    }
+    my $pat = $pat0;
+    my %mods = %mods0;
+    my $p5 = %mods{"perl5"} || %mods{"p5"} || %mods{"P5"};
+    #my sub warning($e){warn(Carp::longmess($e))};# XXX doesnt work yet.
+    my sub warning($e){warn("Warning: $e")};
+    if $p5 {
+    } else {
+	my $pre = "";
+	if %mods{"i"} || %mods{"ignorecase"} {      
+	    $pre ~= ":i";
+	    %mods.delete("i"); # avoid haskell handling it.
+	    %mods.delete("ignorecase");
+            warning "PGE doesn't actually do :ignorecase yet.";
+	}
+	if %mods{"w"} || %mods{"words"} {      
+	    $pre ~= ":w";
+	    %mods.delete("w"); # avoid haskell handling it.
+	    %mods.delete("words");
+	}
+	if $pre ne "" {
+	    $pre ~= "::" if substr($pat,0,1) ne (":"|"#");
+	    $pat = $pre ~ $pat;
+	}
+    }
+    for %mods.keys -> $k {
+	if !(%modifiers_known{$k}
+	     || ($k.chars > 2 && substr($k,-2,2) eq ("th"|"st"|"nd"|"rd")
+		 && pugs_internals_m:perl5/\A\d+(?:th|st|nd|rd)\Z/)
+	     || ($k.chars > 1 && substr($k,-1,1) eq "x"
+		 && pugs_internals_m:perl5/\A\d+x\Z/)) {
+            my $msg = "Unknown modifier :$k will probably be ignored.";
+	    $msg ~= "  Perhaps you meant :i:w ?" if $k eq ("iw"|"wi");
+            warning $msg;
+	} elsif $p5 && !(%modifiers_supported_p5{$k}) {
+	    warning "Modifier :$k is not (yet?) supported by :perl5 regexps.";
+	} elsif !$p5 && !(%modifiers_supported_p6{$k}) {
+	    warning "Modifier :$k is not yet supported by PGE/pugs.";
+	}
+    }
+    my $adverbs = join("",map {":"~$_} %mods.keys);
     # Use of Rul awaits working infix:<~~> .
     #'Rul.new(:f(sub($_s_){$_s_ ~~ '~"$hook$adverbs$qo$pat$qc}))";
     "$hook$adverbs$qo$pat$qc";
 }
+
 # These macros cannot be "is primitive".
 macro rxbare_ ($pat) is builtin is safe {
     rx_common_("pugs_internals_rxbare",hash(),$pat,"/","/");
