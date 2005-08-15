@@ -120,7 +120,7 @@ multi sub infix:<~~> (Rul $r, $x) is primitive is safe is builtin {$r.f.($x)}
 
 
 sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
-    state(%modifiers_known, %modifiers_supported_p5, %modifiers_supported_p6);
+    state(%modifiers_known, %modifiers_supported_p6, %modifiers_supported_p5);
     FIRST {
 	%modifiers_known = map {;($_ => 1)}
         <perl5 p5 P5 i ignorecase w words g global c continue p pos
@@ -136,8 +136,33 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     my $p5 = %mods{"perl5"} || %mods{"p5"} || %mods{"P5"};
     #my sub warning($e){warn(Carp::longmess($e))};# XXX doesnt work yet.
     my sub warning($e){warn("Warning: $e")};
-    if $p5 {
-    } else {
+    for %mods.keys -> $k {
+	if %modifiers_known{$k} {
+	    if $p5 && !%modifiers_supported_p5{$k} {
+		warning "Modifier :$k is not (yet?) supported by :perl5 regexps.";
+	    } elsif !$p5 && !%modifiers_supported_p6{$k} {
+		warning "Modifier :$k is not yet supported by PGE/pugs.";
+	    }
+	}
+	elsif ($k.chars > 1 && substr($k,-1,1) eq "x"
+	       && pugs_internals_m:perl5/\A(\d+)x\Z/) {
+	    my $n = +$0;
+	    %mods.delete($k);
+	    %mods{'x'} = $n;
+	}
+	elsif ($k.chars > 2 && substr($k,-2,2) eq ("th"|"st"|"nd"|"rd")
+		 && pugs_internals_m:perl5/\A(\d+)(?:th|st|nd|rd)\Z/) {
+	    my $n = +$0;
+	    %mods.delete($k);
+	    %mods{'nth'} = $n;
+	}
+	else {
+            my $msg = "Unknown modifier :$k will probably be ignored.";
+	    $msg ~= "  Perhaps you meant :i:w ?" if $k eq ("iw"|"wi");
+            warning $msg;
+	}
+    }
+    if !$p5 {
 	my $pre = "";
 	if %mods{"i"} || %mods{"ignorecase"} {      
 	    $pre ~= ":i";
@@ -155,22 +180,29 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
 	    $pat = $pre ~ $pat;
 	}
     }
-    for %mods.keys -> $k {
-	if !(%modifiers_known{$k}
-	     || ($k.chars > 2 && substr($k,-2,2) eq ("th"|"st"|"nd"|"rd")
-		 && pugs_internals_m:perl5/\A\d+(?:th|st|nd|rd)\Z/)
-	     || ($k.chars > 1 && substr($k,-1,1) eq "x"
-		 && pugs_internals_m:perl5/\A\d+x\Z/)) {
-            my $msg = "Unknown modifier :$k will probably be ignored.";
-	    $msg ~= "  Perhaps you meant :i:w ?" if $k eq ("iw"|"wi");
-            warning $msg;
-	} elsif $p5 && !(%modifiers_supported_p5{$k}) {
-	    warning "Modifier :$k is not (yet?) supported by :perl5 regexps.";
-	} elsif !$p5 && !(%modifiers_supported_p6{$k}) {
-	    warning "Modifier :$k is not yet supported by PGE/pugs.";
-	}
-    }
+    my $g = %mods{'g'} || %mods{'global'};
+    my $ov = %mods{'ov'} || %mods{'overlap'};
+    my $ex = %mods{'ex'} || %mods{'exhaustive'};
     my $adverbs = join("",map {":"~$_} %mods.keys);
+    if $ov && 0 { # XXX disabled until Rul works.
+	my($str,$pos,$re,$m,$m0,$a,$s,$at,$prev) =
+	('$_str_','$_pos_','$_re_','$_m_','$_m0_',
+	 '$_a_','$_s_','$_at_','$_prev_');
+	my $code = "Rul.new(:f(sub($str)\{
+           my $re = $hook$adverbs$qo$pat$qc;
+           my $pos = 0;  my $a = []; my $prev = -1; my $m;
+           while 1 \{
+              my $s = substr($str,$pos) // last;
+              $m = $s ~~ $re or last;
+              my $m0 = {$m}[0];
+              my $at = $pos + $m0.from;
+              {$a}.push($m0) if $at > $prev; $prev = $at;
+              $pos += {$m}.from + 1;
+           }
+           # want.Scalar
+           0 ?? ([|] \@{$a}) :: $a }))";
+	return $code;
+    }
     # Use of Rul awaits working infix:<~~> .
     #'Rul.new(:f(sub($_s_){$_s_ ~~ '~"$hook$adverbs$qo$pat$qc}))";
     "$hook$adverbs$qo$pat$qc";
