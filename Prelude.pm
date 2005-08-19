@@ -123,17 +123,17 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     state(%modifiers_known, %modifiers_supported_p6, %modifiers_supported_p5);
     FIRST {
 	%modifiers_known = map {;($_ => 1)}
-        <perl5 p5 P5 i ignorecase w words g global c continue p pos
+        <perl5 Perl5 P5 i ignorecase w words g global c continue p pos
 	once bytes codes graphs langs x nth ov overlap ex exhaustive
 	rw keepall e each any parsetree stringify>;
 	%modifiers_supported_p6 = map {;($_ => 1)}
 	<i ignorecase w words g global  stringify>;
 	%modifiers_supported_p5 = map {;($_ => 1)}
-	<perl5 p5 P5 i ignorecase g global  stringify>;
+	<perl5 Perl5 P5 i ignorecase g global  stringify>;
     }
     my $pat = $pat0;
     my %mods = %mods0;
-    my $p5 = %mods{"perl5"} || %mods{"p5"} || %mods{"P5"};
+    my $p5 = %mods{"perl5"} || %mods{"Perl5"} || %mods{"P5"};
     #my sub warning($e){warn(Carp::longmess($e))};# XXX doesnt work yet.
     my sub warning($e){warn("Warning: $e")};
     for %mods.keys -> $k {
