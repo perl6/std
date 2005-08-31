@@ -10,12 +10,15 @@ There are a couple of things going on here.
 * They sometimes use Pugs internals to do the job
 * Some of this had not been specced yet (need S29 work).
 
-All functions in this file need to have the `is primitive`
 When writing primitives, please do *not* use &return, because
-that messes up PIR generation.  To return a value, arrange
+that messes up PIR generation.  To return a value, arrange for
 it to be the last evaluated expression.
 
-Please declare either `is safe` or `is unsafe`, too.
+All functions (but not macros) in this file need to have the
+`is primitive` trait.
+
+Please also declare whether the function can be used in a safe
+context (such as the IRC evalbot) using `is safe` or `is unsafe`.
 
 For functions exported to the global `*` namespace, please use
 the `is builtin` trait.
