@@ -59,7 +59,7 @@ sub shift (@a) is builtin is primitive {
     my $e = @a[0];
     my $i = 0;
     while $i < $top {
-	@a[$i++] = @a[$i];
+        @a[$i++] = @a[$i];
     }
     pop(@a);
     return $e;
@@ -72,8 +72,8 @@ sub splice (@a is rw, ?$offset=0, ?$length, *@list) is builtin is primitive {
 
     $off += $size if $off < 0;
     if $off > $size {
-	warn "splice() offset past end of array\n";
-	$off = $size;
+        warn "splice() offset past end of array\n";
+        $off = $size;
     }
     # $off is now ready
 
@@ -88,42 +88,42 @@ sub splice (@a is rw, ?$offset=0, ?$length, *@list) is builtin is primitive {
     my @result;
 
     if 1 {
-	my $i = $off;
-	my $stop = $off + $len;
-	while $i < $stop {
-	    push(@result,@a[$i]);
-	    $i++;
-	}
+        my $i = $off;
+        my $stop = $off + $len;
+        while $i < $stop {
+            push(@result,@a[$i]);
+            $i++;
+        }
     }
 
     if $size_change > 0 {
-	my $i = $size + $size_change -1;
-	my $final = $off + $size_change;
-	while $i >= $final {
-	    @a[$i] = @a[$i-$size_change];
-	    $i--;
-	}
+        my $i = $size + $size_change -1;
+        my $final = $off + $size_change;
+        while $i >= $final {
+            @a[$i] = @a[$i-$size_change];
+            $i--;
+        }
     } elsif $size_change < 0 {
-	my $i = $off;
-	my $final = $size + $size_change -1;
-	while $i <= $final {
-	    @a[$i] = @a[$i-$size_change];
-	    $i++;
-	}
-	# +@a = $size + $size_change;
-	#   doesnt exist yet, so...
-	my $n = 0;
-	while $n-- > $size_change {
-	    pop(@a);
-	}
+        my $i = $off;
+        my $final = $size + $size_change -1;
+        while $i <= $final {
+            @a[$i] = @a[$i-$size_change];
+            $i++;
+        }
+        # +@a = $size + $size_change;
+        #   doesnt exist yet, so...
+        my $n = 0;
+        while $n-- > $size_change {
+            pop(@a);
+        }
     }
 
     if $listlen > 0 {
-	my $i = 0;
-	while $i < $listlen {
-	    @a[$off+$i] = @list[$i];
-	    $i++;
-	}
+        my $i = 0;
+        while $i < $listlen {
+            @a[$off+$i] = @list[$i];
+            $i++;
+        }
     }
 
     #  want.List ?? *@result :: pop(@result)

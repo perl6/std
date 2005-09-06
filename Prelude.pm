@@ -125,14 +125,14 @@ multi sub infix:<~~> (Rul $r, $x) is primitive is safe is builtin {$r.f.($x)}
 sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     state(%modifiers_known, %modifiers_supported_p6, %modifiers_supported_p5);
     FIRST {
-	%modifiers_known = map {;($_ => 1)}
+        %modifiers_known = map {;($_ => 1)}
         <perl5 Perl5 P5 i ignorecase w words g global c continue p pos
-	once bytes codes graphs langs x nth ov overlap ex exhaustive
-	rw keepall e each any parsetree stringify>;
-	%modifiers_supported_p6 = map {;($_ => 1)}
-	<i ignorecase w words g global  stringify>;
-	%modifiers_supported_p5 = map {;($_ => 1)}
-	<perl5 Perl5 P5 i ignorecase g global  stringify>;
+        once bytes codes graphs langs x nth ov overlap ex exhaustive
+        rw keepall e each any parsetree stringify>;
+        %modifiers_supported_p6 = map {;($_ => 1)}
+        <i ignorecase w words g global  stringify>;
+        %modifiers_supported_p5 = map {;($_ => 1)}
+        <perl5 Perl5 P5 i ignorecase g global  stringify>;
     }
     my $pat = $pat0;
     my %mods = %mods0;
@@ -140,58 +140,58 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     #my sub warning($e){warn(Carp::longmess($e))};# XXX doesnt work yet.
     my sub warning($e){warn("Warning: $e")};
     for %mods.keys -> $k {
-	if %modifiers_known{$k} {
-	    if $p5 && !%modifiers_supported_p5{$k} {
-		warning "Modifier :$k is not (yet?) supported by :perl5 regexps.";
-	    } elsif !$p5 && !%modifiers_supported_p6{$k} {
-		warning "Modifier :$k is not yet supported by PGE/pugs.";
-	    }
-	}
-	elsif ($k.chars > 1 && substr($k,-1,1) eq "x"
-	       && pugs_internals_m:perl5/\A(\d+)x\Z/) {
-	    my $n = +$0;
-	    %mods.delete($k);
-	    %mods{'x'} = $n;
-	}
-	elsif ($k.chars > 2 && substr($k,-2,2) eq ("th"|"st"|"nd"|"rd")
-		 && pugs_internals_m:perl5/\A(\d+)(?:th|st|nd|rd)\Z/) {
-	    my $n = +$0;
-	    %mods.delete($k);
-	    %mods{'nth'} = $n;
-	}
-	else {
+        if %modifiers_known{$k} {
+            if $p5 && !%modifiers_supported_p5{$k} {
+                warning "Modifier :$k is not (yet?) supported by :perl5 regexps.";
+            } elsif !$p5 && !%modifiers_supported_p6{$k} {
+                warning "Modifier :$k is not yet supported by PGE/pugs.";
+            }
+        }
+        elsif ($k.chars > 1 && substr($k,-1,1) eq "x"
+               && pugs_internals_m:perl5/\A(\d+)x\Z/) {
+            my $n = +$0;
+            %mods.delete($k);
+            %mods{'x'} = $n;
+        }
+        elsif ($k.chars > 2 && substr($k,-2,2) eq ("th"|"st"|"nd"|"rd")
+                 && pugs_internals_m:perl5/\A(\d+)(?:th|st|nd|rd)\Z/) {
+            my $n = +$0;
+            %mods.delete($k);
+            %mods{'nth'} = $n;
+        }
+        else {
             my $msg = "Unknown modifier :$k will probably be ignored.";
-	    $msg ~= "  Perhaps you meant :i:w ?" if $k eq ("iw"|"wi");
+            $msg ~= "  Perhaps you meant :i:w ?" if $k eq ("iw"|"wi");
             warning $msg;
-	}
+        }
     }
     if !$p5 {
-	my $pre = "";
-	if %mods{"i"} || %mods{"ignorecase"} {      
-	    $pre ~= ":i";
-	    %mods.delete("i"); # avoid haskell handling it.
-	    %mods.delete("ignorecase");
+        my $pre = "";
+        if %mods{"i"} || %mods{"ignorecase"} {      
+            $pre ~= ":i";
+            %mods.delete("i"); # avoid haskell handling it.
+            %mods.delete("ignorecase");
             warning "PGE doesn't actually do :ignorecase yet.";
-	}
-	if %mods{"w"} || %mods{"words"} {      
-	    $pre ~= ":w";
-	    %mods.delete("w"); # avoid haskell handling it.
-	    %mods.delete("words");
-	}
-	if $pre ne "" {
-	    $pre ~= "::" if substr($pat,0,1) ne (":"|"#");
-	    $pat = $pre ~ $pat;
-	}
+        }
+        if %mods{"w"} || %mods{"words"} {      
+            $pre ~= ":w";
+            %mods.delete("w"); # avoid haskell handling it.
+            %mods.delete("words");
+        }
+        if $pre ne "" {
+            $pre ~= "::" if substr($pat,0,1) ne (":"|"#");
+            $pat = $pre ~ $pat;
+        }
     }
     my $g = %mods{'g'} || %mods{'global'};
     my $ov = %mods{'ov'} || %mods{'overlap'};
     my $ex = %mods{'ex'} || %mods{'exhaustive'};
     my $adverbs = join("",map {":"~$_} %mods.keys);
     if $ov && 0 { # XXX disabled until Rul works.
-	my($str,$pos,$re,$m,$m0,$a,$s,$at,$prev) =
-	('$_str_','$_pos_','$_re_','$_m_','$_m0_',
-	 '$_a_','$_s_','$_at_','$_prev_');
-	my $code = "Rul.new(:f(sub($str)\{
+        my($str,$pos,$re,$m,$m0,$a,$s,$at,$prev) =
+        ('$_str_','$_pos_','$_re_','$_m_','$_m0_',
+         '$_a_','$_s_','$_at_','$_prev_');
+        my $code = "Rul.new(:f(sub($str)\{
            my $re = $hook$adverbs$qo$pat$qc;
            my $pos = 0;  my $a = []; my $prev = -1; my $m;
            while 1 \{
@@ -204,7 +204,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
            }
            # want.Scalar
            0 ?? ([|] \@{$a}) :: $a }))";
-	return $code;
+        return $code;
     }
     # Use of Rul awaits working infix:<~~> .
     #'Rul.new(:f(sub($_s_){$_s_ ~~ '~"$hook$adverbs$qo$pat$qc}))";
@@ -439,58 +439,58 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
     my $ai = 0;
     my $str = "";
     while ($fi < $flen) {
-	# optional non-conversion text
-	my $idx = index($fmt,"%",$fi);
-	if $idx < 0 {
-	    $str ~= substr($fmt,$fi);
-	    last;
-	} else {
-	    my $len = $idx - $fi;
-	    $str ~= substr($fmt,$fi, $len) if $len > 0;
-	    $fi = $idx;
-	}
+        # optional non-conversion text
+        my $idx = index($fmt,"%",$fi);
+        if $idx < 0 {
+            $str ~= substr($fmt,$fi);
+            last;
+        } else {
+            my $len = $idx - $fi;
+            $str ~= substr($fmt,$fi, $len) if $len > 0;
+            $fi = $idx;
+        }
 
-	# a conversion
-	my $start = $fi;
-	$fi++;
-	while !(substr($fmt,$fi,1)
-		~~ any<% c s d u o x e f g X E G b p n i D U O F>) {
-	    $fi++;
-	}
-	my $specifier = substr($fmt,$fi,1); $fi++;
-	my $conversion = substr($fmt,$start,$fi - $start);
+        # a conversion
+        my $start = $fi;
+        $fi++;
+        while !(substr($fmt,$fi,1)
+                ~~ any<% c s d u o x e f g X E G b p n i D U O F>) {
+            $fi++;
+        }
+        my $specifier = substr($fmt,$fi,1); $fi++;
+        my $conversion = substr($fmt,$start,$fi - $start);
 
-	# FIXME -- when next; works, do if $spec eq "%" { ...; next; }
-	my $arg;
-	if $specifier ne '%' {
-	    die "Insufficient arguments to sprintf" if $ai >= +@args;
-	    $arg = @args[$ai];
-	    $ai++;
-	}
+        # FIXME -- when next; works, do if $spec eq "%" { ...; next; }
+        my $arg;
+        if $specifier ne '%' {
+            die "Insufficient arguments to sprintf" if $ai >= +@args;
+            $arg = @args[$ai];
+            $ai++;
+        }
 
-	given $specifier {
-	    when any(<c d u o x b i>) {
-		$str ~= Pugs::Internals::sprintf($conversion,int($arg));
-	    }
-	    when 's' {
-		$str ~= Pugs::Internals::sprintf($conversion,"$arg");
-	    }
-	    when any(<e f g>) {
-		$str ~= Pugs::Internals::sprintf($conversion,1.0*$arg);
-	    }
-	    when any(<X D U O>) {
-		$str ~= uc Pugs::Internals::sprintf(lc($conversion),int($arg));
-	    }
-	    when any(<E G F>) {
-		$str ~= uc Pugs::Internals::sprintf(lc($conversion),1.0*$arg);
-	    }
-	    when '%' {
-		$str ~= '%';
-	    }
-	    default {
-		die "sprintf does not yet implement %{$specifier}";
-	    }
-	}
+        given $specifier {
+            when any(<c d u o x b i>) {
+                $str ~= Pugs::Internals::sprintf($conversion,int($arg));
+            }
+            when 's' {
+                $str ~= Pugs::Internals::sprintf($conversion,"$arg");
+            }
+            when any(<e f g>) {
+                $str ~= Pugs::Internals::sprintf($conversion,1.0*$arg);
+            }
+            when any(<X D U O>) {
+                $str ~= uc Pugs::Internals::sprintf(lc($conversion),int($arg));
+            }
+            when any(<E G F>) {
+                $str ~= uc Pugs::Internals::sprintf(lc($conversion),1.0*$arg);
+            }
+            when '%' {
+                $str ~= '%';
+            }
+            default {
+                die "sprintf does not yet implement %{$specifier}";
+            }
+        }
     }
     $str;
 }
