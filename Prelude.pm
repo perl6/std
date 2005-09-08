@@ -87,7 +87,7 @@ class Control::Caller {
             'subname' => @caller[3],
             'subtype' => @caller[4],
             'sub'     => @caller[5],
-        ) :: undef;
+        ) !! undef;
     }
 }
 
@@ -203,7 +203,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
               $pos += {$m}.from + 1;
            }
            # want.Scalar
-           0 ?? ([|] \@{$a}) :: $a }))";
+           0 ?? ([|] \@{$a}) !! $a }))";
         return $code;
     }
     # Use of Rul awaits working infix:<~~> .
@@ -277,8 +277,8 @@ class Pipe {
         my ($in, $out, $err, undef) =
             Pugs::Internals::runInteractiveCommand($command);
         close $err;
-        close  ($r ?? $in :: $out);
-        ($r ?? $out :: $in);
+        close  ($r ?? $in !! $out);
+        ($r ?? $out !! $in);
     }
 
     # Bidirectional pipe. Potenially dangerous. Uses the shell.
@@ -402,11 +402,11 @@ class Num {
         $n
     }
     multi sub round_gen(Num $n, Code $corner) returns Int is safe {
-        (int($n) == $n) ?? int($n) :: $corner($n);
+        (int($n) == $n) ?? int($n) !! $corner($n);
     }
 
     sub do_round($n) is primitive is safe {
-        ($n < 0) ?? int( $n - 0.5) :: int($n + 0.5);
+        ($n < 0) ?? int( $n - 0.5) !! int($n + 0.5);
     }
     sub round($n) is primitive is safe {
         round_gen($n, &do_round)
@@ -418,7 +418,7 @@ class Num {
     our &trunc ::= &truncate;
 
     sub do_ceil($n) is primitive is safe {
-        ($n < 0) ?? (-int(-$n)) :: int($n + 1)
+        ($n < 0) ?? (-int(-$n)) !! int($n + 1)
     }
     sub ceiling($n) is primitive is safe {
         round_gen($n, &do_ceil)
@@ -426,7 +426,7 @@ class Num {
     our &ceil ::= &ceiling;
 
     sub do_floor($n) is primitive is safe {
-        ($n < 0) ?? (-int(1-$n)) :: int($n)
+        ($n < 0) ?? (-int(1-$n)) !! int($n)
     }
     sub floor($n) is primitive is safe {
         round_gen($n, &do_floor)
