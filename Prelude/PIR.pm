@@ -37,7 +37,7 @@ sub exit (Int ?$status = 0) is builtin is primitive {
 sub Perl6::Internals::eval_parrot (Str $code) is builtin is primitive {
     my $sub = substr($code, 0, 1) eq "."
         ?? Perl6::Internals::compile_pir($code)
-        :: Perl6::Internals::compile_pir(".sub pugs_eval_parrot\n$code\n.end\n");
+        !! Perl6::Internals::compile_pir(".sub pugs_eval_parrot\n$code\n.end\n");
     $sub();
 }
 
@@ -126,8 +126,8 @@ sub splice (@a is rw, ?$offset=0, ?$length, *@list) is builtin is primitive {
         }
     }
 
-    #  want.List ?? *@result :: pop(@result)
-    #  want.List ?? *@result :: +@result ?? @result[-1] :: undef;
+    #  want.List ?? *@result !! pop(@result)
+    #  want.List ?? *@result !! +@result ?? @result[-1] !! undef;
     #  *@result;
     @result;
 }
