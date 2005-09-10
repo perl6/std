@@ -202,7 +202,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
               {$a}.push($m0) if $at > $prev; $prev = $at;
               $pos += {$m}.from + 1;
            }
-           # want.Scalar
+           # want.Item
            0 ?? ([|] \@{$a}) !! $a }))";
         return $code;
     }
@@ -369,7 +369,7 @@ class Time::Local {
         my $sec = int $when;
         my $pico = ($when - int $when) * 10**12;
         # XXX: waiting on a better want
-        #if want ~~ rx:P5/^Scalar/ {
+        #if want ~~ rx:P5/^Item/ {
         #    $res = Pugs::Internals::localtime(bool::true, $sec, $pico);
         #} else {
             my @tm = Pugs::Internals::localtime(bool::false, $sec, $pico);
