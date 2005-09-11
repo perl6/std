@@ -506,6 +506,6 @@ sub Hash::as ($obj, $fmt, $comma) is primitive is safe {
 }
 
 sub PIL2JS::Internals::use_jsan_module_imp (*@whatever) {
-    die "Support for loading JSAN modules requires running under PIL2JS!";
+    die "Can't load JSAN modules when not running under PIL2JS!";
 }
 our &PIL2JS::Internals::use_jsan_module_noimp := &PIL2JS::Internals::use_jsan_module_imp;
