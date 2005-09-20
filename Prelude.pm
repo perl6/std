@@ -91,6 +91,43 @@ class Control::Caller {
     }
 }
 
+class fatal {
+    # pragma to dispense of the holy war about whether to raise
+    # exceptions or return false values to signal error conditions
+    # in library code. Do either! Let your caller decide!
+    # instead of "die             'file not found';"
+    #         or "return ENOENT; # file not found"
+    #  say this: "fail            'file not found';"
+    
+    %*INC<fatal.pm> = "<precompiled>";
+
+    our $fatal::DEFAULT_FATALITY is constant = 1;
+    
+    sub import {
+        Pugs::Internals::install_pragma_value($?CLASS, 1);
+    }
+
+    sub unimport {
+        Pugs::Internals::install_pragma_value($?CLASS, 0);
+    }
+
+    # XXX: here's my doubt. In Preluded code, do I need
+    #      current_pragma_value or caller_pragma_value?
+    #      I'm guessing "current" because this "is primitive".
+    #      If I'm wrong then the above two subs might not work?
+    # XXX2: "fail" clashes with Test's &fail.
+    sub __fail(?$e = "failed") is primitive is builtin is safe {
+        if Pugs::Internals::current_pragma_value($?CLASS) //
+                $fatal::DEFAULT_FATALITY {
+            die $e;
+        } else {
+            $! = $e;
+            return undef; # this is probably the one place we can return
+                          # in the Prelude: we want to exit from the
+                          # *caller*'s scope.
+        }
+    }
+}
 
 class Carp {
     # Please remember to update t/pugsrun/11-safemode.t if you change the fully
