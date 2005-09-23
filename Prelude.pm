@@ -26,6 +26,19 @@ the `is builtin` trait.
 =cut
 
 
+class Process {
+    multi sub exec($prog, @args) returns Bool is builtin is primitive is unsafe {
+        Pugs::Internals::exec($prog, bool::false, @args);
+    }
+    multi sub exec(@args) returns Bool is builtin is primitive is unsafe {
+        Pugs::Internals::exec(@args[0], bool::true, @args);
+    }
+    multi sub exec($string) returns Bool is builtin is primitive is unsafe {
+        my @args = $string.split(rx:Perl5/\s+/);
+        exec(@args);
+    }
+}
+
 class Control::Basic {
     # multi-lingual eval.
 
