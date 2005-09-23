@@ -28,13 +28,20 @@ the `is builtin` trait.
 
 class Process {
     multi sub exec($prog, @args) returns Bool is builtin is primitive is unsafe {
+        # say "e:prog args"; # XXX delme
         Pugs::Internals::exec($prog, bool::false, @args);
     }
     multi sub exec(@args) returns Bool is builtin is primitive is unsafe {
+        # say "e:args:" ~ @args.perl; # XXX delme
         Pugs::Internals::exec(@args[0], bool::true, @args);
     }
     multi sub exec($string) returns Bool is builtin is primitive is unsafe {
-        my @args = $string.split(rx:Perl5/\s+/);
+        # say "e:string"; # XXX delme
+        # so, why do these two not actually split?
+        # my @args = $string.split(rx:Perl5/\s+/);
+        # my @args = split(rx:Perl5/\s+/, $string);
+        
+        my @args = $string.split;
         exec(@args);
     }
 }
