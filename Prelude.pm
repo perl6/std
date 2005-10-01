@@ -466,7 +466,7 @@ class Num {
         ($n < 0) ?? int( $n - 0.5) !! int($n + 0.5);
     }
     sub round($n) is primitive is safe {
-        round_gen($n, &do_round)
+        Num::round_gen($n, &Num::do_round)
     }
 
     sub truncate($n) is primitive is safe {
@@ -478,7 +478,7 @@ class Num {
         ($n < 0) ?? (-int(-$n)) !! int($n + 1)
     }
     sub ceiling($n) is primitive is safe {
-        round_gen($n, &do_ceil)
+        Num::round_gen($n, &Num::do_ceil)
     }
     our &ceil ::= &ceiling;
 
@@ -486,7 +486,7 @@ class Num {
         ($n < 0) ?? (-int(1-$n)) !! int($n)
     }
     sub floor($n) is primitive is safe {
-        round_gen($n, &do_floor)
+        Num::round_gen($n, &Num::do_floor)
     }
 }
 
