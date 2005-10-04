@@ -195,7 +195,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     my %mods = %mods0;
     my $p5 = %mods{"perl5"} || %mods{"Perl5"} || %mods{"P5"};
     #my sub warning($e){warn(Carp::longmess($e))};# XXX doesnt work yet.
-    my sub warning($e){warn("Warning: $e")};
+    my sub warning($e){warn("Warning: $e\n")};
     for %mods.keys -> $k {
         if %modifiers_known{$k} {
             if $p5 && !%modifiers_supported_p5{$k} {
@@ -228,7 +228,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
             $pre ~= ":i";
             %mods.delete("i"); # avoid haskell handling it.
             %mods.delete("ignorecase");
-            warning "PGE doesn't actually do :ignorecase yet.";
+#           warning "PGE doesn't actually do :ignorecase yet.";
         }
         if %mods{"w"} || %mods{"words"} {      
             $pre ~= ":w";
