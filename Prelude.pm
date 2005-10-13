@@ -382,27 +382,30 @@ class Str does Iter {
 
     method trans (Str $self: *%intable) is primitive is safe {
         # Motto: If in doubt use brute force!
-        my sub expand(Str $string) {
-            my $idx = index($string, '-');
-            if ($idx == -1) {
-                split('', $string);
+        my sub expand (Str $string is copy) {
+            my $idx;
+            my @rv;
+    
+            while (($idx = index($string,'-')) != -1) {
+                my $pre = substr($string,0,$idx-1);
+                my $start = substr($string,$idx-1,1);
+                my $end = substr($string,$idx+1,1);
+    
+                push @rv, $pre.split('');
+                push @rv, (~ $start)..(~ $end);
+    
+                $string = substr($string,$idx+2);
             }
-            else {
-                my $s1 = substr($string, 0, $idx);
-                my $s2 = substr($string, $idx+1);
-                my @rv = $s1;
-                while ($s1 ne $s2) {
-                    $s1++;
-                    push @rv, $s1
-                }
-                @rv;
-            }
+    
+            push @rv, $string.split('');
+    
+            @rv;
         }
-
+    
         my %transtable;
         for %intable.kv -> $k, $v {
-            my @ks = expand($k);
-            my @vs = expand($v);
+            my @ks = $k.isa(Str) ?? expand($k) !! $k;
+            my @vs = $v.isa(Str) ?? expand($v) !! $v;
             %transtable{@ks} = @vs;
         }
     
