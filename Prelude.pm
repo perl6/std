@@ -404,8 +404,9 @@ class Str does Iter {
     
         my %transtable;
         for %intable.kv -> $k, $v {
-            my @ks = $k.isa(Str) ?? expand($k) !! $k;
-            my @vs = $v.isa(Str) ?? expand($v) !! $v;
+            # Hack, $k and $j gets joined with spaces. So ...
+            my @ks = $k.isa(Str) ?? expand($k) !! (~ $k).split('');
+            my @vs = $v.isa(Str) ?? expand($v) !! (~ $v).split('');
             %transtable{@ks} = @vs;
         }
     
