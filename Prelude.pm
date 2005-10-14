@@ -398,15 +398,26 @@ class Str does Iter {
             }
     
             push @rv, $string.split('');
-    
+
+            @rv;
+        }
+
+	# The key of a pair gets stringified and expand'ed by the above
+        # function. Simulate this but support multi-char elements
+        my sub expand_arrayref ( $arr is copy ) {
+            my @rv;
+
+            push @rv, $arr.shift;
+            push @rv, ' ', $_ for $arr;
+
             @rv;
         }
     
         my %transtable;
         for %intable.kv -> $k, $v {
-            # Hack, $k and $j gets joined with spaces. So ...
-            my @ks = $k.isa(Str) ?? expand($k) !! (~ $k).split('');
-            my @vs = $v.isa(Str) ?? expand($v) !! (~ $v).split('');
+            # $k is stringified by the => operator.
+            my @ks = expand($k);
+            my @vs = $v.isa(Str) ?? expand($v) !! expand_arrayref($v);
             %transtable{@ks} = @vs;
         }
     
