@@ -380,7 +380,7 @@ class IO does Iter {
 class Str does Iter {
     method shift ($self: ) is primitive { =open($self) }
 
-    method trans (Str $self: *%intable) is primitive is safe {
+    method trans (Str $self: Pair *@intable) is primitive is safe {
         # Motto: If in doubt use brute force!
         my sub expand (Str $string is copy) {
             my @rv;
@@ -396,44 +396,34 @@ class Str does Iter {
             if (substr($string,-1,1) eq '-') {
                 $add_dash = 1;
                 $string = substr($string,0,-1)
-            }    
+            }
 
             while (($idx = index($string,'-')) != -1) {
                 my $pre = substr($string,0,$idx-1);
                 my $start = substr($string,$idx-1,1);
                 my $end = substr($string,$idx+1,1);
-    
+
                 push @rv, $pre.split('');
                 push @rv, (~ $start)..(~ $end);
-    
+
                 $string = substr($string,$idx+2);
             }
-    
+
             push @rv, $string.split('');
             push @rv, '-' if $add_dash;
 
             @rv;
         }
 
-	# The key of a pair gets stringified and expand'ed by the above
-        # function. Simulate this but support multi-char elements
-        my sub expand_arrayref ( $arr is copy ) {
-            my @rv;
-
-            push @rv, $arr.shift;
-            push @rv, ' ', $_ for $arr;
-
-            @rv;
-        }
-    
         my %transtable;
-        for %intable.kv -> $k, $v {
+        for @intable -> Pair $pair {
+            my ($k, $v) = $pair.kv;
             # $k is stringified by the => operator.
-            my @ks = expand($k);
-            my @vs = $v.isa(Str) ?? expand($v) !! expand_arrayref($v);
+            my @ks = $k.isa(Str) ?? expand($v) !! $k.values;
+            my @vs = $v.isa(Str) ?? expand($v) !! $v.values;
             %transtable{@ks} = @vs;
         }
-    
+
         [~] map { %transtable{$_} // $_ } $self.split('');
     }
 }
