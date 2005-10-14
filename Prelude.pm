@@ -383,9 +383,21 @@ class Str does Iter {
     method trans (Str $self: *%intable) is primitive is safe {
         # Motto: If in doubt use brute force!
         my sub expand (Str $string is copy) {
-            my $idx;
             my @rv;
-    
+
+            my $add_dash;
+            my $idx;
+
+            if (substr($string,0,1) eq '-') {
+                push @rv, '-';
+                $string = substr($string,1);
+            }
+
+            if (substr($string,-1,1) eq '-') {
+                $add_dash = 1;
+                $string = substr($string,0,-1)
+            }    
+
             while (($idx = index($string,'-')) != -1) {
                 my $pre = substr($string,0,$idx-1);
                 my $start = substr($string,$idx-1,1);
@@ -398,6 +410,7 @@ class Str does Iter {
             }
     
             push @rv, $string.split('');
+            push @rv, '-' if $add_dash;
 
             @rv;
         }
