@@ -419,7 +419,7 @@ class Str does Iter {
         for @intable -> Pair $pair {
             my ($k, $v) = $pair.kv;
             # $k is stringified by the => operator.
-            my @ks = $k.isa(Str) ?? expand($v) !! $k.values;
+            my @ks = $k.isa(Str) ?? expand($k) !! $k.values;
             my @vs = $v.isa(Str) ?? expand($v) !! $v.values;
             %transtable{@ks} = @vs;
         }
