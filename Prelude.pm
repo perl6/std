@@ -10,7 +10,7 @@ There are a couple of things going on here.
 * They sometimes use Pugs internals to do the job
 * Some of this had not been specced yet (need S29 work).
 
-When writing primitives, please do *not* use &return, because
+When writing primitives, please do *not* use `&return`, because
 that messes up PIR generation.  To return a value, arrange for
 it to be the last evaluated expression.
 
