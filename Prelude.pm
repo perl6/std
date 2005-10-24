@@ -582,6 +582,12 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
     $str;
 }
 
+multi sub *shift (@array) is primitive { shift @array };
+multi sub *shift ($array) is primitive { die "Cannot 'pop' scalar"; };
+
+multi sub *pop (@array) is primitive { pop @array };
+multi sub *pop ($array) is primitive { die "Cannot 'pop' scalar"; };
+
 sub Scalar::as ($obj, $fmt) is primitive is safe {
     sprintf($fmt,$obj);
 }
