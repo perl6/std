@@ -56,7 +56,7 @@ class Control::Basic {
 
     # safety of the individual methods is defined in Pugs.Prim.hs
     # (maybe :lang<YAML> doesn't quite belong here?)
-    multi sub eval (Str ?$code = $CALLER::_, Str +$lang = 'Perl6')
+    multi sub eval (Str ?$code = $CALLER::_, Str :$lang = 'Perl6')
             is primitive is safe is builtin {
         given lc $lang {
             when 'perl6'   { Pugs::Internals::eval($code) };
@@ -74,7 +74,7 @@ class Control::Basic {
     # S29:
     # Behaves like, and replaces Perl 5 C<do EXPR>, with optional C<$lang>
     # support.
-    multi sub evalfile (Str $filename: Str +$lang = 'Perl6')
+    multi sub evalfile (Str $filename: Str :$lang = 'Perl6')
             is primitive is unsafe {
         eval(slurp $filename, $lang);
     }
@@ -90,7 +90,7 @@ class Control::Caller {
     has Code $.sub;
     has Str $.params;   # FIXME: needs attention; don't use yet.
 
-    multi sub caller (Class ?$kind = Any, Int +$skip = 0, Str +$label)
+    multi sub caller (Class ?$kind = Any, Int :$skip = 0, Str :$label)
             returns Control::Caller is primitive is builtin is safe {
         my @caller = Pugs::Internals::caller($kind, $skip, $label);
 
@@ -156,7 +156,7 @@ class Carp {
         my($mess, $i);
         $mess = "$e at $?CALLER::POSITION";
 
-        #while Control::Caller::caller(++$i) -> $caller {
+        #while Control::Caller::caller(+:$i) -> $caller {
         #   $mess ~= "\n\t{$caller.package}::{$caller.subname}() at {$caller.file} line {$caller.line}";
         #}
         loop {
@@ -297,8 +297,8 @@ class File {
     # spec, see the thread rooted at <20050502192508.GF24107@sike.forum2.org>
     # on p6-l.
 
-    multi sub open (Str $filename, Str +$layer, Bool +$r, Bool +$w, Bool +$rw,
-            Bool +$a) returns IO is primitive is unsafe is builtin {
+    multi sub open (Str $filename, Str :$layer, Bool :$r, Bool :$w, Bool :$rw,
+            Bool :$a) returns IO is primitive is unsafe is builtin {
         die "fancy open modes not supported yet" if $a and ($r or $w or $rw);
 
         my $mode;
@@ -327,7 +327,7 @@ class File {
 class Pipe {
     # Easy to use, unidirectional pipe. Uses the shell.
 
-    multi sub open (Str $command, Bool +$r is copy, Bool +$w) returns IO
+    multi sub open (Str $command, Bool :$r is copy, Bool :$w) returns IO
             is primitive is unsafe {
         die "Pipe::open is unidirectional" if all($r, $w);
         $r = bool::true if none($r, $w);
