@@ -56,7 +56,7 @@ class Control::Basic {
 
     # safety of the individual methods is defined in Pugs.Prim.hs
     # (maybe :lang<YAML> doesn't quite belong here?)
-    multi sub eval (Str ?$code = $CALLER::_, Str :$lang = 'Perl6')
+    multi sub eval (Str $code = $CALLER::_, Str :$lang = 'Perl6')
             is primitive is safe is builtin {
         given lc $lang {
             when 'perl6'   { Pugs::Internals::eval($code) };
@@ -90,7 +90,7 @@ class Control::Caller {
     has Code $.sub;
     has Str $.params;   # FIXME: needs attention; don't use yet.
 
-    multi sub caller (Class ?$kind = Any, Int :$skip = 0, Str :$label)
+    multi sub caller (Class $kind = Any, Int :$skip = 0, Str :$label)
             returns Control::Caller is primitive is builtin is safe {
         my @caller = Pugs::Internals::caller($kind, $skip, $label);
 
@@ -136,7 +136,7 @@ class fatal {
     #      I'm guessing "current" because this "is primitive".
     #      If I'm wrong then the above two subs might not work?
     # XXX2: "fail" clashes with Test's &fail.
-    sub __fail(?$e = "failed") is primitive is builtin is safe {
+    sub __fail($e = "failed") is primitive is builtin is safe {
         if Pugs::Internals::current_pragma_value($?CLASS) //
                 $fatal::DEFAULT_FATALITY {
             die $e;
@@ -152,7 +152,7 @@ class fatal {
 class Carp {
     # Please remember to update t/pugsrun/11-safemode.t if you change the fully
     # qualified name of longmess.
-    multi sub longmess (: ?$e = '') returns Str is primitive is safe {
+    multi sub longmess (: $e = '') returns Str is primitive is safe {
         my($mess, $i);
         $mess = "$e at $?CALLER::POSITION";
 
@@ -317,7 +317,7 @@ class File {
         $fh;
     }
 
-    multi method seek ($self: Int $position, Int ?$whence = $File::SEEK_START)
+    multi method seek ($self: Int $position, Int $whence = $File::SEEK_START)
             returns Bool is primitive is unsafe is builtin {
         Pugs::Internals::hSeek($seek, $position, $whence);
     }
@@ -450,7 +450,7 @@ class Time::Local {
     has Int  $.tz;      # variation from UTC in seconds
     has Bool $.is_dst;
 
-    multi sub localtime(Num ?$when = time) returns Time::Local
+    multi sub localtime(Num $when = time) returns Time::Local
             is primitive is builtin is safe {
         my $res;
         my $sec = int $when;

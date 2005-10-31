@@ -30,7 +30,7 @@ sub sleep (Num $seconds) returns Num is builtin is primitive {
     $seconds_slept;
 }
 
-sub exit (Int ?$status = 0) is builtin is primitive {
+sub exit (Int $status = 0) is builtin is primitive {
     Perl6::Internals::exit $status;
 }
 
@@ -65,7 +65,7 @@ sub shift (@a) is builtin is primitive {
     return $e;
 }
 
-sub splice (@a is rw, ?$offset=0, ?$length, *@list) is builtin is primitive {
+sub splice (@a is rw, $offset=0, $length?, *@list) is builtin is primitive {
     my $off = +$offset;
     my $len = $length;
     my $size = +@a;
