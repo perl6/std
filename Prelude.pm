@@ -604,3 +604,8 @@ sub PIL2JS::Internals::use_jsan_module_imp (*@whatever) {
     die "Can't load JSAN modules when not running under PIL2JS!";
 }
 our &PIL2JS::Internals::use_jsan_module_noimp := &PIL2JS::Internals::use_jsan_module_imp;
+
+sub PIL2JS::Internals::use_perl5_module_imp (*@whatever) {
+    die "Can't load perl5 modules via js when not running under PIL2JS!";
+}
+our &PIL2JS::Internals::use_perl5_module_noimp := &PIL2JS::Internals::use_perl5_module_imp;
