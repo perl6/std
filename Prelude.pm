@@ -585,7 +585,7 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
 }
 
 multi sub *shift (@array) is primitive { shift @array };
-multi sub *shift ($array) is primitive { die "Cannot 'pop' scalar"; };
+multi sub *shift ($array) is primitive { die "Cannot 'shift' scalar"; };
 
 multi sub *pop (@array) is primitive { pop @array };
 multi sub *pop ($array) is primitive { die "Cannot 'pop' scalar"; };
