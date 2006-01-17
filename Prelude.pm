@@ -121,7 +121,7 @@ class fatal {
     
     # make 'use fatal' not try to load a module. XXX: add a real inc class to
     # interface %*INC, instead of this hack.
-    %*INC<fatal> = { filename => "fatal", resname => "<precompiled>", };
+    # %*INC<fatal> = { filename => "fatal", resname => "<precompiled>", };
 
     our $fatal::DEFAULT_FATALITY is constant = 1;
     
