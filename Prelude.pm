@@ -584,19 +584,19 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
     $str;
 }
 
-multi sub *shift (@array) is primitive { shift @array };
-multi sub *shift ($array) is primitive { die "Cannot 'shift' scalar"; };
+multi shift (@array) is builtin is primitive { List::shift(@array) };
+multi shift ($array) is builtin is primitive { die "Cannot 'shift' scalar"; };
 
-multi sub *pop (@array) is primitive { pop @array };
-multi sub *pop ($array) is primitive { die "Cannot 'pop' scalar"; };
+multi pop (@array) is builtin is primitive { List::pop(@array) };
+multi pop ($array) is builtin is primitive { die "Cannot 'pop' scalar"; };
 
-sub Scalar::as ($obj, $fmt) is primitive is safe {
+multi as (Scalar $obj: $fmt) is builtin is primitive is safe {
     sprintf($fmt,$obj);
 }
-sub List::as ($obj, $fmt, $comma) is primitive is safe {
+multi as (List $obj: $fmt, $comma) is builtin is primitive is safe {
     join($comma, map -> $v { sprintf($fmt,$v) } @$obj );
 }
-sub Hash::as ($obj, $fmt, $comma) is primitive is safe {
+multi as (Hash $obj: $fmt, $comma) is builtin is primitive is safe {
     join($comma, map -> $k,$v { sprintf($fmt,$k,$v) } $obj.kv );
 }
 
