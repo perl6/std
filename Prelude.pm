@@ -609,3 +609,52 @@ sub PIL2JS::Internals::use_perl5_module_imp (*@whatever) {
     die "Can't load perl5 modules via js when not running under PIL2JS!";
 }
 our &PIL2JS::Internals::use_perl5_module_noimp := &PIL2JS::Internals::use_perl5_module_imp;
+
+
+
+macro use ($module=$+_) is builtin is unsafe {
+    #Pugs::Internals::use($module);
+    Pugs::Internals::require_use_helper(1,$module);
+}
+macro require ($module=$+_) is builtin is unsafe {
+    #Pugs::Internals::require($module);
+    Pugs::Internals::require_use_helper(0,$module);
+}
+sub Pugs::Internals::require_use_helper ($use_,$module) is builtin is unsafe {
+  my sub opRequire() { 
+    $use_
+      ?? Pugs::Internals::use($module)
+      !! Pugs::Internals::require($module);
+  }
+  my sub find() {
+    my $file = join("/",split("::",$module)) ~ ".pm";
+    for @*INC -> $dir {
+      my $path = $dir~"/"~$file;
+      next if !-e $path;
+      my $fn = $path~".yml";
+      if -e $fn {
+      }
+      else {
+        if -w $path {
+          Pugs::Internals::compile_file_to_yml($path);
+        }
+      }
+      return opRequire();
+    }
+    die "Can't find " ~ $file ~ ' in @*INC (@*INC contains: ' ~
+        join(' ',@*INC) ~ ")."; #XXX - should be fail
+  }
+  my $seen = %*INC{$module};
+  if $seen {
+    opRequire();
+  }
+  else {
+    find();
+  }
+}
+sub Pugs::Internals::compile_file_to_yml($file) is builtin is unsafe {
+    #return if not $file ~~ rx:perl5/\A[a-zA-Z0-9_\.\/]+\z/;
+    say "Attempting to compile $file ...";
+    system($*EXECUTABLE_NAME~" -CParse-YAML $file > $file.yml");
+    say "back.";
+}
