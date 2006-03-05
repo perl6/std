@@ -611,14 +611,34 @@ sub PIL2JS::Internals::use_perl5_module_imp (*@whatever) {
 our &PIL2JS::Internals::use_perl5_module_noimp := &PIL2JS::Internals::use_perl5_module_imp;
 
 
+# In src/perl6/Prelude.pm, prefix:<-M> doesn't work. :(
+multi prefix_M ($file) is builtin is unsafe {
+  if not -e $file {
+    undef;
+  }
+  elsif $file ~~ rx:perl5/[^-_a-zA-Z0-9\.\/\\\:]/ {
+    warn "-M bug: avoided $file";
+    undef;
+  }
+  else {
+    my $cmd = %?CONFIG<perl5path>~q{ -e 'print join("\n",map{-M}@ARGV,"")' }~$file;
+    my $p = Pipe::open($cmd);
+    my $m = slurp($p);  $p.close;
+    # In src/perl6/Prelude.pm, regexs dont work. :(
+    #die "-M bug $m" if not $m ~~ rx:perl5/\A[-e0-9\.]+\Z/;    
+    +$m;
+  }
+}
+
+
 
 macro use ($module=$+_) is builtin is unsafe {
     #Pugs::Internals::use($module);
-    Pugs::Internals::require_use_helper(1,$module);
+    Pugs::Internals::require_use_helper(bool::true,$module);
 }
 macro require ($module=$+_) is builtin is unsafe {
     #Pugs::Internals::require($module);
-    Pugs::Internals::require_use_helper(0,$module);
+    Pugs::Internals::require_use_helper(bool::false,$module);
 }
 sub Pugs::Internals::require_use_helper ($use_,$module) is builtin is unsafe {
   my sub opRequire() { 
@@ -627,12 +647,12 @@ sub Pugs::Internals::require_use_helper ($use_,$module) is builtin is unsafe {
       !! Pugs::Internals::require($module);
   }
   my sub find() {
-    my $file = join("/",split("::",$module)) ~ ".pm";
+    my $file = join(%?CONFIG<file_sep>,split("::",$module)) ~ ".pm";
     for @*INC -> $dir {
-      my $path = $dir~"/"~$file;
+      my $path = $dir ~ %?CONFIG<file_sep> ~ $file;
       next if !-e $path;
-      my $fn = $path~".yml";
-      if -e $fn {
+      my $yml = "$path.yml";
+      if -e $yml && prefix_M($yml) < prefix_M($path) {
       }
       else {
         if -w $path {
