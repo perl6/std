@@ -655,7 +655,7 @@ sub Pugs::Internals::require_use_helper ($use_,$module) is builtin is unsafe {
       if -e $yml && prefix_M($yml) < prefix_M($path) {
       }
       else {
-        if -w $path {
+        if 1 {
           Pugs::Internals::compile_file_to_yml($path);
         }
       }
