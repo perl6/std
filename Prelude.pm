@@ -632,11 +632,11 @@ multi prefix_M ($file) is builtin is unsafe {
 
 
 
-macro use ($module=$+_) is builtin is unsafe {
+sub Pugs::Internals::Disabled::use ($module=$+_) is builtin is unsafe {
     #Pugs::Internals::use($module);
     Pugs::Internals::require_use_helper(bool::true,$module);
 }
-macro require ($module=$+_) is builtin is unsafe {
+sub Pugs::Internals::Disabled::require ($module=$+_) is builtin is unsafe {
     #Pugs::Internals::require($module);
     Pugs::Internals::require_use_helper(bool::false,$module);
 }
