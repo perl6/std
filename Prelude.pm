@@ -199,10 +199,10 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     #my sub warning($e){warn(Carp::longmess($e))};# XXX doesnt work yet.
     my sub warning($e){warn("Warning: $e\n")};
     for %mods.keys -> $k {
-        if %modifiers_known{$k} {
-            if $p5 && !%modifiers_supported_p5{$k} {
+        if %modifiers_known.{$k} {
+            if $p5 && !%modifiers_supported_p5.{$k} {
                 warning "Modifier :$k is not (yet?) supported by :perl5 regexps.";
-            } elsif !$p5 && !%modifiers_supported_p6{$k} {
+            } elsif !$p5 && !%modifiers_supported_p6.{$k} {
                 warning "Modifier :$k is not yet supported by PGE/pugs.";
             }
         }
@@ -226,13 +226,13 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     }
     if !$p5 {
         my $pre = "";
-        if %mods{"i"} || %mods{"ignorecase"} {      
+        if %mods<i> || %mods<ignorecase> {      
             $pre ~= ":i";
             %mods.delete("i"); # avoid haskell handling it.
             %mods.delete("ignorecase");
 #           warning "PGE doesn't actually do :ignorecase yet.";
         }
-        if %mods{"w"} || %mods{"words"} {      
+        if %mods<w> || %mods<words> {      
             $pre ~= ":w";
             %mods.delete("w"); # avoid haskell handling it.
             %mods.delete("words");
