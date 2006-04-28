@@ -170,6 +170,7 @@ class Carp {
 }
 
 
+=kwid
 
 role Rule {}
 class Pugs::Internals::VRule does Rule {}
@@ -207,7 +208,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
             }
         }
         elsif ($k.chars > 1 && substr($k,-1,1) eq "x"
-               && pugs_internals_m:perl5/\A(\d+)x\Z/) {
+               && internals_m:perl5/\A(\d+)x\Z/) {
             my $n = +$0;
             %mods.delete($k);
             %mods{'x'} = $n;
@@ -281,6 +282,7 @@ macro m_ (%mods,$pat,$qo,$qc) is builtin is safe {
     rx_common_("pugs_internals_m",%mods,$pat,$qo,$qc);
 }
 
+=cut
 
 
 class File {
