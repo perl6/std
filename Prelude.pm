@@ -186,13 +186,13 @@ multi sub infix:<~~> (Rul $r, $x) is primitive is safe is builtin {$r.f.($x)}
 sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     state(%modifiers_known, %modifiers_supported_p6, %modifiers_supported_p5);
     FIRST {
-        %modifiers_known = map {;($_ => 1)}
+        %modifiers_known = map {;($_ => 1)},
         <perl5 Perl5 P5 i ignorecase w words g global c continue p pos
         once bytes codes graphs langs x nth ov overlap ex exhaustive
         rw keepall e each any parsetree stringify>;
-        %modifiers_supported_p6 = map {;($_ => 1)}
+        %modifiers_supported_p6 = map {;($_ => 1)},
         <i ignorecase w words g global  stringify>;
-        %modifiers_supported_p5 = map {;($_ => 1)}
+        %modifiers_supported_p5 = map {;($_ => 1)},
         <perl5 Perl5 P5 i ignorecase g global  stringify>;
     }
     my $pat = $pat0;
@@ -247,7 +247,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     my $g = %mods{'g'} || %mods{'global'};
     my $ov = %mods{'ov'} || %mods{'overlap'};
     my $ex = %mods{'ex'} || %mods{'exhaustive'};
-    my $adverbs = join("",map {":"~$_} %mods.keys);
+    my $adverbs = join("",map {":"~$_}, %mods.keys);
     if $ov && 0 { # XXX disabled until Rul works.
         my($str,$pos,$re,$m,$m0,$a,$s,$at,$prev) =
         ('$_str_','$_pos_','$_re_','$_m_','$_m0_',
@@ -429,7 +429,7 @@ class Str does Iter {
             %transtable{@ks} = @vs;
         }
 
-        [~] map { %transtable{$_} // $_ } $self.split('');
+        [~] map { %transtable{$_} // $_ }, $self.split('');
     }
 }
 
@@ -597,10 +597,10 @@ multi as (Scalar $obj: $fmt) is builtin is primitive is safe {
     sprintf($fmt,$obj);
 }
 multi as (List $obj: $fmt, $comma) is builtin is primitive is safe {
-    join($comma, map -> $v { sprintf($fmt,$v) } @$obj );
+    join($comma, map -> $v { sprintf($fmt,$v) }, @$obj );
 }
 multi as (Hash $obj: $fmt, $comma) is builtin is primitive is safe {
-    join($comma, map -> $k,$v { sprintf($fmt,$k,$v) } $obj.kv );
+    join($comma, map -> $k,$v { sprintf($fmt,$k,$v) }, $obj.kv );
 }
 
 sub PIL2JS::Internals::use_jsan_module_imp (*@whatever) {
@@ -624,7 +624,7 @@ multi prefix_M ($file) is builtin is unsafe {
     undef;
   }
   else {
-    my $cmd = %?CONFIG<perl5path>~q{ -e 'print join("\n",map{-M}@ARGV,"")' }~$file;
+    my $cmd = %?CONFIG<perl5path>~q{ -e 'print join("\n", map {-M}, @ARGV,"")' }~$file;
     my $p = Pipe::open($cmd);
     my $m = slurp($p);  $p.close;
     # In src/perl6/Prelude.pm, regexs dont work. :(
