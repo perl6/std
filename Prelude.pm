@@ -546,7 +546,7 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
         my $start = $fi;
         $fi++;
         while !(substr($fmt,$fi,1)
-                ~~ any<% c s d u o x e f g X E G b p n i D U O F>) {
+                ~~ any(<% c s d u o x e f g X E G b p n i D U O F>)) {
             $fi++;
         }
         my $specifier = substr($fmt,$fi,1); $fi++;
