@@ -102,12 +102,12 @@ class Control::Caller {
         #( map { say( $_ => @caller[ %idx{$_} ] ) }, keys %idx );
 
         @caller.elems ?? Control::Caller.new(
-            'package' => @caller[0],
-            'file'    => @caller[1],
-            'line'    => @caller[2],
-            'subname' => @caller[3],
-            'subtype' => @caller[4],
-            'sub'     => @caller[5],
+            package => @caller[0],
+            file    => @caller[1],
+            line    => @caller[2],
+            subname => @caller[3],
+            subtype => @caller[4],
+            sub     => @caller[5],
         ) !! undef;
     }
 }
