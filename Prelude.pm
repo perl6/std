@@ -654,7 +654,7 @@ sub Pugs::Internals::require_use_helper ($use_,$module) is builtin is unsafe {
     my $file = join(%?CONFIG<file_sep>,split("::",$module)) ~ ".pm";
     for @*INC -> $dir {
       my $path = $dir ~ %?CONFIG<file_sep> ~ $file;
-      next if !-e $path;
+      next if !(-e $path);
       my $yml = "$path.yml";
       if -e $yml && prefix_M($yml) < prefix_M($path) {
       }
