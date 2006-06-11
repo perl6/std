@@ -124,7 +124,7 @@ class fatal {
     # interface %*INC, instead of this hack.
     # %*INC<fatal> = { filename => "fatal", resname => "<precompiled>", };
 
-    our $fatal::DEFAULT_FATALITY is constant = 1;
+    $fatal::DEFAULT_FATALITY is constant = 1;
     
     sub import {
         Pugs::Internals::install_pragma_value($?CLASS, 1);
