@@ -337,7 +337,7 @@ class Pipe {
             is primitive is unsafe {
         die "Pipe::open is unidirectional" if all($r, $w);
         $r = True if none($r, $w);
-        my ($in, $out, $err, undef) =
+        my ($in, $out, $err) =
             Pugs::Internals::runInteractiveCommand($command);
         close $err;
         close  ($r ?? $in !! $out);
