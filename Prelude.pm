@@ -325,7 +325,7 @@ class File {
 
     multi method seek ($self: Int $position, Int $whence = $File::SEEK_START)
             returns Bool is primitive is unsafe is builtin {
-        Pugs::Internals::hSeek($seek, $position, $whence);
+        Pugs::Internals::hSeek($self, $position, $whence);
     }
 }
 
