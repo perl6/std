@@ -188,11 +188,11 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     state(%modifiers_known, %modifiers_supported_p6, %modifiers_supported_p5);
     FIRST {
         %modifiers_known = map {;($_ => 1)},
-        <perl5 Perl5 P5 i ignorecase w words g global c continue p pos
+        <perl5 Perl5 P5 i ignorecase s sigspace g global c continue p pos
         once bytes codes graphs langs x nth ov overlap ex exhaustive
         rw keepall e each any parsetree stringify>;
         %modifiers_supported_p6 = map {;($_ => 1)},
-        <i ignorecase w words g global  stringify>;
+        <i ignorecase s sigspace g global  stringify>;
         %modifiers_supported_p5 = map {;($_ => 1)},
         <perl5 Perl5 P5 i ignorecase g global  stringify>;
     }
@@ -223,7 +223,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
         }
         else {
             my $msg = "Unknown modifier :$k will probably be ignored.";
-            $msg ~= "  Perhaps you meant :i:w ?" if $k eq ("iw"|"wi");
+            $msg ~= "  Perhaps you meant :i:s ?" if $k eq ("is"|"si");
             warning $msg;
         }
     }
@@ -235,10 +235,10 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
             %mods.delete("ignorecase");
 #           warning "PGE doesn't actually do :ignorecase yet.";
         }
-        if %mods<w> || %mods<words> {      
-            $pre ~= ":w";
-            %mods.delete("w"); # avoid haskell handling it.
-            %mods.delete("words");
+        if %mods<s> || %mods<sigspace> {      
+            $pre ~= ":s";
+            %mods.delete("s"); # avoid haskell handling it.
+            %mods.delete("sigspace");
         }
         if $pre ne "" {
             $pre ~= "::" if substr($pat,0,1) ne (":"|"#");
