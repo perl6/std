@@ -366,7 +366,7 @@ class Pipe {
 
 
 role Iter {
-    multi sub prefix:<=> (Iter $self: ) { $self.shift() }
+    multi sub prefix:<=> (Iter $self: ) is primitive { $self.shift() }
     
     method shift   ($self: ) { ... }
     method next    ($self: ) { ... }
@@ -491,10 +491,10 @@ class Time::Local {
 }
 
 class Num {
-    multi sub round_gen(Int $n, Code $corner) returns Int is safe {
+    multi sub round_gen(Int $n, Code $corner) returns Int is primitive is safe {
         $n
     }
-    multi sub round_gen(Num $n, Code $corner) returns Int is safe {
+    multi sub round_gen(Num $n, Code $corner) returns Int is primitive is safe {
         (int($n) == $n) ?? int($n) !! $corner($n);
     }
 
@@ -616,7 +616,7 @@ our &PIL2JS::Internals::use_perl5_module_noimp := &PIL2JS::Internals::use_perl5_
 
 
 # In src/perl6/Prelude.pm, prefix:<-M> doesn't work. :(
-multi prefix_M ($file) is builtin is unsafe {
+multi prefix_M ($file) is builtin is primitive is unsafe {
   if not -e $file {
     undef;
   }
