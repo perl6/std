@@ -90,26 +90,26 @@ class Control::Caller {
     has Str $.subtype;
     has Code $.sub;
     has Str $.params;   # FIXME: needs attention; don't use yet.
+}
 
-    multi sub caller (Class $kind = Any, Int :$skip = 0, Str :$label)
-            returns Control::Caller is primitive is builtin is safe {
-        my @caller = Pugs::Internals::caller($kind, $skip, $label);
+multi sub caller (Class $kind = Any, Int :$skip = 0, Str :$label)
+        returns Control::Caller is primitive is builtin is safe {
+    my @caller = Pugs::Internals::caller($kind, $skip, $label);
 
-        # FIXME: why doesn't this work?
-        # this is here just because of an icky pugsbug.
-        #my %idx = <package file line subname subtype params> Y 0 .. 5; # ugly.
-        #Control::Caller.new( map { ; $_ => @caller[ %idx{$_} ] }, keys %idx );
-        #( map { say( $_ => @caller[ %idx{$_} ] ) }, keys %idx );
+    # FIXME: why doesn't this work?
+    # this is here just because of an icky pugsbug.
+    #my %idx = <package file line subname subtype params> Y 0 .. 5; # ugly.
+    #Control::Caller.new( map { ; $_ => @caller[ %idx{$_} ] }, keys %idx );
+    #( map { say( $_ => @caller[ %idx{$_} ] ) }, keys %idx );
 
-        @caller.elems ?? Control::Caller.new(
-            package => @caller[0],
-            file    => @caller[1],
-            line    => @caller[2],
-            subname => @caller[3],
-            subtype => @caller[4],
-            sub     => @caller[5],
-        ) !! undef;
-    }
+    @caller.elems ?? Control::Caller.new(
+        package => @caller[0],
+        file    => @caller[1],
+        line    => @caller[2],
+        subname => @caller[3],
+        subtype => @caller[4],
+        sub     => @caller[5],
+    ) !! undef;
 }
 
 class fatal {
@@ -455,39 +455,39 @@ class Time::Local {
     has Str  $.tzname;  # string, eg, JDT
     has Int  $.tz;      # variation from UTC in seconds
     has Bool $.is_dst;
+}
 
-    multi sub localtime(Num $when = time) returns Time::Local
-            is primitive is builtin is safe {
-        my $res;
-        my $sec = int $when;
-        my $pico = ($when - int $when) * 10**12;
-        # XXX: waiting on a better want
-        #if want ~~ rx:P5/^Item/ {
-        #    $res = Pugs::Internals::localtime(True, $sec, $pico);
-        #} else {
-            my @tm = Pugs::Internals::localtime(False, $sec, $pico);
+multi sub localtime(Num $when = time) returns Time::Local
+        is primitive is builtin is safe {
+    my $res;
+    my $sec = int $when;
+    my $pico = ($when - int $when) * 10**12;
+    # XXX: waiting on a better want
+    #if want ~~ rx:P5/^Item/ {
+    #    $res = Pugs::Internals::localtime(True, $sec, $pico);
+    #} else {
+        my @tm = Pugs::Internals::localtime(False, $sec, $pico);
 
-            # FIXME: this is how it oughta look, with @ids being class level.
-            #my @ids = <year month day hour min sec picosec wday yday tzname tz is_dst>; # XXX: this should be a class variable!
-            #Time::Local.new( pairs zip @ids, @tm );
+        # FIXME: this is how it oughta look, with @ids being class level.
+        #my @ids = <year month day hour min sec picosec wday yday tzname tz is_dst>; # XXX: this should be a class variable!
+        #Time::Local.new( pairs zip @ids, @tm );
 
-            $res = Time::Local.new(
-                year    => @tm[0],
-                month   => @tm[1],
-                day     => @tm[2],
-                hour    => @tm[3],
-                min     => @tm[4],
-                sec     => @tm[5],
-                picosec => @tm[6],
-                wday    => @tm[7],
-                yday    => @tm[8],
-                tzname  => @tm[9],
-                tz      => @tm[10],
-                is_dst  => @tm[11],
-            );
-        #}
-        $res;
-    }
+        $res = Time::Local.new(
+            year    => @tm[0],
+            month   => @tm[1],
+            day     => @tm[2],
+            hour    => @tm[3],
+            min     => @tm[4],
+            sec     => @tm[5],
+            picosec => @tm[6],
+            wday    => @tm[7],
+            yday    => @tm[8],
+            tzname  => @tm[9],
+            tz      => @tm[10],
+            is_dst  => @tm[11],
+        );
+    #}
+    $res;
 }
 
 class Num {
