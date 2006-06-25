@@ -323,9 +323,9 @@ class File {
         $fh;
     }
 
-    multi method seek ($self: Int $position, Int $whence = $File::SEEK_START)
+    multi method seek (Int $position, Int $whence = $File::SEEK_START)
             returns Bool is primitive is unsafe is builtin {
-        Pugs::Internals::hSeek($self, $position, $whence);
+        Pugs::Internals::hSeek(self, $position, $whence);
     }
 }
 
@@ -366,17 +366,17 @@ class Pipe {
 
 
 role Iter {
-    multi sub prefix:<=> (Iter $self: ) is primitive { $self.shift() }
+    multi sub prefix:<=> () is primitive { self.shift() }
     
-    method shift   ($self: ) { ... }
-    method next    ($self: ) { ... }
-    method current ($self: ) { ... }
+    method shift   () { ... }
+    method next    () { ... }
+    method current () { ... }
 }
 
 # Support for =$fh
 class IO does Iter {
-    method shift   ($self: ) is primitive { $self.readline() }
-    method next    ($self: ) is primitive { $self.shift() }
+    method shift   () is primitive { self.readline() }
+    method next    () is primitive { self.shift() }
 }
 
 # Support for ="some_file"
@@ -384,9 +384,9 @@ class IO does Iter {
 # meaning the same as &readline to $obj.shift(), ="some_file" worked, so I
 # added the .shift() declaration here.  --iblech
 class Str does Iter {
-    method shift ($self: ) is primitive { =open($self) }
+    method shift () is primitive { =open(self) }
 
-    method trans (Str $self: Pair *@intable) is primitive is safe {
+    method trans (Pair *@intable) is primitive is safe {
         # Motto: If in doubt use brute force!
         my sub expand (Str $string is copy) {
             my @rv;
@@ -430,7 +430,7 @@ class Str does Iter {
             %transtable{@ks} = @vs;
         }
 
-        [~] map { %transtable{$_} // $_ }, $self.split('');
+        [~] map { %transtable{$_} // $_ }, self.split('');
     }
 }
 
