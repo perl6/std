@@ -30,11 +30,11 @@ the `is builtin` trait.
 class Process {
     multi sub exec($prog, @args) returns Bool is builtin is primitive is unsafe {
         # say "e:prog args"; # XXX delme
-        Pugs::Internals::exec($prog, False, @args);
+        Pugs::Internals::exec($prog, Bool::False, @args);
     }
     multi sub exec(@args) returns Bool is builtin is primitive is unsafe {
         # say "e:args:" ~ @args.perl; # XXX delme
-        Pugs::Internals::exec(@args[0], True, @args);
+        Pugs::Internals::exec(@args[0], Bool::True, @args);
     }
     multi sub exec($string) returns Bool is builtin is primitive is unsafe {
         # say "e:string"; # XXX delme
@@ -317,7 +317,7 @@ class File {
         my $fh = Pugs::Internals::openFile($filename, $mode);
 
         # XXX layers :)
-        Pugs::Internals::hSetBinaryMode($fh, True) if
+        Pugs::Internals::hSetBinaryMode($fh, Bool::True) if
             $layer ~~ rx:P5/:raw\b/;
 
         $fh;
@@ -336,7 +336,7 @@ class Pipe {
     multi sub open (Str $command, Bool :$r is copy, Bool :$w) returns IO
             is primitive is unsafe {
         die "Pipe::open is unidirectional" if all($r, $w);
-        $r = True if none($r, $w);
+        $r = Bool::True if none($r, $w);
         my ($in, $out, $err) =
             Pugs::Internals::runInteractiveCommand($command);
         close $err;
@@ -464,9 +464,9 @@ multi sub localtime(Num $when = time) returns Time::Local
     my $pico = ($when - int $when) * 10**12;
     # XXX: waiting on a better want
     #if want ~~ rx:P5/^Item/ {
-    #    $res = Pugs::Internals::localtime(True, $sec, $pico);
+    #    $res = Pugs::Internals::localtime(Bool::True, $sec, $pico);
     #} else {
-        my @tm = Pugs::Internals::localtime(False, $sec, $pico);
+        my @tm = Pugs::Internals::localtime(Bool::False, $sec, $pico);
 
         # FIXME: this is how it oughta look, with @ids being class level.
         #my @ids = <year month day hour min sec picosec wday yday tzname tz is_dst>; # XXX: this should be a class variable!
@@ -638,11 +638,11 @@ multi prefix_M ($file) is builtin is primitive is unsafe {
 
 sub Pugs::Internals::Disabled::use ($module=$+_) is builtin is unsafe {
     #Pugs::Internals::use($module);
-    Pugs::Internals::require_use_helper(True,$module);
+    Pugs::Internals::require_use_helper(Bool::True,$module);
 }
 sub Pugs::Internals::Disabled::require ($module=$+_) is builtin is unsafe {
     #Pugs::Internals::require($module);
-    Pugs::Internals::require_use_helper(False,$module);
+    Pugs::Internals::require_use_helper(Bool::False,$module);
 }
 sub Pugs::Internals::require_use_helper ($use_,$module) is builtin is unsafe {
   my sub opRequire() { 
