@@ -75,7 +75,7 @@ class Control::Basic {
     # S29:
     # Behaves like, and replaces Perl 5 C<do EXPR>, with optional C<$lang>
     # support.
-    multi sub evalfile (Str $filename: Str :$lang = 'Perl6')
+    multi sub evalfile (Str $filename; Str :$lang = 'Perl6')
             is primitive is unsafe {
         eval(slurp $filename, $lang);
     }
@@ -155,7 +155,7 @@ class fatal {
 class Carp {
     # Please remember to update t/pugsrun/11-safemode.t if you change the fully
     # qualified name of longmess.
-    multi sub longmess (: $e = '') returns Str is primitive is safe {
+    multi sub longmess (; $e = '') returns Str is primitive is safe {
         my($mess, $i);
         $mess = "$e at $?CALLER::POSITION";
 
@@ -594,13 +594,13 @@ multi shift ($array) is builtin is primitive { die "Cannot 'shift' scalar"; };
 multi pop (@array) is builtin is primitive { List::pop(@array) };
 multi pop ($array) is builtin is primitive { die "Cannot 'pop' scalar"; };
 
-multi as (Scalar $obj: $fmt) is builtin is primitive is safe {
+multi as (Scalar $obj; $fmt) is builtin is primitive is safe {
     sprintf($fmt,$obj);
 }
-multi as (List $obj: $fmt, $comma) is builtin is primitive is safe {
+multi as (List $obj; $fmt, $comma) is builtin is primitive is safe {
     join($comma, map -> $v { sprintf($fmt,$v) }, @$obj );
 }
-multi as (Hash $obj: $fmt, $comma) is builtin is primitive is safe {
+multi as (Hash $obj; $fmt, $comma) is builtin is primitive is safe {
     join($comma, map -> $k,$v { sprintf($fmt,$k,$v) }, $obj.kv );
 }
 
