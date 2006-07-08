@@ -1,6 +1,6 @@
-module Prelude-0.0.1;
-
 use v6-alpha;
+
+module Prelude-0.0.1;
 
 
 =kwid
