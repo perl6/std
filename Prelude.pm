@@ -60,7 +60,7 @@ class Control::Basic {
     multi sub eval (Str $code = $CALLER::_, Str :$lang = 'Perl6')
             is primitive is safe is builtin {
         given lc $lang {
-            when 'perl6'   { Pugs::Internals::eval($code) };
+            when 'perl6'   { Pugs::Internals::eval_perl6($code) };
             when 'perl5'   { Pugs::Internals::eval_perl5($code) };
             when 'haskell' { Pugs::Internals::eval_haskell($code) };
             when 'parrot'  { Pugs::Internals::eval_parrot($code) };

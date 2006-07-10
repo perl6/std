@@ -11,7 +11,7 @@ Pugs::Internals::compile_file_to_yml($path);
 Pugs::Internals::install_pragma_value($?CLASS, 0)
 Pugs::Internals::current_pragma_value($?CLASS) 
 
-Pugs::Internals::eval($code)
+Pugs::Internals::eval_perl6($code)
 Pugs::Internals::eval_haskell($code)
 Pugs::Internals::eval_parrot($code)
 Pugs::Internals::eval_perl5($code)
