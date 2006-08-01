@@ -265,7 +265,7 @@ sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
               $pos += {$m}.from + 1;
            }
            # want.Item
-           0 ?? ([|] \@{$a}) !! $a }))";
+           0 ?? ([|] \@$a) !! $a }))";
         return $code;
     }
     # Use of Rul awaits working infix:<~~> .
