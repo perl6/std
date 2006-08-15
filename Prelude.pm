@@ -186,7 +186,7 @@ multi sub infix:<~~> (Rul $r, $x) is primitive is safe is builtin {$r.f.($x)}
 
 sub rx_common_($hook,%mods0,$pat0,$qo,$qc) is builtin is safe {
     state(%modifiers_known, %modifiers_supported_p6, %modifiers_supported_p5);
-    FIRST {
+    START {
         %modifiers_known = map {;($_ => 1)},
         <perl5 Perl5 P5 i ignorecase s sigspace g global c continue p pos
         once bytes codes graphs langs x nth ov overlap ex exhaustive
