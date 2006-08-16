@@ -678,7 +678,7 @@ sub Pugs::Internals::require_use_helper ($use_,$module) is builtin is unsafe {
 }
 sub Pugs::Internals::compile_file_to_yml($file) is builtin is unsafe {
     # XXX - re-enable this when Parse-YAML supports closures correctly!
-    return if index($file, 'Test.pm') == -1;
+    return() if index($file, 'Test.pm') == -1;
     say "Attempting to compile $file ...";
     system($*EXECUTABLE_NAME~" -CParse-YAML $file > $file.yml");
     say "back.";
