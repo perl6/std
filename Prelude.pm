@@ -594,13 +594,13 @@ multi shift ($array) is builtin is primitive { die "Cannot 'shift' scalar"; };
 multi pop (@array) is builtin is primitive { List::pop(@array) };
 multi pop ($array) is builtin is primitive { die "Cannot 'pop' scalar"; };
 
-multi as (Scalar $obj; $fmt) is builtin is primitive is safe {
+multi fmt (Scalar $obj; $fmt) is builtin is primitive is safe {
     sprintf($fmt,$obj);
 }
-multi as (List $obj; $fmt, $comma) is builtin is primitive is safe {
+multi fmt (List $obj; $fmt, $comma) is builtin is primitive is safe {
     join($comma, map -> $v { sprintf($fmt,$v) }, @$obj );
 }
-multi as (Hash $obj; $fmt, $comma) is builtin is primitive is safe {
+multi fmt (Hash $obj; $fmt, $comma) is builtin is primitive is safe {
     join($comma, map -> $k,$v { sprintf($fmt,$k,$v) }, $obj.kv );
 }
 
