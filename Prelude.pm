@@ -635,6 +635,7 @@ multi prefix_M ($file) is builtin is primitive is unsafe {
 }
 
 
+=begin disabled
 
 sub Pugs::Internals::Disabled::use ($module=$+_) is builtin is unsafe {
     #Pugs::Internals::use($module);
@@ -683,3 +684,5 @@ sub Pugs::Internals::compile_file_to_yml($file) is builtin is unsafe {
     system($*EXECUTABLE_NAME~" -CParse-YAML $file > $file.yml");
     say "back.";
 }
+
+=cut
