@@ -576,10 +576,12 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
                     push @num, int($arg) +& ( 1 ~ (0 x ($bit))) ?? 1 !! 0;
                 }
 
+                my $converted = int(@num.reverse.join(""));
+
                 $conversion ~~ m/(\d+)/;
                 my $formatter = ~$0;
    
-                my $length = int($formatter) - $arg.bytes - 1;
+                my $length = int($formatter) - $converted.bytes;
    
                 my $ret;
                 if ($length < 0) {
@@ -588,14 +590,11 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
                 else {
                     given $formatter {
                         when /^0/ {
-                            $ret = (('0' x $length) ~ 
-                                int(@num.reverse.join("")));
+                            $ret = (('0' x $length) ~ $converted);
                         }
                         default {
-                            $ret = ((' ' x $length) ~
-                                int(@num.reverse.join("")));
+                            $ret = ((' ' x $length) ~ $converted);
                         }
-                            $ret = int(@num.reverse.join(""));
                     }
                 }
                 $str ~= $ret;
