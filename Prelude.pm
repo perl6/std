@@ -562,8 +562,44 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
         }
 
         given $specifier {
-            when any(<c d u o x b i>) {
+            when any(<c d u o x i>) {
                 $str ~= Pugs::Internals::sprintf($conversion,int($arg));
+            }
+
+            ##
+            # No "%b" in Haskell Printf libraries
+            # This may not be 100% compatible with C sprintf,
+            # or even the rest of Perl 6's sprintf
+            when 'b' {
+                my Bool @num;
+                for (0..~int($arg).bytes*8-1) -> $bit {
+                    push @num, int($arg) +& ( 1 ~ (0 x ($bit))) ?? 1 !! 0;
+                }
+
+                $conversion ~~ m/(\d+)/;
+                my $formatter = ~$0;
+   
+                my $length = int($formatter) - $arg.bytes - 1;
+   
+                my $ret;
+                if ($length < 0) {
+                    $ret = int(@num.reverse.join(""));
+                }
+                else {
+                    given $formatter {
+                        when /^0/ {
+                            $ret = (('0' x $length) ~ 
+                                int(@num.reverse.join("")));
+                        }
+                        default {
+                            $ret = ((' ' x $length) ~
+                                int(@num.reverse.join("")));
+                        }
+                            $ret = int(@num.reverse.join(""));
+                    }
+                }
+                $str ~= $ret;
+
             }
             when 's' {
                 $str ~= Pugs::Internals::sprintf($conversion,"$arg");
