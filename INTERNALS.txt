@@ -5,26 +5,26 @@ to work correctly.
 Perl6::Internals::compile_pir($code)
 Perl6::Internals::exit $status;
 Perl6::Internals::sleep $seconds;
-Pugs::Internals::caller($kind, $skip, $label);
-Pugs::Internals::compile_file_to_yml($path);
+Perl6::Internals::caller($kind, $skip, $label);
+Perl6::Internals::compile_file_to_yml($path);
 
-Pugs::Internals::install_pragma_value($?CLASS, 0)
-Pugs::Internals::current_pragma_value($?CLASS) 
+Perl6::Internals::install_pragma_value($?CLASS, 0)
+Perl6::Internals::current_pragma_value($?CLASS) 
 
-Pugs::Internals::eval_perl6($code)
-Pugs::Internals::eval_haskell($code)
-Pugs::Internals::eval_parrot($code)
-Pugs::Internals::eval_perl5($code)
-Pugs::Internals::eval_yaml($code)
+Perl6::Internals::eval_perl6($code)
+Perl6::Internals::eval_haskell($code)
+Perl6::Internals::eval_parrot($code)
+Perl6::Internals::eval_perl5($code)
+Perl6::Internals::eval_yaml($code)
 
-Pugs::Internals::exec($prog, Bool, @args)
-Pugs::Internals::hSeek(self, $position, $whence)
-Pugs::Internals::hSetBinaryMode($fh, Bool)
-Pugs::Internals::localtime(Bool::False, $sec, $pico)
-Pugs::Internals::openFile($filename, $mode)
-Pugs::Internals::require($module)
-Pugs::Internals::require_use_helper(Bool,$module)
-Pugs::Internals::runInteractiveCommand($command)
-Pugs::Internals::sprintf($conversion,int($arg)) #There is a p6 version of this
-Pugs::Internals::use($module)
+Perl6::Internals::exec($prog, Bool, @args)
+Perl6::Internals::hSeek(self, $position, $whence)
+Perl6::Internals::hSetBinaryMode($fh, Bool)
+Perl6::Internals::localtime(Bool::False, $sec, $pico)
+Perl6::Internals::openFile($filename, $mode)
+Perl6::Internals::require($module)
+Perl6::Internals::require_use_helper(Bool,$module)
+Perl6::Internals::runInteractiveCommand($command)
+Perl6::Internals::sprintf($conversion,int($arg)) #There is a p6 version of this
+Perl6::Internals::use($module)
 
