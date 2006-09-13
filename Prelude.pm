@@ -532,6 +532,11 @@ class Num {
     }
 }
 
+sub Math::Basic::pi () is primitive is safe {3.141592653589793}
+# *pi is non-spec (S29);  Should require use Math::Basic :constants;
+sub pi() is primitive is builtin is safe {Math::Basic::pi}
+
+
 sub sprintf ($fmt, *@args) is primitive is builtin is safe {
     my $flen = $fmt.chars;
     my $fi = 0;
