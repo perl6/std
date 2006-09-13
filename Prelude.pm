@@ -491,6 +491,9 @@ multi sub localtime(Num $when = time) returns Time::Local
 }
 
 class Num {
+
+    # Not Public API
+
     multi sub round_gen(Int $n, Code $corner) returns Int is primitive is safe {
         $n
     }
@@ -501,6 +504,15 @@ class Num {
     sub do_round($n) is primitive is safe {
         ($n < 0) ?? int( $n - 0.5) !! int($n + 0.5);
     }
+    sub do_ceil($n) is primitive is safe {
+        ($n < 0) ?? (-int(-$n)) !! int($n + 1)
+    }
+    sub do_floor($n) is primitive is safe {
+        ($n < 0) ?? (-int(1-$n)) !! int($n)
+    }
+
+    # Public API (but signatures are not spec)
+
     sub round($n) is primitive is safe {
         Num::round_gen($n, &Num::do_round)
     }
@@ -510,17 +522,11 @@ class Num {
     }
     our &trunc ::= &truncate;
 
-    sub do_ceil($n) is primitive is safe {
-        ($n < 0) ?? (-int(-$n)) !! int($n + 1)
-    }
     sub ceiling($n) is primitive is safe {
         Num::round_gen($n, &Num::do_ceil)
     }
     our &ceil ::= &ceiling;
 
-    sub do_floor($n) is primitive is safe {
-        ($n < 0) ?? (-int(1-$n)) !! int($n)
-    }
     sub floor($n) is primitive is safe {
         Num::round_gen($n, &Num::do_floor)
     }
