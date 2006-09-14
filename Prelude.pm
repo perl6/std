@@ -26,6 +26,7 @@ the `is builtin` trait.
 
 =cut
 
+use Math::Basic :GLOBAL<pi>;
 
 class Process {
     multi sub exec($prog, @args) returns Bool is builtin is primitive is unsafe {
@@ -532,8 +533,8 @@ class Num {
     }
 }
 
-sub Math::Basic::pi () is primitive is safe {3.141592653589793}
 # *pi is non-spec (S29);  Should require use Math::Basic :constants;
+# use Math::Basic :GLOBAL<pi>; fails to define *pi, so...
 sub pi() is primitive is builtin is safe {Math::Basic::pi}
 
 
