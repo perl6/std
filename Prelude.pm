@@ -537,7 +537,6 @@ class Num {
 # use Math::Basic :GLOBAL<pi>; fails to define *pi, so...
 sub pi() is primitive is builtin is safe {Math::Basic::pi}
 
-multi bla(Num $n) is primitive is safe {$n * 10}
 
 sub sprintf ($fmt, *@args) is primitive is builtin is safe {
     my $flen = $fmt.chars;
