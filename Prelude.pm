@@ -537,6 +537,7 @@ class Num {
 # use Math::Basic :GLOBAL<pi>; fails to define *pi, so...
 sub pi() is primitive is builtin is safe {Math::Basic::pi}
 
+multi bla(Num $n) is primitive is safe {$n * 10}
 
 sub sprintf ($fmt, *@args) is primitive is builtin is safe {
     my $flen = $fmt.chars;
@@ -733,3 +734,13 @@ sub Pugs::Internals::compile_file_to_yml($file) is builtin is unsafe {
 }
 
 =cut
+
+# These are used by t/xx-xx-uncategorized/prelude_test.t
+sub  *prelude_test_1(){'test 1'}
+sub   prelude_test_2_helper(){'test 2'}
+our &*prelude_test_2 ::= &prelude_test_2_helper;
+sub   prelude_test_3_helper(){'test 3'}
+our &*prelude_test_3 :=  &prelude_test_3_helper;
+multi prelude_test_4(Str $x) is builtin {'test 4'}
+multi *prelude_test_5(Str $x) {'test 5'}
+
