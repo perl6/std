@@ -154,7 +154,7 @@ class fatal {
 }
 
 class Carp {
-    # Please remember to update t/pugsrun/11-safemode.t if you change the fully
+    # Please remember to update t/run/11-safemode.t if you change the fully
     # qualified name of longmess.
     multi sub longmess (; $e = '') returns Str is primitive is safe {
         my($mess, $i);
