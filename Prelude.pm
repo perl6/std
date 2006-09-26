@@ -387,6 +387,14 @@ class IO does Iter {
 class Str does Iter {
     method shift () is primitive { =open(self) }
 
+    multi method comb (Regex $rx = /\S+/) is primitive is safe {
+	list self ~~ rx:g/<$rx>/;
+    }
+
+    multi method comb (Str $s) is primitive is safe {
+	list self ~~ rx:P5:g/\Q$s\E/;
+    }
+
     method trans (Pair *@intable) is primitive is safe {
         # Motto: If in doubt use brute force!
         my sub expand (Str $string is copy) {
