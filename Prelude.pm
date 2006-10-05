@@ -658,6 +658,9 @@ multi fmt (List $obj; $fmt, $comma) is builtin is primitive is safe {
 multi fmt (Hash $obj; $fmt, $comma) is builtin is primitive is safe {
     join($comma, map -> $k,$v { sprintf($fmt,$k,$v) }, $obj.kv );
 }
+multi fmt (Pair $obj; $fmt, $comma) is builtin is primitive is safe {
+    join($comma, map -> $k,$v { sprintf($fmt,$k,$v) }, $obj.kv );
+}
 
 sub PIL2JS::Internals::use_jsan_module_imp (*@whatever) {
     die "Can't load JSAN modules when not running under PIL2JS!";
