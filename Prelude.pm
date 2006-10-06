@@ -653,7 +653,7 @@ multi fmt (Scalar $obj; $fmt) is builtin is primitive is safe {
     sprintf($fmt,$obj);
 }
 multi fmt (List $obj; $fmt, $comma) is builtin is primitive is safe {
-    join($comma, map -> $v { sprintf($fmt,$v) }, @$obj );
+    join($comma, map -> $v { sprintf($fmt, $v.isa(Pair) ?? $v.kv !! $v) }, @$obj );
 }
 multi fmt (Hash $obj; $fmt, $comma) is builtin is primitive is safe {
     join($comma, map -> $k,$v { sprintf($fmt,$k,$v) }, $obj.kv );
