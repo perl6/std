@@ -652,13 +652,14 @@ multi pop ($array) is builtin is primitive { die "Cannot 'pop' scalar"; };
 multi fmt (Scalar $obj; $fmt) is builtin is primitive is safe {
     sprintf($fmt,$obj);
 }
-multi fmt (List $obj; $fmt, $comma) is builtin is primitive is safe {
+multi fmt (Pair $obj; $fmt) is builtin is primitive is safe {
+    sprintf($fmt,$obj.kv);
+}
+# $comma defaults chosen per L<S02/Literals/"interpolate an entire array">.
+multi fmt (List $obj; $fmt, $comma = ' ') is builtin is primitive is safe {
     join($comma, map -> $v { sprintf($fmt, $v.isa(Pair) ?? $v.kv !! $v) }, @$obj );
 }
-multi fmt (Hash $obj; $fmt, $comma) is builtin is primitive is safe {
-    join($comma, map -> $k,$v { sprintf($fmt,$k,$v) }, $obj.kv );
-}
-multi fmt (Pair $obj; $fmt, $comma) is builtin is primitive is safe {
+multi fmt (Hash $obj; $fmt, $comma = "\n") is builtin is primitive is safe {
     join($comma, map -> $k,$v { sprintf($fmt,$k,$v) }, $obj.kv );
 }
 
