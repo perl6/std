@@ -58,7 +58,7 @@ class Control::Basic {
 
     # safety of the individual methods is defined in Pugs.Prim.hs
     # (maybe :lang<YAML> doesn't quite belong here?)
-    multi sub eval (Str $code = $CALLER::_, Str :$lang = 'Perl6')
+    multi sub eval (Str $code, Str :$lang = 'Perl6')
             is primitive is safe is builtin {
         given lc $lang {
             when 'perl6'   { Pugs::Internals::eval_perl6($code) };
