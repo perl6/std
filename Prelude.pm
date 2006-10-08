@@ -58,16 +58,26 @@ class Control::Basic {
 
     # safety of the individual methods is defined in Pugs.Prim.hs
     # (maybe :lang<YAML> doesn't quite belong here?)
-    multi sub eval (Str $code, Str :$lang = 'Perl6')
-            is primitive is safe is builtin {
-        given lc $lang {
-            when 'perl6'   { Pugs::Internals::eval_perl6($code) };
-            when 'perl5'   { Pugs::Internals::eval_perl5($code) };
-            when 'haskell' { Pugs::Internals::eval_haskell($code) };
-            when 'parrot'  { Pugs::Internals::eval_parrot($code) };
-            when 'pir'     { Pugs::Internals::eval_parrot($code) };
-            when 'yaml'    { Pugs::Internals::eval_yaml($code) };
-
+    multi sub eval (Str $code, Str :$lang = 'Perl6') is primitive is safe is builtin {
+        if $lang.lc eq 'perl6' {
+            Pugs::Internals::eval_perl6($code);
+        }
+        elsif $lang.lc eq 'perl5' {
+            Pugs::Internals::eval_perl5($code);
+        }
+        elsif $lang.lc eq 'haskell' {
+            Pugs::Internals::eval_haskell($code);
+        }
+        elsif $lang.lc eq 'parrot' {
+            Pugs::Internals::eval_parrot($code);
+        }
+        elsif $lang.lc eq 'pir' {
+            Pugs::Internals::eval_parrot($code);
+        }
+        elsif $lang.lc eq 'yaml' {
+            Pugs::Internals::eval_yaml($code)
+        }
+        else {
             die "Language \"$lang\" unknown.";
         }
     }
