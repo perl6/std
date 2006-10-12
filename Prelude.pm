@@ -413,7 +413,7 @@ class Str does Iter {
                 gather {
                     while $str ~~ $rx {
                         take ~$();
-                        $str = substr($str, $/.to);
+                        substr($str, 0, $/.to) = "";
                     }
                 }
             }
