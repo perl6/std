@@ -397,8 +397,23 @@ class IO does Iter {
 class Str does Iter {
     method shift () is primitive { =open(self) }
 
-    multi method comb (Regex $rx = /\S+/) is primitive is safe {
-	list self ~~ rx:g/<$rx>/;
+#    multi method comb (Regex $rx = /\S+/) is primitive {
+#	list self ~~ rx:g/<$rx>/;
+#    }
+
+    multi method comb () is primitive is safe {
+	list self ~~ rx:P5:g/\S+/;
+    }
+
+    multi method comb (Regex $rx) is primitive is safe {
+	my $p5rx = $rx.perl;
+	$p5rx ~~ s:P5:g/\^\^/^/;		# kludge absence of /<$rx>/
+	$p5rx ~~ s:P5:g/\$\$/\$/;
+	$p5rx ~~ s:P5:g/\\h/[\x20\t]/;		# XXX incomplete
+	$p5rx ~~ s:P5:g/\\H/[^\x20\t]/;
+	$p5rx ~~ s:P5:g/\\v/[\n\r]/;
+	$p5rx ~~ s:P5:g/\\V/[^\n\r]/;
+	list self ~~ rx:P5:g/(?smx)$p5rx/;
     }
 
     multi method comb (Str $s) is primitive is safe {
@@ -410,32 +425,28 @@ class Str does Iter {
         my sub expand (Str $string is copy) {
             my @rv;
 
-            my $add_dash;
             my $idx;
 
-            if (substr($string,0,1) eq '-') {
-                push @rv, '-';
-                $string = substr($string,1);
-            }
-
-            if (substr($string,-1,1) eq '-') {
-                $add_dash = 1;
-                $string = substr($string,0,-1)
-            }
-
-            while (($idx = index($string,'-')) != -1) {
+	    # XXX lexer must capture strings as q//
+	    # XXX this should all be done in one pass over the string
+	    $string ~~ s:P5:g/\s+//;
+	    $string ~~ s:P5:g/\\[ntfbr]/{ eval "\"$()\"" }/;
+	    $string ~~ s:P5:g/\\x[0-9a-fA-F]+/{ eval "\"$()\"" }/;
+	    $string ~~ s:P5:g/\\x\[.*?\]*\]/{ eval "\"$()\"" }/;
+	    $string ~~ s:P5:g/\\o[0-7]+/{ eval "\"$()\"" }/;
+	    $string ~~ s:P5:g/\\o\[.*?\]*\]/{ eval "\"$()\"" }/;
+            while (($idx = index($string,'..')) != -1) {
                 my $pre = substr($string,0,$idx-1);
                 my $start = substr($string,$idx-1,1);
-                my $end = substr($string,$idx+1,1);
+                my $end = substr($string,$idx+2,1);
 
                 push @rv, $pre.split('');
                 push @rv, (~ $start)..(~ $end);
 
-                $string = substr($string,$idx+2);
+                $string = substr($string,$idx+3);
             }
 
             push @rv, $string.split('');
-            push @rv, '-' if $add_dash;
 
             @rv;
         }
