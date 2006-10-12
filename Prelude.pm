@@ -405,24 +405,22 @@ class Str does Iter {
         list self ~~ rx:P5:g/\S+/;
     }
 
-    multi method comb (Regex $rx) is primitive {
-        my $p5rx = $rx.perl;
-        $p5rx ~~ s:P5/^\///;
-        $p5rx ~~ s:P5/\/$//;
-        $p5rx ~~ s:P5:g/\^\^/^/;         # XXX kludge absence of /<$rx>/ above
-        $p5rx ~~ s:P5:g/\$\$/\$/;
-        $p5rx ~~ s:P5:g/\\h/[\x20\t]/;   # XXX incomplete
-        $p5rx ~~ s:P5:g/\\H/[^\x20\t]/;
-        $p5rx ~~ s:P5:g/\\v/[\n\r]/;
-        $p5rx ~~ s:P5:g/\\V/[^\n\r]/;
-        list self ~~ rx:P5:g/(?smx)$p5rx/;
+    multi method comb ($rx) is primitive {
+        given $rx {
+            when Str { list self ~~ rx:P5:g/\Q$rx\E/; }
+            when Regex {    # XXX kludge absence of /<$rx>/ above
+                my $str = ~self;
+                gather {
+                    while $str ~~ $rx {
+                        take ~$();
+                        $str = substr($str, $/.to);
+                    }
+                }
+            }
+        }
     }
 
-    multi method comb (Str $s) is primitive is safe {
-        list self ~~ rx:P5:g/\Q$s\E/;
-    }
-
-    method trans (Pair *@intable) is primitive is safe {
+    method trans (Pair *@intable) is primitive {
         # Motto: If in doubt use brute force!
         my sub expand (Str $string is copy) {
             my @rv;
@@ -431,8 +429,8 @@ class Str does Iter {
 
             $string ~~ s:P5:g/\s+//;
             my $delim = '!';
-            while $string ~~ m:P5/$delim/ {
-                $delim = chr(ord($delim)+1);
+            while index($string,$delim) != -1 {
+                $delim = chr(ord($delim)+1);    # XXX still spoofable
             }
             $string = eval "qb$delim$string$delim";
             while (($idx = index($string,'..')) != -1) {
