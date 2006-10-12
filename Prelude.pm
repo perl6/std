@@ -398,26 +398,28 @@ class Str does Iter {
     method shift () is primitive { =open(self) }
 
 #    multi method comb (Regex $rx = /\S+/) is primitive {
-#	list self ~~ rx:g/<$rx>/;
+#       list self ~~ rx:g/<$rx>/;
 #    }
 
     multi method comb () is primitive is safe {
-	list self ~~ rx:P5:g/\S+/;
+        list self ~~ rx:P5:g/\S+/;
     }
 
-    multi method comb (Regex $rx) is primitive is safe {
-	my $p5rx = $rx.perl;
-	$p5rx ~~ s:P5:g/\^\^/^/;		# kludge absence of /<$rx>/
-	$p5rx ~~ s:P5:g/\$\$/\$/;
-	$p5rx ~~ s:P5:g/\\h/[\x20\t]/;		# XXX incomplete
-	$p5rx ~~ s:P5:g/\\H/[^\x20\t]/;
-	$p5rx ~~ s:P5:g/\\v/[\n\r]/;
-	$p5rx ~~ s:P5:g/\\V/[^\n\r]/;
-	list self ~~ rx:P5:g/(?smx)$p5rx/;
+    multi method comb (Regex $rx) is primitive {
+        my $p5rx = $rx.perl;
+        $p5rx ~~ s:P5/^\///;
+        $p5rx ~~ s:P5/\/$//;
+        $p5rx ~~ s:P5:g/\^\^/^/;         # XXX kludge absence of /<$rx>/ above
+        $p5rx ~~ s:P5:g/\$\$/\$/;
+        $p5rx ~~ s:P5:g/\\h/[\x20\t]/;   # XXX incomplete
+        $p5rx ~~ s:P5:g/\\H/[^\x20\t]/;
+        $p5rx ~~ s:P5:g/\\v/[\n\r]/;
+        $p5rx ~~ s:P5:g/\\V/[^\n\r]/;
+        list self ~~ rx:P5:g/(?smx)$p5rx/;
     }
 
     multi method comb (Str $s) is primitive is safe {
-	list self ~~ rx:P5:g/\Q$s\E/;
+        list self ~~ rx:P5:g/\Q$s\E/;
     }
 
     method trans (Pair *@intable) is primitive is safe {
@@ -427,14 +429,12 @@ class Str does Iter {
 
             my $idx;
 
-	    # XXX lexer must capture strings as q//
-	    # XXX this should all be done in one pass over the string
-	    $string ~~ s:P5:g/\s+//;
-	    $string ~~ s:P5:g/\\[ntfbr]/{ eval "\"$()\"" }/;
-	    $string ~~ s:P5:g/\\x[0-9a-fA-F]+/{ eval "\"$()\"" }/;
-	    $string ~~ s:P5:g/\\x\[.*?\]*\]/{ eval "\"$()\"" }/;
-	    $string ~~ s:P5:g/\\o[0-7]+/{ eval "\"$()\"" }/;
-	    $string ~~ s:P5:g/\\o\[.*?\]*\]/{ eval "\"$()\"" }/;
+            $string ~~ s:P5:g/\s+//;
+            my $delim = '!';
+            while $string ~~ m:P5/$delim/ {
+                $delim = chr(ord($delim)+1);
+            }
+            $string = eval "qb$delim$string$delim";
             while (($idx = index($string,'..')) != -1) {
                 my $pre = substr($string,0,$idx-1);
                 my $start = substr($string,$idx-1,1);
