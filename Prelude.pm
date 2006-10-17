@@ -617,7 +617,7 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
 
                 my $converted = int(@num.reverse.join(""));
 
-                $conversion ~~ m/(\d+)/;
+                $conversion ~~ m:P5/(\d+)/;
                 my $formatter = ~$0;
    
                 my $length = int($formatter) - $converted.bytes;
@@ -628,7 +628,7 @@ sub sprintf ($fmt, *@args) is primitive is builtin is safe {
                 }
                 else {
                     given $formatter {
-                        when /^0/ {
+                        when rx:P5/^0/ {
                             $ret = (('0' x $length) ~ $converted);
                         }
                         default {
