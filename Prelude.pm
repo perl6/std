@@ -415,7 +415,8 @@ class Str does Iter {
                         take ~$();
                         substr($str, 0, $/.to) = "";
                     }
-                }
+		    # XXX Pugs would fail if removed the ; in the next line.
+                };
             }
         }
     }
