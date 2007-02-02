@@ -696,7 +696,7 @@ our &PIL2JS::Internals::use_perl5_module_noimp := &PIL2JS::Internals::use_perl5_
 
 # In src/perl6/Prelude.pm, prefix:<-M> doesn't work. :(
 multi prefix_M ($file) is builtin is primitive is unsafe {
-  if not -e $file {
+  if $file ~~ :!e {
     undef;
   }
   elsif $file ~~ rx:perl5/[^-_a-zA-Z0-9\.\/\\\:]/ {
@@ -734,9 +734,9 @@ sub Pugs::Internals::require_use_helper ($use_,$module) is builtin is unsafe {
     my $file = join(%?CONFIG<file_sep>,split("::",$module)) ~ ".pm";
     for @*INC -> $dir {
       my $path = $dir ~ %?CONFIG<file_sep> ~ $file;
-      next if !(-e $path);
+      next if $path ~~ :!e;
       my $yml = "$path.yml";
-      if -e $yml && prefix_M($yml) < prefix_M($path) {
+      if (($yml ~~ :e) && prefix_M($yml) < prefix_M($path)) {
       }
       else {
         if 1 {
