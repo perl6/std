@@ -121,17 +121,20 @@ rule statement_list {
                                                     {*} #= statement_list
 }
 
+token label { <ident> \: \s <?ws> {*} }                 #= label
+
 rule statement {
     <label>*
     [
-    | <statement_control>
-    | <block>
-    | <EXPR> <statement_modifier>?
+    | <statement_control>                               #= statement control
+    | <block>                                           #= statement block
+    | <EXPR> <statement_modifier>?                      #= statement sideff
     ]
+                                                        {*} #= statement
 }
 
 rule statement_control:<use> {
-    <module_name_wild> <EXPR>? ;?                      {*} #= sc use
+    <module_name_wild> <EXPR>? ;?                       {*} #= sc use
 }
 
 rule statement_control:<if> {
@@ -202,13 +205,13 @@ rule statement_control:<CONTROL> { <block> {*} }        #= sc CONTROL
 
 token statement_control { %statement_control }
 
-rule modifier_expr { <EXPR> ;? {*} }              #= modifier_expr
+rule modifier_expr { <EXPR> ;? {*} }                    #= modifier_expr
 
-rule statement_modifier:<if>     { <modifier_expr> {*} };        #= sm if
-rule statement_modifier:<unless> { <modifier_expr> {*} };    #= sm unless
-rule statement_modifier:<for>    { <modifier_expr> {*} };       #= sm for
+rule statement_modifier:<if>     { <modifier_expr> {*} };     #= sm if
+rule statement_modifier:<unless> { <modifier_expr> {*} };     #= sm unless
+rule statement_modifier:<for>    { <modifier_expr> {*} };     #= sm for
 rule statement_modifier:<given>  { <modifier_expr> {*} };     #= sm for
-rule statement_modifier:<hen>    { <modifier_expr> {*} };     #= sm for
+rule statement_modifier:<when>   { <modifier_expr> {*} };     #= sm for
 rule statement_modifier:<while>  { <modifier_expr> {*} };     #= sm while
 rule statement_modifier:<until>  { <modifier_expr> {*} };     #= sm until
 
@@ -447,8 +450,6 @@ token quote_term {
 }
 
 ##  rules for parsing interpolated values in quotes.
-##  FIXME: We're repeating the $<postfix> portion here
-##  because there's apparently an aliasing bug in PGE.
 ##  The first part of the rule handles non-scalar
 ##  interpolation (which must end with a postcircumfix operator);
 ##  the second part handles scalar interpolation.
