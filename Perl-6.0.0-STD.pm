@@ -103,7 +103,7 @@ token pod_comment {
 
 rule comp_unit {
     ^
-    [ <type_declarator> <module_name> <traits> ; ]?
+    [ <type_declarator> <module_name> <trait>* ; ]?
     <statement_list>
     [ $ || <panic: Parse terminated early> ]
                                                     {*} #= comp_unit
@@ -285,9 +285,8 @@ token expect_term {
     | <prefix_postfix_meta_operator>
     | <prefix_circumfix_meta_operator>
     | <variable>
-    | <number>
-    | <integer>
-#    | <listop>         # XXX should be in prefix?
+    | <value>
+    | <ident> <before \h* =\> >         # XXX sufficient?
     ]
     <expect_postfix>*
 }
@@ -384,8 +383,8 @@ token type_declarator:<package> { <null> {*} }  #= td package
 token type_block {
     <scope_declarator>?
     <type_declarator>
-    <module_name>?
-    <traits>
+    <module_name>?              # XXX maybe shouldn't have version/auth?
+    <trait>*
     <block>
 }
 
@@ -395,12 +394,12 @@ token special_variable:<$/> { <null> {*} }
 token variable {
     | <special_variable>
     | <sigiltwigil> <name>
-    | <package> <'::'> <hashpostfix>
+    | <name> <'::'> <hashpostfix>
 }
 
 token sigiltwigil {
     <variable_prefix_sigil>
-    <variable_prefix_twigil>            # note: can be empty
+    <variable_prefix_twigil>?
 }
 
 token variable_prefix_sigil:<$>  { <null> {*} }               #= sigil $
@@ -417,16 +416,27 @@ token variable_prefix_twigil:<*> { <null> {*} }               #= twigil *
 token variable_prefix_twigil:<+> { <null> {*} }               #= twigil +
 token variable_prefix_twigil:<?> { <null> {*} }               #= twigil ?
 token variable_prefix_twigil:<=> { <null> {*} }               #= twigil =
-token variable_prefix_twigil:<> { <null> {*} }                #= twigil empty
 
 token name {
-    | <ident> [ <'::'> <ident> ]*
+    | <ident> <nofat> [ <'::'> <ident> ]*
     | [ <'::'> <ident> ]+
 }
 
 token subname {
     | <name>
     | <CATEGORY> \: <hashpostfix>
+}
+
+token value {
+    | <string>
+    | <number>
+    | <integer>
+    | <version>
+    | <typename>
+}
+
+regex typename {
+    <name> <?{ is_type($<ident>) }>
 }
 
 token integer {
@@ -443,10 +453,10 @@ token number {
 }
 
 token quote_term {
-    |    $<KEY>:=[']    <quote_expr> '
-    |    $<KEY>:=["]    <quote_expr> "
-    |    $<KEY>:=[\<\<] <quote_expr> \>\>
-    |    $<KEY>:=[\<]   <quote_expr> \>
+    | ' <quote_expr> '
+    | " <quote_expr> "
+    | \<\< <quote_expr> \>\>
+    | \<   <quote_expr> \>
 }
 
 ##  rules for parsing interpolated values in quotes.
@@ -462,16 +472,16 @@ token quote_interpolation {
                      | <postcircumfix> )*
 }
 
-
 ## Subroutine parsing.  This is still under development.
 
 rule subroutine {
     <scope_declarator>?
-        [ <routine_modifier> <routine_type>? | <routine_type> ]
-        <ident>?
-        <traits>
-        [\( <signature> \)]?
-        <block>}
+    <subintro>
+    <ident>?
+    <trait>*
+    [\( <signature> \)]?
+    <block>
+}
 
 rule subintro { <routine_modifier> <routine_type>? | <routine_type> }
 
@@ -485,31 +495,34 @@ token routine_declarator:<regex>
 token routine_declarator:<token>
 token routine_declarator:<rule>
 
-token type { <routine_type> ::: <fail> | <ident> }
-
 rule trait { <trait_verb> | <trait_auxiliary> }
 
 token trait_auxiliary:<is>   { <ident>[\( <EXPR> \)]? }
 token trait_auxiliary:<will> { <ident> <block> }
-token trait_verb:<of> { <type> }
-token trait_verb:<returns> { <type> }
+
+token trait_verb:<of>        { <type> }
+token trait_verb:<returns>   { <type> }
 
 rule signature {
-    $<invocant> := (<parameter> <':'>)?
-    $<paramlist> := (<parameter>? [, <parameter>]*)
-    [ <'-->'> $<rettype>:=<type> ]?
+    [<parameter> [ [ \, | \: | ; | ;; ] <parameter> ]* ]?
+    [ <'-->'> <type> ]?
+}
+
+rule type_constraint {
+    | <value>
+    | <type_name>
+    | where <subset>
 }
 
 token parameter {
-    <slurp>
-    <type>*
+    <slurp>?
+    <type_constraint>*
     [
     | \: <ident>? \(
       <sigiltwigil>  <ident>?
       \)
     | <sigiltwigil>  <ident>?
     ]
-    <where>*
     <default_value>
 }
 
