@@ -20,6 +20,34 @@ rule TOP { <compunit> {*} }                             #= TOP
 #  <CATEGORY>: the rule matching any valid category names
 #       <foo>: all tokens of foo category |-ed together
 
+# The internal precedence levels are *not* part of the public interface.
+# The current values are mere implmentation; they may change at any time.
+# Users should only specify precedence in relation to existing levels.
+
+my %term              ::= { :prec<z=>                           };
+my %methodcall        ::= { :prec<v=>                           };
+my %autoincrement     ::= { :prec<u=>, :assoc<non>, :lvalue     };
+my %exponentiation    ::= { :prec<t=>, :assoc<right>            };
+my %symbolic_unary    ::= { :prec<s=>                           };
+my %multiplicative    ::= { :prec<r=>, :assoc<left>             };
+my %additive          ::= { :prec<q=>, :assoc<left>             };
+my %junctive_and      ::= { :prec<p=>, :assoc<list>             };
+my %junctive_or       ::= { :prec<o=>, :assoc<list>             };
+my %named_unary       ::= { :prec<n=>, :assoc<left>             };
+my %nonchaining       ::= { :prec<m=>, :assoc<non>              };
+my %chaining          ::= { :prec<l=>, :assoc<chain>            };
+my %tight_and         ::= { :prec<k=>, :assoc<left>             };
+my %tight_or          ::= { :prec<j=>, :assoc<left>             };
+my %conditional       ::= { :prec<i=>, :assoc<right>            };
+my %item_assignment   ::= { :prec<h=>, :assoc<right>, :lvalue   };
+my %loose_unary       ::= { :prec<g=>, :assoc<right>            };
+my %comma             ::= { :prec<f=>, :assoc<list>             };
+my %list_infix        ::= { :prec<e=>                           };
+my %list_prefix       ::= { :prec<d=>                           };
+my %loose_and         ::= { :prec<c=>                           };
+my %loose_or          ::= { :prec<b=>                           };
+my %terminator        ::= { :prec<a=>, :assoc<list>             };
+
 # Categories are designed to be extensible in derived grammars.
 
 # Use of <*> calls into the appropriate rule for the token.
@@ -36,8 +64,9 @@ category quote;
 category prefix;
 category infix;
 category postfix;
-category circumfix     is reparsed(/ <*> /);
-category postcircumfix is reparsed(/ <*> /);
+
+category circumfix     is reparsed;
+category postcircumfix is reparsed;
 
 category regex_metachar;
 category regex_backslash;
@@ -277,7 +306,7 @@ token module_name_wild {
 token version_wild   { <block> | <whatever> | <version> }
 token authority_wild { <block> | <whatever> | <authority> }
 
-token whatever ::= &token__term:<*>;                   # XXX possible?
+token whatever ::= token term:<*>;                   # XXX possible?
 
 token version {
     | v \d+ [ \. \d+ ]*                 {*}             #= version vstyle
@@ -331,13 +360,13 @@ token expect_infix {
 }
 
 token dotty {
-    | (<'.+'>)                                  {*}     #= dotty plus
-    | (<'.*'>)                                  {*}     #= dotty star
-    | (<'.?'>)                                  {*}     #= dotty query
-    | (<'.='>)                                  {*}     #= dotty equals
-    | (<'.^'>)                                  {*}     #= dotty caret
-    | (<'.:'>)                                  {*}     #= dotty colon
-    | (<'.'>)                                   {*}     #= dotty plain
+    | <'.+'>                                  {*}     #= dotty plus
+    | <'.*'>                                  {*}     #= dotty star
+    | <'.?'>                                  {*}     #= dotty query
+    | <'.='>                                  {*}     #= dotty equals
+    | <'.^'>                                  {*}     #= dotty caret
+    | <'.:'>                                  {*}     #= dotty colon
+    | <'.'>                                   {*}     #= dotty plain
 }
 
 token expect_postfix {
@@ -418,7 +447,7 @@ token methodop {
 }
 
 # XXX how do we handle differences on non-standard prefix precedences?
-token prefix: is equiv(&prefix:<print>) { <ident> [ <listop_expr> ]? }
+#token prefix: is equiv(&prefix:<print>) { <ident> [ <listop_expr> ]? }
 
 token circumfix:<( )>     { \( <EXPR> \) {*} }         #= circumfix ( )
 token circumfix:<[ ]>     { \[ <EXPR> \] {*} }         #= circumfix [ ]
@@ -591,6 +620,435 @@ rule statement_prefix:<gather>  { <statement> }
 rule statement_prefix:<contend> { <statement> }
 rule statement_prefix:<async>   { <statement> }
 rule statement_prefix:<lazy>    { <statement> }
+
+## term
+token term:<*> is Term[|%term]
+    { <null> }
+
+token circumfix:<( )> is Circumfix[|%term]
+    { <null> }
+
+token postcircumfix:<( )> is Postcircumfix[|%term] 
+    is abstract('call')
+    { <null> }
+
+## autoincrement
+token postfix:<++> is Postfix[|%autoincrement]
+    { <null> }
+
+token postfix:<--> is Postfix[|%autoincrement]
+    { <null> }
+
+token prefix:<++> is Prefix[|%autoincrement]
+    { <null> }
+
+token prefix:<--> is Prefix[|%autoincrement]
+    { <null> }
+
+
+## exponentiation
+token infix:<**> is Infix[|%exponentiate]
+    { <null> }
+
+## symbolic unary
+token prefix:<!> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<+> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<-> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<~> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<?> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<=> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<*> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<**> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<~^> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<+^> is Prefix[|%symbolic_unary] 
+    { <null> }
+
+token prefix:<?^> is Prefix[|%symbolic_unary]
+    { <null> }
+
+token prefix:<^> is Prefix[|%symbolic_unary]
+    { <null> }
+
+
+## multiplicative
+token infix:<*> is Infix[|%multiplicative]
+    is pirop('n_mul')
+    { <null> }
+
+token infix:</> is Infix[|%multiplicative]
+    is pirop('n_div')
+    { <null> }
+
+token infix:<%> is Infix[|%multiplicative]
+    { <null> }
+
+token infix:<x> is Infix[|%multiplicative]
+    { <null> }
+
+token infix:<xx> is Infix[|%multiplicative]
+    { <null> }
+
+token infix:<+&> is Infix[|%multiplicative]
+    { <null> }
+
+token infix:{'+<'} is Infix[|%multiplicative]
+    { <null> }
+
+token infix:{'+>'} is Infix[|%multiplicative]
+    { <null> }
+
+token infix:<~&> is Infix[|%multiplicative]
+    is pir("    %r = bands %0, %1")    # perl6-orig
+    { <null> }
+
+token infix:{'~<'} is Infix[|%multiplicative]
+    { <null> }
+
+token infix:{'~>'} is Infix[|%multiplicative]
+    { <null> }
+
+
+## additive
+token infix:<+> is Infix[|%additive]
+    is pirop('n_add')
+    { <null> }
+
+token infix:<-> is Infix[|%additive]
+    is pirop('n_sub')
+    { <null> }
+
+token infix:<~> is Infix[|%additive]
+    is returns('Str')
+    { <null> }
+
+token infix:<+|> is Infix[|%additive]
+    { <null> }
+
+token infix:<+^> is Infix[|%additive]
+    { <null> }
+
+token infix:<~|> is Infix[|%additive]
+    { <null> }
+
+token infix:<~^> is Infix[|%additive]
+    { <null> }
+
+token infix:<?|> is Infix[|%additive]
+    { <null> }
+
+token infix:<?^> is Infix[|%additive]
+    { <null> }
+
+
+## junctive and (all)
+token infix:<&> is Infix[|%junctive_and]
+    { <null> }
+
+
+## junctive or (any)
+token infix:<|> is Infix[|%junctive_or]
+    { <null> }
+
+token infix:<^> is Infix[|%junctive_or]
+    { <null> }
+
+
+## named unary
+token prefix:<rand> is Prefix[|%named_unary]
+    { <null> }
+
+token prefix:<sleep> is Prefix[|%named_unary]
+    { <null> }
+
+token prefix:<abs> is Prefix[|%named_unary]
+    { <null> }
+
+## nonchaining binary
+token infix:{'<=>'} is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<cmp> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<is> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<but> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<does> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<..> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<^..> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<..^> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<^..^> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<ff> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<^ff> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<ff^> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<^ff^> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<fff> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<^fff> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<fff^> is Infix[|%nonchaining]
+    { <null> }
+
+token infix:<^fff^> is Infix[|%nonchaining]
+    { <null> }
+
+
+## chaining binary
+token infix:<==> is Infix[|%chaining]
+    { <null> }
+
+token infix:<!=> is Infix[|%chaining]
+    { <null> }
+
+token infix:{'<'} is Infix[|%chaining]
+    { <null> }
+
+token infix:{'<='} is Infix[|%chaining]
+    { <null> }
+
+token infix:{'>'} is Infix[|%chaining]
+    { <null> }
+
+token infix:{'>='} is Infix[|%chaining]
+    { <null> }
+
+token infix:<~~> is Infix[|%chaining]
+    { <null> }
+
+token infix:<!~> is Infix[|%chaining]
+    { <null> }
+
+token infix:<=~> is Infix[|%chaining]
+    { <panic: Please use either '~~' or '= ~' instead of '=~'> }
+
+token infix:<eq> is Infix[|%chaining]
+    { <null> }
+
+token infix:<ne> is Infix[|%chaining]
+    { <null> }
+
+token infix:<lt> is Infix[|%chaining]
+    { <null> }
+
+token infix:<le> is Infix[|%chaining]
+    { <null> }
+
+token infix:<gt> is Infix[|%chaining]
+    { <null> }
+
+token infix:<ge> is Infix[|%chaining]
+    { <null> }
+
+token infix:<=:=> is Infix[|%chaining]
+    { <null> }
+
+token infix:<===> is Infix[|%chaining]
+    { <null> }
+
+
+## tight and
+token infix:<&&> is Infix[|%tight_and]
+    is abstract('if')
+    { <null> }
+
+
+## tight or
+token infix:<||> is Infix[|%tight_or]
+    is abstract('unless')
+    { <null> }
+
+token infix:<^^> is Infix[|%tight_or]
+    is assoc('list')
+    is abstract('xor')
+    { <null> }
+
+token infix:<//> is Infix[|%tight_or]
+    { <null> }
+
+
+## conditional
+token postfix:<?? !!> is Postfix[|%conditional]
+    is abstract('if')
+    { <null> }
+
+
+## assignment
+token infix:<=> is Infix[|%assignment]
+    is abstract('assign')
+    is lvalue(1)
+    { <null> }
+
+token infix:<:=> is Infix[|%assignment]
+    is abstract('bind')
+    { <null> }
+
+token infix:<::=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<.=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<~=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<+=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<-=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<*=> is Infix[|%assignment]
+    { <null> }
+
+token infix:</=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<%=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<x=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<Y=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<**=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<xx=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<||=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<&&=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<//=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<^^=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<+<=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<+>=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<+|=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<+&=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<+^=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<~|=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<~&=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<~^=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<?|=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<?&=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<?^=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<|=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<&=> is Infix[|%assignment]
+    { <null> }
+
+token infix:<^=> is Infix[|%assignment]
+    { <null> }
+
+## list item separator
+token infix:<,> is Infix[|%comma]
+    { <null> }
+
+## loose unary
+token prefix:<true> is Infix[|%loose_unary]
+    { <null> }
+
+token prefix:<not> is Infix[|%loose_unary]
+    { <null> }
+
+## list prefix (really sub calls)
+token prefix:<print> is Infix(|%list_prefix)
+    { <null> }
+
+## loose and
+token infix:<and> is Infix(|%loose_and)
+    is abstract('if')
+    { <null> }
+
+## loose or
+token infix:<or> is Infix(|%loose_or)
+    is abstract('unless')
+    { <null> }
+
+token infix:<xor> is Infix(|%loose_or)
+    is abstract('xor')
+    { <null> }
+
+token infix:<err> is Infix(|%loose_or)
+    { <null> }
+
+## expression terminator
+token infix:<;> is Infix[|%terminator]
+    { <null> }
+
 
 # The <panic: message> rule is called for syntax errors.
 # If there are any <suppose> points, backtrack and retry parse
