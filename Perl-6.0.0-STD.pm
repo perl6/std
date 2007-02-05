@@ -934,7 +934,7 @@ token infix is Tight_or[]
 ## conditional
 token infix is Conditional[]
     is abstract('if')
-    { :<??> <EXPR(|%conditional> :<!!> }
+    { :<??> <EXPR(|%conditional)> :<!!> }
 
 
 ## assignment
