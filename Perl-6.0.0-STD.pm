@@ -1,6 +1,6 @@
 grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
-=begin TODO
+=begin things :todo
 
     regexen
     colon pairs
@@ -18,8 +18,9 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
     &foo:(Int,Num)
     &foo\($a,$b)
     \c[LATIN CAPITAL LETTER A]
+    add parsing this file to sanity tests :)
 
-=end TODO
+=end things :todo
 
 # XXX need to figure out how to export language:
 # method export_language {
