@@ -1,5 +1,11 @@
 grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
+# XXX need to figure out how to export language:
+# method export_language { 
+#     $?COMPILING::<$?COMPILER> := $?GRAMMAR;
+# }
+# with variants for override vs extend
+
 # This file is designed to be either preprocessed into a grammar with
 # action statements or used as-is without any preprocessing.  The {*}
 # notation is a no-op action block, but can be identified uniquely via
@@ -1100,23 +1106,23 @@ token assertstopper { <stdstopper> | \> }
 
 method EXPR (:$prec = "a=", :$stop = &stdstoppers) {
     if m:p/ <?before $stoppers> / {
-	return;
+        return;
     }
     my @termstack;
     my @opstack;
     push @termstack, $.expect_term();
     while not m:p/ <?before <$stoppers> > / {
-	my $infix := $.expect_infix();
-	if $infix.prec gt $opstack[-1].prec {	# reduce
+        my $infix := $.expect_infix();
+        if $infix.prec gt $opstack[-1].prec {   # reduce
             # XXX your ad here
-	}
-	else {					# shift
+        }
+        else {                                  # shift
             push @opstack, $infix;
             if m:p/ <?before $stoppers> / {
                 fail("$infix.perl() is missing right term");
             }
             push @termstack, $.expect_term();
-	}
+        }
     }
 }
 
