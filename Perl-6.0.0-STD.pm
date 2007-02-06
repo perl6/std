@@ -180,11 +180,16 @@ rule comp_unit {
                                                     {*} #= comp_unit
 }
 
-rule block {
+token block {
     \{
     <statement_list>
     [ \} || <panic: Missing right brace> ]
-                                                    {*} #= block
+    [
+    | <?unsp> <?before <[,:]>> {*}                       #= block
+    | <?before <?unv>? \n > {*} { let $<endline> := 1; } #= block endline
+    | {*} { let $<endlist> := 1; }                       #= block endlist
+    ]
+                                                        {*} #= block
 }
 
 rule statement_list {
@@ -208,7 +213,7 @@ rule statement {
 
 rule statement_control {
     :<use>
-    <module_name_wild> <EXPR>? ;?                       {*} #?#= sc use
+    <module_name_wild> <EXPR>? ;?                       {*} #? #= sc use
 }
 
 rule statement_control {
@@ -285,7 +290,7 @@ rule statement_control { :<CONTROL> <block> {*} }        #= sc CONTROL
 
 token statement_control { %statement_control }
 
-rule modifier_expr { <EXPR> ;? {*} }                    #?#= modifier_expr
+rule modifier_expr { <EXPR> ;? {*} }                    #? #= modifier_expr
 
 token statement_modifier { <statement_cond> | <statement_loop> }
 
@@ -421,20 +426,20 @@ token prefix_circumfix_meta_operator {
     :<[> <infix> :<]>                               {*}  #= precircum square
 }
 
-token prefix_postfix_meta_operator { :<«>     {*} }     #�#= prepost hyper
+token prefix_postfix_meta_operator { :<«>     {*} }  #» #= prepost hyper
 token prefix_postfix_meta_operator { :['<<'] {*} }      #= prepost HYPER
 
 token postfix_prefix_meta_operator { :<»>     {*} }     #= postpre hyper
 token postfix_prefix_meta_operator { :['>>'] {*} }      #= postpre HYPER
 
 token infix_prefix_meta_operator { :<!>     {*} }       #= inpre not
-token infix_prefix_meta_operator { :<«>     {*} }       #�#= inpre hyper dwim
+token infix_prefix_meta_operator { :<«>     {*} }    #» #= inpre hyper dwim
 token infix_prefix_meta_operator { :<»>     {*} }       #= inpre hyper asis
 token infix_prefix_meta_operator { :['<<'] {*} }        #= inpre HYPER dwim
 token infix_prefix_meta_operator { :['>>'] {*} }        #= inpre HYPER asis
 
 token infix_postfix_meta_operator { :<=>     {*} }      #= inpost assign
-token infix_postfix_meta_operator { :<«>     {*} }      #�#= inpost hyper asis
+token infix_postfix_meta_operator { :<«>     {*} }   #» #= inpost hyper asis
 token infix_postfix_meta_operator { :<»>     {*} }      #= inpost hyper dwim
 token infix_postfix_meta_operator { :['<<']  {*} }      #= inpost HYPER asis
 token infix_postfix_meta_operator { :['>>']  {*} }      #= inpost HYPER dwim
@@ -996,7 +1001,7 @@ token infix is Assignment[]                     #= infix:<^^=> def
     { :<^^=> {*} }                              #= infix:<^^=>
 
 token infix is Assignment[]                     #= infix:<+<=> def
-    { :<+<=> {*} }                              #>#= infix:<+<=>
+    { :<+<=> {*} }                           #> #= infix:<+<=>
 
 token infix=> is Assignment[]                   #= infix:<+> def
     { :<+> {*} }                                #= infix:<+>
@@ -1079,7 +1084,7 @@ token terminator is Terminator[:symbol['<==']]  #= terminator:['<=='] def
     { <before \<==> {*} }                       #= terminator:['<==']
 
 token terminator is Terminator[:symbol['==>']]  #= terminator:['==>'] def
-    { <?before :['==>'] > {*} }                 #'#= terminator:['==>']
+    { <?before :['==>'] > {*} }              #' #= terminator:['==>']
 
 token terminator is Terminator[:symbol<)>]      #= terminator:<)> def
     { <?before :<)> > {*} }                     #= terminator:<)>
