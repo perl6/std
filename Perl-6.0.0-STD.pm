@@ -1,6 +1,6 @@
 grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
-=begin things :todo
+=begin things todo
 
     regexen
     colon pairs
@@ -20,7 +20,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
     \c[LATIN CAPITAL LETTER A]
     add parsing this file to sanity tests :)
 
-=end things :todo
+=end things todo
 
 # XXX need to figure out how to export language:
 # method export_language {
@@ -149,7 +149,7 @@ category prefix_circumfix_meta_operator;
 # Lexical routines
 
 # make sure we're not an autoquoted identifier
-regex nofat { <!before \h* <?unsp> <'=>'> > }
+regex nofat { <!before \h* <?unsp> =\> > }
 
 method heredoc {
     while my $heredoc = shift @heredoc_queue {
@@ -191,7 +191,7 @@ token unv {
             | \# \N*         {*}                        #= unv comment line
             | <?pod_comment> {*}                        #= unv comment pod
             ]
-       | \# [
+       | <'#'> [
             # assuming <bracketed> defaults to standard set
             | <?bracketed>   {*}                        #= unv comment inline
             | \N*            {*}                        #= unv comment end
@@ -604,7 +604,10 @@ token value {
 }
 
 regex typename {
-    <name> <?{ is_type($<ident>) }>
+    <name>
+    <?{
+        is_type($<name>)
+    }>
 }
 
 token integer {
@@ -672,7 +675,7 @@ token trait_verb { :<returns>   <type> }
 
 rule signature {
     [<parameter> [ [ \, | \: | ; | ;; ] <parameter> ]* ]?
-    [ <'-->'> <type> ]?
+    [ --\> <type> ]?
 }
 
 rule type_declarator {
@@ -1195,7 +1198,13 @@ token regex_metachar { :<^^> }
 token regex_metachar { :<^> }
 token regex_metachar { :<$$> }
 token regex_metachar {
-    | :<$> <before $ | \s | @(qw/ | ) ] > /)>  }
+    | :<$> <before $
+                 | \s
+                 | \|
+                 | \)     # [
+                 | \]
+                 | \>
+           >
     | <variable>
 }
 
