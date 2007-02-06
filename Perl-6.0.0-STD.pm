@@ -114,9 +114,9 @@ category version;
 
 category term;
 category quote;
-category prefix;
-category infix;
-category postfix;
+category prefix  is defequiv(%symbolic_unary);
+category infix   is defequiv(%additive);
+category postfix is defequiv(%autoincrement);
 
 category circumfix;
 category postcircumfix;
@@ -483,6 +483,7 @@ token infix_postfix_meta_operator { :<»>     {*} }      #= inpost hyper dwim
 token infix_postfix_meta_operator { :['<<']  {*} }      #= inpost HYPER asis
 token infix_postfix_meta_operator { :['>>']  {*} }      #= inpost HYPER dwim
 
+token postfix { :<i> {*} }                              #= postfix i
 token postfix { :<++> {*} }                             #= postfix incr
 token postfix { :<--> {*} }                             #= postfix decr
 
@@ -1174,6 +1175,62 @@ method EXPR (:$prec = "a=", :$stop = &stdstoppers) {
     }
     return @opstack;
 }
+
+#############################################3333
+## Regex
+#############################################3333
+
+# XXX not complete
+
+token regex_metachar { <block> }
+token regex_metachar { <quantifier> }
+token regex_metachar { <regex_mod_internal> }
+token regex_metachar { :<\>> <regex_rightangle> }
+token regex_metachar { :['<<'] }
+token regex_metachar { :['<'] <regex_assertion> :['>'] }
+token regex_metachar { :<\\> <regex_backslash> }
+token regex_metachar { :<.> }
+token regex_metachar { :<^^> }
+token regex_metachar { :<^> }
+token regex_metachar { :<$$> }
+token regex_metachar {
+    | :<$> <before $ | \s | @(qw/ | ) ] > /)>  }
+    | <variable>
+}
+
+token regex_backslash { :<t> }
+token regex_backslash { :<T> }
+token regex_backslash { :<n> }
+token regex_backslash { :<N> }
+token regex_backslash { :<f> }
+token regex_backslash { :<F> }
+token regex_backslash { :<r> }
+token regex_backslash { :<R> }
+token regex_backslash { :<e> }
+token regex_backslash { :<E> }
+
+token regex_backslash { <panic: unrecognized regex colon sequence> }
+
+token regex_assertion { <block> }
+token regex_assertion { <variable> }
+token regex_assertion { :<?> <regex_assertion> }
+token regex_assertion { :<!> <regex_assertion> }
+token regex_assertion { :<+> <cclass_elem>+ }
+token regex_assertion { :<-> <cclass_elem>+ }
+
+token regex_assertion { <panic: unrecognized regex assertion> }
+
+token regex_mod_internal { :<:i> <regex_mod_arg>? }
+token regex_mod_internal { <panic: unrecognized regex modifier> }
+
+token regex_mod_external { :<:nth> <regex_mod_arg> }
+token regex_mod_external { <panic: unrecognized regex modifier> }
+
+token quantifier { :<**> <?ws> <block> <quantmod> }
+token quantifier { :<*> <quantmod> }
+token quantifier { :<+> <quantmod> }
+
+token quantmod { [ \? | \! | \: | \+ ]? }
 
 # The <panic: message> rule is called for syntax errors.
 # If there are any <suppose> points, backtrack and retry parse
