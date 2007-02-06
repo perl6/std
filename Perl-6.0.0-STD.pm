@@ -1,5 +1,26 @@
 grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
+=begin TODO
+
+    regexen
+    colon pairs
+    WHICH etc.
+    contextualizers
+    Array of Int
+    bracket matching incl Unicode Ps/Pe
+    Captures
+    Signatures
+    string literals
+    heredocs
+    generalized quotes
+    quote declarator
+    radix nums
+    &foo:(Int,Num)
+    &foo\($a,$b)
+    \c[LATIN CAPITAL LETTER A]
+
+=end TODO
+
 # XXX need to figure out how to export language:
 # method export_language {
 #     $?COMPILING::<$?COMPILER> := $?GRAMMAR;
@@ -9,7 +30,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 # This file is designed to be either preprocessed into a grammar with
 # action statements or used as-is without any preprocessing.  The {*}
 # notation is a no-op action block, but can be identified uniquely via
-# the following comment.  We put this into a comment rather than using
+# the following #= comment.  We put this into a comment rather than using
 # a macro so that bootstrap compilers don't have to worry about macros
 # yet, and to keep the main grammar relatively uncluttered by action
 # statements.  Note that the preprocessor can certainly generate accesses
@@ -111,6 +132,7 @@ category trait_auxiliary    is endsym(/ \s+ <nofat> /);
 
 category type_declarator    is endsym(/ \b <nofat> /);
 category scope_declarator   is endsym(/ \b <nofat> /);
+category package_declarator is endsym(/ \b <nofat> /);
 category routine_declarator is endsym(/ \b <nofat> /);
 category statement_prefix   is endsym(/ \b <nofat> /);
 category statement_control  is endsym(/ \s <nofat> /);
@@ -128,11 +150,28 @@ category prefix_circumfix_meta_operator;
 # make sure we're not an autoquoted identifier
 regex nofat { <!before \h* <?unsp> <'=>'> > }
 
+method heredoc {
+    while my $heredoc = shift @heredoc_queue {
+        my $delim = $heredoc.delim;
+        my $text = "";
+        # XXX wrong, wrong, wrong
+        if m:p/(.*?) ^^ (\h*) $delim \h* $$ \n?/ {
+            $text = $0;
+            $white = $1;
+            $text ~~ s:g/^^ $white //;
+            $heredoc.text = $text;
+        }
+        else {
+            fail("Ending delimiter $delim not found");
+        }
+    }
+}
+
 token ws {
     || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
     || [
        | <unsp>              {*}                        #= ws unsp
-       | \v                  {*}                        #= ws vwhite
+       | \v                  {*} <heredoc>              #= ws vwhite
        | <unv>               {*}                        #= ws unv
        ]*  {*}                                          #= ws all
 }
@@ -174,7 +213,7 @@ token pod_comment {
 
 rule comp_unit {
     ^
-    [ <type_declarator> <module_name> <trait>* ; ]?
+    [ <package_declarator> <module_name> <trait>* ; ]?
     <statement_list>
     [ $ || <panic: Parse terminated early> ]
                                                     {*} #= comp_unit
@@ -377,7 +416,7 @@ token expect_term {
 token noun {
     | <ident> <before \h* =\> >     # XXX sufficient in face of precedence?
     | <circumfix>
-    | <type_block>
+    | <package_block>
     | <variable>
     | <value>
     | <quote>
@@ -495,18 +534,21 @@ rule scoped_variables {
     <scope_declarator> <variable>
 }
 
-token scope_declarator { :<my>   {*} }     #= sd my
-token scope_declarator { :<our>  {*} }     #= sd our
+token scope_declarator { :<my>       {*} }     #= sd my
+token scope_declarator { :<our>      {*} }     #= sd our
+token scope_declarator { :<state>    {*} }     #= sd state
+token scope_declarator { :<constant> {*} }     #= sd constant
+token scope_declarator { :<has>      {*} }     #= sd has
 
-token type_declarator { :<class>    {*} }  #= td class
-token type_declarator { :<grammar>  {*} }  #= td grammar
-token type_declarator { :<module>   {*} }  #= td module
-token type_declarator { :<role>     {*} }  #= td role
-token type_declarator { :<package>  {*} }  #= td package
+token package_declarator { :<class>     {*} }     #= td class
+token package_declarator { :<grammar>   {*} }     #= td grammar
+token package_declarator { :<module>    {*} }     #= td module
+token package_declarator { :<role>      {*} }     #= td role
+token package_declarator { :<package>   {*} }     #= td package
 
-token type_block {
+token package_block {
     <scope_declarator>?
-    <type_declarator>
+    <package_declarator>
     <module_name>?              # XXX maybe shouldn't have version/auth?
     <trait>*
     <block>
@@ -629,6 +671,13 @@ token trait_verb { :<returns>   <type> }
 rule signature {
     [<parameter> [ [ \, | \: | ; | ;; ] <parameter> ]* ]?
     [ <'-->'> <type> ]?
+}
+
+rule type_declarator {
+    :<subset>
+    <name>
+    [ of <type_name> ]?
+    where <subset>
 }
 
 rule type_constraint {
