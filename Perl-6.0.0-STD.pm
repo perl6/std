@@ -74,15 +74,16 @@ role Terminator {...}
 
 # Categories are designed to be extensible in derived grammars.
 
-# Use of <*> calls into the appropriate rule for the token.
-# The key is automatically skipped unless "reparsed" is used.
-# In any case the default parse pattern is / <*> /, i.e. just call
-# the particular token's subrule.
+# The endsym trait, if specified, says what to implicitly check for in each
+# rule right after the initial :<symbol>.  Normally this is used to make sure
+# there's appropriate whitespace, though Perl 6 also uses it to rule out
+# the => (fatarrow) construct.
 
 category noun_prefix_sigil;
 category noun_prefix_twigil;
 category special_variable;
-category nameroot is parsed(/ \: <*> /);
+category nameroot;
+category version;
 
 category term;
 category quote;
@@ -90,8 +91,8 @@ category prefix;
 category infix;
 category postfix;
 
-category circumfix     is reparsed;
-category postcircumfix is reparsed;
+category circumfix;
+category postcircumfix;
 
 category regex_metachar;
 category regex_backslash;
@@ -99,25 +100,26 @@ category regex_assertion;
 category regex_mod_internal;
 category regex_mod_external;
 
-category trait_verb         is parsed(/ \s+ <nofat> <*> /);
-category trait_auxiliary    is parsed(/ \s+ <nofat> <*> /);
+category trait_verb         is endsym(/ \s+ <nofat> /);
+category trait_auxiliary    is endsym(/ \s+ <nofat> /);
 
-category type_declarator    is parsed(/ \b <nofat> <*> /);
-category scope_declarator   is parsed(/ \b <nofat> <*> /);
-category routine_declarator is parsed(/ \b <nofat> <*> /);
-category statement_prefix   is parsed(/ \b <nofat> <*> /);
-category statement_control  is parsed(/ \s <nofat> <*> /);
-category statement_cond     is parsed(/ \b <nofat> <*> /);
-category statement_loop     is parsed(/ \b <nofat> <*> /);
+category type_declarator    is endsym(/ \b <nofat> /);
+category scope_declarator   is endsym(/ \b <nofat> /);
+category routine_declarator is endsym(/ \b <nofat> /);
+category statement_prefix   is endsym(/ \b <nofat> /);
+category statement_control  is endsym(/ \s <nofat> /);
+category statement_cond     is endsym(/ \b <nofat> /);
+category statement_loop     is endsym(/ \b <nofat> /);
 
 category infix_prefix_meta_operator;
 category infix_postfix_meta_operator;
 category postfix_prefix_meta_operator;
 category prefix_postfix_meta_operator;
-category prefix_circumfix_meta_operator is reparsed;
+category prefix_circumfix_meta_operator;
 
 # Lexical routines
 
+# make sure we're not an autoquoted identifier
 regex nofat { <!before \h* <?unsp> <'=>'> > }
 
 token ws {
@@ -309,26 +311,26 @@ token nameroot { <'lua'> }
 token nameroot { <'php'> }
 
 token module_name {
-    <name>
-    [- <version>
+    <name>                                          {*} #= mn name
+    [- <version>                                    {*} #= mn version
         [-
-            <authority>
+            <authority>                             {*} #= mn auth
         ]?
     ]?
-                                                    {*} #= module_name
+                                                    {*} #= mn
 }
 
 token authority { <-[ \s ; \{ ]>+ }
 
 token module_name_wild {
-    <nameroot>?
-    <name>
-    [- <version_wild>
+    [ <nameroot> \: {*} ]?                              #= mnw root
+    <name>                                          {*} #= mnw name
+    [- <version_wild>                               {*} #= mnw version
         [-
-            <authority_wild>
+            <authority_wild>                        {*} #= mnw auth
         ]?
     ]?
-                                                    {*} #= usename
+                                                    {*} #= mnw
 }
 
 token version_wild   { <block> | <whatever> | <version> }
@@ -337,8 +339,10 @@ token authority_wild { <block> | <whatever> | <authority> }
 token whatever { \* }
 
 token version {
-    | v \d+ [ \. \d+ ]*                 {*}             #= version vstyle
-    | \d+ \. \d+ \. \d+ [ \. \d+]*      {*}             #= version dotted
+    v \d+ [ \. \d+ ]*                 {*}             #= version vstyle
+}
+token version {
+    \d+ \. \d+ \. \d+ [ \. \d+]*      {*}             #= version dotted
 }
 
 ###################################################
@@ -414,36 +418,35 @@ token expect_postfix {
                                                     {*} #= Xpostfix
 }
 token prefix_circumfix_meta_operator {
-    :<[ ]>
-    \[ <infix> \]                                    {*}  #= precircum square
+    :<[> <infix> :<]>                               {*}  #= precircum square
 }
 
-token prefix_postfix_meta_operator { :<«>     {*} }  #= prepost hyper
-token prefix_postfix_meta_operator { :['<<'] {*} }  #= prepost HYPER
+token prefix_postfix_meta_operator { :<«>     {*} }     #= prepost hyper
+token prefix_postfix_meta_operator { :['<<'] {*} }      #= prepost HYPER
 
-token postfix_prefix_meta_operator { :<»>     {*} }  #= postpre hyper
-token postfix_prefix_meta_operator { :['>>'] {*} }  #= postpre HYPER
+token postfix_prefix_meta_operator { :<»>     {*} }     #= postpre hyper
+token postfix_prefix_meta_operator { :['>>'] {*} }      #= postpre HYPER
 
-token infix_prefix_meta_operator { :<!>     {*} }    #= inpre not
-token infix_prefix_meta_operator { :<«>     {*} }    #= inpre hyper dwim
-token infix_prefix_meta_operator { :<»>     {*} }    #= inpre hyper asis
-token infix_prefix_meta_operator { :['<<'] {*} }    #= inpre HYPER dwim
-token infix_prefix_meta_operator { :['>>'] {*} }    #= inpre HYPER asis
+token infix_prefix_meta_operator { :<!>     {*} }       #= inpre not
+token infix_prefix_meta_operator { :<«>     {*} }       #= inpre hyper dwim
+token infix_prefix_meta_operator { :<»>     {*} }       #= inpre hyper asis
+token infix_prefix_meta_operator { :['<<'] {*} }        #= inpre HYPER dwim
+token infix_prefix_meta_operator { :['>>'] {*} }        #= inpre HYPER asis
 
-token infix_postfix_meta_operator { :<=>     {*} }   #= inpost assign
-token infix_postfix_meta_operator { :<«>     {*} }   #= inpost hyper asis
-token infix_postfix_meta_operator { :<»>     {*} }   #= inpost hyper dwim
-token infix_postfix_meta_operator { :['<<']  {*} }   #= inpost HYPER asis
-token infix_postfix_meta_operator { :['>>']  {*} }   #= inpost HYPER dwim
+token infix_postfix_meta_operator { :<=>     {*} }      #= inpost assign
+token infix_postfix_meta_operator { :<«>     {*} }      #= inpost hyper asis
+token infix_postfix_meta_operator { :<»>     {*} }      #= inpost hyper dwim
+token infix_postfix_meta_operator { :['<<']  {*} }      #= inpost HYPER asis
+token infix_postfix_meta_operator { :['>>']  {*} }      #= inpost HYPER dwim
 
-token postfix { :<++> {*} }                              #= postfix incr
-token postfix { :<--> {*} }                              #= postfix decr
+token postfix { :<++> {*} }                             #= postfix incr
+token postfix { :<--> {*} }                             #= postfix decr
 
-token postcircumfix { :<(> <EXPR> :<)> {*} }    #= postcircumfix ( )
+token postcircumfix { :<(> <EXPR> :<)> {*} }            #= postcircumfix ( )
 
-token postcircumfix { :<[> <EXPR> :<]> {*} }    #= postcircumfix [ ]
+token postcircumfix { :<[> <EXPR> :<]> {*} }            #= postcircumfix [ ]
 
-token postcircumfix { :<{> <EXPR> :<}> {*} }    #= postcircumfix { }
+token postcircumfix { :<{> <EXPR> :<}> {*} }            #= postcircumfix { }
 token postcircumfix { :['<'] <anglewords> :['>']
                                                     {*} #= postcircumfix < >
 }
@@ -452,7 +455,7 @@ token postcircumfix { :['<'] <shellwords> :['>']
                                                     {*} #= postcircumfix << >>
 }
 
-token postcircumfix { :<« »> \< <shellwords> \> {*} }    #= postcircumfix « »
+token postcircumfix { :<«> <shellwords> :<»> {*} }      #= postcircumfix « »
 
 token postop { <postfix> | <postcircumfix> }
 
@@ -475,16 +478,13 @@ token methodop {
     ]
 }
 
-# XXX how do we handle differences on non-standard prefix precedences?
-#token prefix: is equiv(&prefix:<print>) { <ident> [ <listop_expr> ]? }
-
-token circumfix { :<(> <EXPR> :<)> {*} }         #= circumfix ( )
-token circumfix { :<[> <EXPR> :<]> {*} }         #= circumfix [ ]
-token circumfix { :['<']  <anglewords>  :['>'] {*} }   #= circumfix < >
-token circumfix { :['<<'] <shellwords> :['>>'] {*} } #= circumfix << >>
-token circumfix { :<«>    <shellwords> :<»>    {*} }   #= circumfix « »
+token circumfix { :<(> <EXPR> :<)> {*} }                #= circumfix ( )
+token circumfix { :<[> <EXPR> :<]> {*} }                #= circumfix [ ]
+token circumfix { :['<']  <anglewords>  :['>'] {*} }    #= circumfix < >
+token circumfix { :['<<'] <shellwords> :['>>'] {*} }    #= circumfix << >>
+token circumfix { :<«>    <shellwords> :<»>    {*} }    #= circumfix « »
 token circumfix is Circumfix[:symbol<{ }>]
-    { <block>         {*} }                        #= circumfix { }
+    { <block>         {*} }                             #= circumfix { }
 
 rule scoped_variables {
     <scope_declarator> <variable>
@@ -597,7 +597,7 @@ rule subroutine {
     <subintro>
     <ident>?
     <trait>*
-    [\( <signature> \)]?
+    [ :? \( <signature> \)]?
     <block>
 }
 
@@ -644,453 +644,454 @@ token parameter {
     <default_value>
 }
 
-rule statement_prefix { :<do>      <statement> }
-rule statement_prefix { :<try>     <statement> }
-rule statement_prefix { :<gather>  <statement> }
-rule statement_prefix { :<contend> <statement> }
-rule statement_prefix { :<async>   <statement> }
-rule statement_prefix { :<lazy>    <statement> }
+rule statement_prefix { :<do>      <statement> {*} }    #= sp do
+rule statement_prefix { :<try>     <statement> {*} }    #= sp try
+rule statement_prefix { :<gather>  <statement> {*} }    #= sp gather
+rule statement_prefix { :<contend> <statement> {*} }    #= sp contend
+rule statement_prefix { :<async>   <statement> {*} }    #= sp async
+rule statement_prefix { :<lazy>    <statement> {*} }    #= sp lazy
 
 ## term
-token term is Term[]
-    { :<*> }
+token term is Term[]                            #= term:<*> def
+    { :<*> {*} }                                #= term:<*>
 
-token circumfix is Term[]
-    { :<( )> }
+token circumfix is Term[]                       #= circumfix:<( )> def
+    { :<( )> {*} }                              #= circumfix:<( )>
 
-token postcircumfix is Term[] 
+token postcircumfix is Term[]                   #= postcircumfix:<( )> def
     is abstract('call')
-    { :<( )> }
+    { :<( )> {*} }                              #= postcircumfix:<( )>
 
 ## autoincrement
-token postfix is Autoincrement[]
-    { :<++> }
+token postfix is Autoincrement[]                #= postfix:<++> def
+    { :<++> {*} }                               #= postfix:<++>
 
-token postfix is Autoincrement[]
-    { :<--> }
+token postfix is Autoincrement[]                #= postfix:<--> def
+    { :<--> {*} }                               #= postfix:<-->
 
-token prefix is Autoincrement[]
-    { :<++> }
+token prefix is Autoincrement[]                 #= prefix:<++> def
+    { :<++> {*} }                               #= prefix:<++>
 
-token prefix is Autoincrement[]
-    { :<--> }
+token prefix is Autoincrement[]                 #= prefix:<--> def
+    { :<--> {*} }                               #= prefix:<-->
 
 
 ## exponentiation
-token infix is Exponentiate[]
-    { :<**> }
+token infix is Exponentiate[]                   #= infix:<**> def
+    { :<**> {*} }                               #= infix:<**>
 
 ## symbolic unary
-token prefix is Symbolic_unary[]
-    { :<!> }
+token prefix is Symbolic_unary[]                #= prefix:<!> def
+    { :<!> {*} }                                #= prefix:<!>
 
-token prefix is Symbolic_unary[]
-    { :<+> }
+token prefix is Symbolic_unary[]                #= prefix:<+> def
+    { :<+> {*} }                                #= prefix:<+>
 
-token prefix is Symbolic_unary[]
-    { :<-> }
+token prefix is Symbolic_unary[]                #= prefix:<-> def
+    { :<-> {*} }                                #= prefix:<->
 
-token prefix is Symbolic_unary[]
-    { :<~> }
+token prefix is Symbolic_unary[]                #= prefix:<~> def
+    { :<~> {*} }                                #= prefix:<~>
 
-token prefix is Symbolic_unary[]
-    { :<?> }
+token prefix is Symbolic_unary[]                #= prefix:<?> def
+    { :<?> {*} }                                #= prefix:<?>
 
-token prefix is Symbolic_unary[]
-    { :<=> }
+token prefix is Symbolic_unary[]                #= prefix:<=> def
+    { :<=> {*} }                                #= prefix:<=>
 
-token prefix is Symbolic_unary[]
-    { :<*> }
+token prefix is Symbolic_unary[]                #= prefix:<*> def
+    { :<*> {*} }                                #= prefix:<*>
 
-token prefix is Symbolic_unary[]
-    { :<**> }
+token prefix is Symbolic_unary[]                #= prefix:<**> def
+    { :<**> {*} }                               #= prefix:<**>
 
-token prefix is Symbolic_unary[]
-    { :<~^> }
+token prefix is Symbolic_unary[]                #= prefix:<~^> def
+    { :<~^> {*} }                               #= prefix:<~^>
 
-token prefix is Symbolic_unary[] 
-    { :<+^> }
+token prefix is Symbolic_unary[]                #= prefix:<+^> def
+    { :<+^> {*} }                               #= prefix:<+^>
 
-token prefix is Symbolic_unary[]
-    { :<?^> }
+token prefix is Symbolic_unary[]                #= prefix:<?^> def
+    { :<?^> {*} }                               #= prefix:<?^>
 
-token prefix is Symbolic_unary[]
-    { :<^> }
+token prefix is Symbolic_unary[]                #= prefix:<^> def
+    { :<^> {*} }                                #= prefix:<^>
 
 
 ## multiplicative
-token infix is Multiplicative[]
-    { :<*> }
+token infix is Multiplicative[]                 #= infix:<*> def
+    { :<*> {*} }                                #= infix:<*>
 
-token infix is Multiplicative[]
-    { :</> }
+token infix is Multiplicative[]                 #= infix:</> def
+    { :</> {*} }                                #= infix:</>
 
-token infix is Multiplicative[]
-    { :<%> }
+token infix is Multiplicative[]                 #= infix:<%> def
+    { :<%> {*} }                                #= infix:<%>
 
-token infix is Multiplicative[]
-    { :<x> }
+token infix is Multiplicative[]                 #= infix:<x> def
+    { :<x> {*} }                                #= infix:<x>
 
-token infix is Multiplicative[]
-    { :<xx> }
+token infix is Multiplicative[]                 #= infix:<xx> def
+    { :<xx> {*} }                               #= infix:<xx>
 
-token infix is Multiplicative[]
-    { :<+&> }
+token infix is Multiplicative[]                 #= infix:<+&> def
+    { :<+&> {*} }                               #= infix:<+&>
 
-token infix is Multiplicative[]
-    { :['+<'] }
+token infix is Multiplicative[]                 #= infix:['+<'] def
+    { :['+<'] {*} }                             #= infix:['+<']
 
-token infix is Multiplicative[]
-    { :['+>'] }
+token infix is Multiplicative[]                 #= infix:['+>'] def
+    { :['+>'] {*} }                             #= infix:['+>']
 
-token infix is Multiplicative[]
-    { :<~&> }
+token infix is Multiplicative[]                 #= infix:<~&> def
+    { :<~&> {*} }                               #= infix:<~&>
 
-token infix is Multiplicative[]
-    { :['~<'] }
+token infix is Multiplicative[]                 #= infix:['~<'] def
+    { :['~<'] {*} }                             #= infix:['~<']
 
-token infix is Multiplicative[]
-    { :['~>'] }
+token infix is Multiplicative[]                 #= infix:['~>'] def
+    { :['~>'] {*} }                             #= infix:['~>']
 
 
 ## additive
-token infix is Additive[]
-    { :<+> }
+token infix is Additive[]                       #= infix:<+> def
+    { :<+> {*} }                                #= infix:<+>
 
-token infix is Additive[]
-    { :<-> }
+token infix is Additive[]                       #= infix:<-> def
+    { :<-> {*} }                                #= infix:<->
 
-token infix is Additive[]
-    { :<~> }
+token infix is Additive[]                       #= infix:<~> def
+    { :<~> {*} }                                #= infix:<~>
 
-token infix is Additive[]
-    { :<+|> }
+token infix is Additive[]                       #= infix:<+|> def
+    { :<+|> {*} }                               #= infix:<+|>
 
-token infix is Additive[]
-    { :<+^> }
+token infix is Additive[]                       #= infix:<+^> def
+    { :<+^> {*} }                               #= infix:<+^>
 
-token infix is Additive[]
-    { :<~|> }
+token infix is Additive[]                       #= infix:<~|> def
+    { :<~|> {*} }                               #= infix:<~|>
 
-token infix is Additive[]
-    { :<~^> }
+token infix is Additive[]                       #= infix:<~^> def
+    { :<~^> {*} }                               #= infix:<~^>
 
-token infix is Additive[]
-    { :<?|> }
+token infix is Additive[]                       #= infix:<?|> def
+    { :<?|> {*} }                               #= infix:<?|>
 
-token infix is Additive[]
-    { :<?^> }
+token infix is Additive[]                       #= infix:<?^> def
+    { :<?^> {*} }                               #= infix:<?^>
 
 
 ## junctive and (all)
-token infix is Junctive_and[]
-    { :<&> }
+token infix is Junctive_and[]                   #= infix:<&> def
+    { :<&> {*} }                                #= infix:<&>
 
 
 ## junctive or (any)
-token infix is Junctive_or[]
-    { :<|> }
+token infix is Junctive_or[]                    #= infix:<|> def
+    { :<|> {*} }                                #= infix:<|>
 
-token infix is Junctive_or[]
-    { :<^> }
+token infix is Junctive_or[]                    #= infix:<^> def
+    { :<^> {*} }                                #= infix:<^>
 
 
 ## named unary examples
-token prefix is Named_unary[]
-    { :<rand> }
+token prefix is Named_unary[]                   #= prefix:<rand> def
+    { :<rand> {*} }                             #= prefix:<rand>
 
-token prefix is Named_unary[]
-    { :<sleep> }
+token prefix is Named_unary[]                   #= prefix:<sleep> def
+    { :<sleep> {*} }                            #= prefix:<sleep>
 
-token prefix is Named_unary[]
-    { :<abs> }
+token prefix is Named_unary[]                   #= prefix:<abs> def
+    { :<abs> {*} }                              #= prefix:<abs>
 
 ## nonchaining binary
-token infix is Nonchaining[]
-    { :['<=>'] }
+token infix is Nonchaining[]                    #= infix:['<=>'] def
+    { :['<=>'] {*} }                            #= infix:['<=>']
 
-token infix is Nonchaining[]
-    { :<cmp> }
+token infix is Nonchaining[]                    #= infix:<cmp> def
+    { :<cmp> {*} }                              #= infix:<cmp>
 
-token infix is Nonchaining[]
-    { :<is> }
+token infix is Nonchaining[]                    #= infix:<is> def
+    { :<is> {*} }                               #= infix:<is>
 
-token infix is Nonchaining[]
-    { :<but> }
+token infix is Nonchaining[]                    #= infix:<but> def
+    { :<but> {*} }                              #= infix:<but>
 
-token infix is Nonchaining[]
-    { :<does> }
+token infix is Nonchaining[]                    #= infix:<does> def
+    { :<does> {*} }                             #= infix:<does>
 
-token infix is Nonchaining[]
-    { :<..> }
+token infix is Nonchaining[]                    #= infix:<..> def
+    { :<..> {*} }                               #= infix:<..>
 
-token infix is Nonchaining[]
-    { :<^..> }
+token infix is Nonchaining[]                    #= infix:<^..> def
+    { :<^..> {*} }                              #= infix:<^..>
 
-token infix is Nonchaining[]
-    { :<..^> }
+token infix is Nonchaining[]                    #= infix:<..^> def
+    { :<..^> {*} }                              #= infix:<..^>
 
-token infix is Nonchaining[]
-    { :<^..^> }
+token infix is Nonchaining[]                    #= infix:<^..^> def
+    { :<^..^> {*} }                             #= infix:<^..^>
 
-token infix is Nonchaining[]
-    { :<ff> }
+token infix is Nonchaining[]                    #= infix:<ff> def
+    { :<ff> {*} }                               #= infix:<ff>
 
-token infix is Nonchaining[]
-    { :<^ff> }
+token infix is Nonchaining[]                    #= infix:<^ff> def
+    { :<^ff> {*} }                              #= infix:<^ff>
 
-token infix is Nonchaining[]
-    { :<ff^> }
+token infix is Nonchaining[]                    #= infix:<ff^> def
+    { :<ff^> {*} }                              #= infix:<ff^>
 
-token infix is Nonchaining[]
-    { :<^ff^> }
+token infix is Nonchaining[]                    #= infix:<^ff^> def
+    { :<^ff^> {*} }                             #= infix:<^ff^>
 
-token infix is Nonchaining[]
-    { :<fff> }
+token infix is Nonchaining[]                    #= infix:<fff> def
+    { :<fff> {*} }                              #= infix:<fff>
 
-token infix is Nonchaining[]
-    { :<^fff> }
+token infix is Nonchaining[]                    #= infix:<^fff> def
+    { :<^fff> {*} }                             #= infix:<^fff>
 
-token infix is Nonchaining[]
-    { :<fff^> }
+token infix is Nonchaining[]                    #= infix:<fff^> def
+    { :<fff^> {*} }                             #= infix:<fff^>
 
-token infix is Nonchaining[]
-    { :<^fff^> }
+token infix is Nonchaining[]                    #= infix:<^fff^> def
+    { :<^fff^> {*} }                            #= infix:<^fff^>
 
 
 ## chaining binary
-token infix is Chaining[]
-    { :<==> }
+token infix is Chaining[]                       #= infix:<==> def
+    { :<==> {*} }                               #= infix:<==>
 
-token infix is Chaining[]
-    { :<!=> }
+token infix is Chaining[]                       #= infix:<!=> def
+    { :<!=> {*} }                               #= infix:<!=>
 
-token infix is Chaining[]
-    { :['<'] }
+token infix is Chaining[]                       #= infix:['<'] def
+    { :['<'] {*} }                              #= infix:['<']
 
-token infix is Chaining[]
-    { :['<='] }
+token infix is Chaining[]                       #= infix:['<='] def
+    { :['<='] {*} }                             #= infix:['<=']
 
-token infix is Chaining[]
-    { :['>'] }
+token infix is Chaining[]                       #= infix:['>'] def
+    { :['>'] {*} }                              #= infix:['>']
 
-token infix is Chaining[]
-    { :['>='] }
+token infix is Chaining[]                       #= infix:['>='] def
+    { :['>='] {*} }                             #= infix:['>=']
 
-token infix is Chaining[]
-    { :<~~> }
+token infix is Chaining[]                       #= infix:<~~> def
+    { :<~~> {*} }                               #= infix:<~~>
 
-token infix is Chaining[]
-    { :<!~> }
+token infix is Chaining[]                       #= infix:<!~> def
+    { :<!~> {*} }                               #= infix:<!~>
 
-token infix is Chaining[]
-    { :<=~> }
+token infix is Chaining[]                       #= infix:<=~> def
+    { :<=~> {*} }                               #= infix:<=~>
 
-token infix is Chaining[]
-    { :<eq> }
+token infix is Chaining[]                       #= infix:<eq> def
+    { :<eq> {*} }                               #= infix:<eq>
 
-token infix is Chaining[]
-    { :<ne> }
+token infix is Chaining[]                       #= infix:<ne> def
+    { :<ne> {*} }                               #= infix:<ne>
 
-token infix is Chaining[]
-    { :<lt> }
+token infix is Chaining[]                       #= infix:<lt> def
+    { :<lt> {*} }                               #= infix:<lt>
 
-token infix is Chaining[]
-    { :<le> }
+token infix is Chaining[]                       #= infix:<le> def
+    { :<le> {*} }                               #= infix:<le>
 
-token infix is Chaining[]
-    { :<gt> }
+token infix is Chaining[]                       #= infix:<gt> def
+    { :<gt> {*} }                               #= infix:<gt>
 
-token infix is Chaining[]
-    { :<ge> }
+token infix is Chaining[]                       #= infix:<ge> def
+    { :<ge> {*} }                               #= infix:<ge>
 
-token infix is Chaining[]
-    { :<=:=> }
+token infix is Chaining[]                       #= infix:<=:=> def
+    { :<=:=> {*} }                              #= infix:<=:=>
 
-token infix is Chaining[]
-    { :<===> }
+token infix is Chaining[]                       #= infix:<===> def
+    { :<===> {*} }                              #= infix:<===>
 
 
 ## tight and
-token infix is Tight_and[]
+token infix is Tight_and[]                      #= infix:<&&> def
     is abstract('if')
-    { :<&&> }
+    { :<&&> {*} }                               #= infix:<&&>
 
 
 ## tight or
-token infix is Tight_or[]
+token infix is Tight_or[]                       #= infix:<||> def
     is abstract('unless')
-    { :<||> }
+    { :<||> {*} }                               #= infix:<||>
 
-token infix is Tight_or[:assoc<list>]
+token infix is Tight_or[:assoc<list>]           #= infix:<^^> def
     is assoc('list')
     is abstract('xor')
-    { :<^^> }
+    { :<^^> {*} }                               #= infix:<^^>
 
-token infix is Tight_or[]
-    { :<//> }
+token infix is Tight_or[]                       #= infix:<//> def
+    { :<//> {*} }                               #= infix:<//>
 
 
 ## conditional
-token infix is Conditional[]
+token infix is Conditional[]                    #= infix:<?? !!> def
     is abstract('if')
-    { :<??> <EXPR(|%conditional)> :<!!> }
+    { :<??> <EXPR(|%conditional)> :<!!> {*} }   #= infix:<?? !!>
 
 
 ## assignment
-token infix is Assignment[]
+token infix is Assignment[]                     #= infix:<=> def
     is abstract('assign')
     is lvalue(1)
-    { :<=> }
+    { :<=> {*} }                                #= infix:<=>
 
-token infix is Assignment[]
+token infix is Assignment[]                     #= infix:<:=> def
     is abstract('bind')
-    { :<:=> }
+    { :<:=> {*} }                               #= infix:<:=>
 
-token infix is Assignment[]
-    { :<::=> }
+token infix is Assignment[]                     #= infix:<::=> def
+    { :<::=> {*} }                              #= infix:<::=>
 
-token infix is Assignment[]
-    { :<.=> }
+token infix is Assignment[]                     #= infix:<.=> def
+    { :<.=> {*} }                               #= infix:<.=>
 
-token infix is Assignment[]
-    { :<~=> }
+token infix is Assignment[]                     #= infix:<~=> def
+    { :<~=> {*} }                               #= infix:<~=>
 
-token infix is Assignment[]
-    { :<+=> }
+token infix is Assignment[]                     #= infix:<+=> def
+    { :<+=> {*} }                               #= infix:<+=>
 
-token infix is Assignment[]
-    { :<-=> }
+token infix is Assignment[]                     #= infix:<-=> def
+    { :<-=> {*} }                               #= infix:<-=>
 
-token infix is Assignment[]
-    { :<*=> }
+token infix is Assignment[]                     #= infix:<*=> def
+    { :<*=> {*} }                               #= infix:<*=>
 
-token infix is Assignment[]
-    { :</=> }
+token infix is Assignment[]                     #= infix:</=> def
+    { :</=> {*} }                               #= infix:</=>
 
-token infix is Assignment[]
-    { :<%=> }
+token infix is Assignment[]                     #= infix:<%=> def
+    { :<%=> {*} }                               #= infix:<%=>
 
-token infix is Assignment[]
-    { :<x=> }
+token infix is Assignment[]                     #= infix:<x=> def
+    { :<x=> {*} }                               #= infix:<x=>
 
-token infix is Assignment[]
-    { :<Y=> }
+token infix is Assignment[]                     #= infix:<Y=> def
+    { :<Y=> {*} }                               #= infix:<Y=>
 
-token infix is Assignment[]
-    { :<**=> }
+token infix is Assignment[]                     #= infix:<**=> def
+    { :<**=> {*} }                              #= infix:<**=>
 
-token infix is Assignment[]
-    { :<xx=> }
+token infix is Assignment[]                     #= infix:<xx=> def
+    { :<xx=> {*} }                              #= infix:<xx=>
 
-token infix is Assignment[]
-    { :<||=> }
+token infix is Assignment[]                     #= infix:<||=> def
+    { :<||=> {*} }                              #= infix:<||=>
 
-token infix is Assignment[]
-    { :<&&=> }
+token infix is Assignment[]                     #= infix:<&&=> def
+    { :<&&=> {*} }                              #= infix:<&&=>
 
-token infix is Assignment[]
-    { :<//=> }
+token infix is Assignment[]                     #= infix:<//=> def
+    { :<//=> {*} }                              #= infix:<//=>
 
-token infix is Assignment[]
-    { :<^^=> }
+token infix is Assignment[]                     #= infix:<^^=> def
+    { :<^^=> {*} }                              #= infix:<^^=>
 
-token infix is Assignment[]
-    { :<+<=> }
+token infix is Assignment[]                     #= infix:<+<=> def
+    { :<+<=> {*} }                              #= infix:<+<=>
 
-token infix=> is Assignment[]
-    { :<+> }
+token infix=> is Assignment[]                   #= infix:<+> def
+    { :<+> {*} }                                #= infix:<+>
 
-token infix is Assignment[]
-    { :<+|=> }
+token infix is Assignment[]                     #= infix:<+|=> def
+    { :<+|=> {*} }                              #= infix:<+|=>
 
-token infix is Assignment[]
-    { :<+&=> }
+token infix is Assignment[]                     #= infix:<+&=> def
+    { :<+&=> {*} }                              #= infix:<+&=>
 
-token infix is Assignment[]
-    { :<+^=> }
+token infix is Assignment[]                     #= infix:<+^=> def
+    { :<+^=> {*} }                              #= infix:<+^=>
 
-token infix is Assignment[]
-    { :<~|=> }
+token infix is Assignment[]                     #= infix:<~|=> def
+    { :<~|=> {*} }                              #= infix:<~|=>
 
-token infix is Assignment[]
-    { :<~&=> }
+token infix is Assignment[]                     #= infix:<~&=> def
+    { :<~&=> {*} }                              #= infix:<~&=>
 
-token infix is Assignment[]
-    { :<~^=> }
+token infix is Assignment[]                     #= infix:<~^=> def
+    { :<~^=> {*} }                              #= infix:<~^=>
 
-token infix is Assignment[]
-    { :<?|=> }
+token infix is Assignment[]                     #= infix:<?|=> def
+    { :<?|=> {*} }                              #= infix:<?|=>
 
-token infix is Assignment[]
-    { :<?&=> }
+token infix is Assignment[]                     #= infix:<?&=> def
+    { :<?&=> {*} }                              #= infix:<?&=>
 
-token infix is Assignment[]
-    { :<?^=> }
+token infix is Assignment[]                     #= infix:<?^=> def
+    { :<?^=> {*} }                              #= infix:<?^=>
 
-token infix is Assignment[]
-    { :<|=> }
+token infix is Assignment[]                     #= infix:<|=> def
+    { :<|=> {*} }                               #= infix:<|=>
 
-token infix is Assignment[]
-    { :<&=> }
+token infix is Assignment[]                     #= infix:<&=> def
+    { :<&=> {*} }                               #= infix:<&=>
 
-token infix is Assignment[]
-    { :<^=> }
+token infix is Assignment[]                     #= infix:<^=> def
+    { :<^=> {*} }                               #= infix:<^=>
 
 ## list item separator
-token infix is Comma[]
-    { :<,> }
+token infix is Comma[]                          #= infix:<,> def
+    { :<,> {*} }                                #= infix:<,>
 
 ## loose unary
-token prefix is Loose_unary[]
-    { :<true> }
+token prefix is Loose_unary[]                   #= prefix:<true> def
+    { :<true> {*} }                             #= prefix:<true>
 
-token prefix is Loose_unary[]
-    { :<not> }
+token prefix is Loose_unary[]                   #= prefix:<not> def
+    { :<not> {*} }                              #= prefix:<not>
 
 ## list prefix (really sub calls)
-token prefix is List_prefix[]
-    { :<print> }
+token prefix is List_prefix[]                   #= prefix:<print> def
+    { :<print> {*} }                            #= prefix:<print>
 
 ## loose and
-token infix is Loose_and[]
+token infix is Loose_and[]                      #= infix:<and> def
     is abstract('if')
-    { :<and> }
+    { :<and> {*} }                              #= infix:<and>
 
 ## loose or
-token infix is Loose_or[]
+token infix is Loose_or[]                       #= infix:<or> def
     is abstract('unless')
-    { :<or> }
+    { :<or> {*} }                               #= infix:<or>
 
-token infix is Loose_or[]
+token infix is Loose_or[]                       #= infix:<xor> def
     is abstract('xor')
-    { :<xor> }
+    { :<xor> {*} }                              #= infix:<xor>
 
-token infix is Loose_or[]
-    { :<err> }
+token infix is Loose_or[]                       #= infix:<err> def
+    { :<err> {*} }                              #= infix:<err>
 
 ## expression terminator
 
-token terminator is Terminator[]
-    { :<;> }                                # XXX correct to eat semicolon?
+# XXX correct to eat semicolon here?
+token terminator is Terminator[]                #= terminator:<;> def
+    { :<;> {*} }                                #= terminator:<;>
 
-token terminator is Terminator[:symbol['<==']]
-    { <before \<==> }
+token terminator is Terminator[:symbol['<==']]  #= terminator:['<=='] def
+    { <before \<==> {*} }                       #= terminator:['<==']
 
-token terminator is Terminator[:symbol['==>']]
-    { <?before :['==>'] > }
+token terminator is Terminator[:symbol['==>']]  #= terminator:['==>'] def
+    { <?before :['==>'] > {*} }                 #= terminator:['==>']
 
-token terminator is Terminator[:symbol<)>]
-    { <?before :<)> > }
+token terminator is Terminator[:symbol<)>]      #= terminator:<)> def
+    { <?before :<)> > {*} }                     #= terminator:<)>
 
-token terminator is Terminator[:symbol<]>]
-    { <?before \] > }
+token terminator is Terminator[:symbol<]>]      #= terminator:<]> def
+    { <?before \] > {*} }                       #= terminator:<]>
 
-token terminator is Terminator[:symbol<\}>]
-    { <?before \} > }
+token terminator is Terminator[:symbol<\}>]     #= terminator:<}> def
+    { <?before \} > {*} }                       #= terminator:<}>
 
-token terminator is Terminator[:symbol<!!>]
-    { <?before !! > }
+token terminator is Terminator[:symbol<!!>]     #= terminator:<!!> def
+    { <?before !! > {*} }                       #= terminator:<!!>
 
 token stdstopper { <terminator> | <statement_cond> | <statement_loop> | $ }
 token assertstopper { <stdstopper> | \> }
