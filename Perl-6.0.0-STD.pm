@@ -382,18 +382,12 @@ token noun {
     | <statement_prefix>
 }
 
-token expect_infix {
+token expect_infix ($minprec) {
     <?ws>
     <infix_prefix_meta_operator>*
-    [
-    | <infix>
-    | <trait_verb>
-    | <trait_auxiliary>
-    | <statement_modifier>
-    | <infix_prefix_meta_operator>
-    | <infix_circumfix_meta_operator>
-    ]
+    <infix>
     <infix_postfix_meta_operator>*
+    ::: <?{ $<infix>.prec gt $minprec }>
                                                     {*} #= Xinfix
 }
 
@@ -1105,25 +1099,26 @@ token assertstopper { <stdstopper> | \> }
 # XXX skeleton of operator precedence parser
 
 method EXPR (:$prec = "a=", :$stop = &stdstoppers) {
-    if m:p/ <?before $stoppers> / {
+    if m:p/ <?before <$stop>> / {
         return;
     }
     my @termstack;
     my @opstack;
     push @termstack, $.expect_term();
-    while not m:p/ <?before <$stoppers> > / {
-        my $infix := $.expect_infix();
-        if $infix.prec gt $opstack[-1].prec {   # reduce
+    while not m:p/ <?before <$stop> > / {
+        my $infix := $.expect_infix($prec) err last;
+        if @opstack and $infix.prec gt @opstack[-1].prec {   # reduce
             # XXX your ad here
         }
         else {                                  # shift
             push @opstack, $infix;
-            if m:p/ <?before $stoppers> / {
+            if m:p/ <?before <$stop>> / {
                 fail("$infix.perl() is missing right term");
             }
             push @termstack, $.expect_term();
         }
     }
+    return @opstack;
 }
 
 # The <panic: message> rule is called for syntax errors.
