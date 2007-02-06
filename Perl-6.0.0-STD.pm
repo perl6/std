@@ -128,6 +128,9 @@ category regex_assertion;
 category regex_mod_internal;
 category regex_mod_external;
 
+category q_backslash;
+category qq_backslash;
+
 category trait_verb         is endsym(/ \s+ <nofat> /);
 category trait_auxiliary    is endsym(/ \s+ <nofat> /);
 
@@ -1184,8 +1187,6 @@ method EXPR (:$prec = "a=", :$stop = &stdstoppers) {
 ## Regex
 #############################################3333
 
-# XXX not complete
-
 token regex_metachar { <block> }
 token regex_metachar { <quantifier> }
 token regex_metachar { <regex_mod_internal> }
@@ -1201,25 +1202,43 @@ token regex_metachar {
     | :<$> <before $
                  | \s
                  | \|
-                 | \)     # [
+                 | \)
                  | \]
                  | \>
            >
     | <variable>
 }
 
-token regex_backslash { :<t> }
-token regex_backslash { :<T> }
-token regex_backslash { :<n> }
-token regex_backslash { :<N> }
-token regex_backslash { :<f> }
-token regex_backslash { :<F> }
-token regex_backslash { :<r> }
-token regex_backslash { :<R> }
-token regex_backslash { :<e> }
-token regex_backslash { :<E> }
+token q_backslash { :<qq> <qq_bracketed> }
+token q_backslash { :<\> }
 
-token regex_backslash { <panic: unrecognized regex colon sequence> }
+token qq_backslash { :<a> }
+token qq_backslash { :<b> }
+token qq_backslash { :<c> <bracket_named_unicode> }
+token qq_backslash { :<e> }
+token qq_backslash { :<f> }
+token qq_backslash { :<n> }
+token qq_backslash { :<o> [ <octnum> | \[<octnum>[,<octnum>]*\] ] }
+token qq_backslash { :<r> }
+token qq_backslash { :<t> }
+token qq_backslash { :<x> [ <hexnum> | \[<hexnum>[,<hexnum>]*\] ] }
+token qq_backslash { :: \W || <panic: unrecognized backslash sequence> }
+
+token regex_backslash { :i :<a> }
+token regex_backslash { :i :<b> }
+token regex_backslash { :i :<c> <bracket_named_unicode> }
+token regex_backslash { :i :<d> }
+token regex_backslash { :i :<e> }
+token regex_backslash { :i :<f> }
+token regex_backslash { :i :<h> }
+token regex_backslash { :i :<n> }
+token regex_backslash { :i :<o> [ <octnum> | \[<octnum>[,<octnum>]*\] ] }
+token regex_backslash { :i :<r> }
+token regex_backslash { :i :<t> }
+token regex_backslash { :i :<v> }
+token regex_backslash { :i :<w> }
+token regex_backslash { :i :<x> [ <hexnum> | \[<hexnum>[,<hexnum>]*\] ] }
+token regex_backslash { :: <panic: unrecognized regex backslash sequence> }
 
 token regex_assertion { <block> }
 token regex_assertion { <variable> }
@@ -1227,6 +1246,7 @@ token regex_assertion { :<?> <regex_assertion> }
 token regex_assertion { :<!> <regex_assertion> }
 token regex_assertion { :<+> <cclass_elem>+ }
 token regex_assertion { :<-> <cclass_elem>+ }
+# XXX --more--
 
 token regex_assertion { <panic: unrecognized regex assertion> }
 
