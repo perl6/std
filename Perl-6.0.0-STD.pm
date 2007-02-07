@@ -235,6 +235,18 @@ token block {
                                                         {*} #= block
 }
 
+token regex_block {  # perhaps parameterize and combine with block someday
+    \{
+    <regex>
+    [ \} || <panic: Missing right brace> ]
+    [
+    | <?unsp> <?before <[,:]>> {*}                       #= rxblock
+    | <?before <?unv>? \n > {*} { let $<endline> := 1; } #= rxblock endline
+    | {*} { let $<endlist> := 1; }                       #= rxblock endlist
+    ]
+                                                        {*} #= rxblock
+}
+
 rule statement_list {
     <statement>*
                                                     {*} #= statement_list
@@ -365,26 +377,26 @@ token nameroot { <'lua'> }
 token nameroot { <'php'> }
 
 token module_name {
-    <name>                                          {*} #= mn name
-    [- <version>                                    {*} #= mn version
+    <name>                                          {*} #= modulename name
+    [- <version>                                    {*} #= modulename version
         [-
-            <authority>                             {*} #= mn auth
+            <authority>                             {*} #= modulename auth
         ]?
     ]?
-                                                    {*} #= mn
+                                                    {*} #= modulename
 }
 
 token authority { <-[ \s ; \{ ]>+ }
 
 token module_name_wild {
-    [ <nameroot> \: {*} ]?                              #= mnw root
-    <name>                                          {*} #= mnw name
-    [- <version_wild>                               {*} #= mnw version
+    [ <nameroot> \: {*} ]?                              #= modulewild root
+    <name>                                          {*} #= modulewild name
+    [- <version_wild>                               {*} #= modulewild version
         [-
-            <authority_wild>                        {*} #= mnw auth
+            <authority_wild>                        {*} #= modulewild auth
         ]?
     ]?
-                                                    {*} #= mnw
+                                                    {*} #= modwild
 }
 
 token version_wild   { <block> | <whatever> | <version> }
@@ -426,7 +438,8 @@ token noun {
     | <quote>
     | <term>
     | <scope_declarator>
-    | <routine_declarator>
+    | <routine_block>
+    | <regex_block>
     | <statement_prefix>
 }
 
@@ -647,13 +660,22 @@ token quote_interpolation {
                      | <postcircumfix> )*
 }
 
-rule subroutine {
+rule routine_block {
     <scope_declarator>?
     <subintro>
     <ident>?
     <trait>*
     [ :? \( <signature> \)]?
     <block>
+}
+
+rule regex_method {
+    <scope_declarator>?
+    <regex_declarator>
+    <ident>?
+    <trait>*
+    [ :? \( <signature> \)]?
+    <regex_block>
 }
 
 rule subintro { <routine_modifier> <routine_type>? | <routine_type> }
@@ -664,9 +686,10 @@ token routine_declarator { :<sub> }
 token routine_declarator { :<method> }
 token routine_declarator { :<submethod> }
 token routine_declarator { :<macro> }
-token routine_declarator { :<regex> }
-token routine_declarator { :<token> }
-token routine_declarator { :<rule> }
+
+token regex_declarator { :<regex> }
+token regex_declarator { :<token> }
+token regex_declarator { :<rule> }
 
 rule trait { <trait_verb> | <trait_auxiliary> }
 
@@ -1187,10 +1210,68 @@ method EXPR (:$prec = "a=", :$stop = &stdstoppers) {
 ## Regex
 #############################################3333
 
+rule regex {
+    <regex_ordered_disjunction>
+}
+
+rule regex_ordered_disjunction {
+    <'||'>?
+    <regex_ordered_conjunction>
+    [ :<||> <regex_ordered_conjunction> ]*
+}
+
+rule regex_ordered_conjunction {
+    <regex_unordered_disjunction>
+    [ :<&&> <regex_unordered_disjunction> ]*
+}
+
+rule regex_unordered_disjunction {
+    <'|'>?
+    <regex_unordered_conjunction>
+    [ :<|> <regex_unordered_conjunction> ]*
+}
+
+rule regex_unordered_conjunction {
+    <regex_sequence>
+    [ :<&> <regex_sequence> ]*
+}
+
+rule regex_sequence {
+    <regex_quantified_atom>+
+    # Could combine unquantified atoms into one here...
+}
+
+rule regex_quantified_atom {
+    <regex_atom>
+    [ <regex_quantifier>
+        <?{ $<regex_atom>.max_width }>
+            || <panic: "Can't quantify zero-width atom")
+    ]?
+}
+
+rule <regex_atom> {
+    || <regex_metachar>
+    || (.)
+}
+
+# sequence stoppers
+token regex_metachar { :['>'] :: <fail> }
+token regex_metachar { :<&&>  :: <fail> }
+token regex_metachar { :<&>   :: <fail> }
+token regex_metachar { :<||>  :: <fail> }
+token regex_metachar { :<|>   :: <fail> }
+token regex_metachar { :<}>   :: <fail> }
+token regex_metachar { :<]>   :: <fail> }
+token regex_metachar { :<)>   :: <fail> }
+
+# "normal" metachars
 token regex_metachar { <block> }
-token regex_metachar { <quantifier> }
+token regex_metachar { <quantifier> <panic: quantifier quantifies nothing> }
 token regex_metachar { <regex_mod_internal> }
+token regex_metachar { :<[> <regex> :<]> }
+token regex_metachar { :<(> <regex> :<)> }
 token regex_metachar { :<\>> <regex_rightangle> }
+token regex_metachar { :['>>'] }
 token regex_metachar { :['<<'] }
 token regex_metachar { :['<'] <regex_assertion> :['>'] }
 token regex_metachar { :<\\> <regex_backslash> }
@@ -1240,13 +1321,20 @@ token regex_backslash { :i :<w> }
 token regex_backslash { :i :<x> [ <hexnum> | \[<hexnum>[,<hexnum>]*\] ] }
 token regex_backslash { :: <panic: unrecognized regex backslash sequence> }
 
-token regex_assertion { <block> }
-token regex_assertion { <variable> }
 token regex_assertion { :<?> <regex_assertion> }
 token regex_assertion { :<!> <regex_assertion> }
+
+token regex_assertion { <block> }
+token regex_assertion { <variable> }
+token regex_assertion { <ident> [
+                                | \: <?ws> <qq_literal(:stop«>»))>
+                                | \( <EXPR> \)
+                                | <?ws> <EXPR>
+                                ]?
+}
+
 token regex_assertion { :<+> <cclass_elem>+ }
 token regex_assertion { :<-> <cclass_elem>+ }
-# XXX --more--
 
 token regex_assertion { <panic: unrecognized regex assertion> }
 
@@ -1256,9 +1344,9 @@ token regex_mod_internal { <panic: unrecognized regex modifier> }
 token regex_mod_external { :<:nth> <regex_mod_arg> }
 token regex_mod_external { <panic: unrecognized regex modifier> }
 
-token quantifier { :<**> <?ws> <block> <quantmod> }
-token quantifier { :<*> <quantmod> }
-token quantifier { :<+> <quantmod> }
+token regex_quantifier { :<**> <?ws> <block> <quantmod> }
+token regex_quantifier { :<*> <quantmod> }
+token regex_quantifier { :<+> <quantmod> }
 
 token quantmod { [ \? | \! | \: | \+ ]? }
 
