@@ -149,36 +149,35 @@ category prefix_circumfix_meta_operator;
 # make sure we're not an autoquoted identifier
 regex nofat { <!before \h* <?unsp> =\> > }
 
-class Heredoc {
+class Herestub {
     has Str $.delim;
-    has Str $.text is rw;
+    has $.orignode;
     has $.lang;
 }
 
+# XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
+
 method heredoc {
-    while my $heredoc = shift @heredoc_queue {
-        my $delim = $heredoc.delim;
-        my $lang = $heredoc.lang;
-        my $text = "";
-        my $ws;
-        if m:p/$text:=<q_text($lang,
-                              :stop(rx[^^ $ws:=(\h*) $delim \h* $$ \n?]
-                             )>/
-        {
-            if $ws {
+    while my $herestub = shift @herestub_queue {
+        my $delim = $herestub.delim;
+        my $lang = $herestub.lang;
+        my $doc;
+        my $ws = "";
+        my $stoppat = $delim eq "" ?? rx[^^ \h* $$]
+                                   !! rx[^^ $ws:=(\h*?) $delim \h* $$ \n?];
+        my @heredoc_initial_ws is context is rw;
+        if m:p/$doc:=<q_text($lang, :stop($stoppat))>/ {
+            if $ws and @heredoc_initial_ws {
                 my $wsequiv = $ws;
                 $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
-                my @lines = $text.split(/^^/);
-                for @lines {
+                my @lines = $text.split(/^^/);  # XXX wrong, wrong, wrong
+                for @heredoc_initial_strings {
                     next if s/^ $ws //;   # reward consistent tabbing
                     s/^^ (\t+) /{ ' ' x ($0 * 8) }/;
                     s/^ $wsequiv // or s/^ \h+ //;
                 }
-                $heredoc.text = @lines.join;
             }
-            else {
-                $heredoc.text = $text;
-            }
+            $herestub.orignode<doc> = $doc;
         }
         else {
             fail("Ending delimiter $delim not found");
