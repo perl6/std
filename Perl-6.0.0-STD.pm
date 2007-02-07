@@ -2,30 +2,22 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
-    rx
-    colon pairs
     WHICH etc.
     contextualizers
     Array of Int
     bracket matching incl Unicode Ps/Pe
     Captures
     Signatures
-    string literals
     heredocs
     quote declarator
-    radix nums
     &foo:(Int,Num)
     &foo\($a,$b)
     \c[LATIN CAPITAL LETTER A]
+    sublanguages
+    exporting grammars to the compiler vs namespace (which one is default?)
     add parsing this file to sanity tests :)
 
 =end things todo
-
-# XXX need to figure out how to export language:
-# method export_language {
-#     $?COMPILING::<$?COMPILER> := $?GRAMMAR;
-# }
-# with variants for override vs extend
 
 # This file is designed to be either preprocessed into a grammar with
 # action statements or used as-is without any preprocessing.  The {*}
@@ -52,27 +44,29 @@ rule TOP { <compunit> {*} }                             #= TOP
 # Users should only specify precedence in relation to existing levels.
 
 my %term              ::= { :prec<z=>                           };
-my %methodcall        ::= { :prec<v=>                           };
-my %autoincrement     ::= { :prec<u=>, :assoc<non>, :lvalue     };
-my %exponentiation    ::= { :prec<t=>, :assoc<right>            };
-my %symbolic_unary    ::= { :prec<s=>                           };
-my %multiplicative    ::= { :prec<r=>, :assoc<left>             };
-my %additive          ::= { :prec<q=>, :assoc<left>             };
-my %junctive_and      ::= { :prec<p=>, :assoc<list>             };
-my %junctive_or       ::= { :prec<o=>, :assoc<list>             };
-my %named_unary       ::= { :prec<n=>, :assoc<left>             };
-my %nonchaining       ::= { :prec<m=>, :assoc<non>              };
-my %chaining          ::= { :prec<l=>, :assoc<chain>            };
-my %tight_and         ::= { :prec<k=>, :assoc<left>             };
-my %tight_or          ::= { :prec<j=>, :assoc<left>             };
-my %conditional       ::= { :prec<i=>, :assoc<right>            };
-my %item_assignment   ::= { :prec<h=>, :assoc<right>, :lvalue   };
-my %loose_unary       ::= { :prec<g=>, :assoc<right>            };
-my %comma             ::= { :prec<f=>, :assoc<list>             };
-my %list_infix        ::= { :prec<e=>                           };
-my %list_prefix       ::= { :prec<d=>                           };
-my %loose_and         ::= { :prec<c=>                           };
-my %loose_or          ::= { :prec<b=>                           };
+my %tightest          ::= { :prec<y=>                           };
+my %methodcall        ::= { :prec<w=>                           };
+my %autoincrement     ::= { :prec<v=>, :assoc<non>, :lvalue     };
+my %exponentiation    ::= { :prec<u=>, :assoc<right>            };
+my %symbolic_unary    ::= { :prec<t=>                           };
+my %multiplicative    ::= { :prec<s=>, :assoc<left>             };
+my %additive          ::= { :prec<r=>, :assoc<left>             };
+my %junctive_and      ::= { :prec<q=>, :assoc<list>             };
+my %junctive_or       ::= { :prec<p=>, :assoc<list>             };
+my %named_unary       ::= { :prec<o=>, :assoc<left>             };
+my %nonchaining       ::= { :prec<n=>, :assoc<non>              };
+my %chaining          ::= { :prec<m=>, :assoc<chain>            };
+my %tight_and         ::= { :prec<l=>, :assoc<left>             };
+my %tight_or          ::= { :prec<k=>, :assoc<left>             };
+my %conditional       ::= { :prec<j=>, :assoc<right>            };
+my %item_assignment   ::= { :prec<i=>, :assoc<right>, :lvalue   };
+my %loose_unary       ::= { :prec<h=>, :assoc<right>            };
+my %comma             ::= { :prec<g=>, :assoc<list>             };
+my %list_infix        ::= { :prec<f=>                           };
+my %list_prefix       ::= { :prec<e=>                           };
+my %loose_and         ::= { :prec<d=>                           };
+my %loose_or          ::= { :prec<c=>                           };
+my %loosest           ::= { :prec<b=>                           };
 my %terminator        ::= { :prec<a=>, :assoc<list>             };
 
 my %sublang = (); # XXX TBD  probably wrong to use a hash here anyway
@@ -432,7 +426,7 @@ token expect_term {
 }
 
 token noun {
-    | <ident> <before \h* =\> >     # XXX sufficient in face of precedence?
+    | <pair>
     | <circumfix>
     | <package_block>
     | <variable>
@@ -445,12 +439,25 @@ token noun {
     | <statement_prefix>
 }
 
-token expect_infix ($minprec) {
+token pair {
+    | $<key>:=<ident> \h* =\> $<val>:=<EXPR(%assignment<prec>)>
+    | <colonpair>
+}
+
+token colonpair {
+    [
+    | \: !? <ident>
+    | \: <ident>? <unsp>? <postcircumfix>
+    ]
+}
+
+token expect_infix ($minprec,$lastop) {
     <?ws>
+    [ <colonpair> { $lastop.adverb($<colonpair>) } <?ws> ]*
     <infix_prefix_meta_operator>*
     <infix>
     <infix_postfix_meta_operator>*
-    ::: <?{ $<infix>.prec gt $minprec }>
+    ::: <?{ $<infix>.prec ge $minprec }>
                                                     {*} #= Xinfix
 }
 
@@ -616,7 +623,6 @@ token subname {
 token value {
     | <string>
     | <number>
-    | <integer>
     | <version>
     | <typename>
 }
@@ -628,6 +634,12 @@ regex typename {
     }>
 }
 
+token number {
+    | <int>
+    | <num>
+    | <radix>
+}
+
 token integer {
     | 0 [ b <[01]>+           [ _ <[01]>+ ]*
         | o <[0..7]>+         [ _ <[0..7]>+ ]*
@@ -637,8 +649,17 @@ token integer {
     | \d+[_\d+]*
 }
 
-token number {
+token num {
     \d+[_\d+]* [ \. \d+[_\d+]* [ <[Ee]> <[+\-]>? \d+ ]? ]
+}
+
+token radix {
+    \: (\d+) 
+    [
+    | \< (<[ 0..9 a..z A..Z ]>+) [ \* <number> \*\* <number> ]? \>
+    | \[ <EXPR> \]
+    | \( <EXPR> \)
+    }
 }
 
 token quote { <before :<'>>    <bracketed(%quotelang<q>)>   :<'>    }
@@ -666,6 +687,10 @@ token quote { (:<mm>) <quotesnabber($0)> }
 token quote { (:<s>) <quotesnabber($0)> <finish_subst> } # XXX handwave
 token quote { (:<ss>) <quotesnabber($0)> <finish_subst> } # XXX handwave
 token quote { (:<tr>) <quotesnabber($0)> <finish_trans> } # XXX handwave
+
+# The key observation here is that the inside of quoted constructs may
+# be any of a lot of different sublanguages, and we have to parameterize
+# which parse rule to use as well as what options to feed that parse rule.
 
 token quotesnabber ($lang) {
     >> <nofat> ::
@@ -1052,7 +1077,7 @@ token infix is Tight_or[]                       #= infix:<//> def
 ## conditional
 token infix is Conditional[]                    #= infix:<?? !!> def
     is abstract('if')
-    { :<??> <EXPR(|%conditional)> :<!!> {*} }   #= infix:<?? !!>
+    { :<??> <EXPR(%conditional<prec>)> :<!!> {*} }   #= infix:<?? !!>
 
 
 ## assignment
@@ -1216,7 +1241,7 @@ token assertstopper { <stdstopper> | \> }
 
 # XXX skeleton of operator precedence parser
 
-method EXPR (:$prec = "a=", :$stop = &stdstoppers) {
+method EXPR (:$prec = %loosest<prec>, :$stop = &stdstoppers) {
     if m:p/ <?before <$stop>> / {
         return;
     }
@@ -1367,10 +1392,19 @@ token regex_assertion { <ident> [
                                 ]?
 }
 
-token regex_assertion { :<+> <cclass_elem>+ }
-token regex_assertion { :<-> <cclass_elem>+ }
+token regex_assertion { <before :<[>> <cclass_elem>+ }
+token regex_assertion { <before :<+>> <cclass_elem>+ }
+token regex_assertion { <before :<->> <cclass_elem>+ }
 
 token regex_assertion { <panic: unrecognized regex assertion> }
+
+token cclass_elem {
+    [ \+ | - | <null> ]
+    [
+    | <name>
+    | <before \[> <bracketed(%quotelang<cclass>)>
+    ]
+}
 
 token regex_mod_internal { :<:i> <regex_mod_arg>? }
 token regex_mod_internal { <panic: unrecognized regex modifier> }
