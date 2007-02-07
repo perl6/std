@@ -2,7 +2,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
-    regexen
+    rx
     colon pairs
     WHICH etc.
     contextualizers
@@ -12,7 +12,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
     Signatures
     string literals
     heredocs
-    generalized quotes
     quote declarator
     radix nums
     &foo:(Int,Num)
@@ -76,6 +75,8 @@ my %loose_and         ::= { :prec<c=>                           };
 my %loose_or          ::= { :prec<b=>                           };
 my %terminator        ::= { :prec<a=>, :assoc<list>             };
 
+my %sublang = (); # XXX TBD  probably wrong to use a hash here anyway
+
 role Term {...}
 role Methodcall {...}
 role Autoincrement {...}
@@ -127,6 +128,7 @@ category regex_backslash;
 category regex_assertion;
 category regex_mod_internal;
 category regex_mod_external;
+category quote_mod;
 
 category q_backslash;
 category qq_backslash;
@@ -134,14 +136,14 @@ category qq_backslash;
 category trait_verb         is endsym(/ \s+ <nofat> /);
 category trait_auxiliary    is endsym(/ \s+ <nofat> /);
 
-category type_declarator    is endsym(/ \b <nofat> /);
-category scope_declarator   is endsym(/ \b <nofat> /);
-category package_declarator is endsym(/ \b <nofat> /);
-category routine_declarator is endsym(/ \b <nofat> /);
-category statement_prefix   is endsym(/ \b <nofat> /);
+category type_declarator    is endsym(/ >> <nofat> /);
+category scope_declarator   is endsym(/ >> <nofat> /);
+category package_declarator is endsym(/ >> <nofat> /);
+category routine_declarator is endsym(/ >> <nofat> /);
+category statement_prefix   is endsym(/ >> <nofat> /);
 category statement_control  is endsym(/ \s <nofat> /);
-category statement_cond     is endsym(/ \b <nofat> /);
-category statement_loop     is endsym(/ \b <nofat> /);
+category statement_cond     is endsym(/ >> <nofat> /);
+category statement_loop     is endsym(/ >> <nofat> /);
 
 category infix_prefix_meta_operator;
 category infix_postfix_meta_operator;
@@ -237,7 +239,7 @@ token block {
 
 token regex_block {  # perhaps parameterize and combine with block someday
     \{
-    <regex>
+    <regex \}>
     [ \} || <panic: Missing right brace> ]
     [
     | <?unsp> <?before <[,:]>> {*}                       #= rxblock
@@ -639,11 +641,42 @@ token number {
     \d+[_\d+]* [ \. \d+[_\d+]* [ <[Ee]> <[+\-]>? \d+ ]? ]
 }
 
-token quote_term {
-    | ' <quote_expr> '
-    | " <quote_expr> "
-    | \<\< <quote_expr> \>\>
-    | \<   <quote_expr> \>
+token quote { <before :<'>>    <bracketed(%quotelang<q>)>   :<'>    }
+token quote { <before :<">>    <bracketed(%quotelang<q>)>   :<">    }
+token quote { <before :['<']>  <bracketed(%quotelang<qw>)> :['>']  }
+token quote { <before :['<<']> <bracketed(%quotelang<qww>)> :['>>'] }
+
+token quote { (:<q>) <quotesnabber($0)> }
+token quote { (:<qq>) <quotesnabber($0)> }
+token quote { (:<qw>) <quotesnabber($0)> }
+token quote { (:<qww>) <quotesnabber($0)> }
+token quote { (:<qx>) <quotesnabber($0)> }
+token quote { (:<qt>) <quotesnabber($0)> }
+token quote { (:<qn>) <quotesnabber($0)> }
+token quote { (:<qs>) <quotesnabber($0)> }
+token quote { (:<qa>) <quotesnabber($0)> }
+token quote { (:<qh>) <quotesnabber($0)> }
+token quote { (:<qf>) <quotesnabber($0)> }
+token quote { (:<qc>) <quotesnabber($0)> }
+token quote { (:<qb>) <quotesnabber($0)> }
+
+token quote { (:<rx>) <quotesnabber($0)> }
+token quote { (:<m>) <quotesnabber($0)> }
+token quote { (:<mm>) <quotesnabber($0)> }
+token quote { (:<s>) <quotesnabber($0)> <finish_subst> } # XXX handwave
+token quote { (:<ss>) <quotesnabber($0)> <finish_subst> } # XXX handwave
+token quote { (:<tr>) <quotesnabber($0)> <finish_trans> } # XXX handwave
+
+token quotesnabber ($lang) {
+    >> <nofat> ::
+    { $<lang> = %sublang{$lang} }
+    [ <quote_mod> { $.tweaklang() } ]*
+    <bracketed($<lang>)>
+}
+
+method tweaklang {
+    # XXX assuming quote_mod returns a pair...
+    $<lang>{$<quote_mod>.key} = $<quote_mod>.value;
 }
 
 ##  rules for parsing interpolated values in quotes.
@@ -1210,7 +1243,7 @@ method EXPR (:$prec = "a=", :$stop = &stdstoppers) {
 ## Regex
 #############################################3333
 
-rule regex {
+rule regex ($stop is context) {
     <regex_ordered_disjunction>
 }
 
@@ -1250,6 +1283,7 @@ rule regex_quantified_atom {
 }
 
 rule <regex_atom> {
+    || <$+stop> :: <fail>
     || <regex_metachar>
     || (.)
 }
@@ -1268,8 +1302,8 @@ token regex_metachar { :<)>   :: <fail> }
 token regex_metachar { <block> }
 token regex_metachar { <quantifier> <panic: quantifier quantifies nothing> }
 token regex_metachar { <regex_mod_internal> }
-token regex_metachar { :<[> <regex> :<]> }
-token regex_metachar { :<(> <regex> :<)> }
+token regex_metachar { :<[> <regex \]> :<]> }
+token regex_metachar { :<(> <regex \)> :<)> }
 token regex_metachar { :<\>> <regex_rightangle> }
 token regex_metachar { :['>>'] }
 token regex_metachar { :['<<'] }
