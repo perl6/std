@@ -8,7 +8,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
     bracket matching incl Unicode Ps/Pe
     Captures
     Signatures
-    heredocs
     quote declarator
     &foo:(Int,Num)
     &foo\($a,$b)
@@ -150,16 +149,36 @@ category prefix_circumfix_meta_operator;
 # make sure we're not an autoquoted identifier
 regex nofat { <!before \h* <?unsp> =\> > }
 
+class Heredoc {
+    has Str $.delim;
+    has Str $.text is rw;
+    has $.lang;
+}
+
 method heredoc {
     while my $heredoc = shift @heredoc_queue {
         my $delim = $heredoc.delim;
+        my $lang = $heredoc.lang;
         my $text = "";
-        # XXX wrong, wrong, wrong
-        if m:p/(.*?) ^^ (\h*) $delim \h* $$ \n?/ {
-            $text = $0;
-            $white = $1;
-            $text ~~ s:g/^^ $white //;
-            $heredoc.text = $text;
+        my $ws;
+        if m:p/$text:=<q_text($lang,
+                              :stop(rx[^^ $ws:=(\h*) $delim \h* $$ \n?]
+                             )>/
+        {
+            if $ws {
+                my $wsequiv = $ws;
+                $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
+                my @lines = $text.split(/^^/);
+                for @lines {
+                    next if s/^ $ws //;   # reward consistent tabbing
+                    s/^^ (\t+) /{ ' ' x ($0 * 8) }/;
+                    s/^ $wsequiv // or s/^ \h+ //;
+                }
+                $heredoc.text = @lines.join;
+            }
+            else {
+                $heredoc.text = $text;
+            }
         }
         else {
             fail("Ending delimiter $delim not found");
@@ -662,10 +681,10 @@ token radix {
     }
 }
 
-token quote { <before :<'>>    <bracketed(%quotelang<q>)>   :<'>    }
-token quote { <before :<">>    <bracketed(%quotelang<q>)>   :<">    }
-token quote { <before :['<']>  <bracketed(%quotelang<qw>)> :['>']  }
-token quote { <before :['<<']> <bracketed(%quotelang<qww>)> :['>>'] }
+token quote { <before :<'>>    <bracketed(%sublang<q>)>   :<'>    }
+token quote { <before :<">>    <bracketed(%sublang<q>)>   :<">    }
+token quote { <before :['<']>  <bracketed(%sublang<qw>)> :['>']  }
+token quote { <before :['<<']> <bracketed(%sublang<qww>)> :['>>'] }
 
 token quote { (:<q>) <quotesnabber($0)> }
 token quote { (:<qq>) <quotesnabber($0)> }
@@ -1386,7 +1405,7 @@ token regex_assertion { :<!> <regex_assertion> }
 token regex_assertion { <block> }
 token regex_assertion { <variable> }
 token regex_assertion { <ident> [
-                                | \: <?ws> <qq_literal(:stop«>»))>
+                                | \: <?ws> <q_text(%sublang<qq>, :stop«>»))>
                                 | \( <EXPR> \)
                                 | <?ws> <EXPR>
                                 ]?
@@ -1402,7 +1421,7 @@ token cclass_elem {
     [ \+ | - | <null> ]
     [
     | <name>
-    | <before \[> <bracketed(%quotelang<cclass>)>
+    | <before \[> <bracketed(%sublang<cclass>)>
     ]
 }
 
