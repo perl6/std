@@ -9,6 +9,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
     Captures
     Signatures
     quote declarator
+    right side of s///, tr///, s[] = expr
     &foo:(Int,Num)
     &foo\($a,$b)
     \c[LATIN CAPITAL LETTER A]
@@ -43,7 +44,6 @@ rule TOP { <compunit> {*} }                             #= TOP
 # Users should only specify precedence in relation to existing levels.
 
 my %term              ::= { :prec<z=>                           };
-my %tightest          ::= { :prec<y=>                           };
 my %methodcall        ::= { :prec<w=>                           };
 my %autoincrement     ::= { :prec<v=>, :assoc<non>, :lvalue     };
 my %exponentiation    ::= { :prec<u=>, :assoc<right>            };
@@ -65,8 +65,9 @@ my %list_infix        ::= { :prec<f=>                           };
 my %list_prefix       ::= { :prec<e=>                           };
 my %loose_and         ::= { :prec<d=>                           };
 my %loose_or          ::= { :prec<c=>                           };
-my %loosest           ::= { :prec<b=>                           };
 my %terminator        ::= { :prec<a=>, :assoc<list>             };
+
+my $LOOSEST = "a=!";    # "epsilon" tighter than terminator
 
 my %sublang = (); # XXX TBD  probably wrong to use a hash here anyway
 
@@ -170,7 +171,6 @@ method heredoc {
             if $ws and @heredoc_initial_ws {
                 my $wsequiv = $ws;
                 $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
-                my @lines = $text.split(/^^/);  # XXX wrong, wrong, wrong
                 for @heredoc_initial_strings {
                     next if s/^ $ws //;   # reward consistent tabbing
                     s/^^ (\t+) /{ ' ' x ($0 * 8) }/;
@@ -441,6 +441,18 @@ token expect_term {
     <noun>                                              {*} #= Xterm noun
     <expect_postfix>*                                   {*} #= Xterm postfix
                                                         {*} #= Xterm
+    <?ws>
+    <adverbs>?
+}
+
+token adverbs {
+    [ <colonpair> <?ws> ]+
+    {
+        my $prop = $+prevop err
+            panic('No previous operator visible to adverbial pair (' ~
+                $<colonpair> ~ ')');
+        $prop.adverb($<colonpair>)
+    }
 }
 
 token noun {
@@ -459,7 +471,7 @@ token noun {
 
 token pair {
     | $<key>:=<ident> \h* =\> $<val>:=<EXPR(%assignment<prec>)>
-    | <colonpair>
+    | [ <colonpair> <?ws> ]+
 }
 
 token colonpair {
@@ -469,13 +481,11 @@ token colonpair {
     ]
 }
 
-token expect_infix ($minprec,$lastop) {
-    <?ws>
-    [ <colonpair> { $lastop.adverb($<colonpair>) } <?ws> ]*
+token expect_infix ($loosest) {
     <infix_prefix_meta_operator>*
     <infix>
     <infix_postfix_meta_operator>*
-    ::: <?{ $<infix>.prec ge $minprec }>
+    ::: <?{ resolve_meta($/) and $<infix>.prec ge $loosest }>
                                                     {*} #= Xinfix
 }
 
@@ -569,9 +579,11 @@ token methodop {
 
 token circumfix { :<(> <EXPR> :<)> {*} }                #= circumfix ( )
 token circumfix { :<[> <EXPR> :<]> {*} }                #= circumfix [ ]
+
 token circumfix { :['<']  <anglewords>  :['>'] {*} }    #= circumfix < >
 token circumfix { :['<<'] <shellwords> :['>>'] {*} }    #= circumfix << >>
 token circumfix { :<«>    <shellwords> :<»>    {*} }    #= circumfix « »
+
 token circumfix is Circumfix[:symbol<{ }>]
     { <block>         {*} }                             #= circumfix { }
 
@@ -672,11 +684,15 @@ token num {
 }
 
 token radix {
-    \: (\d+) 
+    \: $<radix> := [\d+] 
     [
-    | \< (<[ 0..9 a..z A..Z ]>+) [ \* <number> \*\* <number> ]? \>
-    | \[ <EXPR> \]
-    | \( <EXPR> \)
+    || \<
+            $<radnum> := [<[ 0..9 a..z A..Z ]>+ [ \. <[ 0..9 a..z A..Z ]>+ ]? ]
+            [ \* $<base> := <number> \*\* $<exp> := <number> ]?
+       \>
+      { return radcalc($<radix>, $<radnum>, $<base>, $<exp>) }
+    || <?before \[> <postcircumfix>
+    || <?before \(> <postcircumfix>
     }
 }
 
@@ -1236,50 +1252,109 @@ token infix is Loose_or[]                       #= infix:<err> def
 token terminator is Terminator[]                #= terminator:<;> def
     { :<;> {*} }                                #= terminator:<;>
 
-token terminator is Terminator[:symbol['<==']]  #= terminator:['<=='] def
-    { <before \<==> {*} }                       #= terminator:['<==']
+token terminator is Terminator[]                #= terminator:['<=='] def
+    { <?before :['<=='] > {*} }                 #= terminator:['<==']
 
-token terminator is Terminator[:symbol['==>']]  #= terminator:['==>'] def
+token terminator is Terminator[]                #= terminator:['==>'] def
     { <?before :['==>'] > {*} }              #' #= terminator:['==>']
 
-token terminator is Terminator[:symbol<)>]      #= terminator:<)> def
+token terminator is Terminator[]                #= terminator:<)> def
     { <?before :<)> > {*} }                     #= terminator:<)>
 
-token terminator is Terminator[:symbol<]>]      #= terminator:<]> def
-    { <?before \] > {*} }                       #= terminator:<]>
+token terminator is Terminator[]                #= terminator:<]> def
+    { <?before :<]> > {*} }                     #= terminator:<]>
 
-token terminator is Terminator[:symbol<\}>]     #= terminator:<}> def
-    { <?before \} > {*} }                       #= terminator:<}>
+token terminator is Terminator[]                #= terminator:<}> def
+    { <?before :<}> > {*} }                     #= terminator:<}>
 
-token terminator is Terminator[:symbol<!!>]     #= terminator:<!!> def
-    { <?before !! > {*} }                       #= terminator:<!!>
+token terminator is Terminator[]                #= terminator:<!!> def
+    { <?before :<!!> > {*} }                    #= terminator:<!!>
 
 token stdstopper { <terminator> | <statement_cond> | <statement_loop> | $ }
 token assertstopper { <stdstopper> | \> }
 
-# XXX skeleton of operator precedence parser
+# A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR (:$prec = %loosest<prec>, :$stop = &stdstoppers) {
+method EXPR (:$prec = $LOOSEST, :$stop = &stdstoppers) {
+    constant $TERMINATOR = ';' ~~ &terminator;
     if m:p/ <?before <$stop>> / {
         return;
     }
+    my $prevop is context is rw;
     my @termstack;
     my @opstack;
+    push @opstack, $TERMINATOR;         # (just a sentinal value)
     push @termstack, $.expect_term();
-    while not m:p/ <?before <$stop> > / {
-        my $infix := $.expect_infix($prec) err last;
-        if @opstack and $infix.prec gt @opstack[-1].prec {   # reduce
-            # XXX your ad here
-        }
-        else {                                  # shift
-            push @opstack, $infix;
-            if m:p/ <?before <$stop>> / {
-                fail("$infix.perl() is missing right term");
+
+    my sub reduce {
+        my $op = pop @opstack;
+        given $op.assoc {
+            when 'chain' {
+                my @chain;
+                push @chain, pop(@termstack);
+                push @chain, $op;
+                while @opstack {
+                    last if $op.prec ne @opstack[-1].prec;
+                    push @chain, pop(@termstack);
+                    push @chain, pop(@opstack);
+                }
+                push @chain, pop(@termstack);
+                $op.chain = reverse @chain;
+                push @termstack, $op;
             }
-            push @termstack, $.expect_term();
+            when 'list' {
+                my @list;
+                push @list, pop(@termstack);
+                while @opstack {
+                    last if $op.symbol ne @opstack[-1].symbol;
+                    push @list, pop(@termstack);
+                    pop(@opstack);
+                }
+                push @list, pop(@termstack);
+                $op.list = reverse @list;
+                push @termstack, $op;
+            }
+            default {
+                $op.right = pop @termstack;
+                $op.left = pop @termstack;
+                push @termstack, $op;
+            }
         }
     }
-    return @opstack;
+
+    while not m:p/ <?before <$stop> > / {
+        my $infix := $.expect_infix($prec) // $TERMINATOR;
+        my Str $newprec = $infix.prec;
+
+        # Does new infix (or terminator) force any reductions?
+        while @opstack[-1].prec lt $newprec {
+            reduce();
+        }
+
+        # Not much point in reducing the sentinals...
+        last if $newprec lt $LOOSEST;
+
+        # Equal precedence now uses associativity to decide.
+        if @opstack[-1].prec eq $newprec {
+            given $infix.assoc {
+                when 'non'   { panic("$infix is not associative") }
+                when 'left'  { reduce() }   # reduce immediately
+                when 'right' | 'chain' { }  # just shift
+                when 'list'  {              # if op differs reduce else shift
+                    reduce() if $infix.symbol !eqv @opstack[-1].symbol;
+                }
+                default { panic(qq[Unknown associativity: "$_"] }
+            }
+        }
+        push @opstack, $infix;
+        if m:p/ <?before <$stop>> / {
+            fail("$infix.perl() is missing right term");
+        }
+        push @termstack, $.expect_term();
+    }
+    reduce() if @termstack > 1;
+    @termstack == 1 or panic("Internal operator parser error");
+    return @termstack[0];
 }
 
 #############################################3333
@@ -1348,8 +1423,10 @@ token regex_metachar { <regex_mod_internal> }
 token regex_metachar { :<[> <regex \]> :<]> }
 token regex_metachar { :<(> <regex \)> :<)> }
 token regex_metachar { :<\>> <regex_rightangle> }
-token regex_metachar { :['>>'] }
+token regex_metachar { :['<('] }
+token regex_metachar { :[')>'] }
 token regex_metachar { :['<<'] }
+token regex_metachar { :['>>'] }
 token regex_metachar { :['<'] <regex_assertion> :['>'] }
 token regex_metachar { :<\\> <regex_backslash> }
 token regex_metachar { :<.> }
