@@ -130,21 +130,21 @@ our %quote_adverb := {
         adv => &q_trans_adverb,
         esc => < >,             # let trans parser handle everything
     },
-}
+};
 
 our %regex_adverb := {
     g => {
         ...
     },
     # XXX --more--
-}
+};
 
 our %trans_adverb := {
     d => {
         ...
     },
     # XXX --more--
-}
+};
 
 role Term {...}
 role Methodcall {...}
@@ -767,7 +767,6 @@ token radix {
       { return radcalc($<radix>, $<radnum>, $<base>, $<exp>) }
     || <?before \[> <postcircumfix>
     || <?before \(> <postcircumfix>
-    }
 }
 
 token quote { <before :<'>>    <bracketed(%sublang<Q:q>)>   :<'>    }
@@ -1290,7 +1289,7 @@ token infix is Assignment[]                     #= infix:<^^=> def
 token infix is Assignment[]                     #= infix:<+<=> def
     { :<+<=> {*} }                           #> #= infix:<+<=>
 
-token infix=> is Assignment[]                   #= infix:<+> def
+token infix is Assignment[]                     #= infix:<+> def
     { :<+> {*} }                                #= infix:<+>
 
 token infix is Assignment[]                     #= infix:<+|=> def
@@ -1379,8 +1378,6 @@ token terminator is Terminator[]                #= terminator:<)> def
 token terminator is Terminator[]                #= terminator:<]> def
     { <?before :<]> > {*} }                     #= terminator:<]>
 
-token terminator is Terminator[]                #= terminator:<}> def
-    { <?before :<}> > {*} }                     #= terminator:<}>
 
 token terminator is Terminator[]                #= terminator:<!!> def
     { <?before :<!!> > {*} }                    #= terminator:<!!>
@@ -1458,7 +1455,7 @@ method EXPR (:$prec = $LOOSEST, :$stop = &stdstoppers) {
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if $infix.symbol !eqv @opstack[-1].symbol;
                 }
-                default { panic(qq[Unknown associativity "$_" for "$infix"] }
+                default { panic(qq[Unknown associativity "$_" for "$infix"]) }
             }
         }
         push @opstack, $infix;
@@ -1515,7 +1512,7 @@ rule regex_quantified_atom {
     ]?
 }
 
-rule <regex_atom> {
+rule regex_atom {
     || <$+stop> :: <fail>
     || <regex_metachar>
     || (.)
