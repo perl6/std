@@ -1283,7 +1283,7 @@ method EXPR (:$prec = $LOOSEST, :$stop = &stdstoppers) {
     my $prevop is context is rw;
     my @termstack;
     my @opstack;
-    push @opstack, $TERMINATOR;         # (just a sentinal value)
+    push @opstack, $TERMINATOR;         # (just a sentinel value)
     push @termstack, $.expect_term();
 
     my sub reduce {
@@ -1331,19 +1331,19 @@ method EXPR (:$prec = $LOOSEST, :$stop = &stdstoppers) {
             reduce();
         }
 
-        # Not much point in reducing the sentinals...
+        # Not much point in reducing the sentinels...
         last if $newprec lt $LOOSEST;
 
-        # Equal precedence now uses associativity to decide.
+        # Equal precedence, so use associativity to decide.
         if @opstack[-1].prec eq $newprec {
             given $infix.assoc {
-                when 'non'   { panic("$infix is not associative") }
+                when 'non'   { panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if $infix.symbol !eqv @opstack[-1].symbol;
                 }
-                default { panic(qq[Unknown associativity: "$_"] }
+                default { panic(qq[Unknown associativity "$_" for "$infix"] }
             }
         }
         push @opstack, $infix;
