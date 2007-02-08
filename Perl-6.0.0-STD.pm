@@ -69,15 +69,81 @@ my %terminator        ::= { :prec<a=>, :assoc<list>             };
 
 my $LOOSEST = "a=!";    # "epsilon" tighter than terminator
 
-my %sublang := {  # XXX TBD  probably wrong to use a hash here anyway
+# XXX maybe shouldn't be hash, but for now.
+
+our %quote_adverb := {
+    Q => {                          # base form of all quotes
+        use => &q_pickdelim,
+        adv => &Q_adverb,
+        esc => < >,
+    },
     q  => {
         use => &q_pickdelim,
-        esc => /<?before <[ \\ ]> > <snabinterp> /,
+        adv => &q_quote_adverb,
+        esc => < \\ >,
     },
     qq => {
         use => &q_pickdelim,
-        esc => /<?before <[ \\ $ @ % & \{ ]> > <snabinterp> /,
+        adv => &q_quote_adverb,
+        esc => < \\ $ @ % & { >,
     },
+    b => {
+        add => < \\ >,
+    },
+    s => {
+        add => < $ >,
+    },
+    a => {
+        add => < @ >,
+    },
+    h => {
+        add => < % >,
+    },
+    f => {
+        add => < & >,
+    },
+    c => {
+        add => < { >,
+    },
+    to => {
+        use => &q_herestub,
+        adv => &q_quote_adverb,
+        add => < ^^ >,          #  grabs leading whitespace
+    },
+    rx => {
+        use => &q_regex,
+        adv => &q_regex_adverb,
+        esc => < >,             # let regex parser handle everything
+    },
+    m => {
+        use => &q_regex,
+        adv => &q_regex_adverb,
+        esc => < >,             # let regex parser handle everything
+    },
+    s => {
+        use => &q_regex,
+        adv => &q_regex_adverb,
+        esc => < >,             # let regex parser handle everything
+    },
+    tr => {
+        use => &q_trans,
+        adv => &q_trans_adverb,
+        esc => < >,             # let trans parser handle everything
+    },
+}
+
+our %regex_adverb := {
+    g => {
+        ...
+    },
+    # XXX --more--
+}
+
+our %trans_adverb := {
+    d => {
+        ...
+    },
+    # XXX --more--
 }
 
 role Term {...}
@@ -111,48 +177,48 @@ role Terminator {...}
 # there's appropriate whitespace, though Perl 6 also uses it to rule out
 # the => (fatarrow) construct.
 
-category noun_prefix_sigil;
-category noun_prefix_twigil;
-category special_variable;
-category nameroot;
-category version;
+proto token noun_prefix_sigil;
+proto token noun_prefix_twigil;
+proto token special_variable;
+proto token nameroot;
+proto token version;
 
-category term;
-category quote;
-category prefix  is defequiv(%symbolic_unary);
-category infix   is defequiv(%additive);
-category postfix is defequiv(%autoincrement);
+proto token term;
+proto token quote;
+proto token prefix  is defequiv(%symbolic_unary);
+proto token infix   is defequiv(%additive);
+proto token postfix is defequiv(%autoincrement);
 
-category circumfix;
-category postcircumfix;
+proto token circumfix;
+proto token postcircumfix;
 
-category regex_metachar;
-category regex_backslash;
-category regex_assertion;
-category regex_mod_internal;
-category regex_mod_external;
-category quote_mod;
+proto token regex_metachar;
+proto token regex_backslash;
+proto token regex_assertion;
+proto token regex_mod_internal;
+proto token regex_mod_external;
+proto token quote_mod;
 
-category q_backslash;
-category qq_backslash;
+proto token q_backslash;
+proto token qq_backslash;
 
-category trait_verb         is endsym(/ \s+ <nofat> /);
-category trait_auxiliary    is endsym(/ \s+ <nofat> /);
+proto token trait_verb         is endsym(/ \s+ <nofat> /);
+proto token trait_auxiliary    is endsym(/ \s+ <nofat> /);
 
-category type_declarator    is endsym(/ >> <nofat> /);
-category scope_declarator   is endsym(/ >> <nofat> /);
-category package_declarator is endsym(/ >> <nofat> /);
-category routine_declarator is endsym(/ >> <nofat> /);
-category statement_prefix   is endsym(/ >> <nofat> /);
-category statement_control  is endsym(/ \s <nofat> /);
-category statement_cond     is endsym(/ >> <nofat> /);
-category statement_loop     is endsym(/ >> <nofat> /);
+proto token type_declarator    is endsym(/ >> <nofat> /);
+proto token scope_declarator   is endsym(/ >> <nofat> /);
+proto token package_declarator is endsym(/ >> <nofat> /);
+proto token routine_declarator is endsym(/ >> <nofat> /);
+proto rule statement_prefix   is endsym(/ >> <nofat> /);
+proto rule statement_control  is endsym(/ \s <nofat> /);
+proto rule statement_cond     is endsym(/ >> <nofat> /);
+proto rule statement_loop     is endsym(/ >> <nofat> /);
 
-category infix_prefix_meta_operator;
-category infix_postfix_meta_operator;
-category postfix_prefix_meta_operator;
-category prefix_postfix_meta_operator;
-category prefix_circumfix_meta_operator;
+proto token infix_prefix_meta_operator;
+proto token infix_postfix_meta_operator;
+proto token postfix_prefix_meta_operator;
+proto token prefix_postfix_meta_operator;
+proto token prefix_circumfix_meta_operator;
 
 # Lexical routines
 
@@ -176,7 +242,7 @@ method heredoc {
         my $stoppat = $delim eq "" ?? rx[^^ \h* $$]
                                    !! rx[^^ $ws:=(\h*?) $delim \h* $$ \n?];
         my @heredoc_initial_ws is context is rw;
-        if m:p/$doc:=<q_text($lang, :stop($stoppat))>/ {
+        if m:p/$doc:=<q_unbalanced($lang, :stop($stoppat))>/ {
             if $ws and @heredoc_initial_ws {
                 my $wsequiv = $ws;
                 $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
@@ -705,10 +771,10 @@ token radix {
     }
 }
 
-token quote { <before :<'>>    <bracketed(%sublang<q>)>   :<'>    }
-token quote { <before :<">>    <bracketed(%sublang<q>)>   :<">    }
-token quote { <before :['<']>  <bracketed(%sublang<qw>)> :['>']  }
-token quote { <before :['<<']> <bracketed(%sublang<qww>)> :['>>'] }
+token quote { <before :<'>>    <bracketed(%sublang<Q:q>)>   :<'>    }
+token quote { <before :<">>    <bracketed(%sublang<Q:q>)>   :<">    }
+token quote { <before :['<']>  <bracketed(%sublang<Q:w>)> :['>']  }
+token quote { <before :['<<']> <bracketed(%sublang<Q:ww>)> :['>>'] }
 
 token quote { (:<q>) <quotesnabber($0)> }
 token quote { (:<qq>) <quotesnabber($0)> }
@@ -735,12 +801,15 @@ token quote { (:<tr>) <quotesnabber($0)> <finish_trans> } # XXX handwave
 # be any of a lot of different sublanguages, and we have to parameterize
 # which parse rule to use as well as what options to feed that parse rule.
 
-token quotesnabber ($lang) {
+token quotesnabber ($q, :$lang = $sublang{"Q:$q"}) {
     >> <nofat> ::
-    { $<lang> = %sublang{$lang} }
     <?ws>
-    [ <quote_mod> { $.tweaklang() } <?ws> ]*
-    <$($<lang><use>)($<lang>)>         # XXX doubt this parses right yet...
+
+    # Look for current lang's adverbs.
+    [ <$($lang<adv>)($lang)> { $lang.tweak($/) } <?ws> ]*
+
+      # Dispatch to current lang's subparser.
+      <$($lang<use>)($lang)>
 }
 
 method tweaklang {
@@ -750,36 +819,36 @@ method tweaklang {
 
 # assumes whitespace is eaten already
 
-regex q_pickdelim ($escapes) {
+regex q_pickdelim ($lang, @esc = $lang<esc>) {
     [
     | <?before @openers>
       <?before $<start> := [(.)$0*]>
       { $<stop> := flipbrack($<start>) }
-      <q_balanced($<start>,$<stop>,$escapes)>
-    | [ (\S) || <panic: Quote delimiter must not be whitespace> ]
+      <q_balanced($lang, $<start>, $<stop>, @esc)>
+    | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
+        <q_unbalanced($lang, $<stop>, @esc)>
     ]
 }
 
-regex q_balanced ($start, $stop, $escapes) {
+regex q_balanced ($lang, $start, $stop, :@esc = $lang<esc>) {
     $<start> := <$start>
     $<text> := [.*?]
     @<more> := [
       <!before <$stop>>
       [
-      || $<escape> := <$escapes>
-      || <?before <$start>> $<subtext> := <q_balanced($start, $stop, $escapes)>
+      || <?before <$start>> $<subtext> := <q_balanced($lang, $start, $stop, :@esc)>
+      || <?before @esc> $<escape> := [ <q_escape($lang)> ]
       ]
       $<text> := [.*?]
     ]*
     $<stop> := <$stop>
 }
 
-regex q_unbalanced ($stop, $escapes) {
-    [^^ <?before \h> { $<linestart> = 1 } ]?
+regex q_unbalanced ($stop, @esc) {
     $<text> := [.*?]
     @<more> := [
       <!before <$stop>>
-      $<escape> := <$escapes>
+      [ <?before @esc> $<escape> := [ <q_escape($lang)> ]
       $<text> := [.*?]
     ]*
     $<stop> := <$stop>
@@ -1493,6 +1562,7 @@ token regex_metachar {
 
 token q_backslash { :<qq> <qq_bracketed> }
 token q_backslash { :<\> }
+token q_backslash { (.) }
 
 token qq_backslash { :<a> }
 token qq_backslash { :<b> }
