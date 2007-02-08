@@ -41,7 +41,7 @@ rule TOP { <compunit> {*} }                             #= TOP
 
 # The internal precedence levels are *not* part of the public interface.
 # The current values are mere implmentation; they may change at any time.
-# Users should only specify precedence in relation to existing levels.
+# Users should specify precedence only in relation to existing levels.
 
 my %term              ::= { :prec<z=>                           };
 my %methodcall        ::= { :prec<w=>                           };
@@ -69,7 +69,16 @@ my %terminator        ::= { :prec<a=>, :assoc<list>             };
 
 my $LOOSEST = "a=!";    # "epsilon" tighter than terminator
 
-my %sublang = (); # XXX TBD  probably wrong to use a hash here anyway
+my %sublang := {  # XXX TBD  probably wrong to use a hash here anyway
+    q  => {
+        use => &q_pickdelim,
+        esc => /<?before <[ \\ ]> > <snabinterp> /,
+    },
+    qq => {
+        use => &q_pickdelim,
+        esc => /<?before <[ \\ $ @ % & \{ ]> > <snabinterp> /,
+    },
+}
 
 role Term {...}
 role Methodcall {...}
@@ -729,13 +738,51 @@ token quote { (:<tr>) <quotesnabber($0)> <finish_trans> } # XXX handwave
 token quotesnabber ($lang) {
     >> <nofat> ::
     { $<lang> = %sublang{$lang} }
-    [ <quote_mod> { $.tweaklang() } ]*
-    <bracketed($<lang>)>
+    <?ws>
+    [ <quote_mod> { $.tweaklang() } <?ws> ]*
+    <$($<lang><use>)($<lang>)>         # XXX doubt this parses right yet...
 }
 
 method tweaklang {
     # XXX assuming quote_mod returns a pair...
     $<lang>{$<quote_mod>.key} = $<quote_mod>.value;
+}
+
+# assumes whitespace is eaten already
+
+regex q_pickdelim ($escapes) {
+    [
+    | <?before @openers>
+      <?before $<start> := [(.)$0*]>
+      { $<stop> := flipbrack($<start>) }
+      <q_balanced($<start>,$<stop>,$escapes)>
+    | [ (\S) || <panic: Quote delimiter must not be whitespace> ]
+    ]
+}
+
+regex q_balanced ($start, $stop, $escapes) {
+    $<start> := <$start>
+    $<text> := [.*?]
+    @<more> := [
+      <!before <$stop>>
+      [
+      || $<escape> := <$escapes>
+      || <?before <$start>> $<subtext> := <q_balanced($start, $stop, $escapes)>
+      ]
+      $<text> := [.*?]
+    ]*
+    $<stop> := <$stop>
+}
+
+regex q_unbalanced ($stop, $escapes) {
+    [^^ <?before \h> { $<linestart> = 1 } ]?
+    $<text> := [.*?]
+    @<more> := [
+      <!before <$stop>>
+      $<escape> := <$escapes>
+      $<text> := [.*?]
+    ]*
+    $<stop> := <$stop>
 }
 
 ##  rules for parsing interpolated values in quotes.
@@ -1480,8 +1527,9 @@ token regex_assertion { :<!> <regex_assertion> }
 
 token regex_assertion { <block> }
 token regex_assertion { <variable> }
-token regex_assertion { <ident> [
-                                | \: <?ws> <q_text(%sublang<qq>, :stop«>»))>
+token regex_assertion { <ident> [               # is qq right here?
+                                | \: <?ws>
+                                    <q_unbalanced(%sublang<qq><esc>, :stop«>»))>
                                 | \( <EXPR> \)
                                 | <?ws> <EXPR>
                                 ]?
