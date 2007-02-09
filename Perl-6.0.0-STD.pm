@@ -73,17 +73,17 @@ my $LOOSEST = "a=!";    # "epsilon" tighter than terminator
 
 our %quote_adverb := {
     Q => {                          # base form of all quotes
-        use => &q_pickdelim,
+        now => &q_pickdelim,
         adv => &Q_adverb,
         esc => < >,
     },
     q  => {
-        use => &q_pickdelim,
+        now => &q_pickdelim,
         adv => &q_quote_adverb,
         esc => < \\ >,
     },
     qq => {
-        use => &q_pickdelim,
+        now => &q_pickdelim,
         adv => &q_quote_adverb,
         esc => < \\ $ @ % & { >,
     },
@@ -106,27 +106,27 @@ our %quote_adverb := {
         add => < { >,
     },
     to => {
-        use => &q_herestub,
+        now => &q_herestub,
         adv => &q_quote_adverb,
         add => < ^^ >,          #  grabs leading whitespace
     },
     rx => {
-        use => &q_regex,
+        now => &q_regex,
         adv => &q_regex_adverb,
         esc => < >,             # let regex parser handle everything
     },
     m => {
-        use => &q_regex,
+        now => &q_regex,
         adv => &q_regex_adverb,
         esc => < >,             # let regex parser handle everything
     },
     s => {
-        use => &q_regex,
+        now => &q_regex,
         adv => &q_regex_adverb,
         esc => < >,             # let regex parser handle everything
     },
     tr => {
-        use => &q_trans,
+        now => &q_trans,
         adv => &q_trans_adverb,
         esc => < >,             # let trans parser handle everything
     },
@@ -177,48 +177,48 @@ role Terminator {...}
 # there's appropriate whitespace, though Perl 6 also uses it to rule out
 # the => (fatarrow) construct.
 
-proto token noun_prefix_sigil { ::: }
-proto token noun_prefix_twigil { ::: }
-proto token special_variable { ::: }
-proto token nameroot { ::: }
-proto token version { ::: }
+proto token noun_prefix_sigil {  }
+proto token noun_prefix_twigil {  }
+proto token special_variable {  }
+proto token nameroot {  }
+proto token version {  }
 
-proto token term { ::: }
-proto token quote { ::: }
-proto token prefix  is defequiv(%symbolic_unary) { ::: }
-proto token infix   is defequiv(%additive) { ::: }
-proto token postfix is defequiv(%autoincrement) { ::: }
+proto token term {  }
+proto token quote {  }
+proto token prefix  is defequiv(%symbolic_unary) {  }
+proto token infix   is defequiv(%additive) {  }
+proto token postfix is defequiv(%autoincrement) {  }
 
-proto token circumfix { ::: }
-proto token postcircumfix { ::: }
+proto token circumfix {  }
+proto token postcircumfix {  }
 
-proto token regex_metachar { ::: }
-proto token regex_backslash { ::: }
-proto token regex_assertion { ::: }
-proto token regex_mod_internal { ::: }
-proto token regex_mod_external { ::: }
-proto token quote_mod { ::: }
+proto token regex_metachar {  }
+proto token regex_backslash {  }
+proto token regex_assertion {  }
+proto token regex_mod_internal {  }
+proto token regex_mod_external {  }
+proto token quote_mod {  }
 
-proto token q_backslash { ::: }
-proto token qq_backslash { ::: }
+proto token q_backslash {  }
+proto token qq_backslash {  }
 
-proto token trait_verb         is endsym(/ \s+ <nofat> /) { ::: }
-proto token trait_auxiliary    is endsym(/ \s+ <nofat> /) { ::: }
+proto token trait_verb         is endsym(/ \s+ <nofat> /) {  }
+proto token trait_auxiliary    is endsym(/ \s+ <nofat> /) {  }
 
-proto token type_declarator    is endsym(/ >> <nofat> /) { ::: }
-proto token scope_declarator   is endsym(/ >> <nofat> /) { ::: }
-proto token package_declarator is endsym(/ >> <nofat> /) { ::: }
-proto token routine_declarator is endsym(/ >> <nofat> /) { ::: }
-proto rule statement_prefix   is endsym(/ >> <nofat> /) { ::: }
-proto rule statement_control  is endsym(/ \s <nofat> /) { ::: }
-proto rule statement_cond     is endsym(/ >> <nofat> /) { ::: }
-proto rule statement_loop     is endsym(/ >> <nofat> /) { ::: }
+proto token type_declarator    is endsym(/ >> <nofat> /) {  }
+proto token scope_declarator   is endsym(/ >> <nofat> /) {  }
+proto token package_declarator is endsym(/ >> <nofat> /) {  }
+proto token routine_declarator is endsym(/ >> <nofat> /) {  }
+proto rule statement_prefix   is endsym(/ >> <nofat> /) {  }
+proto rule statement_control  is endsym(/ \s <nofat> /) {  }
+proto rule statement_cond     is endsym(/ >> <nofat> /) {  }
+proto rule statement_loop     is endsym(/ >> <nofat> /) {  }
 
-proto token infix_prefix_meta_operator { ::: }
-proto token infix_postfix_meta_operator { ::: }
-proto token postfix_prefix_meta_operator { ::: }
-proto token prefix_postfix_meta_operator { ::: }
-proto token prefix_circumfix_meta_operator { ::: }
+proto token infix_prefix_meta_operator {  }
+proto token infix_postfix_meta_operator {  }
+proto token postfix_prefix_meta_operator {  }
+proto token prefix_postfix_meta_operator {  }
+proto token prefix_circumfix_meta_operator {  }
 
 # Lexical routines
 
@@ -807,7 +807,7 @@ token quotesnabber ($q, :$lang = $sublang{"Q:$q"}) {
     [ <$($lang<adv>)($lang)> { $lang.tweak($/) } <?ws> ]*
 
       # Dispatch to current lang's subparser.
-      <$($lang<use>)($lang)>
+      <$($lang<now>)($lang)>
 }
 
 method tweaklang {
@@ -1378,6 +1378,8 @@ token terminator is Terminator[]                #= terminator:<)> def
 token terminator is Terminator[]                #= terminator:<]> def
     { <?before :<]> > {*} }                     #= terminator:<]>
 
+token terminator is Terminator[]                #= terminator:<}> def
+    { <?before :<\}> > {*} }   # XXX bogus \    #= terminator:<}>
 
 token terminator is Terminator[]                #= terminator:<!!> def
     { <?before :<!!> > {*} }                    #= terminator:<!!>
@@ -1398,7 +1400,7 @@ method EXPR (:$prec = $LOOSEST, :$stop = &stdstoppers) {
     push @opstack, $TERMINATOR;         # (just a sentinel value)
     push @termstack, $.expect_term();
 
-    my sub reduce {
+    my sub reduce () {
         my $op = pop @opstack;
         given $op.assoc {
             when 'chain' {
@@ -1524,7 +1526,7 @@ token regex_metachar { :<&&>  :: <fail> }
 token regex_metachar { :<&>   :: <fail> }
 token regex_metachar { :<||>  :: <fail> }
 token regex_metachar { :<|>   :: <fail> }
-token regex_metachar { :<}>   :: <fail> }
+token regex_metachar { :<\}>   :: <fail> } # pugs needs spurious backslash here
 token regex_metachar { :<]>   :: <fail> }
 token regex_metachar { :<)>   :: <fail> }
 
