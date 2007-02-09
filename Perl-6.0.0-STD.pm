@@ -1378,8 +1378,9 @@ token terminator is Terminator[]                #= terminator:<)> def
 token terminator is Terminator[]                #= terminator:<]> def
     { <?before :<]> > {*} }                     #= terminator:<]>
 
+constant $RB = "}";  # work around pugs parser
 token terminator is Terminator[]                #= terminator:<}> def
-    { <?before :<\}> > {*} }   # XXX bogus \    #= terminator:<}>
+    { <?before <symbol($RB)> > {*} }             #= terminator:<}>
 
 token terminator is Terminator[]                #= terminator:<!!> def
     { <?before :<!!> > {*} }                    #= terminator:<!!>
@@ -1526,7 +1527,7 @@ token regex_metachar { :<&&>  :: <fail> }
 token regex_metachar { :<&>   :: <fail> }
 token regex_metachar { :<||>  :: <fail> }
 token regex_metachar { :<|>   :: <fail> }
-token regex_metachar { :<\}>   :: <fail> } # pugs needs spurious backslash here
+token regex_metachar { <symbol($RB)> :: <fail> }
 token regex_metachar { :<]>   :: <fail> }
 token regex_metachar { :<)>   :: <fail> }
 
