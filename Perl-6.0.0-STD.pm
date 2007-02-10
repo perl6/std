@@ -3,8 +3,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 =begin things todo
 
     WHICH etc.
-    contextualizers
-    Array of Int
     bracket matching incl Unicode Ps/Pe
     Captures
     Signatures
@@ -15,6 +13,8 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
     \c[LATIN CAPITAL LETTER A]
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
+    add more suppositions and figure out exact error continuation semantics
+    finish out all the {*} #= hookage
     add parsing this file to sanity tests :)
 
 =end things todo
@@ -146,29 +146,37 @@ our %trans_adverb := {
     # XXX --more--
 };
 
-role Term {...}
-role Methodcall {...}
-role Autoincrement {...}
-role Exponentiation {...}
-role Symbolic_unary {...}
-role Multiplicative {...}
-role Additive {...}
-role Junctive_and {...}
-role Junctive_or {...}
-role Named_unary {...}
-role Nonchaining {...}
-role Chaining {...}
-role Tight_and {...}
-role Tight_or {...}
-role Conditional {...}
-role Item_assignment {...}
-role Loose_unary {...}
-role Comma {...}
-role List_infix {...}
-role List_prefix {...}
-role Loose_and {...}
-role Loose_or {...}
-role Terminator {...}
+token Q_adverb {}
+token q_quote_adverb {}
+token q_quote {}
+token q_regex_adverb {}
+token q_regex {}
+token q_trans_adverb {}
+token q_trans {}
+
+role Term {}
+role Methodcall {}
+role Autoincrement {}
+role Exponentiation {}
+role Symbolic_unary {}
+role Multiplicative {}
+role Additive {}
+role Junctive_and {}
+role Junctive_or {}
+role Named_unary {}
+role Nonchaining {}
+role Chaining {}
+role Tight_and {}
+role Tight_or {}
+role Conditional {}
+role Item_assignment {}
+role Loose_unary {}
+role Comma {}
+role List_infix {}
+role List_prefix {}
+role Loose_and {}
+role Loose_or {}
+role Terminator {}
 
 # Categories are designed to be extensible in derived grammars.
 
@@ -224,6 +232,8 @@ proto token prefix_circumfix_meta_operator {  }
 
 # make sure we're not an autoquoted identifier
 regex nofat { <!before \h* <?unsp>? =\> > }
+
+token q_herestub {}
 
 class Herestub {
     has Str $.delim;
@@ -341,7 +351,14 @@ rule statement_list {
                                                     {*} #= statement_list
 }
 
-token label { <ident> \: \s <?ws> {*} }                 #= label
+token label { <ident>
+    # XXX not sure if this is the right way to write a supposition yet...
+    [ <!{ is_type($<ident>) }>
+    || <suppose "Did you mean a label $<ident>: instead of a contextualizer?">
+    ]
+    \: \s <?ws>
+                                                    {*} #= label
+    }
 
 rule statement {
     <label>*                                     {*}    #= label
@@ -536,6 +553,7 @@ token noun {
     | <package_block>
     | <variable>
     | <value>
+    | <subcall>
     | <quote>
     | <term>
     | <scope_declarator>
@@ -724,24 +742,37 @@ token subname {
     | <CATEGORY> \: <postcurcumfix>
 }
 
+token subcall {
+    <subname> <?unsp>? \.? \( <EXPR> \)
+}
+
 token value {
     | <string>
     | <number>
     | <version>
-    | <typename>
+    | <fulltypename>
 }
 
-regex typename {
+token typename {
     <name>
     <?{
         is_type($<name>)
     }>
 }
 
+regex fulltypename {
+    <typeident>
+    [
+    | <?before \[> <postcircumfix>
+    | of <typename>
+    | <null>
+    ]
+}
+
 token number {
-    | <int>
-    | <num>
-    | <radix>
+    | <integer>
+    | <dec_number>
+    | <radix_number>
 }
 
 token integer {
@@ -753,16 +784,26 @@ token integer {
     | \d+[_\d+]*
 }
 
-token num {
+token radint {
+    | <integer>
+    | <rad_number> <?{
+                        defined $<rad_number><radint>
+                        and
+                        not defined $<rad_number><radfrac>
+                   }>
+}
+
+token dec_number {
     \d+[_\d+]* [ \. \d+[_\d+]* [ <[Ee]> <[+\-]>? \d+ ]? ]
 }
 
-token radix {
+token rad_number {
     \: $<radix> := [\d+] 
     [
     || \<
-            $<radnum> := [<[ 0..9 a..z A..Z ]>+ [ \. <[ 0..9 a..z A..Z ]>+ ]? ]
-            [ \* $<base> := <number> \*\* $<exp> := <number> ]?
+            $<radint> := [<[ 0..9 a..z A..Z ]>+
+            $<radfrac> := [ \. <[ 0..9 a..z A..Z ]>+ ]? ]
+            [ \* $<base> := <radint> \*\* $<exp> := <radint> ]?
        \>
       { return radcalc($<radix>, $<radnum>, $<base>, $<exp>) }
     || <?before \[> <postcircumfix>
@@ -946,12 +987,18 @@ rule statement_prefix { :<lazy>    <statement> {*} }    #= sp lazy
 token term is Term[]                            #= term:<*> def
     { :<*> {*} }                                #= term:<*>
 
+token circumfix is Term[:symbol<$( )>]            #= circumfix:<$( )> def
+    { <noun_prefix_sigil> \( <EXPR> :\) {*} }  #= circumfix:<$( )> 
+
+token circumfix is Term[:symbol<Type( )>]        #= circumfix:<Type( )> def
+    { <typename> \( <EXPR> \) {*} }            #= circumfix:<Type( )> 
+
 token circumfix is Term[]                       #= circumfix:<( )> def
-    { :<( )> {*} }                              #= circumfix:<( )>
+    { :<(> <EXPR> :<)> {*} }                              #= circumfix:<( )>
 
 token postcircumfix is Term[]                   #= postcircumfix:<( )> def
     is abstract('call')
-    { :<( )> {*} }                              #= postcircumfix:<( )>
+    { :<(> <EXPR> :<)> {*} }                              #= postcircumfix:<( )>
 
 ## autoincrement
 token postfix is Autoincrement[]                #= postfix:<++> def
@@ -1241,6 +1288,7 @@ token infix is Assignment[]                     #= infix:<:=> def
 token infix is Assignment[]                     #= infix:<::=> def
     { :<::=> {*} }                              #= infix:<::=>
 
+# XXX need to do something to turn subcall into method call here...
 token infix is Assignment[]                     #= infix:<.=> def
     { :<.=> {*} }                               #= infix:<.=>
 
@@ -1339,9 +1387,27 @@ token prefix is Loose_unary[]                   #= prefix:<true> def
 token prefix is Loose_unary[]                   #= prefix:<not> def
     { :<not> {*} }                              #= prefix:<not>
 
-## list prefix (really sub calls)
-token prefix is List_prefix[]                   #= prefix:<print> def
-    { :<print> {*} }                            #= prefix:<print>
+## list prefix (really sub calls mostly defined in Prelude)
+token prefix is List_prefix[:symbol<listop>]                   #= prefix:<print> def
+    { <listop> \s <nofat>
+        <EXPR(%list_prefix<prec>)>              {*} #= prefix:<print>
+    }
+
+# unrecognized identifiers are assumed to be post-declared subs.
+token prefix is List_prefix[:symbol<listop_postdecl>]   #= prefix:<print> def
+    { <ident> \s <nofat>
+        <EXPR(%list_prefix<prec>)>              {*} #= prefix:<print>
+    }
+
+token prefix is List_prefix[:symbol<$:>]              #= prefix:<$:> def
+    { <noun_prefix_sigil> \: \s
+        <EXPR(%list_prefix<prec>)>              {*}  #= prefix:<$> 
+    }
+
+token prefix is List_prefix[:symbol<Type:>]           #= prefix:<Type:> def
+    { <typename> \: \s
+        <EXPR(%list_prefix<prec>)>              {*}  #= prefix:<Type:> 
+    }
 
 ## loose and
 token infix is Loose_and[]                      #= infix:<and> def
@@ -1378,9 +1444,8 @@ token terminator is Terminator[]                #= terminator:<)> def
 token terminator is Terminator[]                #= terminator:<]> def
     { <?before :<]> > {*} }                     #= terminator:<]>
 
-constant $RB = "}";  # work around pugs parser
-token terminator is Terminator[]                #= terminator:<}> def
-    { <?before <symbol($RB)> > {*} }             #= terminator:<}>
+token terminator is Terminator[:symbol<}>]      #= terminator:<}> def
+    { <?before \}> {*} }                        #= terminator:<}>
 
 token terminator is Terminator[]                #= terminator:<!!> def
     { <?before :<!!> > {*} }                    #= terminator:<!!>
@@ -1390,7 +1455,7 @@ token assertstopper { <stdstopper> | \> }
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR (:$prec = $LOOSEST, :$stop = &stdstoppers) {
+method EXPR (:$prec = $LOOSEST, :$stop = &stdstopper) {
     constant $TERMINATOR = ';' ~~ &terminator;
     if m:p/ <?before <$stop>> / {
         return;
@@ -1527,9 +1592,10 @@ token regex_metachar { :<&&>  :: <fail> }
 token regex_metachar { :<&>   :: <fail> }
 token regex_metachar { :<||>  :: <fail> }
 token regex_metachar { :<|>   :: <fail> }
-token regex_metachar { <symbol($RB)> :: <fail> }
 token regex_metachar { :<]>   :: <fail> }
 token regex_metachar { :<)>   :: <fail> }
+token regex_metachar is symbol<}>
+                     { \}     :: <fail> }
 
 # "normal" metachars
 token regex_metachar { <block> }
