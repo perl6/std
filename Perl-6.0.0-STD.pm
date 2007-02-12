@@ -73,62 +73,65 @@ my $LOOSEST = "a=!";    # "epsilon" tighter than terminator
 
 our %quote_adverb := {
     Q => {                          # base form of all quotes
-        now => &q_pickdelim,
-        adv => &Q_adverb,
-        esc => < >,
+        adverbs => &Q_adverb,
+        parser => &q_pickdelim,
+        escset => < >,
+        escrule => qq_backslash,
     },
     q  => {
-        now => &q_pickdelim,
-        adv => &q_quote_adverb,
-        esc => < \\ >,
+        adverbs => &q_quote_adverb,
+        parser => &q_pickdelim,
+        escset => < \\ >,
+        escrule => qq_backslash,
     },
     qq => {
-        now => &q_pickdelim,
-        adv => &q_quote_adverb,
-        esc => < \\ $ @ % & { >,
+        adverbs => &q_quote_adverb,
+        parser => &q_pickdelim,
+        escset => < \\ $ @ % & { >,
+        escrule => qq_backslash,
     },
     b => {
-        add => < \\ >,
+        escadd => < \\ >,
     },
     s => {
-        add => < $ >,
+        escadd => < $ >,
     },
     a => {
-        add => < @ >,
+        escadd => < @ >,
     },
     h => {
-        add => < % >,
+        escadd => < % >,
     },
     f => {
-        add => < & >,
+        escadd => < & >,
     },
     c => {
-        add => < { >,
+        escadd => < { >,
     },
     to => {
-        now => &q_herestub,
-        adv => &q_quote_adverb,
-        add => < ^^ >,          #  grabs leading whitespace
+        adverbs => &q_quote_adverb,
+        parser => &q_herestub,
+        escadd => < ^^ >,          #  grabs leading whitespace
     },
     rx => {
-        now => &q_regex,
-        adv => &q_regex_adverb,
-        esc => < >,             # let regex parser handle everything
+        adverbs => &q_regex_adverb,
+        parser => &q_regex,
+        escset => < >,             # let regex parser handle everything
     },
     m => {
-        now => &q_regex,
-        adv => &q_regex_adverb,
-        esc => < >,             # let regex parser handle everything
+        adverbs => &q_regex_adverb,
+        parser => &q_regex,
+        escset => < >,             # let regex parser handle everything
     },
     s => {
-        now => &q_regex,
-        adv => &q_regex_adverb,
-        esc => < >,             # let regex parser handle everything
+        adverbs => &q_regex_adverb,
+        parser => &q_regex,
+        escset => < >,             # let regex parser handle everything
     },
     tr => {
-        now => &q_trans,
-        adv => &q_trans_adverb,
-        esc => < >,             # let trans parser handle everything
+        adverbs => &q_trans_adverb,
+        parser => &q_trans,
+        escset => < >,             # let trans parser handle everything
     },
 };
 
@@ -204,7 +207,7 @@ proto token regex_metachar {  }
 proto token regex_backslash {  }
 proto token regex_assertion {  }
 proto token regex_mod_internal {  }
-proto token regex_mod_external {  }
+proto token regex_mod_external is endsym(/ <?before \(> <postcircumfix> /) {  }
 proto token quote_mod {  }
 
 proto token q_backslash {  }
@@ -815,19 +818,20 @@ token quote { <before :<">>    <bracketed(%sublang<Q:q>)>   :<">    }
 token quote { <before :['<']>  <bracketed(%sublang<Q:w>)> :['>']  }
 token quote { <before :['<<']> <bracketed(%sublang<Q:ww>)> :['>>'] }
 
-token quote { (:<q>) <quotesnabber($0)> }
-token quote { (:<qq>) <quotesnabber($0)> }
-token quote { (:<qw>) <quotesnabber($0)> }
-token quote { (:<qww>) <quotesnabber($0)> }
-token quote { (:<qx>) <quotesnabber($0)> }
-token quote { (:<qt>) <quotesnabber($0)> }
-token quote { (:<qn>) <quotesnabber($0)> }
-token quote { (:<qs>) <quotesnabber($0)> }
-token quote { (:<qa>) <quotesnabber($0)> }
-token quote { (:<qh>) <quotesnabber($0)> }
-token quote { (:<qf>) <quotesnabber($0)> }
-token quote { (:<qc>) <quotesnabber($0)> }
-token quote { (:<qb>) <quotesnabber($0)> }
+token quote { (:<q>) (<regex_mod_external>) <quotesnabber($0, $1)> }
+token quote { (:<qq>) (<regex_mod_external>) <quotesnabber($0, $1)> }
+
+token regex_mod_external { :<:w> }
+token regex_mod_external { :<:ww> }
+token regex_mod_external { :<:x> }
+token regex_mod_external { :<:t> }
+token regex_mod_external { :<:n> }
+token regex_mod_external { :<:s> }
+token regex_mod_external { :<:a> }
+token regex_mod_external { :<:h> }
+token regex_mod_external { :<:f> }
+token regex_mod_external { :<:c> }
+token regex_mod_external { :<:b> }
 
 token quote { (:<rx>) <quotesnabber($0)> }
 token quote { (:<m>) <quotesnabber($0)> }
@@ -840,36 +844,61 @@ token quote { (:<tr>) <quotesnabber($0)> <finish_trans> } # XXX handwave
 # be any of a lot of different sublanguages, and we have to parameterize
 # which parse rule to use as well as what options to feed that parse rule.
 
-token quotesnabber ($q, :$lang = $sublang{"Q:$q"}) {
+class QLang {
+    has %.escset;
+    has $.adverbs;
+    has $.parser;
+
+    submethod new ($starthere, $onetweak) {
+        my %start := %quote_adverbs{$starthere};
+        my $self = .bless(|%start);
+        if defined $onetweak {
+            $self.tweak($onetweak);
+        }
+    }
+
+    # XXX someone wants to have turned this into a pair for us...
+    method tweak ($p) {
+        ...
+    }
+}
+
+token quotesnabber ($q, $onetweak?, :$lang is copy = QLang.new($q,$onetweak)) {
     >> <nofat> ::
     <?ws>
 
-    # Look for current lang's adverbs.
-    [ <$($lang<adv>)($lang)> { $lang.tweak($/) } <?ws> ]*
+    # Look for current lang's adverbs.  Note: can change $lang!
+    [ $<adv> := <$($lang.adverbs)($lang)> { $lang.tweak($adv) } <?ws> ]*
 
       # Dispatch to current lang's subparser.
-      <$($lang<now>)($lang)>
-}
-
-method tweaklang {
-    # XXX assuming quote_mod returns a pair...
-    $<lang>{$<quote_mod>.key} = $<quote_mod>.value;
+      <$($lang.parser)($lang)>
 }
 
 # assumes whitespace is eaten already
 
-regex q_pickdelim ($lang, @esc = $lang<esc>) {
+regex q_pickdelim ($lang) {
     [
     | <?before @openers>
       <?before $<start> := [(.)$0*]>
       { $<stop> := flipbrack($<start>) }
-      <q_balanced($lang, $<start>, $<stop>, @esc)>
+      <q_balanced($lang, $<start>, $<stop>)>
     | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
-        <q_unbalanced($lang, $<stop>, @esc)>
+        <q_unbalanced($lang, $<stop>)>
     ]
 }
 
-regex q_balanced ($lang, $start, $stop, :@esc = $lang<esc>) {
+regex rx_pickdelim ($lang) {
+    [
+    | <?before @openers>
+      <?before $<start> := [(.)$0*]>
+      { $<stop> := flipbrack($<start>) }
+      <regex($<stop>)>
+    | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
+      <regex($<stop>)>
+    ]
+}
+
+regex q_balanced ($lang, $start, $stop, :@esc = $lang<escset>) {
     $<start> := <$start>
     $<text> := [.*?]
     @<more> := [
@@ -883,7 +912,7 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang<esc>) {
     $<stop> := <$stop>
 }
 
-regex q_unbalanced ($stop, @esc) {
+regex q_unbalanced ($stop, :@esc = $lang<escset>) {
     $<text> := [.*?]
     @<more> := [
       <!before <$stop>>
@@ -891,6 +920,11 @@ regex q_unbalanced ($stop, @esc) {
       $<text> := [.*?]
     ]*
     $<stop> := <$stop>
+}
+
+# We only get here for escapes in escape set, even though more are defined.
+regex q_escape ($lang) {
+    <$($lang<escrule>)>
 }
 
 ##  rules for parsing interpolated values in quotes.
