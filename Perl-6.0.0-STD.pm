@@ -2,14 +2,9 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
-    WHICH etc.
     bracket matching incl Unicode Ps/Pe
-    Captures
-    Signatures
     quote declarator
     right side of s///, tr///, s[] = expr
-    &foo:(Int,Num)
-    &foo\($a,$b)
     \c[LATIN CAPITAL LETTER A]
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
@@ -557,6 +552,8 @@ token noun {
     | <variable>
     | <value>
     | <subcall>
+    | <capterm>
+    | <sigterm>
     | <quote>
     | <term>
     | <scope_declarator>
@@ -656,16 +653,6 @@ token postcircumfix { :<«> <shellwords> :<»> {*} }      #= postcircumfix « »
 
 token postop { <postfix> | <postcircumfix> }
 
-token dot {
-    (
-    | \\ <?before \.>
-    | <?unsp>?
-    )
-    (\. [\>\>|»] )?
-    \. (<[= * + ?]> <?unsp>? <?before \w>)?
-                                                    {*} #= dot
-}
-
 token methodop {
     [
     | <ident>
@@ -717,9 +704,20 @@ token package_block {
 token special_variable { :<$!>  {*} }
 token special_variable { :<$/>  {*} }
 
+token namemod {
+    [
+    | <sigterm>
+    | <capterm>
+    |
+}
+
 token variable {
     | <special_variable>
-    | <sigiltwigil> <name>
+    | <sigiltwigil>
+        [
+        || <?{ $<sigiltwigil><sigil> eq '&' }> :: <sublongname>
+        || <name>
+        }
     | <sigil> \d+
     | <sigil> <?before \< | \(> <postcircumfix>
     | <name> <'::'> <hashpostfix>
@@ -750,13 +748,22 @@ token name {
     | [ <'::'> <ident> ]+
 }
 
-token subname {
+token subshortname {
     | <name>
-    | <CATEGORY> \: <postcurcumfix>
+    | <CATEGORY> \: <?before \< | \{ > <postcircumfix>
+}
+
+token sublongname {
+    <subshortname>
+    [
+    | <capterm>
+    | <sigterm>
+    | <null>
+    ]
 }
 
 token subcall {
-    <subname> <?unsp>? \.? \( <EXPR> \)
+    <subshortname> <?unsp>? \.? \( <EXPR> \)
 }
 
 token value {
@@ -895,11 +902,13 @@ token quotesnabber ($q, $onetweak?, :$lang is copy = QLang.new($q,$onetweak)) {
 
 # assumes whitespace is eaten already
 
+method findbrack {
+    ...
+}
+
 regex q_pickdelim ($lang) {
     [
-    | <?before @openers>
-      <?before $<start> := [(.)$0*]>
-      { $<stop> := flipbrack($<start>) }
+    | <?{ ($<start>,$<stop>) = .findbrack() }>
       <q_balanced($lang, $<start>, $<stop>)>
     | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
         <q_unbalanced($lang, $<stop>)>
@@ -922,9 +931,10 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang<escset>) {
     $<text> := [.*?]
     @<more> := [
       <!before <$stop>>
-      [
-      || <?before <$start>> $<subtext> := <q_balanced($lang, $start, $stop, :@esc)>
-      || <?before @esc> $<escape> := [ <q_escape($lang)> ]
+      [ # XXX triple rule should just be in escapes to be customizable
+      | <?before <$start>**{3}> $<dequote> := <q_dequote($lang, $start, $stop, :@esc)>
+      | <?before <$start>> $<subtext> := <q_balanced($lang, $start, $stop, :@esc)>
+      | <?before @esc> $<escape> := [ <q_escape($lang)> ]
       ]
       $<text> := [.*?]
     ]*
@@ -998,6 +1008,18 @@ token trait_auxiliary { :<will> <ident> <block> }
 
 token trait_verb { :<of>        <type> }
 token trait_verb { :<returns>   <type> }
+
+token capterm {
+    \\ \( <capture> \)
+}
+
+rule capture {
+    <EXPR>
+}
+
+token sigterm {
+    \: \( <signature> \)
+}
 
 rule signature {
     [<parameter> [ [ \, | \: | ; | ;; ] <parameter> ]* ]?
