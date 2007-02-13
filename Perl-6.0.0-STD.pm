@@ -76,19 +76,19 @@ our %quote_adverb := {
         adverbs => &Q_adverb,
         parser => &q_pickdelim,
         escset => < >,
-        escrule => qq_backslash,
+        escrule => &quote_escapes,
     },
     q  => {
         adverbs => &q_quote_adverb,
         parser => &q_pickdelim,
         escset => < \\ >,
-        escrule => qq_backslash,
+        escrule => &quote_escapes,
     },
     qq => {
         adverbs => &q_quote_adverb,
         parser => &q_pickdelim,
         escset => < \\ $ @ % & { >,
-        escrule => qq_backslash,
+        escrule => &quote_escapes,
     },
     b => {
         escadd => < \\ >,
@@ -595,6 +595,9 @@ token dotty {
     | <'.'>                                   {*}     #= dotty plain
 }
 
+# Note, this rule mustn't do anything irreversible because it's used
+# as a lookahead by the quote interpolator.
+
 token expect_postfix {
     [
     | \\ <?before \.>
@@ -664,10 +667,15 @@ token dot {
 }
 
 token methodop {
-    <ident>
+    [
+    | <ident>
+    | <?before \$> <variable>
+    | <?before <[ ' " ]>> <quote>
+    ]
+
     [
     | \.? \( <EXPR> \)
-    | \: <?before \s> <listop_expr>
+    | \: <?before \s> <!{ $+inquote }> <listop_expr>
     | <null>
     ]
 }
@@ -712,6 +720,8 @@ token special_variable { :<$/>  {*} }
 token variable {
     | <special_variable>
     | <sigiltwigil> <name>
+    | <sigil> \d+
+    | <sigil> <?before \< | \(> <postcircumfix>
     | <name> <'::'> <hashpostfix>
 }
 
@@ -813,13 +823,15 @@ token rad_number {
     || <?before \(> <postcircumfix>
 }
 
-token quote { <before :<'>>    <bracketed(%sublang<Q:q>)>   :<'>    }
-token quote { <before :<">>    <bracketed(%sublang<Q:q>)>   :<">    }
-token quote { <before :['<']>  <bracketed(%sublang<Q:w>)> :['>']  }
-token quote { <before :['<<']> <bracketed(%sublang<Q:ww>)> :['>>'] }
+token quote { <before :<'>>    <quotesnabber("q")> }
+token quote { <before :<">>    <quotesnabber("qq")> }
+token quote { <before :['«']> <quotesnabber("q",":ww")> }
+token quote { <before :['<<']> <quotesnabber("q",":ww")> }
+token quote { <before :['<']>  <quotesnabber("q",":w")> }
 
-token quote { (:<q>) (<regex_mod_external>) <quotesnabber($0, $1)> }
+# handle composite forms like qww
 token quote { (:<qq>) (<regex_mod_external>) <quotesnabber($0, $1)> }
+token quote { (:<q>)  (<regex_mod_external>) <quotesnabber($0, $1)> }
 
 token regex_mod_external { :<:w> }
 token regex_mod_external { :<:ww> }
@@ -857,9 +869,16 @@ class QLang {
         }
     }
 
-    # XXX someone wants to have turned this into a pair for us...
+    # XXX someone needs to have turned this into a pair for us...
     method tweak ($p) {
-        ...
+        given $p.key {
+            when 'escset' {
+                ...
+            }
+            when 'escadd' {
+                ...
+            }
+        }
     }
 }
 
@@ -912,7 +931,7 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang<escset>) {
     $<stop> := <$stop>
 }
 
-regex q_unbalanced ($stop, :@esc = $lang<escset>) {
+regex q_unbalanced ($lang, $stop, :@esc = $lang<escset>) {
     $<text> := [.*?]
     @<more> := [
       <!before <$stop>>
@@ -927,18 +946,18 @@ regex q_escape ($lang) {
     <$($lang<escrule>)>
 }
 
-##  rules for parsing interpolated values in quotes.
-##  The first part of the rule handles non-scalar
-##  interpolation (which must end with a postcircumfix operator);
-##  the second part handles scalar interpolation.
+token quote_escapes {
+    || \\ <qq_backslash>
+    || <?before \{> <block>
+    || <?before \$> <variable> <extrapost>?
+    || <variable> <extrapost>
+    || .
+}
 
-token quote_interpolation {
-    | <![$]> ::: <variable>
-          $<postfix>:=( <?dot> [ <postcircumfix> | $<method>:=<ident> ]
-                     | <postcircumfix> )+
-    | <variable>
-          $<postfix>:=( <?dot> [ <postcircumfix> | $<method>:=<ident> ]
-                     | <postcircumfix> )*
+# Note, backtracks!  So expect_postfix mustn't commit to anything permanent.
+regex extrapost ($inquote is context = 1) {
+    <expect_postfix>*
+    <?after <[ \] \} \> \) ]> > 
 }
 
 rule routine_block {
@@ -1491,6 +1510,7 @@ token assertstopper { <stdstopper> | \> }
 
 method EXPR (:$prec = $LOOSEST, :$stop = &stdstopper) {
     constant $TERMINATOR = ';' ~~ &terminator;
+    my $inquote is context = 0;
     if m:p/ <?before <$stop>> / {
         return;
     }
