@@ -64,6 +64,8 @@ my %terminator        ::= { :prec<a=>, :assoc<list>             };
 
 my $LOOSEST = "a=!";    # "epsilon" tighter than terminator
 
+our @herestub_queue;
+
 # XXX maybe shouldn't be hash, but for now...
 
 our %quote_adverb := {
@@ -231,7 +233,16 @@ proto token prefix_circumfix_meta_operator {  }
 # make sure we're not an autoquoted identifier
 regex nofat { <!before \h* <?unsp>? =\> > }
 
-token q_herestub {}
+token q_herestub ($lang) {
+    $<delimstr> := <quotesnabber('Q')>  # force raw semantics on /END/ marker
+    {
+        push @herestub_queue:
+            new Herestub:
+                delim => $<delimstr><delimited><q><text>, # XXX or some such
+                orignode => $/,
+                lang => $lang;
+    }
+}
 
 class Herestub {
     has Str $.delim;
@@ -717,7 +728,7 @@ token variable {
         [
         || <?{ $<sigiltwigil><sigil> eq '&' }> :: <sublongname>
         || <name>
-        }
+        ]
     | <sigil> \d+
     | <sigil> <?before \< | \(> <postcircumfix>
     | <name> <'::'> <hashpostfix>
@@ -876,8 +887,8 @@ class QLang {
         }
     }
 
-    # XXX someone needs to have turned this into a pair for us...
     method tweak ($p) {
+        # XXX more bogus hashiness, we need another polymorphic dispatch here
         given $p.key {
             when 'escset' {
                 ...
@@ -897,7 +908,7 @@ token quotesnabber ($q, $onetweak?, :$lang is copy = QLang.new($q,$onetweak)) {
     [ $<adv> := <$($lang.adverbs)($lang)> { $lang.tweak($adv) } <?ws> ]*
 
       # Dispatch to current lang's subparser.
-      <$($lang.parser)($lang)>
+      $<delimited> := <$($lang.parser)($lang)>
 }
 
 # assumes whitespace is eaten already
@@ -909,20 +920,20 @@ method findbrack {
 regex q_pickdelim ($lang) {
     [
     | <?{ ($<start>,$<stop>) = .findbrack() }>
-      <q_balanced($lang, $<start>, $<stop>)>
+      $<q> := <q_balanced($lang, $<start>, $<stop>)>
+      { let $<text> := $<q><text>
     | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
-        <q_unbalanced($lang, $<stop>)>
+        $<q> := <q_unbalanced($lang, $<stop>)>
     ]
 }
 
 regex rx_pickdelim ($lang) {
     [
-    | <?before @openers>
-      <?before $<start> := [(.)$0*]>
-      { $<stop> := flipbrack($<start>) }
-      <regex($<stop>)>
+    | <?{ ($<start>,$<stop>) = .findbrack() }>
+      $<start>
+      $<r> := <regex($<stop>)>        # counts its own brackets, we hope
     | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
-      <regex($<stop>)>
+      $<r> := <regex($<stop>)>
     ]
 }
 
