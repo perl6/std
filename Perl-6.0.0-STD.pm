@@ -2,8 +2,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
-    ensure declarators and other categories are driving rather than driven
-       (think about multi-word keywords like "multi sub" vs "multi")
     right side of s///, tr///, s[] = expr
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
@@ -327,7 +325,7 @@ rule comp_unit (:$define_compunit is context = 1) {
     ^
     <package_declarator>?
     <statement_list>
-    [ $ || <panic: Parse terminated early> ]
+    [ $ || <panic: Can't understand next input--giving up> ]
                                                     {*} #= comp_unit
 }
 
@@ -560,8 +558,13 @@ token adverbs {
 token noun {
     [
     | <pair>
+    | <package_declarator>
+    | <scope_declarator>
+    | <plurality_declarator>
+    | <routine_declarator>
+    | <regex_declarator>
+    | <type_declarator>
     | <circumfix>
-    | <package_block>
     | <variable>
     | <value>
     | <subcall>
@@ -569,9 +572,6 @@ token noun {
     | <sigterm>
     | <quote>
     | <term>
-    | <scope_declarator>
-    | <routine_block>
-    | <regex_block>
     | <statement_prefix>
     ]
                                                         {*} #= noun
@@ -699,21 +699,25 @@ token circumfix { :<«>    <shellwords> :<»>    {*} }    #= circumfix « »
 token circumfix is Circumfix[:symbol<{ }>]
     { <block>         {*} }                             #= circumfix { }
 
-rule scoped_variables {
-    <scope_declarator>
+rule scoped {
     <type>?
     [
     | <variable>
     | \( <signature> \)
+    | <package_declarator>
+    | <plurality_declarator>
+    | <routine_declarator>
+    | <regex_declarator>
+    | <type_declarator>
     ]
-                                                        {*} #= scopedvar
+                                                        {*} #= scoped
 }
 
-token scope_declarator { :<my>       {*} }     #= sd my
-token scope_declarator { :<our>      {*} }     #= sd our
-token scope_declarator { :<state>    {*} }     #= sd state
-token scope_declarator { :<constant> {*} }     #= sd constant
-token scope_declarator { :<has>      {*} }     #= sd has
+token scope_declarator { :<my>       <scoped> {*} }     #= sd my
+token scope_declarator { :<our>      <scoped> {*} }     #= sd our
+token scope_declarator { :<state>    <scoped> {*} }     #= sd state
+token scope_declarator { :<constant> <scoped> {*} }     #= sd constant
+token scope_declarator { :<has>      <scoped> {*} }     #= sd has
 
 token package_declarator { :<class>   <package_def> {*} }     #= pd class
 token package_declarator { :<grammar> <package_def> {*} }     #= pd grammar
@@ -722,8 +726,6 @@ token package_declarator { :<role>    <package_def> {*} }     #= pd role
 token package_declarator { :<package> <package_def> {*} }     #= pd package
 
 token package_def {
-    <scope_declarator>?
-    <package_declarator>
     <module_name>?
     <trait>* {*}                                         #= pkgdef traits
     [
@@ -737,6 +739,31 @@ token package_def {
     ]
                                                         {*} #= pkgdef
 }
+
+rule pluralized {
+    [
+    | <variable>
+    | \( <signature> \)
+    | <package_declarator>
+    | <routine_declarator>
+    | <regex_declarator>
+    | <type_declarator>
+    ]
+                                                        {*} #= scoped
+}
+
+token plurality_declarator { :<multi> <pluralized> }
+token plurality_declarator { :<proto> <pluralized> }
+token plurality_declarator { :<only>  <pluralized> }
+
+token routine_declarator { :<sub>       <routine_def> }
+token routine_declarator { :<method>    <routine_def> }
+token routine_declarator { :<submethod> <routine_def> }
+token routine_declarator { :<macro>     <macro_def> }
+
+token regex_declarator { :<regex>       <regex_def> }
+token regex_declarator { :<token>       <regex_def> }
+token regex_declarator { :<rule>        <regex_def> }
 
 token special_variable { :<$!>  {*} }
 token special_variable { :<$/>  {*} }
@@ -1133,44 +1160,21 @@ regex extrapost ($inquote is context = 1) {
                                                         {*} #= extrapost
 }
 
-rule routine_block {
-    <scope_declarator>?
-    <subintro>
+rule routine_def {
     <ident>?
     <trait>*
     [ :? \( <signature> \)]?
     <block>
-                                                        {*} #= routine_block
+                                                        {*} #= routine_def
 }
 
-rule regex_method {
-    <scope_declarator>?
-    <regex_declarator>
+rule regex_def {
     <ident>?
     <trait>*
     [ :? \( <signature> \)]?
     <regex_block>
-                                                        {*} #= regex_method
+                                                        {*} #= regex_def
 }
-
-rule subintro {
-    [
-    | <routine_modifier> <routine_declarator>?
-    | <routine_declarator>
-    ]
-                                                        {*} #= subintro
-}
-
-token routine_modifier { multi | proto | only }
-
-token routine_declarator { :<sub> }
-token routine_declarator { :<method> }
-token routine_declarator { :<submethod> }
-token routine_declarator { :<macro> }
-
-token regex_declarator { :<regex> }
-token regex_declarator { :<token> }
-token regex_declarator { :<rule> }
 
 rule trait { <trait_verb> | <trait_auxiliary> }
 
