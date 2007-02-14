@@ -2,7 +2,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
-    bracket matching incl Unicode Ps/Pe
     right side of s///, tr///, s[] = expr
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
@@ -921,11 +920,12 @@ class QLang {
     has $.adverbs;
     has $.parser;
 
-    submethod new ($starthere, $onetweak) {
+    submethod new ($pedigree) {
+        my ($starthere, @adv) = $pedigree.split(':');
         my %start := %quote_adverbs{$starthere};
         my $self = .bless(|%start);
-        if defined $onetweak {
-            $self.tweak($onetweak);
+        for @adv {
+            $self.tweak($_);
         }
     }
 
@@ -942,38 +942,128 @@ class QLang {
     }
 }
 
-token quotesnabber ($q, $onetweak?, :$lang is copy = QLang.new($q,$onetweak)) {
+sub qlang ($pedigree) {
+    $pedigree ~~ s:g/ \s+ //;
+    (state %qlang){$pedigree} //= new QLang($pedigree);
+}
+
+token quotesnabber ($q is copy) {
     <!before \w> <nofat> ::
     <?ws>
 
-    # Look for current lang's adverbs.  Note: can change $lang!
-    [ $<adv> := <$($lang.adverbs)($lang)> { $lang.tweak($adv) } <?ws> ]*
+    [ (<colonpair>) { $q ~= $0 } <?ws> ]*
 
-      # Dispatch to current lang's subparser.
-      $<delimited> := <$($lang.parser)($lang)>
+    { my $lang = qlang($q) }
+
+    # Dispatch to current lang's subparser.
+    $<delimited> := <$($<lang>.parser)($<lang>)>
                                                         {*} #= quotesnabber
 }
+
+# XXX should eventually be derived from current Unicode tables.
+constant %open2close ::= {
+    "\x0028" => "\x0029", "\x003C" => "\x003E", "\x005B" => "\x005D",
+    "\x007B" => "\x007D", "\x00AB" => "\x00BB", "\x0F3A" => "\x0F3B",
+    "\x0F3C" => "\x0F3D", "\x169B" => "\x169C", "\x2039" => "\x203A",
+    "\x2045" => "\x2046", "\x207D" => "\x207E", "\x208D" => "\x208E",
+    "\x2208" => "\x220B", "\x2209" => "\x220C", "\x220A" => "\x220D",
+    "\x2215" => "\x29F5", "\x223C" => "\x223D", "\x2243" => "\x22CD",
+    "\x2252" => "\x2253", "\x2254" => "\x2255", "\x2264" => "\x2265",
+    "\x2266" => "\x2267", "\x2268" => "\x2269", "\x226A" => "\x226B",
+    "\x226E" => "\x226F", "\x2270" => "\x2271", "\x2272" => "\x2273",
+    "\x2274" => "\x2275", "\x2276" => "\x2277", "\x2278" => "\x2279",
+    "\x227A" => "\x227B", "\x227C" => "\x227D", "\x227E" => "\x227F",
+    "\x2280" => "\x2281", "\x2282" => "\x2283", "\x2284" => "\x2285",
+    "\x2286" => "\x2287", "\x2288" => "\x2289", "\x228A" => "\x228B",
+    "\x228F" => "\x2290", "\x2291" => "\x2292", "\x2298" => "\x29B8",
+    "\x22A2" => "\x22A3", "\x22A6" => "\x2ADE", "\x22A8" => "\x2AE4",
+    "\x22A9" => "\x2AE3", "\x22AB" => "\x2AE5", "\x22B0" => "\x22B1",
+    "\x22B2" => "\x22B3", "\x22B4" => "\x22B5", "\x22B6" => "\x22B7",
+    "\x22C9" => "\x22CA", "\x22CB" => "\x22CC", "\x22D0" => "\x22D1",
+    "\x22D6" => "\x22D7", "\x22D8" => "\x22D9", "\x22DA" => "\x22DB",
+    "\x22DC" => "\x22DD", "\x22DE" => "\x22DF", "\x22E0" => "\x22E1",
+    "\x22E2" => "\x22E3", "\x22E4" => "\x22E5", "\x22E6" => "\x22E7",
+    "\x22E8" => "\x22E9", "\x22EA" => "\x22EB", "\x22EC" => "\x22ED",
+    "\x22F0" => "\x22F1", "\x22F2" => "\x22FA", "\x22F3" => "\x22FB",
+    "\x22F4" => "\x22FC", "\x22F6" => "\x22FD", "\x22F7" => "\x22FE",
+    "\x2308" => "\x2309", "\x230A" => "\x230B", "\x2329" => "\x232A",
+    "\x23B4" => "\x23B5", "\x2768" => "\x2769", "\x276A" => "\x276B",
+    "\x276C" => "\x276D", "\x276E" => "\x276F", "\x2770" => "\x2771",
+    "\x2772" => "\x2773", "\x2774" => "\x2775", "\x27C3" => "\x27C4",
+    "\x27C5" => "\x27C6", "\x27D5" => "\x27D6", "\x27DD" => "\x27DE",
+    "\x27E2" => "\x27E3", "\x27E4" => "\x27E5", "\x27E6" => "\x27E7",
+    "\x27E8" => "\x27E9", "\x27EA" => "\x27EB", "\x2983" => "\x2984",
+    "\x2985" => "\x2986", "\x2987" => "\x2988", "\x2989" => "\x298A",
+    "\x298B" => "\x298C", "\x298D" => "\x298E", "\x298F" => "\x2990",
+    "\x2991" => "\x2992", "\x2993" => "\x2994", "\x2995" => "\x2996",
+    "\x2997" => "\x2998", "\x29C0" => "\x29C1", "\x29C4" => "\x29C5",
+    "\x29CF" => "\x29D0", "\x29D1" => "\x29D2", "\x29D4" => "\x29D5",
+    "\x29D8" => "\x29D9", "\x29DA" => "\x29DB", "\x29F8" => "\x29F9",
+    "\x29FC" => "\x29FD", "\x2A2B" => "\x2A2C", "\x2A2D" => "\x2A2E",
+    "\x2A34" => "\x2A35", "\x2A3C" => "\x2A3D", "\x2A64" => "\x2A65",
+    "\x2A79" => "\x2A7A", "\x2A7D" => "\x2A7E", "\x2A7F" => "\x2A80",
+    "\x2A81" => "\x2A82", "\x2A83" => "\x2A84", "\x2A8B" => "\x2A8C",
+    "\x2A91" => "\x2A92", "\x2A93" => "\x2A94", "\x2A95" => "\x2A96",
+    "\x2A97" => "\x2A98", "\x2A99" => "\x2A9A", "\x2A9B" => "\x2A9C",
+    "\x2AA1" => "\x2AA2", "\x2AA6" => "\x2AA7", "\x2AA8" => "\x2AA9",
+    "\x2AAA" => "\x2AAB", "\x2AAC" => "\x2AAD", "\x2AAF" => "\x2AB0",
+    "\x2AB3" => "\x2AB4", "\x2ABB" => "\x2ABC", "\x2ABD" => "\x2ABE",
+    "\x2ABF" => "\x2AC0", "\x2AC1" => "\x2AC2", "\x2AC3" => "\x2AC4",
+    "\x2AC5" => "\x2AC6", "\x2ACD" => "\x2ACE", "\x2ACF" => "\x2AD0",
+    "\x2AD1" => "\x2AD2", "\x2AD3" => "\x2AD4", "\x2AD5" => "\x2AD6",
+    "\x2AEC" => "\x2AED", "\x2AF7" => "\x2AF8", "\x2AF9" => "\x2AFA",
+    "\x2E02" => "\x2E03", "\x2E04" => "\x2E05", "\x2E09" => "\x2E0A",
+    "\x2E0C" => "\x2E0D", "\x2E1C" => "\x2E1D", "\x3008" => "\x3009",
+    "\x300A" => "\x300B", "\x300C" => "\x300D", "\x300E" => "\x300F",
+    "\x3010" => "\x3011", "\x3014" => "\x3015", "\x3016" => "\x3017",
+    "\x3018" => "\x3019", "\x301A" => "\x301B", "\x301D" => "\x301E",
+    "\xFD3E" => "\xFD3F", "\xFE17" => "\xFE18", "\xFE35" => "\xFE36",
+    "\xFE37" => "\xFE38", "\xFE39" => "\xFE3A", "\xFE3B" => "\xFE3C",
+    "\xFE3D" => "\xFE3E", "\xFE3F" => "\xFE40", "\xFE41" => "\xFE42",
+    "\xFE43" => "\xFE44", "\xFE47" => "\xFE48", "\xFE59" => "\xFE5A",
+    "\xFE5B" => "\xFE5C", "\xFE5D" => "\xFE5E", "\xFF08" => "\xFF09",
+    "\xFF1C" => "\xFF1E", "\xFF3B" => "\xFF3D", "\xFF5B" => "\xFF5D",
+    "\xFF5F" => "\xFF60", "\xFF62" => "\xFF63",
+};
 
 # assumes whitespace is eaten already
 
 method findbrack {
-    ...
+    my $start;
+    my $stop;
+    if m:p/ <?before <isPe>> / {
+        panic("Use a closing delimiter for an opener is reserved");
+    }
+    elsif m:p/ <?before $start := [ (<isPs>|<isMirrored>) $0* ] > / {
+        $stop = %open2close{$0} err
+            panic("Don't know how to flip $start bracket");
+        $stop x= $start.chars;
+        return $start, $stop;
+    }
+    else {
+        return ();
+    }
+}
+
+regex bracketed ($lang = QLang("Q")) {
+     <?{ ($<start>,$<stop>) = $.findbrack() }>
+     $<q> := <q_balanced($lang, $<start>, $<stop>)>
+                                                        {*} #= bracketed
 }
 
 regex q_pickdelim ($lang) {
     [
-    | <?{ ($<start>,$<stop>) = .findbrack() }>
-      $<q> := <q_balanced($lang, $<start>, $<stop>)>
-      { let $<text> := $<q><text>
-    | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
-        $<q> := <q_unbalanced($lang, $<stop>)>
+    || <?{ ($<start>,$<stop>) = $.findbrack() }>
+       $<q> := <q_balanced($lang, $<start>, $<stop>)>
+    || [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
+       $<q> := <q_unbalanced($lang, $<stop>)>
     ]
                                                         {*} #= q_pickdelim
 }
 
 regex rx_pickdelim ($lang) {
     [
-    | <?{ ($<start>,$<stop>) = .findbrack() }>
+    | <?{ ($<start>,$<stop>) = $.findbrack() }>
       $<start>
       $<r> := <regex($<stop>)>        # counts its own brackets, we hope
     | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
@@ -1850,7 +1940,7 @@ token cclass_elem {
     [ \+ | - | <null> ]
     [
     | <name>
-    | <before \[> <bracketed(%sublang<cclass>)>
+    | <before \[> <bracketed(QLang('cclass'))>
     ]
 }
 
