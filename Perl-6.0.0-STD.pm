@@ -3,7 +3,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 =begin things todo
 
     bracket matching incl Unicode Ps/Pe
-    quote declarator
     right side of s///, tr///, s[] = expr
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
@@ -700,7 +699,12 @@ token circumfix is Circumfix[:symbol<{ }>]
     { <block>         {*} }                             #= circumfix { }
 
 rule scoped_variables {
-    <scope_declarator> <variable>
+    <scope_declarator>
+    <type>?
+    [
+    | <variable>
+    | \( <signature> \)
+    ]
                                                         {*} #= scopedvar
 }
 
@@ -882,8 +886,10 @@ token quote { <before :['<<']> <quotesnabber("q",":ww")> }
 token quote { <before :['<']>  <quotesnabber("q",":w")> }
 
 # handle composite forms like qww
-token quote { (:<qq>) (<regex_mod_external>) <quotesnabber($0, $1)> }
-token quote { (:<q>)  (<regex_mod_external>) <quotesnabber($0, $1)> }
+token quote { :<qq> <regex_mod_external>
+    <quotesnabber('qq', $<regex_mod_external>)> }
+token quote { :<q>  <regex_mod_external>
+    <quotesnabber('q', $<regex_mod_external>)> }
 
 token regex_mod_external { :<:w> }
 token regex_mod_external { :<:ww> }
@@ -897,12 +903,14 @@ token regex_mod_external { :<:f> }
 token regex_mod_external { :<:c> }
 token regex_mod_external { :<:b> }
 
-token quote { (:<rx>) <quotesnabber($0)> }
-token quote { (:<m>) <quotesnabber($0)> }
-token quote { (:<mm>) <quotesnabber($0)> }
-token quote { (:<s>) <quotesnabber($0)> <finish_subst> } # XXX handwave
-token quote { (:<ss>) <quotesnabber($0)> <finish_subst> } # XXX handwave
-token quote { (:<tr>) <quotesnabber($0)> <finish_trans> } # XXX handwave
+token quote { :<rx> <quotesnabber('rx')> }
+
+token quote { :<m>  <quotesnabber('m')> }
+token quote { :<mm> <quotesnabber('m', ':s')> }
+token quote { :<s>  <quotesnabber('s')> <finish_subst> } # XXX handwave
+token quote { :<ss> <quotesnabber('s', ':s')> <finish_subst> } # XXX handwave
+
+token quote { :<tr> <quotesnabber($0)> <finish_trans> } # XXX handwave
 
 # The key observation here is that the inside of quoted constructs may
 # be any of a lot of different sublanguages, and we have to parameterize
@@ -935,7 +943,7 @@ class QLang {
 }
 
 token quotesnabber ($q, $onetweak?, :$lang is copy = QLang.new($q,$onetweak)) {
-    >> <nofat> ::
+    <!before \w> <nofat> ::
     <?ws>
 
     # Look for current lang's adverbs.  Note: can change $lang!
@@ -1045,9 +1053,15 @@ rule regex_method {
                                                         {*} #= regex_method
 }
 
-rule subintro { <routine_modifier> <routine_type>? | <routine_type> }
+rule subintro {
+    [
+    | <routine_modifier> <routine_declarator>?
+    | <routine_declarator>
+    ]
+                                                        {*} #= subintro
+}
 
-token routine_modifier { multi | proto }
+token routine_modifier { multi | proto | only }
 
 token routine_declarator { :<sub> }
 token routine_declarator { :<method> }
