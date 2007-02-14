@@ -2,6 +2,8 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
+    ensure declarators and other categories are driving rather than driven
+       (think about multi-word keywords like "multi sub" vs "multi")
     right side of s///, tr///, s[] = expr
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
@@ -321,9 +323,9 @@ token pod_comment {
 
 # Top-level rules
 
-rule comp_unit {
+rule comp_unit (:$define_compunit is context = 1) {
     ^
-    [ <package_declarator> <module_name> <trait>* ; ]?
+    <package_declarator>?
     <statement_list>
     [ $ || <panic: Parse terminated early> ]
                                                     {*} #= comp_unit
@@ -713,19 +715,27 @@ token scope_declarator { :<state>    {*} }     #= sd state
 token scope_declarator { :<constant> {*} }     #= sd constant
 token scope_declarator { :<has>      {*} }     #= sd has
 
-token package_declarator { :<class>     {*} }     #= td class
-token package_declarator { :<grammar>   {*} }     #= td grammar
-token package_declarator { :<module>    {*} }     #= td module
-token package_declarator { :<role>      {*} }     #= td role
-token package_declarator { :<package>   {*} }     #= td package
+token package_declarator { :<class>   <package_def> {*} }     #= pd class
+token package_declarator { :<grammar> <package_def> {*} }     #= pd grammar
+token package_declarator { :<module>  <package_def> {*} }     #= pd module
+token package_declarator { :<role>    <package_def> {*} }     #= pd role
+token package_declarator { :<package> <package_def> {*} }     #= pd package
 
-token package_block {
+token package_def {
     <scope_declarator>?
     <package_declarator>
-    <module_name>?              # XXX maybe shouldn't have version/auth?
-    <trait>*
-    <block>
-                                                        {*} #= pkgblock
+    <module_name>?
+    <trait>* {*}                                         #= pkgdef traits
+    [
+    || <?{ $+define_compunit } :: \;
+        { defined $<module_name> or
+            panic("Compilation unit cannot be anonymous"
+        }
+                                                        {*} #= pkgdef semi
+    || <block>
+                                                        {*} #= pkgdef block
+    ]
+                                                        {*} #= pkgdef
 }
 
 token special_variable { :<$!>  {*} }
