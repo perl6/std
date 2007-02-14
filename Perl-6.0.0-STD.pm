@@ -5,7 +5,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
     bracket matching incl Unicode Ps/Pe
     quote declarator
     right side of s///, tr///, s[] = expr
-    \c[LATIN CAPITAL LETTER A]
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
     add more suppositions and figure out exact error continuation semantics
@@ -242,6 +241,7 @@ token q_herestub ($lang) {
                 orignode => $/,
                 lang => $lang;
     }
+                                                        {*} #= herestub
 }
 
 class Herestub {
@@ -517,7 +517,7 @@ token module_name_wild {
 token version_wild   { <block> | <whatever> | <version> }
 token authority_wild { <block> | <whatever> | <authority> }
 
-token whatever { \* }
+token whatever { \* {*} }                            #= whatever
 
 token version {
     v \d+ [ \. \d+ ]*                 {*}             #= version vstyle
@@ -554,9 +554,11 @@ token adverbs {
                 $<colonpair> ~ ')');
         $prop.adverb($<colonpair>)
     }
+                                                        {*} #= adverbs
 }
 
 token noun {
+    [
     | <pair>
     | <circumfix>
     | <package_block>
@@ -571,18 +573,26 @@ token noun {
     | <routine_block>
     | <regex_block>
     | <statement_prefix>
+    ]
+                                                        {*} #= noun
 }
 
 token pair {
+    [
     | $<key>:=<ident> \h* =\> $<val>:=<EXPR(%assignment<prec>)>
+                                                        {*} #= pair fat
     | [ <colonpair> <?ws> ]+
+                                                        {*} #= pair colon
+    ]
+                                                        {*} #= pair
 }
 
 token colonpair {
     [
-    | \: !? <ident>
-    | \: <ident>? <unsp>? <postcircumfix>
+    | \: !? <ident>                                     {*} #= colonpair bool
+    | \: <ident>? <unsp>? <postcircumfix>               {*} #= colonpair value
     ]
+                                                        {*} #= colonpair
 }
 
 token expect_infix ($loosest) {
@@ -676,6 +686,7 @@ token methodop {
     | \: <?before \s> <!{ $+inquote }> <listop_expr>
     | <null>
     ]
+                                                        {*} #= methodop
 }
 
 token circumfix { :<(> <EXPR> :<)> {*} }                #= circumfix ( )
@@ -690,6 +701,7 @@ token circumfix is Circumfix[:symbol<{ }>]
 
 rule scoped_variables {
     <scope_declarator> <variable>
+                                                        {*} #= scopedvar
 }
 
 token scope_declarator { :<my>       {*} }     #= sd my
@@ -710,19 +722,14 @@ token package_block {
     <module_name>?              # XXX maybe shouldn't have version/auth?
     <trait>*
     <block>
+                                                        {*} #= pkgblock
 }
 
 token special_variable { :<$!>  {*} }
 token special_variable { :<$/>  {*} }
 
-token namemod {
-    [
-    | <sigterm>
-    | <capterm>
-    |
-}
-
 token variable {
+    [
     | <special_variable>
     | <sigiltwigil>
         [
@@ -732,11 +739,14 @@ token variable {
     | <sigil> \d+
     | <sigil> <?before \< | \(> <postcircumfix>
     | <name> <'::'> <hashpostfix>
+    ]
+                                                        {*} #= variable
 }
 
 token sigiltwigil {
     <noun_prefix_sigil>
     <noun_prefix_twigil>?
+                                                        {*} #= sigiltwigil
 }
 
 token noun_prefix_sigil { :<$>   {*} }               #= sigil $
@@ -755,13 +765,19 @@ token noun_prefix_twigil { :<?>  {*} }               #= twigil ?
 token noun_prefix_twigil { :<=>  {*} }               #= twigil =
 
 token name {
+    [
     | <ident> <nofat> [ <'::'> <ident> ]*
     | [ <'::'> <ident> ]+
+    ]
+                                                        {*} #= name
 }
 
 token subshortname {
+    [
     | <name>
     | <CATEGORY> \: <?before \< | \{ > <postcircumfix>
+    ]
+                                                        {*} #= subshort
 }
 
 token sublongname {
@@ -771,17 +787,21 @@ token sublongname {
     | <sigterm>
     | <null>
     ]
+                                                        {*} #= sublong
 }
 
 token subcall {
-    <subshortname> <?unsp>? \.? \( <EXPR> \)
+    <subshortname> <?unsp>? \.? \( <EXPR> \)            {*} #= subcall
 }
 
 token value {
+    [
     | <string>
     | <number>
     | <version>
     | <fulltypename>
+    ]
+                                                        {*} #= value
 }
 
 token typename {
@@ -789,6 +809,7 @@ token typename {
     <?{
         is_type($<name>)
     }>
+                                                        {*} #= typename
 }
 
 regex fulltypename {
@@ -798,34 +819,45 @@ regex fulltypename {
     | of <typename>
     | <null>
     ]
+                                                        {*} #= fulltypenmae
 }
 
 token number {
+    [
     | <integer>
     | <dec_number>
     | <radix_number>
+    ]
+                                                        {*} #= number
 }
 
 token integer {
+    [
     | 0 [ b <[01]>+           [ _ <[01]>+ ]*
         | o <[0..7]>+         [ _ <[0..7]>+ ]*
         | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
         | d \d+               [ _ \d+]*
         ]
     | \d+[_\d+]*
+    ]
+                                                        {*} #= integer
 }
 
 token radint {
+    [
     | <integer>
     | <rad_number> <?{
                         defined $<rad_number><radint>
                         and
                         not defined $<rad_number><radfrac>
                    }>
+    ]
+                                                        {*} #= radint
 }
 
 token dec_number {
     \d+[_\d+]* [ \. \d+[_\d+]* [ <[Ee]> <[+\-]>? \d+ ]? ]
+                                                        {*} #= dec_number
 }
 
 token rad_number {
@@ -839,6 +871,8 @@ token rad_number {
       { return radcalc($<radix>, $<radnum>, $<base>, $<exp>) }
     || <?before \[> <postcircumfix>
     || <?before \(> <postcircumfix>
+    ]
+                                                        {*} #= rad_number
 }
 
 token quote { <before :<'>>    <quotesnabber("q")> }
@@ -909,6 +943,7 @@ token quotesnabber ($q, $onetweak?, :$lang is copy = QLang.new($q,$onetweak)) {
 
       # Dispatch to current lang's subparser.
       $<delimited> := <$($lang.parser)($lang)>
+                                                        {*} #= quotesnabber
 }
 
 # assumes whitespace is eaten already
@@ -925,6 +960,7 @@ regex q_pickdelim ($lang) {
     | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
         $<q> := <q_unbalanced($lang, $<stop>)>
     ]
+                                                        {*} #= q_pickdelim
 }
 
 regex rx_pickdelim ($lang) {
@@ -935,6 +971,7 @@ regex rx_pickdelim ($lang) {
     | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
       $<r> := <regex($<stop>)>
     ]
+                                                        {*} #= rx_pickdelim
 }
 
 regex q_balanced ($lang, $start, $stop, :@esc = $lang<escset>) {
@@ -950,6 +987,7 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang<escset>) {
       $<text> := [.*?]
     ]*
     $<stop> := <$stop>
+                                                        {*} #= q_balanced
 }
 
 regex q_unbalanced ($lang, $stop, :@esc = $lang<escset>) {
@@ -960,25 +998,31 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang<escset>) {
       $<text> := [.*?]
     ]*
     $<stop> := <$stop>
+                                                        {*} #= q_unbalanced
 }
 
 # We only get here for escapes in escape set, even though more are defined.
 regex q_escape ($lang) {
     <$($lang<escrule>)>
+                                                        {*} #= q_escaped
 }
 
 token quote_escapes {
+    [
     || \\ <qq_backslash>
     || <?before \{> <block>
     || <?before \$> <variable> <extrapost>?
     || <variable> <extrapost>
     || .
+    ]
+                                                        {*} #= quote_escapes
 }
 
 # Note, backtracks!  So expect_postfix mustn't commit to anything permanent.
 regex extrapost ($inquote is context = 1) {
     <expect_postfix>*
     <?after <[ \] \} \> \) ]> > 
+                                                        {*} #= extrapost
 }
 
 rule routine_block {
@@ -988,6 +1032,7 @@ rule routine_block {
     <trait>*
     [ :? \( <signature> \)]?
     <block>
+                                                        {*} #= routine_block
 }
 
 rule regex_method {
@@ -997,6 +1042,7 @@ rule regex_method {
     <trait>*
     [ :? \( <signature> \)]?
     <regex_block>
+                                                        {*} #= regex_method
 }
 
 rule subintro { <routine_modifier> <routine_type>? | <routine_type> }
@@ -1022,19 +1068,23 @@ token trait_verb { :<returns>   <type> }
 
 token capterm {
     \\ \( <capture> \)
+                                                        {*} #= capterm
 }
 
 rule capture {
     <EXPR>
+                                                        {*} #= capture
 }
 
 token sigterm {
     \: \( <signature> \)
+                                                        {*} #= sigterm
 }
 
 rule signature {
     [<parameter> [ [ \, | \: | ; | ;; ] <parameter> ]* ]?
     [ --\> <type> ]?
+                                                        {*} #= signature
 }
 
 rule type_declarator {
@@ -1042,12 +1092,16 @@ rule type_declarator {
     <name>
     [ of <type_name> ]?
     where <subset>
+                                                        {*} #= type_decl
 }
 
 rule type_constraint {
+    [
     | <value>
     | <type_name>
     | where <subset>
+    ]
+                                                        {*} #= type_constraint
 }
 
 token parameter {
@@ -1060,6 +1114,7 @@ token parameter {
     | <sigiltwigil>  <ident>?
     ]
     <default_value>
+                                                        {*} #= parameter
 }
 
 rule statement_prefix { :<do>      <statement> {*} }    #= sp do
@@ -1630,33 +1685,39 @@ method EXPR (:$prec = $LOOSEST, :$stop = &stdstopper) {
 
 rule regex ($stop is context) {
     <regex_ordered_disjunction>
+                                                        {*} #= rx
 }
 
 rule regex_ordered_disjunction {
     <'||'>?
     <regex_ordered_conjunction>
     [ :<||> <regex_ordered_conjunction> ]*
+                                                        {*} #= rx_ord_dis
 }
 
 rule regex_ordered_conjunction {
     <regex_unordered_disjunction>
     [ :<&&> <regex_unordered_disjunction> ]*
+                                                        {*} #= rx_ord_con
 }
 
 rule regex_unordered_disjunction {
     <'|'>?
     <regex_unordered_conjunction>
     [ :<|> <regex_unordered_conjunction> ]*
+                                                        {*} #= rx_unord_dis
 }
 
 rule regex_unordered_conjunction {
     <regex_sequence>
     [ :<&> <regex_sequence> ]*
+                                                        {*} #= rx_unord_con
 }
 
 rule regex_sequence {
     <regex_quantified_atom>+
     # Could combine unquantified atoms into one here...
+                                                        {*} #= rx_seq
 }
 
 rule regex_quantified_atom {
@@ -1665,12 +1726,16 @@ rule regex_quantified_atom {
         <?{ $<regex_atom>.max_width }>
             || <panic: "Can't quantify zero-width atom")
     ]?
+                                                        {*} #= rx_quantatom
 }
 
 rule regex_atom {
+    [
     || <$+stop> :: <fail>
     || <regex_metachar>
     || (.)
+    ]
+                                                        {*} #= rx_atom
 }
 
 # sequence stoppers
@@ -1712,13 +1777,17 @@ token regex_metachar {
     | <variable>
 }
 
+token codepoint {
+    \[ (.*?) \]
+}
+
 token q_backslash { :<qq> <qq_bracketed> }
 token q_backslash { :<\> }
 token q_backslash { (.) }
 
 token qq_backslash { :<a> }
 token qq_backslash { :<b> }
-token qq_backslash { :<c> <bracket_named_unicode> }
+token qq_backslash { :<c> <codepoint> }
 token qq_backslash { :<e> }
 token qq_backslash { :<f> }
 token qq_backslash { :<n> }
@@ -1730,7 +1799,7 @@ token qq_backslash { :: \W || <panic: unrecognized backslash sequence> }
 
 token regex_backslash { :i :<a> }
 token regex_backslash { :i :<b> }
-token regex_backslash { :i :<c> <bracket_named_unicode> }
+token regex_backslash { :i :<c> <codepoint> }
 token regex_backslash { :i :<d> }
 token regex_backslash { :i :<e> }
 token regex_backslash { :i :<f> }
