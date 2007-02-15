@@ -2,6 +2,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
+    finish precedence roles
     right side of s///, tr///, s[] = expr
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
@@ -153,6 +154,7 @@ token q_regex {}
 token q_trans_adverb {}
 token q_trans {}
 
+# XXX need to set up $+thisop according to precedence table.
 role Term {}
 role Methodcall {}
 role Autoincrement {}
@@ -217,10 +219,10 @@ proto token type_declarator    is endsym(/ >> <nofat> /) {  }
 proto token scope_declarator   is endsym(/ >> <nofat> /) {  }
 proto token package_declarator is endsym(/ >> <nofat> /) {  }
 proto token routine_declarator is endsym(/ >> <nofat> /) {  }
-proto rule statement_prefix   is endsym(/ >> <nofat> /) {  }
-proto rule statement_control  is endsym(/ \s <nofat> /) {  }
-proto rule statement_cond     is endsym(/ >> <nofat> /) {  }
-proto rule statement_loop     is endsym(/ >> <nofat> /) {  }
+proto rule statement_prefix    is endsym(/ >> <nofat> /) {  }
+proto rule statement_control   is endsym(/ \s <nofat> /) {  }
+proto rule statement_mod_cond  is endsym(/ >> <nofat> /) {  }
+proto rule statement_mod_loop  is endsym(/ >> <nofat> /) {  }
 
 proto token infix_prefix_meta_operator {  }
 proto token infix_postfix_meta_operator {  }
@@ -376,8 +378,8 @@ rule statement {
     | <statement_control>                        {*}    #= statement control
     | <block>                                    {*}    #= statement block
     | <EXPR>                                     {*}    #= statement expr
-        [<statement_cond> <EXPR> {*} ]?                 #= statement mod cond
-        [<statement_loop> <EXPR> {*} ]?                 #= statement mod loop
+        [<statement_mod_cond> <EXPR> {*} ]?             #= statement mod cond
+        [<statement_mod_loop> <EXPR> {*} ]?             #= statement mod loop
     ]
                                                         {*} #= statement
 }
@@ -463,16 +465,14 @@ token statement_control { %statement_control }
 
 rule modifier_expr { <EXPR> ;? {*} }                    #? #= modifier_expr
 
-token statement_modifier { <statement_cond> | <statement_loop> }
+rule statement_mod_cond { :<if>     <modifier_expr> {*} };     #= scond if
+rule statement_mod_cond { :<unless> <modifier_expr> {*} };     #= scond unless
+rule statement_mod_cond { :<when>   <modifier_expr> {*} };     #= scond for
 
-rule statement_cond { :<if>     <modifier_expr> {*} };     #= scond if
-rule statement_cond { :<unless> <modifier_expr> {*} };     #= scond unless
-rule statement_cond { :<when>   <modifier_expr> {*} };     #= scond for
-
-rule statement_loop { :<for>    <modifier_expr> {*} };     #= sloop for
-rule statement_loop { :<given>  <modifier_expr> {*} };     #= sloop for
-rule statement_loop { :<while>  <modifier_expr> {*} };     #= sloop while
-rule statement_loop { :<until>  <modifier_expr> {*} };     #= sloop until
+rule statement_mod_loop { :<for>    <modifier_expr> {*} };     #= sloop for
+rule statement_mod_loop { :<given>  <modifier_expr> {*} };     #= sloop for
+rule statement_mod_loop { :<while>  <modifier_expr> {*} };     #= sloop while
+rule statement_mod_loop { :<until>  <modifier_expr> {*} };     #= sloop until
 
 token nameroot { <'perl6'> }
 token nameroot { <'perl5'> }
@@ -645,7 +645,19 @@ token expect_postfix {
 
 # backtracks or we'll never get to parse [LIST] on seeing [+
 regex prefix_circumfix_meta_operator (:$thisop? is context ) {
-    :<[> <expect_infix> :<]>                           {*}  #= precircum square
+    [
+    || :<[> <expect_infix> :<]>
+    || :<[\\> <expect_infix> :<]>
+    ]
+    [
+    || <!{ $+thisop<assoc> eq 'non' }>
+    || <panic: Can't reduce a non-associative operator>
+    ]
+    [
+    || <!{ $+thisop<prec> eq %conditional<prec> }>
+    || <panic: Can't reduce a conditional operator>
+    ]
+                                                    {*}  #= precircum reduce
 }
 
 token prefix_postfix_meta_operator { :<«>     {*} }     #= prepost hyper
@@ -660,15 +672,16 @@ token infix { <infix_circumfix_meta_operator> }
 token infix_prefix_meta_operator {
     :<!> <!before !> <expect_infix>
 
+    <?nonest: negation>
+
     [
     || <?{ $+thisop<assoc> eq 'chain'}>
     || <?{ $+thisop<assoc> and $+thisop<boolean> }>
     || <panic: Only boolean infix operators may be negated>
     ]
 
-    [ <!{ $+thisop<hyper> }> || <panic: Negation of hyperop not allowed> ]
+    { $+thisop<hyper> and panic("Negation of hyper operator not allowed") }
 
-    <?nonest: negation>
 
                                                         {*} #= inpre not
 }
@@ -1209,13 +1222,16 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang<escset>) {
     $<start> := <$start>
     $<text> := [.*?]
     @<more> := [
-      <!before <$stop>>
-      [ # XXX triple rule should just be in escapes to be customizable
-      | <?before <$start>**{3}> $<dequote> := <q_dequote($lang, $start, $stop, :@esc)>
-      | <?before <$start>> $<subtext> := <q_balanced($lang, $start, $stop, :@esc)>
-      | <?before @esc> $<escape> := [ <q_escape($lang)> ]
-      ]
-      $<text> := [.*?]
+        <!before <$stop>>
+        [ # XXX triple rule should just be in escapes to be customizable
+        | <?before <$start>**{3}>
+            $<dequote> := <q_dequote($lang, $start, $stop, :@esc)>
+        | <?before <$start>>
+            $<subtext> := <q_balanced($lang, $start, $stop, :@esc)>
+        | <?before @esc>
+            $<escape> := [ <q_escape($lang)> ]
+        ]
+        $<text> := [.*?]
     ]*
     $<stop> := <$stop>
                                                         {*} #= q_balanced
@@ -1295,7 +1311,7 @@ token sigterm {
                                                         {*} #= sigterm
 }
 
-rule signature {
+rule signature (:$zone is context is rw = 'posreq') {
     [<parameter> [ [ \, | \: | ; | ;; ] <parameter> ]* ]?
     [ --\> <type> ]?
                                                         {*} #= signature
@@ -1319,17 +1335,63 @@ rule type_constraint {
 }
 
 token parameter {
-    <slurp>?
+
     <type_constraint>*
     [
-    | \: <ident>? \(
-      <sigiltwigil>  <ident>?
-      \)
-    | <sigiltwigil>  <ident>?
+    | $<slurp> := [ $<quantchar>:=[ \* ] <sigiltwigil> <ident>?  ]
+        { let $<quant> := '*' }
+    |   [ $<named> :=
+            [ $<quantchar>:=[ \: ]
+                [
+                | $<name>:=<?ident> \( <sigiltwigil> <ident>?  \)
+                |             <sigiltwigil> $<name>:=<ident>
+                ]
+                { let $<quant> := '*' }
+            ]
+        | <sigiltwigil>  <ident>?
+            { let $<quant> := '!'; }
+        ]
+        [ $<quantchar> := <[ ? ! ]> { let $<quant> := $<quantchar> } ]?
     ]
-    \??
+
     <trait>*
-    <default_value>
+
+    [
+        <default_value> {
+            given $<quantchar> {
+              when '!' { panic("Can't put a default on a required parameter") }
+              when '*' { panic("Can't put a default on a slurpy parameter") }
+            }
+            let $<quant> := '?';
+        }
+    ]?
+
+    # enforce zone constraints
+    {
+        given $<quant> {
+            when '!' {
+                given $+zone {
+                    when 'posopt' {
+panic("Can't use required parameter in optional zone");
+                    }
+                    when 'var' {
+panic("Can't use required parameter in variadic zone");
+                    }
+                }
+            }
+            when '?' {
+                given $+zone {
+                    when 'posreq' { $+zone = 'posopt' }
+                    when 'var' {
+panic("Can't use optional positional parameter in variadic zone");
+                    }
+                }
+            }
+            when '*' {
+                $+zone = 'var';
+            }
+        }
+    }
                                                         {*} #= parameter
 }
 
@@ -1814,7 +1876,13 @@ token terminator is Terminator[:symbol<}>]      #= terminator:<}> def
 token terminator is Terminator[]                #= terminator:<!!> def
     { <?before :<!!> > {*} }                    #= terminator:<!!>
 
-token stdstopper { <terminator> | <statement_cond> | <statement_loop> | $ }
+regex stdstopper {
+    | <terminator>
+    | <statement_mod_cond>
+    | <statement_mod_loop>
+    | $
+}
+
 token assertstopper { <stdstopper> | \> }
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
@@ -2065,10 +2133,20 @@ token cclass_elem {
     ]
 }
 
+token regex_mod_internal { <colonpair> }
 token regex_mod_internal { :<:i> <regex_mod_arg>? }
+token regex_mod_internal { :<:!i> }
+token regex_mod_internal { :<:[> <EXPR> :<]> }
+token regex_mod_internal { :<:\<> <EXPR> :<\>> }
 token regex_mod_internal { <panic: unrecognized regex modifier> }
 
+token regex_mod_external { <colonpair> }
+token regex_mod_external { :<:g> <regex_mod_arg> }
+token regex_mod_external { :<:global> <regex_mod_arg> }
+token regex_mod_external { :<:s> <regex_mod_arg> }
+token regex_mod_external { :<:sigspace> <regex_mod_arg> }
 token regex_mod_external { :<:nth> <regex_mod_arg> }
+token regex_mod_external { \:\d+ ( x | st | nd | rd | th ) }
 token regex_mod_external { <panic: unrecognized regex modifier> }
 
 token regex_quantifier { :<**> <?ws> <block> <quantmod> }
