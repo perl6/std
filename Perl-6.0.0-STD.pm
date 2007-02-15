@@ -193,6 +193,7 @@ proto token quote {  }
 proto token prefix  is defequiv(%symbolic_unary) {  }
 proto token infix   is defequiv(%additive) {  }
 proto token postfix is defequiv(%autoincrement) {  }
+proto token dotty is endsym(/ <?unsp>? / {  }
 
 proto token circumfix {  }
 proto token postcircumfix {  }
@@ -596,21 +597,25 @@ token colonpair {
 }
 
 token expect_infix ($loosest) {
-    <infix_prefix_meta_operator>*
     <infix>
     <infix_postfix_meta_operator>*
     ::: <?{ resolve_meta($/) and $<infix>.prec ge $loosest }>
                                                     {*} #= Xinfix
 }
 
-token dotty {
-    | <'.+'>                                  {*}     #= dotty plus
-    | <'.*'>                                  {*}     #= dotty star
-    | <'.?'>                                  {*}     #= dotty query
-    | <'.='>                                  {*}     #= dotty equals
-    | <'.^'>                                  {*}     #= dotty caret
-    | <'.:'>                                  {*}     #= dotty colon
-    | <'.'>                                   {*}     #= dotty plain
+token dotty { :<.+> <methodop>                      {*}     #= dotty plus
+token dotty { :<.*> <methodop>                      {*}     #= dotty star
+token dotty { :<.?> <methodop>                      {*}     #= dotty query
+token dotty { :<.=> <methodop>                      {*}     #= dotty equals
+token dotty { :<.^> <methodop>                      {*}     #= dotty caret
+token dotty { :<.:> <methodop>                      {*}     #= dotty colon
+token dotty { :<.>  <dottyop>                       {*}     #= dotty plain
+
+token dottyop {
+    [
+    | methodop
+    | postop
+    ]
 }
 
 # Note, this rule mustn't do anything irreversible because it's used
@@ -625,33 +630,61 @@ token expect_postfix {
     [ [\. <?unsp>?]? <postfix_prefix_meta_operator> <?unsp>? ]*
 
     [
-    | $<dot> := <dotty> <?unsp>? <methodop>
-    | $<dot> := [ \.]   <?unsp>? <postop>
-    |                            <postop>
+    | <dotty>
+    | <postop>
     ]
                                                     {*} #= Xpostfix
 }
+
 token prefix_circumfix_meta_operator {
     :<[> <infix> :<]>                               {*}  #= precircum square
 }
 
-token prefix_postfix_meta_operator { :<«>     {*} }  #» #= prepost hyper
+token prefix_postfix_meta_operator { :<«>     {*} }     #= prepost hyper
 token prefix_postfix_meta_operator { :['<<'] {*} }      #= prepost HYPER
 
 token postfix_prefix_meta_operator { :<»>     {*} }     #= postpre hyper
 token postfix_prefix_meta_operator { :['>>'] {*} }      #= postpre HYPER
 
-token infix_prefix_meta_operator { :<!>     {*} }       #= inpre not
-token infix_prefix_meta_operator { :<«>     {*} }    #» #= inpre hyper dwim
-token infix_prefix_meta_operator { :<»>     {*} }       #= inpre hyper asis
-token infix_prefix_meta_operator { :['<<'] {*} }        #= inpre HYPER dwim
-token infix_prefix_meta_operator { :['>>'] {*} }        #= inpre HYPER asis
+token infix { <infix_prefix_meta_operator> }
+token infix { <infix_circumfix_meta_operator> }
+
+token infix_prefix_meta_operator { :<!> <infix> {*} }       #= inpre not
+
+# XXX maybe need an assertion like <?{ not %+infixseen<hyper>++ }> 
+token infix_circumfix_meta_operator {
+    :<«> <infix> :<»>                        {*} #= incirc hyper dwimdwim
+}
+
+token infix_circumfix_meta_operator {
+    :<«> <infix> :<«>                        {*} #= incirc hyper dwimasis
+}
+
+token infix_circumfix_meta_operator {
+    :<»> <infix> :<»>                        {*} #= incirc hyper asisdwim
+}
+
+token infix_circumfix_meta_operator {
+    :<»> <infix> :<«>                        {*} #= incirc hyper asisasis
+}
+
+token infix_circumfix_meta_operator {
+    :['<<'] <infix> :['>>']                  {*} #= incirc HYPER dwimdwim
+}
+
+token infix_circumfix_meta_operator {
+    :['<<'] <infix> :['<<']                  {*} #= incirc HYPER dwimasis
+}
+
+token infix_circumfix_meta_operator {
+    :['>>'] <infix> :['>>']                  {*} #= incirc HYPER asisdwim
+}
+
+token infix_circumfix_meta_operator {
+    :['>>'] <infix> :['<<']                  {*} #= incirc HYPER asisasis
+}
 
 token infix_postfix_meta_operator { :<=>     {*} }      #= inpost assign
-token infix_postfix_meta_operator { :<«>     {*} }   #» #= inpost hyper asis
-token infix_postfix_meta_operator { :<»>     {*} }      #= inpost hyper dwim
-token infix_postfix_meta_operator { :['<<']  {*} }      #= inpost HYPER asis
-token infix_postfix_meta_operator { :['>>']  {*} }      #= inpost HYPER dwim
 
 token postfix { :<i> {*} }                              #= postfix i
 token postfix { :<++> {*} }                             #= postfix incr
@@ -662,8 +695,9 @@ token postcircumfix { :<(> <EXPR> :<)> {*} }            #= postcircumfix ( )
 token postcircumfix { :<[> <EXPR> :<]> {*} }            #= postcircumfix [ ]
 
 token postcircumfix { :<{> <EXPR> :<}> {*} }            #= postcircumfix { }
-token postcircumfix { :['<'] <anglewords> :['>']
-                                                    {*} #= postcircumfix < >
+
+token postcircumfix {
+    :['<'] <anglewords> :['>'] {*}                      #= postcircumfix < >
 }
 
 token postcircumfix { :['<'] <shellwords> :['>']
