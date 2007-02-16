@@ -3,7 +3,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 =begin things todo
 
     right side of s///, tr///, s[] = expr
-    has $.handler handles *
     sublanguages
     harvest symbol bits from regex
     exporting grammars to the compiler vs namespace (which one is default?)
@@ -716,6 +715,7 @@ rule scoped {
     | <regex_declarator>
     | <type_declarator>
     ]
+    <trait>*
     {*}
 }
 
@@ -1065,6 +1065,8 @@ token quote { <before :['«']> <quotesnabber("q",":ww")> }
 token quote { <before :['<<']> <quotesnabber("q",":ww")> }
 token quote { <before :['<']>  <quotesnabber("q",":w")> }
 
+token quote { <before :['/']>  <quotesnabber("rx")> }
+
 # handle composite forms like qww
 token quote { :<qq> <regex_mod_external>
     <quotesnabber('qq', $<regex_mod_external>)> }
@@ -1329,11 +1331,12 @@ rule regex_def {
 
 rule trait { <trait_verb> | <trait_auxiliary> }
 
-token trait_auxiliary { :<is>   <ident>[\( <EXPR> \)]? }
-token trait_auxiliary { :<will> <ident> <block> }
+rule trait_auxiliary { :<is>   <ident><postcircumfix>?
+rule trait_auxiliary { :<will> <ident> <block> }
 
-token trait_verb { :<of>        <type> }
-token trait_verb { :<returns>   <type> }
+rule trait_verb { :<of>        <type> }
+rule trait_verb { :<returns>   <type> }
+rule trait_verb { :<handles>   <EXPR> }
 
 token capterm {
     \\ \( <capture> \)
