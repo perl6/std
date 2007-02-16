@@ -499,7 +499,7 @@ regex infix_nospace {
 token expect_tight_infix ($loosest) {
     <!before \{>                # presumably a statement control block
     <expect_infix>
-    ::: <?{ $+thisop<prec> ge $loosest<prec> }>
+    ::: <?{ $+thisop.prec ge $loosest }>
 }
 
 token expect_infix {
@@ -548,7 +548,7 @@ regex prefix_circumfix_meta_operator (:$thisop? is context ) {     #= [ ]
     [ <!{ $+thisop<assoc> eq 'non' }>
         || <panic: Can't reduce a non-associative operator> ]
 
-    [ <!{ $+thisop<prec> eq %conditional<prec> }>
+    [ <!{ $+thisop.prec eq %conditional<prec> }>
         || <panic: Can't reduce a conditional operator> ]
 
 
@@ -643,7 +643,7 @@ token infix_postfix_meta_operator {                           #= =
     <nonest: assignment>
 
     [
-    || <?{ $+thisop<prec> gt %item_assignment<prec> }
+    || <?{ $+thisop.prec gt %item_assignment<prec> }
     || <panic: Can't make assignment op of operator looser than assignment>
     ]
 
@@ -1842,7 +1842,8 @@ token assertstopper { <stdstopper> | \> }
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR (:$prec = %LOOSEST, :$stop = &stdstopper) {
+method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
+    my $preclim = %preclim<prec>;
     my $inquote is context = 0;
     if m:p/ <?before <$stop>> / {
         return;
@@ -1861,7 +1862,7 @@ method EXPR (:$prec = %LOOSEST, :$stop = &stdstopper) {
                 push @chain, pop(@termstack);
                 push @chain, $op;
                 while @opstack {
-                    last if $op<prec> ne @opstack[-1]<prec>;
+                    last if $op.prec ne @opstack[-1].prec;
                     push @chain, pop(@termstack);
                     push @chain, pop(@opstack)<infix>;
                 }
@@ -1891,13 +1892,13 @@ method EXPR (:$prec = %LOOSEST, :$stop = &stdstopper) {
 
     while not m:p/ <?before <$stop> > / {
         my $thisop is context is rw;
-        my $infix := $.expect_tight_infix($prec);
-        my Str $newprec = $thisop<prec>;
+        my $infix := $.expect_tight_infix($preclim);
+        my Str $newprec = $thisop.prec;
         $thisop //= %terminator;
         $thisop<infix> = $infix;
 
         # Does new infix (or terminator) force any reductions?
-        while @opstack[-1]<prec> lt $newprec {
+        while @opstack[-1].prec lt $newprec {
             reduce();
         }
 
@@ -1905,7 +1906,7 @@ method EXPR (:$prec = %LOOSEST, :$stop = &stdstopper) {
         last if $newprec lt $LOOSEST;
 
         # Equal precedence, so use associativity to decide.
-        if @opstack[-1]<prec> eq $newprec {
+        if @opstack[-1].prec eq $newprec {
             given $thisop<assoc> {
                 when 'non'   { panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
