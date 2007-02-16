@@ -7,7 +7,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
     sublanguages
     exporting grammars to the compiler vs namespace (which one is default?)
     add more suppositions and figure out exact error continuation semantics
-    finish out all the {*}                                   #= hookage
+    finish out all the {*}                                   #+ hookage
     add parsing this file to sanity tests :)
 
 =end things todo
@@ -16,13 +16,16 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 # action statements or used as-is without any preprocessing.  The {*}
 # notation is a no-op action block, but can be identified uniquely via a
 # combination of the preceding token or rule name plus any additional text
-# following a #= comment.  We put this into a comment rather than using
+# following a #+ comment.  We put this into a comment rather than using
 # a macro so that bootstrap compilers don't have to worry about macros
 # yet, and to keep the main grammar relatively uncluttered by action
 # statements.  Note that the preprocessor can certainly generate accesses
 # to $/ within the action block, so we need not mention it explicitly.
+# Also, some rules are named by syntactic category plus the symbols
+# parsed by the rule.  These extra parts of the operator name are mentioned
+# in comments that begin #=.
 
-# Note that rules with only one action need no #= comment, so the identifier
+# Note that rules with only one action need no #+ comment, so the identifier
 # of the following stub is just "TOP".
 
 rule TOP { <compunit> {*} }
@@ -67,96 +70,6 @@ my %terminator        ::= { :prec<a=>, :assoc<list>             };
 
 # "epsilon" tighter than terminator
 my $LOOSEST = %LOOSEST<prec>;
-
-our @herestub_queue;
-
-# XXX maybe shouldn't be hash, but for now...
-
-our %quote_adverb := {
-    Q => {                          # base form of all quotes
-        adverbs => &Q_adverb,
-        parser => &q_pickdelim,
-        escset => < >,
-        escrule => &quote_escapes,
-    },
-    q  => {
-        adverbs => &q_quote_adverb,
-        parser => &q_pickdelim,
-        escset => < \\ >,
-        escrule => &quote_escapes,
-    },
-    qq => {
-        adverbs => &q_quote_adverb,
-        parser => &q_pickdelim,
-        escset => < \\ $ @ % & { >,
-        escrule => &quote_escapes,
-    },
-    b => {
-        escadd => < \\ >,
-    },
-    s => {
-        escadd => < $ >,
-    },
-    a => {
-        escadd => < @ >,
-    },
-    h => {
-        escadd => < % >,
-    },
-    f => {
-        escadd => < & >,
-    },
-    c => {
-        escadd => < { >,
-    },
-    to => {
-        adverbs => &q_quote_adverb,
-        parser => &q_herestub,
-        escadd => < ^^ >,          #  grabs leading whitespace
-    },
-    rx => {
-        adverbs => &q_regex_adverb,
-        parser => &q_regex,
-        escset => < >,             # let regex parser handle everything
-    },
-    m => {
-        adverbs => &q_regex_adverb,
-        parser => &q_regex,
-        escset => < >,             # let regex parser handle everything
-    },
-    s => {
-        adverbs => &q_regex_adverb,
-        parser => &q_regex,
-        escset => < >,             # let regex parser handle everything
-    },
-    tr => {
-        adverbs => &q_trans_adverb,
-        parser => &q_trans,
-        escset => < >,             # let trans parser handle everything
-    },
-};
-
-our %regex_adverb := {
-    g => {
-        ...
-    },
-    # XXX --more--
-};
-
-our %trans_adverb := {
-    d => {
-        ...
-    },
-    # XXX --more--
-};
-
-token Q_adverb {}
-token q_quote_adverb {}
-token q_quote {}
-token q_regex_adverb {}
-token q_regex {}
-token q_trans_adverb {}
-token q_trans {}
 
 # XXX need to set up $+thisop according to precedence table.
 role Term {}
@@ -239,80 +152,33 @@ proto token prefix_circumfix_meta_operator {  }
 # make sure we're not an autoquoted identifier
 regex nofat { <!before \h* <?unsp>? =\> > }
 
-token q_herestub ($lang) {
-    $<delimstr> := <quotesnabber('Q')>  # force raw semantics on /END/ marker
-    {
-        push @herestub_queue:
-            new Herestub:
-                delim => $<delimstr><delimited><q><text>, # XXX or some such
-                orignode => $/,
-                lang => $lang;
-    }
-    {*}
-}
-
-class Herestub {
-    has Str $.delim;
-    has $.orignode;
-    has $.lang;
-}
-
-# XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
-
-method heredoc {
-    while my $herestub = shift @herestub_queue {
-        my $delim = $herestub.delim;
-        my $lang = $herestub.lang;
-        my $doc;
-        my $ws = "";
-        my $stoppat = $delim eq "" ?? rx[^^ \h* $$]
-                                   !! rx[^^ $ws:=(\h*?) $delim \h* $$ \n?];
-        my @heredoc_initial_ws is context is rw;
-        if m:p/$doc:=<q_unbalanced($lang, :stop($stoppat))>/ {
-            if $ws and @heredoc_initial_ws {
-                my $wsequiv = $ws;
-                $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
-                for @heredoc_initial_strings {
-                    next if s/^ $ws //;   # reward consistent tabbing
-                    s/^^ (\t+) /{ ' ' x ($0 * 8) }/;
-                    s/^ $wsequiv // or s/^ \h+ //;
-                }
-            }
-            $herestub.orignode<doc> = $doc;
-        }
-        else {
-            fail("Ending delimiter $delim not found");
-        }
-    }
-}
-
 token ws {
     || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
     || [
-       | <unsp>              {*}                                #= unsp
-       | \v                  {*} <heredoc>                      #= vwhite
-       | <unv>               {*}                                #= unv
-       ]*  {*}                                                  #= all
+       | <unsp>              {*}                                #+ unsp
+       | \v                  {*} <heredoc>                      #+ vwhite
+       | <unv>               {*}                                #+ unv
+       ]*  {*}                                                  #+ all
 }
 
 token unsp {
     \\ <?before [\s|\#]>
     [
-    | \v                     {*}                                #= vwhite
-    | <unv>                  {*}                                #= unv
-    ]*  {*}                                                     #= all
+    | \v                     {*}                                #+ vwhite
+    | <unv>                  {*}                                #+ unv
+    ]*  {*}                                                     #+ all
 }
 
 token unv {
-       | \h+                 {*}                                #= hwhite
+       | \h+                 {*}                                #+ hwhite
        | ^^ [
-            | \# \N*         {*}                                #= line
-            | <?pod_comment> {*}                                #= pod
+            | \# \N*         {*}                                #+ line
+            | <?pod_comment> {*}                                #+ pod
             ]
        | <'#'> [
             # assuming <bracketed> defaults to standard set
-            | <?bracketed>   {*}                                #= inline
-            | \N*            {*}                                #= end
+            | <?bracketed>   {*}                                #+ inline
+            | \N*            {*}                                #+ end
             ]
 }
 
@@ -322,8 +188,8 @@ token pod_comment {
     ^^ =
     [
     | begin <?ws> <ident> .*? \n
-      =end <?ws> $<ident> \N* \n?                   {*}         #= block
-    | \N* \n?                                       {*}         #= misc
+      =end <?ws> $<ident> \N* \n?                   {*}         #+ block
+    | \N* \n?                                       {*}         #+ misc
     ]
     {*}
 }
@@ -343,9 +209,9 @@ token block {
     <statement_list>
     [ \} || <panic: Missing right brace> ]
     [
-    | <?unsp>? <?before <[,:]>> {*}                             #= normal 
-    | <?before <?unv>? \n > {*} { let $<endline> := 1; }        #= endline
-    | {*} { let $<endlist> := 1; }                              #= endlist
+    | <?unsp>? <?before <[,:]>> {*}                             #+ normal 
+    | <?before <?unv>? \n > {*} { let $<endline> := 1; }        #+ endline
+    | {*} { let $<endlist> := 1; }                              #+ endlist
     ]
     {*}
 }
@@ -355,9 +221,9 @@ token regex_block {  # perhaps parameterize and combine with block someday
     <regex \}>
     [ \} || <panic: Missing right brace> ]
     [
-    | <?unsp>? <?before <[,:]>> {*}                             #= normal
-    | <?before <?unv>? \n > {*} { let $<endline> := 1; }        #= endline
-    | {*} { let $<endlist> := 1; }                              #= endlist
+    | <?unsp>? <?before <[,:]>> {*}                             #+ normal
+    | <?before <?unv>? \n > {*} { let $<endline> := 1; }        #+ endline
+    | {*} { let $<endlist> := 1; }                              #+ endlist
     ]
     {*}
 }
@@ -377,59 +243,59 @@ token label { <ident>
     }
 
 rule statement {
-    <label>*                                     {*}            #= label
+    <label>*                                     {*}            #+ label
     [
-    | <statement_control>                        {*}            #= control
-    | <block>                                    {*}            #= block
-    | <EXPR>                                     {*}            #= expr
-        [<statement_mod_cond> <EXPR> {*} ]?                     #= mod cond
-        [<statement_mod_loop> <EXPR> {*} ]?                     #= mod loop
+    | <statement_control>                        {*}            #+ control
+    | <block>                                    {*}            #+ block
+    | <EXPR>                                     {*}            #+ expr
+        [<statement_mod_cond> <EXPR> {*} ]?                     #+ mod cond
+        [<statement_mod_loop> <EXPR> {*} ]?                     #+ mod loop
     ]
     {*}
 }
 
 rule statement_control {
     :<use>
-    <module_name_wild> <EXPR>? ;?                       {*} #?  #= use
+    <module_name_wild> <EXPR>? ;?                       {*} #?  #+ use
 }
 
 rule statement_control {
     :<if>
-    <EXPR>                           {*}                        #= if expr
-    <block>                          {*}                        #= if block
-    @<elsif> := [ elsif <EXPR>       {*}                        #= elsif expr
-                        <block>      {*} ]*                     #= elsif block
-    @<else> := [ else <block>        {*} ]?                     #= else
+    <EXPR>                           {*}                        #+ if expr
+    <block>                          {*}                        #+ if block
+    @<elsif> := [ elsif <EXPR>       {*}                        #+ elsif expr
+                        <block>      {*} ]*                     #+ elsif block
+    @<else> := [ else <block>        {*} ]?                     #+ else
     {*}
 }
 
 rule statement_control {
     :<unless>
-    <EXPR>                           {*}                        #= unless expr
-    <block>                          {*}                        #= unless block
+    <EXPR>                           {*}                        #+ unless expr
+    <block>                          {*}                        #+ unless block
     {*}
 }
 
 rule statement_control {
     :<while>
-    <EXPR>                             {*}                      #= while expr
-    <block>                            {*}                      #= while block
+    <EXPR>                             {*}                      #+ while expr
+    <block>                            {*}                      #+ while block
     {*}
 }
 
 rule statement_control {
     :<until>
-    <EXPR>                             {*}                      #= until expr
-    <block>                            {*}                      #= until block
+    <EXPR>                             {*}                      #+ until expr
+    <block>                            {*}                      #+ until block
     {*}
 }
 rule statement_control {
     :<repeat>
     [
-        | (while|until) <EXPR>         {*}                      #= rep wu expr
-          <block>                      {*}                      #= rep wu block
-        | <block>                      {*}                      #= rep block wu
-          (while|until) <EXPR>         {*}                      #= rep expr wu
+        | (while|until) <EXPR>         {*}                      #+ rep wu expr
+          <block>                      {*}                      #+ rep wu block
+        | <block>                      {*}                      #+ rep block wu
+          (while|until) <EXPR>         {*}                      #+ rep expr wu
     ]
     {*}
 }
@@ -437,46 +303,46 @@ rule statement_control {
     :<loop>
     $<eee> := [
         \(
-            $<e1> := <EXPR> ;   {*}                             #= loop e1
-            $<e2> := <EXPR> ;   {*}                             #= loop e2
-            $<e3> := <EXPR>     {*}                             #= loop e3
-        \)                      {*}                             #= loop eee
+            $<e1> := <EXPR> ;   {*}                             #+ loop e1
+            $<e2> := <EXPR> ;   {*}                             #+ loop e2
+            $<e3> := <EXPR>     {*}                             #+ loop e3
+        \)                      {*}                             #+ loop eee
     ]?
-    <block>                     {*}                             #= loop block
+    <block>                     {*}                             #+ loop block
     {*}
 }
 
-rule statement_control { :<for>     <block> {*} }               #= for
-rule statement_control { :<when>    <block> {*} }               #= when
-rule statement_control { :<BEGIN>   <block> {*} }               #= BEGIN
-rule statement_control { :<CHECK>   <block> {*} }               #= CHECK
-rule statement_control { :<INIT>    <block> {*} }               #= INIT
-rule statement_control { :<END>     <block> {*} }               #= END
-rule statement_control { :<START>   <block> {*} }               #= START
-rule statement_control { :<ENTER>   <block> {*} }               #= ENTER
-rule statement_control { :<LEAVE>   <block> {*} }               #= LEAVE
-rule statement_control { :<KEEP>    <block> {*} }               #= KEEP
-rule statement_control { :<UNDO>    <block> {*} }               #= UNDO
-rule statement_control { :<FIRST>   <block> {*} }               #= FIRST
-rule statement_control { :<NEXT>    <block> {*} }               #= NEXT
-rule statement_control { :<LAST>    <block> {*} }               #= LAST
-rule statement_control { :<PRE>     <block> {*} }               #= PRE
-rule statement_control { :<POST>    <block> {*} }               #= POST
-rule statement_control { :<CATCH>   <block> {*} }               #= CATCH
-rule statement_control { :<CONTROL> <block> {*} }               #= CONTROL
+rule statement_control { :<for>     <block> {*} }               #+ for
+rule statement_control { :<when>    <block> {*} }               #+ when
+rule statement_control { :<BEGIN>   <block> {*} }               #+ BEGIN
+rule statement_control { :<CHECK>   <block> {*} }               #+ CHECK
+rule statement_control { :<INIT>    <block> {*} }               #+ INIT
+rule statement_control { :<END>     <block> {*} }               #+ END
+rule statement_control { :<START>   <block> {*} }               #+ START
+rule statement_control { :<ENTER>   <block> {*} }               #+ ENTER
+rule statement_control { :<LEAVE>   <block> {*} }               #+ LEAVE
+rule statement_control { :<KEEP>    <block> {*} }               #+ KEEP
+rule statement_control { :<UNDO>    <block> {*} }               #+ UNDO
+rule statement_control { :<FIRST>   <block> {*} }               #+ FIRST
+rule statement_control { :<NEXT>    <block> {*} }               #+ NEXT
+rule statement_control { :<LAST>    <block> {*} }               #+ LAST
+rule statement_control { :<PRE>     <block> {*} }               #+ PRE
+rule statement_control { :<POST>    <block> {*} }               #+ POST
+rule statement_control { :<CATCH>   <block> {*} }               #+ CATCH
+rule statement_control { :<CONTROL> <block> {*} }               #+ CONTROL
 
 token statement_control { %statement_control }
 
 rule modifier_expr { <EXPR> ;? {*} }
 
-rule statement_mod_cond { :<if>     <modifier_expr> {*} };      #= if
-rule statement_mod_cond { :<unless> <modifier_expr> {*} };      #= unless
-rule statement_mod_cond { :<when>   <modifier_expr> {*} };      #= for
+rule statement_mod_cond { :<if>     <modifier_expr> {*} };      #+ if
+rule statement_mod_cond { :<unless> <modifier_expr> {*} };      #+ unless
+rule statement_mod_cond { :<when>   <modifier_expr> {*} };      #+ for
 
-rule statement_mod_loop { :<for>    <modifier_expr> {*} };      #= for
-rule statement_mod_loop { :<given>  <modifier_expr> {*} };      #= for
-rule statement_mod_loop { :<while>  <modifier_expr> {*} };      #= while
-rule statement_mod_loop { :<until>  <modifier_expr> {*} };      #= until
+rule statement_mod_loop { :<for>    <modifier_expr> {*} };      #+ for
+rule statement_mod_loop { :<given>  <modifier_expr> {*} };      #+ for
+rule statement_mod_loop { :<while>  <modifier_expr> {*} };      #+ while
+rule statement_mod_loop { :<until>  <modifier_expr> {*} };      #+ until
 
 token nameroot { <'perl6'> }
 token nameroot { <'perl5'> }
@@ -497,10 +363,10 @@ token nameroot { <'lua'> }
 token nameroot { <'php'> }
 
 token module_name {
-    <name>                                          {*}         #= name
-    [- <version>                                    {*}         #= version
+    <name>                                          {*}         #+ name
+    [- <version>                                    {*}         #+ version
         [-
-            <authority>                             {*}         #= auth
+            <authority>                             {*}         #+ auth
         ]?
     ]?
     {*}
@@ -509,11 +375,11 @@ token module_name {
 token authority { <-[ \s ; \{ ]>+ }
 
 token module_name_wild {
-    [ <nameroot> \: {*} ]?                                      #= root
-    <name>                                          {*}         #= name
-    [- <version_wild>                               {*}         #= version
+    [ <nameroot> \: {*} ]?                                      #+ root
+    <name>                                          {*}         #+ name
+    [- <version_wild>                               {*}         #+ version
         [-
-            <authority_wild>                        {*}         #= auth
+            <authority_wild>                        {*}         #+ auth
         ]?
     ]?
     {*}
@@ -525,10 +391,10 @@ token authority_wild { <block> | <whatever> | <authority> }
 token whatever { \* {*} }
 
 token version {
-    v \d+ [ \. \d+ ]*                 {*}                       #= vstyle
+    v \d+ [ \. \d+ ]*                 {*}                       #+ vstyle
 }
 token version {
-    \d+ \. \d+ \. \d+ [ \. \d+]*      {*}                       #= dotted
+    \d+ \. \d+ \. \d+ [ \. \d+]*      {*}                       #+ dotted
 }
 
 ###################################################
@@ -538,14 +404,14 @@ token expect_term {
 
     [
         [
-        | <prefix>                                      {*}     #= prefix
-        | <prefix_circumfix_meta_operator>              {*}     #= precircum
+        | <prefix>                                      {*}     #+ prefix
+        | <prefix_circumfix_meta_operator>              {*}     #+ precircum
         ]
-        <prefix_postfix_meta_operator>*                 {*}     #= prepost
+        <prefix_postfix_meta_operator>*                 {*}     #+ prepost
     ]*
 
-    <noun>                                              {*}     #= noun
-    <expect_postfix>*                                   {*}     #= postfix
+    <noun>                                              {*}     #+ noun
+    <expect_postfix>*                                   {*}     #+ postfix
     <?ws>
     <adverbs>?
     {*}
@@ -587,22 +453,27 @@ token noun {
 token pair {
     [
     | $<key>:=<ident> \h* =\> $<val>:=<EXPR(%assignment)>
-                                                        {*}     #= fat
+                                                        {*}     #+ fat
     | [ <colonpair> <?ws> ]+
-                                                        {*}     #= colon
+                                                        {*}     #+ colon
     ]
     {*}
 }
 
 token colonpair {
     [
-    | \: !? <ident>                                     {*}     #= bool
-    | \: <ident>? <unsp>? <postcircumfix>               {*}     #= value
+    | \: !? <ident>                                     {*}     #+ bool
+    | \: <ident>? <unsp>? <postcircumfix>               {*}     #+ value
     ]
     {*}
 }
 
-token expect_infix_prec ($loosest) {
+regex infix_nospace {
+    <expect_infix>
+    <!{ $<expect_infix> ~~ /\s/ }>
+}
+
+token expect_tight_infix ($loosest) {
     <!before \{>                # presumably a statement control block
     <expect_infix>
     ::: <?{ $+thisop<prec> ge $loosest<prec> }>
@@ -614,13 +485,13 @@ token expect_infix {
     {*}
 }
 
-token dotty { :<.+> <methodop>                      {*}         #= plus
-token dotty { :<.*> <methodop>                      {*}         #= star
-token dotty { :<.?> <methodop>                      {*}         #= query
-token dotty { :<.=> <methodop>                      {*}         #= equals
-token dotty { :<.^> <methodop>                      {*}         #= caret
-token dotty { :<.:> <methodop>                      {*}         #= colon
-token dotty { :<.>  <dottyop>                       {*}         #= plain
+token dotty { :<.+> <methodop>                      {*}         #+ plus
+token dotty { :<.*> <methodop>                      {*}         #+ star
+token dotty { :<.?> <methodop>                      {*}         #+ query
+token dotty { :<.=> <methodop>                      {*}         #+ equals
+token dotty { :<.^> <methodop>                      {*}         #+ caret
+token dotty { :<.:> <methodop>                      {*}         #+ colon
+token dotty { :<.>  <dottyop>                       {*}         #+ plain
 
 token dottyop {
     [
@@ -647,34 +518,31 @@ token expect_postfix {
     {*}
 }
 
-# backtracks or we'll never get to parse [LIST] on seeing [+
-regex prefix_circumfix_meta_operator (:$thisop? is context ) {
-    [
-    || :<[> <expect_infix> :<]>
-    || :<[\\> <expect_infix> :<]>
-    ]
-    [
-    || <!{ $+thisop<assoc> eq 'non' }>
-    || <panic: Can't reduce a non-associative operator>
-    ]
-    [
-    || <!{ $+thisop<prec> eq %conditional<prec> }>
-    || <panic: Can't reduce a conditional operator>
-    ]
-    {*}
+# Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
+regex prefix_circumfix_meta_operator (:$thisop? is context ) {     #= [ ]
+    :<[> \\?? <infix_nospace> :<]>   # prefer no meta \ if op has \
+
+    [ <!{ $+thisop<assoc> eq 'non' }>
+        || <panic: Can't reduce a non-associative operator> ]
+
+    [ <!{ $+thisop<prec> eq %conditional<prec> }>
+        || <panic: Can't reduce a conditional operator> ]
+
+
+    {*}                                                         #+ [ ]
 }
 
-token prefix_postfix_meta_operator { :<«>     {*} }             #= hyper
-token prefix_postfix_meta_operator { :['<<'] {*} }              #= HYPER
+token prefix_postfix_meta_operator { :<«>     {*} }             #+ hyper
+token prefix_postfix_meta_operator { :['<<'] {*} }              #+ HYPER
 
-token postfix_prefix_meta_operator { :<»>     {*} }             #= hyper
-token postfix_prefix_meta_operator { :['>>'] {*} }              #= HYPER
+token postfix_prefix_meta_operator { :<»>     {*} }             #+ hyper
+token postfix_prefix_meta_operator { :['>>'] {*} }              #+ HYPER
 
 token infix { <infix_prefix_meta_operator> }
 token infix { <infix_circumfix_meta_operator> }
 
-token infix_prefix_meta_operator {
-    :<!> <!before !> <expect_infix>
+token infix_prefix_meta_operator {                            #= !
+    :<!> <!before !> <infix_nospace>
 
     <?nonest: negation>
 
@@ -686,63 +554,68 @@ token infix_prefix_meta_operator {
 
     { $+thisop<hyper> and panic("Negation of hyper operator not allowed") }
 
-
-    {*}
+    {*}                                                         #+ !
 }
 
 regex nonest (Str $s) {
-    <!{ $+thisop{$s}++ }> || <panic: Nested $s operators not allowed>
+    <!{ $+thisop{$s}++ }> || <panic: Nested $s metaoperators not allowed>
 }
 
-token infix_circumfix_meta_operator {
-    :<«> <expect_infix> :<»>
+token infix_circumfix_meta_operator {                         #= X X
+    :<X> <infix_nospace> :<X>
+    <nonest: cross>
+    {*}                                                         #+ X X
+}
+
+token infix_circumfix_meta_operator {                         #= « »
+    :<«> <infix_nospace> :<»>
     <nonest: hyper>
-    {*}
+    {*}                                                         #+ « »
 }
 
-token infix_circumfix_meta_operator {
-    :<«> <expect_infix> :<«>
+token infix_circumfix_meta_operator {                         #= « «
+    :<«> <infix_nospace> :<«>
     <nonest: hyper>
-    {*}
+    {*}                                                         #+ « «
 }
 
-token infix_circumfix_meta_operator {
-    :<»> <expect_infix> :<»>
+token infix_circumfix_meta_operator {                         #= » »
+    :<»> <infix_nospace> :<»>
     <nonest: hyper>
-    {*}
+    {*}                                                         #+ » » 
 }
 
-token infix_circumfix_meta_operator {
-    :<»> <expect_infix> :<«>
+token infix_circumfix_meta_operator {                         #= » «
+    :<»> <infix_nospace> :<«>
     <nonest: hyper>
-    {*}
+    {*}                                                         #+ » «
 }
 
-token infix_circumfix_meta_operator {
-    :['<<'] <expect_infix> :['>>']
+token infix_circumfix_meta_operator {                         #= << >>
+    :['<<'] <infix_nospace> :['>>']
     <nonest: hyper>
-    {*}
+    {*}                                                         #+ << >>
 }
 
-token infix_circumfix_meta_operator {
-    :['<<'] <expect_infix> :['<<']
+token infix_circumfix_meta_operator {                         #= << <<
+    :['<<'] <infix_nospace> :['<<']
     <nonest: hyper>
-    {*}
+    {*}                                                         #+ << <<
 }
 
-token infix_circumfix_meta_operator {
-    :['>>'] <expect_infix> :['>>']
+token infix_circumfix_meta_operator {                         #= >> >>
+    :['>>'] <infix_nospace> :['>>']
     <nonest: hyper>
-    {*}
+    {*}                                                         #+ >> >>
 }
 
-token infix_circumfix_meta_operator {
-    :['>>'] <expect_infix> :['<<']
+token infix_circumfix_meta_operator {                         #= >> <<
+    :['>>'] <infix_nospace> :['<<']
     <nonest: hyper>
-    {*}
+    {*}                                                         #+ >> <<
 }
 
-token infix_postfix_meta_operator {
+token infix_postfix_meta_operator {                           #= =
     :<=>
     <nonest: assignment>
 
@@ -762,25 +635,25 @@ token infix_postfix_meta_operator {
     ]
     
     { $+thisop = %item_assignment }  # force assignment precedence
-    {*}
+    {*}                                                         #+ =
 }
 
-token postfix { :<i> {*} }                                      #= i
-token postfix { :<++> {*} }                                     #= incr
-token postfix { :<--> {*} }                                     #= decr
+token postfix { :<i> {*} }                                      #+ i
+token postfix { :<++> {*} }                                     #+ incr
+token postfix { :<--> {*} }                                     #+ decr
 
-token postcircumfix { :<(> <EXPR> :<)> {*} }                    #= ( )
+token postcircumfix { :<(> <EXPR> :<)> {*} }                    #+ ( )
 
-token postcircumfix { :<[> <EXPR> :<]> {*} }                    #= [ ]
+token postcircumfix { :<[> <EXPR> :<]> {*} }                    #+ [ ]
 
-token postcircumfix { :<{> <EXPR> :<}> {*} }                    #= { }
+token postcircumfix { :<{> <EXPR> :<}> {*} }                    #+ { }
 
-token postcircumfix { :['<'] <anglewords> :['>'] {*}            #= < > }
+token postcircumfix { :['<'] <anglewords> :['>'] {*}            #+ < > }
 
-token postcircumfix { :['<<'] <shellwords> :['>>'] {*}          #= << >>
+token postcircumfix { :['<<'] <shellwords> :['>>'] {*}          #+ << >>
 }
 
-token postcircumfix { :<«> <shellwords> :<»> {*} }              #= « »
+token postcircumfix { :<«> <shellwords> :<»> {*} }              #+ « »
 
 token postop { <postfix> | <postcircumfix> }
 
@@ -799,15 +672,15 @@ token methodop {
     {*}
 }
 
-token circumfix { :<(> <EXPR> :<)> {*} }                        #= ( )
-token circumfix { :<[> <EXPR> :<]> {*} }                        #= [ ]
+token circumfix { :<(> <EXPR> :<)> {*} }                        #+ ( )
+token circumfix { :<[> <EXPR> :<]> {*} }                        #+ [ ]
 
-token circumfix { :['<']  <anglewords>  :['>'] {*} }            #= < >
-token circumfix { :['<<'] <shellwords> :['>>'] {*} }            #= << >>
-token circumfix { :<«>    <shellwords> :<»>    {*} }            #= « »
+token circumfix { :['<']  <anglewords>  :['>'] {*} }            #+ < >
+token circumfix { :['<<'] <shellwords> :['>>'] {*} }            #+ << >>
+token circumfix { :<«>    <shellwords> :<»>    {*} }            #+ « »
 
-token circumfix is Circumfix[:symbol<{ }>]
-    { <block>         {*} }                                     #= { }
+token circumfix does Circumfix[:symbol<{ }>]
+    { <block>         {*} }                                     #+ { }
 
 rule scoped {
     <type>?
@@ -823,29 +696,29 @@ rule scoped {
     {*}
 }
 
-token scope_declarator { :<my>       <scoped> {*} }             #= my
-token scope_declarator { :<our>      <scoped> {*} }             #= our
-token scope_declarator { :<state>    <scoped> {*} }             #= state
-token scope_declarator { :<constant> <scoped> {*} }             #= constant
-token scope_declarator { :<has>      <scoped> {*} }             #= has
+token scope_declarator { :<my>       <scoped> {*} }             #+ my
+token scope_declarator { :<our>      <scoped> {*} }             #+ our
+token scope_declarator { :<state>    <scoped> {*} }             #+ state
+token scope_declarator { :<constant> <scoped> {*} }             #+ constant
+token scope_declarator { :<has>      <scoped> {*} }             #+ has
 
-token package_declarator { :<class>   <package_def> {*} }       #= class
-token package_declarator { :<grammar> <package_def> {*} }       #= grammar
-token package_declarator { :<module>  <package_def> {*} }       #= module
-token package_declarator { :<role>    <package_def> {*} }       #= role
-token package_declarator { :<package> <package_def> {*} }       #= package
+token package_declarator { :<class>   <package_def> {*} }       #+ class
+token package_declarator { :<grammar> <package_def> {*} }       #+ grammar
+token package_declarator { :<module>  <package_def> {*} }       #+ module
+token package_declarator { :<role>    <package_def> {*} }       #+ role
+token package_declarator { :<package> <package_def> {*} }       #+ package
 
 token package_def {
     <module_name>?
-    <trait>* {*}                                                #= traits
+    <trait>* {*}                                                #+ traits
     [
     || <?{ $+define_compunit } :: \;
         { defined $<module_name> or
             panic("Compilation unit cannot be anonymous"
         }
-                                                        {*}     #= semi
+        {*}                                                     #+ semi
     || <block>
-                                                        {*}     #= block
+        {*}                                                     #+ block
     ]
     {*}
 }
@@ -899,20 +772,20 @@ token sigiltwigil {
     {*}
 }
 
-token noun_prefix_sigil { :<$>   {*} }                          #= $
-token noun_prefix_sigil { :<@>   {*} }                          #= @
-token noun_prefix_sigil { :<@@>  {*} }                          #= @@
-token noun_prefix_sigil { :<%>   {*} }                          #= %
-token noun_prefix_sigil { :<&>   {*} }                          #= &
-token noun_prefix_sigil { :<::>  {*} }                          #= ::
+token noun_prefix_sigil { :<$>   {*} }                          #+ $
+token noun_prefix_sigil { :<@>   {*} }                          #+ @
+token noun_prefix_sigil { :<@@>  {*} }                          #+ @@
+token noun_prefix_sigil { :<%>   {*} }                          #+ %
+token noun_prefix_sigil { :<&>   {*} }                          #+ &
+token noun_prefix_sigil { :<::>  {*} }                          #+ ::
 
-token noun_prefix_twigil { :<.>  {*} }                          #= .
-token noun_prefix_twigil { :<!>  {*} }                          #= !
-token noun_prefix_twigil { :<^>  {*} }                          #= ^
-token noun_prefix_twigil { :<*>  {*} }                          #= *
-token noun_prefix_twigil { :<+>  {*} }                          #= +
-token noun_prefix_twigil { :<?>  {*} }                          #= ?
-token noun_prefix_twigil { :<=>  {*} }                          #= =
+token noun_prefix_twigil { :<.>  {*} }                          #+ .
+token noun_prefix_twigil { :<!>  {*} }                          #+ !
+token noun_prefix_twigil { :<^>  {*} }                          #+ ^
+token noun_prefix_twigil { :<*>  {*} }                          #+ *
+token noun_prefix_twigil { :<+>  {*} }                          #+ +
+token noun_prefix_twigil { :<?>  {*} }                          #+ ?
+token noun_prefix_twigil { :<=>  {*} }                          #+ =
 
 token name {
     [
@@ -1024,6 +897,143 @@ token rad_number {
     || <?before \(> <postcircumfix>
     ]
     {*}
+}
+
+our @herestub_queue;
+
+# XXX maybe shouldn't be hash, but for now...
+
+our %quote_adverb := {
+    Q => {                          # base form of all quotes
+        adverbs => &Q_adverb,
+        parser => &q_pickdelim,
+        escset => < >,
+        escrule => &quote_escapes,
+    },
+    q  => {
+        adverbs => &q_quote_adverb,
+        parser => &q_pickdelim,
+        escset => < \\ >,
+        escrule => &quote_escapes,
+    },
+    qq => {
+        adverbs => &q_quote_adverb,
+        parser => &q_pickdelim,
+        escset => < \\ $ @ % & { >,
+        escrule => &quote_escapes,
+    },
+    b => {
+        escadd => < \\ >,
+    },
+    s => {
+        escadd => < $ >,
+    },
+    a => {
+        escadd => < @ >,
+    },
+    h => {
+        escadd => < % >,
+    },
+    f => {
+        escadd => < & >,
+    },
+    c => {
+        escadd => < { >,
+    },
+    to => {
+        adverbs => &q_quote_adverb,
+        parser => &q_herestub,
+        escadd => < ^^ >,          #  grabs leading whitespace
+    },
+    rx => {
+        adverbs => &q_regex_adverb,
+        parser => &q_regex,
+        escset => < >,             # let regex parser handle everything
+    },
+    m => {
+        adverbs => &q_regex_adverb,
+        parser => &q_regex,
+        escset => < >,             # let regex parser handle everything
+    },
+    s => {
+        adverbs => &q_regex_adverb,
+        parser => &q_regex,
+        escset => < >,             # let regex parser handle everything
+    },
+    tr => {
+        adverbs => &q_trans_adverb,
+        parser => &q_trans,
+        escset => < >,             # let trans parser handle everything
+    },
+};
+
+our %regex_adverb := {
+    g => {
+        ...
+    },
+    # XXX --more--
+};
+
+our %trans_adverb := {
+    d => {
+        ...
+    },
+    # XXX --more--
+};
+
+token Q_adverb {}
+token q_quote_adverb {}
+token q_quote {}
+token q_regex_adverb {}
+token q_regex {}
+token q_trans_adverb {}
+token q_trans {}
+
+token q_herestub ($lang) {
+    $<delimstr> := <quotesnabber('Q')>  # force raw semantics on /END/ marker
+    {
+        push @herestub_queue:
+            new Herestub:
+                delim => $<delimstr><delimited><q><text>, # XXX or some such
+                orignode => $/,
+                lang => $lang;
+    }
+    {*}
+}
+
+class Herestub {
+    has Str $.delim;
+    has $.orignode;
+    has $.lang;
+}
+
+# XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
+
+method heredoc {
+    while my $herestub = shift @herestub_queue {
+        my $delim = $herestub.delim;
+        my $lang = $herestub.lang;
+        my $doc;
+        my $ws = "";
+        my $stoppat = $delim eq "" ?? rx[^^ \h* $$]
+                                   !! rx[^^ $ws:=(\h*?) $delim \h* $$ \n?];
+        my @heredoc_initial_ws is context is rw;
+        if m:p/$doc:=<q_unbalanced($lang, :stop($stoppat))>/ {
+            if $ws and @heredoc_initial_ws {
+                my $wsequiv = $ws;
+                $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
+                for @heredoc_initial_strings {
+                    next if s/^ $ws //;   # reward consistent tabbing
+                    s/^^ (\t+) /{ ' ' x ($0 * 8) }/;
+                    s/^ $wsequiv // or s/^ \h+ //;
+                }
+            }
+            $herestub.orignode<doc> = $doc;
+        }
+        else {
+            fail("Ending delimiter $delim not found");
+        }
+    }
 }
 
 token quote { <before :<'>>    <quotesnabber("q")> }
@@ -1401,400 +1411,400 @@ rule default_value {
     \= <EXPR(%item_assignment)>
 }
 
-rule statement_prefix { :<do>      <statement> {*} }            #= do
-rule statement_prefix { :<try>     <statement> {*} }            #= try
-rule statement_prefix { :<gather>  <statement> {*} }            #= gather
-rule statement_prefix { :<contend> <statement> {*} }            #= contend
-rule statement_prefix { :<async>   <statement> {*} }            #= async
-rule statement_prefix { :<lazy>    <statement> {*} }            #= lazy
+rule statement_prefix { :<do>      <statement> {*} }            #+ do
+rule statement_prefix { :<try>     <statement> {*} }            #+ try
+rule statement_prefix { :<gather>  <statement> {*} }            #+ gather
+rule statement_prefix { :<contend> <statement> {*} }            #+ contend
+rule statement_prefix { :<async>   <statement> {*} }            #+ async
+rule statement_prefix { :<lazy>    <statement> {*} }            #+ lazy
 
 ## term
-token term is Term[]                                            #= * def
-    { :<*> {*} }                                                #= *
+token term does Term[]                                          #= *
+    { :<*> {*} }                                                #+ *
 
-token circumfix is Term[:symbol<$( )>]                          #= $( ) def
-    { <noun_prefix_sigil> \( <EXPR> :\) {*} }                   #= $( ) 
+token circumfix does Term[:symbol<$( )>]                        #= $( )
+    { <noun_prefix_sigil> \( <EXPR> :\) {*} }                   #+ $( ) 
 
-token circumfix is Term[:symbol<Type( )>]                       #= Type( ) def
-    { <typename> \( <EXPR> \) {*} }                             #= Type( ) 
+token circumfix does Term[:symbol<Type( )>]                     #= Type( )
+    { <typename> \( <EXPR> \) {*} }                             #+ Type( ) 
 
-token circumfix is Term[]                                       #= ( ) def
-    { :<(> <EXPR> :<)> {*} }                                    #= ( )
+token circumfix does Term[]                                     #= ( )
+    { :<(> <EXPR> :<)> {*} }                                    #+ ( )
 
-token postcircumfix is Term[]                                   #= ( ) def
+token postcircumfix does Term[]                                 #= ( )
     is abstract('call')
-    { :<(> <EXPR> :<)> {*} }                                    #= ( )
+    { :<(> <EXPR> :<)> {*} }                                    #+ ( )
 
 ## autoincrement
-token postfix is Autoincrement[]                                #= ++ def
-    { :<++> {*} }                                               #= ++
+token postfix does Autoincrement[]                              #= ++
+    { :<++> {*} }                                               #+ ++
 
-token postfix is Autoincrement[]                                #= -- def
-    { :<--> {*} }                                               #= --
+token postfix does Autoincrement[]                              #= --
+    { :<--> {*} }                                               #+ --
 
-token prefix is Autoincrement[]                                 #= ++ def
-    { :<++> {*} }                                               #= ++
+token prefix does Autoincrement[]                               #= ++
+    { :<++> {*} }                                               #+ ++
 
-token prefix is Autoincrement[]                                 #= -- def
-    { :<--> {*} }                                               #= --
+token prefix does Autoincrement[]                               #= --
+    { :<--> {*} }                                               #+ --
 
 
 ## exponentiation
-token infix is Exponentiate[]                                   #= ** def
-    { :<**> {*} }                                               #= **
+token infix does Exponentiate[]                                 #= **
+    { :<**> {*} }                                               #+ **
 
 ## symbolic unary
-token prefix is Symbolic_unary[]                                #= ! def
-    { :<!> {*} }                                                #= !
+token prefix does Symbolic_unary[]                              #= !
+    { :<!> {*} }                                                #+ !
 
-token prefix is Symbolic_unary[]                                #= + def
-    { :<+> {*} }                                                #= +
+token prefix does Symbolic_unary[]                              #= +
+    { :<+> {*} }                                                #+ +
 
-token prefix is Symbolic_unary[]                                #= - def
-    { :<-> {*} }                                                #= -
+token prefix does Symbolic_unary[]                              #= -
+    { :<-> {*} }                                                #+ -
 
-token prefix is Symbolic_unary[]                                #= ~ def
-    { :<~> {*} }                                                #= ~
+token prefix does Symbolic_unary[]                              #= ~
+    { :<~> {*} }                                                #+ ~
 
-token prefix is Symbolic_unary[]                                #= ? def
-    { :<?> {*} }                                                #= ?
+token prefix does Symbolic_unary[]                              #= ?
+    { :<?> {*} }                                                #+ ?
 
-token prefix is Symbolic_unary[]                                #= = def
-    { :<=> {*} }                                                #= =
+token prefix does Symbolic_unary[]                              #= =
+    { :<=> {*} }                                                #+ =
 
-token prefix is Symbolic_unary[]                                #= * def
-    { :<*> {*} }                                                #= *
+token prefix does Symbolic_unary[]                              #= *
+    { :<*> {*} }                                                #+ *
 
-token prefix is Symbolic_unary[]                                #= ** def
-    { :<**> {*} }                                               #= **
+token prefix does Symbolic_unary[]                              #= **
+    { :<**> {*} }                                               #+ **
 
-token prefix is Symbolic_unary[]                                #= ~^ def
-    { :<~^> {*} }                                               #= ~^
+token prefix does Symbolic_unary[]                              #= ~^
+    { :<~^> {*} }                                               #+ ~^
 
-token prefix is Symbolic_unary[]                                #= +^ def
-    { :<+^> {*} }                                               #= +^
+token prefix does Symbolic_unary[]                              #= +^
+    { :<+^> {*} }                                               #+ +^
 
-token prefix is Symbolic_unary[]                                #= ?^ def
-    { :<?^> {*} }                                               #= ?^
+token prefix does Symbolic_unary[]                              #= ?^
+    { :<?^> {*} }                                               #+ ?^
 
-token prefix is Symbolic_unary[]                                #= ^ def
-    { :<^> {*} }                                                #= ^
+token prefix does Symbolic_unary[]                              #= ^
+    { :<^> {*} }                                                #+ ^
 
 
 ## multiplicative
-token infix is Multiplicative[]                                 #= * def
-    { :<*> {*} }                                                #= *
+token infix does Multiplicative[]                               #= *
+    { :<*> {*} }                                                #+ *
 
-token infix is Multiplicative[]                                 #= / def
-    { :</> {*} }                                                #= /
+token infix does Multiplicative[]                               #= /
+    { :</> {*} }                                                #+ /
 
-token infix is Multiplicative[]                                 #= % def
-    { :<%> {*} }                                                #= %
+token infix does Multiplicative[]                               #= %
+    { :<%> {*} }                                                #+ %
 
-token infix is Multiplicative[]                                 #= x def
-    { :<x> {*} }                                                #= x
+token infix does Multiplicative[]                               #= x
+    { :<x> {*} }                                                #+ x
 
-token infix is Multiplicative[]                                 #= xx def
-    { :<xx> {*} }                                               #= xx
+token infix does Multiplicative[]                               #= xx
+    { :<xx> {*} }                                               #+ xx
 
-token infix is Multiplicative[]                                 #= +& def
-    { :<+&> {*} }                                               #= +&
+token infix does Multiplicative[]                               #= +&
+    { :<+&> {*} }                                               #+ +&
 
-token infix is Multiplicative[]                                 #= +< def
-    { :['+<'] {*} }                                             #= +<
+token infix does Multiplicative[]                               #= +<
+    { :['+<'] {*} }                                             #+ +<
 
-token infix is Multiplicative[]                                 #= +> def
-    { :['+>'] {*} }                                             #= +>
+token infix does Multiplicative[]                               #= +>
+    { :['+>'] {*} }                                             #+ +>
 
-token infix is Multiplicative[]                                 #= ~& def
-    { :<~&> {*} }                                               #= ~&
+token infix does Multiplicative[]                               #= ~&
+    { :<~&> {*} }                                               #+ ~&
 
-token infix is Multiplicative[]                                 #= ~< def
-    { :['~<'] {*} }                                             #= ~<
+token infix does Multiplicative[]                               #= ~<
+    { :['~<'] {*} }                                             #+ ~<
 
-token infix is Multiplicative[]                                 #= ~> def
-    { :['~>'] {*} }                                             #= ~>
+token infix does Multiplicative[]                               #= ~>
+    { :['~>'] {*} }                                             #+ ~>
 
 
 ## additive
-token infix is Additive[]                                       #= + def
-    { :<+> {*} }                                                #= +
+token infix does Additive[]                                     #= +
+    { :<+> {*} }                                                #+ +
 
-token infix is Additive[]                                       #= - def
-    { :<-> {*} }                                                #= -
+token infix does Additive[]                                     #= -
+    { :<-> {*} }                                                #+ -
 
-token infix is Additive[]                                       #= ~ def
-    { :<~> {*} }                                                #= ~
+token infix does Additive[]                                     #= ~
+    { :<~> {*} }                                                #+ ~
 
-token infix is Additive[]                                       #= +| def
-    { :<+|> {*} }                                               #= +|
+token infix does Additive[]                                     #= +|
+    { :<+|> {*} }                                               #+ +|
 
-token infix is Additive[]                                       #= +^ def
-    { :<+^> {*} }                                               #= +^
+token infix does Additive[]                                     #= +^
+    { :<+^> {*} }                                               #+ +^
 
-token infix is Additive[]                                       #= ~| def
-    { :<~|> {*} }                                               #= ~|
+token infix does Additive[]                                     #= ~|
+    { :<~|> {*} }                                               #+ ~|
 
-token infix is Additive[]                                       #= ~^ def
-    { :<~^> {*} }                                               #= ~^
+token infix does Additive[]                                     #= ~^
+    { :<~^> {*} }                                               #+ ~^
 
-token infix is Additive[]                                       #= ?| def
-    { :<?|> {*} }                                               #= ?|
+token infix does Additive[]                                     #= ?|
+    { :<?|> {*} }                                               #+ ?|
 
-token infix is Additive[]                                       #= ?^ def
-    { :<?^> {*} }                                               #= ?^
+token infix does Additive[]                                     #= ?^
+    { :<?^> {*} }                                               #+ ?^
 
 
 ## junctive and (all)
-token infix is Junctive_and[]                                   #= & def
-    { :<&> {*} }                                                #= &
+token infix does Junctive_and[]                                 #= &
+    { :<&> {*} }                                                #+ &
 
 
 ## junctive or (any)
-token infix is Junctive_or[]                                    #= | def
-    { :<|> {*} }                                                #= |
+token infix does Junctive_or[]                                  #= |
+    { :<|> {*} }                                                #+ |
 
-token infix is Junctive_or[]                                    #= ^ def
-    { :<^> {*} }                                                #= ^
+token infix does Junctive_or[]                                  #= ^
+    { :<^> {*} }                                                #+ ^
 
 
 ## named unary examples
-token prefix is Named_unary[]                                   #= rand def
-    { :<rand> {*} }                                             #= rand
+token prefix does Named_unary[]                                 #= rand
+    { :<rand> {*} }                                             #+ rand
 
-token prefix is Named_unary[]                                   #= sleep def
-    { :<sleep> {*} }                                            #= sleep
+token prefix does Named_unary[]                                 #= sleep
+    { :<sleep> {*} }                                            #+ sleep
 
-token prefix is Named_unary[]                                   #= abs def
-    { :<abs> {*} }                                              #= abs
+token prefix does Named_unary[]                                 #= abs
+    { :<abs> {*} }                                              #+ abs
 
 ## nonchaining binary
-token infix is Nonchaining[]                                    #= <=> def
-    { :['<=>'] {*} }                                            #= <=>
+token infix does Nonchaining[]                                  #= <=>
+    { :['<=>'] {*} }                                            #+ <=>
 
-token infix is Nonchaining[]                                    #= cmp def
-    { :<cmp> {*} }                                              #= cmp
+token infix does Nonchaining[]                                  #= cmp
+    { :<cmp> {*} }                                              #+ cmp
 
-token infix is Nonchaining[]                                    #= is def
-    { :<is> {*} }                                               #= is
+token infix does Nonchaining[]                                  #= is
+    { :<is> {*} }                                               #+ is
 
-token infix is Nonchaining[]                                    #= but def
-    { :<but> {*} }                                              #= but
+token infix does Nonchaining[]                                  #= but
+    { :<but> {*} }                                              #+ but
 
-token infix is Nonchaining[]                                    #= does def
-    { :<does> {*} }                                             #= does
+token infix does Nonchaining[]                                  #= does
+    { :<does> {*} }                                             #+ does
 
-token infix is Nonchaining[]                                    #= .. def
-    { :<..> {*} }                                               #= ..
+token infix does Nonchaining[]                                  #= ..
+    { :<..> {*} }                                               #+ ..
 
-token infix is Nonchaining[]                                    #= ^.. def
-    { :<^..> {*} }                                              #= ^..
+token infix does Nonchaining[]                                  #= ^..
+    { :<^..> {*} }                                              #+ ^..
 
-token infix is Nonchaining[]                                    #= ..^ def
-    { :<..^> {*} }                                              #= ..^
+token infix does Nonchaining[]                                  #= ..^
+    { :<..^> {*} }                                              #+ ..^
 
-token infix is Nonchaining[]                                    #= ^..^ def
-    { :<^..^> {*} }                                             #= ^..^
+token infix does Nonchaining[]                                  #= ^..^
+    { :<^..^> {*} }                                             #+ ^..^
 
-token infix is Nonchaining[]                                    #= ff def
-    { :<ff> {*} }                                               #= ff
+token infix does Nonchaining[]                                  #= ff
+    { :<ff> {*} }                                               #+ ff
 
-token infix is Nonchaining[]                                    #= ^ff def
-    { :<^ff> {*} }                                              #= ^ff
+token infix does Nonchaining[]                                  #= ^ff
+    { :<^ff> {*} }                                              #+ ^ff
 
-token infix is Nonchaining[]                                    #= ff^ def
-    { :<ff^> {*} }                                              #= ff^
+token infix does Nonchaining[]                                  #= ff^
+    { :<ff^> {*} }                                              #+ ff^
 
-token infix is Nonchaining[]                                    #= ^ff^ def
-    { :<^ff^> {*} }                                             #= ^ff^
+token infix does Nonchaining[]                                  #= ^ff^
+    { :<^ff^> {*} }                                             #+ ^ff^
 
-token infix is Nonchaining[]                                    #= fff def
-    { :<fff> {*} }                                              #= fff
+token infix does Nonchaining[]                                  #= fff
+    { :<fff> {*} }                                              #+ fff
 
-token infix is Nonchaining[]                                    #= ^fff def
-    { :<^fff> {*} }                                             #= ^fff
+token infix does Nonchaining[]                                  #= ^fff
+    { :<^fff> {*} }                                             #+ ^fff
 
-token infix is Nonchaining[]                                    #= fff^ def
-    { :<fff^> {*} }                                             #= fff^
+token infix does Nonchaining[]                                  #= fff^
+    { :<fff^> {*} }                                             #+ fff^
 
-token infix is Nonchaining[]                                    #= ^fff^ def
-    { :<^fff^> {*} }                                            #= ^fff^
+token infix does Nonchaining[]                                  #= ^fff^
+    { :<^fff^> {*} }                                            #+ ^fff^
 
 
 ## chaining binary
-token infix is Chaining[]                                       #= == def
-    { :<==> {*} }                                               #= ==
+token infix does Chaining[]                                     #= ==
+    { :<==> {*} }                                               #+ ==
 
-token infix is Chaining[]                                       #= != def
-    { :<!=> {*} }                                               #= !=
+token infix does Chaining[]                                     #= !=
+    { :<!=> {*} }                                               #+ !=
 
-token infix is Chaining[]                                       #= < def
-    { :['<'] {*} }                                              #= <
+token infix does Chaining[]                                     #= <
+    { :['<'] {*} }                                              #+ <
 
-token infix is Chaining[]                                       #= <= def
-    { :['<='] {*} }                                             #= <=
+token infix does Chaining[]                                     #= <=
+    { :['<='] {*} }                                             #+ <=
 
-token infix is Chaining[]                                       #= > def
-    { :['>'] {*} }                                              #= >
+token infix does Chaining[]                                     #= >
+    { :['>'] {*} }                                              #+ >
 
-token infix is Chaining[]                                       #= >= def
-    { :['>='] {*} }                                             #= >=
+token infix does Chaining[]                                     #= >=
+    { :['>='] {*} }                                             #+ >=
 
-token infix is Chaining[]                                       #= ~~ def
-    { :<~~> {*} }                                               #= ~~
+token infix does Chaining[]                                     #= ~~
+    { :<~~> {*} }                                               #+ ~~
 
-token infix is Chaining[]                                       #= !~ def
-    { :<!~> {*} }                                               #= !~
+token infix does Chaining[]                                     #= !~
+    { :<!~> {*} }                                               #+ !~
 
-token infix is Chaining[]                                       #= =~ def
-    { :<=~> {*} }                                               #= =~
+token infix does Chaining[]                                     #= =~
+    { :<=~> {*} }                                               #+ =~
 
-token infix is Chaining[]                                       #= eq def
-    { :<eq> {*} }                                               #= eq
+token infix does Chaining[]                                     #= eq
+    { :<eq> {*} }                                               #+ eq
 
-token infix is Chaining[]                                       #= ne def
-    { :<ne> {*} }                                               #= ne
+token infix does Chaining[]                                     #= ne
+    { :<ne> {*} }                                               #+ ne
 
-token infix is Chaining[]                                       #= lt def
-    { :<lt> {*} }                                               #= lt
+token infix does Chaining[]                                     #= lt
+    { :<lt> {*} }                                               #+ lt
 
-token infix is Chaining[]                                       #= le def
-    { :<le> {*} }                                               #= le
+token infix does Chaining[]                                     #= le
+    { :<le> {*} }                                               #+ le
 
-token infix is Chaining[]                                       #= gt def
-    { :<gt> {*} }                                               #= gt
+token infix does Chaining[]                                     #= gt
+    { :<gt> {*} }                                               #+ gt
 
-token infix is Chaining[]                                       #= ge def
-    { :<ge> {*} }                                               #= ge
+token infix does Chaining[]                                     #= ge
+    { :<ge> {*} }                                               #+ ge
 
-token infix is Chaining[]                                       #= =:= def
-    { :<=:=> {*} }                                              #= =:=
+token infix does Chaining[]                                     #= =:=
+    { :<=:=> {*} }                                              #+ =:=
 
-token infix is Chaining[]                                       #= === def
-    { :<===> {*} }                                              #= ===
+token infix does Chaining[]                                     #= ===
+    { :<===> {*} }                                              #+ ===
 
 
 ## tight and
-token infix is Tight_and[]                                      #= && def
+token infix does Tight_and[]                                    #= &&
     is abstract('if')
-    { :<&&> {*} }                                               #= &&
+    { :<&&> {*} }                                               #+ &&
 
 
 ## tight or
-token infix is Tight_or[]                                       #= || def
+token infix does Tight_or[]                                     #= ||
     is abstract('unless')
-    { :<||> {*} }                                               #= ||
+    { :<||> {*} }                                               #+ ||
 
-token infix is Tight_or[:assoc<list>]                           #= ^^ def
+token infix does Tight_or[:assoc<list>]                         #= ^^
     is assoc('list')
     is abstract('xor')
-    { :<^^> {*} }                                               #= ^^
+    { :<^^> {*} }                                               #+ ^^
 
-token infix is Tight_or[]                                       #= // def
-    { :<//> {*} }                                               #= //
+token infix does Tight_or[]                                     #= //
+    { :<//> {*} }                                               #+ //
 
 
 ## conditional
-token infix is Conditional[]                                    #= ?? !! def
+token infix does Conditional[]                                  #= ?? !!
     is abstract('if')
-    { :<??> <EXPR(%conditional)> :<!!> {*} }                    #= ?? !!
+    { :<??> <EXPR(%conditional)> :<!!> {*} }                    #+ ?? !!
 
 
 ## assignment
-token infix is Assignment[]                                     #= = def
+token infix does Assignment[]                                   #= =
     is abstract('assign')
     is lvalue(1)
-    { :<=> {*} }                                                #= =
+    { :<=> {*} }                                                #+ =
 
-token infix is Assignment[]                                     #= := def
+token infix does Assignment[]                                   #= :=
     is abstract('bind')
-    { :<:=> {*} }                                               #= :=
+    { :<:=> {*} }                                               #+ :=
 
-token infix is Assignment[]                                     #= ::= def
-    { :<::=> {*} }                                              #= ::=
+token infix does Assignment[]                                   #= ::=
+    { :<::=> {*} }                                              #+ ::=
 
 # XXX need to do something to turn subcall into method call here...
-token infix is Assignment[]                                     #= .= def
-    { :<.=> {*} }                                               #= .=
+token infix does Assignment[]                                   #= .=
+    { :<.=> {*} }                                               #+ .=
 
 # Note, other assignment ops generated by infix_postfix_meta_operator rule
 
 ## list item separator
-token infix is Comma[]                                          #= , def
-    { :<,> {*} }                                                #= ,
+token infix does Comma[]                                        #= ,
+    { :<,> {*} }                                                #+ ,
 
 ## loose unary
-token prefix is Loose_unary[]                                   #= true def
-    { :<true> {*} }                                             #= true
+token prefix does Loose_unary[]                                 #= true
+    { :<true> {*} }                                             #+ true
 
-token prefix is Loose_unary[]                                   #= not def
-    { :<not> {*} }                                              #= not
+token prefix does Loose_unary[]                                 #= not
+    { :<not> {*} }                                              #+ not
 
 ## list prefix (really sub calls mostly defined in Prelude)
-token prefix is List_prefix[:symbol<listop>]                    #= print def
+token prefix does List_prefix[:symbol<listop>]                  #= print
     { <listop> \s <nofat>
-        <EXPR(%list_prefix)>              {*}                   #= print
+        <EXPR(%list_prefix)>              {*}                   #+ print
     }
 
 # unrecognized identifiers are assumed to be post-declared subs.
-token prefix is List_prefix[:symbol<listop_postdecl>]           #= print def
+token prefix does List_prefix[:symbol<listop_postdecl>]         #= print
     { <ident> \s <nofat>
-        <EXPR(%list_prefix)>              {*}                   #= print
+        <EXPR(%list_prefix)>              {*}                   #+ print
     }
 
-token prefix is List_prefix[:symbol<$:>]                        #= $: def
+token prefix does List_prefix[:symbol<$:>]                      #= $:
     { <noun_prefix_sigil> \: \s
-        <EXPR(%list_prefix)>              {*}                   #= $ 
+        <EXPR(%list_prefix)>              {*}                   #+ $ 
     }
 
-token prefix is List_prefix[:symbol<Type:>]                     #= Type: def
+token prefix does List_prefix[:symbol<Type:>]                   #= Type:
     { <typename> \: \s
-        <EXPR(%list_prefix)>              {*}                   #= Type: 
+        <EXPR(%list_prefix)>              {*}                   #+ Type: 
     }
 
 ## loose and
-token infix is Loose_and[]                                      #= and def
+token infix does Loose_and[]                                    #= and
     is abstract('if')
-    { :<and> {*} }                                              #= and
+    { :<and> {*} }                                              #+ and
 
 ## loose or
-token infix is Loose_or[]                                       #= or def
+token infix does Loose_or[]                                     #= or
     is abstract('unless')
-    { :<or> {*} }                                               #= or
+    { :<or> {*} }                                               #+ or
 
-token infix is Loose_or[]                                       #= xor def
+token infix does Loose_or[]                                     #= xor
     is abstract('xor')
-    { :<xor> {*} }                                              #= xor
+    { :<xor> {*} }                                              #+ xor
 
-token infix is Loose_or[]                                       #= err def
-    { :<err> {*} }                                              #= err
+token infix does Loose_or[]                                     #= err
+    { :<err> {*} }                                              #+ err
 
 ## expression terminator
 
 # XXX correct to eat semicolon here?
-token terminator is Terminator[]                                #= ; def
-    { :<;> {*} }                                                #= ;
+token terminator does Terminator[]                              #= ;
+    { :<;> {*} }                                                #+ ;
 
-token terminator is Terminator[]                                #= <== def
-    { <?before :['<=='] > {*} }                                 #= <==
+token terminator does Terminator[]                              #= <==
+    { <?before :['<=='] > {*} }                                 #+ <==
 
-token terminator is Terminator[]                                #= ==> def
-    { <?before :['==>'] > {*} }              #'                 #= ==>
+token terminator does Terminator[]                              #= ==>
+    { <?before :['==>'] > {*} }              #'                 #+ ==>
 
-token terminator is Terminator[]                                #= --> def
-    { <?before :['-->'] > {*} }              #'                 #= -->
+token terminator does Terminator[]                              #= -->
+    { <?before :['-->'] > {*} }              #'                 #+ -->
 
-token terminator is Terminator[]                                #= ) def
-    { <?before :<)> > {*} }                                     #= )
+token terminator does Terminator[]                              #= )
+    { <?before :<)> > {*} }                                     #+ )
 
-token terminator is Terminator[]                                #= ] def
-    { <?before :<]> > {*} }                                     #= ]
+token terminator does Terminator[]                              #= ]
+    { <?before :<]> > {*} }                                     #+ ]
 
-token terminator is Terminator[:symbol<}>]                      #= } def
-    { <?before \}> {*} }                                        #= }
+token terminator does Terminator[:symbol<}>]                    #= }
+    { <?before \}> {*} }                                        #+ }
 
-token terminator is Terminator[]                                #= !! def
-    { <?before :<!!> > {*} }                                    #= !!
+token terminator does Terminator[]                              #= !!
+    { <?before :<!!> > {*} }                                    #+ !!
 
 regex stdstopper {
     | <terminator>
@@ -1856,7 +1866,7 @@ method EXPR (:$prec = %LOOSEST, :$stop = &stdstopper) {
 
     while not m:p/ <?before <$stop> > / {
         my $thisop is context is rw;
-        my $infix := $.expect_infix_prec($prec);
+        my $infix := $.expect_tight_infix($prec);
         my Str $newprec = $thisop<prec>;
         $thisop //= %terminator;
         $thisop<infix> = $infix;
