@@ -2,9 +2,10 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
-    finish precedence roles
     right side of s///, tr///, s[] = expr
+    has $.handler handles *
     sublanguages
+    harvest symbol bits from regex
     exporting grammars to the compiler vs namespace (which one is default?)
     add more suppositions and figure out exact error continuation semantics
     finish out all the {*}                                   #+ hookage
@@ -43,58 +44,80 @@ rule TOP { <compunit> {*} }
 # The current values are mere implmentation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
 
-my %term              ::= { :prec<z=>                           };
-my %methodcall        ::= { :prec<w=>                           };
-my %autoincrement     ::= { :prec<v=>, :assoc<non>, :lvalue     };
-my %exponentiation    ::= { :prec<u=>, :assoc<right>            };
-my %symbolic_unary    ::= { :prec<t=>                           };
-my %multiplicative    ::= { :prec<s=>, :assoc<left>             };
-my %additive          ::= { :prec<r=>, :assoc<left>             };
-my %junctive_and      ::= { :prec<q=>, :assoc<list>             };
-my %junctive_or       ::= { :prec<p=>, :assoc<list>             };
-my %named_unary       ::= { :prec<o=>, :assoc<left>             };
-my %nonchaining       ::= { :prec<n=>, :assoc<non>              };
-my %chaining          ::= { :prec<m=>, :assoc<chain>, :bool     };
-my %tight_and         ::= { :prec<l=>, :assoc<left>             };
-my %tight_or          ::= { :prec<k=>, :assoc<left>             };
-my %conditional       ::= { :prec<j=>, :assoc<right>, :!assign  };
-my %item_assignment   ::= { :prec<i=>, :assoc<right>, :lvalue   };
-my %loose_unary       ::= { :prec<h=>, :assoc<right>            };
-my %comma             ::= { :prec<g=>, :assoc<list>, :!assign   };
-my %list_infix        ::= { :prec<f=>, :assoc<list>, :!assign   };
-my %list_prefix       ::= { :prec<e=>,                          };
-my %loose_and         ::= { :prec<d=>, :assoc<left>, :!assign   };
-my %loose_or          ::= { :prec<c=>, :assoc<left>, :!assign   };
-my %LOOSEST           ::= { :prec<a=!>,                         };
-my %terminator        ::= { :prec<a=>, :assoc<list>             };
+constant %term              ::= { :prec<z=>                           };
+constant %methodcall        ::= { :prec<w=>                           };
+constant %autoincrement     ::= { :prec<v=>, :lvalue                  };
+constant %exponentiation    ::= { :prec<u=>, :assoc<right>            };
+constant %symbolic_unary    ::= { :prec<t=>                           };
+constant %multiplicative    ::= { :prec<s=>, :assoc<left>             };
+constant %additive          ::= { :prec<r=>, :assoc<left>             };
+constant %junctive_and      ::= { :prec<q=>, :assoc<list>             };
+constant %junctive_or       ::= { :prec<p=>, :assoc<list>             };
+constant %named_unary       ::= { :prec<o=>, :assoc<left>             };
+constant %nonchaining       ::= { :prec<n=>, :assoc<non>              };
+constant %chaining          ::= { :prec<m=>, :assoc<chain>, :bool     };
+constant %tight_and         ::= { :prec<l=>, :assoc<left>             };
+constant %tight_or          ::= { :prec<k=>, :assoc<left>             };
+constant %conditional       ::= { :prec<j=>, :assoc<right>, :!assign  };
+constant %item_assignment   ::= { :prec<i=>, :assoc<right>, :lvalue   };
+constant %loose_unary       ::= { :prec<h=>,                          };
+constant %comma             ::= { :prec<g=>, :assoc<list>, :!assign   };
+constant %list_infix        ::= { :prec<f=>, :assoc<list>, :!assign   };
+constant %list_prefix       ::= { :prec<e=>,                          };
+constant %loose_and         ::= { :prec<d=>, :assoc<left>, :!assign   };
+constant %loose_or          ::= { :prec<c=>, :assoc<left>, :!assign   };
+constant %LOOSEST           ::= { :prec<a=!>,                         };
+constant %terminator        ::= { :prec<a=>, :assoc<list>             };
 
 # "epsilon" tighter than terminator
 my $LOOSEST = %LOOSEST<prec>;
 
-# XXX need to set up $+thisop according to precedence table.
-role Term {}
-role Methodcall {}
-role Autoincrement {}
-role Exponentiation {}
-role Symbolic_unary {}
-role Multiplicative {}
-role Additive {}
-role Junctive_and {}
-role Junctive_or {}
-role Named_unary {}
-role Nonchaining {}
-role Chaining {}
-role Tight_and {}
-role Tight_or {}
-role Conditional {}
-role Item_assignment {}
-role Loose_unary {}
-role Comma {}
-role List_infix {}
-role List_prefix {}
-role Loose_and {}
-role Loose_or {}
-role Terminator {}
+role PrecOp[*%defaults] {
+    has Str $.prec = "zzz";
+    has Str $.assoc = "";
+    has Str $.symbol = "?unk?";
+    has Bool $.lvalue = False;
+    has Bool $.bool = False;
+    has Bool $.assign = True;
+
+    has Match $.match handles *;  # in particular, handles .<foo> and .[0]
+
+    # XXX not quite right, wants some shorter deep APPLY hook for Type()
+    # XXX we're also assuming that a rule with an "of" type will autocoerce
+    method new (Match $m) {
+        # Note, binding $<prec> or $<assoc> in match overrides default here!
+        my $self = $.bless(|%$m, |%defaults, :match($m));
+        $self.symbol = join ' ', gather { ... };  # XXX don't know how yet
+        if $self.assoc {
+            $+thisop = $self;
+        }
+        return $self;
+    }
+}
+
+class Term            does PrecOp[|%term]                   {}
+class Methodcall      does PrecOp[|%methodcall]             {}
+class Autoincrement   does PrecOp[|%autoincrement]          {}
+class Exponentiation  does PrecOp[|%exponentiation]         {}
+class Symbolic_unary  does PrecOp[|%symbolic_unary]         {}
+class Multiplicative  does PrecOp[|%multiplicative]         {}
+class Additive        does PrecOp[|%additive]               {}
+class Junctive_and    does PrecOp[|%junctive_and]           {}
+class Junctive_or     does PrecOp[|%junctive_or]            {}
+class Named_unary     does PrecOp[|%named_unary]            {}
+class Nonchaining     does PrecOp[|%nonchaining]            {}
+class Chaining        does PrecOp[|%chaining]               {}
+class Tight_and       does PrecOp[|%tight_and]              {}
+class Tight_or        does PrecOp[|%tight_or]               {}
+class Conditional     does PrecOp[|%conditional]            {}
+class Item_assignment does PrecOp[|%item_assignment]        {}
+class Loose_unary     does PrecOp[|%loose_unary]            {}
+class Comma           does PrecOp[|%comma]                  {}
+class List_infix      does PrecOp[|%list_infix]             {}
+class List_prefix     does PrecOp[|%list_prefix]            {}
+class Loose_and       does PrecOp[|%loose_and]              {}
+class Loose_or        does PrecOp[|%loose_or]               {}
+class Terminator      does PrecOp[|%terminator]             {}
 
 # Categories are designed to be extensible in derived grammars.
 
@@ -679,8 +702,8 @@ token circumfix { :['<']  <anglewords>  :['>'] {*} }            #+ < >
 token circumfix { :['<<'] <shellwords> :['>>'] {*} }            #+ << >>
 token circumfix { :<«>    <shellwords> :<»>    {*} }            #+ « »
 
-token circumfix does Circumfix[:symbol<{ }>]
-    { <block>         {*} }                                     #+ { }
+token circumfix ( --> Circumfix)                                #= { }
+    { <?before :<{> <block> <?after :<}>  {*} }                 #+ { }
 
 rule scoped {
     <type>?
@@ -1284,10 +1307,14 @@ regex extrapost ($inquote is context = 1) {
     {*}
 }
 
+rule multisig {
+    :?\( <signature> \) [ \| :?\( <signature> \) ]*
+}
+
 rule routine_def {
     <ident>?
     <trait>*
-    [ :? \( <signature> \)]?
+    <multisig>?
     <block>
     {*}
 }
@@ -1295,7 +1322,7 @@ rule routine_def {
 rule regex_def {
     <ident>?
     <trait>*
-    [ :? \( <signature> \)]?
+    [ :?\( <signature> \)]?
     <regex_block>
     {*}
 }
@@ -1419,391 +1446,389 @@ rule statement_prefix { :<async>   <statement> {*} }            #+ async
 rule statement_prefix { :<lazy>    <statement> {*} }            #+ lazy
 
 ## term
-token term does Term[]                                          #= *
+token term ( --> Term)                                          #= *
     { :<*> {*} }                                                #+ *
 
-token circumfix does Term[:symbol<$( )>]                        #= $( )
-    { <noun_prefix_sigil> \( <EXPR> :\) {*} }                   #+ $( ) 
+token circumfix ( --> Term)                                     #= $( )
+    { <symbol <noun_prefix_sigil>> :<(> <EXPR> :<)> {*} }       #+ $( ) 
 
-token circumfix does Term[:symbol<Type( )>]                     #= Type( )
-    { <typename> \( <EXPR> \) {*} }                             #+ Type( ) 
+token circumfix ( --> Term)                                     #= Type( )
+    { <symbol <typename> > :<(> <EXPR> :<)> {*} }               #+ Type( ) 
 
-token circumfix does Term[]                                     #= ( )
+token circumfix ( --> Term)                                     #= ( )
     { :<(> <EXPR> :<)> {*} }                                    #+ ( )
 
-token postcircumfix does Term[]                                 #= ( )
+token postcircumfix ( --> Term)                                 #= ( )
     is abstract('call')
     { :<(> <EXPR> :<)> {*} }                                    #+ ( )
 
 ## autoincrement
-token postfix does Autoincrement[]                              #= ++
+token postfix ( --> Autoincrement)                              #= ++
     { :<++> {*} }                                               #+ ++
 
-token postfix does Autoincrement[]                              #= --
+token postfix ( --> Autoincrement)                              #= --
     { :<--> {*} }                                               #+ --
 
-token prefix does Autoincrement[]                               #= ++
+token prefix ( --> Autoincrement)                               #= ++
     { :<++> {*} }                                               #+ ++
 
-token prefix does Autoincrement[]                               #= --
+token prefix ( --> Autoincrement)                               #= --
     { :<--> {*} }                                               #+ --
 
 
 ## exponentiation
-token infix does Exponentiate[]                                 #= **
+token infix ( --> Exponentiate)                                 #= **
     { :<**> {*} }                                               #+ **
 
 ## symbolic unary
-token prefix does Symbolic_unary[]                              #= !
+token prefix ( --> Symbolic_unary)                              #= !
     { :<!> {*} }                                                #+ !
 
-token prefix does Symbolic_unary[]                              #= +
+token prefix ( --> Symbolic_unary)                              #= +
     { :<+> {*} }                                                #+ +
 
-token prefix does Symbolic_unary[]                              #= -
+token prefix ( --> Symbolic_unary)                              #= -
     { :<-> {*} }                                                #+ -
 
-token prefix does Symbolic_unary[]                              #= ~
+token prefix ( --> Symbolic_unary)                              #= ~
     { :<~> {*} }                                                #+ ~
 
-token prefix does Symbolic_unary[]                              #= ?
+token prefix ( --> Symbolic_unary)                              #= ?
     { :<?> {*} }                                                #+ ?
 
-token prefix does Symbolic_unary[]                              #= =
+token prefix ( --> Symbolic_unary)                              #= =
     { :<=> {*} }                                                #+ =
 
-token prefix does Symbolic_unary[]                              #= *
+token prefix ( --> Symbolic_unary)                              #= *
     { :<*> {*} }                                                #+ *
 
-token prefix does Symbolic_unary[]                              #= **
+token prefix ( --> Symbolic_unary)                              #= **
     { :<**> {*} }                                               #+ **
 
-token prefix does Symbolic_unary[]                              #= ~^
+token prefix ( --> Symbolic_unary)                              #= ~^
     { :<~^> {*} }                                               #+ ~^
 
-token prefix does Symbolic_unary[]                              #= +^
+token prefix ( --> Symbolic_unary)                              #= +^
     { :<+^> {*} }                                               #+ +^
 
-token prefix does Symbolic_unary[]                              #= ?^
+token prefix ( --> Symbolic_unary)                              #= ?^
     { :<?^> {*} }                                               #+ ?^
 
-token prefix does Symbolic_unary[]                              #= ^
+token prefix ( --> Symbolic_unary)                              #= ^
     { :<^> {*} }                                                #+ ^
 
 
 ## multiplicative
-token infix does Multiplicative[]                               #= *
+token infix ( --> Multiplicative)                               #= *
     { :<*> {*} }                                                #+ *
 
-token infix does Multiplicative[]                               #= /
+token infix ( --> Multiplicative)                               #= /
     { :</> {*} }                                                #+ /
 
-token infix does Multiplicative[]                               #= %
+token infix ( --> Multiplicative)                               #= %
     { :<%> {*} }                                                #+ %
 
-token infix does Multiplicative[]                               #= x
+token infix ( --> Multiplicative)                               #= x
     { :<x> {*} }                                                #+ x
 
-token infix does Multiplicative[]                               #= xx
+token infix ( --> Multiplicative)                               #= xx
     { :<xx> {*} }                                               #+ xx
 
-token infix does Multiplicative[]                               #= +&
+token infix ( --> Multiplicative)                               #= +&
     { :<+&> {*} }                                               #+ +&
 
-token infix does Multiplicative[]                               #= +<
+token infix ( --> Multiplicative)                               #= +<
     { :['+<'] {*} }                                             #+ +<
 
-token infix does Multiplicative[]                               #= +>
+token infix ( --> Multiplicative)                               #= +>
     { :['+>'] {*} }                                             #+ +>
 
-token infix does Multiplicative[]                               #= ~&
+token infix ( --> Multiplicative)                               #= ~&
     { :<~&> {*} }                                               #+ ~&
 
-token infix does Multiplicative[]                               #= ~<
+token infix ( --> Multiplicative)                               #= ~<
     { :['~<'] {*} }                                             #+ ~<
 
-token infix does Multiplicative[]                               #= ~>
+token infix ( --> Multiplicative)                               #= ~>
     { :['~>'] {*} }                                             #+ ~>
 
 
 ## additive
-token infix does Additive[]                                     #= +
+token infix ( --> Additive)                                     #= +
     { :<+> {*} }                                                #+ +
 
-token infix does Additive[]                                     #= -
+token infix ( --> Additive)                                     #= -
     { :<-> {*} }                                                #+ -
 
-token infix does Additive[]                                     #= ~
+token infix ( --> Additive)                                     #= ~
     { :<~> {*} }                                                #+ ~
 
-token infix does Additive[]                                     #= +|
+token infix ( --> Additive)                                     #= +|
     { :<+|> {*} }                                               #+ +|
 
-token infix does Additive[]                                     #= +^
+token infix ( --> Additive)                                     #= +^
     { :<+^> {*} }                                               #+ +^
 
-token infix does Additive[]                                     #= ~|
+token infix ( --> Additive)                                     #= ~|
     { :<~|> {*} }                                               #+ ~|
 
-token infix does Additive[]                                     #= ~^
+token infix ( --> Additive)                                     #= ~^
     { :<~^> {*} }                                               #+ ~^
 
-token infix does Additive[]                                     #= ?|
+token infix ( --> Additive)                                     #= ?|
     { :<?|> {*} }                                               #+ ?|
 
-token infix does Additive[]                                     #= ?^
+token infix ( --> Additive)                                     #= ?^
     { :<?^> {*} }                                               #+ ?^
 
 
 ## junctive and (all)
-token infix does Junctive_and[]                                 #= &
+token infix ( --> Junctive_and)                                 #= &
     { :<&> {*} }                                                #+ &
 
 
 ## junctive or (any)
-token infix does Junctive_or[]                                  #= |
+token infix ( --> Junctive_or)                                  #= |
     { :<|> {*} }                                                #+ |
 
-token infix does Junctive_or[]                                  #= ^
+token infix ( --> Junctive_or)                                  #= ^
     { :<^> {*} }                                                #+ ^
 
 
 ## named unary examples
-token prefix does Named_unary[]                                 #= rand
+token prefix ( --> Named_unary)                                 #= rand
     { :<rand> {*} }                                             #+ rand
 
-token prefix does Named_unary[]                                 #= sleep
+token prefix ( --> Named_unary)                                 #= sleep
     { :<sleep> {*} }                                            #+ sleep
 
-token prefix does Named_unary[]                                 #= abs
+token prefix ( --> Named_unary)                                 #= abs
     { :<abs> {*} }                                              #+ abs
 
 ## nonchaining binary
-token infix does Nonchaining[]                                  #= <=>
+token infix ( --> Nonchaining)                                  #= <=>
     { :['<=>'] {*} }                                            #+ <=>
 
-token infix does Nonchaining[]                                  #= cmp
+token infix ( --> Nonchaining)                                  #= cmp
     { :<cmp> {*} }                                              #+ cmp
 
-token infix does Nonchaining[]                                  #= is
+token infix ( --> Nonchaining)                                  #= is
     { :<is> {*} }                                               #+ is
 
-token infix does Nonchaining[]                                  #= but
+token infix ( --> Nonchaining)                                  #= but
     { :<but> {*} }                                              #+ but
 
-token infix does Nonchaining[]                                  #= does
+token infix ( --> Nonchaining)                                  #= does
     { :<does> {*} }                                             #+ does
 
-token infix does Nonchaining[]                                  #= ..
+token infix ( --> Nonchaining)                                  #= ..
     { :<..> {*} }                                               #+ ..
 
-token infix does Nonchaining[]                                  #= ^..
+token infix ( --> Nonchaining)                                  #= ^..
     { :<^..> {*} }                                              #+ ^..
 
-token infix does Nonchaining[]                                  #= ..^
+token infix ( --> Nonchaining)                                  #= ..^
     { :<..^> {*} }                                              #+ ..^
 
-token infix does Nonchaining[]                                  #= ^..^
+token infix ( --> Nonchaining)                                  #= ^..^
     { :<^..^> {*} }                                             #+ ^..^
 
-token infix does Nonchaining[]                                  #= ff
+token infix ( --> Nonchaining)                                  #= ff
     { :<ff> {*} }                                               #+ ff
 
-token infix does Nonchaining[]                                  #= ^ff
+token infix ( --> Nonchaining)                                  #= ^ff
     { :<^ff> {*} }                                              #+ ^ff
 
-token infix does Nonchaining[]                                  #= ff^
+token infix ( --> Nonchaining)                                  #= ff^
     { :<ff^> {*} }                                              #+ ff^
 
-token infix does Nonchaining[]                                  #= ^ff^
+token infix ( --> Nonchaining)                                  #= ^ff^
     { :<^ff^> {*} }                                             #+ ^ff^
 
-token infix does Nonchaining[]                                  #= fff
+token infix ( --> Nonchaining)                                  #= fff
     { :<fff> {*} }                                              #+ fff
 
-token infix does Nonchaining[]                                  #= ^fff
+token infix ( --> Nonchaining)                                  #= ^fff
     { :<^fff> {*} }                                             #+ ^fff
 
-token infix does Nonchaining[]                                  #= fff^
+token infix ( --> Nonchaining)                                  #= fff^
     { :<fff^> {*} }                                             #+ fff^
 
-token infix does Nonchaining[]                                  #= ^fff^
+token infix ( --> Nonchaining)                                  #= ^fff^
     { :<^fff^> {*} }                                            #+ ^fff^
 
 
 ## chaining binary
-token infix does Chaining[]                                     #= ==
+token infix ( --> Chaining)                                     #= ==
     { :<==> {*} }                                               #+ ==
 
-token infix does Chaining[]                                     #= !=
+token infix ( --> Chaining)                                     #= !=
     { :<!=> {*} }                                               #+ !=
 
-token infix does Chaining[]                                     #= <
+token infix ( --> Chaining)                                     #= <
     { :['<'] {*} }                                              #+ <
 
-token infix does Chaining[]                                     #= <=
+token infix ( --> Chaining)                                     #= <=
     { :['<='] {*} }                                             #+ <=
 
-token infix does Chaining[]                                     #= >
+token infix ( --> Chaining)                                     #= >
     { :['>'] {*} }                                              #+ >
 
-token infix does Chaining[]                                     #= >=
+token infix ( --> Chaining)                                     #= >=
     { :['>='] {*} }                                             #+ >=
 
-token infix does Chaining[]                                     #= ~~
+token infix ( --> Chaining)                                     #= ~~
     { :<~~> {*} }                                               #+ ~~
 
-token infix does Chaining[]                                     #= !~
+token infix ( --> Chaining)                                     #= !~
     { :<!~> {*} }                                               #+ !~
 
-token infix does Chaining[]                                     #= =~
+token infix ( --> Chaining)                                     #= =~
     { :<=~> {*} }                                               #+ =~
 
-token infix does Chaining[]                                     #= eq
+token infix ( --> Chaining)                                     #= eq
     { :<eq> {*} }                                               #+ eq
 
-token infix does Chaining[]                                     #= ne
+token infix ( --> Chaining)                                     #= ne
     { :<ne> {*} }                                               #+ ne
 
-token infix does Chaining[]                                     #= lt
+token infix ( --> Chaining)                                     #= lt
     { :<lt> {*} }                                               #+ lt
 
-token infix does Chaining[]                                     #= le
+token infix ( --> Chaining)                                     #= le
     { :<le> {*} }                                               #+ le
 
-token infix does Chaining[]                                     #= gt
+token infix ( --> Chaining)                                     #= gt
     { :<gt> {*} }                                               #+ gt
 
-token infix does Chaining[]                                     #= ge
+token infix ( --> Chaining)                                     #= ge
     { :<ge> {*} }                                               #+ ge
 
-token infix does Chaining[]                                     #= =:=
+token infix ( --> Chaining)                                     #= =:=
     { :<=:=> {*} }                                              #+ =:=
 
-token infix does Chaining[]                                     #= ===
+token infix ( --> Chaining)                                     #= ===
     { :<===> {*} }                                              #+ ===
 
 
 ## tight and
-token infix does Tight_and[]                                    #= &&
-    is abstract('if')
+token infix ( --> Tight_and)                                    #= &&
     { :<&&> {*} }                                               #+ &&
 
 
 ## tight or
-token infix does Tight_or[]                                     #= ||
-    is abstract('unless')
+token infix ( --> Tight_or)                                     #= ||
     { :<||> {*} }                                               #+ ||
 
-token infix does Tight_or[:assoc<list>]                         #= ^^
-    is assoc('list')
-    is abstract('xor')
-    { :<^^> {*} }                                               #+ ^^
+token infix ( --> Tight_or)  {                                  #= ^^
+    :<^^>
+    { $<assoc> := 'list' }  # override Tight_or's 'left' associativity
+    {*}                                                         #+ ^^
+}
 
-token infix does Tight_or[]                                     #= //
+token infix ( --> Tight_or)                                     #= //
     { :<//> {*} }                                               #+ //
 
 
 ## conditional
-token infix does Conditional[]                                  #= ?? !!
-    is abstract('if')
+token infix ( --> Conditional)                                  #= ?? !!
     { :<??> <EXPR(%conditional)> :<!!> {*} }                    #+ ?? !!
 
 
 ## assignment
-token infix does Assignment[]                                   #= =
+token infix ( --> Assignment)                                   #= =
     is abstract('assign')
     is lvalue(1)
     { :<=> {*} }                                                #+ =
 
-token infix does Assignment[]                                   #= :=
+token infix ( --> Assignment)                                   #= :=
     is abstract('bind')
     { :<:=> {*} }                                               #+ :=
 
-token infix does Assignment[]                                   #= ::=
+token infix ( --> Assignment)                                   #= ::=
     { :<::=> {*} }                                              #+ ::=
 
 # XXX need to do something to turn subcall into method call here...
-token infix does Assignment[]                                   #= .=
+token infix ( --> Assignment)                                   #= .=
     { :<.=> {*} }                                               #+ .=
 
 # Note, other assignment ops generated by infix_postfix_meta_operator rule
 
 ## list item separator
-token infix does Comma[]                                        #= ,
+token infix ( --> Comma)                                        #= ,
     { :<,> {*} }                                                #+ ,
 
 ## loose unary
-token prefix does Loose_unary[]                                 #= true
+token prefix ( --> Loose_unary)                                 #= true
     { :<true> {*} }                                             #+ true
 
-token prefix does Loose_unary[]                                 #= not
+token prefix ( --> Loose_unary)                                 #= not
     { :<not> {*} }                                              #+ not
 
 ## list prefix (really sub calls mostly defined in Prelude)
-token prefix does List_prefix[:symbol<listop>]                  #= print
-    { <listop> \s <nofat>
+token prefix ( --> List_prefix)                                 #= print
+    { <symbol <listop> > \s <nofat>
         <EXPR(%list_prefix)>              {*}                   #+ print
     }
 
 # unrecognized identifiers are assumed to be post-declared subs.
-token prefix does List_prefix[:symbol<listop_postdecl>]         #= print
-    { <ident> \s <nofat>
+token prefix ( --> List_prefix)                                 #= print
+    { <symbol <ident>> \s <nofat>
         <EXPR(%list_prefix)>              {*}                   #+ print
     }
 
-token prefix does List_prefix[:symbol<$:>]                      #= $:
-    { <noun_prefix_sigil> \: \s
-        <EXPR(%list_prefix)>              {*}                   #+ $ 
+token prefix ( --> List_prefix)                                 #= $:
+    { <symbol <noun_prefix_sigil> \: > \s
+        <EXPR(%list_prefix)>              {*}                   #+ $:
     }
 
-token prefix does List_prefix[:symbol<Type:>]                   #= Type:
-    { <typename> \: \s
+token prefix ( --> List_prefix)                                 #= Type:
+    { <symbol <typename> \: > \s
         <EXPR(%list_prefix)>              {*}                   #+ Type: 
     }
 
 ## loose and
-token infix does Loose_and[]                                    #= and
+token infix ( --> Loose_and)                                    #= and
     is abstract('if')
     { :<and> {*} }                                              #+ and
 
 ## loose or
-token infix does Loose_or[]                                     #= or
+token infix ( --> Loose_or)                                     #= or
     is abstract('unless')
     { :<or> {*} }                                               #+ or
 
-token infix does Loose_or[]                                     #= xor
+token infix ( --> Loose_or)                                     #= xor
     is abstract('xor')
     { :<xor> {*} }                                              #+ xor
 
-token infix does Loose_or[]                                     #= err
+token infix ( --> Loose_or)                                     #= err
     { :<err> {*} }                                              #+ err
 
 ## expression terminator
 
 # XXX correct to eat semicolon here?
-token terminator does Terminator[]                              #= ;
+token terminator ( --> Terminator)                              #= ;
     { :<;> {*} }                                                #+ ;
 
-token terminator does Terminator[]                              #= <==
+token terminator ( --> Terminator)                              #= <==
     { <?before :['<=='] > {*} }                                 #+ <==
 
-token terminator does Terminator[]                              #= ==>
+token terminator ( --> Terminator)                              #= ==>
     { <?before :['==>'] > {*} }              #'                 #+ ==>
 
-token terminator does Terminator[]                              #= -->
+token terminator ( --> Terminator)                              #= -->
     { <?before :['-->'] > {*} }              #'                 #+ -->
 
-token terminator does Terminator[]                              #= )
+token terminator ( --> Terminator)                              #= )
     { <?before :<)> > {*} }                                     #+ )
 
-token terminator does Terminator[]                              #= ]
+token terminator ( --> Terminator)                              #= ]
     { <?before :<]> > {*} }                                     #+ ]
 
-token terminator does Terminator[:symbol<}>]                    #= }
-    { <?before \}> {*} }                                        #+ }
+token terminator ( --> Terminator)                              #= }
+    {[ <?before :<}> > {*} ]}                                   #+ }
 
-token terminator does Terminator[]                              #= !!
+token terminator ( --> Terminator)                              #= !!
     { <?before :<!!> > {*} }                                    #+ !!
 
 regex stdstopper {
