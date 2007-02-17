@@ -81,9 +81,7 @@ role PrecOp[*%defaults] {
 
     has Match $.match handles *;  # in particular, handles .<foo> and .[0]
 
-    # XXX not quite right, wants some shorter deep APPLY hook for Type()
-    # XXX we're also assuming that a rule with an "of" type will autocoerce
-    method new (Match $m) {
+    method &.(Match $m) {
         # Note, binding $<prec> or $<assoc> in match overrides default here!
         my $self = $.bless(|%$m, |%defaults, :match($m));
         $self.symbol = join ' ', gather { ... };  # XXX don't know how yet
@@ -496,7 +494,7 @@ regex infix_nospace {
 }
 
 token expect_tight_infix ($loosest) {
-    <!before \{>                # presumably a statement control block
+    <!before \{ | -\> >                # presumably a statement control block
     <expect_infix>
     ::: <?{ $+thisop.prec ge $loosest }>
 }
@@ -763,8 +761,8 @@ token plurality_declarator { :<proto> <pluralized> }
 token plurality_declarator { :<only>  <pluralized> }
 
 token routine_declarator { :<sub>       <routine_def> }
-token routine_declarator { :<method>    <routine_def> }
-token routine_declarator { :<submethod> <routine_def> }
+token routine_declarator { :<method>    <method_def> }
+token routine_declarator { :<submethod> <method_def> }
 token routine_declarator { :<macro>     <macro_def> }
 
 token regex_declarator { :<regex>       <regex_def> }
@@ -1314,9 +1312,18 @@ rule multisig {
 }
 
 rule routine_def {
-    <ident>?
+    | <ident>?  <multisig>?
     <trait>*
-    <multisig>?
+    <block>
+    {*}
+}
+
+rule method_def {
+    [
+    | <ident>  <multisig>?
+    | <?before <sigil> \. <[ [ { ( ]> > <sigiltwigil> <postcircumfix>
+    ]
+    <trait>*
     <block>
     {*}
 }
