@@ -2,9 +2,8 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
-    right side of s///, tr///, s[] = expr
     sublanguages
-    harvest symbol bits from regex
+    harvest symbol bits from regex, install endsyms
     exporting grammars to the compiler vs namespace (which one is default?)
     add more suppositions and figure out exact error continuation semantics
     finish out all the {*} #= hookage
@@ -1248,10 +1247,35 @@ token quote { :<rx> <quotesnabber('rx')> }
 
 token quote { :<m>  <quotesnabber('m')> }
 token quote { :<mm> <quotesnabber('m', ':s')> }
-token quote { :<s>  <quotesnabber('s')> <finish_subst> } # XXX handwave
-token quote { :<ss> <quotesnabber('s', ':s')> <finish_subst> } # XXX handwave
+token quote { :<s>  $<pat> := <quotesnabber('s')> <finish_subst($<pat>)> }
+token quote { :<ss> $<pat> := <quotesnabber('s', ':s')> <finish_subst($<pat>)> }
 
-token quote { :<tr> <quotesnabber($0)> <finish_trans> } # XXX handwave
+token quote { :<tr> $<pat> := <quotesnabber('tr')> <finish_trans(<$pat>)> }
+
+token finish_subst ($pat, :$thisop is context is rw) {
+    [
+    # bracketed form
+    | <?{ $pat<delim> == 2 }> ::
+          <?ws>
+          <infix>            # looking for pseudoassign here
+          { $thisop.prec == %item_assignment<prec> or
+              panic("Bracketed subst must use some form of assignment" }
+          $<repl> := <EXPR(%item_assignment)>
+    # unbracketed form
+    | $<repl> := <q_unbalanced(qlang('qq'), $pat<delim>[0])>
+    ]
+}
+
+token finish_trans ($pat) {
+    [
+    # bracketed form
+    | <?{ $pat<delim> == 2 }> ::
+          <?ws>
+          $<repl> := <q_pickdelim(qlang('tr'))>
+    # unbracketed form
+    | $<repl> := <q_unbalanced(qlang('tr'), $pat<delim>[0])>
+    ]
+}
 
 # The key observation here is that the inside of quoted constructs may
 # be any of a lot of different sublanguages, and we have to parameterize
@@ -1289,7 +1313,7 @@ sub qlang ($pedigree) {
     (state %qlang){$pedigree} //= new QLang($pedigree);
 }
 
-token quotesnabber ($q is copy) {
+token quotesnabber ($q is copy, :$delim is context is rw = '') {
     <!before \w> <nofat> ::
     <?ws>
 
@@ -1299,6 +1323,7 @@ token quotesnabber ($q is copy) {
 
     # Dispatch to current lang's subparser.
     $<delimited> := <$($<lang>.parser)($<lang>)>
+    { let $<delim> = $delim }
     {*}
 }
 
@@ -1380,9 +1405,11 @@ method findbrack {
         $stop = %open2close{$0} err
             panic("Don't know how to flip $start bracket");
         $stop x= $start.chars;
+        $+delim = [$start,$stop];
         return $start, $stop;
     }
     else {
+        $+delim = substr($_,0,1);
         return ();
     }
 }
