@@ -3,7 +3,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 =begin things todo
 
     sublanguages
-    harvest symbol bits from regex, install endsyms
+    harvest symbol bits from regex, install endsyms (or does engine do this?)
     add more suppositions and figure out exact error continuation semantics
     finish out all the {*} #= hookage
     think about longest-token-defeating {*} that maybe should be <?{ {*}; 1}>
@@ -162,7 +162,8 @@ class Loose_and       does PrecOp[|%loose_and]              {}
 class Loose_or        does PrecOp[|%loose_or]               {}
 class Terminator      does PrecOp[|%terminator]             {}
 
-# Categories are designed to be extensible in derived grammars.
+# Categories are designed to be easily extensible in derived grammars
+# by merely adding more rules in the same category.
 
 # The endsym trait, if specified, says what to implicitly check for in each
 # rule right after the initial :<symbol>.  Normally this is used to make sure
@@ -464,14 +465,18 @@ rule statement_list {
     {*}
 }
 
-token label { <ident>
-    # XXX not sure if this is the right way to write a supposition yet...
-    [ <!{ is_type($<ident>) }>
-    || <suppose "Did you mean a label $<ident>: instead of a contextualizer?">
-    ]
-    \: \s <?ws>
+token label {
+    <ident> \: \s <?ws>
+
+    [ <?{ is_type($<ident>) }>
+      <suppose: You tried to use an existing name $<ident> as a label>
+    ]?
+
+    # add label as a pseudo type
+    { COMPILING::{"::$<ident>"} = Label.new($<ident>) }  # XXX need statement ref too?
+
     {*}
-    }
+}
 
 rule statement {
     <label>*                                     {*}            #= label
@@ -1076,10 +1081,10 @@ token typename {
 }
 
 regex fulltypename {
-    <typeident>
+    <typename> <?unsp>?
     [
     | <?before \[> <postcircumfix>
-    | of <typename>
+    | <?ws> of <?ws> <fulltypename>
     | <null>
     ]
     {*}
