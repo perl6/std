@@ -2276,7 +2276,7 @@ rule regex_quantified_atom {
 rule regex_atom {
     [
     || <$+stop> :: <fail>
-    || <regex_metachar> ::
+    || <regex_metachar>
     || (.)
     ]
     {*}
