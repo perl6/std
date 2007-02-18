@@ -662,7 +662,7 @@ token expect_term {
         while $pre or $post {
             $oldterm = $nounphrase;
             if $pre {
-                if $post and $post<prec> gt $pre<prec>{
+                if $post and $post.prec gt $pre.prec {
                     $nounphrase = $post;
                     $post = shift @<post>;
                 }
