@@ -638,7 +638,8 @@ token version {
 token expect_term {
     <?ws>
 
-    [
+    # queue up the prefixes to interleave with postfixes
+    @<pre> := [
         [
         | <prefix>                                      {*}     #= prefix
         | <prefix_circumfix_meta_operator>              {*}     #= precircum
@@ -647,10 +648,38 @@ token expect_term {
     ]*
 
     <noun>                                              {*}     #= noun
-    <expect_postfix>*                                   {*}     #= postfix
+
+    # also queue up any postfixes, since adverbs could change things
+    @<post> := <expect_postfix>*                        {*}     #= postfix
     <?ws>
     <adverbs>?
-    {*}
+
+    # now push ops over the noun according to precedence.
+    {
+        my $nounphrase = $<noun>;
+        my $pre = pop @<pre>;
+        my $post = shift @<post>;
+        while $pre or $post {
+            $oldterm = $nounphrase;
+            if $pre {
+                if $post and $post<prec> gt $pre<prec>{
+                    $nounphrase = $post;
+                    $post = shift @<post>;
+                }
+                else {
+                    $nounphrase = $pre;
+                    $pre = pop @<pre>;
+                }
+            }
+            else {
+                $nounphrase = $post;
+                $post = shift @<post>;
+            }
+            $nounphrase<term> = $oldterm;
+        }
+        {*}
+        return $nounphrase;
+    }
 }
 
 token adverbs {
@@ -1282,8 +1311,8 @@ method heredoc {
 
 token quote { <before :<'>>    <quotesnabber("q")> }
 token quote { <before :<">>    <quotesnabber("qq")> }
-token quote { <before :['«']> <quotesnabber("q",":ww")> }
-token quote { <before :['<<']> <quotesnabber("q",":ww")> }
+token quote { <before :['«']>  <quotesnabber("qq",":ww")> }
+token quote { <before :['<<']> <quotesnabber("qq",":ww")> }
 token quote { <before :['<']>  <quotesnabber("q",":w")> }
 
 token quote { <before :['/']>  <quotesnabber("rx")> }
@@ -2116,6 +2145,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
     my $prevop is context is rw;
     my @termstack;
     my @opstack;
+
     push @opstack, %terminator;         # (just a sentinel value)
     push @termstack, $.expect_term();
 
