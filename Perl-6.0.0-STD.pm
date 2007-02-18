@@ -2403,6 +2403,7 @@ token regex_mod_external { <panic: unrecognized regex modifier> }
 token regex_quantifier { :<**> <?ws> <block> <quantmod> }
 token regex_quantifier { :<*> <quantmod> }
 token regex_quantifier { :<+> <quantmod> }
+token regex_quantifier { :<?> <quantmod> }
 
 token quantmod { [ \? | \! | \: | \+ ]? }
 
