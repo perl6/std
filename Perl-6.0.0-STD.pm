@@ -3,7 +3,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 =begin things todo
 
     sublanguages
-    harvest symbol bits from regex, install endsyms (or does engine do this?)
     add more suppositions and figure out exact error continuation semantics
     finish out all the {*} #= hookage
     think about longest-token-defeating {*} that maybe should be <?{ {*}; 1}>
@@ -62,7 +61,7 @@ token TOP { <UNIT( $+unitstop or /$/ )> {*} }
         # (Presumably normal subroutine defs don't need to mutate the grammar)
         BEGIN {
             temp COMPILING::<$?PARSER> := grammar is OUTER::<$?PARSER> {
-                token infix returns Additive { :<plus> }
+                token infix returns Additive { <sym: plus> }
             }
             my $more = m:p/ <$?PARSER::UNIT(/<null>/)>/;   # XXX or some such
             ...
@@ -119,7 +118,7 @@ my $LOOSEST = %LOOSEST<prec>;
 role PrecOp[*%defaults] {
     has Str $.prec = "zzz";
     has Str $.assoc = "";
-    has Str $.symbol = "?unk?";
+    has Str @.sym;
     has Bool $.lvalue = False;
     has Bool $.bool = False;
     has Bool $.assign = True;
@@ -130,7 +129,6 @@ role PrecOp[*%defaults] {
     method &.(Match $m) {
         # Note, binding $<prec> or $<assoc> in match overrides default here!
         my $self = $.bless(|%$m, |%defaults, :match($m));
-        $self.symbol = join ' ', gather { ... };  # XXX don't know how yet
         if $self.assoc {
             $+thisop = $self;
         }
@@ -165,209 +163,207 @@ class Terminator      does PrecOp[|%terminator]             {}
 # Categories are designed to be easily extensible in derived grammars
 # by merely adding more rules in the same category.
 
-# The endsym trait, if specified, says what to implicitly check for in each
-# rule right after the initial :<symbol>.  Normally this is used to make sure
+# The endsym context, if specified, says what to implicitly check for in each
+# rule right after the initial <sym>.  Normally this is used to make sure
 # there's appropriate whitespace, though Perl 6 also uses it to rule out
 # the => (fatarrow) construct.
 
+my $endsym is context = / <null> /;
+
+multi method sym (Str $pat) {
+    m:p/ $pat <$+endsym> /;
+}
+
+multi method sym ($pat) {
+    m:p/ <$pat> <$+endsym> /;
+}
+
 token category
-        { :<category> }
+        { <sym: category> }
 proto token category
         { }
 
 token category
-        { :<sigil> }
+        { <sym: sigil> }
 proto token sigil
         { }
 
 token category
-        { :<twigil> }
+        { <sym: twigil> }
 proto token twigil
         { }
 
 token category
-        { :<special_variable> }
+        { <sym: special_variable> }
 proto token special_variable
         { }
 
 token category
-        { :<nameroot> }
+        { <sym: nameroot> }
 proto token nameroot
         { }
 
 token category
-        { :<version> }
+        { <sym: version> }
 proto token version
         { }
 
 token category
-        { :<term> }
+        { <sym: term> }
 proto token term
         { }
 
 token category
-        { :<quote> }
+        { <sym: quote> }
 proto token quote
         { }
 
 token category
-        { :<prefix> }
+        { <sym: prefix> }
 proto token prefix
             is defequiv(%symbolic_unary)        # XXX not sure how used yet
         { }
 
 token category
-        { :<infix> }
+        { <sym: infix> }
 proto token infix
             is defequiv(%additive)
         { }
 
 token category
 
-        { :<postfix> }
+        { <sym: postfix> }
 proto token postfix
             is defequiv(%autoincrement)
         { }
 
 token category
-        { :<dotty> }
-proto token dotty
-            is endsym(/ <?unsp>? /
+        { <sym: dotty> }
+proto token dotty (:$endsym is context = / <?unsp>? /)
         { }
 
 token category
-        { :<circumfix> }
+        { <sym: circumfix> }
 proto token circumfix
         { }
 
 token category
-        { :<postcircumfix> }
+        { <sym: postcircumfix> }
 proto token postcircumfix
         { }
 
 token category
-        { :<regex_metachar> }
+        { <sym: regex_metachar> }
 proto token regex_metachar
         { }
 
 token category
-        { :<regex_backslash> }
+        { <sym: regex_backslash> }
 proto token regex_backslash
         { }
 
 token category
-        { :<regex_assertion> }
+        { <sym: regex_assertion> }
 proto token regex_assertion
         { }
 
 token category
-        { :<regex_mod_internal> }
+        { <sym: regex_mod_internal> }
 proto token regex_mod_internal
         { }
 
 token category
-        { :<regex_mod_external> }
-proto token regex_mod_external
-            is endsym(/ <?before \(> <postcircumfix> /)
+        { <sym: regex_mod_external> }
+proto token regex_mod_external (:$endsym is context = / <?before \(> <postcircumfix> /)
         { }
 
 token category
-        { :<quote_mod> }
+        { <sym: quote_mod> }
 proto token quote_mod
         { }
 
 token category
-        { :<q_backslash> }
+        { <sym: q_backslash> }
 proto token q_backslash
         { }
 
 token category
-        { :<qq_backslash> }
+        { <sym: qq_backslash> }
 proto token qq_backslash
         { }
 
 token category
-        { :<trait_verb> }
-proto token trait_verb
-            is endsym(/ \s+ <nofat> /)
+        { <sym: trait_verb> }
+proto token trait_verb (:$endsym is context = / \s+ <nofat> /)
         { }
 
 token category
-        { :<trait_auxiliary> }
-proto token trait_auxiliary
-            is endsym(/ \s+ <nofat> /)
+        { <sym: trait_auxiliary> }
+proto token trait_auxiliary (:$endsym is context = / \s+ <nofat> /)
         { }
 
 token category
-        { :<type_declarator> }
-proto token type_declarator
-            is endsym(/ >> <nofat> /)
+        { <sym: type_declarator> }
+proto token type_declarator (:$endsym is context = / >> <nofat> /)
         { }
 
 token category
-        { :<scope_declarator> }
-proto token scope_declarator
-            is endsym(/ >> <nofat> /)
+        { <sym: scope_declarator> }
+proto token scope_declarator (:$endsym is context = / >> <nofat> /)
         { }
 
 token category
-        { :<package_declarator> }
-proto token package_declarator
-            is endsym(/ >> <nofat> /)
+        { <sym: package_declarator> }
+proto token package_declarator (:$endsym is context = / >> <nofat> /)
         { }
 
 token category
-        { :<routine_declarator> }
-proto token routine_declarator
-            is endsym(/ >> <nofat> /)
+        { <sym: routine_declarator> }
+proto token routine_declarator (:$endsym is context = / >> <nofat> /)
         { }
 
 token category
-        { :<statement_prefix> }
-proto rule  statement_prefix
-            is endsym(/ >> <nofat> /)
+        { <sym: statement_prefix> }
+proto rule  statement_prefix (:$endsym is context = / >> <nofat> /)
         { }
 
 token category
-        { :<statement_control> }
-proto rule  statement_control
-            is endsym(/ \s <nofat> /)
+        { <sym: statement_control> }
+proto rule  statement_control (:$endsym is context = / \s <nofat> /)
         { }
 
 token category
-        { :<statement_mod_cond> }
-proto rule  statement_mod_cond
-            is endsym(/ >> <nofat> /)
+        { <sym: statement_mod_cond> }
+proto rule  statement_mod_cond (:$endsym is context = / >> <nofat> /)
         { }
 
 token category
-        { :<statement_mod_loop> }
-proto rule  statement_mod_loop
-            is endsym(/ >> <nofat> /)
+        { <sym: statement_mod_loop> }
+proto rule  statement_mod_loop (:$endsym is context = / >> <nofat> /)
         { }
 
 token category
-        { :<infix_prefix_meta_operator> }
+        { <sym: infix_prefix_meta_operator> }
 proto token infix_prefix_meta_operator
         { }
 
 token category
-        { :<infix_postfix_meta_operator> }
+        { <sym: infix_postfix_meta_operator> }
 proto token infix_postfix_meta_operator
         { }
 
 token category
-        { :<postfix_prefix_meta_operator> }
+        { <sym: postfix_prefix_meta_operator> }
 proto token postfix_prefix_meta_operator
         { }
 
 token category
-        { :<prefix_postfix_meta_operator> }
+        { <sym: prefix_postfix_meta_operator> }
 proto token prefix_postfix_meta_operator
         { }
 
 token category
-        { :<prefix_circumfix_meta_operator> }
+        { <sym: prefix_circumfix_meta_operator> }
 proto token prefix_circumfix_meta_operator
         { }
 
@@ -491,12 +487,12 @@ rule statement {
 }
 
 rule statement_control {
-    :<use>
+    <sym: use>
     <module_name_wild> <EXPR>? ;?                       {*} #=  #? use
 }
 
 rule statement_control {
-    :<if>
+    <sym: if>
     <EXPR>                           {*}                        #= if expr
     <block>                          {*}                        #= if block
     @<elsif> := [ elsif <EXPR>       {*}                        #= elsif expr
@@ -506,27 +502,27 @@ rule statement_control {
 }
 
 rule statement_control {
-    :<unless>
+    <sym: unless>
     <EXPR>                           {*}                        #= unless expr
     <block>                          {*}                        #= unless block
     {*}
 }
 
 rule statement_control {
-    :<while>
+    <sym: while>
     <EXPR>                             {*}                      #= while expr
     <block>                            {*}                      #= while block
     {*}
 }
 
 rule statement_control {
-    :<until>
+    <sym: until>
     <EXPR>                             {*}                      #= until expr
     <block>                            {*}                      #= until block
     {*}
 }
 rule statement_control {
-    :<repeat>
+    <sym: repeat>
     [
         | (while|until) <EXPR>         {*}                      #= rep wu expr
           <block>                      {*}                      #= rep wu block
@@ -536,7 +532,7 @@ rule statement_control {
     {*}
 }
 rule statement_control {
-    :<loop>
+    <sym: loop>
     $<eee> := [
         \(
             $<e1> := <EXPR> ;   {*}                             #= loop e1
@@ -548,37 +544,37 @@ rule statement_control {
     {*}
 }
 
-rule statement_control { :<for>     <block> {*} }               #= for
-rule statement_control { :<when>    <block> {*} }               #= when
-rule statement_control { :<BEGIN>   <block> {*} }               #= BEGIN
-rule statement_control { :<CHECK>   <block> {*} }               #= CHECK
-rule statement_control { :<INIT>    <block> {*} }               #= INIT
-rule statement_control { :<END>     <block> {*} }               #= END
-rule statement_control { :<START>   <block> {*} }               #= START
-rule statement_control { :<ENTER>   <block> {*} }               #= ENTER
-rule statement_control { :<LEAVE>   <block> {*} }               #= LEAVE
-rule statement_control { :<KEEP>    <block> {*} }               #= KEEP
-rule statement_control { :<UNDO>    <block> {*} }               #= UNDO
-rule statement_control { :<FIRST>   <block> {*} }               #= FIRST
-rule statement_control { :<NEXT>    <block> {*} }               #= NEXT
-rule statement_control { :<LAST>    <block> {*} }               #= LAST
-rule statement_control { :<PRE>     <block> {*} }               #= PRE
-rule statement_control { :<POST>    <block> {*} }               #= POST
-rule statement_control { :<CATCH>   <block> {*} }               #= CATCH
-rule statement_control { :<CONTROL> <block> {*} }               #= CONTROL
+rule statement_control { <sym: for>     <block> {*} }               #= for
+rule statement_control { <sym: when>    <block> {*} }               #= when
+rule statement_control { <sym: BEGIN>   <block> {*} }               #= BEGIN
+rule statement_control { <sym: CHECK>   <block> {*} }               #= CHECK
+rule statement_control { <sym: INIT>    <block> {*} }               #= INIT
+rule statement_control { <sym: END>     <block> {*} }               #= END
+rule statement_control { <sym: START>   <block> {*} }               #= START
+rule statement_control { <sym: ENTER>   <block> {*} }               #= ENTER
+rule statement_control { <sym: LEAVE>   <block> {*} }               #= LEAVE
+rule statement_control { <sym: KEEP>    <block> {*} }               #= KEEP
+rule statement_control { <sym: UNDO>    <block> {*} }               #= UNDO
+rule statement_control { <sym: FIRST>   <block> {*} }               #= FIRST
+rule statement_control { <sym: NEXT>    <block> {*} }               #= NEXT
+rule statement_control { <sym: LAST>    <block> {*} }               #= LAST
+rule statement_control { <sym: PRE>     <block> {*} }               #= PRE
+rule statement_control { <sym: POST>    <block> {*} }               #= POST
+rule statement_control { <sym: CATCH>   <block> {*} }               #= CATCH
+rule statement_control { <sym: CONTROL> <block> {*} }               #= CONTROL
 
 token statement_control { %statement_control }
 
 rule modifier_expr { <EXPR> ;? {*} }
 
-rule statement_mod_cond { :<if>     <modifier_expr> {*} };      #= if
-rule statement_mod_cond { :<unless> <modifier_expr> {*} };      #= unless
-rule statement_mod_cond { :<when>   <modifier_expr> {*} };      #= for
+rule statement_mod_cond { <sym: if>     <modifier_expr> {*} };      #= if
+rule statement_mod_cond { <sym: unless> <modifier_expr> {*} };      #= unless
+rule statement_mod_cond { <sym: when>   <modifier_expr> {*} };      #= for
 
-rule statement_mod_loop { :<for>    <modifier_expr> {*} };      #= for
-rule statement_mod_loop { :<given>  <modifier_expr> {*} };      #= for
-rule statement_mod_loop { :<while>  <modifier_expr> {*} };      #= while
-rule statement_mod_loop { :<until>  <modifier_expr> {*} };      #= until
+rule statement_mod_loop { <sym: for>    <modifier_expr> {*} };      #= for
+rule statement_mod_loop { <sym: given>  <modifier_expr> {*} };      #= for
+rule statement_mod_loop { <sym: while>  <modifier_expr> {*} };      #= while
+rule statement_mod_loop { <sym: until>  <modifier_expr> {*} };      #= until
 
 token nameroot { <'perl6'> }
 token nameroot { <'perl5'> }
@@ -750,13 +746,13 @@ token expect_infix {
     {*}
 }
 
-token dotty { :<.+> <methodop>                      {*}         #= plus
-token dotty { :<.*> <methodop>                      {*}         #= star
-token dotty { :<.?> <methodop>                      {*}         #= query
-token dotty { :<.=> <methodop>                      {*}         #= equals
-token dotty { :<.^> <methodop>                      {*}         #= caret
-token dotty { :<.:> <methodop>                      {*}         #= colon
-token dotty { :<.>  <dottyop>                       {*}         #= plain
+token dotty { <sym: .+> <methodop>                      {*}         #= plus
+token dotty { <sym: .*> <methodop>                      {*}         #= star
+token dotty { <sym: .?> <methodop>                      {*}         #= query
+token dotty { <sym: .=> <methodop>                      {*}         #= equals
+token dotty { <sym: .^> <methodop>                      {*}         #= caret
+token dotty { <sym: .:> <methodop>                      {*}         #= colon
+token dotty { <sym: .>  <dottyop>                       {*}         #= plain
 
 token dottyop {
     [
@@ -785,7 +781,9 @@ token expect_postfix {
 
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
 regex prefix_circumfix_meta_operator (:$thisop? is context ) {     #+ [ ]
-    :<[> \\?? <infix_nospace> :<]>   # prefer no meta \ if op has \
+    @<sym> := [ \[ \\?? ]   # prefer no meta \ if op has \
+    <infix_nospace>
+    @<sym> := [ \] ]
 
     [ <!{ $+thisop<assoc> eq 'non' }>
         || <panic: Can't reduce a non-associative operator> ]
@@ -797,17 +795,17 @@ regex prefix_circumfix_meta_operator (:$thisop? is context ) {     #+ [ ]
     {*}                                                         #= [ ]
 }
 
-token prefix_postfix_meta_operator { :<«>     {*} }             #= hyper
-token prefix_postfix_meta_operator { :['<<'] {*} }              #= HYPER
+token prefix_postfix_meta_operator { <sym: «>     {*} }             #= hyper
+token prefix_postfix_meta_operator { <sym('<<')> {*} }              #= HYPER
 
-token postfix_prefix_meta_operator { :<»>     {*} }             #= hyper
-token postfix_prefix_meta_operator { :['>>'] {*} }              #= HYPER
+token postfix_prefix_meta_operator { <sym: »>     {*} }             #= hyper
+token postfix_prefix_meta_operator { <sym('>>')> {*} }              #= HYPER
 
 token infix { <infix_prefix_meta_operator> }
 token infix { <infix_circumfix_meta_operator> }
 
 token infix_prefix_meta_operator {                            #+ !
-    :<!> <!before !> <infix_nospace>
+    <sym: !> <!before !> <infix_nospace>
 
     <?nonest: negation>
 
@@ -827,61 +825,61 @@ regex nonest (Str $s) {
 }
 
 token infix_circumfix_meta_operator {                         #+ X X
-    :<X> <infix_nospace> :<X>
+    <sym: X> <infix_nospace> <sym: X>
     <nonest: cross>
     {*}                                                         #= X X
 }
 
 token infix_circumfix_meta_operator {                         #+ « »
-    :<«> <infix_nospace> :<»>
+    <sym: «> <infix_nospace> <sym: »>
     <nonest: hyper>
     {*}                                                         #= « »
 }
 
 token infix_circumfix_meta_operator {                         #+ « «
-    :<«> <infix_nospace> :<«>
+    <sym: «> <infix_nospace> <sym: «>
     <nonest: hyper>
     {*}                                                         #= « «
 }
 
 token infix_circumfix_meta_operator {                         #+ » »
-    :<»> <infix_nospace> :<»>
+    <sym: »> <infix_nospace> <sym: »>
     <nonest: hyper>
     {*}                                                         #= » » 
 }
 
 token infix_circumfix_meta_operator {                         #+ » «
-    :<»> <infix_nospace> :<«>
+    <sym: »> <infix_nospace> <sym: «>
     <nonest: hyper>
     {*}                                                         #= » «
 }
 
 token infix_circumfix_meta_operator {                         #+ << >>
-    :['<<'] <infix_nospace> :['>>']
+    <sym('<<')> <infix_nospace> <sym('>>')>
     <nonest: hyper>
     {*}                                                         #= << >>
 }
 
 token infix_circumfix_meta_operator {                         #+ << <<
-    :['<<'] <infix_nospace> :['<<']
+    <sym('<<')> <infix_nospace> <sym('<<')>
     <nonest: hyper>
     {*}                                                         #= << <<
 }
 
 token infix_circumfix_meta_operator {                         #+ >> >>
-    :['>>'] <infix_nospace> :['>>']
+    <sym('>>')> <infix_nospace> <sym('>>')>
     <nonest: hyper>
     {*}                                                         #= >> >>
 }
 
 token infix_circumfix_meta_operator {                         #+ >> <<
-    :['>>'] <infix_nospace> :['<<']
+    <sym('>>')> <infix_nospace> <sym('<<')>
     <nonest: hyper>
     {*}                                                         #= >> <<
 }
 
 token infix_postfix_meta_operator {                           #+ =
-    :<=>
+    <sym: =>
     <nonest: assignment>
 
     [
@@ -903,22 +901,22 @@ token infix_postfix_meta_operator {                           #+ =
     {*}                                                         #= =
 }
 
-token postfix { :<i> {*} }                                      #= i
-token postfix { :<++> {*} }                                     #= incr
-token postfix { :<--> {*} }                                     #= decr
+token postfix { <sym: i> {*} }                                      #= i
+token postfix { <sym: ++> {*} }                                     #= incr
+token postfix { <sym: --> {*} }                                     #= decr
 
-token postcircumfix { :<(> <EXPR> :<)> {*} }                    #= ( )
+token postcircumfix { <sym: (> <EXPR> <sym: )> {*} }                    #= ( )
 
-token postcircumfix { :<[> <EXPR> :<]> {*} }                    #= [ ]
+token postcircumfix { <sym: [> <EXPR> <sym: ]> {*} }                    #= [ ]
 
-token postcircumfix { :<{> <EXPR> :<}> {*} }                    #= { }
+token postcircumfix { <sym: {> <EXPR> <sym: }> {*} }                    #= { }
 
-token postcircumfix { :['<'] <anglewords> :['>'] {*}            #= < > }
+token postcircumfix { <sym('<')> <anglewords> <sym('>')> {*}            #= < > }
 
-token postcircumfix { :['<<'] <shellwords> :['>>'] {*}          #= << >>
+token postcircumfix { <sym('<<')> <shellwords> <sym('>>')> {*}          #= << >>
 }
 
-token postcircumfix { :<«> <shellwords> :<»> {*} }              #= « »
+token postcircumfix { <sym: «> <shellwords> <sym: »> {*} }              #= « »
 
 token postop { <postfix> | <postcircumfix> }
 
@@ -937,15 +935,18 @@ token methodop {
     {*}
 }
 
-token circumfix { :<(> <EXPR> :<)> {*} }                        #= ( )
-token circumfix { :<[> <EXPR> :<]> {*} }                        #= [ ]
+token circumfix { <sym: (> <EXPR> <sym: )> {*} }                        #= ( )
+token circumfix { <sym: [> <EXPR> <sym: ]> {*} }                        #= [ ]
 
-token circumfix { :['<']  <anglewords>  :['>'] {*} }            #= < >
-token circumfix { :['<<'] <shellwords> :['>>'] {*} }            #= << >>
-token circumfix { :<«>    <shellwords> :<»>    {*} }            #= « »
+token circumfix { <sym('<')>  <anglewords>  <sym('>')> {*} }            #= < >
+token circumfix { <sym('<<')> <shellwords> <sym('>>')> {*} }            #= << >>
+token circumfix { <sym: «>    <shellwords> <sym: »>    {*} }    #= « »
 
-token circumfix ( --> Circumfix)                                #+ { }
-    { <?before :<{> <block> <?after :<}>  {*} }                 #= { }
+token circumfix ( --> Circumfix) {                              #+ { }
+    <?before \{> <block> <?after \}>
+    { @<sym>:=<{ }> }
+    {*}                                                         #= { }
+}
 
 rule scoped {
     <type>?
@@ -962,17 +963,17 @@ rule scoped {
     {*}
 }
 
-token scope_declarator { :<my>       <scoped> {*} }             #= my
-token scope_declarator { :<our>      <scoped> {*} }             #= our
-token scope_declarator { :<state>    <scoped> {*} }             #= state
-token scope_declarator { :<constant> <scoped> {*} }             #= constant
-token scope_declarator { :<has>      <scoped> {*} }             #= has
+token scope_declarator { <sym: my>       <scoped> {*} }             #= my
+token scope_declarator { <sym: our>      <scoped> {*} }             #= our
+token scope_declarator { <sym: state>    <scoped> {*} }             #= state
+token scope_declarator { <sym: constant> <scoped> {*} }             #= constant
+token scope_declarator { <sym: has>      <scoped> {*} }             #= has
 
-token package_declarator { :<class>   <package_def> {*} }       #= class
-token package_declarator { :<grammar> <package_def> {*} }       #= grammar
-token package_declarator { :<module>  <package_def> {*} }       #= module
-token package_declarator { :<role>    <package_def> {*} }       #= role
-token package_declarator { :<package> <package_def> {*} }       #= package
+token package_declarator { <sym: class>   <package_def> {*} }       #= class
+token package_declarator { <sym: grammar> <package_def> {*} }       #= grammar
+token package_declarator { <sym: module>  <package_def> {*} }       #= module
+token package_declarator { <sym: role>    <package_def> {*} }       #= role
+token package_declarator { <sym: package> <package_def> {*} }       #= package
 
 token package_def {
     <module_name>?
@@ -1001,21 +1002,21 @@ rule pluralized {
     {*}
 }
 
-token plurality_declarator { :<multi> <pluralized> {*} }        #= multi
-token plurality_declarator { :<proto> <pluralized> {*} }        #= proto
-token plurality_declarator { :<only>  <pluralized> {*} }        #= only
+token plurality_declarator { <sym: multi> <pluralized> {*} }        #= multi
+token plurality_declarator { <sym: proto> <pluralized> {*} }        #= proto
+token plurality_declarator { <sym: only>  <pluralized> {*} }        #= only
 
-token routine_declarator { :<sub>       <routine_def> {*} }     #= sub
-token routine_declarator { :<method>    <method_def> {*} }      #= method
-token routine_declarator { :<submethod> <method_def> {*} }      #= submethod
-token routine_declarator { :<macro>     <macro_def> {*} }       #= macro
+token routine_declarator { <sym: sub>       <routine_def> {*} }     #= sub
+token routine_declarator { <sym: method>    <method_def> {*} }      #= method
+token routine_declarator { <sym: submethod> <method_def> {*} }      #= submethod
+token routine_declarator { <sym: macro>     <macro_def> {*} }       #= macro
 
-token regex_declarator { :<regex>       <regex_def> {*} }       #= regex
-token regex_declarator { :<token>       <regex_def> {*} }       #= token
-token regex_declarator { :<rule>        <regex_def> {*} }       #= rule
+token regex_declarator { <sym: regex>       <regex_def> {*} }       #= regex
+token regex_declarator { <sym: token>       <regex_def> {*} }       #= token
+token regex_declarator { <sym: rule>        <regex_def> {*} }       #= rule
 
-token special_variable { :<$!>  {*} }                           #= $!
-token special_variable { :<$/>  {*} }                           #= $/
+token special_variable { <sym: \$!>  {*} }                           #= $!
+token special_variable { <sym: \$/>  {*} }                           #= $/
 
 token variable {
     [
@@ -1045,20 +1046,20 @@ token sigiltwigil {
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
 # you otherwise don't care what the longest token is.
 
-token sigil { :<$>  }
-token sigil { :<@@> }
-token sigil { :<@>  }
-token sigil { :<%>  }
-token sigil { :<&>  }
-token sigil { :<::> }
+token sigil { <sym: \$> }
+token sigil { <sym: @@> }
+token sigil { <sym: @>  }
+token sigil { <sym: %>  }
+token sigil { <sym: &>  }
+token sigil { <sym: ::> }
 
-token twigil { :<.> }
-token twigil { :<!> }
-token twigil { :<^> }
-token twigil { :<*> }
-token twigil { :<+> }
-token twigil { :<?> }
-token twigil { :<=> }
+token twigil { <sym: .> }
+token twigil { <sym: !> }
+token twigil { <sym: ^> }
+token twigil { <sym: *> }
+token twigil { <sym: +> }
+token twigil { <sym: ?> }
+token twigil { <sym: => }
 
 token name {
     [
@@ -1309,40 +1310,40 @@ method heredoc {
     }
 }
 
-token quote { <before :<'>>    <quotesnabber("q")> }
-token quote { <before :<">>    <quotesnabber("qq")> }
-token quote { <before :['«']>  <quotesnabber("qq",":ww")> }
-token quote { <before :['<<']> <quotesnabber("qq",":ww")> }
-token quote { <before :['<']>  <quotesnabber("q",":w")> }
+token quote { <before '    > { @<sym> := <' '> }   <quotesnabber("q")>        }
+token quote { <before "    > { @<sym> := <" "> }   <quotesnabber("qq")>       }
+token quote { <before «    > { @<sym> := <« »> }   <quotesnabber("qq",":ww")> }
+token quote { <before \<\< > { @<sym> := «<< >>» } <quotesnabber("qq",":ww")> }
+token quote { <before \<   > { @<sym> := «< >» }   <quotesnabber("q", ":w")>  }
 
-token quote { <before :['/']>  <quotesnabber("rx")> }
+token quote { <before <sym('/')>>  <quotesnabber("rx")> }
 
 # handle composite forms like qww
-token quote { :<qq> <regex_mod_external>
+token quote { <sym: qq> <regex_mod_external>
     <quotesnabber('qq', $<regex_mod_external>)> }
-token quote { :<q>  <regex_mod_external>
+token quote { <sym: q>  <regex_mod_external>
     <quotesnabber('q', $<regex_mod_external>)> }
 
-token regex_mod_external { :<:w> }
-token regex_mod_external { :<:ww> }
-token regex_mod_external { :<:x> }
-token regex_mod_external { :<:t> }
-token regex_mod_external { :<:n> }
-token regex_mod_external { :<:s> }
-token regex_mod_external { :<:a> }
-token regex_mod_external { :<:h> }
-token regex_mod_external { :<:f> }
-token regex_mod_external { :<:c> }
-token regex_mod_external { :<:b> }
+token regex_mod_external { <sym: :w> }
+token regex_mod_external { <sym: :ww> }
+token regex_mod_external { <sym: :x> }
+token regex_mod_external { <sym: :t> }
+token regex_mod_external { <sym: :n> }
+token regex_mod_external { <sym: :s> }
+token regex_mod_external { <sym: :a> }
+token regex_mod_external { <sym: :h> }
+token regex_mod_external { <sym: :f> }
+token regex_mod_external { <sym: :c> }
+token regex_mod_external { <sym: :b> }
 
-token quote { :<rx> <quotesnabber('rx')> }
+token quote { <sym: rx> <quotesnabber('rx')> }
 
-token quote { :<m>  <quotesnabber('m')> }
-token quote { :<mm> <quotesnabber('m', ':s')> }
-token quote { :<s>  $<pat> := <quotesnabber('s')> <finish_subst($<pat>)> }
-token quote { :<ss> $<pat> := <quotesnabber('s', ':s')> <finish_subst($<pat>)> }
+token quote { <sym: m>  <quotesnabber('m')> }
+token quote { <sym: mm> <quotesnabber('m', ':s')> }
+token quote { <sym: s>  $<pat> := <quotesnabber('s')> <finish_subst($<pat>)> }
+token quote { <sym: ss> $<pat> := <quotesnabber('s', ':s')> <finish_subst($<pat>)> }
 
-token quote { :<tr> $<pat> := <quotesnabber('tr')> <finish_trans(<$pat>)> }
+token quote { <sym: tr> $<pat> := <quotesnabber('tr')> <finish_trans(<$pat>)> }
 
 token finish_subst ($pat, :$thisop is context is rw) {
     [
@@ -1618,12 +1619,12 @@ rule regex_def {
 
 rule trait { <trait_verb> | <trait_auxiliary> }
 
-rule trait_auxiliary { :<is>   <ident><postcircumfix>?
-rule trait_auxiliary { :<will> <ident> <block> }
+rule trait_auxiliary { <sym: is>   <ident><postcircumfix>?
+rule trait_auxiliary { <sym: will> <ident> <block> }
 
-rule trait_verb { :<of>        <type> }
-rule trait_verb { :<returns>   <type> }
-rule trait_verb { :<handles>   <EXPR> }
+rule trait_verb { <sym: of>        <type> }
+rule trait_verb { <sym: returns>   <type> }
+rule trait_verb { <sym: handles>   <EXPR> }
 
 token capterm {
     \\ \( <capture> \)
@@ -1647,7 +1648,7 @@ rule signature (:$zone is context is rw = 'posreq') {
 }
 
 rule type_declarator {
-    :<subset>
+    <sym: subset>
     <name>
     [ of <type_name> ]?
     where <subset>
@@ -1728,401 +1729,400 @@ rule default_value {
     \= <EXPR(%item_assignment)>
 }
 
-rule statement_prefix { :<do>      <statement> {*} }            #= do
-rule statement_prefix { :<try>     <statement> {*} }            #= try
-rule statement_prefix { :<gather>  <statement> {*} }            #= gather
-rule statement_prefix { :<contend> <statement> {*} }            #= contend
-rule statement_prefix { :<async>   <statement> {*} }            #= async
-rule statement_prefix { :<lazy>    <statement> {*} }            #= lazy
+rule statement_prefix { <sym: do>      <statement> {*} }            #= do
+rule statement_prefix { <sym: try>     <statement> {*} }            #= try
+rule statement_prefix { <sym: gather>  <statement> {*} }            #= gather
+rule statement_prefix { <sym: contend> <statement> {*} }            #= contend
+rule statement_prefix { <sym: async>   <statement> {*} }            #= async
+rule statement_prefix { <sym: lazy>    <statement> {*} }            #= lazy
 
 ## term
 token term ( --> Term)                                          #+ *
-    { :<*> {*} }                                                #= *
+    { <sym: *> {*} }                                                #= *
 
 token circumfix ( --> Term)                                     #+ $( )
-    { <symbol <sigil>> :<(> <EXPR> :<)> {*} }       #= $( ) 
+    { <sym <sigil>> $<sym>:=<'('> <EXPR> $<sym>:=<')'> {*} }    #= $( ) 
 
 token circumfix ( --> Term)                                     #+ Type( )
-    { <symbol <typename> > :<(> <EXPR> :<)> {*} }               #= Type( ) 
+    { <sym <typename>> $<sym>:=<'('> <EXPR> $<sym>:=<')'> {*} } #= Type( ) 
 
 token circumfix ( --> Term)                                     #+ ( )
-    { :<(> <EXPR> :<)> {*} }                                    #= ( )
+    { \( <EXPR> \) { @<sym>:=<( )> } {*} }                      #= ( )
 
 token postcircumfix ( --> Term)                                 #+ ( )
-    is abstract('call')
-    { :<(> <EXPR> :<)> {*} }                                    #= ( )
+    { \( <EXPR> \) { @<sym> := <( )> } {*} }                    #= ( )
 
 ## autoincrement
 token postfix ( --> Autoincrement)                              #+ ++
-    { :<++> {*} }                                               #= ++
+    { <sym: ++> {*} }                                               #= ++
 
 token postfix ( --> Autoincrement)                              #+ --
-    { :<--> {*} }                                               #= --
+    { <sym: --> {*} }                                               #= --
 
 token prefix ( --> Autoincrement)                               #+ ++
-    { :<++> {*} }                                               #= ++
+    { <sym: ++> {*} }                                               #= ++
 
 token prefix ( --> Autoincrement)                               #+ --
-    { :<--> {*} }                                               #= --
+    { <sym: --> {*} }                                               #= --
 
 
 ## exponentiation
 token infix ( --> Exponentiate)                                 #+ **
-    { :<**> {*} }                                               #= **
+    { <sym: **> {*} }                                               #= **
 
 ## symbolic unary
 token prefix ( --> Symbolic_unary)                              #+ !
-    { :<!> {*} }                                                #= !
+    { <sym: !> {*} }                                                #= !
 
 token prefix ( --> Symbolic_unary)                              #+ +
-    { :<+> {*} }                                                #= +
+    { <sym: +> {*} }                                                #= +
 
 token prefix ( --> Symbolic_unary)                              #+ -
-    { :<-> {*} }                                                #= -
+    { <sym: -> {*} }                                                #= -
 
 token prefix ( --> Symbolic_unary)                              #+ ~
-    { :<~> {*} }                                                #= ~
+    { <sym: ~> {*} }                                                #= ~
 
 token prefix ( --> Symbolic_unary)                              #+ ?
-    { :<?> {*} }                                                #= ?
+    { <sym: ?> {*} }                                                #= ?
 
 token prefix ( --> Symbolic_unary)                              #+ =
-    { :<=> {*} }                                                #= =
+    { <sym: => {*} }                                                #= =
 
 token prefix ( --> Symbolic_unary)                              #+ *
-    { :<*> {*} }                                                #= *
+    { <sym: *> {*} }                                                #= *
 
 token prefix ( --> Symbolic_unary)                              #+ **
-    { :<**> {*} }                                               #= **
+    { <sym: **> {*} }                                               #= **
 
 token prefix ( --> Symbolic_unary)                              #+ ~^
-    { :<~^> {*} }                                               #= ~^
+    { <sym: ~^> {*} }                                               #= ~^
 
 token prefix ( --> Symbolic_unary)                              #+ +^
-    { :<+^> {*} }                                               #= +^
+    { <sym: +^> {*} }                                               #= +^
 
 token prefix ( --> Symbolic_unary)                              #+ ?^
-    { :<?^> {*} }                                               #= ?^
+    { <sym: ?^> {*} }                                               #= ?^
 
 token prefix ( --> Symbolic_unary)                              #+ ^
-    { :<^> {*} }                                                #= ^
+    { <sym: ^> {*} }                                                #= ^
 
 token prefix ( --> Symbolic_unary)                              #+ |
-    { :<|> {*} }                                                #= |
+    { <sym: |> {*} }                                                #= |
 
 
 ## multiplicative
 token infix ( --> Multiplicative)                               #+ *
-    { :<*> {*} }                                                #= *
+    { <sym: *> {*} }                                                #= *
 
 token infix ( --> Multiplicative)                               #+ /
-    { :</> {*} }                                                #= /
+    { <sym: /> {*} }                                                #= /
 
 token infix ( --> Multiplicative)                               #+ %
-    { :<%> {*} }                                                #= %
+    { <sym: %> {*} }                                                #= %
 
 token infix ( --> Multiplicative)                               #+ x
-    { :<x> {*} }                                                #= x
+    { <sym: x> {*} }                                                #= x
 
 token infix ( --> Multiplicative)                               #+ xx
-    { :<xx> {*} }                                               #= xx
+    { <sym: xx> {*} }                                               #= xx
 
 token infix ( --> Multiplicative)                               #+ +&
-    { :<+&> {*} }                                               #= +&
+    { <sym: +&> {*} }                                               #= +&
 
 token infix ( --> Multiplicative)                               #+ +<
-    { :['+<'] {*} }                                             #= +<
+    { <sym('+<')> {*} }                                             #= +<
 
 token infix ( --> Multiplicative)                               #+ +>
-    { :['+>'] {*} }                                             #= +>
+    { <sym('+>')> {*} }                                             #= +>
 
 token infix ( --> Multiplicative)                               #+ ~&
-    { :<~&> {*} }                                               #= ~&
+    { <sym: ~&> {*} }                                               #= ~&
 
 token infix ( --> Multiplicative)                               #+ ~<
-    { :['~<'] {*} }                                             #= ~<
+    { <sym('~<')> {*} }                                             #= ~<
 
 token infix ( --> Multiplicative)                               #+ ~>
-    { :['~>'] {*} }                                             #= ~>
+    { <sym('~>')> {*} }                                             #= ~>
 
 
 ## additive
 token infix ( --> Additive)                                     #+ +
-    { :<+> {*} }                                                #= +
+    { <sym: +> {*} }                                                #= +
 
 token infix ( --> Additive)                                     #+ -
-    { :<-> {*} }                                                #= -
+    { <sym: -> {*} }                                                #= -
 
 token infix ( --> Additive)                                     #+ ~
-    { :<~> {*} }                                                #= ~
+    { <sym: ~> {*} }                                                #= ~
 
 token infix ( --> Additive)                                     #+ +|
-    { :<+|> {*} }                                               #= +|
+    { <sym: +|> {*} }                                               #= +|
 
 token infix ( --> Additive)                                     #+ +^
-    { :<+^> {*} }                                               #= +^
+    { <sym: +^> {*} }                                               #= +^
 
 token infix ( --> Additive)                                     #+ ~|
-    { :<~|> {*} }                                               #= ~|
+    { <sym: ~|> {*} }                                               #= ~|
 
 token infix ( --> Additive)                                     #+ ~^
-    { :<~^> {*} }                                               #= ~^
+    { <sym: ~^> {*} }                                               #= ~^
 
 token infix ( --> Additive)                                     #+ ?|
-    { :<?|> {*} }                                               #= ?|
+    { <sym: ?|> {*} }                                               #= ?|
 
 token infix ( --> Additive)                                     #+ ?^
-    { :<?^> {*} }                                               #= ?^
+    { <sym: ?^> {*} }                                               #= ?^
 
 
 ## junctive and (all)
 token infix ( --> Junctive_and)                                 #+ &
-    { :<&> {*} }                                                #= &
+    { <sym: &> {*} }                                                #= &
 
 
 ## junctive or (any)
 token infix ( --> Junctive_or)                                  #+ |
-    { :<|> {*} }                                                #= |
+    { <sym: |> {*} }                                                #= |
 
 token infix ( --> Junctive_or)                                  #+ ^
-    { :<^> {*} }                                                #= ^
+    { <sym: ^> {*} }                                                #= ^
 
 
 ## named unary examples
 token prefix ( --> Named_unary)                                 #+ rand
-    { :<rand> {*} }                                             #= rand
+    { <sym: rand> {*} }                                             #= rand
 
 token prefix ( --> Named_unary)                                 #+ sleep
-    { :<sleep> {*} }                                            #= sleep
+    { <sym: sleep> {*} }                                            #= sleep
 
 token prefix ( --> Named_unary)                                 #+ abs
-    { :<abs> {*} }                                              #= abs
+    { <sym: abs> {*} }                                              #= abs
 
 ## nonchaining binary
 token infix ( --> Nonchaining)                                  #+ <=>
-    { :['<=>'] {*} }                                            #= <=>
+    { <sym('<=>')> {*} }                                            #= <=>
 
 token infix ( --> Nonchaining)                                  #+ cmp
-    { :<cmp> {*} }                                              #= cmp
+    { <sym: cmp> {*} }                                              #= cmp
 
 token infix ( --> Nonchaining)                                  #+ is
-    { :<is> {*} }                                               #= is
+    { <sym: is> {*} }                                               #= is
 
 token infix ( --> Nonchaining)                                  #+ but
-    { :<but> {*} }                                              #= but
+    { <sym: but> {*} }                                              #= but
 
 token infix ( --> Nonchaining)                                  #+ does
-    { :<does> {*} }                                             #= does
+    { <sym: does> {*} }                                             #= does
 
 token infix ( --> Nonchaining)                                  #+ ..
-    { :<..> {*} }                                               #= ..
+    { <sym: ..> {*} }                                               #= ..
 
 token infix ( --> Nonchaining)                                  #+ ^..
-    { :<^..> {*} }                                              #= ^..
+    { <sym: ^..> {*} }                                              #= ^..
 
 token infix ( --> Nonchaining)                                  #+ ..^
-    { :<..^> {*} }                                              #= ..^
+    { <sym: ..^> {*} }                                              #= ..^
 
 token infix ( --> Nonchaining)                                  #+ ^..^
-    { :<^..^> {*} }                                             #= ^..^
+    { <sym: ^..^> {*} }                                             #= ^..^
 
 token infix ( --> Nonchaining)                                  #+ ff
-    { :<ff> {*} }                                               #= ff
+    { <sym: ff> {*} }                                               #= ff
 
 token infix ( --> Nonchaining)                                  #+ ^ff
-    { :<^ff> {*} }                                              #= ^ff
+    { <sym: ^ff> {*} }                                              #= ^ff
 
 token infix ( --> Nonchaining)                                  #+ ff^
-    { :<ff^> {*} }                                              #= ff^
+    { <sym: ff^> {*} }                                              #= ff^
 
 token infix ( --> Nonchaining)                                  #+ ^ff^
-    { :<^ff^> {*} }                                             #= ^ff^
+    { <sym: ^ff^> {*} }                                             #= ^ff^
 
 token infix ( --> Nonchaining)                                  #+ fff
-    { :<fff> {*} }                                              #= fff
+    { <sym: fff> {*} }                                              #= fff
 
 token infix ( --> Nonchaining)                                  #+ ^fff
-    { :<^fff> {*} }                                             #= ^fff
+    { <sym: ^fff> {*} }                                             #= ^fff
 
 token infix ( --> Nonchaining)                                  #+ fff^
-    { :<fff^> {*} }                                             #= fff^
+    { <sym: fff^> {*} }                                             #= fff^
 
 token infix ( --> Nonchaining)                                  #+ ^fff^
-    { :<^fff^> {*} }                                            #= ^fff^
+    { <sym: ^fff^> {*} }                                            #= ^fff^
 
 
 ## chaining binary
 token infix ( --> Chaining)                                     #+ ==
-    { :<==> {*} }                                               #= ==
+    { <sym: ==> {*} }                                               #= ==
 
 token infix ( --> Chaining)                                     #+ !=
-    { :<!=> {*} }                                               #= !=
+    { <sym: !=> {*} }                                               #= !=
 
 token infix ( --> Chaining)                                     #+ <
-    { :['<'] {*} }                                              #= <
+    { <sym('<')> {*} }                                              #= <
 
 token infix ( --> Chaining)                                     #+ <=
-    { :['<='] {*} }                                             #= <=
+    { <sym('<=')> {*} }                                             #= <=
 
 token infix ( --> Chaining)                                     #+ >
-    { :['>'] {*} }                                              #= >
+    { <sym('>')> {*} }                                              #= >
 
 token infix ( --> Chaining)                                     #+ >=
-    { :['>='] {*} }                                             #= >=
+    { <sym('>=')> {*} }                                             #= >=
 
 token infix ( --> Chaining)                                     #+ ~~
-    { :<~~> {*} }                                               #= ~~
+    { <sym: ~~> {*} }                                               #= ~~
 
 token infix ( --> Chaining)                                     #+ !~
-    { :<!~> {*} }                                               #= !~
+    { <sym: !~> {*} }                                               #= !~
 
 token infix ( --> Chaining)                                     #+ =~
-    { :<=~> {*} }                                               #= =~
+    { <sym: =~> {*} }                                               #= =~
 
 token infix ( --> Chaining)                                     #+ eq
-    { :<eq> {*} }                                               #= eq
+    { <sym: eq> {*} }                                               #= eq
 
 token infix ( --> Chaining)                                     #+ ne
-    { :<ne> {*} }                                               #= ne
+    { <sym: ne> {*} }                                               #= ne
 
 token infix ( --> Chaining)                                     #+ lt
-    { :<lt> {*} }                                               #= lt
+    { <sym: lt> {*} }                                               #= lt
 
 token infix ( --> Chaining)                                     #+ le
-    { :<le> {*} }                                               #= le
+    { <sym: le> {*} }                                               #= le
 
 token infix ( --> Chaining)                                     #+ gt
-    { :<gt> {*} }                                               #= gt
+    { <sym: gt> {*} }                                               #= gt
 
 token infix ( --> Chaining)                                     #+ ge
-    { :<ge> {*} }                                               #= ge
+    { <sym: ge> {*} }                                               #= ge
 
 token infix ( --> Chaining)                                     #+ =:=
-    { :<=:=> {*} }                                              #= =:=
+    { <sym: =:=> {*} }                                              #= =:=
 
 token infix ( --> Chaining)                                     #+ ===
-    { :<===> {*} }                                              #= ===
+    { <sym: ===> {*} }                                              #= ===
 
 
 ## tight and
 token infix ( --> Tight_and)                                    #+ &&
-    { :<&&> {*} }                                               #= &&
+    { <sym: &&> {*} }                                               #= &&
 
 
 ## tight or
 token infix ( --> Tight_or)                                     #+ ||
-    { :<||> {*} }                                               #= ||
+    { <sym: ||> {*} }                                               #= ||
 
 token infix ( --> Tight_or)  {                                  #+ ^^
-    :<^^>
+    <sym: ^^>
     { $<assoc> := 'list' }  # override Tight_or's 'left' associativity
     {*}                                                         #= ^^
 }
 
 token infix ( --> Tight_or)                                     #+ //
-    { :<//> {*} }                                               #= //
+    { <sym: //> {*} }                                               #= //
 
 
 ## conditional
 token infix ( --> Conditional)                                  #+ ?? !!
-    { :<??> <EXPR(%conditional)> :<!!> {*} }                    #= ?? !!
+    { <sym: ??> <EXPR(%conditional)> <sym: !!> {*} }                    #= ?? !!
 
 
 ## assignment
 token infix ( --> Assignment)                                   #+ =
     is abstract('assign')
     is lvalue(1)
-    { :<=> {*} }                                                #= =
+    { <sym: => {*} }                                                #= =
 
 token infix ( --> Assignment)                                   #+ :=
     is abstract('bind')
-    { :<:=> {*} }                                               #= :=
+    { <sym: :=> {*} }                                               #= :=
 
 token infix ( --> Assignment)                                   #+ ::=
-    { :<::=> {*} }                                              #= ::=
+    { <sym: ::=> {*} }                                              #= ::=
 
 # XXX need to do something to turn subcall into method call here...
 token infix ( --> Assignment)                                   #+ .=
-    { :<.=> {*} }                                               #= .=
+    { <sym: .=> {*} }                                               #= .=
 
 # Note, other assignment ops generated by infix_postfix_meta_operator rule
 
 ## list item separator
 token infix ( --> Comma)                                        #+ ,
-    { :<,> {*} }                                                #= ,
+    { <sym: ,> {*} }                                                #= ,
 
 ## loose unary
 token prefix ( --> Loose_unary)                                 #+ true
-    { :<true> {*} }                                             #= true
+    { <sym: true> {*} }                                             #= true
 
 token prefix ( --> Loose_unary)                                 #+ not
-    { :<not> {*} }                                              #= not
+    { <sym: not> {*} }                                              #= not
 
 ## list prefix (really sub calls mostly defined in Prelude)
 token prefix ( --> List_prefix)                                 #+ print
-    { <symbol <listop> > \s <nofat>
+    { <sym <listop>> \s <nofat>
         <EXPR(%list_prefix)>              {*}                   #= print
     }
 
 # unrecognized identifiers are assumed to be post-declared subs.
 token prefix ( --> List_prefix)                                 #+ print
-    { <symbol <ident>> \s <nofat>
+    { <sym <ident>> \s <nofat>
         <EXPR(%list_prefix)>              {*}                   #= print
     }
 
 token prefix ( --> List_prefix)                                 #+ $:
-    { <symbol <sigil> \: > \s
+    { <sym <sigil> \: > \s
         <EXPR(%list_prefix)>              {*}                   #= $:
     }
 
 token prefix ( --> List_prefix)                                 #+ Type:
-    { <symbol <typename> \: > \s
+    { <sym <typename> \: > \s
         <EXPR(%list_prefix)>              {*}                   #= Type: 
     }
 
 ## loose and
 token infix ( --> Loose_and)                                    #+ and
     is abstract('if')
-    { :<and> {*} }                                              #= and
+    { <sym: and> {*} }                                              #= and
 
 ## loose or
 token infix ( --> Loose_or)                                     #+ or
     is abstract('unless')
-    { :<or> {*} }                                               #= or
+    { <sym: or> {*} }                                               #= or
 
 token infix ( --> Loose_or)                                     #+ xor
     is abstract('xor')
-    { :<xor> {*} }                                              #= xor
+    { <sym: xor> {*} }                                              #= xor
 
 token infix ( --> Loose_or)                                     #+ err
-    { :<err> {*} }                                              #= err
+    { <sym: err> {*} }                                              #= err
 
 ## expression terminator
 
 # XXX correct to eat semicolon here?
 token terminator ( --> Terminator)                              #+ ;
-    { :<;> {*} }                                                #= ;
+    { <sym: ;> {*} }                                                #= ;
 
 token terminator ( --> Terminator)                              #+ <==
-    { <?before :['<=='] > {*} }                                 #= <==
+    { <?before <sym('<==')> > {*} }                                 #= <==
 
 token terminator ( --> Terminator)                              #+ ==>
-    { <?before :['==>'] > {*} }              #'                 #= ==>
+    { <?before <sym('==>')> > {*} }              #'                 #= ==>
 
 token terminator ( --> Terminator)                              #+ -->
-    { <?before :['-->'] > {*} }              #'                 #= -->
+    { <?before <sym('-->')> > {*} }              #'                 #= -->
 
 token terminator ( --> Terminator)                              #+ )
-    { <?before :<)> > {*} }                                     #= )
+    { <?before <sym: )> > {*} }                                     #= )
 
 token terminator ( --> Terminator)                              #+ ]
-    { <?before :<]> > {*} }                                     #= ]
+    { <?before <sym: ]> > {*} }                                     #= ]
 
 token terminator ( --> Terminator)                              #+ }
-    {[ <?before :<}> > {*} ]}                                   #= }
+    {[ <?before <sym: }> > {*} ]}                                   #= }
 
 token terminator ( --> Terminator)                              #+ !!
-    { <?before :<!!> > {*} }                                    #= !!
+    { <?before <sym: !!> > {*} }                                    #= !!
 
 regex stdstopper {
     | <terminator>
@@ -2169,7 +2169,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
-                    last if $op<symbol> ne @opstack[-1]<symbol>;
+                    last if $op.sym ne @opstack[-1].sym;
                     push @list, pop(@termstack);
                     pop(@opstack);
                 }
@@ -2207,7 +2207,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
-                    reduce() if $thisop<symbol> !eqv @opstack[-1]<symbol>;
+                    reduce() if $thisop.sym !eqv @opstack[-1].sym;
                 }
                 default { panic(qq[Unknown associativity "$_" for "$infix"]) }
             }
@@ -2235,26 +2235,26 @@ rule regex ($stop is context) {
 rule regex_ordered_disjunction {
     <'||'>?
     <regex_ordered_conjunction>
-    [ :<||> <regex_ordered_conjunction> ]*
+    [ <'||'> <regex_ordered_conjunction> ]*
     {*}
 }
 
 rule regex_ordered_conjunction {
     <regex_unordered_disjunction>
-    [ :<&&> <regex_unordered_disjunction> ]*
+    [ <'&&'> <regex_unordered_disjunction> ]*
     {*}
 }
 
 rule regex_unordered_disjunction {
     <'|'>?
     <regex_unordered_conjunction>
-    [ :<|> <regex_unordered_conjunction> ]*
+    [ <'|'> <regex_unordered_conjunction> ]*
     {*}
 }
 
 rule regex_unordered_conjunction {
     <regex_sequence>
-    [ :<&> <regex_sequence> ]*
+    [ <'&'> <regex_sequence> ]*
     {*}
 }
 
@@ -2283,40 +2283,60 @@ rule regex_atom {
 }
 
 # sequence stoppers
-token regex_metachar { :['>'] :: <fail> }
-token regex_metachar { :<&&>  :: <fail> }
-token regex_metachar { :<&>   :: <fail> }
-token regex_metachar { :<||>  :: <fail> }
-token regex_metachar { :<|>   :: <fail> }
-token regex_metachar { :<]>   :: <fail> }
-token regex_metachar { :<)>   :: <fail> }
-token regex_metachar is symbol<}>
-                     { \}     :: <fail> }
+token regex_metachar { \>   :: <fail> }
+token regex_metachar { \&\& :: <fail> }
+token regex_metachar { \&   :: <fail> }
+token regex_metachar { \|\| :: <fail> }
+token regex_metachar { \|   :: <fail> }
+token regex_metachar { \]   :: <fail> }
+token regex_metachar { \)   :: <fail> }
+token regex_metachar { \\\\ :: <fail> }
+
+token regex_metachar { <quantifier> <panic: quantifier quantifies nothing> }
 
 # "normal" metachars
-token regex_metachar { <block> }
-token regex_metachar { <quantifier> <panic: quantifier quantifies nothing> }
-token regex_metachar { <regex_mod_internal> }
-token regex_metachar { :<[> <regex \]> :<]> }
-token regex_metachar { :<(> <regex \)> :<)> }
-token regex_metachar { :<\>> <regex_rightangle> }
-token regex_metachar { :['<('] }
-token regex_metachar { :[')>'] }
-token regex_metachar { :['<<'] }
-token regex_metachar { :['>>'] }
-token regex_metachar { :['<'] <regex_assertion> :['>'] }
-token regex_metachar { :<\\> <regex_backslash> }
-token regex_metachar { :<.> }
-token regex_metachar { :<^^> }
-token regex_metachar { :<^> }
-token regex_metachar { :<$$> }
 token regex_metachar {
-    | :<$> <before $
-                 | \s
-                 | \|
-                 | \)
-                 | \]
-                 | \>
+    <block>
+    { @<sym> := <{ }> }
+}
+
+token regex_metachar {
+    <regex_mod_internal>
+    { @<sym> := $<regex_mod_internal><sym> }
+}
+
+token regex_metachar {
+    \[ <regex \]> \]
+    { @<sym>:=<[ ]> }
+}
+
+token regex_metachar {
+    \( <regex \)> \)
+    { @<sym>:=<( )> }
+}
+
+token regex_metachar { <sym( '<(' )> }
+token regex_metachar { <sym( ')>' )> }
+
+token regex_metachar { <sym( '<<' )> }
+token regex_metachar { <sym( '>>' )> }
+
+token regex_metachar {
+    \< <regex_assertion> \>
+    { @<sym>:=«< >» }
+}
+token regex_metachar { <sym:\\> <regex_backslash> }
+token regex_metachar { <sym:.> }
+token regex_metachar { <sym:^^> }
+token regex_metachar { <sym:^> }
+token regex_metachar { <sym:\$\$> }
+token regex_metachar {
+    | <sym: \$> <before $
+                      | \s
+                      | \|
+                      | \)
+                      | \]
+                      | \>
            >
     | <variable>
 }
@@ -2325,44 +2345,44 @@ token codepoint {
     \[ (.*?) \]
 }
 
-token q_backslash { :<qq> <qq_bracketed> }
-token q_backslash { :<\> }
-token q_backslash { (.) }
+token q_backslash { <sym:qq> <qq_bracketed> }
+token q_backslash { <sym:\\> }
+token q_backslash { :: (.) }
 
-token qq_backslash { :<a> }
-token qq_backslash { :<b> }
-token qq_backslash { :<c> <codepoint> }
-token qq_backslash { :<e> }
-token qq_backslash { :<f> }
-token qq_backslash { :<n> }
-token qq_backslash { :<o> [ <octnum> | \[<octnum>[,<octnum>]*\] ] }
-token qq_backslash { :<r> }
-token qq_backslash { :<t> }
-token qq_backslash { :<x> [ <hexnum> | \[<hexnum>[,<hexnum>]*\] ] }
+token qq_backslash { <sym:a> }
+token qq_backslash { <sym:b> }
+token qq_backslash { <sym:c> <codepoint> }
+token qq_backslash { <sym:e> }
+token qq_backslash { <sym:f> }
+token qq_backslash { <sym:n> }
+token qq_backslash { <sym:o> [ <octnum> | \[<octnum>[,<octnum>]*\] ] }
+token qq_backslash { <sym:r> }
+token qq_backslash { <sym:t> }
+token qq_backslash { <sym:x> [ <hexnum> | \[<hexnum>[,<hexnum>]*\] ] }
 token qq_backslash { :: \W || <panic: unrecognized backslash sequence> }
 
-token regex_backslash { :i :<a> }
-token regex_backslash { :i :<b> }
-token regex_backslash { :i :<c> <codepoint> }
-token regex_backslash { :i :<d> }
-token regex_backslash { :i :<e> }
-token regex_backslash { :i :<f> }
-token regex_backslash { :i :<h> }
-token regex_backslash { :i :<n> }
-token regex_backslash { :i :<o> [ <octnum> | \[<octnum>[,<octnum>]*\] ] }
-token regex_backslash { :i :<r> }
-token regex_backslash { :i :<t> }
-token regex_backslash { :i :<v> }
-token regex_backslash { :i :<w> }
-token regex_backslash { :i :<x> [ <hexnum> | \[<hexnum>[,<hexnum>]*\] ] }
+token regex_backslash { :i <sym a> }
+token regex_backslash { :i <sym b> }
+token regex_backslash { :i <sym c> <codepoint> }
+token regex_backslash { :i <sym d> }
+token regex_backslash { :i <sym e> }
+token regex_backslash { :i <sym f> }
+token regex_backslash { :i <sym h> }
+token regex_backslash { :i <sym n> }
+token regex_backslash { :i <sym o> [ <octnum> | \[<octnum>[,<octnum>]*\] ] }
+token regex_backslash { :i <sym r> }
+token regex_backslash { :i <sym t> }
+token regex_backslash { :i <sym v> }
+token regex_backslash { :i <sym w> }
+token regex_backslash { :i <sym x> [ <hexnum> | \[<hexnum>[,<hexnum>]*\] ] }
 token regex_backslash { :: <panic: unrecognized regex backslash sequence> }
 
-token regex_assertion { :<?> <regex_assertion> }
-token regex_assertion { :<!> <regex_assertion> }
+token regex_assertion { <sym:?> <regex_assertion> }
+token regex_assertion { <sym:!> <regex_assertion> }
 
-token regex_assertion { <block> }
-token regex_assertion { <variable> }
-token regex_assertion { <ident> [               # is qq right here?
+token regex_assertion { <block> { @<sym> := <{ }> } }
+token regex_assertion { <sym <variable>> }
+token regex_assertion { <sym <ident>> [               # is qq right here?
                                 | \: <?ws>
                                     <q_unbalanced(%sublang<qq><esc>, :stop«>»))>
                                 | \( <EXPR> \)
@@ -2370,9 +2390,9 @@ token regex_assertion { <ident> [               # is qq right here?
                                 ]?
 }
 
-token regex_assertion { <before :<[>> <cclass_elem>+ }
-token regex_assertion { <before :<+>> <cclass_elem>+ }
-token regex_assertion { <before :<->> <cclass_elem>+ }
+token regex_assertion { <before \[ > <cclass_elem>+ { @<sym> := <[> } }
+token regex_assertion { <before \+ > <cclass_elem>+ { @<sym> := <+> } }
+token regex_assertion { <before \- > <cclass_elem>+ { @<sym> := <-> } }
 
 token regex_assertion { <panic: unrecognized regex assertion> }
 
@@ -2384,26 +2404,24 @@ token cclass_elem {
     ]
 }
 
-token regex_mod_internal { <colonpair> }
-token regex_mod_internal { :<:i> <regex_mod_arg>? }
-token regex_mod_internal { :<:!i> }
-token regex_mod_internal { :<:[> <EXPR> :<]> }
-token regex_mod_internal { :<:\<> <EXPR> :<\>> }
+token regex_mod_internal { <colonpair> { @<sym> := «: $<colonpair><key>» } }
+token regex_mod_internal { <sym: :i> <regex_mod_arg>? }
+token regex_mod_internal { <sym: :!i> }
 token regex_mod_internal { <panic: unrecognized regex modifier> }
 
-token regex_mod_external { <colonpair> }
-token regex_mod_external { :<:g> <regex_mod_arg> }
-token regex_mod_external { :<:global> <regex_mod_arg> }
-token regex_mod_external { :<:s> <regex_mod_arg> }
-token regex_mod_external { :<:sigspace> <regex_mod_arg> }
-token regex_mod_external { :<:nth> <regex_mod_arg> }
+token regex_mod_external { <colonpair> { @<sym> := «: $<colonpair><key>» }}
+token regex_mod_external { <sym: :g> <regex_mod_arg> }
+token regex_mod_external { <sym: :global> <regex_mod_arg> }
+token regex_mod_external { <sym: :s> <regex_mod_arg> }
+token regex_mod_external { <sym: :sigspace> <regex_mod_arg> }
+token regex_mod_external { <sym: :nth> <regex_mod_arg> }
 token regex_mod_external { \:\d+ ( x | st | nd | rd | th ) }
 token regex_mod_external { <panic: unrecognized regex modifier> }
 
-token regex_quantifier { :<**> <?ws> <block> <quantmod> }
-token regex_quantifier { :<*> <quantmod> }
-token regex_quantifier { :<+> <quantmod> }
-token regex_quantifier { :<?> <quantmod> }
+token regex_quantifier { <sym: **> <?ws> <block> <quantmod> }
+token regex_quantifier { <sym: *> <quantmod> }
+token regex_quantifier { <sym: +> <quantmod> }
+token regex_quantifier { <sym: ?> <quantmod> }
 
 token quantmod { [ \? | \! | \: | \+ ]? }
 
