@@ -2295,42 +2295,47 @@ token regex_metachar { \\\\ :: <fail> }
 token regex_metachar { <quantifier> <panic: quantifier quantifies nothing> }
 
 # "normal" metachars
-token regex_metachar {
+token regex_metachar {                                          #= { }
     <block>
     { @<sym> := <{ }> }
+    {*}                                                         #= { }
 }
 
-token regex_metachar {
+token regex_metachar {                                          #+ :mod
     <regex_mod_internal>
     { @<sym> := $<regex_mod_internal><sym> }
+    {*}                                                         #= :mod
 }
 
-token regex_metachar {
+token regex_metachar {                                          #+ [ ]
     \[ <regex \]> \]
     { @<sym>:=<[ ]> }
+    {*}                                                         #= [ ]
 }
 
-token regex_metachar {
+token regex_metachar {                                          #+ ( )
     \( <regex \)> \)
     { @<sym>:=<( )> }
+    {*}                                                         #= ( )
 }
 
-token regex_metachar { <sym( '<(' )> }
-token regex_metachar { <sym( ')>' )> }
+token regex_metachar { <sym( '<(' )> {*} }                      #= <(
+token regex_metachar { <sym( ')>' )> {*} }                      #= )>
 
-token regex_metachar { <sym( '<<' )> }
-token regex_metachar { <sym( '>>' )> }
+token regex_metachar { <sym( '<<' )> {*} }                      #= <<
+token regex_metachar { <sym( '>>' )> {*} }                      #= >>
 
-token regex_metachar {
+token regex_metachar {                                          #+ < >
     \< <regex_assertion> \>
     { @<sym>:=«< >» }
+    {*}                                                         #= < >
 }
-token regex_metachar { <sym:\\> <regex_backslash> }
-token regex_metachar { <sym:.> }
-token regex_metachar { <sym:^^> }
-token regex_metachar { <sym:^> }
-token regex_metachar { <sym:\$\$> }
-token regex_metachar {
+token regex_metachar { <sym:\\> <regex_backslash> {*} }         #= \
+token regex_metachar { <sym:.> {*} }                            #= .
+token regex_metachar { <sym:^^> {*} }                           #= ^^
+token regex_metachar { <sym:^> {*} }                            #= ^
+token regex_metachar { <sym:\$\$> {*} }                         #= $$
+token regex_metachar {                                          #+ $
     <sym: \$> <before $
                       | \s
                       | \|
@@ -2338,11 +2343,13 @@ token regex_metachar {
                       | \]
                       | \>
               >
+    {*}                                                         #= $
 }
 
-regex_metachar {
-    <sym <variable>>
-    $<binding> := [ <':='> <regex_quantified_atom> ]?
+token regex_metachar {                                          #+ var
+    <sym <variable>> <?ws>
+    $<binding> := [ <':='> <?ws> <regex_quantified_atom> ]?
+    {*}                                                         #= var
 }
 
 token codepoint {
