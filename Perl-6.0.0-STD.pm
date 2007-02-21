@@ -2331,14 +2331,18 @@ token regex_metachar { <sym:^^> }
 token regex_metachar { <sym:^> }
 token regex_metachar { <sym:\$\$> }
 token regex_metachar {
-    | <sym: \$> <before $
+    <sym: \$> <before $
                       | \s
                       | \|
                       | \)
                       | \]
                       | \>
-           >
-    | <variable>
+              >
+}
+
+regex_metachar {
+    <sym <variable>>
+    $<binding> := [ <':='> <regex_quantified_atom> ]?
 }
 
 token codepoint {
