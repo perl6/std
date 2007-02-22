@@ -1233,7 +1233,7 @@ method heredoc {
                 $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
                 for @heredoc_initial_strings {
                     next if s/^ $ws //;   # reward consistent tabbing
-                    s/^^ (\t+) /{ ' ' x ($0 * 8) }/;
+                    s/^^ (\t+) /{ ' ' x ($0 * (COMPILING::<$?TABSTOP> // 8)) }/;
                     s/^ $wsequiv // or s/^ \h+ //;
                 }
             }
