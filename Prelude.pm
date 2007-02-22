@@ -109,7 +109,7 @@ multi sub caller (Class $kind = Any, Int :$skip = 0, Str :$label)
 
     # FIXME: why doesn't this work?
     # this is here just because of an icky pugsbug.
-    #my %idx = <package file line subname subtype params> Y 0 .. 5; # ugly.
+    #my %idx = <package file line subname subtype params> Z 0 .. 5; # ugly.
     #Control::Caller.new( map { ; $_ => @caller[ %idx{$_} ] }, keys %idx );
     #( map { say( $_ => @caller[ %idx{$_} ] ) }, keys %idx );
 
