@@ -1199,7 +1199,7 @@ token rad_number {
 our @herestub_queue;
 
 token q_herestub ($lang) {
-    $<delimstr> := <quotesnabber('Q')>  # force raw semantics on /END/ marker
+    $<delimstr> := <quotesnabber()>  # force raw semantics on /END/ marker
     {
         push @herestub_queue:
             new Herestub:
@@ -1245,19 +1245,19 @@ method heredoc {
     }
 }
 
-token quote { <before '    > { @<sym> := <' '> }   <quotesnabber("q")>        }
-token quote { <before "    > { @<sym> := <" "> }   <quotesnabber("qq")>       }
-token quote { <before «    > { @<sym> := <« »> }   <quotesnabber("qq",":ww")> }
-token quote { <before \<\< > { @<sym> := «<< >>» } <quotesnabber("qq",":ww")> }
-token quote { <before \<   > { @<sym> := «< >» }   <quotesnabber("q", ":w")>  }
+token quote { <before '    > { @<sym> := <' '> }   <quotesnabber(":q")>        }
+token quote { <before "    > { @<sym> := <" "> }   <quotesnabber(":qq")>       }
+token quote { <before «    > { @<sym> := <« »> }   <quotesnabber(":qq",":ww")> }
+token quote { <before \<\< > { @<sym> := «<< >>» } <quotesnabber(":qq",":ww")> }
+token quote { <before \<   > { @<sym> := «< >» }   <quotesnabber(":q", ":w")>  }
 
-token quote { <before <sym('/')>>  <quotesnabber("rx")> }
+token quote { <before <sym('/')>>  <quotesnabber(":rx")> }
 
 # handle composite forms like qww
 token quote { <sym: qq> <regex_mod_external>
-    <quotesnabber('qq', $<regex_mod_external>)> }
+    <quotesnabber(':qq', $<regex_mod_external>)> }
 token quote { <sym: q>  <regex_mod_external>
-    <quotesnabber('q', $<regex_mod_external>)> }
+    <quotesnabber(':q', $<regex_mod_external>)> }
 
 token regex_mod_external { <sym: :w> }
 token regex_mod_external { <sym: :ww> }
@@ -1271,14 +1271,14 @@ token regex_mod_external { <sym: :f> }
 token regex_mod_external { <sym: :c> }
 token regex_mod_external { <sym: :b> }
 
-token quote { <sym: rx> <quotesnabber('rx')> }
+token quote { <sym: rx> <quotesnabber(':rx')> }
 
-token quote { <sym: m>  <quotesnabber('m')> }
-token quote { <sym: mm> <quotesnabber('m', ':s')> }
-token quote { <sym: s>  $<pat> := <quotesnabber('s')> <finish_subst($<pat>)> }
-token quote { <sym: ss> $<pat> := <quotesnabber('s', ':s')> <finish_subst($<pat>)> }
+token quote { <sym: m>  <quotesnabber(':rx')> }
+token quote { <sym: mm> <quotesnabber(':rx', ':s')> }
+token quote { <sym: s>  $<pat> := <quotesnabber(':rx')> <finish_subst($<pat>)> }
+token quote { <sym: ss> $<pat> := <quotesnabber(':rx', ':s')> <finish_subst($<pat>)> }
 
-token quote { <sym: tr> $<pat> := <quotesnabber('tr')> <finish_trans(<$pat>)> }
+token quote { <sym: tr> $<pat> := <quotesnabber(':tr')> <finish_trans(<$pat>)> }
 
 token finish_subst ($pat, :%thisop is context is rw) {
     [
@@ -1290,7 +1290,7 @@ token finish_subst ($pat, :%thisop is context is rw) {
               panic("Bracketed subst must use some form of assignment" }
           $<repl> := <EXPR(%item_assignment)>
     # unbracketed form
-    | $<repl> := <q_unbalanced(qlang('qq'), $pat<delim>[0])>
+    | $<repl> := <q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
     ]
 }
 
@@ -1299,97 +1299,43 @@ token finish_trans ($pat) {
     # bracketed form
     | <?{ $pat<delim> == 2 }> ::
           <?ws>
-          $<repl> := <q_pickdelim(qlang('tr'))>
+          $<repl> := <q_pickdelim(qlang('Q',':tr'))>
     # unbracketed form
-    | $<repl> := <q_unbalanced(qlang('tr'), $pat<delim>[0])>
+    | $<repl> := <q_unbalanced(qlang('Q',':tr'), $pat<delim>[0])>
     ]
 }
-
-class Q_tweaker is QLang {
-    has %.escset;
-    has $.tweaker;
-    has $.parser;
-    multi method Q_tweaker ('qq', True) { }
-    multi method Q_tweaker ('q', True) { }
-    multi method Q_tweaker ('b', $tf) { $.escset{'\\'} = $tf }
-    multi method Q_tweaker ('s', $tf) { $.escset{'$'} = $tf }
-    multi method Q_tweaker ('a', $tf) { $.escset{'@'} = $tf }
-    multi method Q_tweaker ('h', $tf) { $.escset{'%'} = $tf }
-    multi method Q_tweaker ('f', $tf) { $.escset{'&'} = $tf }
-    multi method Q_tweaker ('c', $tf) { $.escset{'{'} = $tf }
-    multi method Q_tweaker ('to', True) {
-        $.parser = &q_heredoc;
-        $.escadd(/^^/);
-    }
-}
-
-method q_quote_tweaker {}
-method q_quote {}
-method q_regex_tweaker {}
-method q_regex {}
-method q_trans_tweaker {}
-method q_trans {}
-
-our %quote_adverb := {
-    Q => {                          # base form of all quotes
-        tweaker => Q_tweaker,
-        parser => &q_pickdelim,
-        escset => < >,
-        escrule => &quote_escapes,
-    },
-    q  => {
-        tweaker => &q_quote_tweaker,
-        parser => &q_pickdelim,
-        escset => < \\ >,
-        escrule => &quote_escapes,
-    },
-    qq => {
-        tweaker => &q_quote_tweaker,
-        parser => &q_pickdelim,
-        escset => < \\ $ @ % & { >,
-        escrule => &quote_escapes,
-    },
-    rx => {
-        tweaker => &q_regex_tweaker,
-        parser => &q_regex,
-        escset => < >,             # let regex parser handle everything
-    },
-    m => {
-        tweaker => &q_regex_tweaker,
-        parser => &q_regex,
-        escset => < >,             # let regex parser handle everything
-    },
-    s => {
-        tweaker => &q_regex_tweaker,
-        parser => &q_regex,
-        escset => < >,             # let regex parser handle everything
-    },
-    tr => {
-        tweaker => &q_trans_tweaker,
-        parser => &q_trans,
-        escset => < >,             # let trans parser handle everything
-    },
-};
 
 # The key observation here is that the inside of quoted constructs may
 # be any of a lot of different sublanguages, and we have to parameterize
 # which parse rule to use as well as what options to feed that parse rule.
 
-class QLang {
-    has %.escset;
-    has $.tweaker;
+role QLang {
+    has %.options;
+    has $.tweaker handles 'tweak';
     has $.parser;
+    has $.escrule;
+
+    my %Q_root := {
+        Q => {                          # base form of all quotes
+            tweaker => ::Q_tweaker,
+            parser => &q_pickdelim,
+            options => < >,
+            escrule => &quote_escapes,
+        },
+    };
+
 
     method new (@pedigree) {
         if @pedigree == 1 {
-            my %start := %quote_adverbs{@pedigree[0]} err
+            my %start := %Q_root{@pedigree[0]} err
                 panic("Quote construct @pedigree[0] not recognized");
-            return %start<sublang>.bless(|%start);
+            return $.bless(|%start);
         }
         else {
             my $tail = pop @pedigree;
-            my $self = qlang(@pedigree).clone err fail $!;
-            return $self.$.tweaker($tail);
+            my $self = qlang(@pedigree).clone
+                err fail "Can't clone {@pedigree}: $!";
+            return $self.tweak($tail);
         }
     }
 }
@@ -1399,13 +1345,75 @@ sub qlang (@pedigree) {
     (state %qlang){$pedigree} //= new QLang(@pedigree);
 }
 
+class Q_tweaker does QLang {
+    has @.escapes;
+
+    method escset {
+        @.escapes ||=               # presumably resolves after adverbs
+           '\\' xx ?%options<b>,
+            '$' xx ?%options<s>,
+            '@' xx ?%options<a>,
+            '%' xx ?%options<h>,
+            '&' xx ?%options<f>,
+            '{' xx ?%options<c>;
+    }
+
+    multi method tweak (:q(True)) {
+        %.options.keys and panic("Too late for :q");
+        %.options = (:b, :!s, :!a, :!h, :!f, :!c);
+    }
+
+    multi method tweak (:qq(True)) {
+        %.options.keys and panic("Too late for :qq");
+        %.options = (:b, :s, :a, :h, :f, :c);
+    }
+
+    multi method tweak (:b($tf)) { %.options<b> = $tf }
+    multi method tweak (:s($tf)) { %.options<s> = $tf }
+    multi method tweak (:a($tf)) { %.options<a> = $tf }
+    multi method tweak (:h($tf)) { %.options<h> = $tf }
+    multi method tweak (:f($tf)) { %.options<f> = $tf }
+    multi method tweak (:c($tf)) { %.options<c> = $tf }
+
+    multi method tweak (:to(True)) {
+        $.parser = &q_heredoc;
+        %.options<to> = True;
+    }
+
+    multi method tweak (:rx(True)) {
+        $.tweaker = ::RX_tweaker,
+        $.parser = &rx_pickdelim;
+        %.options = < >;
+        $.escrule = &regex_metachar;
+    }
+
+    multi method tweak (:tr(True)) {
+        $.tweaker = ::TR_tweaker,
+        $.parser = &tr_pickdelim;
+        %.options = < >;
+        $.escrule = &trans_metachar;
+    }
+}
+
+class RX_tweaker does QLang {
+    multi method tweak (:g($global)) { %.option<g> = $global }
+    # etc.
+}
+
+method q_quote_tweaker {}
+method q_quote {}
+method q_regex_tweaker {}
+method q_regex {}
+method q_trans_tweaker {}
+method q_trans {}
+
 token quotesnabber (*@q, :$delim is context is rw = '') {
     <!before \w> <nofat> ::
     <?ws>
 
     [ (<quotepair>) { push @q, $0 } <?ws> ]*
 
-    { let $<lang> = qlang(@q) }
+    { let $<lang> = qlang('Q', @q) }
 
     # Dispatch to current lang's subparser.
     $<delimited> := <$($<lang>.parser)($<lang>)>
@@ -1521,8 +1529,19 @@ regex rx_pickdelim ($lang) {
     | <?{ ($<start>,$<stop>) = $.findbrack() }>
       $<start>
       $<r> := <regex($<stop>)>        # counts its own brackets, we hope
-    | [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
+    | [ $<stop> := [\S] || <panic: Regex delimiter must not be whitespace> ]
       $<r> := <regex($<stop>)>
+    ]
+    {*}
+}
+
+regex tr_pickdelim ($lang) {
+    [
+    | <?{ ($<start>,$<stop>) = $.findbrack() }>
+      $<start>
+      $<r> := <transliterator($<stop>)>
+    | [ $<stop> := [\S] || <panic: tr delimiter must not be whitespace> ]
+      $<r> := <transliterator($<stop>)>
     ]
     {*}
 }
