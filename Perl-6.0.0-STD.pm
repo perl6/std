@@ -121,12 +121,10 @@ role PrecOp[*%defaults] {
     method &.(Match $m) {
         $m does ::?ROLE;
         for %defaults.kv -> $k, $v { $m<$k> //= $v }
-        if $m<assoc> {
-            %+thisop<top> = $m;
-            if not $m<transparent> {
-                %+thisop<prec> = $m<prec>
-                %+thisop<assoc> = $m<assoc>
-            }
+        %+thisop<top> = $m;
+        if not $m<transparent> {
+            %+thisop<prec> = $m<prec>
+            %+thisop<assoc> = $m<assoc>
         }
         return $m;
     }
@@ -635,9 +633,14 @@ token expect_term {
     # queue up the prefixes to interleave with postfixes
     @<pre> := [
         [
-        | <prefix>                                      {*}     #= prefix
-        | <prefix_circumfix_meta_operator>              {*}     #= precircum
+        | <prefix>
+            { $<prec> := $<prefix><prec> }
+                                                        {*}     #= prefix
+        | <prefix_circumfix_meta_operator>
+            { $<prec> := $<prefix_circumfix_meta_operator><prec> }
+                                                        {*}     #= precircum
         ]
+        # XXX assuming no precedence change
         <prefix_postfix_meta_operator>*                 {*}     #= prepost
     ]*
 
@@ -783,6 +786,7 @@ token expect_postfix {
     | <dotty>
     | <postop>
     ]
+    { $<prec> = $<postop><prec> }
     {*}
 }
 
@@ -798,6 +802,7 @@ regex prefix_circumfix_meta_operator (:%thisop? is context ) {     #+ [ ]
     [ <!{ %+thisop<prec> eq %conditional<prec> }>
         || <panic: Can't reduce a conditional operator> ]
 
+    { $<prec> := %thisop<prec> }
 
     {*}                                                         #= [ ]
 }
@@ -824,7 +829,6 @@ token infix_prefix_meta_operator (--> Chaining) {                              #
 
     { %+thisop<hyper> and panic("Negation of hyper operator not allowed") }
 
-    { $<prec> = %+thisop<prec>; $<assoc> = %+thisop<assoc>; }
     {*}                                                         #= !
 }
 
@@ -909,23 +913,35 @@ token infix_postfix_meta_operator (--> Item_assignment) {       #+ =
     {*}                                                         #= =
 }
 
-token postfix { <sym: i> {*} }                                  #= i
-token postfix { <sym: ++> {*} }                                 #= incr
-token postfix { <sym: --> {*} }                                 #= decr
+token postfix (--> Autoincrement)
+    { <sym: i> {*} }              #= i
+token postfix (--> Autoincrement)
+    { <sym: ++> {*} }             #= incr
+token postfix (--> Autoincrement)
+    { <sym: --> {*} }             #= decr
 
-token postcircumfix { <sym: (> <EXPR> <sym: )> {*} }            #= ( )
+token postcircumfix (--> Methodcall)
+    { <sym: (> <EXPR> <sym: )> {*} }            #= ( )
 
-token postcircumfix { <sym: [> <EXPR> <sym: ]> {*} }            #= [ ]
+token postcircumfix (--> Methodcall)
+    { <sym: [> <EXPR> <sym: ]> {*} }            #= [ ]
 
-token postcircumfix { <sym: {> <EXPR> <sym: }> {*} }            #= { }
+token postcircumfix (--> Methodcall)
+    { <sym: {> <EXPR> <sym: }> {*} }            #= { }
 
-token postcircumfix { <sym("<")> <anglewords> $<sym>:=[\>] {*} } #= < >
+token postcircumfix (--> Methodcall)
+    { <sym("<")> <anglewords> $<sym>:=[\>] {*} } #= < >
 
-token postcircumfix { <sym('<<')> <shellwords> $<sym>:=[\>\>] {*}} #= << >>
+token postcircumfix (--> Methodcall)
+    { <sym('<<')> <shellwords> $<sym>:=[\>\>] {*}} #= << >>
 
-token postcircumfix { <sym: «> <shellwords> $<sym>:=[\»] {*} }  #= « »
+token postcircumfix (--> Methodcall)
+    { <sym: «> <shellwords> $<sym>:=[\»] {*} }  #= « »
 
-token postop { <postfix> | <postcircumfix> }
+token postop {
+    | <postfix>         { $<prec> := $<postfix><prec> }
+    | <postcircumfix>   { $<prec> := $<postcircumfix><prec> }
+}
 
 token methodop {
     [
@@ -1264,13 +1280,13 @@ token quote { <sym: ss> $<pat> := <quotesnabber('s', ':s')> <finish_subst($<pat>
 
 token quote { <sym: tr> $<pat> := <quotesnabber('tr')> <finish_trans(<$pat>)> }
 
-token finish_subst ($pat, :$thisop is context is rw) {
+token finish_subst ($pat, :%thisop is context is rw) {
     [
     # bracketed form
     | <?{ $pat<delim> == 2 }> ::
           <?ws>
           <infix>            # looking for pseudoassign here
-          { $thisop<prec> == %item_assignment<prec> or
+          { %thisop<prec> == %item_assignment<prec> or
               panic("Bracketed subst must use some form of assignment" }
           $<repl> := <EXPR(%item_assignment)>
     # unbracketed form
@@ -2150,6 +2166,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
         return;
     }
     my $prevop is context is rw;
+    my %thisop is context is rw;
     my @termstack;
     my @opstack;
 
@@ -2176,7 +2193,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
-                    last if $op.sym ne @opstack[-1].sym;
+                    last if $op<top><sym> ne @opstack[-1]<top><sym>;
                     push @list, pop(@termstack);
                     pop(@opstack);
                 }
@@ -2193,10 +2210,12 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
     }
 
     while not m:p/ <?before <$stop> > / {
-        my $thisop is context is rw;
+        %thisop = ();
         my $infix := $.expect_tight_infix($preclim);
-        $thisop //= Terminator(Match);
-        my Str $newprec = $thisop<prec>;
+        if not defined %thisop<prec> {
+            %thisop = %terminator;
+        }
+        my Str $newprec = %thisop<prec>;
 
         # Does new infix (or terminator) force any reductions?
         while @opstack[-1]<prec> lt $newprec {
@@ -2208,20 +2227,21 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
 
         # Equal precedence, so use associativity to decide.
         if @opstack[-1]<prec> eq $newprec {
-            given $thisop<assoc> {
+            given %thisop<assoc> {
                 when 'non'   { panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
-                    reduce() if $thisop.sym !eqv @opstack[-1].sym;
+                    reduce() if %thisop<top><sym> !eqv @opstack[-1]<top><sym>;
                 }
                 default { panic(qq[Unknown associativity "$_" for "$infix"]) }
             }
         }
-        push @opstack, $thisop;
+        push @opstack, %thisop;
         if m:p/ <?before <$stop>> / {
             fail("$infix.perl() is missing right term");
         }
+        %thisop = ();
         push @termstack, $.expect_term();
     }
     reduce() if @termstack > 1;
