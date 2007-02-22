@@ -90,25 +90,25 @@ token TOP { <UNIT( $+unitstop or /$/ )> {*} }
 constant %term              ::= { :prec<z=>                           };
 constant %methodcall        ::= { :prec<w=>                           };
 constant %autoincrement     ::= { :prec<v=>, :lvalue                  };
-constant %exponentiation    ::= { :prec<u=>, :assoc<right>            };
+constant %exponentiation    ::= { :prec<u=>, :assoc<right>, :assign   };
 constant %symbolic_unary    ::= { :prec<t=>                           };
-constant %multiplicative    ::= { :prec<s=>, :assoc<left>             };
-constant %additive          ::= { :prec<r=>, :assoc<left>             };
-constant %junctive_and      ::= { :prec<q=>, :assoc<list>             };
-constant %junctive_or       ::= { :prec<p=>, :assoc<list>             };
-constant %named_unary       ::= { :prec<o=>, :assoc<left>             };
+constant %multiplicative    ::= { :prec<s=>, :assoc<left>,  :assign   };
+constant %additive          ::= { :prec<r=>, :assoc<left>,  :assign   };
+constant %junctive_and      ::= { :prec<q=>, :assoc<list>,  :assign   };
+constant %junctive_or       ::= { :prec<p=>, :assoc<list>,  :assign   };
+constant %named_unary       ::= { :prec<o=>,                          };
 constant %nonchaining       ::= { :prec<n=>, :assoc<non>              };
 constant %chaining          ::= { :prec<m=>, :assoc<chain>, :bool     };
-constant %tight_and         ::= { :prec<l=>, :assoc<left>             };
-constant %tight_or          ::= { :prec<k=>, :assoc<left>             };
-constant %conditional       ::= { :prec<j=>, :assoc<right>, :!assign  };
+constant %tight_and         ::= { :prec<l=>, :assoc<left>,  :assign   };
+constant %tight_or          ::= { :prec<k=>, :assoc<left>,  :assign   };
+constant %conditional       ::= { :prec<j=>, :assoc<right>,           };
 constant %item_assignment   ::= { :prec<i=>, :assoc<right>, :lvalue   };
 constant %loose_unary       ::= { :prec<h=>,                          };
-constant %comma             ::= { :prec<g=>, :assoc<list>, :!assign   };
-constant %list_infix        ::= { :prec<f=>, :assoc<list>, :!assign   };
+constant %comma             ::= { :prec<g=>, :assoc<list>,            };
+constant %list_infix        ::= { :prec<f=>, :assoc<list>,            };
 constant %list_prefix       ::= { :prec<e=>,                          };
-constant %loose_and         ::= { :prec<d=>, :assoc<left>, :!assign   };
-constant %loose_or          ::= { :prec<c=>, :assoc<left>, :!assign   };
+constant %loose_and         ::= { :prec<d=>, :assoc<left>,            };
+constant %loose_or          ::= { :prec<c=>, :assoc<left>,            };
 constant %LOOSEST           ::= { :prec<a=!>,                         };
 constant %terminator        ::= { :prec<a=>, :assoc<list>             };
 
@@ -116,26 +116,23 @@ constant %terminator        ::= { :prec<a=>, :assoc<list>             };
 my $LOOSEST = %LOOSEST<prec>;
 
 role PrecOp[*%defaults] {
-    has Str $.prec = "zzz";
-    has Str $.assoc = "";
-    has Str @.sym;
-    has Bool $.lvalue = False;
-    has Bool $.bool = False;
-    has Bool $.assign = True;
-    has %.meta;
 
-    has Match $.match is rw handles *;  # in particular, handles .<foo> and .[0]
-
-    # This is hopefully called to coerce a match into an operator object.
+    # This is hopefully called on a match to mix in operator info by type.
     method &.(Match $m) {
-        # Note, binding $<prec> or $<assoc> in match overrides default here!
-        my $self = $.bless(|%$m, |%defaults, :match($m));
-        if $self.assoc {
-            $+thisop = $self;
+        $m does ::?ROLE;
+        for %defaults.kv -> $k, $v { $m<$k> //= $v }
+        if $m<assoc> {
+            %+thisop<top> = $m;
+            if not $m<transparent> {
+                %+thisop<prec> = $m<prec>
+                %+thisop<assoc> = $m<assoc>
+            }
         }
-        return $self;
+        return $m;
     }
 }
+
+class Hyper           does PrecOp[:transparent]             {}
 
 class Term            does PrecOp[|%term]                   {}
 class Methodcall      does PrecOp[|%methodcall]             {}
@@ -659,7 +656,7 @@ token expect_term {
         while $pre or $post {
             $oldterm = $nounphrase;
             if $pre {
-                if $post and $post.prec gt $pre.prec {
+                if $post and $post<prec> gt $pre<prec> {
                     $nounphrase = $post;
                     $post = shift @<post>;
                 }
@@ -746,7 +743,7 @@ regex infix_nospace {
 token expect_tight_infix ($loosest) {
     <!before \{ | -\> >                # presumably a statement control block
     <expect_infix>
-    ::: <?{ $+thisop.prec ge $loosest }>
+    ::: <?{ %+thisop<prec> ge $loosest }>
 }
 
 token expect_infix {
@@ -790,15 +787,15 @@ token expect_postfix {
 }
 
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
-regex prefix_circumfix_meta_operator (:$thisop? is context ) {     #+ [ ]
+regex prefix_circumfix_meta_operator (:%thisop? is context ) {     #+ [ ]
     @<sym> := [ \[ \\?? ]   # prefer no meta \ if op has \
     <infix_nospace>
     @<sym> := [ \] ]
 
-    [ <!{ $+thisop.assoc eq 'non' }>
+    [ <!{ %+thisop<assoc> eq 'non' }>
         || <panic: Can't reduce a non-associative operator> ]
 
-    [ <!{ $+thisop.prec eq %conditional<prec> }>
+    [ <!{ %+thisop<prec> eq %conditional<prec> }>
         || <panic: Can't reduce a conditional operator> ]
 
 
@@ -814,25 +811,25 @@ token postfix_prefix_meta_operator { <sym('>>')> {*} }          #= HYPER
 token infix { <infix_prefix_meta_operator> }
 token infix { <infix_circumfix_meta_operator> }
 
-token infix_prefix_meta_operator {                              #+ !
+token infix_prefix_meta_operator (--> Chaining) {                              #+ !
     <sym: !> <!before !> <infix_nospace>
 
     <?nonest: negation>
 
     [
-    || <?{ $+thisop.assoc eq 'chain'}>
-    || <?{ $+thisop.assoc and $+thisop.bool }>
+    || <?{ %+thisop<assoc> eq 'chain'}>
+    || <?{ %+thisop<assoc> and %+thisop.bool }>
     || <panic: Only boolean infix operators may be negated>
     ]
 
-    { $+thisop.meta<hyper> and panic("Negation of hyper operator not allowed") }
+    { %+thisop<hyper> and panic("Negation of hyper operator not allowed") }
 
-    { $+thisop.match = $/ } # XXX steal $+thisop
+    { $<prec> = %+thisop<prec>; $<assoc> = %+thisop<assoc>; }
     {*}                                                         #= !
 }
 
 regex nonest (Str $s) {
-    <!{ $+thisop.meta{$s}++ }> || <panic: Nested $s metaoperators not allowed>
+    <!{ %+thisop{$s}++ }> || <panic: Nested $s metaoperators not allowed>
 }
 
 token infix_circumfix_meta_operator (--> List_infix) {          #+ X X
@@ -842,59 +839,51 @@ token infix_circumfix_meta_operator (--> List_infix) {          #+ X X
     {*}                                                         #= X X
 }
 
-token infix_circumfix_meta_operator {                           #+ « »
+token infix_circumfix_meta_operator (--> Hyper) {               #+ « »
     <sym: «> <infix_nospace> <sym: »>
     <nonest: hyper>
-    { $+thisop.match = $/ } # XXX steal $+thisop
     {*}                                                         #= « »
 }
 
-token infix_circumfix_meta_operator {                           #+ « «
+token infix_circumfix_meta_operator (--> Hyper) {               #+ « «
     <sym: «> <infix_nospace> <sym: «>
     <nonest: hyper>
-    { $+thisop.match = $/ } # XXX steal $+thisop
     {*}                                                         #= « «
 }
 
-token infix_circumfix_meta_operator {                           #+ » »
+token infix_circumfix_meta_operator (--> Hyper) {               #+ » »
     <sym: »> <infix_nospace> <sym: »>
     <nonest: hyper>
-    { $+thisop.match = $/ } # XXX steal $+thisop
     {*}                                                         #= » » 
 }
 
-token infix_circumfix_meta_operator {                           #+ » «
+token infix_circumfix_meta_operator (--> Hyper) {               #+ » «
     <sym: »> <infix_nospace> <sym: «>
     <nonest: hyper>
-    { $+thisop.match = $/ } # XXX steal $+thisop
     {*}                                                         #= » «
 }
 
-token infix_circumfix_meta_operator {                           #+ << >>
+token infix_circumfix_meta_operator (--> Hyper) {               #+ << >>
     <sym('<<')> <infix_nospace> <sym('>>')>
     <nonest: hyper>
-    { $+thisop.match = $/ } # XXX steal $+thisop
     {*}                                                         #= << >>
 }
 
-token infix_circumfix_meta_operator {                           #+ << <<
+token infix_circumfix_meta_operator (--> Hyper) {               #+ << <<
     <sym('<<')> <infix_nospace> <sym('<<')>
     <nonest: hyper>
-    { $+thisop.match = $/ } # XXX steal $+thisop
     {*}                                                         #= << <<
 }
 
-token infix_circumfix_meta_operator {                           #+ >> >>
+token infix_circumfix_meta_operator (--> Hyper) {               #+ >> >>
     <sym('>>')> <infix_nospace> <sym('>>')>
     <nonest: hyper>
-    { $+thisop.match = $/ } # XXX steal $+thisop
     {*}                                                         #= >> >>
 }
 
-token infix_circumfix_meta_operator {                           #+ >> <<
+token infix_circumfix_meta_operator (--> Hyper) {               #+ >> <<
     <sym('>>')> <infix_nospace> <sym('<<')>
     <nonest: hyper>
-    { $+thisop.match = $/ } # XXX steal $+thisop
     {*}                                                         #= >> <<
 }
 
@@ -903,17 +892,17 @@ token infix_postfix_meta_operator (--> Item_assignment) {       #+ =
     <nonest: assignment>
 
     [
-    || <?{ $+thisop.prec gt %item_assignment<prec> }
+    || <?{ %+thisop<prec> gt %item_assignment<prec> }
     || <panic: Can't make assignment op of operator looser than assignment>
     ]
 
     [
-    || <!{ $+thisop.assoc eq 'chain' }
+    || <!{ %+thisop<assoc> eq 'chain' }
     || <panic: Can't make assignment op of boolean operator>
     ]
     
     [
-    || <!{ $+thisop.assoc eq 'non' }
+    || <!{ %+thisop<assoc> eq 'non' }
     || <panic: Can't make assignment op of non-associative operator>
     ]
     
@@ -1281,7 +1270,7 @@ token finish_subst ($pat, :$thisop is context is rw) {
     | <?{ $pat<delim> == 2 }> ::
           <?ws>
           <infix>            # looking for pseudoassign here
-          { $thisop.prec == %item_assignment<prec> or
+          { $thisop<prec> == %item_assignment<prec> or
               panic("Bracketed subst must use some form of assignment" }
           $<repl> := <EXPR(%item_assignment)>
     # unbracketed form
@@ -2169,19 +2158,19 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
 
     my sub reduce () {
         my $op = pop @opstack;
-        given $op.assoc {
+        given $op<assoc> {
             when 'chain' {
                 my @chain;
                 push @chain, pop(@termstack);
                 push @chain, $op;
                 while @opstack {
-                    last if $op.prec ne @opstack[-1].prec;
+                    last if $op<prec> ne @opstack[-1]<prec>;
                     push @chain, pop(@termstack);
-                    push @chain, pop(@opstack)<infix>;
+                    push @chain, pop(@opstack)<top>;
                 }
                 push @chain, pop(@termstack);
-                $op<infix><chain> = reverse @chain;
-                push @termstack, $op<infix>;
+                $op<top><chain> = reverse @chain;
+                push @termstack, $op<top>;
             }
             when 'list' {
                 my @list;
@@ -2192,13 +2181,13 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
                     pop(@opstack);
                 }
                 push @list, pop(@termstack);
-                $op<infix><list> = reverse @list;
-                push @termstack, $op<infix>;
+                $op<top><list> = reverse @list;
+                push @termstack, $op<top>;
             }
             default {
-                $op<infix><right> = pop @termstack;
-                $op<infix><left> = pop @termstack;
-                push @termstack, $op<infix>;
+                $op<top><right> = pop @termstack;
+                $op<top><left> = pop @termstack;
+                push @termstack, $op<top>;
             }
         }
     }
@@ -2207,10 +2196,10 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
         my $thisop is context is rw;
         my $infix := $.expect_tight_infix($preclim);
         $thisop //= Terminator(Match);
-        my Str $newprec = $thisop.prec;
+        my Str $newprec = $thisop<prec>;
 
         # Does new infix (or terminator) force any reductions?
-        while @opstack[-1].prec lt $newprec {
+        while @opstack[-1]<prec> lt $newprec {
             reduce();
         }
 
@@ -2218,8 +2207,8 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
         last if $newprec lt $LOOSEST;
 
         # Equal precedence, so use associativity to decide.
-        if @opstack[-1].prec eq $newprec {
-            given $thisop.assoc {
+        if @opstack[-1]<prec> eq $newprec {
+            given $thisop<assoc> {
                 when 'non'   { panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
