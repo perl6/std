@@ -123,8 +123,8 @@ role PrecOp[*%defaults] {
         for %defaults.kv -> $k, $v { $m<$k> //= $v }
         %+thisop<top> = $m;
         if not $m<transparent> {
-            %+thisop<prec> = $m<prec>
-            %+thisop<assoc> = $m<assoc>
+            %+thisop<prec> = $m<prec>;
+            %+thisop<assoc> = $m<assoc>;
         }
         return $m;
     }
@@ -823,7 +823,7 @@ token infix_prefix_meta_operator (--> Chaining) {                              #
 
     [
     || <?{ %+thisop<assoc> eq 'chain'}>
-    || <?{ %+thisop<assoc> and %+thisop.bool }>
+    || <?{ %+thisop<assoc> and %+thisop<bool> }>
     || <panic: Only boolean infix operators may be negated>
     ]
 
@@ -1305,30 +1305,6 @@ token finish_trans ($pat) {
     ]
 }
 
-# XXX maybe shouldn't be hash, but for now...
-
-our %Q_tweaker := {
-    to => {
-        tweaker => &q_quote_tweaker,
-        parser => &q_herestub,
-        escadd => < ^^ >,          #  grabs leading whitespace
-    },
-}
-
-our %regex_tweaker := {
-    g => {
-        ...
-    },
-    # XXX --more--
-};
-
-our %trans_tweaker := {
-    d => {
-        ...
-    },
-    # XXX --more--
-};
-
 class Q_tweaker is QLang {
     has %.escset;
     has $.tweaker;
@@ -1341,6 +1317,10 @@ class Q_tweaker is QLang {
     multi method Q_tweaker ('h', $tf) { $.escset{'%'} = $tf }
     multi method Q_tweaker ('f', $tf) { $.escset{'&'} = $tf }
     multi method Q_tweaker ('c', $tf) { $.escset{'{'} = $tf }
+    multi method Q_tweaker ('to', True) {
+        $.parser = &q_heredoc;
+        $.escadd(/^^/);
+    }
 }
 
 method q_quote_tweaker {}
