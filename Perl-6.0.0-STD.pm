@@ -2,7 +2,6 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
 
-    sublanguages
     add more suppositions and figure out exact error continuation semantics
     finish out all the {*} #= hookage
     think about longest-token-defeating {*} that maybe should be <?{ {*}; 1}>
@@ -268,10 +267,10 @@ token category
 proto token regex_mod_internal
         { }
 
-token category
-        { <sym: regex_mod_external> }
-proto token regex_mod_external (:$endsym is context = / <?before \(> <postcircumfix> /)
-        { }
+#token category
+#        { <sym: regex_mod_external> }
+#proto token regex_mod_external (:$endsym is context = / <?before \(> <postcircumfix> /)
+#        { }
 
 token category
         { <sym: quote_mod> }
@@ -731,9 +730,11 @@ token colonpair {
 }
 
 token quotepair {
+    \:
     [
-    | \: ! <ident>                                         {*}  #= bool
-    | \: <ident> [ <unsp>? <?before \(> <postcircumfix> ]? {*}  #= value
+    | ! <ident>                                         {*}     #= bool
+    | <ident> [ <unsp>? <?before \(> <postcircumfix> ]? {*}     #= value
+    | \d+ <[a-z]>+                                              #= nth
     ]
     {*}
 }
@@ -1251,34 +1252,37 @@ token quote { <before «    > { @<sym> := <« »> }   <quotesnabber(":qq",":ww")
 token quote { <before \<\< > { @<sym> := «<< >>» } <quotesnabber(":qq",":ww")> }
 token quote { <before \<   > { @<sym> := «< >» }   <quotesnabber(":q", ":w")>  }
 
-token quote { <before <sym('/')>>  <quotesnabber(":rx")> }
+token quote { <before <sym('/')>>  <quotesnabber(":regex")> }
 
 # handle composite forms like qww
-token quote { <sym: qq> <regex_mod_external>
-    <quotesnabber(':qq', $<regex_mod_external>)> }
-token quote { <sym: q>  <regex_mod_external>
-    <quotesnabber(':q', $<regex_mod_external>)> }
+token quote { <sym: qq> <quote_mod_external>
+    <quotesnabber(':qq', $<quote_mod_external>)> }
+token quote { <sym: q>  <quote_mod_external>
+    <quotesnabber(':q', $<quote_mod_external>)> }
 
-token regex_mod_external { <sym: :w> }
-token regex_mod_external { <sym: :ww> }
-token regex_mod_external { <sym: :x> }
-token regex_mod_external { <sym: :t> }
-token regex_mod_external { <sym: :n> }
-token regex_mod_external { <sym: :s> }
-token regex_mod_external { <sym: :a> }
-token regex_mod_external { <sym: :h> }
-token regex_mod_external { <sym: :f> }
-token regex_mod_external { <sym: :c> }
-token regex_mod_external { <sym: :b> }
+token quote_mod_external { <sym: w> }
+token quote_mod_external { <sym: ww> }
+token quote_mod_external { <sym: x> }
+token quote_mod_external { <sym: to> }
+token quote_mod_external { <sym: s> }
+token quote_mod_external { <sym: a> }
+token quote_mod_external { <sym: h> }
+token quote_mod_external { <sym: f> }
+token quote_mod_external { <sym: c> }
+token quote_mod_external { <sym: b> }
 
-token quote { <sym: rx> <quotesnabber(':rx')> }
+token quote { <sym: rx> <quotesnabber(':regex')> }
 
-token quote { <sym: m>  <quotesnabber(':rx')> }
-token quote { <sym: mm> <quotesnabber(':rx', ':s')> }
-token quote { <sym: s>  $<pat> := <quotesnabber(':rx')> <finish_subst($<pat>)> }
-token quote { <sym: ss> $<pat> := <quotesnabber(':rx', ':s')> <finish_subst($<pat>)> }
+token quote { <sym: m>  <quotesnabber(':regex')> }
+token quote { <sym: mm> <quotesnabber(':regex', ':s')> }
 
-token quote { <sym: tr> $<pat> := <quotesnabber(':tr')> <finish_trans(<$pat>)> }
+token quote { <sym: s>  $<pat> := <quotesnabber(':regex')>
+                        <finish_subst($<pat>)> }
+token quote { <sym: ss> $<pat> := <quotesnabber(':regex', ':s')>
+                        <finish_subst($<pat>)> }
+
+token quote { <sym: tr> $<pat> := <quotesnabber(':trans')>
+                        <finish_trans(<$pat>)> }
 
 token finish_subst ($pat, :%thisop is context is rw) {
     [
@@ -1310,7 +1314,7 @@ token finish_trans ($pat) {
 # which parse rule to use as well as what options to feed that parse rule.
 
 role QLang {
-    has %.options;
+    has %.option;
     has $.tweaker handles 'tweak';
     has $.parser;
     has $.escrule;
@@ -1319,7 +1323,7 @@ role QLang {
         Q => {                          # base form of all quotes
             tweaker => ::Q_tweaker,
             parser => &q_pickdelim,
-            options => < >,
+            option => < >,
             escrule => &quote_escapes,
         },
     };
@@ -1350,62 +1354,133 @@ class Q_tweaker does QLang {
 
     method escset {
         @.escapes ||=               # presumably resolves after adverbs
-           '\\' xx ?%options<b>,
-            '$' xx ?%options<s>,
-            '@' xx ?%options<a>,
-            '%' xx ?%options<h>,
-            '&' xx ?%options<f>,
-            '{' xx ?%options<c>;
+           '\\' xx ?%option<b>,
+            '$' xx ?%option<s>,
+            '@' xx ?%option<a>,
+            '%' xx ?%option<h>,
+            '&' xx ?%option<f>,
+            '{' xx ?%option<c>;
     }
 
-    multi method tweak (:q(True)) {
-        %.options.keys and panic("Too late for :q");
-        %.options = (:b, :!s, :!a, :!h, :!f, :!c);
+    multi method tweak (:q($single)) {
+        $single or panic("Can't turn :q back off");
+        %.option.keys and panic("Too late for :q");
+        %.option = (:b, :!s, :!a, :!h, :!f, :!c);
     }
 
-    multi method tweak (:qq(True)) {
-        %.options.keys and panic("Too late for :qq");
-        %.options = (:b, :s, :a, :h, :f, :c);
+    multi method tweak (:qq($double)) {
+        $double or panic("Can't turn :qq back off");
+        %.option.keys and panic("Too late for :qq");
+        %.option = (:b, :s, :a, :h, :f, :c);
     }
 
-    multi method tweak (:b($tf)) { %.options<b> = $tf }
-    multi method tweak (:s($tf)) { %.options<s> = $tf }
-    multi method tweak (:a($tf)) { %.options<a> = $tf }
-    multi method tweak (:h($tf)) { %.options<h> = $tf }
-    multi method tweak (:f($tf)) { %.options<f> = $tf }
-    multi method tweak (:c($tf)) { %.options<c> = $tf }
+    multi method tweak (:b($backslash))   { %.option<b>  = $backslash }
+    multi method tweak (:s($scalar))      { %.option<s>  = $scalar }
+    multi method tweak (:a($array))       { %.option<a>  = $array }
+    multi method tweak (:h($hash))        { %.option<h>  = $hash }
+    multi method tweak (:f($function))    { %.option<f>  = $function }
+    multi method tweak (:c($closure))     { %.option<c>  = $closure }
+
+    multi method tweak (:x($exec))        { %.option<c>  = $exec }
+    multi method tweak (:w($words))       { %.option<w>  = $words }
+    multi method tweak (:ww($quotewords)) { %.option<ww> = $quotewords }
 
     multi method tweak (:to(True)) {
         $.parser = &q_heredoc;
-        %.options<to> = True;
+        %.option<to> = True;
     }
 
-    multi method tweak (:rx(True)) {
+    multi method tweak (:$regex) {
         $.tweaker = ::RX_tweaker,
         $.parser = &rx_pickdelim;
-        %.options = < >;
+        %.option = < >;
         $.escrule = &regex_metachar;
     }
 
-    multi method tweak (:tr(True)) {
+    multi method tweak (:$trans) {
         $.tweaker = ::TR_tweaker,
         $.parser = &tr_pickdelim;
-        %.options = < >;
+        %.option = < >;
         $.escrule = &trans_metachar;
     }
+
+    multi method tweak (:$code)) {
+        $.tweaker = ::RX_tweaker,
+        $.parser = &rx_pickdelim;
+        %.option = < >;
+        $.escrule = &regex_metachar;
+    }
+
+    multi method tweak (*%x)) {
+        panic("Unrecognized quote modifier: %x.keys()");
+    }
+
 }
 
 class RX_tweaker does QLang {
-    multi method tweak (:g($global)) { %.option<g> = $global }
-    # etc.
+    multi method tweak (:g($global))      { %.option<g>  = $global }
+    multi method tweak (:i($ignorecase))  { %.option<i>  = $ignorecase }
+    multi method tweak (:c($continue))    { %.option<c>  = $continue }
+    multi method tweak (:p($pos))         { %.option<p>  = $pos }
+    multi method tweak (:ov($overlap))    { %.option<ov> = $overlap }
+    multi method tweak (:ex($exhaustive)) { %.option<ex> = $exhaustive }
+    multi method tweak (:s($sigspace))    { %.option<s>  = $sigspace }
+
+    multi method tweak (:$bytes)  { %.option<UNILEVEL> = 'bytes' }
+    multi method tweak (:$codes)  { %.option<UNILEVEL> = 'codes' }
+    multi method tweak (:$graphs) { %.option<UNILEVEL> = 'graphs' }
+    multi method tweak (:$langs)  { %.option<UNILEVEL> = 'langs' }
+
+    multi method tweak (:$rw)      { %.option<rw>      = $rw }
+    multi method tweak (:$ratchet) { %.option<ratchet> = $ratchet }
+    multi method tweak (:$keepall) { %.option<keepall> = $keepall }
+    multi method tweak (:$panic)   { %.option<panic>   = $panic }
+
+    # XXX probably wrong
+    multi method tweak (:P5($Perl5)) {
+        %.option<P5> = $Perl5;
+        $.tweaker = ::P5RX_tweaker,
+        $.parser = &p5rx_pickdelim;
+        $.escrule = &p5regex_metachar;
+    }
+
+    multi method tweak (:$nth)            { %.option<nth> = $nth }
+    multi method tweak (:x($times))       { %.option<x> = $times }
+
+    # Ain't we special!
+    multi method tweak (*%x) {
+        my $na = %x.keys();
+        my ($n,$a) = $na ~~ /^(\d+)(<[a-z]>+)$/
+            or panic("Unrecognized regex modifier: $na");
+        if $a eq 'x' {
+            %.option{x} = $n;
+        }
+        elsif $a eq 'st' | 'nd' | 'rd' | 'th' {
+            %.option{nth} = $n;
+        }
+    }
 }
 
-method q_quote_tweaker {}
-method q_quote {}
-method q_regex_tweaker {}
-method q_regex {}
-method q_trans_tweaker {}
-method q_trans {}
+class P5RX_tweaker does QLang {
+    multi method tweak (:$g) { %.option<g>  = $g }
+    multi method tweak (:$i) { %.option<i>  = $i }
+    multi method tweak (:$s) { %.option<s>  = $s }
+    multi method tweak (:$m) { %.option<m>  = $m }
+
+    multi method tweak (*%x) {
+        panic("Unrecognized Perl 5 regex modifier: %x.keys()");
+    }
+}
+
+class TR_tweaker does QLang {
+    multi method tweak (:$c) { %.option<c>  = $c }
+    multi method tweak (:$d) { %.option<d>  = $d }
+    multi method tweak (:$s) { %.option<s>  = $s }
+
+    multi method tweak (*%x) {
+        panic("Unrecognized transliteration modifier: %x.keys()");
+    }
+}
 
 token quotesnabber (*@q, :$delim is context is rw = '') {
     <!before \w> <nofat> ::
@@ -2440,19 +2515,21 @@ token cclass_elem {
     ]
 }
 
+token regex_mod_arg { \( <EXPR> \) }
+
 token regex_mod_internal { <quotepair> { @<sym> := «: $<quotepair><key>» } }
 token regex_mod_internal { <sym: :i> <regex_mod_arg>? }
 token regex_mod_internal { <sym: :!i> }
 token regex_mod_internal { <panic: unrecognized regex modifier> }
 
-token regex_mod_external { <quotepair> { @<sym> := «: $<quotepair><key>» }}
-token regex_mod_external { <sym: :g> <regex_mod_arg> }
-token regex_mod_external { <sym: :global> <regex_mod_arg> }
-token regex_mod_external { <sym: :s> <regex_mod_arg> }
-token regex_mod_external { <sym: :sigspace> <regex_mod_arg> }
-token regex_mod_external { <sym: :nth> <regex_mod_arg> }
-token regex_mod_external { \:\d+ ( x | st | nd | rd | th ) }
-token regex_mod_external { <panic: unrecognized regex modifier> }
+# token regex_mod_external { <quotepair> { @<sym> := «: $<quotepair><key>» }}
+# token regex_mod_external { <sym: :g> <regex_mod_arg> }
+# token regex_mod_external { <sym: :global> <regex_mod_arg> }
+# token regex_mod_external { <sym: :s> <regex_mod_arg> }
+# token regex_mod_external { <sym: :sigspace> <regex_mod_arg> }
+# token regex_mod_external { <sym: :nth> <regex_mod_arg> }
+# token regex_mod_external { \:\d+ ( x | st | nd | rd | th ) }
+# token regex_mod_external { <panic: unrecognized regex modifier> }
 
 token regex_quantifier { <sym: **> <?ws> <block> <quantmod> }
 token regex_quantifier { <sym: *> <quantmod> }
