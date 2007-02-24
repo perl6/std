@@ -112,7 +112,7 @@ constant %LOOSEST           ::= { :prec<a=!>,                         };
 constant %terminator        ::= { :prec<a=>, :assoc<list>             };
 
 # "epsilon" tighter than terminator
-my $LOOSEST = %LOOSEST<prec>;
+constant $LOOSEST = %LOOSEST<prec>;
 
 role PrecOp[*%defaults] {
 
@@ -174,193 +174,193 @@ multi method sym ($pat) {
 }
 
 token category
-        { <sym: category> }
+    { <sym: category> }
 proto token category
-        { }
+    { }
 
 token category
-        { <sym: sigil> }
+    { <sym: sigil> }
 proto token sigil
-        { }
+    { }
 
 token category
-        { <sym: twigil> }
+    { <sym: twigil> }
 proto token twigil
-        { }
+    { }
 
 token category
-        { <sym: special_variable> }
+    { <sym: special_variable> }
 proto token special_variable
-        { }
+    { }
 
 token category
-        { <sym: nameroot> }
+    { <sym: nameroot> }
 proto token nameroot
-        { }
+    { }
 
 token category
-        { <sym: version> }
+    { <sym: version> }
 proto token version
-        { }
+    { }
 
 token category
-        { <sym: term> }
+    { <sym: term> }
 proto token term
-        { }
+    { }
 
 token category
-        { <sym: quote> }
+    { <sym: quote> }
 proto token quote
-        { }
+    { }
 
 token category
-        { <sym: prefix> }
+    { <sym: prefix> }
 proto token prefix
-            is defequiv(%symbolic_unary)        # XXX not sure how used yet
-        { }
+        is defequiv(%symbolic_unary)        # XXX not sure how used yet
+    { }
 
 token category
-        { <sym: infix> }
+    { <sym: infix> }
 proto token infix
-            is defequiv(%additive)
-        { }
+        is defequiv(%additive)
+    { }
 
 token category
 
-        { <sym: postfix> }
+    { <sym: postfix> }
 proto token postfix
-            is defequiv(%autoincrement)
-        { }
+        is defequiv(%autoincrement)
+    { }
 
 token category
-        { <sym: dotty> }
+    { <sym: dotty> }
 proto token dotty (:$endsym is context = / <?unsp>? /)
-        { }
+    { }
 
 token category
-        { <sym: circumfix> }
+    { <sym: circumfix> }
 proto token circumfix
-        { }
+    { }
 
 token category
-        { <sym: postcircumfix> }
+    { <sym: postcircumfix> }
 proto token postcircumfix
-        { }
+    { }
 
 token category
-        { <sym: regex_metachar> }
+    { <sym: regex_metachar> }
 proto token regex_metachar
-        { }
+    { }
 
 token category
-        { <sym: regex_backslash> }
+    { <sym: regex_backslash> }
 proto token regex_backslash
-        { }
+    { }
 
 token category
-        { <sym: regex_assertion> }
+    { <sym: regex_assertion> }
 proto token regex_assertion
-        { }
+    { }
 
 token category
-        { <sym: regex_mod_internal> }
+    { <sym: regex_mod_internal> }
 proto token regex_mod_internal
-        { }
+    { }
 
 #token category
-#        { <sym: regex_mod_external> }
+#    { <sym: regex_mod_external> }
 #proto token regex_mod_external (:$endsym is context = / <?before \(> <postcircumfix> /)
-#        { }
+#    { }
 
 token category
-        { <sym: quote_mod> }
+    { <sym: quote_mod> }
 proto token quote_mod
-        { }
+    { }
 
 token category
-        { <sym: q_backslash> }
+    { <sym: q_backslash> }
 proto token q_backslash
-        { }
+    { }
 
 token category
-        { <sym: qq_backslash> }
+    { <sym: qq_backslash> }
 proto token qq_backslash
-        { }
+    { }
 
 token category
-        { <sym: trait_verb> }
+    { <sym: trait_verb> }
 proto token trait_verb (:$endsym is context = / \s+ <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: trait_auxiliary> }
+    { <sym: trait_auxiliary> }
 proto token trait_auxiliary (:$endsym is context = / \s+ <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: type_declarator> }
+    { <sym: type_declarator> }
 proto token type_declarator (:$endsym is context = / >> <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: scope_declarator> }
+    { <sym: scope_declarator> }
 proto token scope_declarator (:$endsym is context = / >> <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: package_declarator> }
+    { <sym: package_declarator> }
 proto token package_declarator (:$endsym is context = / >> <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: routine_declarator> }
+    { <sym: routine_declarator> }
 proto token routine_declarator (:$endsym is context = / >> <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: statement_prefix> }
+    { <sym: statement_prefix> }
 proto rule  statement_prefix (:$endsym is context = / >> <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: statement_control> }
+    { <sym: statement_control> }
 proto rule  statement_control (:$endsym is context = / \s <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: statement_mod_cond> }
+    { <sym: statement_mod_cond> }
 proto rule  statement_mod_cond (:$endsym is context = / >> <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: statement_mod_loop> }
+    { <sym: statement_mod_loop> }
 proto rule  statement_mod_loop (:$endsym is context = / >> <nofat> /)
-        { }
+    { }
 
 token category
-        { <sym: infix_prefix_meta_operator> }
+    { <sym: infix_prefix_meta_operator> }
 proto token infix_prefix_meta_operator
-        { }
+    { }
 
 token category
-        { <sym: infix_postfix_meta_operator> }
+    { <sym: infix_postfix_meta_operator> }
 proto token infix_postfix_meta_operator
-        { }
+    { }
 
 token category
-        { <sym: postfix_prefix_meta_operator> }
+    { <sym: postfix_prefix_meta_operator> }
 proto token postfix_prefix_meta_operator
-        { }
+    { }
 
 token category
-        { <sym: prefix_postfix_meta_operator> }
+    { <sym: prefix_postfix_meta_operator> }
 proto token prefix_postfix_meta_operator
-        { }
+    { }
 
 token category
-        { <sym: prefix_circumfix_meta_operator> }
+    { <sym: prefix_circumfix_meta_operator> }
 proto token prefix_circumfix_meta_operator
-        { }
+    { }
 
 # Lexical routines
 
