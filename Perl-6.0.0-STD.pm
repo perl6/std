@@ -118,7 +118,7 @@ role PrecOp[*%defaults] {
 
     # This is hopefully called on a match to mix in operator info by type.
     method &.(Match $m) {
-        $m does ?CLASS;
+        $m does ::?CLASS;
         for %defaults.kv -> $k, $v { $m{$k} //= $v };
         %+thisop<top> = $m;
         if not $m<transparent> {
@@ -1324,9 +1324,9 @@ role QLang {
     my %Q_root := {
         Q => {                          # base form of all quotes
             tweaker => ::Q_tweaker,
-            parser => &q_pickdelim,
+            parser => &Perl::q_pickdelim,
             option => < >,
-            escrule => &quote_escapes,
+            escrule => &Perl::quote_escapes,
         },
     };
 
@@ -2550,5 +2550,8 @@ token quantmod { [ \? | \! | \: | \+ ]? }
 # further compilation is suppressed by the <commit><fail>.
 
 rule panic (Str $s) { <commit> <fail($s)> }
+
+$_ = '42';
+say Perl.new.EXPR().perl;
 
 ## vim: expandtab sw=4

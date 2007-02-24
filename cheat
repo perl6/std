@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+
+# This program attempts to translate some of the constructs pugs does not
+# yet handle into constructs that it does handle.
+
+use strict;
+use warnings;
+
+my %text;
+my $curclass;
+
+while (<>) {
+    if (/role (\w+)\[\*?(.*?)\]/) {
+	my $name = $1;
+	my $param = $2;
+	$text{$name} = "#line " . ($. + 2) . "\n";
+	while (<>) {
+	    s/\Q$param\E/\$?PARAM/g;
+	    last if /^\}/;
+	    s/method &\./method coerce/;
+	    $text{$name} .= $_;
+	}
+	$_ = "#line " . ($. + 1) . "\n";
+	next;
+    }
+
+    if (/^class (\w+)/) {
+	$curclass = $1;
+    }
+
+    s/does (\w+)\[(.*?)\] *\{/"{\n" . instantiate($1,$2) . "#line $.\n"/e and next;
+
+    s/\( *-->/\( *%_ -->/;
+    s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
+    s/\(:(\w+)\((.*?)\)\)/(:$2)/;
+}
+continue {
+    print $_;
+}
+
+sub instantiate {
+    my ($name, $arg) = @_;
+    my $text = $text{$name} or die "Can't find role $name\n";
+    $text =~ s/\$\?PARAM/%($arg)/g;
+    $text =~ s/::?CLASS/$curclass/g;
+    $text;
+}
