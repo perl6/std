@@ -118,7 +118,7 @@ role PrecOp[*%defaults] {
 
     # This is hopefully called on a match to mix in operator info by type.
     method &.(Match $m) {
-        $m does ::?CLASS;
+        $m but= ::?CLASS;
         for %defaults.kv -> $k, $v { $m{$k} //= $v };
         %+thisop<top> = $m;
         if not $m<transparent> {

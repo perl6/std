@@ -42,6 +42,6 @@ sub instantiate {
     my ($name, $arg) = @_;
     my $text = $text{$name} or die "Can't find role $name\n";
     $text =~ s/\$\?PARAM/%($arg)/g;
-    $text =~ s/::?CLASS/$curclass/g;
+    $text =~ s/::\?CLASS/$curclass/g;
     $text;
 }
