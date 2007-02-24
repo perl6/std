@@ -118,8 +118,8 @@ role PrecOp[*%defaults] {
 
     # This is hopefully called on a match to mix in operator info by type.
     method &.(Match $m) {
-        $m does ::?ROLE;
-        for %defaults.kv -> $k, $v { $m<$k> //= $v }
+        $m does ?CLASS;
+        for %defaults.kv -> $k, $v { $m{$k} //= $v };
         %+thisop<top> = $m;
         if not $m<transparent> {
             %+thisop<prec> = $m<prec>;
@@ -419,7 +419,7 @@ method UNIT ($unitstop is context = /$/) {
 
 # Note: we only check for the unitstopper.  We don't check for ^ because
 # we might be embedded in something else.
-rule comp_unit (:$begin_compunit is context = 1)
+rule comp_unit (:$begin_compunit is context = 1) {
     <package_declarator>?
     { $begin_compunit = 0 }
     <statement_list>
@@ -1234,7 +1234,9 @@ method heredoc {
                 $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
                 for @heredoc_initial_strings {
                     next if s/^ $ws //;   # reward consistent tabbing
-                    s/^^ (\t+) /{ ' ' x ($0 * (COMPILING::<$?TABSTOP> // 8)) }/;
+                    s/^^ (\t+) /{
+                        ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
+                    }/;
                     s/^ $wsequiv // or s/^ \h+ //;
                 }
             }
@@ -1385,9 +1387,9 @@ class Q_tweaker does QLang {
     multi method tweak (:w($words))       { %.option<w>  = $words }
     multi method tweak (:ww($quotewords)) { %.option<ww> = $quotewords }
 
-    multi method tweak (:to(True)) {
+    multi method tweak (:to($heredoc)) {
         $.parser = &q_heredoc;
-        %.option<to> = True;
+        %.option<to> = $heredoc;
     }
 
     multi method tweak (:$regex) {
@@ -1404,14 +1406,14 @@ class Q_tweaker does QLang {
         $.escrule = &trans_metachar;
     }
 
-    multi method tweak (:$code)) {
+    multi method tweak (:$code) {
         $.tweaker = ::RX_tweaker,
         $.parser = &rx_pickdelim;
         %.option = < >;
         $.escrule = &regex_metachar;
     }
 
-    multi method tweak (*%x)) {
+    multi method tweak (*%x) {
         panic("Unrecognized quote modifier: %x.keys()");
     }
 
