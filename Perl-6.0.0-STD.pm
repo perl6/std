@@ -173,10 +173,11 @@ multi method sym ($pat) {
     m:p/ <$pat> <$+endsym> /;
 }
 
-token category
-    { <sym: category> }
 proto token category
     { }
+
+token category
+    { <sym: category> }
 
 token category
     { <sym: sigil> }
@@ -505,6 +506,8 @@ rule statement_control {
 
 rule statement_control {
     <sym: while>
+    [ <?before \( [[my]? \$\w+ =]? \< \$?\w+ \> \)>
+        <panic: This appears to be Perl 5 code> ]?
     <EXPR>                             {*}                      #= while expr
     <block>                            {*}                      #= while block
     {*}
@@ -1708,7 +1711,7 @@ rule regex_def {
 
 rule trait { <trait_verb> | <trait_auxiliary> }
 
-rule trait_auxiliary { <sym: is>   <ident><postcircumfix>?
+rule trait_auxiliary { <sym: is>   <ident><postcircumfix>? }
 rule trait_auxiliary { <sym: will> <ident> <block> }
 
 rule trait_verb { <sym: of>        <type> }
@@ -2217,8 +2220,9 @@ token terminator ( --> Terminator)                              #+ )
 token terminator ( --> Terminator)                              #+ ]
     { <?before <sym: ]> > {*} }                                 #= ]
 
+# XXX can't parse } in token yet
 token terminator ( --> Terminator)                              #+ }
-    {[ <?before <sym: }> > {*} ]}                               #= }
+    { { fail() if ord($_) == 125 } }                 #= }
 
 token terminator ( --> Terminator)                              #+ !!
     { <?before <sym: !!> > {*} }                                #= !!

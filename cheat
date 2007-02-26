@@ -8,6 +8,8 @@ use warnings;
 
 my %text;
 my $curclass;
+my %proto;
+my %protosig;
 
 while (<>) {
     if (/role (\w+)\[\*?(.*?)\]/) {
@@ -33,6 +35,17 @@ while (<>) {
     s/\( *-->/\( *%_ -->/;
     s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
     s/\(:(\w+)\((.*?)\)\)/(:$2)/;
+
+    if (/^proto\s+(regex|rule|token)\s+(\w+)\s*(?:\(([^)]*)\))?/) {
+	my $name = $2;
+	$proto{$name}++;
+	$protosig{$name} = $3;
+    }
+    elsif (/^(?:multi\s+)?(regex|rule|token)\s+(\w+)\s*(?:\(([^)]*)\))?/) {
+	if ($proto{$2}) {
+	    
+	}
+    }
 }
 continue {
     print $_;
