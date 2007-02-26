@@ -1676,6 +1676,7 @@ token quote_escapes {
 # Note, backtracks!  So expect_postfix mustn't commit to anything permanent.
 regex extrapost ($inquote is context = 1) {
     <expect_postfix>*
+    # XXX Shouldn't need a backslash on anything but the right square here
     <?after <[ \] \} \> \) ]> > 
     {*}
 }
@@ -1694,7 +1695,8 @@ rule routine_def {
 rule method_def {
     [
     | <ident>  <multisig>?
-    | <?before <sigil> \. <[ [ { ( ]> > <sigiltwigil> <postcircumfix>
+    # XXX should not need backslash on this curly
+    | <?before <sigil> \. <[ [ \{ ( ]> > <sigiltwigil> <postcircumfix>
     ]
     <trait>*
     <block>
@@ -2220,9 +2222,9 @@ token terminator ( --> Terminator)                              #+ )
 token terminator ( --> Terminator)                              #+ ]
     { <?before <sym: ]> > {*} }                                 #= ]
 
-# XXX can't parse } in token yet
+# XXX curly shouldn't need this backslash
 token terminator ( --> Terminator)                              #+ }
-    { { fail() if ord($_) == 125 } }                 #= }
+    { <?before <sym: <[ \} ]> > > {*} }                                 #= }
 
 token terminator ( --> Terminator)                              #+ !!
     { <?before <sym: !!> > {*} }                                #= !!
