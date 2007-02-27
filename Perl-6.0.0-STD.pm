@@ -542,37 +542,37 @@ rule statement_control {
     {*}
 }
 
-rule statement_control { <sym: for>     <block> {*} }               #= for
-rule statement_control { <sym: when>    <block> {*} }               #= when
-rule statement_control { <sym: BEGIN>   <block> {*} }               #= BEGIN
-rule statement_control { <sym: CHECK>   <block> {*} }               #= CHECK
-rule statement_control { <sym: INIT>    <block> {*} }               #= INIT
-rule statement_control { <sym: END>     <block> {*} }               #= END
-rule statement_control { <sym: START>   <block> {*} }               #= START
-rule statement_control { <sym: ENTER>   <block> {*} }               #= ENTER
-rule statement_control { <sym: LEAVE>   <block> {*} }               #= LEAVE
-rule statement_control { <sym: KEEP>    <block> {*} }               #= KEEP
-rule statement_control { <sym: UNDO>    <block> {*} }               #= UNDO
-rule statement_control { <sym: FIRST>   <block> {*} }               #= FIRST
-rule statement_control { <sym: NEXT>    <block> {*} }               #= NEXT
-rule statement_control { <sym: LAST>    <block> {*} }               #= LAST
-rule statement_control { <sym: PRE>     <block> {*} }               #= PRE
-rule statement_control { <sym: POST>    <block> {*} }               #= POST
-rule statement_control { <sym: CATCH>   <block> {*} }               #= CATCH
-rule statement_control { <sym: CONTROL> <block> {*} }               #= CONTROL
+rule statement_control { <sym: for>     <block> {*} }           #= for
+rule statement_control { <sym: when>    <block> {*} }           #= when
+rule statement_control { <sym: BEGIN>   <block> {*} }           #= BEGIN
+rule statement_control { <sym: CHECK>   <block> {*} }           #= CHECK
+rule statement_control { <sym: INIT>    <block> {*} }           #= INIT
+rule statement_control { <sym: END>     <block> {*} }           #= END
+rule statement_control { <sym: START>   <block> {*} }           #= START
+rule statement_control { <sym: ENTER>   <block> {*} }           #= ENTER
+rule statement_control { <sym: LEAVE>   <block> {*} }           #= LEAVE
+rule statement_control { <sym: KEEP>    <block> {*} }           #= KEEP
+rule statement_control { <sym: UNDO>    <block> {*} }           #= UNDO
+rule statement_control { <sym: FIRST>   <block> {*} }           #= FIRST
+rule statement_control { <sym: NEXT>    <block> {*} }           #= NEXT
+rule statement_control { <sym: LAST>    <block> {*} }           #= LAST
+rule statement_control { <sym: PRE>     <block> {*} }           #= PRE
+rule statement_control { <sym: POST>    <block> {*} }           #= POST
+rule statement_control { <sym: CATCH>   <block> {*} }           #= CATCH
+rule statement_control { <sym: CONTROL> <block> {*} }           #= CONTROL
 
 token statement_control { %statement_control }
 
 rule modifier_expr { <EXPR> ;? {*} }
 
-rule statement_mod_cond { <sym: if>     <modifier_expr> {*} };      #= if
-rule statement_mod_cond { <sym: unless> <modifier_expr> {*} };      #= unless
-rule statement_mod_cond { <sym: when>   <modifier_expr> {*} };      #= for
+rule statement_mod_cond { <sym: if>     <modifier_expr> {*} };  #= if
+rule statement_mod_cond { <sym: unless> <modifier_expr> {*} };  #= unless
+rule statement_mod_cond { <sym: when>   <modifier_expr> {*} };  #= for
 
-rule statement_mod_loop { <sym: for>    <modifier_expr> {*} };      #= for
-rule statement_mod_loop { <sym: given>  <modifier_expr> {*} };      #= for
-rule statement_mod_loop { <sym: while>  <modifier_expr> {*} };      #= while
-rule statement_mod_loop { <sym: until>  <modifier_expr> {*} };      #= until
+rule statement_mod_loop { <sym: for>    <modifier_expr> {*} };  #= for
+rule statement_mod_loop { <sym: given>  <modifier_expr> {*} };  #= for
+rule statement_mod_loop { <sym: while>  <modifier_expr> {*} };  #= while
+rule statement_mod_loop { <sym: until>  <modifier_expr> {*} };  #= until
 
 token nameroot { <'perl6'> }
 token nameroot { <'perl5'> }
@@ -795,7 +795,7 @@ token expect_postfix {
 }
 
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
-regex prefix_circumfix_meta_operator (:%thisop? is context ) {     #+ [ ]
+regex prefix_circumfix_meta_operator (:%thisop? is context ) {  #+ [ ]
     @<sym> := [ \[ \\?? ]   # prefer no meta \ if op has \
     <infix_nospace>
     @<sym> := [ \] ]
@@ -820,7 +820,7 @@ token postfix_prefix_meta_operator { <sym('>>')> {*} }          #= HYPER
 token infix { <infix_prefix_meta_operator> }
 token infix { <infix_circumfix_meta_operator> }
 
-token infix_prefix_meta_operator (--> Chaining) {                              #+ !
+token infix_prefix_meta_operator (--> Chaining) {               #+ !
     <sym: !> <!before !> <infix_nospace>
 
     <?nonest: negation>
@@ -975,10 +975,20 @@ token circumfix ( --> Circumfix) {                              #+ { }
     {*}                                                         #= { }
 }
 
+token variable_decl {
+    <variable>
+    [   # Is it a shaped array or hash declaration?
+        <?{ $<variable><sigiltwigil><sigil> eq '@' | '%' }>
+        <?ws>
+        <?before <[ \< \( \[ \{ ]> >
+        <postcircumfix>
+    ]?
+}
+
 rule scoped {
     <type>?
     [
-    | <variable>
+    | <variable_decl>
     | \( <signature> \)
     | <package_declarator>
     | <plurality_declarator>
@@ -1019,7 +1029,7 @@ token package_def {
 
 rule pluralized {
     [
-    | <variable>
+    | <variable_decl>
     | \( <signature> \)
     | <package_declarator>
     | <routine_declarator>
@@ -1758,21 +1768,43 @@ rule type_constraint {
     {*}
 }
 
+token param_var {
+    <sigiltwigil>
+    [
+        # Is it a longname declaration?
+    || <?{ $<sigiltwigil><sigil> eq '&' }> <?before <?ident> > ::
+        $<ident> := <sublongname>
+
+    ||  # Is it a shaped array or hash declaration?
+        <?{ $<sigiltwigil><sigil> eq '@' | '%' }>
+        <ident>?
+        <?ws>
+        <?before <[ \< \( \[ \{ ]> >
+        <postcircumfix>
+
+        # ordinary parameter name
+    || <ident>
+
+        # bare sigil?
+    || <null>
+    ]
+}
+
 token parameter {
 
     <type_constraint>*
     [
-    | $<slurp> := [ $<quantchar>:=[ \* ] <sigiltwigil> <ident>?  ]
+    | $<slurp> := [ $<quantchar>:=[ \* ] <param_var>  ]
         { let $<quant> := '*' }
     |   [ $<named> :=
             [ $<quantchar>:=[ \: ]
                 [
-                | $<name>:=<?ident> \( <sigiltwigil> <ident>?  \)
-                |             <sigiltwigil> $<name>:=<ident>
+                | $<name>:=<?ident> \( <param_var>  \)
+                | <param_var> { $<name> := $<param_var><ident> }
                 ]
                 { let $<quant> := '*' }
             ]
-        | <sigiltwigil>  <ident>?
+        | <param_var>
             { let $<quant> := '!'; }
         ]
         [ $<quantchar> := <[ ? ! ]> { let $<quant> := $<quantchar> } ]?
@@ -2224,7 +2256,7 @@ token terminator ( --> Terminator)                              #+ ]
 
 # XXX curly shouldn't need this backslash
 token terminator ( --> Terminator)                              #+ }
-    { <?before <sym: <[ \} ]> > > {*} }                                 #= }
+    { <?before <sym: <[ \} ]> > > {*} }                         #= }
 
 token terminator ( --> Terminator)                              #+ !!
     { <?before <sym: !!> > {*} }                                #= !!
