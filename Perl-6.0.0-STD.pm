@@ -3,7 +3,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 =begin things todo
 
     add more suppositions and figure out exact error continuation semantics
-    finish out all the {*} #= hookage
+    finish out all the {*}                       #= hookage
     think about longest-token-defeating {*} that maybe should be <?{ {*}; 1}>
     add parsing this file to sanity tests :)
 
@@ -13,7 +13,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 # action statements or used as-is without any preprocessing.  The {*}
 # notation is a no-op action block, but can be identified uniquely via a
 # combination of the preceding token or rule name plus any additional text
-# following a #= comment.  We put this into a comment rather than using
+# following a                       #= comment.  We put this into a comment rather than using
 # a macro so that bootstrap compilers don't have to worry about macros
 # yet, and to keep the main grammar relatively uncluttered by action
 # statements.  Note that the preprocessor can certainly generate accesses
@@ -29,7 +29,7 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 # for disambiguating the name.  However, if no $<sym> is set, the original
 # symbol will be used by default.
 
-# Note that rules with only one action need no #= comment, so the identifier
+# Note that rules with only one action need no                  #= comment, so the identifier
 # of the following stub is just "TOP".
 
 token TOP { <UNIT( $+unitstop or /$/ )> {*} }
@@ -420,7 +420,7 @@ rule statement {
 
 rule statement_control:use {
     <sym>
-    <module_name_wild> <EXPR>? ;?                       {*} #=  #? use
+    <module_name_wild> <EXPR>? ;?                       {*}     #= use
 }
 
 rule statement_control:if {
@@ -496,14 +496,14 @@ rule statement_control:CONTROL { <sym> <block> {*} }            #= CONTROL
 
 rule modifier_expr { <EXPR> ;? {*} }
 
-rule statement_mod_cond:if { <sym>     <modifier_expr> {*} };  #= if
-rule statement_mod_cond:unless { <sym> <modifier_expr> {*} };  #= unless
-rule statement_mod_cond:when { <sym>   <modifier_expr> {*} };  #= for
+rule statement_mod_cond:if     { <sym> <modifier_expr> {*} };   #= if
+rule statement_mod_cond:unless { <sym> <modifier_expr> {*} };   #= unless
+rule statement_mod_cond:when   { <sym> <modifier_expr> {*} };   #= for
 
-rule statement_mod_loop:for { <sym>    <modifier_expr> {*} };  #= for
-rule statement_mod_loop:given { <sym>  <modifier_expr> {*} };  #= for
-rule statement_mod_loop:while { <sym>  <modifier_expr> {*} };  #= while
-rule statement_mod_loop:until { <sym>  <modifier_expr> {*} };  #= until
+rule statement_mod_loop:for   { <sym>  <modifier_expr> {*} };   #= for
+rule statement_mod_loop:given { <sym>  <modifier_expr> {*} };   #= for
+rule statement_mod_loop:while { <sym>  <modifier_expr> {*} };   #= while
+rule statement_mod_loop:until { <sym>  <modifier_expr> {*} };   #= until
 
 token nameroot { <'perl6'> }
 token nameroot { <'perl5'> }
@@ -690,13 +690,13 @@ token expect_infix {
     {*}
 }
 
-token dotty:sym<.+> { <sym> <methodop>                    {*} }     #= plus
-token dotty:sym<.*> { <sym> <methodop>                    {*} }     #= star
-token dotty:sym<.?> { <sym> <methodop>                    {*} }     #= query
-token dotty:sym<.=> { <sym> <methodop>                    {*} }     #= equals
-token dotty:sym<.^> { <sym> <methodop>                    {*} }     #= caret
-token dotty:sym<.:> { <sym> <methodop>                    {*} }     #= colon
-token dotty:sym<.>  { <sym> <dottyop>                     {*} }     #= plain
+token dotty:sym<.+> { <sym> <methodop>                    {*} } #= plus
+token dotty:sym<.*> { <sym> <methodop>                    {*} } #= star
+token dotty:sym<.?> { <sym> <methodop>                    {*} } #= query
+token dotty:sym<.=> { <sym> <methodop>                    {*} } #= equals
+token dotty:sym<.^> { <sym> <methodop>                    {*} } #= caret
+token dotty:sym<.:> { <sym> <methodop>                    {*} } #= colon
+token dotty:sym<.>  { <sym> <dottyop>                     {*} } #= plain
 
 token dottyop {
     [
@@ -743,11 +743,11 @@ regex prefix_circumfix_meta_operator:reduce (:%thisop? is context ) {
     {*}                                                         #= [ ]
 }
 
-token prefix_postfix_meta_operator:sym<«>    { <sym> {*} }         #= hyper
-token prefix_postfix_meta_operator:sym« << » { <sym> {*} }          #= HYPER
+token prefix_postfix_meta_operator:sym< « >    { <sym> {*} }    #= hyper
+token prefix_postfix_meta_operator:sym« << » { <sym> {*} }      #= HYPER
 
-token postfix_prefix_meta_operator:sym<»>    { <sym> {*} }         #= hyper
-token postfix_prefix_meta_operator:sym« >> » { <sym> {*} }          #= HYPER
+token postfix_prefix_meta_operator:sym< » >    { <sym> {*} }    #= hyper
+token postfix_prefix_meta_operator:sym« >> » { <sym> {*} }      #= HYPER
 
 token infix:pre { <infix_prefix_meta_operator> }
 token infix:circ { <infix_circumfix_meta_operator> }
@@ -849,27 +849,27 @@ token infix_postfix_meta_operator:sym<=> (--> Item_assignment) {
     {*}                                                         #= =
 }
 
-token postfix:i       (--> Autoincrement) { <sym> {*} }              #= i
-token postfix:sym<++> (--> Autoincrement) { <sym> {*} }             #= incr
-token postfix:sym<--> (--> Autoincrement) { <sym> {*} }             #= decr
+token postfix:i       (--> Autoincrement) { <sym> {*} }         #= i
+token postfix:sym<++> (--> Autoincrement) { <sym> {*} }         #= incr
+token postfix:sym<--> (--> Autoincrement) { <sym> {*} }         #= decr
 
 token postcircumfix:sym<( )> (--> Methodcall)
-    { \( <EXPR> \) {*} }            #= ( )
+    { \( <EXPR> \) {*} }                                        #= ( )
 
 token postcircumfix (--> Methodcall)
-    { \[ <EXPR> \] {*} }            #= [ ]
+    { \[ <EXPR> \] {*} }                                        #= [ ]
 
 token postcircumfix (--> Methodcall)
-    { \{ <EXPR> \} {*} }            #= { }
+    { \{ <EXPR> \} {*} }                                        #= { }
 
 token postcircumfix:sym«< >» (--> Methodcall)
-    { \< <anglewords> \> {*} } #= < >
+    { \< <anglewords> \> {*} }                                  #= < >
 
 token postcircumfix:sym«<< >>» (--> Methodcall)
-    { \<\< <shellwords> \>\> {*}} #= << >>
+    { \<\< <shellwords> \>\> {*}}                               #= << >>
 
 token postcircumfix:sym<« »> (--> Methodcall)
-    { \« <shellwords> \» {*} }  #= « »
+    { \« <shellwords> \» {*} }                                  #= « »
 
 token postop {
     | <postfix>         { $<prec> := $<postfix><prec> }
@@ -929,17 +929,17 @@ rule scoped {
     {*}
 }
 
-token scope_declarator:my { <sym>       <scoped> {*} }         #= my
-token scope_declarator:our { <sym>      <scoped> {*} }         #= our
-token scope_declarator:state { <sym>    <scoped> {*} }         #= state
-token scope_declarator:constant { <sym> <scoped> {*} }         #= constant
-token scope_declarator:has { <sym>      <scoped> {*} }         #= has
+token scope_declarator:my { <sym>       <scoped> {*} }          #= my
+token scope_declarator:our { <sym>      <scoped> {*} }          #= our
+token scope_declarator:state { <sym>    <scoped> {*} }          #= state
+token scope_declarator:constant { <sym> <scoped> {*} }          #= constant
+token scope_declarator:has { <sym>      <scoped> {*} }          #= has
 
-token package_declarator:class { <sym>   <package_def> {*} }   #= class
-token package_declarator:grammar { <sym> <package_def> {*} }   #= grammar
-token package_declarator:module { <sym>  <package_def> {*} }   #= module
-token package_declarator:role { <sym>    <package_def> {*} }   #= role
-token package_declarator:package { <sym> <package_def> {*} }   #= package
+token package_declarator:class { <sym>   <package_def> {*} }    #= class
+token package_declarator:grammar { <sym> <package_def> {*} }    #= grammar
+token package_declarator:module { <sym>  <package_def> {*} }    #= module
+token package_declarator:role { <sym>    <package_def> {*} }    #= role
+token package_declarator:package { <sym> <package_def> {*} }    #= package
 
 token package_def {
     <module_name>?
@@ -968,21 +968,21 @@ rule pluralized {
     {*}
 }
 
-token plurality_declarator:multi { <sym> <pluralized> {*} }    #= multi
-token plurality_declarator:proto { <sym> <pluralized> {*} }    #= proto
-token plurality_declarator:only { <sym>  <pluralized> {*} }    #= only
+token plurality_declarator:multi { <sym> <pluralized> {*} }     #= multi
+token plurality_declarator:proto { <sym> <pluralized> {*} }     #= proto
+token plurality_declarator:only { <sym>  <pluralized> {*} }     #= only
 
-token routine_declarator:sub { <sym>       <routine_def> {*} } #= sub
-token routine_declarator:method { <sym>    <method_def> {*} }  #= method
-token routine_declarator:submethod { <sym> <method_def> {*} }  #= submethod
-token routine_declarator:macro { <sym>     <macro_def> {*} }   #= macro
+token routine_declarator:sub { <sym>       <routine_def> {*} }  #= sub
+token routine_declarator:method { <sym>    <method_def> {*} }   #= method
+token routine_declarator:submethod { <sym> <method_def> {*} }   #= submethod
+token routine_declarator:macro { <sym>     <macro_def> {*} }    #= macro
 
-token regex_declarator:regex { <sym>       <regex_def> {*} }   #= regex
-token regex_declarator:token { <sym>       <regex_def> {*} }   #= token
-token regex_declarator:rule { <sym>        <regex_def> {*} }   #= rule
+token regex_declarator:regex { <sym>       <regex_def> {*} }    #= regex
+token regex_declarator:token { <sym>       <regex_def> {*} }    #= token
+token regex_declarator:rule { <sym>        <regex_def> {*} }    #= rule
 
-token special_variable:sym<$!> { <sym>  {*} }                      #= $!
-token special_variable:sym<$/> { <sym>  {*} }                      #= $/
+token special_variable:sym<$!> { <sym>  {*} }                   #= $!
+token special_variable:sym<$/> { <sym>  {*} }                   #= $/
 
 token variable {
     [
@@ -1784,16 +1784,16 @@ rule default_value {
     \= <EXPR(%item_assignment)>
 }
 
-rule statement_prefix:do { <sym>      <statement> {*} }        #= do
-rule statement_prefix:try { <sym>     <statement> {*} }        #= try
-rule statement_prefix:gather { <sym>  <statement> {*} }        #= gather
-rule statement_prefix:contend { <sym> <statement> {*} }        #= contend
-rule statement_prefix:async { <sym>   <statement> {*} }        #= async
-rule statement_prefix:lazy { <sym>    <statement> {*} }        #= lazy
+rule statement_prefix:do { <sym>      <statement> {*} }         #= do
+rule statement_prefix:try { <sym>     <statement> {*} }         #= try
+rule statement_prefix:gather { <sym>  <statement> {*} }         #= gather
+rule statement_prefix:contend { <sym> <statement> {*} }         #= contend
+rule statement_prefix:async { <sym>   <statement> {*} }         #= async
+rule statement_prefix:lazy { <sym>    <statement> {*} }         #= lazy
 
 ## term
 token term:sym<*> ( --> Term)
-    { <sym> {*} }                                            #= *
+    { <sym> {*} }                                               #= *
 
 token circumfix:sigil ( --> Term)
     { <sym <sigil>> $<sym>:=<'('> <EXPR> $<sym>:=<')'> {*} }    #= $( ) 
@@ -1802,271 +1802,271 @@ token circumfix:type ( --> Term)
     { <sym <typename>> $<sym>:=<'('> <EXPR> $<sym>:=<')'> {*} } #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
-    { \( <EXPR> \)  {*} }                      #= ( )
+    { \( <EXPR> \)  {*} }                                       #= ( )
 
 token postcircumfix:sym<( )> ( --> Term)
-    { \( <EXPR> \)  {*} }                    #= ( )
+    { \( <EXPR> \)  {*} }                                       #= ( )
 
 ## autoincrement
 token postfix:sym<++> ( --> Autoincrement)
-    { <sym> {*} }                                           #= ++
+    { <sym> {*} }                                               #= ++
 
 token postfix:sym<--> ( --> Autoincrement)
-    { <sym> {*} }                                           #= --
+    { <sym> {*} }                                               #= --
 
 token prefix:sym<++> ( --> Autoincrement)
-    { <sym> {*} }                                           #= ++
+    { <sym> {*} }                                               #= ++
 
 token prefix:sym<--> ( --> Autoincrement)
-    { <sym> {*} }                                           #= --
+    { <sym> {*} }                                               #= --
 
 
 ## exponentiation
 token infix:sym<**> ( --> Exponentiate)
-    { <sym> {*} }                                           #= **
+    { <sym> {*} }                                               #= **
 
 ## symbolic unary
 token prefix:sym<!> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= !
+    { <sym> {*} }                                               #= !
 
 token prefix:sym<+> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= +
+    { <sym> {*} }                                               #= +
 
 token prefix:sym<-> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= -
+    { <sym> {*} }                                               #= -
 
 token prefix:sym<~> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= ~
+    { <sym> {*} }                                               #= ~
 
 token prefix:sym<?> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= ?
+    { <sym> {*} }                                               #= ?
 
 token prefix:sym<=> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= =
+    { <sym> {*} }                                               #= =
 
 token prefix:sym<*> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= *
+    { <sym> {*} }                                               #= *
 
 token prefix:sym<**> ( --> Symbolic_unary)
-    { <sym> {*} }                                           #= **
+    { <sym> {*} }                                               #= **
 
 token prefix:sym<~^> ( --> Symbolic_unary)
-    { <sym> {*} }                                           #= ~^
+    { <sym> {*} }                                               #= ~^
 
 token prefix:sym<+^> ( --> Symbolic_unary)
-    { <sym> {*} }                                           #= +^
+    { <sym> {*} }                                               #= +^
 
 token prefix:sym<?^> ( --> Symbolic_unary)
-    { <sym> {*} }                                           #= ?^
+    { <sym> {*} }                                               #= ?^
 
 token prefix:sym<^> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= ^
+    { <sym> {*} }                                               #= ^
 
 token prefix:sym<|> ( --> Symbolic_unary)
-    { <sym> {*} }                                            #= |
+    { <sym> {*} }                                               #= |
 
 
 ## multiplicative
 token infix:sym<*> ( --> Multiplicative)
-    { <sym> {*} }                                            #= *
+    { <sym> {*} }                                               #= *
 
 token infix:sym</> ( --> Multiplicative)
-    { <sym> {*} }                                            #= /
+    { <sym> {*} }                                               #= /
 
 token infix:sym<%> ( --> Multiplicative)
-    { <sym> {*} }                                            #= %
+    { <sym> {*} }                                               #= %
 
 token infix:sym<x> ( --> Multiplicative)
-    { <sym> {*} }                                            #= x
+    { <sym> {*} }                                               #= x
 
 token infix:sym<xx> ( --> Multiplicative)
-    { <sym> {*} }                                           #= xx
+    { <sym> {*} }                                               #= xx
 
 token infix:sym<+&> ( --> Multiplicative)
-    { <sym> {*} }                                           #= +&
+    { <sym> {*} }                                               #= +&
 
 token infix:sym« +< » ( --> Multiplicative)
-    { <sym> {*} }                                         #= +<
+    { <sym> {*} }                                               #= +<
 
 token infix:sym« +> » ( --> Multiplicative)
-    { <sym> {*} }                                         #= +>
+    { <sym> {*} }                                               #= +>
 
 token infix:sym<~&> ( --> Multiplicative)
-    { <sym> {*} }                                           #= ~&
+    { <sym> {*} }                                               #= ~&
 
 token infix:sym« ~< » ( --> Multiplicative)
-    { <sym> {*} }                                         #= ~<
+    { <sym> {*} }                                               #= ~<
 
 token infix:sym« ~> » ( --> Multiplicative)
-    { <sym> {*} }                                         #= ~>
+    { <sym> {*} }                                               #= ~>
 
 
 ## additive
 token infix:sym<+> ( --> Additive)
-    { <sym> {*} }                                            #= +
+    { <sym> {*} }                                               #= +
 
 token infix:sym<-> ( --> Additive)
-    { <sym> {*} }                                            #= -
+    { <sym> {*} }                                               #= -
 
 token infix:sym<~> ( --> Additive)
-    { <sym> {*} }                                            #= ~
+    { <sym> {*} }                                               #= ~
 
 token infix:sym<+|> ( --> Additive)
-    { <sym> {*} }                                           #= +|
+    { <sym> {*} }                                               #= +|
 
 token infix:sym<+^> ( --> Additive)
-    { <sym> {*} }                                           #= +^
+    { <sym> {*} }                                               #= +^
 
 token infix:sym<~|> ( --> Additive)
-    { <sym> {*} }                                           #= ~|
+    { <sym> {*} }                                               #= ~|
 
 token infix:sym<~^> ( --> Additive)
-    { <sym> {*} }                                           #= ~^
+    { <sym> {*} }                                               #= ~^
 
 token infix:sym<?|> ( --> Additive)
-    { <sym> {*} }                                           #= ?|
+    { <sym> {*} }                                               #= ?|
 
 token infix:sym<?^> ( --> Additive)
-    { <sym> {*} }                                           #= ?^
+    { <sym> {*} }                                               #= ?^
 
 
 ## junctive and (all)
 token infix:sym<&> ( --> Junctive_and)
-    { <sym> {*} }                                            #= &
+    { <sym> {*} }                                               #= &
 
 
 ## junctive or (any)
 token infix:sym<|> ( --> Junctive_or)
-    { <sym> {*} }                                            #= |
+    { <sym> {*} }                                               #= |
 
 token infix:sym<^> ( --> Junctive_or)
-    { <sym> {*} }                                            #= ^
+    { <sym> {*} }                                               #= ^
 
 
 ## named unary examples
 token prefix:rand ( --> Named_unary)
-    { <sym> {*} }                                         #= rand
+    { <sym> {*} }                                               #= rand
 
 token prefix:sleep ( --> Named_unary)
-    { <sym> {*} }                                        #= sleep
+    { <sym> {*} }                                               #= sleep
 
 token prefix:abs ( --> Named_unary)
-    { <sym> {*} }                                          #= abs
+    { <sym> {*} }                                               #= abs
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
-    { <sym> {*} }                                        #= <=>
+    { <sym> {*} }                                               #= <=>
 
 token infix:cmp ( --> Nonchaining)
-    { <sym> {*} }                                          #= cmp
+    { <sym> {*} }                                               #= cmp
 
 token infix:is ( --> Nonchaining)
-    { <sym> {*} }                                           #= is
+    { <sym> {*} }                                               #= is
 
 token infix:but ( --> Nonchaining)
-    { <sym> {*} }                                          #= but
+    { <sym> {*} }                                               #= but
 
 token infix:does ( --> Nonchaining)
-    { <sym> {*} }                                         #= does
+    { <sym> {*} }                                               #= does
 
 token infix:sym<..> ( --> Nonchaining)
-    { <sym> {*} }                                           #= ..
+    { <sym> {*} }                                               #= ..
 
 token infix:sym<^..> ( --> Nonchaining)
-    { <sym> {*} }                                          #= ^..
+    { <sym> {*} }                                               #= ^..
 
 token infix:sym<..^> ( --> Nonchaining)
-    { <sym> {*} }                                          #= ..^
+    { <sym> {*} }                                               #= ..^
 
 token infix:sym<^..^> ( --> Nonchaining)
-    { <sym> {*} }                                         #= ^..^
+    { <sym> {*} }                                               #= ^..^
 
 token infix:sym<ff> ( --> Nonchaining)
-    { <sym> {*} }                                           #= ff
+    { <sym> {*} }                                               #= ff
 
 token infix:sym<^ff> ( --> Nonchaining)
-    { <sym> {*} }                                          #= ^ff
+    { <sym> {*} }                                               #= ^ff
 
 token infix:sym<ff^> ( --> Nonchaining)
-    { <sym> {*} }                                          #= ff^
+    { <sym> {*} }                                               #= ff^
 
 token infix:sym<^ff^> ( --> Nonchaining)
-    { <sym> {*} }                                         #= ^ff^
+    { <sym> {*} }                                               #= ^ff^
 
 token infix:sym<fff> ( --> Nonchaining)
-    { <sym> {*} }                                          #= fff
+    { <sym> {*} }                                               #= fff
 
 token infix:sym<^fff> ( --> Nonchaining)
-    { <sym> {*} }                                         #= ^fff
+    { <sym> {*} }                                               #= ^fff
 
 token infix:sym<fff^> ( --> Nonchaining)
-    { <sym> {*} }                                         #= fff^
+    { <sym> {*} }                                               #= fff^
 
 token infix:sym<^fff^> ( --> Nonchaining)
-    { <sym> {*} }                                        #= ^fff^
+    { <sym> {*} }                                               #= ^fff^
 
 
 ## chaining binary
 token infix:sym<==> ( --> Chaining)
-    { <sym> {*} }                                           #= ==
+    { <sym> {*} }                                               #= ==
 
 token infix:sym<!=> ( --> Chaining)
-    { <sym> {*} }                                           #= !=
+    { <sym> {*} }                                               #= !=
 
 token infix:sym« < » ( --> Chaining)
-    { <sym> {*} }                                          #= <
+    { <sym> {*} }                                               #= <
 
 token infix:sym« <= » ( --> Chaining)
-    { <sym> {*} }                                         #= <=
+    { <sym> {*} }                                               #= <=
 
 token infix:sym« > » ( --> Chaining)
-    { <sym> {*} }                                          #= >
+    { <sym> {*} }                                               #= >
 
 token infix:sym« >= » ( --> Chaining)
-    { <sym> {*} }                                         #= >=
+    { <sym> {*} }                                               #= >=
 
 token infix:sym<~~> ( --> Chaining)
-    { <sym> {*} }                                           #= ~~
+    { <sym> {*} }                                               #= ~~
 
 token infix:sym<!~> ( --> Chaining)
-    { <sym> {*} }                                           #= !~
+    { <sym> {*} }                                               #= !~
 
 token infix:sym<=~> ( --> Chaining)
-    { <sym> {*} }                                           #= =~
+    { <sym> {*} }                                               #= =~
 
 token infix:sym<eq> ( --> Chaining)
-    { <sym> {*} }                                           #= eq
+    { <sym> {*} }                                               #= eq
 
 token infix:sym<ne> ( --> Chaining)
-    { <sym> {*} }                                           #= ne
+    { <sym> {*} }                                               #= ne
 
 token infix:sym<lt> ( --> Chaining)
-    { <sym> {*} }                                           #= lt
+    { <sym> {*} }                                               #= lt
 
 token infix:sym<le> ( --> Chaining)
-    { <sym> {*} }                                           #= le
+    { <sym> {*} }                                               #= le
 
 token infix:sym<gt> ( --> Chaining)
-    { <sym> {*} }                                           #= gt
+    { <sym> {*} }                                               #= gt
 
 token infix:sym<ge> ( --> Chaining)
-    { <sym> {*} }                                           #= ge
+    { <sym> {*} }                                               #= ge
 
 token infix:sym<=:=> ( --> Chaining)
-    { <sym> {*} }                                          #= =:=
+    { <sym> {*} }                                               #= =:=
 
 token infix:sym<===> ( --> Chaining)
-    { <sym> {*} }                                          #= ===
+    { <sym> {*} }                                               #= ===
 
 
 ## tight and
 token infix:sym<&&> ( --> Tight_and)
-    { <sym> {*} }                                           #= &&
+    { <sym> {*} }                                               #= &&
 
 
 ## tight or
 token infix:sym<||> ( --> Tight_or)
-    { <sym> {*} }                                           #= ||
+    { <sym> {*} }                                               #= ||
 
 token infix:sym<^^> ( --> Tight_or)  {
     <sym>
@@ -2075,40 +2075,40 @@ token infix:sym<^^> ( --> Tight_or)  {
 }
 
 token infix:sym<//> ( --> Tight_or)
-    { <sym> {*} }                                           #= //
+    { <sym> {*} }                                               #= //
 
 
 ## conditional
 token infix:sym<?? !!> ( --> Conditional)
-    { \?\? <EXPR(%conditional)> \!\! {*} }            #= ?? !!
+    { \?\? <EXPR(%conditional)> \!\! {*} }                      #= ?? !!
 
 
 ## assignment
 token infix:sym<=> ( --> Assignment)
-    { <sym> {*} }                                            #= =
+    { <sym> {*} }                                               #= =
 
 token infix:sym<:=> ( --> Assignment)
-    { <sym> {*} }                                           #= :=
+    { <sym> {*} }                                               #= :=
 
 token infix:sym<::=> ( --> Assignment)
-    { <sym> {*} }                                          #= ::=
+    { <sym> {*} }                                               #= ::=
 
 # XXX need to do something to turn subcall into method call here...
 token infix:sym<.=> ( --> Assignment)
-    { <sym> {*} }                                           #= .=
+    { <sym> {*} }                                               #= .=
 
 # Note, other assignment ops generated by infix_postfix_meta_operator rule
 
 ## loose unary
 token prefix:sym<true> ( --> Loose_unary)
-    { <sym> {*} }                                         #= true
+    { <sym> {*} }                                               #= true
 
 token prefix:sym<not> ( --> Loose_unary)
-    { <sym> {*} }                                          #= not
+    { <sym> {*} }                                               #= not
 
 ## list item separator
 token infix:sym<,> ( --> Comma)
-    { <sym> {*} }                                            #= ,
+    { <sym> {*} }                                               #= ,
 
 ## list infix
 token infix ( --> List_infix)
@@ -2144,44 +2144,44 @@ token prefix ( --> List_prefix)
 
 ## loose and
 token infix:sym<and> ( --> Loose_and)
-    { <sym> {*} }                                          #= and
+    { <sym> {*} }                                               #= and
 
 ## loose or
 token infix:sym<or> ( --> Loose_or)
-    { <sym> {*} }                                           #= or
+    { <sym> {*} }                                               #= or
 
 token infix:sym<xor> ( --> Loose_or)
-    { <sym> {*} }                                          #= xor
+    { <sym> {*} }                                               #= xor
 
 token infix:sym<err> ( --> Loose_or)
-    { <sym> {*} }                                          #= err
+    { <sym> {*} }                                               #= err
 
 ## expression terminator
 
 # XXX correct to eat semicolon here?
 token terminator:sym<;> ( --> Terminator)
-    { <sym> {*} }                                            #= ;
+    { <sym> {*} }                                               #= ;
 
 token terminator:sym« <== » ( --> Terminator)
-    { <?before <'<=='> > {*} }                             #= <==
+    { <?before <'<=='> > {*} }                                  #= <==
 
 token terminator:sym« ==> » ( --> Terminator)
-    { <?before <'==>'> > {*} }              #'             #= ==>
+    { <?before <'==>'> > {*} }              #'                  #= ==>
 
 token terminator:sym« --> » ( --> Terminator)
-    { <?before <'-->'> > {*} }              #'             #= -->
+    { <?before <'-->'> > {*} }              #'                  #= -->
 
 token terminator:sym<)> ( --> Terminator)
-    { <?before <sym> > {*} }                                 #= )
+    { <?before <sym> > {*} }                                    #= )
 
 token terminator:sym<]> ( --> Terminator)
-    { <?before \] > {*} }                                 #= ]
+    { <?before \] > {*} }                                       #= ]
 
 token terminator:sym<}> ( --> Terminator)
-    { <?before \} > {*} }                         #= }
+    { <?before \} > {*} }                                       #= }
 
 token terminator:sym<!!> ( --> Terminator)
-    { <?before \!\! > {*} }                                #= !!
+    { <?before \!\! > {*} }                                     #= !!
 
 regex stdstopper {
     | <terminator>
@@ -2381,21 +2381,21 @@ token regex_metachar {
     {*}                                                         #= ( )
 }
 
-token regex_metachar:sym« <( » { \<\( {*} }                      #= <(
-token regex_metachar:sym« )> » { \)\> {*} }                      #= )>
+token regex_metachar:sym« <( » { \<\( {*} }                     #= <(
+token regex_metachar:sym« )> » { \)\> {*} }                     #= )>
 
-token regex_metachar:sym« << » { \<\< {*} }                      #= <<
-token regex_metachar:sym« >> » { \>\> {*} }                      #= >>
+token regex_metachar:sym« << » { \<\< {*} }                     #= <<
+token regex_metachar:sym« >> » { \>\> {*} }                     #= >>
 
 token regex_metachar:sym«< >» {
     \< <regex_assertion> \>
     {*}                                                         #= < >
 }
-token regex_metachar:sym<\\> { <sym> <regex_backslash> {*} }         #= \
-token regex_metachar:sym<.>  { <sym> {*} }                            #= .
-token regex_metachar:sym<^^> { <sym> {*} }                           #= ^^
-token regex_metachar:sym<^>  { <sym> {*} }                            #= ^
-token regex_metachar:sym<$$> { <sym> {*} }                         #= $$
+token regex_metachar:sym<\\> { <sym> <regex_backslash> {*} }    #= \
+token regex_metachar:sym<.>  { <sym> {*} }                      #= .
+token regex_metachar:sym<^^> { <sym> {*} }                      #= ^^
+token regex_metachar:sym<^>  { <sym> {*} }                      #= ^
+token regex_metachar:sym<$$> { <sym> {*} }                      #= $$
 token regex_metachar:sym<$>  {
     \$
     <before
