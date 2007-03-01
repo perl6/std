@@ -10,6 +10,7 @@ my %text;
 my $curclass;
 my %proto;
 my %protosig;
+my %multis;
 
 while (<>) {
     if (/role (\w+)\[\*?(.*?)\]/) {
@@ -35,20 +36,67 @@ while (<>) {
     s/\( *-->/\( *%_ -->/;
     s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
     s/\(:(\w+)\((.*?)\)\)/(:$2)/;
+    s/is context<rw>/is context is rw/g;
 
-    if (/^proto\s+(regex|rule|token)\s+(\w+)\s*(?:\(([^)]*)\))?/) {
+    if (/^proto \s+ (regex|rule|token) \s+
+	(\w+) \s*
+	(?:\(([^)]*)\))?/x) {
 	my $name = $2;
 	$proto{$name}++;
 	$protosig{$name} = $3;
     }
-    elsif (/^(?:multi\s+)?(regex|rule|token)\s+(\w+)\s*(?:\(([^)]*)\))?/) {
-	if ($proto{$2}) {
-	    
+    elsif (s/^(?:multi\s+)?
+	(regex|rule|token) \s+
+	(\w+) ( :\w+ ( <.*?>
+	            | «.*?»
+		    | \{.*?\}
+		    | \[.*?\]
+		    )?
+	      ) \s*
+	(?:\(([^)]*)\))?//x) {
+	my $type = $1;
+	my $name = $2;
+	my $adv = $3;
+	my $sig = $5;
+
+	my $newdflt = $adv;
+	$newdflt =~ s/:(\w+)$/'$1'/ or
+	$newdflt =~ s/:sym(<.*?>)/$1/ or
+	$newdflt =~ s/:sym(«.*?»)/$1/ or
+	$newdflt =~ s/:sym(\(.*?\))/$1/ or
+	$newdflt =~ s/:sym(\[.*?\])/$1/;
+
+	my $newparm = ":\$sym is context is rw = $newdflt";
+
+	my $newsig = $protosig{$name} || "";
+	if ($newsig =~ /^\s*-->/) {
+	    $newsig =~ s/-->/$newparm -->/;
 	}
+	elsif ($newsig =~ /-->/) {
+	    $newsig =~ s/-->/, $newparm -->/;
+	}
+	elsif ($newsig) {
+	    $newsig .= ', ' . $newparm;
+	}
+	my $mangle = $name . $adv;
+	$mangle =~ s/:(sym)?/_/;
+	$mangle =~ s/(\W)/sprintf("_%02x_",ord($1))/eg;
+	$mangle =~ s/__/_/g;
+	$mangle =~ s/_$//;
+	push(@{$multis{$name}}, $mangle);
+	substr($_,0,0,"$type $mangle ($newsig)")
     }
 }
 continue {
     print $_;
+}
+
+foreach my $name (sort keys %multis) {
+    print "token $name {\n";
+    for (@{$multis{$name}}) {
+	print "    | <$_>\n";
+    }
+    print "}\n\n";
 }
 
 sub instantiate {
