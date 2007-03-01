@@ -1,3 +1,4 @@
+use v6-alpha;
 grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =begin things todo
