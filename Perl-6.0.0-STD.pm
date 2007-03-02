@@ -10,28 +10,32 @@ grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
 
 =end things todo
 
-# This file is designed to be either preprocessed into a grammar with
-# action statements or used as-is without any preprocessing.  The {*}
-# notation is a no-op action block, but can be identified uniquely via a
-# combination of the preceding token or rule name plus any additional text
-# following a                       #= comment.  We put this into a comment rather than using
-# a macro so that bootstrap compilers don't have to worry about macros
-# yet, and to keep the main grammar relatively uncluttered by action
-# statements.  Note that the preprocessor can certainly generate accesses
-# to $/ within the action block, so we need not mention it explicitly.
-# Also, some rules are named by syntactic category plus an additonal symbol
-# specified in adverbial form, either in bare :name form or in :sym<name>
-# form.  (It does not matter which form you use for identifier symbols,
-# except that to specify a symbol "sym" you must use the :sym<sym> form
-# of adverb.)  If you use the <sym> rule within the rule, it will parse the
-# symbol at that point.  At the final reduction point of a rule, if $<sym>
-# has been set, that is used as the final symbol name for the rule.  This
-# need not match the symbol specified as part the rule name; that is just
-# for disambiguating the name.  However, if no $<sym> is set, the original
-# symbol will be used by default.
+=begin comment overview
 
-# Note that rules with only one action need no                  #= comment, so the identifier
-# of the following stub is just "TOP".
+This file is designed to be either preprocessed into a grammar with
+action statements or used as-is without any preprocessing.  The {*}
+notation is a no-op action block, but can be identified uniquely via a
+combination of the preceding token or rule name plus any additional text
+following a #= comment.  We put this into a comment rather than using
+a macro so that bootstrap compilers don't have to worry about macros
+yet, and to keep the main grammar relatively uncluttered by action
+statements.  Note that the preprocessor can certainly generate accesses
+to $/ within the action block, so we need not mention it explicitly.
+Also, some rules are named by syntactic category plus an additonal symbol
+specified in adverbial form, either in bare :name form or in :sym<name>
+form.  (It does not matter which form you use for identifier symbols,
+except that to specify a symbol "sym" you must use the :sym<sym> form
+of adverb.)  If you use the <sym> rule within the rule, it will parse the
+symbol at that point.  At the final reduction point of a rule, if $<sym>
+has been set, that is used as the final symbol name for the rule.  This
+need not match the symbol specified as part the rule name; that is just
+for disambiguating the name.  However, if no $<sym> is set, the original
+symbol will be used by default.
+
+Note that rules with only one action need no #= comment, so the identifier
+of the following stub is just "TOP".
+
+=end comment overview
 
 token TOP { <UNIT( $+unitstop or /$/ )> {*} }
 
@@ -358,8 +362,6 @@ method UNIT ($unitstop is context = /$/) {
 # Note: we only check for the unitstopper.  We don't check for ^ because
 # we might be embedded in something else.
 rule comp_unit (:$begin_compunit is context = 1) {
-    <package_declarator>?
-    { $begin_compunit = 0 }
     <statement_list>
     [ <$+unitstop> || <panic: Can't understand next input--giving up> ]
     {*}
@@ -506,23 +508,23 @@ rule statement_mod_loop:given { <sym>  <modifier_expr> {*} };   #= for
 rule statement_mod_loop:while { <sym>  <modifier_expr> {*} };   #= while
 rule statement_mod_loop:until { <sym>  <modifier_expr> {*} };   #= until
 
-token nameroot { <'perl6'> }
-token nameroot { <'perl5'> }
-token nameroot { <'parrot'> }
-token nameroot { <'ruby'> }
-token nameroot { <'python'> }
-token nameroot { <'tcl'> }
-token nameroot { <'js'> }
-token nameroot { <'scheme'> }
-token nameroot { <'lisp'> }
-token nameroot { <'haskell'> }
-token nameroot { <'java'> }
-token nameroot { <'c'> }
-token nameroot { <'cplusplus'> }
-token nameroot { <'csharp'> }
-token nameroot { <'ada'> }
-token nameroot { <'lua'> }
-token nameroot { <'php'> }
+token nameroot:perl6     { <sym> }
+token nameroot:perl5     { <sym> }
+token nameroot:parrot    { <sym> }
+token nameroot:ruby      { <sym> }
+token nameroot:python    { <sym> }
+token nameroot:tcl       { <sym> }
+token nameroot:js        { <sym> }
+token nameroot:scheme    { <sym> }
+token nameroot:lisp      { <sym> }
+token nameroot:haskell   { <sym> }
+token nameroot:java      { <sym> }
+token nameroot:c         { <sym> }
+token nameroot:cplusplus { <sym> }
+token nameroot:csharp    { <sym> }
+token nameroot:ada       { <sym> }
+token nameroot:lua       { <sym> }
+token nameroot:php       { <sym> }
 
 token module_name {
     <name>                                          {*}         #= name
@@ -947,8 +949,9 @@ token package_def {
     <trait>* {*}                                                #= traits
     [
     || <?{ $+begin_compunit } :: \;
-        { defined $<module_name> or
-            panic("Compilation unit cannot be anonymous"
+        {
+            $<module_name> err panic("Compilation unit cannot be anonymous");
+            $begin_compunit = 0;
         }
         {*}                                                     #= semi
     || <block>
