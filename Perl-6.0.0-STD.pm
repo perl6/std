@@ -367,6 +367,10 @@ rule comp_unit (:$begin_compunit is context = 1) {
     {*}
 }
 
+token pblock {
+    [-\> <signature>]? <block>
+}
+
 token block {
     \{
     <statement_list>
@@ -429,17 +433,17 @@ rule statement_control:use {
 rule statement_control:if {
     <sym>
     <EXPR>                           {*}                        #= if expr
-    <block>                          {*}                        #= if block
+    <pblock>                         {*}                        #= if block
     @<elsif> := ( elsif <EXPR>       {*}                        #= elsif expr
-                        <block>      {*} )*                     #= elsif block
-    @<else> := ( else <block>        {*} )?                     #= else
+                        <pblock>     {*} )*                     #= elsif block
+    @<else> := ( else <pblock>       {*} )?                     #= else
     {*}
 }
 
 rule statement_control:unless {
     <sym> 
     <EXPR>                           {*}                        #= unless expr
-    <block>                          {*}                        #= unless block
+    <pblock>                         {*}                        #= unless block
     {*}
 }
 
@@ -448,13 +452,13 @@ rule statement_control:while {
     [ <?before \( [[my]? \$\w+ =]? \< \$?\w+ \> \)>
         <panic: This appears to be Perl 5 code> ]?
     <EXPR>                             {*}                      #= while expr
-    <block>                            {*}                      #= while block
+    <pblock>                           {*}                      #= while block
     {*}
 }
 
 rule statement_control:until { <sym>
     <EXPR>                             {*}                      #= until expr
-    <block>                            {*}                      #= until block
+    <pblock>                           {*}                      #= until block
     {*}
 }
 rule statement_control:repeat { <sym>
@@ -478,7 +482,15 @@ rule statement_control:loop { <sym>
     {*}
 }
 
-rule statement_control:for     { <sym> <block> {*} }            #= for
+rule statement_control:for {
+    <sym>
+    [ <?before \( [[my]? \$\w+ =]? \< \$?\w+ \> \)>
+        <panic: This appears to be Perl 5 code> ]?
+    <EXPR>                             {*}                      #= for expr
+    <pblock>                           {*}                      #= for block
+    {*}
+}
+
 rule statement_control:when    { <sym> <block> {*} }            #= when
 rule statement_control:BEGIN   { <sym> <block> {*} }            #= BEGIN
 rule statement_control:CHECK   { <sym> <block> {*} }            #= CHECK
@@ -1679,7 +1691,9 @@ token sigterm {
 }
 
 rule signature (:$zone is context<rw> = 'posreq') {
-    [<parameter> [ [ \, | \: | ; | ;; ] <parameter> ]* ]?
+    @<parsep> := ( <parameter>
+                    ( \, | \: | ; | ;; | <?before --\> | \) | \{ > )
+                 )*
     [ --\> <type> ]?
     {*}
 }
