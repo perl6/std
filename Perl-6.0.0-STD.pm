@@ -1,10 +1,10 @@
 use v6-alpha;
-grammar Perl-6.0.0-STD;          # (XXX maybe should be -PROTO or some such)
+grammar Perl-6.0.0-STD;
 
 =begin things todo
 
     add more suppositions and figure out exact error continuation semantics
-    finish out all the {*}                       #= hookage
+    finish out all the {*} #= hookage
     think about longest-token-defeating {*} that maybe should be <?{ {*}; 1}>
     add parsing this file to sanity tests :)
 
@@ -368,7 +368,7 @@ rule comp_unit (:$begin_compunit is context = 1) {
 }
 
 token pblock {
-    [-\> <signature>]? <block>
+    [ -\> <signature> ]? <block>
 }
 
 token block {
@@ -484,7 +484,7 @@ rule statement_control:loop { <sym>
 
 rule statement_control:for {
     <sym>
-    [ <?before \( [[my]? \$\w+ =]? \< \$?\w+ \> \)>
+    [ <?before [my]?<?ws>\$\w+<?ws>\( >
         <panic: This appears to be Perl 5 code> ]?
     <EXPR>                             {*}                      #= for expr
     <pblock>                           {*}                      #= for block
