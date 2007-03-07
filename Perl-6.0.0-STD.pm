@@ -1060,12 +1060,7 @@ token subshortname {
 }
 
 token sublongname {
-    <subshortname>
-    [
-    | <capterm>
-    | <sigterm>
-    | <null>
-    ]
+    <subshortname> <sigterm>?
     {*}
 }
 
