@@ -546,7 +546,7 @@ token module_name {
 token whatever { \* {*} }
 
 token version {
-    v \d+ [ \. \d+ ]*                 {*}                       #= vstyle
+    v \d+ [ \. (\d+ | <whatever>) ]* \+?            {*}         #= vstyle
 }
 
 ###################################################
@@ -1865,6 +1865,7 @@ token infix:sym</> ( --> Multiplicative)
 token infix:sym<%> ( --> Multiplicative)
     { <sym> {*} }                                               #= %
 
+# Note: no word boundary check after x, relies on longest token for x2 xx2 etc
 token infix:sym<x> ( --> Multiplicative)
     { <sym> {*} }                                               #= x
 
