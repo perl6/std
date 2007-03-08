@@ -203,9 +203,6 @@ proto token twigil { }
 token category:special_variable { <sym> }
 proto token special_variable { }
 
-token category:nameroot { <sym> }
-proto token nameroot { }
-
 token category:version { <sym> }
 proto token version { }
 
@@ -518,24 +515,6 @@ rule statement_mod_loop:for   { <sym>  <modifier_expr> {*} };   #= for
 rule statement_mod_loop:given { <sym>  <modifier_expr> {*} };   #= for
 rule statement_mod_loop:while { <sym>  <modifier_expr> {*} };   #= while
 rule statement_mod_loop:until { <sym>  <modifier_expr> {*} };   #= until
-
-token nameroot:perl6     { <sym> }
-token nameroot:perl5     { <sym> }
-token nameroot:parrot    { <sym> }
-token nameroot:ruby      { <sym> }
-token nameroot:python    { <sym> }
-token nameroot:tcl       { <sym> }
-token nameroot:js        { <sym> }
-token nameroot:scheme    { <sym> }
-token nameroot:lisp      { <sym> }
-token nameroot:haskell   { <sym> }
-token nameroot:java      { <sym> }
-token nameroot:c         { <sym> }
-token nameroot:cplusplus { <sym> }
-token nameroot:csharp    { <sym> }
-token nameroot:ada       { <sym> }
-token nameroot:lua       { <sym> }
-token nameroot:php       { <sym> }
 
 token module_name {
     <name>                                          {*}         #= name
