@@ -1,5 +1,4 @@
-use v6-alpha;
-grammar Perl-6.0.0-STD;
+grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 =begin things todo
 
@@ -427,7 +426,7 @@ rule statement {
 
 rule statement_control:use {
     <sym>
-    <module_name_wild> <EXPR>? ;?                       {*}     #= use
+    <module_name> <EXPR>? ;?                       {*}     #= use
 }
 
 rule statement_control:if {
@@ -540,37 +539,14 @@ token nameroot:php       { <sym> }
 
 token module_name {
     <name>                                          {*}         #= name
-    [- <version>                                    {*}         #= version
-        [-
-            <authority>                             {*}         #= auth
-        ]?
-    ]?
+    <colonpair>*
     {*}
 }
-
-token authority { <-[ \s ; \{ ]>+ }
-
-token module_name_wild {
-    [ <nameroot> \: {*} ]?                                      #= root
-    <name>                                          {*}         #= name
-    [- <version_wild>                               {*}         #= version
-        [-
-            <authority_wild>                        {*}         #= auth
-        ]?
-    ]?
-    {*}
-}
-
-token version_wild   { <block> | <whatever> | <version> }
-token authority_wild { <block> | <whatever> | <authority> }
 
 token whatever { \* {*} }
 
 token version {
     v \d+ [ \. \d+ ]*                 {*}                       #= vstyle
-}
-token version {
-    \d+ \. \d+ \. \d+ [ \. \d+]*      {*}                       #= dotted
 }
 
 ###################################################
