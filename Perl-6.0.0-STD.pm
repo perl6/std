@@ -882,20 +882,22 @@ token variable_decl {
         <?before <[ \< \( \[ \{ ]> >
         <postcircumfix>
     ]?
+
+    <trait>*
+    <default_value>?
 }
 
 rule scoped {
-    <type>?
     [
     | <variable_decl>
-    | \( <signature> \)
+    | <type>? \( <signature> \) <trait>*
     | <package_declarator>
-    | <plurality_declarator>
-    | <routine_declarator>
+    | <type>? <plurality_declarator>
+    | <type>? <routine_declarator>
     | <regex_declarator>
-    | <type_declarator>
+    | <type>? <type_declarator>
     ]
-    <trait>*
+    
     {*}
 }
 
@@ -930,7 +932,7 @@ token package_def {
 rule pluralized {
     [
     | <variable_decl>
-    | \( <signature> \)
+    | \( <signature> \) <trait>*
     | <package_declarator>
     | <routine_declarator>
     | <regex_declarator>
