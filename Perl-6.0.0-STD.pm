@@ -884,7 +884,10 @@ token variable_decl {
     ]?
 
     <trait>*
-    <default_value>?
+    [
+    | \= <EXPR(%item_assignment)>
+    | \.\= <EXPR(%item_assignment)>
+    ]
 }
 
 rule scoped {
