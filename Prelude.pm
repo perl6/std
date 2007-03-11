@@ -542,21 +542,17 @@ class Num {
 
     # Public API (but signatures are not spec)
 
-    sub round($n) is primitive is safe {
+    sub round($n) is primitive is safe is builtin {
         Num::round_gen($n, &Num::do_round)
     }
 
-    sub truncate($n) is primitive is safe {
-        int($n)
-    }
-    our &trunc ::= &truncate;
+    sub truncate($n) is primitive is safe is builtin { $n.int }
+    sub trunc($n) is primitive is safe is builtin { $n.int }
 
-    sub ceiling($n) is primitive is safe {
-        Num::round_gen($n, &Num::do_ceil)
-    }
-    our &ceil ::= &ceiling;
+    sub ceiling($n) is primitive is safe is builtin { Num::round_gen($n, &Num::do_ceil) }
+    sub ceil($n) is primitive is safe is builtin { Num::round_gen($n, &Num::do_ceil) }
 
-    sub floor($n) is primitive is safe {
+    sub floor($n) is primitive is safe is builtin {
         Num::round_gen($n, &Num::do_floor)
     }
 }
