@@ -97,33 +97,34 @@ token TOP { <UNIT( $+unitstop or /$/ )> {*} }
 # The current values are mere implmentation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
 
-constant %term              ::= { :prec<z=>                           };
-constant %methodcall        ::= { :prec<w=>                           };
-constant %autoincrement     ::= { :prec<v=>, :lvalue                  };
-constant %exponentiation    ::= { :prec<u=>, :assoc<right>, :assign   };
-constant %symbolic_unary    ::= { :prec<t=>                           };
-constant %multiplicative    ::= { :prec<s=>, :assoc<left>,  :assign   };
-constant %additive          ::= { :prec<r=>, :assoc<left>,  :assign   };
-constant %junctive_and      ::= { :prec<q=>, :assoc<list>,  :assign   };
-constant %junctive_or       ::= { :prec<p=>, :assoc<list>,  :assign   };
-constant %named_unary       ::= { :prec<o=>,                          };
-constant %nonchaining       ::= { :prec<n=>, :assoc<non>              };
-constant %chaining          ::= { :prec<m=>, :assoc<chain>, :bool     };
-constant %tight_and         ::= { :prec<l=>, :assoc<left>,  :assign   };
-constant %tight_or          ::= { :prec<k=>, :assoc<left>,  :assign   };
-constant %conditional       ::= { :prec<j=>, :assoc<right>,           };
-constant %item_assignment   ::= { :prec<i=>, :assoc<right>, :lvalue   };
-constant %loose_unary       ::= { :prec<h=>,                          };
-constant %comma             ::= { :prec<g=>, :assoc<list>,            };
-constant %list_infix        ::= { :prec<f=>, :assoc<list>,            };
-constant %list_prefix       ::= { :prec<e=>,                          };
-constant %loose_and         ::= { :prec<d=>, :assoc<left>,            };
-constant %loose_or          ::= { :prec<c=>, :assoc<left>,            };
-constant %LOOSEST           ::= { :prec<a=!>,                         };
-constant %terminator        ::= { :prec<a=>, :assoc<list>             };
+constant %term              = { :prec<z=>                           };
+constant %methodcall        = { :prec<w=>                           };
+constant %autoincrement     = { :prec<v=>, :lvalue                  };
+constant %exponentiation    = { :prec<u=>, :assoc<right>, :assign   };
+constant %symbolic_unary    = { :prec<t=>                           };
+constant %multiplicative    = { :prec<s=>, :assoc<left>,  :assign   };
+constant %additive          = { :prec<r=>, :assoc<left>,  :assign   };
+constant %junctive_and      = { :prec<q=>, :assoc<list>,  :assign   };
+constant %junctive_or       = { :prec<p=>, :assoc<list>,  :assign   };
+constant %named_unary       = { :prec<o=>,                          };
+constant %nonchaining       = { :prec<n=>, :assoc<non>              };
+constant %chaining          = { :prec<m=>, :assoc<chain>, :bool     };
+constant %tight_and         = { :prec<l=>, :assoc<left>,  :assign   };
+constant %tight_or          = { :prec<k=>, :assoc<left>,  :assign   };
+constant %conditional       = { :prec<j=>, :assoc<right>,           };
+constant %item_assignment   = { :prec<i=>, :assoc<right>, :lvalue   };
+constant %loose_unary       = { :prec<h=>,                          };
+constant %comma             = { :prec<g=>, :assoc<list>,            };
+constant %list_infix        = { :prec<f=>, :assoc<list>,            };
+constant %list_prefix       = { :prec<e=>,                          };
+constant %loose_and         = { :prec<d=>, :assoc<left>,            };
+constant %loose_or          = { :prec<c=>, :assoc<left>,            };
+constant %LOOSEST           = { :prec<a=!>,                         };
+constant %terminator        = { :prec<a=>, :assoc<list>             };
 
 # "epsilon" tighter than terminator
-constant $LOOSEST = %LOOSEST<prec>;
+#constant $LOOSEST = %LOOSEST<prec>;
+constant $LOOSEST = "a=!"; # XXX preceding line is busted
 
 role PrecOp[*%defaults] {
 
@@ -1412,7 +1413,7 @@ token quotesnabber (*@q, :$delim is context<rw> = '') {
 }
 
 # XXX should eventually be derived from current Unicode tables.
-constant %open2close ::= {
+constant %open2close = {
     "\x0028" => "\x0029", "\x003C" => "\x003E", "\x005B" => "\x005D",
     "\x007B" => "\x007D", "\x00AB" => "\x00BB", "\x0F3A" => "\x0F3B",
     "\x0F3C" => "\x0F3D", "\x169B" => "\x169C", "\x2039" => "\x203A",

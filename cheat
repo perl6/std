@@ -37,6 +37,7 @@ while (<>) {
     s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
     s/\(:(\w+)\((.*?)\)\)/(:$2)/;
     s/is context<rw>/is context is rw/g;
+    s/^grammar Perl:ver<(.*?)>:auth<(.*)>;/grammar Perl;/;
 
     if (/^proto \s+ (regex|rule|token) \s+
 	(\w+) \s*
