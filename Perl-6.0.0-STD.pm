@@ -2280,8 +2280,14 @@ rule regex_ordered_disjunction {
 }
 
 rule regex_ordered_conjunction {
+    <regex_submatch>
+    [ '&&' <regex_submatch> ]*
+    {*}
+}
+
+rule regex_submatch {
     <regex_unordered_disjunction>
-    [ '&&' <regex_unordered_disjunction> ]*
+    [ \!?'~~' <regex_unordered_disjunction> ]*
     {*}
 }
 
@@ -2317,7 +2323,8 @@ rule regex_atom {
     [
     || <$+stop> :: <fail>
     || <regex_metachar>
-    || (.)
+    || (\w)
+    || <panic: "unrecognized metacharacter">
     ]
     {*}
 }
@@ -2386,6 +2393,9 @@ token regex_metachar:sym<$>  {
     >
     {*}                                                         #= $
 }
+
+token regex_metachar:sym<' '> { <?before "'"  > <quotesnabber(":q")>  }
+token regex_metachar:sym<" "> { <?before '"'  > <quotesnabber(":qq")> }
 
 token regex_metachar:var {
     <sym <variable>> <?ws>
