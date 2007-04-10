@@ -1544,7 +1544,7 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     $<start> := <$start>
     $<text> := [.*?]
     @<more> := (
-        <!before <$stop>>
+        <!before($stop)>
         [ # XXX triple rule should just be in escapes to be customizable
         | <?before <$start>**{3}>
             $<dequote> := <q_dequote($lang, $start, $stop, :@esc)>
@@ -1562,7 +1562,7 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
 regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
     $<text> := [.*?]
     @<more> := (
-      <!before <$stop>>
+      <!before($stop)>
       [ <?before @esc> $<escape> := [ <q_escape($lang)> ]
       $<text> := [.*?]
     )*
@@ -2176,7 +2176,7 @@ token assertstopper { <stdstopper> | '>' }
 method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
-    if m:p/ <?before <$stop>> / {
+    if m:p/ <?before($stop)> / {
         return;
     }
     my $prevop is context<rw>;
@@ -2223,7 +2223,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
         }
     }
 
-    while not m:p/ <?before <$stop> > / {
+    while not m:p/ <?before($stop)> / {
         %thisop = ();
         my $infix := $.expect_tight_infix($preclim);
         if not defined %thisop<prec> {
@@ -2252,7 +2252,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
             }
         }
         push @opstack, %thisop;
-        if m:p/ <?before <$stop>> / {
+        if m:p/ <?before($stop)> / {
             fail("$infix.perl() is missing right term");
         }
         %thisop = ();

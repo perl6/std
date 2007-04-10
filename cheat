@@ -35,6 +35,7 @@ while (<>) {
 
     s/\( *-->/\( *%_ -->/;
     s/'([{}])'/'\\$1'/g;
+    s/\$\.(expect\w+)\((.*?)\)/m:p\/<$1($2)> { return \$<$1> }\//;
     s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
     s/\(:(\w+)\((.*?)\)\)/(:$2)/;
     s/is context<rw>/is context is rw/g;
