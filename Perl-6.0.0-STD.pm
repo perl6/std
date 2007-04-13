@@ -2413,7 +2413,12 @@ token q_backslash:misc { :: (.) }
 
 token qq_backslash:a { <sym> }
 token qq_backslash:b { <sym> }
-token qq_backslash:c { <sym> <codepoint> }
+token qq_backslash:c { <sym>
+    [
+    || \[ <-[ \] \v ]>* \]
+    || <codepoint> }
+    ]
+}
 token qq_backslash:e { <sym> }
 token qq_backslash:f { <sym> }
 token qq_backslash:n { <sym> }
@@ -2425,7 +2430,12 @@ token qq_backslash:misc { :: \W || <panic: unrecognized backslash sequence> }
 
 token regex_backslash:a { :i <sym> }
 token regex_backslash:b { :i <sym> }
-token regex_backslash:c { :i <sym> <codepoint> }
+token regex_backslash:c { :i <sym>
+    [
+    || \[ <-[ \] \v ]>* \]
+    || <codepoint> }
+    ]
+}
 token regex_backslash:d { :i <sym> }
 token regex_backslash:e { :i <sym> }
 token regex_backslash:f { :i <sym> }
