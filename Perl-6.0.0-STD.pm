@@ -855,11 +855,11 @@ token methodop {
     | <ident>
     | <?before '$'> <variable>
     | <?before <[ ' " ]>> <quote>
-    ]
+    ] <?unsp>? 
 
     [
-    | '.'? '(' <EXPR> ')'
-    | ':' <?before \s> <!{ $+inquote }> <listop_expr>
+    | '.'? <?unsp>? '(' <EXPR> ')'
+    | ':' <?unsp>? <?before \s> <!{ $+inquote }> <listop_expr>
     | <null>
     ]
     {*}
