@@ -339,10 +339,10 @@ token unv {
 # XXX We need to parse the pod eventually to support $= variables.
 
 token pod_comment {
-    ^^ '='
+    ^^ '=' <?unsp>?
     [
     | begin <?ws> <ident> .*? \n
-      '=end' <?ws> $<ident> \N* \n?                 {*}         #= block
+      '=' <?unsp>? 'end' <?ws> $<ident> \N* \n?     {*}         #= block
     | \N* \n?                                       {*}         #= misc
     ]
     {*}
@@ -632,7 +632,7 @@ token pair {
 token colonpair {
     [
     | ':' '!'? <ident>                                   {*}    #= bool
-    | ':' <ident>? <unsp>? <postcircumfix>               {*}    #= value
+    | ':' <ident>? <?unsp>? <postcircumfix>              {*}    #= value
     ]
     {*}
 }
@@ -640,7 +640,7 @@ token colonpair {
 token quotepair {
     ':'
     [
-    | '!' <ident>                                       {*}     #= bool
+    | '!' <ident>                                        {*}    #= bool
     | <ident> [ <unsp>? <?before '('> <postcircumfix> ]? {*}    #= value
     | \d+ <[a..z]>+                                             #= nth
     ]
@@ -830,10 +830,10 @@ token postfix:sym<--> (--> Autoincrement) { <sym> {*} }         #= decr
 token postcircumfix:sym<( )> (--> Methodcall)
     { '(' <EXPR> ')' {*} }                                      #= ( )
 
-token postcircumfix (--> Methodcall)
+token postcircumfix:sym<[ ]> (--> Methodcall)
     { '[' <EXPR> ']' {*} }                                      #= [ ]
 
-token postcircumfix (--> Methodcall)
+token postcircumfix:sym<{ }> (--> Methodcall)
     { '{' <EXPR> '}' {*} }                                      #= { }
 
 token postcircumfix:sym«< >» (--> Methodcall)
@@ -859,7 +859,7 @@ token methodop {
 
     [
     | '.'? <?unsp>? '(' <EXPR> ')'
-    | ':' <?unsp>? <?before \s> <!{ $+inquote }> <listop_expr>
+    | ':' <?before \s> <!{ $+inquote }> <listop_expr>
     | <null>
     ]
     {*}
@@ -872,9 +872,8 @@ token circumfix:sym«< >»   { '<'  <anglewords> '>'  {*} }       #= < >
 token circumfix:sym«<< >>» { '<<' <shellwords> '>>' {*} }       #= << >>
 token circumfix:sym<« »>   { '«'  <shellwords> '»'  {*} }       #= « »
 
-token circumfix ( --> Circumfix) {
-    <?before '{'> <block> <?after '}'>
-    { @<sym>:=<{ }> }
+token circumfix:sym<{ }> ( --> Circumfix) {
+    <?before '{'> <block>
     {*}                                                         #= { }
 }
 
@@ -883,7 +882,7 @@ token variable_decl {
     [   # Is it a shaped array or hash declaration?
         <?{ $<variable><sigiltwigil><sigil> eq '@' | '%' }>
         <?ws>
-        <?before <[ \< \( \[ \{ ]> >
+        <?before [ '<' | '(' |  '[' | '{' ] >
         <postcircumfix>
     ]?
 
@@ -1100,7 +1099,7 @@ token dec_number {
 }
 
 token rad_number {
-    ':' $<radix> := [\d+] 
+    ':' $<radix> := [\d+] <?unsp>?      # XXX optional dot here?
     [
     || '<'
             $<radint> := [<[ 0..9 a..z A..Z ]>+
@@ -1609,8 +1608,7 @@ rule routine_def {
 rule method_def {
     [
     | <ident>  <multisig>?
-    # XXX should not need backslash on this curly
-    | <?before <sigil> '.' <[ [ \{ ( ]> > <sigiltwigil> <postcircumfix>
+    | <?before <sigil> '.' [ '[' | '{' | '(' ] > <sigiltwigil> <postcircumfix>
     ]
     <trait>*
     <block>
@@ -1627,12 +1625,12 @@ rule regex_def {
 
 rule trait { <trait_verb> | <trait_auxiliary> }
 
-rule trait_auxiliary:is { <sym>   <ident><postcircumfix>? }
+rule trait_auxiliary:is   { <sym> <ident><postcircumfix>? }
 rule trait_auxiliary:will { <sym> <ident> <block> }
 
-rule trait_verb:of { <sym>        <type> }
-rule trait_verb:returns { <sym>   <type> }
-rule trait_verb:handles { <sym>   <EXPR> }
+rule trait_verb:of      { <sym> <type> }
+rule trait_verb:returns { <sym> <type> }
+rule trait_verb:handles { <sym> <EXPR> }
 
 token capterm {
     '\\(' <capture> ')'
