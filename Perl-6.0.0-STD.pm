@@ -2413,8 +2413,8 @@ token qq_backslash:a { <sym> }
 token qq_backslash:b { <sym> }
 token qq_backslash:c { <sym>
     [
-    || \[ <-[ \] \v ]>* \]
-    || <codepoint> }
+    || '[' <-[ \] \v ]>* ']'
+    || <codepoint>
     ]
 }
 token qq_backslash:e { <sym> }
@@ -2430,8 +2430,8 @@ token regex_backslash:a { :i <sym> }
 token regex_backslash:b { :i <sym> }
 token regex_backslash:c { :i <sym>
     [
-    || \[ <-[ \] \v ]>* \]
-    || <codepoint> }
+    || '[' <-[ \] \v ]>* ']'
+    || <codepoint>
     ]
 }
 token regex_backslash:d { :i <sym> }
