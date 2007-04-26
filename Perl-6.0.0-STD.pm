@@ -491,7 +491,20 @@ rule statement_control:for {
     {*}
 }
 
-rule statement_control:when    { <sym> <block> {*} }            #= when
+rule statement_control:given {
+    <sym>
+    <EXPR>                             {*}                      #= given expr
+    <pblock>                           {*}                      #= given block
+    {*}
+}
+rule statement_control:when {
+    <sym>
+    <EXPR>                             {*}                      #= when expr
+    <pblock>                           {*}                      #= when block
+    {*}
+}
+rule statement_control:default   { <sym> <block> {*} }          #= default
+
 rule statement_control:BEGIN   { <sym> <block> {*} }            #= BEGIN
 rule statement_control:CHECK   { <sym> <block> {*} }            #= CHECK
 rule statement_control:INIT    { <sym> <block> {*} }            #= INIT
@@ -511,14 +524,16 @@ rule statement_control:CONTROL { <sym> <block> {*} }            #= CONTROL
 
 rule modifier_expr { <EXPR> ';'? {*} }
 
-rule statement_mod_cond:if     { <sym> <modifier_expr> {*} }    #= if
-rule statement_mod_cond:unless { <sym> <modifier_expr> {*} }    #= unless
-rule statement_mod_cond:when   { <sym> <modifier_expr> {*} }    #= for
+rule statement_mod_cond:if     { <sym> <modifier_expr> {*} }    #= mod if
+rule statement_mod_cond:unless { <sym> <modifier_expr> {*} }    #= mod unless
+rule statement_mod_cond:when   { <sym> <modifier_expr> {*} }    #= mod for
 
-rule statement_mod_loop:for   { <sym> <modifier_expr> {*} }     #= for
-rule statement_mod_loop:given { <sym> <modifier_expr> {*} }     #= for
-rule statement_mod_loop:while { <sym> <modifier_expr> {*} }     #= while
-rule statement_mod_loop:until { <sym> <modifier_expr> {*} }     #= until
+rule statement_mod_loop:while { <sym> <modifier_expr> {*} }     #= mod while
+rule statement_mod_loop:until { <sym> <modifier_expr> {*} }     #= mod until
+
+rule statement_mod_loop:for   { <sym> <modifier_expr> {*} }     #= mod for
+rule statement_mod_loop:given { <sym> <modifier_expr> {*} }     #= mod given
+rule statement_mod_loop:when  { <sym> <modifier_expr> {*} }     #= mod when
 
 token module_name {
     <name>                                          {*}         #= name
@@ -612,7 +627,6 @@ token noun {
     | <subcall>
     | <capterm>
     | <sigterm>
-    | <quote>
     | <term>
     | <statement_prefix>
     ]
@@ -859,7 +873,7 @@ token methodop {
 
     [
     | '.'? <?unsp>? '(' <EXPR> ')'
-    | ':' <?before \s> <!{ $+inquote }> <listop_expr>
+    | ':' <?before \s> <!{ $+inquote }> <EXPR(%list_prefix)>
     | <null>
     ]
     {*}
@@ -868,9 +882,17 @@ token methodop {
 token circumfix:sym<( )> { '(' <EXPR> ')' {*} }                 #= ( )
 token circumfix:sym<[ ]> { '[' <EXPR> ']' {*} }                 #= [ ]
 
-token circumfix:sym«< >»   { '<'  <anglewords> '>'  {*} }       #= < >
-token circumfix:sym«<< >>» { '<<' <shellwords> '>>' {*} }       #= << >>
-token circumfix:sym<« »>   { '«'  <shellwords> '»'  {*} }       #= « »
+token circumfix:sym«< >»   { '<'  <anglewords '>'> '>'  {*} }   #= < >
+token circumfix:sym«<< >>» { '<<' <shellwords '>>'> '>>' {*} }  #= << >>
+token circumfix:sym<« »>   { '«'  <shellwords '»'> '»'  {*} }   #= « »
+
+token anglewords($stop) {
+    <?ws> [ <!before $stop> .]*  # XXX need to split
+}
+
+token shellwords($stop) {
+    <?ws> [ <!before $stop> .]*  # XXX need to split
+}
 
 token circumfix:sym<{ }> ( --> Circumfix) {
     <?before '{'> <block>
@@ -896,12 +918,12 @@ token variable_decl {
 rule scoped {
     [
     | <variable_decl>
-    | <type>? '(' <signature> ')' <trait>*
+    | <typename>? '(' <signature> ')' <trait>*
     | <package_declarator>
-    | <type>? <plurality_declarator>
-    | <type>? <routine_declarator>
+    | <typename>? <plurality_declarator>
+    | <typename>? <routine_declarator>
     | <regex_declarator>
-    | <type>? <type_declarator>
+    | <typename>? <type_declarator>
     ]
     
     {*}
@@ -978,7 +1000,7 @@ token variable {
         ]
     | <sigil> \d+ {*}                                           #= $0
     | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
-    | <name> '::' <hashpostfix> {*}                             #= FOO::<$x>
+    | <name> '::' <?before '<' | '«' | '{' > <postcircumfix> {*} #= FOO::<$x>
     ]
     {*}
 }
@@ -1034,7 +1056,7 @@ token subcall {
 
 token value {
     [
-    | <string>
+    | <quote>
     | <number>
     | <version>
     | <fulltypename>
@@ -1047,16 +1069,14 @@ token typename {
     <?{
         is_type($<name>)
     }>
+    # parametric type?
+    <?unsp>? [ <?before '['> <postcircumfix> ]?
     {*}
 }
 
 regex fulltypename {
-    <typename> <?unsp>?
-    [
-    | <?before '['> <postcircumfix>
-    | <?ws> of <?ws> <fulltypename>
-    | <null>
-    ]
+    <typename>
+    [ <?ws> of <?ws> <fulltypename> ]?
     {*}
 }
 
@@ -1064,7 +1084,7 @@ token number {
     [
     | <integer>
     | <dec_number>
-    | <radix_number>
+    | <rad_number>
     ]
     {*}
 }
@@ -1106,11 +1126,19 @@ token rad_number {
             $<radfrac> := [ '.' <[ 0..9 a..z A..Z ]>+ ]? ]
             [ '*' $<base> := <radint> '**' $<exp> := <radint> ]?
        '>'
-      { return radcalc($<radix>, $<radnum>, $<base>, $<exp>) }
+      { return radcalc($<radix>, $<radint>, $<radfrac>, $<base>, $<exp>) }
     || <?before '['> <postcircumfix>
     || <?before '('> <postcircumfix>
     ]
     {*}
+}
+
+token octint {
+    <[ 0..7 ]>+
+}
+
+token hexint {
+    <[ 0..9 a..f A..F ]>+
 }
 
 our @herestub_queue;
@@ -1539,6 +1567,10 @@ regex tr_pickdelim ($lang) {
     {*}
 }
 
+regex transliterator($stop) {
+    # XXX your ad here
+}
+
 regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     $<start> := <$start>
     $<text> := [.*?]
@@ -1546,7 +1578,7 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
         <!before($stop)>
         [ # XXX triple rule should just be in escapes to be customizable
         | <?before <$start>**{3}>
-            $<dequote> := <q_dequote($lang, $start, $stop, :@esc)>
+            $<dequote> := <EXPR(/<$stop>**{3}/)>
         | <?before <$start>>
             $<subtext> := <q_balanced($lang, $start, $stop, :@esc)>
         | <?before @esc>
@@ -1623,13 +1655,21 @@ rule regex_def {
     {*}
 }
 
+# XXX redundant with routine_def?
+rule macro_def {
+    | <ident>?  <multisig>?
+    <trait>*
+    <block>
+    {*}
+}
+
 rule trait { <trait_verb> | <trait_auxiliary> }
 
 rule trait_auxiliary:is   { <sym> <ident><postcircumfix>? }
 rule trait_auxiliary:will { <sym> <ident> <block> }
 
-rule trait_verb:of      { <sym> <type> }
-rule trait_verb:returns { <sym> <type> }
+rule trait_verb:of      { <sym> <fulltypename> }
+rule trait_verb:returns { <sym> <fulltypename> }
 rule trait_verb:handles { <sym> <EXPR> }
 
 token capterm {
@@ -1651,23 +1691,22 @@ rule signature (:$zone is context<rw> = 'posreq') {
     @<parsep> := ( <parameter>
                     ( ',' | ':' | ';' | ';;' | <?before '-->' | ')' | '{' > )
                  )*
-    [ '-->' <type> ]?
+    [ '-->' <fulltypename> ]?
     {*}
 }
 
 rule type_declarator:subset {
     <sym>
     <name>
-    [ of <type_name> ]?
-    where <subset>
+    [ of <fulltypename> ]?
+    where <EXPR>
     {*}
 }
 
 rule type_constraint {
     [
     | <value>
-    | <type_name>
-    | where <subset>
+    | where <EXPR>
     ]
     {*}
 }
@@ -1773,7 +1812,7 @@ token term:sym<*> ( --> Term)
 token circumfix:sigil ( --> Term)
     { <sym <sigil>> $<sym>:='(' <EXPR> $<sym>:=')' {*} }        #= $( ) 
 
-token circumfix:type ( --> Term)
+token circumfix:typename ( --> Term)
     { <sym <typename>> $<sym>:='(' <EXPR> $<sym>:=')' {*} }     #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
@@ -2087,35 +2126,30 @@ token infix:sym<,> ( --> Comma)
     { <sym> {*} }                                               #= ,
 
 ## list infix
-token infix ( --> List_infix)
-    { <sym X> {*} }                                             #= X
+token infix:sym<X> ( --> List_infix)
+    { <sym> {*} }                                               #= X
 
-token infix ( --> List_infix)
-    { <sym Z> {*} }                                             #= Z
+token infix:sym<Z> ( --> List_infix)
+    { <sym> {*} }                                               #= Z
 
-token infix ( --> List_infix)
-    { <sym minmax> {*} }                                        #= minmax
+token infix:sym<minmax> ( --> List_infix)
+    { <sym> {*} }                                               #= minmax
 
-## list prefix (really sub calls mostly defined in Prelude)
-token prefix ( --> List_prefix)
-    { <sym <listop>> \s <nofat>
-        <EXPR(%list_prefix)>              {*}                   #= print
-    }
-
-# unrecognized identifiers are assumed to be post-declared subs.
-token prefix ( --> List_prefix)
-    { <sym <ident>> \s <nofat>
-        <EXPR(%list_prefix)>              {*}                   #= print
-    }
-
-token prefix ( --> List_prefix)
+token prefix:sigil ( --> List_prefix)
     { <sym <sigil> ':' > \s
         <EXPR(%list_prefix)>              {*}                   #= $:
     }
 
-token prefix ( --> List_prefix)
+token prefix:typename ( --> List_prefix)
     { <sym <typename> ':' > \s
         <EXPR(%list_prefix)>              {*}                   #= Type: 
+    }
+
+# unrecognized identifiers are assumed to be post-declared listops.
+# (XXX for cheating purposes this rule must be the last prefix: rule)
+token prefix:listop ( --> List_prefix)
+    { :: <sym <ident> > \s <nofat>
+        <EXPR(%list_prefix)>              {*}                   #= print
     }
 
 ## loose and
@@ -2337,7 +2371,7 @@ token regex_metachar { ']'  :: <fail> }
 token regex_metachar { ')'  :: <fail> }
 token regex_metachar { \\\\ :: <fail> }
 
-token regex_metachar { <quantifier> <panic: quantifier quantifies nothing> }
+token regex_metachar { <regex_quantifier> <panic: quantifier quantifies nothing> }
 
 # "normal" metachars
 token regex_metachar {                                          #= { }
@@ -2405,7 +2439,7 @@ token codepoint {
     '[' (.*?) ']'
 }
 
-token q_backslash:qq { <sym> <qq_bracketed> }
+token q_backslash:qq { <?before qq> <quote> }
 token q_backslash:sym<\\> { <sym> }
 token q_backslash:misc { :: (.) }
 
@@ -2420,10 +2454,10 @@ token qq_backslash:c { <sym>
 token qq_backslash:e { <sym> }
 token qq_backslash:f { <sym> }
 token qq_backslash:n { <sym> }
-token qq_backslash:o { <sym> [ <octnum> | '['<octnum>[','<octnum>]*']' ] }
+token qq_backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
 token qq_backslash:r { <sym> }
 token qq_backslash:t { <sym> }
-token qq_backslash:x { <sym> [ <hexnum> | '['<hexnum>[','<hexnum>]*']' ] }
+token qq_backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
 token qq_backslash:misc { :: \W || <panic: unrecognized backslash sequence> }
 
 token regex_backslash:a { :i <sym> }
@@ -2439,32 +2473,32 @@ token regex_backslash:e { :i <sym> }
 token regex_backslash:f { :i <sym> }
 token regex_backslash:h { :i <sym> }
 token regex_backslash:n { :i <sym> }
-token regex_backslash:o { :i <sym> [ <octnum> | '['<octnum>[','<octnum>]*']' ] }
+token regex_backslash:o { :i <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
 token regex_backslash:r { :i <sym> }
 token regex_backslash:t { :i <sym> }
 token regex_backslash:v { :i <sym> }
 token regex_backslash:w { :i <sym> }
-token regex_backslash:x { :i <sym> [ <hexnum> | '['<hexnum>[','<hexnum>]*']' ] }
+token regex_backslash:x { :i <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
 token regex_backslash:oops { :: <panic: unrecognized regex backslash sequence> }
 
 token regex_assertion:sym<?> { <sym> <regex_assertion> }
 token regex_assertion:sym<!> { <sym> <regex_assertion> }
 
-token regex_assertion { <block> { @<sym> := <{ }> } }
-token regex_assertion { <sym <variable>> }
-token regex_assertion { <sym <ident>> [               # is qq right here?
+token regex_assertion:sym<{ }> { <block> }
+token regex_assertion:variable { <variable> }
+token regex_assertion:ident { <ident> [               # is qq right here?
                                 | ':' <?ws>
-                                    <q_unbalanced(%sublang<qq><esc>, :stop«>»))>
+                                    <q_unbalanced(qlang('Q',':qq'), :stop«>»))>
                                 | '(' <EXPR> ')'
                                 | <?ws> <EXPR>
                                 ]?
 }
 
-token regex_assertion { <before '[' > <cclass_elem>+ { @<sym> := <[> } }
-token regex_assertion { <before '+' > <cclass_elem>+ { @<sym> := <+> } }
-token regex_assertion { <before '-' > <cclass_elem>+ { @<sym> := <-> } }
+token regex_assertion:sym<[> { <before '[' > <cclass_elem>+ }
+token regex_assertion:sym<+> { <before '+' > <cclass_elem>+ }
+token regex_assertion:sym<-> { <before '-' > <cclass_elem>+ }
 
-token regex_assertion { <panic: unrecognized regex assertion> }
+token regex_assertion:bogus { <panic: unrecognized regex assertion> }
 
 token cclass_elem {
     [ '+' | '-' | <null> ]
