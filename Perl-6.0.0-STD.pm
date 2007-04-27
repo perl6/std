@@ -1575,10 +1575,10 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     $<start> := <$start>
     $<text> := [.*?]
     @<more> := (
-        <!before($stop)>
+        <!before <$stop>>
         [ # XXX triple rule should just be in escapes to be customizable
         | <?before <$start>**{3}>
-            $<dequote> := <EXPR(/<$stop>**{3}/)>
+            $<dequote> := <EXPR(%LOOSEST,/<$stop>**{3}/)>
         | <?before <$start>>
             $<subtext> := <q_balanced($lang, $start, $stop, :@esc)>
         | <?before @esc>
@@ -1593,7 +1593,7 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
 regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
     $<text> := [.*?]
     @<more> := (
-      <!before($stop)>
+      <!before <$stop>>
       [ <?before @esc> $<escape> := [ <q_escape($lang)> ]
       $<text> := [.*?]
     )*
@@ -2208,7 +2208,7 @@ token assertstopper { <stdstopper> | '>' }
 method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
-    if m:p/ <?before($stop)> / {
+    if m:p/ <?before <$stop>> / {
         return;
     }
     my $prevop is context<rw>;
@@ -2255,7 +2255,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
         }
     }
 
-    while not m:p/ <?before($stop)> / {
+    while not m:p/ <?before <$stop>> / {
         %thisop = ();
         my $infix := $.expect_tight_infix($preclim);
         if not defined %thisop<prec> {
@@ -2284,7 +2284,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
             }
         }
         push @opstack, %thisop;
-        if m:p/ <?before($stop)> / {
+        if m:p/ <?before <$stop>> / {
             fail("$infix.perl() is missing right term");
         }
         %thisop = ();
@@ -2490,7 +2490,7 @@ token regex_assertion:ident { <ident> [               # is qq right here?
                                 | ':' <?ws>
                                     <q_unbalanced(qlang('Q',':qq'), :stop«>»))>
                                 | '(' <EXPR> ')'
-                                | <?ws> <EXPR>
+                                | <?ws> <EXPR(%LOOSEST,&assertstopper)>
                                 ]?
 }
 

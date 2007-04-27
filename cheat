@@ -81,6 +81,9 @@ while (<>) {
 	elsif ($newsig) {
 	    $newsig .= ', ' . $newparm;
 	}
+	else {
+	    $newsig = $newparm;
+	}
 	my $mangle = $name . $adv;
 	$mangle =~ s/:(sym)?/_/;
 	$mangle =~ s/(\W)/sprintf("_%02x_",ord($1))/eg;
