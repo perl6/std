@@ -820,17 +820,17 @@ token infix_postfix_meta_operator:sym<=> (--> Item_assignment) {
     <nonest: assignment>
 
     [
-    || <?{ %+thisop<prec> gt %item_assignment<prec> }
+    || <?{ %+thisop<prec> gt %item_assignment<prec> }>
     || <panic: Can't make assignment op of operator looser than assignment>
     ]
 
     [
-    || <!{ %+thisop<assoc> eq 'chain' }
+    || <!{ %+thisop<assoc> eq 'chain' }>
     || <panic: Can't make assignment op of boolean operator>
     ]
     
     [
-    || <!{ %+thisop<assoc> eq 'non' }
+    || <!{ %+thisop<assoc> eq 'non' }>
     || <panic: Can't make assignment op of non-associative operator>
     ]
     
@@ -945,7 +945,7 @@ token package_def {
     <module_name>?
     <trait>* {*}                                                #= traits
     [
-    || <?{ $+begin_compunit } :: ';'
+    || <?{ $+begin_compunit }> :: ';'
         {
             $<module_name> err panic("Compilation unit cannot be anonymous");
             $begin_compunit = 0;
@@ -1737,7 +1737,7 @@ token parameter {
 
     <type_constraint>*
     [
-    | $<slurp> := [ $<quantchar>:=[ '*' ] <param_var> )
+    | $<slurp> := [ $<quantchar>:=[ '*' ] <param_var> ]
         { let $<quant> := '*' }
     |   [ $<named> :=
             [ $<quantchar>:=[ ':' ]
