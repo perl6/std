@@ -430,10 +430,22 @@ class Str does Iter {
     # they only work if eval("$arg") == $arg.
     # A Rule/Regex constructor that takes a string and an Hash could be a useful thing?
 
-    method subst(Regex $rule, $replacement) is primitive is safe {
-        my $dup = self;
-        my $rgx = Pugs::Internals::rule_pattern($rule);
-        my $adv = Pugs::Internals::rule_adverbs($rule);
+    # FIXME: this should be the definition, but with this if I call 
+    # 'hello'.subst(/h/,'f')
+    # $rule is empty (???)
+
+    # method subst(Str|Regex $rule, $replacement) is primitive is safe {
+
+    method subst($rule, $replacement) is primitive is safe {
+        my ($rgx,$adv,$dup = self);
+        # can't use ~~ because /foo/ ~~ Str matches
+        if $rule.isa(Str) {
+          $rgx =  "<'$rule'>";
+        }
+        else {
+          $rgx = Pugs::Internals::rule_pattern($rule);
+          $adv = Pugs::Internals::rule_adverbs($rule);
+        }
 
         # in the map body I can't use a single Str because otherwise interpolation goes wrong
         my $advstr = $adv.map: { ":$_[0]"~"($_[1])"}.join if $adv;
