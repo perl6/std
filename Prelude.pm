@@ -421,6 +421,29 @@ class Str does Iter {
         }
     }
 
+    # XXX: This seems to basically work but it is 
+    # a) wrong
+    # b) slow
+    # Sadly we can't use <$rule> in s/// because it is unimplemented in current pugs
+    # so we just rebuild a regexen from it's source and  adverbs.
+    # Adverbs may have arguments, but since we just recreate them via String manipulation
+    # they only work if eval("$arg") == $arg.
+    # A Rule/Regex constructor that takes a string and an Hash could be a useful thing?
+
+    method subst(Regex $rule, $replacement) is primitive {
+        my $dup = self;
+        my $rgx = Pugs::Internals::rule_pattern($rule);
+        my $adv = Pugs::Internals::rule_adverbs($rule);
+
+        # in the map body I can't use a single Str because otherwise interpolation goes wrong
+        my $advstr = $adv.map: { ":$_[0]"~"($_[1])"}.join if $adv;
+        my $apply = '()' if $replacement ~~ Code;
+        my $op="s$advstr/$rgx/\$replacement$apply/";
+
+        eval('$dup ~~ '~$op);
+        $dup
+    }
+
     method trans (Pair *@intable) is primitive {
         # Motto: If in doubt use brute force!
         my sub expand (Str $string is copy) {
