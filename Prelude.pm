@@ -430,7 +430,7 @@ class Str does Iter {
     # they only work if eval("$arg") == $arg.
     # A Rule/Regex constructor that takes a string and an Hash could be a useful thing?
 
-    method subst(Regex $rule, $replacement) is primitive {
+    method subst(Regex $rule, $replacement) is primitive is safe {
         my $dup = self;
         my $rgx = Pugs::Internals::rule_pattern($rule);
         my $adv = Pugs::Internals::rule_adverbs($rule);
@@ -442,6 +442,10 @@ class Str does Iter {
 
         eval('$dup ~~ '~$op);
         $dup
+    }
+
+    method match(Regex $rule) is primitive is safe{
+        self ~~ $rule
     }
 
     method trans (Pair *@intable) is primitive {
