@@ -574,31 +574,32 @@ token expect_term {
     <adverbs>?
 
     # now push ops over the noun according to precedence.
-    {
-        my $nounphrase = $<noun>;
-        my $pre = pop @<pre>;
-        my $post = shift @<post>;
-        while $pre or $post {
-            $oldterm = $nounphrase;
-            if $pre {
-                if $post and $post<prec> gt $pre<prec> {
-                    $nounphrase = $post;
-                    $post = shift @<post>;
-                }
-                else {
-                    $nounphrase = $pre;
-                    $pre = pop @<pre>;
-                }
+    { return nounphrase(|$/) }
+}
+
+sub nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
+    my $nounphrase = $noun;
+    my $pre = pop @pre;
+    my $post = shift @post;
+    while $pre or $post {
+        $oldterm = $nounphrase;
+        if $pre {
+            if $post and $post<prec> gt $pre<prec> {
+                $nounphrase = $post;
+                $post = shift @post;
             }
             else {
-                $nounphrase = $post;
-                $post = shift @<post>;
+                $nounphrase = $pre;
+                $pre = pop @pre;
             }
-            $nounphrase<term> = $oldterm;
         }
-        {*}
-        return $nounphrase;
+        else {
+            $nounphrase = $post;
+            $post = shift @post;
+        }
+        $nounphrase<term> = $oldterm;
     }
+    return $nounphrase;
 }
 
 token adverbs {
