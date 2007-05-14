@@ -373,7 +373,7 @@ token block {
     <statement_list>
     [ '}' || <panic: Missing right brace> ]
     [
-    | <?unsp>? <?before <[,:]>> {*}                             #= normal 
+    | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
     | <?before <?unv>? \n > {*} { let $<endline> := 1; }        #= endline
     | {*} { let $<endlist> := 1; }                              #= endlist
     ]
