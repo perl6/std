@@ -538,6 +538,12 @@ class Str does Iter {
         my Int $nc = $s.codes;
         my Int $ng = $nc;
         loop(my $i = 0; $i < $nc; $i++) {
+            # Currently, substr treats its numerical arguments as though
+            # they were in units of codepoints, but it should probably
+            # default to graphemes.  So this should really be
+            # substr($s, $i.as(Codes), 1.as(Codes))  S02:620
+            # but that isn't implemented yet.  This unitless version
+            # may (should) stop working in the future.
             $ng-- if substr($s, $i, 1).ord == any(@combining);
         }
         $ng;
