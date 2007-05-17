@@ -60,22 +60,22 @@ class Control::Basic {
     # (maybe :lang<YAML> doesn't quite belong here?)
     multi sub eval (Str $code, Str :$lang = 'Perl6') is primitive is safe is builtin {
         if $lang.lc eq 'perl6' {
-            Pugs::Internals::eval_perl6($code);
+            &Pugs::Internals::eval_perl6.nextwith($code);
         }
         elsif $lang.lc eq 'perl5' {
-            Pugs::Internals::eval_perl5($code);
+            &Pugs::Internals::eval_perl5.nextwith($code);
         }
         elsif $lang.lc eq 'haskell' {
-            Pugs::Internals::eval_haskell($code);
+            &Pugs::Internals::eval_haskell.nextwith($code);
         }
         elsif $lang.lc eq 'parrot' {
-            Pugs::Internals::eval_parrot($code);
+            &Pugs::Internals::eval_parrot.nextwith($code);
         }
         elsif $lang.lc eq 'pir' {
-            Pugs::Internals::eval_parrot($code);
+            &Pugs::Internals::eval_parrot.nextwith($code);
         }
         elsif $lang.lc eq 'yaml' {
-            Pugs::Internals::eval_yaml($code)
+            &Pugs::Internals::eval_yaml.nextwith($code)
         }
         else {
             die "Language \"$lang\" unknown.";
@@ -88,7 +88,7 @@ class Control::Basic {
     # support.
     multi sub evalfile (Str $filename; Str :$lang = 'Perl6')
             is primitive is unsafe {
-        eval(slurp $filename, $lang);
+        &eval.nextwith(slurp $filename, $lang);
     }
 }
 
