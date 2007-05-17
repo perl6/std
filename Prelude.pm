@@ -802,8 +802,16 @@ multi prefix_M ($file) is builtin is primitive is unsafe {
   }
 }
 
+# These are used by t/xx-xx-uncategorized/prelude_test.t
+sub  *prelude_test_1(){'test 1'}
+sub   prelude_test_2_helper(){'test 2'}
+&*prelude_test_2 ::= &prelude_test_2_helper;
+sub   prelude_test_3_helper(){'test 3'}
+&*prelude_test_3 :=  &prelude_test_3_helper;
+multi prelude_test_4(Str $x) is builtin {'test 4'}
+multi *prelude_test_5(Str $x) {'test 5'}
 
-=begin disabled
+=begin END
 
 sub Pugs::Internals::Disabled::use ($module=$+_) is builtin is unsafe {
     #Pugs::Internals::use($module);
@@ -852,15 +860,3 @@ sub Pugs::Internals::compile_file_to_yml($file) is builtin is unsafe {
     system($*EXECUTABLE_NAME~" -CParse-YAML $file > $file.yml");
     say "back.";
 }
-
-=cut
-
-# These are used by t/xx-xx-uncategorized/prelude_test.t
-sub  *prelude_test_1(){'test 1'}
-sub   prelude_test_2_helper(){'test 2'}
-&*prelude_test_2 ::= &prelude_test_2_helper;
-sub   prelude_test_3_helper(){'test 3'}
-&*prelude_test_3 :=  &prelude_test_3_helper;
-multi prelude_test_4(Str $x) is builtin {'test 4'}
-multi *prelude_test_5(Str $x) {'test 5'}
-
