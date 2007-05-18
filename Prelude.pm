@@ -88,7 +88,7 @@ class Control::Basic {
     # support.
     multi sub evalfile (Str $filename; Str :$lang = 'Perl6')
             is primitive is unsafe {
-        &eval.nextwith(slurp $filename, $lang);
+        &*eval.nextwith(slurp $filename, $lang);
     }
 }
 
