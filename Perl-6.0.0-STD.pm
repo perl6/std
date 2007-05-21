@@ -582,7 +582,7 @@ sub nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
     my $pre = pop @pre;
     my $post = shift @post;
     while $pre or $post {
-        $oldterm = $nounphrase;
+        my $oldterm = $nounphrase;
         if $pre {
             if $post and $post<prec> gt $pre<prec> {
                 $nounphrase = $post;
@@ -1177,7 +1177,7 @@ method heredoc {
             if $ws and @heredoc_initial_ws {
                 my $wsequiv = $ws;
                 $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
-                for @heredoc_initial_strings {
+                for @heredoc_initial_ws {
                     next if s/^ $ws //;   # reward consistent tabbing
                     s/^^ (\t+) /{
                         ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
@@ -1301,12 +1301,12 @@ class Q_tweaker does QLang {
 
     method escset {
         @.escapes ||=               # presumably resolves after adverbs
-           '\\' xx ?%option<b>,
-            '$' xx ?%option<s>,
-            '@' xx ?%option<a>,
-            '%' xx ?%option<h>,
-            '&' xx ?%option<f>,
-            '{' xx ?%option<c>;
+           '\\' xx ?%.option<b>,
+            '$' xx ?%.option<s>,
+            '@' xx ?%.option<a>,
+            '%' xx ?%.option<h>,
+            '&' xx ?%.option<f>,
+            '{' xx ?%.option<c>;
     }
 
     multi method tweak (:q($single)) {
@@ -1333,29 +1333,29 @@ class Q_tweaker does QLang {
     multi method tweak (:ww($quotewords)) { %.option<ww> = $quotewords }
 
     multi method tweak (:to($heredoc)) {
-        $.parser = &q_heredoc;
+        $.parser = &Perl::q_heredoc;
         %.option<to> = $heredoc;
     }
 
     multi method tweak (:$regex) {
         $.tweaker = ::RX_tweaker,
-        $.parser = &rx_pickdelim;
+        $.parser = &Perl::rx_pickdelim;
         %.option = < >;
-        $.escrule = &regex_metachar;
+        $.escrule = &Perl::regex_metachar;
     }
 
     multi method tweak (:$trans) {
         $.tweaker = ::TR_tweaker,
-        $.parser = &tr_pickdelim;
+        $.parser = &Perl::tr_pickdelim;
         %.option = < >;
-        $.escrule = &trans_metachar;
+        $.escrule = &Perl::trans_metachar;
     }
 
     multi method tweak (:$code) {
         $.tweaker = ::RX_tweaker,
-        $.parser = &rx_pickdelim;
+        $.parser = &Perl::rx_pickdelim;
         %.option = < >;
-        $.escrule = &regex_metachar;
+        $.escrule = &Perl::regex_metachar;
     }
 
     multi method tweak (*%x) {
@@ -1387,8 +1387,8 @@ class RX_tweaker does QLang {
     multi method tweak (:P5($Perl5)) {
         %.option<P5> = $Perl5;
         $.tweaker = ::P5RX_tweaker,
-        $.parser = &p5rx_pickdelim;
-        $.escrule = &p5regex_metachar;
+        $.parser = &Perl::p5rx_pickdelim;
+        $.escrule = &Perl::p5regex_metachar;
     }
 
     multi method tweak (:$nth)            { %.option<nth> = $nth }
@@ -2404,15 +2404,17 @@ token regex_metachar:sym« )> » { ')>' {*} }                     #= )>
 
 token regex_metachar:sym« << » { '<<' {*} }                     #= <<
 token regex_metachar:sym« >> » { '>>' {*} }                     #= >>
+token regex_metachar:sym< « > { '«' {*} }                       #= «
+token regex_metachar:sym< » > { '»' {*} }                       #= »
 
-token regex_metachar:qwlike {
-    <?before [ '<' | '<<' | '«' ] \s >  # (note required whitespace)
+token regex_metachar:qw {
+    <?before '<' \s >  # (note required whitespace)
     <quote>
     {*}                                                         #= quote
 }
 
 token regex_metachar:sym«< >» {
-    '<' <regex_assertion> '>'
+    '<' <unsp>? <regex_assertion> '>'
     {*}                                                         #= < >
 }
 token regex_metachar:sym<\\> { <sym> <regex_backslash> {*} }    #= \
@@ -2492,7 +2494,16 @@ token regex_assertion:sym<?> { <sym> <regex_assertion> }
 token regex_assertion:sym<!> { <sym> <regex_assertion> }
 
 token regex_assertion:sym<{ }> { <block> }
-token regex_assertion:variable { <variable> }
+token regex_assertion:variable {
+    <?before <sigil>>  # note: semantics must be determined per-sigil
+    <EXPR(%LOOSEST,&assertstopper)>
+    {*}                                                        #= variable
+}
+token regex_assertion:method {
+    <?before '.' <!before '>'> >
+    <EXPR(%LOOSEST,&assertstopper)>
+    {*}                                                        #= method
+}
 token regex_assertion:ident { <ident> [               # is qq right here?
                                 | ':' <?ws>
                                     <q_unbalanced(qlang('Q',':qq'), :stop«>»))>
@@ -2504,6 +2515,9 @@ token regex_assertion:ident { <ident> [               # is qq right here?
 token regex_assertion:sym<[> { <before '[' > <cclass_elem>+ }
 token regex_assertion:sym<+> { <before '+' > <cclass_elem>+ }
 token regex_assertion:sym<-> { <before '-' > <cclass_elem>+ }
+token regex_assertion:sym<.> { <sym> }
+token regex_assertion:sym<,> { <sym> }
+token regex_assertion:sym<~~> { <sym> <variable>? }
 
 token regex_assertion:bogus { <panic: unrecognized regex assertion> }
 
