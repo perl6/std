@@ -292,6 +292,9 @@ proto token infix_prefix_meta_operator { }
 token category:infix_postfix_meta_operator { <sym> }
 proto token infix_postfix_meta_operator { }
 
+token category:infix_circumfixfix_meta_operator { <sym> }
+proto token infix_circumfixfix_meta_operator { }
+
 token category:postfix_prefix_meta_operator { <sym> }
 proto token postfix_prefix_meta_operator { }
 
@@ -543,7 +546,7 @@ token module_name {
 
 token whatever { '*' {*} }
 
-token version {
+token version:sym<v> {
     v \d+ [ '.' (\d+ | <whatever>) ]* '+'?            {*}       #= vstyle
 }
 
@@ -761,10 +764,9 @@ regex nonest (Str $s) {
     <!{ %+thisop{$s}++ }> || <panic: Nested $s metaoperators not allowed>
 }
 
-token infix_circumfix_meta_operator (--> List_infix) {
+token infix_circumfix_meta_operator:sym<X X> (--> List_infix) {
     X <infix_nospace> X
     <nonest: cross>
-    { @<sym> := <X X> }
     {*}                                                         #= X X
 }
 
@@ -1202,21 +1204,21 @@ token quote:sym«< >»   { <?before '<'  > <quotesnabber(":q", ":w")>  }
 token quote:sym</ />   { <?before '/'  > <quotesnabber(":regex")> }
 
 # handle composite forms like qww
-token quote:qq { <sym> <quote_mod_external>
-    <quotesnabber(':qq', $<quote_mod_external>)> }
-token quote:q { <sym>  <quote_mod_external>
-    <quotesnabber(':q', $<quote_mod_external>)> }
+token quote:qq { <sym> <quote_mod>
+    <quotesnabber(':qq', $<quote_mod>)> }
+token quote:q { <sym>  <quote_mod>
+    <quotesnabber(':q', $<quote_mod>)> }
 
-token quote_mod_external:w  { <sym> }
-token quote_mod_external:ww { <sym> }
-token quote_mod_external:x  { <sym> }
-token quote_mod_external:to { <sym> }
-token quote_mod_external:s  { <sym> }
-token quote_mod_external:a  { <sym> }
-token quote_mod_external:h  { <sym> }
-token quote_mod_external:f  { <sym> }
-token quote_mod_external:c  { <sym> }
-token quote_mod_external:b  { <sym> }
+token quote_mod:w  { <sym> }
+token quote_mod:ww { <sym> }
+token quote_mod:x  { <sym> }
+token quote_mod:to { <sym> }
+token quote_mod:s  { <sym> }
+token quote_mod:a  { <sym> }
+token quote_mod:h  { <sym> }
+token quote_mod:f  { <sym> }
+token quote_mod:c  { <sym> }
+token quote_mod:b  { <sym> }
 
 token quote:rx { <sym> <quotesnabber(':regex')> }
 
