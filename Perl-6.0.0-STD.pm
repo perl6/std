@@ -2405,6 +2405,12 @@ token regex_metachar:sym« )> » { ')>' {*} }                     #= )>
 token regex_metachar:sym« << » { '<<' {*} }                     #= <<
 token regex_metachar:sym« >> » { '>>' {*} }                     #= >>
 
+token regex_metachar:qwlike {
+    <?before [ '<' | '<<' | '«' ] \s >  # (note required whitespace)
+    <quote>
+    {*}                                                         #= quote
+}
+
 token regex_metachar:sym«< >» {
     '<' <regex_assertion> '>'
     {*}                                                         #= < >
