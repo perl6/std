@@ -367,6 +367,13 @@ rule comp_unit (:$begin_compunit is context = 1) {
     {*}
 }
 
+# Note: because of the possibility of placeholders we can't determine arity of
+# the block syntactically, so this must be determined via semantic analysis.
+# Also, pblocks used in an if/unless statement do not treat $_ as a placeholder,
+# while most other blocks treat $_ as equivalent to $^x.  Therefore the first
+# possible place to check arity is not here but in the rule that calls this
+# rule.  (Could also be done in a later pass.)
+
 token pblock {
     [ '->' <signature> ]? <block>
 }
