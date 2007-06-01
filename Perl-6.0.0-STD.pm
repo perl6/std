@@ -877,7 +877,7 @@ token postop {
 token methodop {
     [
     | <ident>
-    | <?before '$'> <variable>
+    | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]>> <quote>
     ] <?unsp>? 
 
