@@ -774,7 +774,7 @@ multi prefix_M ($file) is builtin is primitive is unsafe {
     undef;
   }
   else {
-    my $cmd = %?CONFIG<perl5path>~q{ -e 'print join("\n", map {-M}, @ARGV,"")' }~$file;
+    my $cmd = %?CONFIG<perl5_path>~q{ -e 'print join("\n", map {-M}, @ARGV,"")' }~$file;
     my $p = Pipe::open($cmd);
     my $m = slurp($p);  $p.close;
     # In src/perl6/Prelude.pm, regexs dont work. :(
