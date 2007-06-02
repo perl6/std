@@ -1276,22 +1276,18 @@ role QLang {
     has $.parser;
     has $.escrule;
 
-    my %Q_root := {
-        Q => {                          # base form of all quotes
-        },
-    };
-
     # a method, so that everything is overridable in derived grammars
-    method root_of_Q ( --> Mapping) {
-        tweaker => ::Q_tweaker,      # class name should be virtual here!
-        parser => &Perl::q_pickdelim,
-        option => < >,
-        escrule => &Perl::quote_escapes,
+    method root_of_Q () {
+        return
+            tweaker => ::Q_tweaker,      # class name should be virtual here!
+            parser => &Perl::q_pickdelim,
+            option => < >,
+            escrule => &Perl::quote_escapes;
     }
 
     method new (@pedigree) {
         if @pedigree == 1 {
-            my %start = try { self."root_of_@pedigree[0]" } err
+            my %start = try { self."root_of_@pedigree[0]" } //
                 panic("Quote construct @pedigree[0] not recognized");
             return $.bless(|%start);
         }
@@ -1826,7 +1822,7 @@ token term:sym<*> ( --> Term)
 token circumfix:sigil ( --> Term)
     { <sym <sigil>> $<sym>:='(' <EXPR> $<sym>:=')' {*} }        #= $( ) 
 
-token circumfix:typename ( --> Term)
+token circumfix:typecast ( --> Term)
     { <sym <typename>> $<sym>:='(' <EXPR> $<sym>:=')' {*} }     #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
@@ -2150,20 +2146,21 @@ token infix:sym<minmax> ( --> List_infix)
     { <sym> {*} }                                               #= minmax
 
 token prefix:sigil ( --> List_prefix)
-    { <sym <sigil> ':' > \s
-        <EXPR(%list_prefix)>              {*}                   #= $:
-    }
+    { <sym <sigil>> \s <EXPR(%list_prefix)> {*} }               #= $
 
-token prefix:typename ( --> List_prefix)
-    { <sym <typename> ':' > \s
-        <EXPR(%list_prefix)>              {*}                   #= Type: 
-    }
+token prefix:typecast ( --> List_prefix)
+    { <sym <typename>> \s <EXPR(%list_prefix)> {*} }            #= Type
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last prefix: rule)
 token prefix:listop ( --> List_prefix)
-    { :: <sym <ident> > \s <nofat>
-        <EXPR(%list_prefix)>              {*}                   #= print
+    { ::                        # call this rule last (as "shortest" token)
+        <sym <ident>>
+        [
+        || \s <nofat> <EXPR(%list_prefix)> {*}                  #= listop args
+        || <nofat> {*}                                          #= listop noarg
+        ]
+        {*}                                                     #= listop
     }
 
 ## loose and
