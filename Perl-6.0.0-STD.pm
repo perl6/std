@@ -892,8 +892,8 @@ token methodop {
 token circumfix:sym<( )> { '(' <EXPR> ')' {*} }                 #= ( )
 token circumfix:sym<[ ]> { '[' <EXPR> ']' {*} }                 #= [ ]
 
-token circumfix:sym«< >»   { '<'  <anglewords '>'> '>'  {*} }   #= < >
-token circumfix:sym«<< >>» { '<<' <shellwords '>>'> '>>' {*} }  #= << >>
+token circumfix:sym«< >»   { '<'  <anglewords '>'> '>'  {*} } #'#= < >
+token circumfix:sym«<< >>» { '<<' <shellwords '>>'> '>>' {*} }#'#= << >>
 token circumfix:sym<« »>   { '«'  <shellwords '»'> '»'  {*} }   #= « »
 
 token anglewords($stop) {
@@ -919,9 +919,10 @@ token variable_decl {
     ]?
 
     <trait>*
+    <?ws>
     [
-    | '=' <EXPR(%item_assignment)>
-    | '.=' <EXPR(%item_assignment)>
+    | '=' <?ws> <EXPR(%item_assignment)>
+    | '.=' <?ws> <EXPR(%item_assignment)>
     ]
 }
 
@@ -1277,17 +1278,20 @@ role QLang {
 
     my %Q_root := {
         Q => {                          # base form of all quotes
-            tweaker => ::Q_tweaker,
-            parser => &Perl::q_pickdelim,
-            option => < >,
-            escrule => &Perl::quote_escapes,
         },
     };
 
+    # a method, so that everything is overridable in derived grammars
+    method root_of_Q ( --> Mapping) {
+        tweaker => ::Q_tweaker,      # class name should be virtual here!
+        parser => &Perl::q_pickdelim,
+        option => < >,
+        escrule => &Perl::quote_escapes,
+    }
 
     method new (@pedigree) {
         if @pedigree == 1 {
-            my %start := %Q_root{@pedigree[0]} err
+            my %start = try { self."root_of_@pedigree[0]" } err
                 panic("Quote construct @pedigree[0] not recognized");
             return $.bless(|%start);
         }
