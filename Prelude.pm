@@ -525,7 +525,8 @@ class Str does Iter {
             # substr($s, $i.as(Codes), 1.as(Codes))  S02:620
             # but that isn't implemented yet.  This unitless version
             # may (should) stop working in the future.
-            $ng-- if substr($s, $i, 1).ord == any(@combining);
+            $ng-- if substr($s, $i, 1).ord == any(@combining)
+                    or substr($s, $i, 2) eq "\r\n";
         }
         $ng;
     }
