@@ -375,8 +375,10 @@ rule comp_unit (:$begin_compunit is context = 1) {
 # rule.  (Could also be done in a later pass.)
 
 token pblock {
-    [ $<arrow> := ( '->' | '<->' ) <signature> ]? <block>
+    [ <lambda> <signature> ]? <block>
 }
+
+token lambda { '->' | '<->' }
 
 token block {
     '{'
@@ -678,7 +680,7 @@ regex infix_nospace {
 }
 
 token expect_tight_infix ($loosest) {
-    <!before '{' | '->' >           #'  # presumably a statement control block
+    <!before '{' | <lambda> >     #'  # presumably a statement control block
     <expect_infix>
     ::: <?{ %+thisop<prec> ge $loosest }>
 }
