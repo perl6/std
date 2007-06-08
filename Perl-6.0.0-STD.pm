@@ -375,7 +375,7 @@ rule comp_unit (:$begin_compunit is context = 1) {
 # rule.  (Could also be done in a later pass.)
 
 token pblock {
-    [ '->' <signature> ]? <block>
+    [ $<arrow> := ( '->' | '<->' ) <signature> ]? <block>
 }
 
 token block {
