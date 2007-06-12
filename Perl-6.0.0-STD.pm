@@ -329,12 +329,19 @@ token unsp {
 token unv {
        | \h+                 {*}                                #= hwhite
        | ^^ [
-            | '#' \N*         {*}                               #= line
+            | '#' [
+                || <?{ ($<start>,$<stop>) = $.peek_brackets() }> ::
+                     $<start> \N*
+                     [ <!before ^^ '#' $stop> \N* \n ]*?
+                     ^^ '#' $<stop> \N*
+                             {*}                                #= block
+                || \N*       {*}                                #= line
+            ]
             | <?pod_comment> {*}                                #= pod
             ]
        | '#' [
             # assuming <bracketed> defaults to standard set
-            | <?bracketed>   {*}                                #= inline
+            | <?bracketed>   {*}                                #= embedded
             | \N*            {*}                                #= end
             ]
 }
@@ -1522,44 +1529,53 @@ constant %open2close = {
 
 # assumes whitespace is eaten already
 
-method findbrack {
+method peek_delimiters {
+    return peek_brackets ||
+        substr($_,0,1) xx 2;
+}
+
+method peek_brackets {
     my $start;
     my $stop;
-    if m:p/ <?before <isPe>> / {
+    if m:p/ \s / {
+        panic("Whitespace not allowed as delimiter");
+    }
+    elsif m:p/ <?before <isPe>> / {
         panic("Use a closing delimiter for an opener is reserved");
     }
-    elsif m:p/ <?before $start := [ (<isPs>|<isMirrored>) $0* ] > / {
+    elsif m:p/ <?before $start := [ (leftbrack) $0* ] > / {
         $stop = %open2close{$0} err
             panic("Don't know how to flip $start bracket");
         $stop x= $start.chars;
-        $+delim = [$start,$stop];
         return $start, $stop;
     }
     else {
-        $+delim = substr($_,0,1);
         return ();
     }
 }
 
 regex bracketed ($lang = qlang("Q")) {
-     <?{ ($<start>,$<stop>) = $.findbrack() }>
+     <?{ ($<start>,$<stop>) = $.peek_brackets() }>
      $<q> := <q_balanced($lang, $<start>, $<stop>)>
     {*}
 }
 
 regex q_pickdelim ($lang) {
-    [
-    || <?{ ($<start>,$<stop>) = $.findbrack() }>
-       $<q> := <q_balanced($lang, $<start>, $<stop>)>
-    || [ $<stop> := [\S] || <panic: Quote delimiter must not be whitespace> ]
-       $<q> := <q_unbalanced($lang, $<stop>)>
-    ]
+    {
+       ($<start>,$<stop>) = $.peek_delimiters() }>
+       if $<start> eq $<stop> {
+           $<q> := self.q_unbalanced($lang, $<stop>);
+       }
+       else {
+           $<q> := self.q_balanced($lang, $<start>, $<stop>);
+       }
+    }
     {*}
 }
 
 regex rx_pickdelim ($lang) {
     [
-    | <?{ ($<start>,$<stop>) = $.findbrack() }>
+    | <?{ ($<start>,$<stop>) = $.peek_delimiters() }>
       $<start>
       $<r> := <regex($<stop>)>        # counts its own brackets, we hope
     | [ $<stop> := [\S] || <panic: Regex delimiter must not be whitespace> ]
@@ -1570,7 +1586,7 @@ regex rx_pickdelim ($lang) {
 
 regex tr_pickdelim ($lang) {
     [
-    | <?{ ($<start>,$<stop>) = $.findbrack() }>
+    | <?{ ($<start>,$<stop>) = $.peek_delimiters() }>
       $<start>
       $<r> := <transliterator($<stop>)>
     | [ $<stop> := [\S] || <panic: tr delimiter must not be whitespace> ]
