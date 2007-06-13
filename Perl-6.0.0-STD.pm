@@ -341,7 +341,7 @@ token block_comment {
     $<start> \N* \n                        # eat the #{ line
     [
     ||  [
-        || <block_comment> \n  # inner block comments must match up too
+        || [ <?block_comment> | <?pod_comment> ] \n # inner blocks must match too
         || \N* \n
         ]*?                                # 0 or more inner lines
         ^^ '#' $<stop> <differ> \N*        # the #} line (leave final \n there)
@@ -359,8 +359,8 @@ token pod_comment {
     ^^ '=' <?unsp>?
     [
     | begin <?ws> <ident> .*? \n
-      '=' <?unsp>? 'end' <?ws> $<ident> \N* \n?     {*}         #= block
-    | \N* \n?                                       {*}         #= misc
+      '=' <?unsp>? 'end' <?ws> $<ident> \N*         {*}         #= block
+    | \N*                                           {*}         #= misc
     ]
     {*}
 }
@@ -1303,6 +1303,7 @@ role QLang {
 
     method new (@pedigree) {
         if @pedigree == 1 {
+#           my %start = try { self."root_of_@pedigree[0]" } //
             my %start = try { self.root_of_Q } //
                 panic("Quote construct @pedigree[0] not recognized");
             return $.bless(|%start);
