@@ -327,24 +327,31 @@ token unsp {
 }
 
 token unv {
-       | \h+                 {*}                                #= hwhite
-       | ^^ [
-            | '#' [
-                || <?{ ($<start>,$<stop>) = $.peek_brackets() }> ::
-                     $<start> \N*
-                     [ <!before ^^ '#' $stop> \N* \n ]*?
-                     ^^ '#' $<stop> \N*
-                             {*}                                #= block
-                || \N*       {*}                                #= line
-            ]
-            | <?pod_comment> {*}                                #= pod
-            ]
-       | '#' [
-            # assuming <bracketed> defaults to standard set
-            | <?bracketed>   {*}                                #= embedded
-            | \N*            {*}                                #= end
-            ]
+   | \h+                 {*}                                    #= hwhite
+   | ^^ [ <?block_comment> | <?pod_comment> ]  {*}              #= multiline
+   | '#' [
+        # assuming <bracketed> defaults to standard set
+        | <?bracketed>   {*}                                    #= embedded
+        | \N*            {*}                                    #= end
+        ]
 }
+
+token block_comment {
+    ^^ '#' <?{ ($<start>,$<stop>) = $.peek_brackets() }>
+    $<start> \N* \n                        # eat the #{ line
+    [
+    ||  [
+        || <block_comment> \n  # inner block comments must match up too
+        || \N* \n
+        ]*?                                # 0 or more inner lines
+        ^^ '#' $<stop> <differ> \N*        # the #} line (leave final \n there)
+    || <panic: Unterminated block comment> # (hopefully adds current position)
+    ]
+    {*}                                                         #= block
+}
+
+regex same   { <?after (.)> <?before $0> }
+regex differ { <?after (.)> <!before $0> }
 
 # XXX We need to parse the pod eventually to support $= variables.
 
