@@ -1296,7 +1296,7 @@ role QLang {
 
     method new (@pedigree) {
         if @pedigree == 1 {
-            my %start = try { self."root_of_@pedigree[0]" } //
+            my %start = try { self.root_of_Q } //
                 panic("Quote construct @pedigree[0] not recognized");
             return $.bless(|%start);
         }
@@ -1562,7 +1562,7 @@ regex bracketed ($lang = qlang("Q")) {
 
 regex q_pickdelim ($lang) {
     {
-       ($<start>,$<stop>) = $.peek_delimiters() }>
+       ($<start>,$<stop>) = $.peek_delimiters();
        if $<start> eq $<stop> {
            $<q> := self.q_unbalanced($lang, $<stop>);
        }
