@@ -453,6 +453,11 @@ rule statement_control:use {
     <module_name> <EXPR>? ';'?                       {*}        #= use
 }
 
+rule statement_control:no {
+    <sym>
+    <module_name> <EXPR>? ';'?                       {*}        #= no
+}
+
 rule statement_control:if {
     <sym>
     <EXPR>                           {*}                        #= if expr
@@ -968,6 +973,18 @@ token package_declarator:grammar { <sym> <package_def> {*} }    #= grammar
 token package_declarator:module  { <sym> <package_def> {*} }    #= module
 token package_declarator:role    { <sym> <package_def> {*} }    #= role
 token package_declarator:package { <sym> <package_def> {*} }    #= package
+
+token package_declarator:require {   # here because of declarational aspects
+    <sym>
+    <module_name> <EXPR>?
+    {*}
+}
+
+token package_declarator:trusts {
+    <sym>
+    <module_name>
+    {*}
+}
 
 token package_def {
     <module_name>?
