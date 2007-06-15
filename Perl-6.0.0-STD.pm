@@ -895,6 +895,7 @@ token methodop {
     | <ident>
     | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]>> <quote>
+        { $<quote> ~~ /\W/ or panic("Useless use of quotes") }
     ] <?unsp>? 
 
     [
@@ -1857,6 +1858,14 @@ token circumfix:sym<( )> ( --> Term)
 token postcircumfix:sym<( )> ( --> Term)
     { '(' <EXPR> ')'  {*} }                                     #= ( )
 
+## methodcall
+
+token infix:sym<.> ( --> Methodcall)
+    { <panic: Please use ~ instead of . to concatenate strings> }
+
+token postfix:sym{'->'} ( --> Methodcall)
+    { <panic: Please use . instead of -> to call methods> }
+
 ## autoincrement
 token postfix:sym<++> ( --> Autoincrement)
     { <sym> {*} }                                               #= ++
@@ -2132,6 +2141,9 @@ token infix:sym<//> ( --> Tight_or)
 ## conditional
 token infix:sym<?? !!> ( --> Conditional)
     { '??' <EXPR(%conditional)> '!!' {*} }                      #= ?? !!
+
+token infix:sym<?> ( --> Conditional)
+    { <panic: Please use ??!! instead of ?: for the conditional operator> }
 
 
 ## assignment
