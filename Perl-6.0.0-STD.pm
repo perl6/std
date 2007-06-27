@@ -1974,6 +1974,12 @@ token infix:sym<+&> ( --> Multiplicative)
 token infix:sym« +< » ( --> Multiplicative)
     { <sym> {*} }                                               #= +<
 
+token infix:sym« << » ( --> Multiplicative)
+    { <panic: Please use +< or ~< instead of << to do left shift> }
+
+token infix:sym« >> » ( --> Multiplicative)
+    { <panic: Please use +> or ~> instead of >> to do right shift> }
+
 token infix:sym« +> » ( --> Multiplicative)
     { <sym> {*} }                                               #= +>
 
