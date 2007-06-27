@@ -667,7 +667,7 @@ token noun {
 
 token pair {
     [
-    | $<key>:=<ident> \h* '=>' $<val>:=<EXPR(%assignment)>
+    | $<key>:=<ident> \h* '=>' $<val>:=<EXPR(%item_assignment)>
                                                         {*}     #= fat
     | [ <colonpair> <?ws> ]+
                                                         {*}     #= colon
@@ -1232,7 +1232,7 @@ method heredoc {
             $herestub.orignode<doc> = $doc;
         }
         else {
-            fail("Ending delimiter $delim not found");
+            panic("Ending delimiter $delim not found");
         }
     }
 }
@@ -1760,7 +1760,15 @@ rule type_declarator:subset {
 rule type_constraint {
     [
     | <value>
-    | where <EXPR>
+    | where <EXPR(%chaining)>
+    ]
+    {*}
+}
+
+rule post_constraint {
+    [
+    | <multisig>
+    | where <EXPR(%chaining)
     ]
     {*}
 }
@@ -1806,8 +1814,9 @@ token parameter {
         ]
         [ $<quantchar> := <[ ? ! ]> { let $<quant> := $<quantchar> } ]?
     ]
-
     <trait>*
+
+    <post_constraint>*
 
     [
         <default_value> {
@@ -2106,10 +2115,10 @@ token infix:sym<~~> ( --> Chaining)
     { <sym> {*} }                                               #= ~~
 
 token infix:sym<!~> ( --> Chaining)
-    { <sym> {*} }                                               #= !~
+    { <panic: Please use !~~ instead of !~ to do negated pattern matching> }
 
 token infix:sym<=~> ( --> Chaining)
-    { <sym> {*} }                                               #= =~
+    { <panic: Please use ~~ instead of =~ to do pattern matching> }
 
 token infix:sym<eq> ( --> Chaining)
     { <sym> {*} }                                               #= eq
@@ -2324,6 +2333,10 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
     while not m:p/ <?before <$stop>> / {
         %thisop = ();
         my $infix := $.expect_tight_infix($preclim);
+        
+        # XXX might want to allow this in a declaration though
+        if not $infix { panic("Can't have two terms in a row") }
+
         if not defined %thisop<prec> {
             %thisop = %terminator;
         }
@@ -2351,7 +2364,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
         }
         push @opstack, %thisop;
         if m:p/ <?before <$stop>> / {
-            fail("$infix.perl() is missing right term");
+            panic("$infix.perl() is missing right term");
         }
         %thisop = ();
         push @termstack, $.expect_term();
