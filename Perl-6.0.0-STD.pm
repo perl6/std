@@ -94,7 +94,7 @@ token TOP { <UNIT( $+unitstop or /$/ )> {*} }
 =end comment linkage
 
 # The internal precedence levels are *not* part of the public interface.
-# The current values are mere implmentation; they may change at any time.
+# The current values are mere implementation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
 
 constant %term              = { :prec<z=>                           };
