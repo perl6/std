@@ -441,7 +441,7 @@ rule statement {
     [
     | <statement_control>                        {*}            #= control
     | <block>                                    {*}            #= block
-    | <EXPR>                                     {*}            #= expr
+    | $0:=<expect_term> <EXPR(:seen($0))>        {*}            #= expr
         [<statement_mod_cond> <EXPR> {*} ]?                     #= mod cond
         [<statement_mod_loop> <EXPR> {*} ]?                     #= mod loop
     ]
@@ -2286,7 +2286,10 @@ token assertstopper { <stdstopper> | '>' }
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
+method EXPR (%preclim = %LOOSEST,
+                :$stop = &stdstopper,
+                :$seen = $.expect_term())
+{
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
     if m:p/ <?before <$stop>> / {
@@ -2298,7 +2301,7 @@ method EXPR (%preclim = %LOOSEST, :$stop = &stdstopper) {
     my @opstack;
 
     push @opstack, %terminator;         # (just a sentinel value)
-    push @termstack, $.expect_term();
+    push @termstack, $seen;
 
     my sub reduce () {
         my $op = pop @opstack;
