@@ -911,8 +911,8 @@ token methodop {
     {*}
 }
 
-token circumfix:sym<( )> { '(' <EXPR> ')' {*} }                 #= ( )
-token circumfix:sym<[ ]> { '[' <EXPR> ']' {*} }                 #= [ ]
+token circumfix:sym<( )> { '(' <statement> ')' {*} }            #= ( )
+token circumfix:sym<[ ]> { '[' <statement> ']' {*} }            #= [ ]
 
 token circumfix:sym«< >»   { '<'  <anglewords '>'> '>'  {*} } #'#= < >
 token circumfix:sym«<< >>» { '<<' <shellwords '>>'> '>>' {*} }#'#= << >>
@@ -1873,10 +1873,10 @@ token term:sym<*> ( --> Term)
     { <sym> {*} }                                               #= *
 
 token circumfix:sigil ( --> Term)
-    { <sym <sigil>> $<sym>:='(' <EXPR> $<sym>:=')' {*} }        #= $( ) 
+    { <sym <sigil>> $<sym>:='(' <statement> $<sym>:=')' {*} }        #= $( ) 
 
 token circumfix:typecast ( --> Term)
-    { <sym <typename>> $<sym>:='(' <EXPR> $<sym>:=')' {*} }     #= Type( ) 
+    { <sym <typename>> $<sym>:='(' <statement> $<sym>:=')' {*} }     #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
     { '(' <EXPR> ')'  {*} }                                     #= ( )
