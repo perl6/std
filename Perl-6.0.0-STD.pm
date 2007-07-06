@@ -376,7 +376,7 @@ method UNIT ($unitstop is context = /$/) {
 # Note: we only check for the unitstopper.  We don't check for ^ because
 # we might be embedded in something else.
 rule comp_unit (:$begin_compunit is context = 1) {
-    <statement_list>
+    <semilist>
     [ <$+unitstop> || <panic: Can't understand next input--giving up> ]
     {*}
 }
@@ -396,7 +396,7 @@ token lambda { '->' | '<->' }
 
 token block {
     '{'
-    <statement_list>
+    <semilist>
     [ '}' || <panic: Missing right brace> ]
     [
     | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
@@ -418,7 +418,7 @@ token regex_block {  # perhaps parameterize and combine with block someday
     {*}
 }
 
-rule statement_list {
+rule semilist {
     <statement>*
     {*}
 }
@@ -873,13 +873,13 @@ token postfix:sym<++> (--> Autoincrement) { <sym> {*} }         #= incr
 token postfix:sym<--> (--> Autoincrement) { <sym> {*} }         #= decr
 
 token postcircumfix:sym<( )> (--> Methodcall)
-    { '(' <EXPR> ')' {*} }                                      #= ( )
+    { '(' <semilist> ')' {*} }                                      #= ( )
 
 token postcircumfix:sym<[ ]> (--> Methodcall)
-    { '[' <EXPR> ']' {*} }                                      #= [ ]
+    { '[' <semilist> ']' {*} }                                      #= [ ]
 
 token postcircumfix:sym<{ }> (--> Methodcall)
-    { '{' <EXPR> '}' {*} }                                      #= { }
+    { '{' <semilist> '}' {*} }                                      #= { }
 
 token postcircumfix:sym«< >» (--> Methodcall)
     { '<' <anglewords> '>' {*} }                                #= < >
@@ -904,15 +904,15 @@ token methodop {
     ] <?unsp>? 
 
     [
-    | '.'? <?unsp>? '(' <EXPR> ')'
+    | '.'? <?unsp>? '(' <semilist> ')'
     | ':' <?before \s> <!{ $+inquote }> <EXPR(%list_prefix)>
     | <null>
     ]
     {*}
 }
 
-token circumfix:sym<( )> { '(' <statement> ')' {*} }            #= ( )
-token circumfix:sym<[ ]> { '[' <statement> ']' {*} }            #= [ ]
+token circumfix:sym<( )> { '(' <semilist> ')' {*} }            #= ( )
+token circumfix:sym<[ ]> { '[' <semilist> ']' {*} }            #= [ ]
 
 token circumfix:sym«< >»   { '<'  <anglewords '>'> '>'  {*} } #'#= < >
 token circumfix:sym«<< >>» { '<<' <shellwords '>>'> '>>' {*} }#'#= << >>
@@ -1095,7 +1095,7 @@ token sublongname {
 }
 
 token subcall {
-    <subshortname> <?unsp>? '.'? '(' <EXPR> ')'
+    <subshortname> <?unsp>? '.'? '(' <semilist> ')'
     {*}
 }
 
@@ -1873,16 +1873,16 @@ token term:sym<*> ( --> Term)
     { <sym> {*} }                                               #= *
 
 token circumfix:sigil ( --> Term)
-    { <sym <sigil>> $<sym>:='(' <statement> $<sym>:=')' {*} }        #= $( ) 
+    { <sym <sigil>> $<sym>:='(' <semilist> $<sym>:=')' {*} }        #= $( ) 
 
 token circumfix:typecast ( --> Term)
-    { <sym <typename>> $<sym>:='(' <statement> $<sym>:=')' {*} }     #= Type( ) 
+    { <sym <typename>> $<sym>:='(' <semilist> $<sym>:=')' {*} }     #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
-    { '(' <EXPR> ')'  {*} }                                     #= ( )
+    { '(' <semilist> ')'  {*} }                                     #= ( )
 
 token postcircumfix:sym<( )> ( --> Term)
-    { '(' <EXPR> ')'  {*} }                                     #= ( )
+    { '(' <semilist> ')'  {*} }                                     #= ( )
 
 ## methodcall
 
@@ -2594,7 +2594,7 @@ token regex_assertion:method {
 token regex_assertion:ident { <ident> [               # is qq right here?
                                 | ':' <?ws>
                                     <q_unbalanced(qlang('Q',':qq'), :stop«>»))>
-                                | '(' <EXPR> ')'
+                                | '(' <semilist> ')'
                                 | <?ws> <EXPR(%LOOSEST,&assertstopper)>
                                 ]?
 }
@@ -2616,7 +2616,7 @@ token cclass_elem {
     ]
 }
 
-token regex_mod_arg { '(' <EXPR> ')' }
+token regex_mod_arg { '(' <semilist> ')' }
 
 token regex_mod_internal:adv {
     <quotepair> { @<sym> := «: $<quotepair><key>» }
