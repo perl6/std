@@ -376,7 +376,7 @@ method UNIT ($unitstop is context = /$/) {
 # Note: we only check for the unitstopper.  We don't check for ^ because
 # we might be embedded in something else.
 rule comp_unit (:$begin_compunit is context = 1) {
-    <semilist>
+    <statementlist>
     [ <$+unitstop> || <panic: Can't understand next input--giving up> ]
     {*}
 }
@@ -396,7 +396,7 @@ token lambda { '->' | '<->' }
 
 token block {
     '{'
-    <semilist>
+    <statementlist>
     [ '}' || <panic: Missing right brace> ]
     [
     | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
@@ -418,6 +418,13 @@ token regex_block {  # perhaps parameterize and combine with block someday
     {*}
 }
 
+# statement semantics
+rule statementlist {
+    <statement>*
+    {*}
+}
+
+# embedded semis, context-dependent semantics
 rule semilist {
     <statement>*
     {*}
@@ -873,13 +880,13 @@ token postfix:sym<++> (--> Autoincrement) { <sym> {*} }         #= incr
 token postfix:sym<--> (--> Autoincrement) { <sym> {*} }         #= decr
 
 token postcircumfix:sym<( )> (--> Methodcall)
-    { '(' <semilist> ')' {*} }                                      #= ( )
+    { '(' <semilist> ')' {*} }                                  #= ( )
 
 token postcircumfix:sym<[ ]> (--> Methodcall)
-    { '[' <semilist> ']' {*} }                                      #= [ ]
+    { '[' <semilist> ']' {*} }                                  #= [ ]
 
 token postcircumfix:sym<{ }> (--> Methodcall)
-    { '{' <semilist> '}' {*} }                                      #= { }
+    { '{' <semilist> '}' {*} }                                  #= { }
 
 token postcircumfix:sym«< >» (--> Methodcall)
     { '<' <anglewords> '>' {*} }                                #= < >
@@ -910,13 +917,6 @@ token methodop {
     ]
     {*}
 }
-
-token circumfix:sym<( )> { '(' <semilist> ')' {*} }            #= ( )
-token circumfix:sym<[ ]> { '[' <semilist> ']' {*} }            #= [ ]
-
-token circumfix:sym«< >»   { '<'  <anglewords '>'> '>'  {*} } #'#= < >
-token circumfix:sym«<< >>» { '<<' <shellwords '>>'> '>>' {*} }#'#= << >>
-token circumfix:sym<« »>   { '«'  <shellwords '»'> '»'  {*} }   #= « »
 
 token anglewords($stop) {
     <?ws> [ <!before $stop> .]*  # XXX need to split
@@ -1873,16 +1873,23 @@ token term:sym<*> ( --> Term)
     { <sym> {*} }                                               #= *
 
 token circumfix:sigil ( --> Term)
-    { <sym <sigil>> $<sym>:='(' <semilist> $<sym>:=')' {*} }        #= $( ) 
+    { <sym <sigil>> $<sym>:='(' <semilist> $<sym>:=')' {*} }    #= $( ) 
 
 token circumfix:typecast ( --> Term)
-    { <sym <typename>> $<sym>:='(' <semilist> $<sym>:=')' {*} }     #= Type( ) 
+    { <sym <typename>> $<sym>:='(' <semilist> $<sym>:=')' {*} } #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
-    { '(' <semilist> ')'  {*} }                                     #= ( )
+    { '(' <statementlist> ')'  {*} }                            #= ( )
 
-token postcircumfix:sym<( )> ( --> Term)
-    { '(' <semilist> ')'  {*} }                                     #= ( )
+token circumfix:sym<[ ]> ( --> Term)
+    { '[' <statementlist> ']' {*} }                             #= [ ]
+
+token circumfix:sym«< >» ( --> Term)
+    { '<'  <anglewords '>'> '>'  {*} }                        #'#= < >
+token circumfix:sym«<< >>» ( --> Term)
+    { '<<' <shellwords '>>'> '>>' {*} }                       #'#= << >>
+token circumfix:sym<« »> ( --> Term)
+    { '«'  <shellwords '»'> '»'  {*} }                          #= « »
 
 ## methodcall
 
