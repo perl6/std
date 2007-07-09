@@ -1140,6 +1140,8 @@ token integer {
         | o <[0..7]>+         [ _ <[0..7]>+ ]*
         | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
         | d \d+               [ _ \d+]*
+        | \d+[_\d+]*
+            { FIRST { warn("Leading 0 does not indicate octal in Perl 6") } }
         ]
     | \d+[_\d+]*
     ]
