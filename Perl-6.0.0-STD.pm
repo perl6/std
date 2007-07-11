@@ -2403,33 +2403,28 @@ rule regex ($stop is context) {
 
 rule regex_ordered_disjunction {
     '||'?
-    <regex_ordered_conjunction>
-    [ '||' <regex_ordered_conjunction> ]*
+    <regex_ordered_conjunction> ** '||'
     {*}
 }
 
 rule regex_ordered_conjunction {
-    <regex_submatch>
-    [ '&&' <regex_submatch> ]*
+    <regex_submatch> ** '&&'
     {*}
 }
 
 rule regex_submatch {
-    <regex_unordered_disjunction>
-    [ \!?'~~' <regex_unordered_disjunction> ]*
+    <regex_unordered_disjunction> ** [ \!?'~~' ]
     {*}
 }
 
 rule regex_unordered_disjunction {
     '|'?
-    <regex_unordered_conjunction>
-    [ '|' <regex_unordered_conjunction> ]*
+    <regex_unordered_conjunction> ** '|'
     {*}
 }
 
 rule regex_unordered_conjunction {
-    <regex_sequence>
-    [ '&' <regex_sequence> ]*
+    <regex_sequence> ** '&'
     {*}
 }
 
