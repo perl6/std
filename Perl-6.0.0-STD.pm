@@ -1633,8 +1633,8 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     @<more> := (
         <!before <$stop>>
         [ # XXX triple rule should just be in escapes to be customizable
-        | <?before <$start>**{3}>
-            $<dequote> := <EXPR(%LOOSEST,/<$stop>**{3}/)>
+        | <?before <$start> ** 3>
+            $<dequote> := <EXPR(%LOOSEST,/<$stop> ** 3/)>
         | <?before <$start>>
             $<subtext> := <q_balanced($lang, $start, $stop, :@esc)>
         | <?before @esc>
@@ -2640,10 +2640,16 @@ token regex_mod_internal:oops { <panic: unrecognized regex modifier> }
 # token regex_mod_external:nth { ':'\d+ ( x | st | nd | rd | th ) }
 # token regex_mod_external:oops { <panic: unrecognized regex modifier> }
 
-token regex_quantifier:sym<**> { <sym> <?ws> <block> <quantmod> }
 token regex_quantifier:sym<*>  { <sym> <quantmod> }
 token regex_quantifier:sym<+>  { <sym> <quantmod> }
 token regex_quantifier:sym<?>  { <sym> <quantmod> }
+token regex_quantifier:sym<**> { <sym> <quantmod> <?ws>
+    [
+    | \d+ [ '..' [ \d+ | '*' ] ]?
+    | <block>
+    | <regex_atom>
+    ]
+}
 
 token quantmod { [ '?' | '!' | ':' | '+' ]? }
 
