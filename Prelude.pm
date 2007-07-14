@@ -563,13 +563,13 @@ class Time::Local {
 multi sub localtime(Num $when = time) returns Time::Local
         is primitive is builtin is safe {
     my $res;
-    my $sec = int $when;
-    my $pico = ($when - int $when) * 10**12;
+    #my $sec = int $when;
+    #my $pico = ($when - int $when) * 10**12;
     # XXX: waiting on a better want
     #if want ~~ rx:P5/^Item/ {
     #    $res = Pugs::Internals::localtime(Bool::True, $sec, $pico);
     #} else {
-        my @tm = Pugs::Internals::localtime(Bool::False, $sec, $pico);
+        my @tm = Pugs::Internals::localtime($when); # Bool::False, $sec, $pico);
 
         # FIXME: this is how it oughta look, with @ids being class level.
         #my @ids = <year month day hour min sec picosec wday yday tzname tz is_dst>; # XXX: this should be a class variable!
