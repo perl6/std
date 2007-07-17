@@ -420,7 +420,7 @@ syn:    <-> <signature> { <statements> }
 name:   lambda rw
 desc:   <-> introduces a (possibly empty) signature to a block, applying the \
         'is rw' trait on all arguments
-ex:     for @liste <-> $a { $a++ }
+ex:     for @list <-> $a { $a++ }
 =end perlhints
 
 token lambda { '->' | '<->' }
