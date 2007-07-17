@@ -740,6 +740,19 @@ token noun {
     {*}
 }
 
+=begin perlhints =>
+token:  pair
+syn:    <key> => <value>
+name:   pair
+desc:   <key> => <value> constructs a pair, usually building a hash
+ex:     my %continents = (
+            England => 'Europe',
+            Brazil  => 'South America',
+            India   => 'Asia'
+        );
+# XXX perhaps a non-hash example?
+=end perlhints
+
 token pair {
     [
     | $<key>:=<ident> \h* '=>' $<val>:=<EXPR(%item_assignment)>
