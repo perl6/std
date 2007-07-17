@@ -477,6 +477,19 @@ rule semilist {
     {*}
 }
 
+=begin perlhints :
+token:  label
+syn:    <identifier>:
+name:   label
+desc:   <identifier>: assigns a name to a block or statement
+ex:     INNER: 
+        for @list { 
+            if m/something/ { 
+                last INNER; 
+            } 
+        }
+=end perlhints
+
 token label {
     <ident> ':' \s <?ws>
 
@@ -625,6 +638,14 @@ token module_name {
     <colonpair>*
     {*}
 }
+
+=begin perlhints *
+token:  whatever
+syn:    @list[*]
+name:   whatever star
+desc:   * in context of list index means "all the indices"
+ex:     @list.pick(*)  # randomly pick all elements of @list
+=end perlhints
 
 token whatever { '*' {*} }
 
