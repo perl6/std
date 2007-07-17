@@ -336,6 +336,19 @@ token unv {
         ]
 }
 
+=begin perlhints #{ #}
+token:  block_comment
+syn:    #{ <arbitrary text> }
+name:   block comment
+desc:   #{ starts a comment that is terminated by }. Inside the comment \
+        brackets may be nested.
+ex:     say 
+        #{ 
+        this is a comment
+        #} 
+        "something"; 
+=end perlhints
+
 token block_comment {
     ^^ '#' <?{ ($<start>,$<stop>) = $.peek_brackets() }>
     $<start> \N* \n                        # eat the #{ line
@@ -391,6 +404,24 @@ rule comp_unit (:$begin_compunit is context = 1) {
 token pblock {
     [ <lambda> <signature> ]? <block>
 }
+
+=begin perlhints ->
+token:  lambda
+syn:    -> <signature> { <statements> }
+name:   lambda
+desc:   -> introduces a (possibly empty) signature to a block
+ex:     for @list -> $a { say $a; }
+        my &function := -> { say 42; };
+=end perlhints
+
+=begin perlhints <->
+token:  lambda
+syn:    <-> <signature> { <statements> }
+name:   lambda rw
+desc:   <-> introduces a (possibly empty) signature to a block, applying the \
+        'is rw' trait on all arguments
+ex:     for @liste <-> $a { $a++ }
+=end perlhints
 
 token lambda { '->' | '<->' }
 
