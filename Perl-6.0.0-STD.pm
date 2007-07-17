@@ -340,7 +340,7 @@ token unv {
 token:  block_comment
 syn:    #{ <arbitrary text> }
 name:   block comment
-desc:   #{ starts a comment that is terminated by }. Inside the comment \
+desc:   #{ starts a comment that is terminated by #}. Inside the comment \
         brackets may be nested.
 ex:     say 
         #{ 
@@ -425,6 +425,14 @@ ex:     for @list <-> $a { $a++ }
 
 token lambda { '->' | '<->' }
 
+=begin perlhints { }
+token:  block
+syn:    { <statemts> }
+name:   block
+desc:   { ... } groups statements and introduces a new scope
+ex:     for @list -> $a { say $a }
+=end perlhints
+
 token block {
     '{'
     <statementlist>
@@ -436,6 +444,14 @@ token block {
     ]
     {*}
 }
+
+=begin perlhints { }
+token:  regex_block
+syn:    regex { <regex> }
+name:   regex block
+desc:   delimits a regex, rule or token
+ex:     regex word { <alpha>+ }
+=end perlhints
 
 token regex_block {  # perhaps parameterize and combine with block someday
     '{'
