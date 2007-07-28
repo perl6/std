@@ -808,8 +808,8 @@ token dotty:sym<.>  { <sym> <dottyop>  {*} }                    #= plain
 
 token dottyop {
     [
-    | methodop
-    | postop
+    | <methodop>
+    | <postop>
     ]
     {*}
 }
