@@ -1111,13 +1111,24 @@ token regex_declarator:rule  { <sym>       <regex_def> {*} }    #= rule
 token special_variable:sym<$!> { <sym>  {*} }                   #= $!
 token special_variable:sym<$/> { <sym>  {*} }                   #= $/
 
+# desigilname should always follow a sigiltwigil
+
+token desigilname {
+    [
+    | <?before '$' > <variable>
+    | <name>
+    ]
+    {*}
+}
+
 token variable {
     [
     | <special_variable> {*}                                    #= special
     | <sigiltwigil>
         [
-        || <?{ $<sigiltwigil><sigil> eq '&' }> :: <sublongname>
-        || <name>
+        || <?{ $<sigiltwigil><sigil> eq '&' }> ::
+            <sublongname> {*}                                   #= subnoun
+        || <desigilname> {*}                                    #= desigilname
         ]
         [
         | <?{ $<sigiltwigil><twigil> eq '.' }>
@@ -1165,7 +1176,7 @@ token name {
 token subshortname {
     [
     | <category> <colonpair>+
-    | <name>
+    | <desigilname>
     ]
     {*}
 }
@@ -1176,6 +1187,7 @@ token sublongname {
 }
 
 token subcall {
+    # XXX should this be sublongname?
     <subshortname> <?unsp>? '.'? '(' <semilist> ')'
     {*}
 }
@@ -1434,7 +1446,7 @@ class Q_tweaker does QLang {
             '%' xx ?%.option<h>,
             '&' xx ?%.option<f>,
             '{' xx ?%.option<c>;
-    }
+    } #'
 
     multi method tweak (:q($single)) {
         $single or panic("Can't turn :q back off");
@@ -2689,7 +2701,7 @@ token regex_assertion:sym<+> { <before '+' > <cclass_elem>+ }
 token regex_assertion:sym<-> { <before '-' > <cclass_elem>+ }
 token regex_assertion:sym<.> { <sym> }
 token regex_assertion:sym<,> { <sym> }
-token regex_assertion:sym<~~> { <sym> <variable>? }
+token regex_assertion:sym<~~> { <sym> <desigilname>? }
 
 token regex_assertion:bogus { <panic: unrecognized regex assertion> }
 
