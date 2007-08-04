@@ -1108,8 +1108,262 @@ token regex_declarator:regex { <sym>       <regex_def> {*} }    #= regex
 token regex_declarator:token { <sym>       <regex_def> {*} }    #= token
 token regex_declarator:rule  { <sym>       <regex_def> {*} }    #= rule
 
-token special_variable:sym<$!> { <sym>  {*} }                   #= $!
-token special_variable:sym<$/> { <sym>  {*} }                   #= $/
+# Most of these special variable rules are there simply to catch old p5 brainos
+
+token special_variable:sym<$!> { <sym> <!before \w> {*} }       #= $!
+
+token special_variable:sym<$!{ }> {
+    ( '$!{' (.*?) '}' )
+    <obs("$0 variable", 'smart match against $!')>
+}
+
+token special_variable:sym<$/> {
+    <sym>
+    # XXX assuming nobody ever wants to assign $/ directly anymore...
+    [ <?before \h* '=' <![=]> >
+        <obs('$/ variable as input record separator',
+             "filehandle's :irs attribute")>
+    ]?
+    {*}                                                         #= $/
+}
+
+token special_variable:sym<$~> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$~ variable', 'Form module')>
+}
+
+token special_variable:sym<$`> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('$` variable', 'explicit pattern before <(')>
+}
+
+token special_variable:sym<$@> {
+    <obs('$@ variable as eval error', '$!')>
+}
+
+token special_variable:sym<$#> {
+    <sym>
+    [
+    || (\w+) <obs("\$#$0 variable", "@{$0}.end")> }
+    || <obs('$# variable', '.fmt')>
+    ]
+}
+token special_variable:sym<$$> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('$$ variable', '$*PID')>
+}
+token special_variable:sym<$%> {
+    <obs('$% variable', 'Form module')>
+}
+
+# Note: this works because placeholders are restricted to lowercase
+token special_variable:sym<$^X> {
+    ( <sigil> '^' (<[A..Z]>) \W )
+    <obscaret($0, $<sigil>, $1)>
+}
+
+token special_variable:sym<$^> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$^ variable', 'Form module')>
+}
+
+token special_variable:sym<$&> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('$& variable', '$/ or $()')>
+}
+
+token special_variable:sym<$*> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$* variable', '^^ and $$')>
+}
+
+token special_variable:sym<$)> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('$) variable', "$*EGID")>
+}
+
+token special_variable:sym<$-> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$- variable', 'Form module')>
+}
+
+token special_variable:sym<$=> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$= variable', 'Form module')>
+}
+
+token special_variable:sym<@+> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('@+ variable', '.to method')>
+}
+
+token special_variable:sym<%+> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('%+ variable', '.to method')>
+}
+
+token special_variable:sym<$+[ ]> {
+    '$+['
+    <obs('@+ variable', '.to method')>
+}
+
+token special_variable:sym<@+[ ]> {
+    '@+['
+    <obs('@+ variable', '.to method')>
+}
+
+token special_variable:sym<@+{ }> {
+    '@+{'
+    <obs('%+ variable', '.to method')>
+}
+
+token special_variable:sym<@-> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('@- variable', '.from method')>
+}
+
+token special_variable:sym<%-> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('%- variable', '.from method')>
+}
+
+token special_variable:sym<$+[ ]> {
+    '$+['
+    <obs('@- variable', '.from method')>
+}
+
+token special_variable:sym<@+[ ]> {
+    '@+['
+    <obs('@- variable', '.from method')>
+}
+
+token special_variable:sym<@+{ }> {
+    '@+{'
+    <obs('%- variable', '.from method')>
+}
+
+token special_variable:sym<$+> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('$+ variable', 'Form module')>
+}
+
+token special_variable:sym<${^ }> {
+    ( <sigil> '{^' (.*?) '}' )
+    <obscaret($0, $<sigil>, $1)> }
+}
+
+# XXX should eventually rely on multi instead of nested cases here...
+multi method obscaret (Str, $var, Str $sigil, Str $name) {
+    my $repl = do given $sigil {
+        when '$' {
+            given $name {
+                when 'MATCH'         { '$/' }
+                when 'PREMATCH'      { 'an explicit pattern before <(' }
+                when 'POSTMATCH'     { 'an explicit pattern after )>' }
+                when 'ENCODING'      { '$?ENCODING' }
+                when 'UNICODE'       { '$?UNICODE' }  # XXX ???
+                when 'TAINT'         { '$*TAINT' }
+                when 'OPEN'          { 'filehandle introspection' }
+                when 'N'             { '$-1' } # XXX ???
+                when 'L'             { 'Form module' }
+                when 'A'             { 'Form module' }
+                when 'E'             { '$!.extended_os_error' }
+                when 'C'             { 'COMPILING namespace' }
+                when 'D'             { '$*DEBUGGING' }
+                when 'F'             { '$*SYSTEM_FD_MAX' }
+                when 'H'             { '$?FOO variables' }
+                when 'I'             { '$*INPLACE' } # XXX ???
+                when 'O'             { '$?OS or $*OS' }
+                when 'P'             { 'whatever debugger Perl 6 comes with' }
+                when 'R'             { 'an explicit result variable' }
+                when 'S'             { 'the context function' } # XXX ???
+                when 'T'             { '$*BASETIME' }
+                when 'V'             { '$*PERL_VERSION' }
+                when 'W'             { '$*WARNING' }
+                when 'X'             { '$*EXECUTABLE_NAME' }
+                when *               { "a global form such as $sigil*$name" }
+            }
+        }
+        when '%' {
+            given $name {
+                when 'H'             { '$?FOO variables' }
+                when *               { "a global form such as $sigil*$name" }
+            }
+        }
+        when * { "a global form such as $sigil*$0" }
+    }
+    return $.obs("$var variable", $repl);
+}
+
+token special_variable:sym<${ }> {
+    ( <sigil> '{' (.*?) '}' )
+    <obs("$0 variable", "{$<sigil>}($1)")>
+}
+
+token special_variable:sym<$[> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$[ variable', 'user-defined array indices')>
+}
+
+token special_variable:sym<$]> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('$] variable', '$*PERL_VERSION')>
+}
+
+token special_variable:sym<$\\> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$\\ variable', "the filehandle's :ors attribute")>
+}
+
+token special_variable:sym<$|> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$| variable', 'Form module')>
+}
+
+token special_variable:sym<$:> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$: variable', 'Form module')>
+}
+
+token special_variable:sym<$;> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$; variable', 'real multidimensional hashes')>
+}
+
+token special_variable:sym<$'> { #'
+    <sym> <?before \s | ',' | <terminator> >
+    <obs(q/$' variable/, 'explicit pattern after )>')> #'
+}
+
+token special_variable:sym<$"> {
+    <sym> <?before \s | ',' | '=' | <terminator> >
+    <obs('$" variable', '.join() method')>
+}
+
+token special_variable:sym<$,> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs(q/$, variable/, ".join() method")>
+}
+
+token special_variable:sym«$<» {
+    <sym> <!before \s* \w+ \s* '>' >
+    <obs('$< variable', "$*UID")>
+}
+
+token special_variable:sym«$>» {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs("$() variable", "$*EUID")>
+}
+
+token special_variable:sym<$.> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs(q/$. variable/, "filehandle's .line method")>
+}
+
+token special_variable:sym<$?> {
+    <sym> <?before \s | ',' | <terminator> >
+    <obs('$? variable as child error', '$!')>
+}
 
 # desigilname should always follow a sigiltwigil
 
@@ -1964,6 +2218,18 @@ rule statement_prefix:async   { <sym> <statement> {*} }         #= async
 rule statement_prefix:lazy    { <sym> <statement> {*} }         #= lazy
 
 ## term
+token term:sym<undef> ( --> Term) {
+    <sym> \h* <nofat>
+    [ <?before '$/' >
+        <obs('$/ variable as input record separator',
+             "the filehandle's .slurp method")>
+    ]?
+    [ <?before < $ @ % & > >
+        <obs('undef as a verb', 'undefine function')>
+    ]?
+    {*}                                                         #= undef
+}
+
 token term:sym<*> ( --> Term)
     { <sym> {*} }                                               #= *
 
@@ -1989,10 +2255,10 @@ token circumfix:sym<« »> ( --> Term)
 ## methodcall
 
 token infix:sym<.> ( --> Methodcall)
-    { <panic: Please use ~ instead of . to concatenate strings> }
+    { <obs('. to concatenate strings', '~')> }
 
 token postfix:sym{'->'} ( --> Methodcall)
-    { <panic: Please use . instead of -> to call methods> }
+    { <obs('-> to call a method', '.')> }
 
 ## autoincrement
 token postfix:sym<++> ( --> Autoincrement)
@@ -2077,10 +2343,10 @@ token infix:sym« +< » ( --> Multiplicative)
     { <sym> {*} }                                               #= +<
 
 token infix:sym« << » ( --> Multiplicative)
-    { <panic: Please use +< or ~< instead of << to do left shift> }
+    { <obs('<< to do left shift', '+< or ~<')> }
 
 token infix:sym« >> » ( --> Multiplicative)
-    { <panic: Please use +> or ~> instead of >> to do right shift> }
+    { <obs('>> to do right shift', '+> or ~>')> }
 
 token infix:sym« +> » ( --> Multiplicative)
     { <sym> {*} }                                               #= +>
@@ -2223,10 +2489,10 @@ token infix:sym<~~> ( --> Chaining)
     { <sym> {*} }                                               #= ~~
 
 token infix:sym<!~> ( --> Chaining)
-    { <panic: Please use !~~ instead of !~ to do negated pattern matching> }
+    { <obs('!~ to do negated pattern matching', '!~~')> }
 
 token infix:sym<=~> ( --> Chaining)
-    { <panic: Please use ~~ instead of =~ to do pattern matching> }
+    { <obs('=~ to do pattern matching', '~~')> }
 
 token infix:sym<eq> ( --> Chaining)
     { <sym> {*} }                                               #= eq
@@ -2277,7 +2543,7 @@ token infix:sym<?? !!> ( --> Conditional)
     { '??' <EXPR(%conditional)> '!!' {*} }                      #= ?? !!
 
 token infix:sym<?> ( --> Conditional)
-    { <panic: Please use ??!! instead of ?: for the conditional operator> }
+    { <obs('?: for the conditional operator', '??!!')> }
 
 
 ## assignment
@@ -2605,7 +2871,11 @@ token regex_metachar:sym<\\> { <sym> <regex_backslash> {*} }    #= \
 token regex_metachar:sym<.>  { <sym> {*} }                      #= .
 token regex_metachar:sym<^^> { <sym> {*} }                      #= ^^
 token regex_metachar:sym<^>  { <sym> {*} }                      #= ^
-token regex_metachar:sym<$$> { <sym> {*} }                      #= $$
+token regex_metachar:sym<$$> {
+    <sym>
+    [ <?before (\w+)> <obs("\$\$$0 to deref var inside a regex","\$(\$$0)")> ]?
+    {*}
+}
 token regex_metachar:sym<$>  {
     '$'
     <before
@@ -2623,6 +2893,7 @@ token regex_metachar:sym<' '> { <?before "'"  > <quotesnabber(":q")>  }
 token regex_metachar:sym<" "> { <?before '"'  > <quotesnabber(":qq")> }
 
 token regex_metachar:var {
+    <!before '$$'>
     <sym <variable>> <?ws>
     $<binding> := ( ':=' <?ws> <regex_quantified_atom> )?
     {*}                                                         #= var
@@ -2756,6 +3027,12 @@ token quantmod { [ '?' | '!' | ':' | '+' ]? }
 # further compilation is suppressed by the <commit><fail>.
 
 rule panic (Str $s) { <commit> <fail($s)> }
+
+# 3rd arg assumes more things will become obsolete after Perl 6 comes out...
+rule obs (Str $old, Str $new, Str $when = ' in Perl 6') {
+    <panic("Obsolete use of $old;$when please use $new instead")>
+}
+
 
 $_ = '42';
 say Perl.new.EXPR().perl;

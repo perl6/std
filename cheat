@@ -11,8 +11,12 @@ my $curclass;
 my %proto;
 my %protosig;
 my %multis;
+my $commentary = "";
 
 while (<>) {
+    $commentary = $1 if /^ =begin \s+ (\w+)/x;
+    s/^/# /, $commentary = '' if /^=end \s+ $commentary/x;
+    s/^/# / if $commentary;
     if (/role (\w+)\[\*?(.*?)\]/) {
 	my $name = $1;
 	my $param = $2;
