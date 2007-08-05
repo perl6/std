@@ -511,6 +511,7 @@ rule statement {
     | $0:=<expect_term> <EXPR(:seen($0))>        {*}            #= expr
         [<statement_mod_cond> <EXPR> {*} ]?                     #= mod cond
         [<statement_mod_loop> <EXPR> {*} ]?                     #= mod loop
+        ';'?
     ]
     {*}
 }
@@ -620,7 +621,7 @@ rule statement_control:POST    { <sym> <block> {*} }            #= POST
 rule statement_control:CATCH   { <sym> <block> {*} }            #= CATCH
 rule statement_control:CONTROL { <sym> <block> {*} }            #= CONTROL
 
-rule modifier_expr { <EXPR> ';'? {*} }
+rule modifier_expr { <EXPR> {*} }
 
 rule statement_mod_cond:if     { <sym> <modifier_expr> {*} }    #= mod if
 rule statement_mod_cond:unless { <sym> <modifier_expr> {*} }    #= mod unless
