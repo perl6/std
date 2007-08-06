@@ -511,7 +511,8 @@ rule statement {
     | $0:=<expect_term> <EXPR(:seen($0))>        {*}            #= expr
         [<statement_mod_cond> <EXPR> {*} ]?                     #= mod cond
         [<statement_mod_loop> <EXPR> {*} ]?                     #= mod loop
-        ';'?
+        [ ';' || <?before <terminator>> ] {*}                   #= modexpr
+    | ';' {*}                                                   #= null
     ]
     {*}
 }
@@ -2618,9 +2619,8 @@ token infix:sym<err> ( --> Loose_or)
 
 ## expression terminator
 
-# XXX correct to eat semicolon here?
 token terminator:sym<;> ( --> Terminator)
-    { <sym> {*} }                                               #= ;
+    { <?before ';' > {*} }                                               #= ;
 
 token terminator:sym« <== » ( --> Terminator)
     { <?before '<==' > {*} }                                    #= <==
