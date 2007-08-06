@@ -388,7 +388,10 @@ method UNIT ($unitstop is context = /$/) {
 
 # Note: we only check for the unitstopper.  We don't check for ^ because
 # we might be embedded in something else.
-rule comp_unit (:$begin_compunit is context = 1) {
+rule comp_unit (:$begin_compunit is context = 1,
+                :$endstmt        is context<rw> = 0,
+                :$endargs        is context<rw> = 0)
+{
     <statementlist>
     [ <$+unitstop> || <panic: Can't understand next input--giving up> ]
     {*}
@@ -439,8 +442,8 @@ token block {
     [ '}' || <panic: Missing right brace> ]
     [
     | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
-    | <?before <?unv>? \n > {*} { let $<endline> := 1; }        #= endline
-    | {*} { let $<endlist> := 1; }                              #= endlist
+    | <?before <?unv>? \n > {*} { let $+endstmt = .pos; }       #= endstmt
+    | {*} { let $+endargs = .pos; }                             #= endargs
     ]
     {*}
 }
@@ -459,8 +462,8 @@ token regex_block {  # perhaps parameterize and combine with block someday
     [ '}' || <panic: Missing right brace> ]
     [
     | <?unsp>? <?before <[,:]>> {*}                             #= normal
-    | <?before <?unv>? \n > {*} { let $<endline> := 1; }        #= endline
-    | {*} { let $<endlist> := 1; }                              #= endlist
+    | <?before <?unv>? \n > {*} { let $+endstmt = .pos; }       #= endstmt
+    | {*} { let $+endargs = .pos; }                             #= endargs
     ]
     {*}
 }
@@ -503,7 +506,7 @@ token label {
     {*}
 }
 
-rule statement {
+rule statement (:$endstmt is context<rw> = 0) {
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
@@ -511,20 +514,30 @@ rule statement {
     | $0:=<expect_term> <EXPR(:seen($0))>        {*}            #= expr
         [<statement_mod_cond> <EXPR> {*} ]?                     #= mod cond
         [<statement_mod_loop> <EXPR> {*} ]?                     #= mod loop
-        [ ';' || <?before <terminator>> ] {*}                   #= modexpr
+        <eat_terminator>
+        {*}                                                     #= modexpr
     | ';' {*}                                                   #= null
     ]
     {*}
 }
 
+token eat_terminator {
+    [
+    || ';'
+    || <?{ .pos == $+endstmt }>
+    || <?before <terminator>>
+    || <panic: Statement not terminated properly>
+    ]
+}
+
 rule statement_control:use {
     <sym>
-    <module_name> <EXPR>? ';'?                       {*}        #= use
+    <module_name> <EXPR>? <eat_terminator>           {*}        #= use
 }
 
 rule statement_control:no {
     <sym>
-    <module_name> <EXPR>? ';'?                       {*}        #= no
+    <module_name> <EXPR>? <eat_terminator>           {*}        #= no
 }
 
 rule statement_control:if {
@@ -995,11 +1008,13 @@ token methodop {
 
     [
     | '.'? <?unsp>? '(' <semilist> ')'
-    | ':' <?before \s> <!{ $+inquote }> <EXPR(%list_prefix)>
+    | ':' <?before \s> <!{ $+inquote }> <arglist>
     | <null>
     ]
     {*}
 }
+
+token arglist ($endargs is context<rw> = 0) { <EXPR(%list_prefix)> }
 
 token anglewords($stop) {
     <?ws> [ <!before $stop> .]*  # XXX need to split
@@ -2586,10 +2601,10 @@ token infix:sym<minmax> ( --> List_infix)
     { <sym> {*} }                                               #= minmax
 
 token prefix:sigil ( --> List_prefix)
-    { <sym <sigil>> \s <EXPR(%list_prefix)> {*} }               #= $
+    { <sym <sigil>> \s <arglist> {*} }                          #= $
 
 token prefix:typecast ( --> List_prefix)
-    { <sym <typename>> \s <EXPR(%list_prefix)> {*} }            #= Type
+    { <sym <typename>> \s <arglist> {*} }                       #= Type
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last prefix: rule)
@@ -2597,7 +2612,7 @@ token prefix:listop ( --> List_prefix)
     { ::                        # call this rule last (as "shortest" token)
         <sym <ident>>
         [
-        || \s <nofat> <EXPR(%list_prefix)> {*}                  #= listop args
+        || \s <nofat> <arglist> {*}                             #= listop args
         || <nofat> {*}                                          #= listop noarg
         ]
         {*}                                                     #= listop
@@ -2648,6 +2663,8 @@ regex stdstopper {
     | <statement_mod_cond>
     | <statement_mod_loop>
     | <$+unitstopper>
+    | <?{ .pos == $+endstmt }>
+    | <?{ .pos == $+endargs }>
     | $
 }
 
