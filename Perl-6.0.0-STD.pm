@@ -512,8 +512,15 @@ rule statement (:$endstmt is context<rw> = 0) {
     | <statement_control>                        {*}            #= control
     | <block>                                    {*}            #= block
     | $0:=<expect_term> <EXPR(:seen($0))>        {*}            #= expr
-        [<statement_mod_cond> <EXPR> {*} ]?                     #= mod cond
-        [<statement_mod_loop> <EXPR> {*} ]?                     #= mod loop
+        [
+        || <?before <stdstopper>>
+        || <statement_mod_loop> <EXPR> {*}                      #= mod loop
+        || <statement_mod_cond> <EXPR> {*}                      #= mod cond
+            [
+            || <?before <stdstopper>>
+            || <statement_mod_loop> <EXPR> {*}                  #= mod condloop
+            ]
+        ]
         <eat_terminator>
         {*}                                                     #= modexpr
     | ';' {*}                                                   #= null
@@ -3051,7 +3058,7 @@ rule obs (Str $old, Str $new, Str $when = ' in Perl 6') {
     <panic("Obsolete use of $old;$when please use $new instead")>
 }
 
-
+say "Starting...";
 $_ = '42';
 say Perl.new.EXPR().perl;
 
