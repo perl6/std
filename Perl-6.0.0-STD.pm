@@ -1,5 +1,8 @@
 grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
+has StrPos $.ws_from;
+has StrPos $.ws_to;
+
 =begin things todo
 
     add more suppositions and figure out exact error continuation semantics
@@ -310,12 +313,15 @@ proto token prefix_circumfix_meta_operator { }
 regex nofat { <!before \h* <?unsp>? '=>' > }
 
 token ws {
+    || <?{ .pos === $!ws_to }>
     || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
-    || [
+    || { $!ws_from = .pos }
+       [
        | <unsp>              {*}                                #= unsp
        | \v                  {*} <heredoc>                      #= vwhite
        | <unv>               {*}                                #= unv
        ]*  {*}                                                  #= all
+       { $!ws_to = .pos }
 }
 
 token unsp {
@@ -442,7 +448,8 @@ token block {
     [ '}' || <panic: Missing right brace> ]
     [
     | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
-    | <?before <?unv>? \n > {*} { let $+endstmt = .pos; }       #= endstmt
+    | <?unv>? <?before \n > <?ws>
+        { let $+endstmt = $!ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = .pos; }                             #= endargs
     ]
     {*}
@@ -462,7 +469,8 @@ token regex_block {  # perhaps parameterize and combine with block someday
     [ '}' || <panic: Missing right brace> ]
     [
     | <?unsp>? <?before <[,:]>> {*}                             #= normal
-    | <?before <?unv>? \n > {*} { let $+endstmt = .pos; }       #= endstmt
+    | <?unv>? <?before \n > <?ws>
+        { let $+endstmt = $!ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = .pos; }                             #= endargs
     ]
     {*}
@@ -510,19 +518,18 @@ rule statement (:$endstmt is context<rw> = 0) {
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
-    | <block>                                    {*}            #= block
-    | $0:=<expect_term> <EXPR(:seen($0))>        {*}            #= expr
+    | $0:=<expect_term> $<expr>:=<EXPR(:seen($0))>  {*}         #= expr
         [
         || <?before <stdstopper>>
-        || <statement_mod_loop> <EXPR> {*}                      #= mod loop
-        || <statement_mod_cond> <EXPR> {*}                      #= mod cond
+        || <statement_mod_loop> $<loopx>:=<EXPR> {*}            #= mod loop
+        || <statement_mod_cond> $<condx>:=<EXPR>
             [
-            || <?before <stdstopper>>
-            || <statement_mod_loop> <EXPR> {*}                  #= mod condloop
+            || <?before <stdstopper>> {*}                       #= mod cond
+            || <statement_mod_loop> $<loopx>:=<EXPR> {*}        #= mod condloop
             ]
         ]
         {*}                                                     #= modexpr
-    | <null> {*}                                                   #= null
+    | <?before ';'> {*}                                         #= null
     ]
     <eat_terminator>
     {*}
@@ -531,9 +538,10 @@ rule statement (:$endstmt is context<rw> = 0) {
 token eat_terminator {
     [
     || ';'
-    || <?{ .pos == $+endstmt }>
+    || <?{ $+endstmt === $!ws_from }>
     || <?before <terminator>>
-    || <panic: Statement not terminated properly>
+    || { if .pos === $!ws_to { .pos = $!ws_from } } # undo any line transition
+        <panic: Statement not terminated properly>  # "can't happen" anyway :)
     ]
 }
 
