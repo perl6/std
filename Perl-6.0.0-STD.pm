@@ -514,7 +514,7 @@ token label {
     {*}
 }
 
-rule statement (:$endstmt is context<rw> = 0) {
+rule statement (StrPos :$endstmt is context<rw> = 0) {
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
@@ -1029,7 +1029,7 @@ token methodop {
     {*}
 }
 
-token arglist ($endargs is context<rw> = 0) { <EXPR(%list_prefix)> }
+token arglist (StrPos :$endargs is context<rw> = 0) { <EXPR(%list_prefix)> }
 
 token anglewords($stop) {
     <?ws> [ <!before $stop> .]*  # XXX need to split
