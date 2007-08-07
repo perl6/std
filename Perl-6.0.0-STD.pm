@@ -521,10 +521,10 @@ rule statement (:$endstmt is context<rw> = 0) {
             || <statement_mod_loop> <EXPR> {*}                  #= mod condloop
             ]
         ]
-        <eat_terminator>
         {*}                                                     #= modexpr
-    | ';' {*}                                                   #= null
+    | <null> {*}                                                   #= null
     ]
+    <eat_terminator>
     {*}
 }
 
