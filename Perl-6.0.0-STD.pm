@@ -2571,8 +2571,20 @@ token infix:sym<//> ( --> Tight_or)
 
 
 ## conditional
-token infix:sym<?? !!> ( --> Conditional)
-    { '??' <EXPR(%conditional)> '!!' {*} }                      #= ?? !!
+token infix:sym<?? !!> ( --> Conditional) {
+    '??'
+    <EXPR(%conditional)>
+    [ '!!' ||
+        [
+        || <?before '='> <panic: Assignment not allowed within ??!!>
+        || <?before '::'> <panic: Please use !! rather than ::>
+        || <?before <infix>>    # Note: a tight infix would have parsed right
+            <panic: Precedence too loose within ??!!; use ??()!! instead >
+        || <panic: Found ?? but no !!; possible precedence problem>
+        ]
+    ]
+    {*}                                                         #= ?? !!
+}
 
 token infix:sym<?> ( --> Conditional)
     { <obs('?: for the conditional operator', '??!!')> }
