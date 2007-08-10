@@ -2822,13 +2822,13 @@ rule regex_submatch {
 }
 
 rule regex_unordered_disjunction {
-    '|'?
-    <regex_unordered_conjunction> ** '|'
+    [ '|' <!before '|'> ]?
+    <regex_unordered_conjunction> ** [ '|' <!before '|'> ]
     {*}
 }
 
 rule regex_unordered_conjunction {
-    <regex_sequence> ** '&'
+    <regex_sequence> ** [ '&' <!before '&'> ]
     {*}
 }
 
@@ -2858,37 +2858,37 @@ rule regex_atom {
 }
 
 # sequence stoppers
-token regex_metachar { '>'  :: <fail> }
-token regex_metachar { '&&' :: <fail> }
-token regex_metachar { '&'  :: <fail> }
-token regex_metachar { '||' :: <fail> }
-token regex_metachar { '|'  :: <fail> }
-token regex_metachar { ']'  :: <fail> }
-token regex_metachar { ')'  :: <fail> }
-token regex_metachar { \\\\ :: <fail> }
+token regex_metachar:sym« > » { '>'  :: <fail> }
+token regex_metachar:sym<&&>  { '&&' :: <fail> }
+token regex_metachar:sym<&>   { '&'  :: <fail> }
+token regex_metachar:sym<||>  { '||' :: <fail> }
+token regex_metachar:sym<|>   { '|'  :: <fail> }
+token regex_metachar:sym<]>   { ']'  :: <fail> }
+token regex_metachar:sym<)>   { ')'  :: <fail> }
+token regex_metachar:sym<\\\\> { \\\\ :: <fail> }
 
-token regex_metachar { <regex_quantifier> <panic: quantifier quantifies nothing> }
+token regex_metachar:quant { <regex_quantifier> <panic: quantifier quantifies nothing> }
 
 # "normal" metachars
-token regex_metachar {                                          #= { }
+token regex_metachar:sym<{ }> {                                          #= { }
     <block>
     { @<sym> := <{ }> }
     {*}                                                         #= { }
 }
 
-token regex_metachar {
+token regex_metachar:mod {
     <regex_mod_internal>
     { @<sym> := $<regex_mod_internal><sym> }
     {*}                                                         #= :mod
 }
 
-token regex_metachar {
+token regex_metachar:sym<[ ]> {
     '[' <regex ']'> ']'
     { @<sym>:=<[ ]> }
     {*}                                                         #= [ ]
 }
 
-token regex_metachar {
+token regex_metachar:sym<( )> {
     '(' <regex ')'> ')'
     { @<sym>:=<( )> }
     {*}                                                         #= ( )
