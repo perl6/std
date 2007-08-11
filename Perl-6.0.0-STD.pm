@@ -37,6 +37,10 @@ symbol will be used by default.
 Note that rules with only one action need no #= comment, so the identifier
 of the following stub is just "TOP".
 
+Another nod toward preprocessing is that blocks that contain nested braces
+are delimited by double braces so that the preprocessor does not need to
+understand Perl 6 code.
+
 =end comment overview
 
 token TOP { <UNIT( $+unitstop or /$/ )> {*} }
@@ -505,11 +509,11 @@ token label {
     <ident> ':' \s <?ws>
 
     [ <?{ is_type($<ident>) }>
-      <suppose: You tried to use an existing name $<ident> as a label>
+      <suppose("You tried to use an existing name $/{'ident'} as a label")>
     ]?
 
     # add label as a pseudo type
-    { COMPILING::{"::$<ident>"} = Label.new($<ident>) }  # XXX need statement ref too?
+    {{ COMPILING::{"::$<ident>"} = Label.new($<ident>) }}  # XXX need statement ref too?
 
     {*}
 }
@@ -540,7 +544,7 @@ token eat_terminator {
     || ';'
     || <?{ $+endstmt === $!ws_from }>
     || <?before <terminator>>
-    || { if .pos === $!ws_to { .pos = $!ws_from } } # undo any line transition
+    || {{ if .pos === $!ws_to { .pos = $!ws_from } }} # undo any line transition
         <panic: Statement not terminated properly>  # "can't happen" anyway :)
     ]
 }
@@ -907,7 +911,7 @@ token infix_prefix_meta_operator:sym<!> (--> Chaining) {
 }
 
 regex nonest (Str $s) {
-    <!{ %+thisop{$s}++ }> || <panic: Nested $s metaoperators not allowed>
+    <!{{ %+thisop{$s}++ }}> || <panic: Nested $s metaoperators not allowed>
 }
 
 token infix_circumfix_meta_operator:sym<X X> (--> List_infix) {
@@ -1176,7 +1180,7 @@ token special_variable:sym<$@> {
 token special_variable:sym<$#> {
     <sym>
     [
-    || (\w+) <obs("\$#$0 variable", "@{$0}.end")> }
+    || (\w+) <obs("\$#$0 variable", "@{$0}.end")>
     || <obs('$# variable', '.fmt')>
     ]
 }
@@ -1430,7 +1434,7 @@ token variable {
 
 token sigiltwigil {
     <sigil> <twigil>?
-    <?{ {*}; 1 }>               # XXX right way to allow use in longer token?
+    <?{{ {*}; 1 }}>               # XXX right way to allow use in longer token?
 }
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
@@ -1520,7 +1524,7 @@ token integer {
         | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
         | d \d+               [ _ \d+]*
         | \d+[_\d+]*
-            { FIRST { warn("Leading 0 does not indicate octal in Perl 6") } }
+            {{ FIRST { warn("Leading 0 does not indicate octal in Perl 6") } }}
         ]
     | \d+[_\d+]*
     ]
@@ -2029,7 +2033,7 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
     $<text> := [.*?]
     @<more> := (
       <!before <$stop>>
-      [ <?before @esc> $<escape> := [ <q_escape($lang)> ]
+      <?before @esc> $<escape> := [ <q_escape($lang)> ]
       $<text> := [.*?]
     )*
     $<stop> := <$stop>
@@ -2149,7 +2153,7 @@ rule type_constraint {
 rule post_constraint {
     [
     | <multisig>
-    | where <EXPR(%chaining)
+    | where <EXPR(%chaining)>
     ]
     {*}
 }
@@ -2200,17 +2204,17 @@ token parameter {
     <post_constraint>*
 
     [
-        <default_value> {
+        <default_value> {{
             given $<quantchar> {
               when '!' { panic("Can't put a default on a required parameter") }
               when '*' { panic("Can't put a default on a slurpy parameter") }
             }
             let $<quant> := '?';
-        }
+        }}
     ]?
 
     # enforce zone constraints
-    {
+    {{
         given $<quant> {
             when '!' {
                 given $+zone {
@@ -2234,7 +2238,7 @@ panic("Can't use optional positional parameter in variadic zone");
                 $+zone = 'var';
             }
         }
-    }
+    }}
     {*}
 }
 
