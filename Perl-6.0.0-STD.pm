@@ -1149,7 +1149,8 @@ token regex_declarator:rule  { <sym>       <regex_def> {*} }    #= rule
 token special_variable:sym<$!> { <sym> <!before \w> {*} }       #= $!
 
 token special_variable:sym<$!{ }> {
-    ( '$!{' (.*?) '}' )
+    # XXX the backslashes are necessary here for bootstrapping, not for P6...
+    ( '$!\{' (.*?) '\}' )
     <obs("$0 variable", 'smart match against $!')>
 }
 
@@ -1524,7 +1525,7 @@ token integer {
         | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
         | d \d+               [ _ \d+]*
         | \d+[_\d+]*
-            {{ FIRST { warn("Leading 0 does not indicate octal in Perl 6") } }}
+            {{ START { warn("Leading 0 does not indicate octal in Perl 6") } }}
         ]
     | \d+[_\d+]*
     ]
@@ -1628,7 +1629,20 @@ token quote:sym<« »>   { <?before '«'  > <quotesnabber(":qq",":ww")> }
 token quote:sym«<< >>» { <?before '<<' > <quotesnabber(":qq",":ww")> }
 token quote:sym«< >»   { <?before '<'  > <quotesnabber(":q", ":w")>  }
 
-token quote:sym</ />   { <?before '/'  > <quotesnabber(":regex")> }
+token quote:sym</ />   {
+    <?before '/'  > <quotesnabber(":regex")>
+    [ (< i g s m x c e ]>+) 
+        # note: only the submatch fails here on the obs call
+        [ $0 ~~ 'i' <obs("/i",":i")> ]?
+        [ $0 ~~ 'g' <obs("/g",":g")> ]?
+        [ $0 ~~ 's' <obs("/s","^^ and $$ anchors")> ]?
+        [ $0 ~~ 'm' <obs("/m",". or \N")> ]?
+        [ $0 ~~ 'x' <obs("/x","normal default whitespace")> ]?
+        [ $0 ~~ 'c' <obs("/c",":c or :p")> ]?
+        [ $0 ~~ 'e' <obs("/e","interpolated {...} or s{} = ... form")> ]?
+        <obs("suffix regex modifiers","prefix adverbs")>
+    ]?
+}
 
 # handle composite forms like qww
 token quote:qq { <sym> <quote_mod>
@@ -3078,8 +3092,8 @@ token quantmod { [ '?' | '!' | ':' | '+' ]? }
 rule panic (Str $s) { <commit> <fail($s)> }
 
 # 3rd arg assumes more things will become obsolete after Perl 6 comes out...
-rule obs (Str $old, Str $new, Str $when = ' in Perl 6') {
-    <panic("Obsolete use of $old;$when please use $new instead")>
+method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
+    $.panic("Obsolete use of $old;$when please use $new instead");
 }
 
 say "Starting...";
