@@ -57,7 +57,7 @@ last if $NAME eq 'category';
 method$ws$NAME$args
 {
     my \$FROM is context = \$S.to;
-    map { Match.new(:from(\$FROM.to), :to(\$_.to)) },
+    map { Match.new(:from(\$FROM), :to(\$_.to)) },
 END
 
         my $re = regex('\\}');
