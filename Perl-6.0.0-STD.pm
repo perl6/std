@@ -317,7 +317,7 @@ proto token prefix_circumfix_meta_operator { }
 regex nofat { <!before \h* <?unsp>? '=>' > }
 
 token ws {
-    || <?{ .pos === $!ws_to }>
+    || <?{ .pos === $!ws_to }> <null>
     || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
     || { $!ws_from = .pos }
        [
@@ -801,7 +801,7 @@ token colonpair {
     ':'
     [
     | '!' <ident>                                       {*}    #= false
-    | <ident> [ <?unsp> <postcircumfix> ]?              {*}    #= value
+    | <ident> [ <?unsp>? <postcircumfix> ]?              {*}    #= value
     | <postcircumfix>                                   {*}    #= structural
     | <sigiltwigil> <desigilname>                       {*}    #= varname
     ]

@@ -43,6 +43,8 @@ my $out = "";
 
 s/^(\s+)// and $out .= $1;
 while ($_ ne "") {
+    if ( s/^(#line.*\n)// ) { next }
+
     if ( s/^(#.*\n)// ) { $out .= $1; next }
 
     if ( s/^(rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
@@ -52,7 +54,7 @@ while ($_ ne "") {
         my $args = $4;
         $args =~ s/\(/(\$S, / or
         $args =~ s/^/ (\$S) /;
-last if $NAME eq 'category';
+#last if $NAME eq 'category';
         $out .= <<"END";
 method$ws$NAME$args
 {
