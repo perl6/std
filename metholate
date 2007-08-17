@@ -52,14 +52,14 @@ while ($_ ne "") {
         my $ws = $2;
         local $NAME = $3;
         my $args = $4;
-        $args =~ s/\(/(\$S, / or
-        $args =~ s/^/ (\$S) /;
+        $args =~ s/\(/(\$¢, / or
+        $args =~ s/^/ (\$¢) /;
 #last if $NAME eq 'category';
         $out .= <<"END";
 method$ws$NAME$args
 {
-    my \$LVL is context = callm(\$S);
-    my \$FROM is context = \$S.to;
+    my \$LVL is context = callm(\$¢);
+    my \$FROM is context = \$¢;
     map { retm(\$_) },
     map { Match.new(:from(\$FROM), :to(\$_.to)) },
 END
@@ -520,7 +520,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $text = $$self{text};
-        "-> \$S {" . $text . "}";
+        "-> \$¢ {" . $text . "}";
     }
 }
 
@@ -528,7 +528,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "BRACKET(\$S, -> \$S {\n" . $re . "\n})";
+        "BRACKET(\$¢, -> \$¢ {\n" . $re . "\n})";
     }
 }
 
@@ -543,7 +543,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self.EXACT(\$S, '" . $text . "')";
+        "self.EXACT(\$¢, '" . $text . "')";
     }
 }
 
@@ -552,7 +552,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         if ($text eq '\\d') {
-            "self.DIGIT(\$S)";
+            "self.DIGIT(\$¢)";
         }
     }
 }
@@ -560,7 +560,7 @@ sub unbalanced {
 { package RE_method_noarg; use base "REbase";
     sub walk {
         my $self = shift;
-        'self.' . $$self{name} . '($S)';
+        'self.' . $$self{name} . '($¢)';
     }
 }
 
@@ -574,7 +574,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $rest = $$self{rest};
-        substr($rest,1,0) = '$S, ';
+        substr($rest,1,0) = '$¢, ';
         'self.' . $$self{name} . $rest;
     }
 }
@@ -633,13 +633,13 @@ sub unbalanced {
                         $how eq '?' ? 'f' :
                                       '';
                 if ($qfer eq '*') {
-                    $quant = "STAR$h(\$S, ";
+                    $quant = "STAR$h(\$¢, ";
                 }
                 elsif ($qfer eq '+') {
-                    $quant = "PLUS$h(\$S, ";
+                    $quant = "PLUS$h(\$¢, ";
                 }
                 elsif ($qfer eq '?') {
-                    $quant = "OPT$h(\$S, ";
+                    $quant = "OPT$h(\$¢, ";
                 }
                 elsif ($qfer eq '**') {
                     if (ref $rest) {
@@ -649,15 +649,15 @@ sub unbalanced {
                         }
                         else {
                             $rep = "REPSEP";
-                            $rest = "-> \$S {\n" . ::indent($rest->walk()) . "\n}";
+                            $rest = "-> \$¢ {\n" . ::indent($rest->walk()) . "\n}";
                         }
                     }
                     else {
                         $rest = "'$rest'";
                     }
-                    $quant = "$rep$h(\$S, $rest, ";
+                    $quant = "$rep$h(\$¢, $rest, ";
                 }
-                $result = $quant . "-> \$S {\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
+                $result = $quant . "-> \$¢ {\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
             }
             else {
                 $result = $$self{atom}->walk(@_);
@@ -684,7 +684,7 @@ sub unbalanced {
         }
         my $result = pop @result;
         for (reverse @result) {
-            $result = "gather for $_ -> \$S {\n" . ::indent("take " . $result) . "\n}";
+            $result = "gather for map({.to}, $_) -> \$¢ {\n" . ::indent("take " . $result) . "\n}";
         }
         $result;
     };
@@ -695,7 +695,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self.EXACT(\$S, '" . $text . "')";
+        "self.EXACT(\$¢, '" . $text . "')";
     }
 }
 
@@ -756,11 +756,10 @@ our class Match does Capture {
 
 my $LVL is context = 0;
 
-sub callm (Match $s) {
-    warn $s.perl unless $s ~~ Match;
+sub callm ($¢) {
     my $lvl = 0;
     while Pugs::Internals::caller(Any,$lvl,"") { $lvl++ }
-    say ' ' x $lvl, caller.subname, " called at $s.to()";
+    say ' ' x $lvl, caller.subname, " called at $¢";
     $lvl;
 }
 
@@ -769,132 +768,120 @@ sub retm (Match $r) {
     $r;
 }
 
-sub STARf ($S, &block) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
+sub STARf ($¢, &block) {
+    my $LVL is context = callm($¢);
 
     map { retm($_) },
-        Match.new(:from($from), :to($from)),
-        PLUSf($S, &block);
+        Match.new(:from($¢), :to($¢)),
+        PLUSf($¢, &block);
 }
 
-sub STARg ($S, &block) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
+sub STARg ($¢, &block) {
+    my $LVL is context = callm($¢);
 
     map { retm($_) }, reverse
-        Match.new(:from($from), :to($from)),
-        PLUSf($S, &block);
+        Match.new(:from($¢), :to($¢)),
+        PLUSf($¢, &block);
 }
 
-sub STAR ($S, &block) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
-    my $to = $from;
-    my $x = $S;
+sub STAR ($¢, &block) {
+    my $LVL is context = callm($¢);
+    my $to = $¢;
     my @all = gather {
         loop {
-            my @x = block($x);
-            say @x.perl;
-        last unless @x;
-            $x = @x[0];  # no backtracking into block on ratchet
-            take $x;
-            $to = $x.to;
+            my @matches = block($to);  # XXX shouldn't read whole list
+            say @matches.perl;
+        last unless @matches;
+            my $first = @matches[0];  # no backtracking into block on ratchet
+            take $first;
+            $to = $first.to;
         }
     }
-    my $r = Match.new(:from($from), :to($to));
+    my $r = Match.new(:from($¢), :to($to));
     retm($r);
 }
 
-sub PLUSf ($S, &block) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
-    my $x = $S;
+sub PLUSf ($¢, &block) {
+    my $LVL is context = callm($¢);
+    my $x = $¢;
 
     map { retm($_) },
     gather {
         for block($x) -> $x {
-            take map { Match.new(:from($from), :to($_.to)) }, $x, PLUSf($x, &block);
+            take map { Match.new(:from($¢), :to($_.to)) }, $x, PLUSf($x.to, &block);
         }
     }
 }
 
-sub PLUSg ($S, &block) {
-    my $LVL is context = callm($S);
+sub PLUSg ($¢, &block) {
+    my $LVL is context = callm($¢);
 
-    reverse PLUSf($S, &block);
+    reverse PLUSf($¢, &block);
 }
 
-sub PLUS ($S, &block) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
-    my $to;
-    my $x = $S;
+sub PLUS ($¢, &block) {
+    my $LVL is context = callm($¢);
+    my $to = $¢;
     my @all = gather {
         loop {
-            my @x = block($x);
-            say @x.perl;
-        last unless @x;
-            $x = @x[0];  # no backtracking into block on ratchet
-            take $x;
-            $to = $x.to;
+            my @matches = block($to);  # XXX shouldn't read whole list
+            say @matches.perl;
+        last unless @matches;
+            my $first = @matches[0];  # no backtracking into block on ratchet
+            take $first;
+            $to = $first.to;
         }
     }
     return () unless @all;
-    my $r = Match.new(:from($from), :to($to));
+    my $r = Match.new(:from($¢), :to($to));
     retm($r);
 }
 
-sub OPT ($S, &block) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
-    my $x = block($S)[0];
-    my $r = $x // Match.new(:from($from),:to($from));
+sub OPT ($¢, &block) {
+    my $LVL is context = callm($¢);
+    my $x = block($¢)[0];
+    my $r = $x // Match.new(:from($¢),:to($¢));
     retm($r);
 }
 
-sub BRACKET ($S, &block) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
-    my @r = block($S);
+sub BRACKET ($¢, &block) {
+    my $LVL is context = callm($¢);
+    my @r = block($¢);
     return unless @r == 1;
     my $r = @r[0];
     retm($r);
 }
 
-method EXACT ($S, $s) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
+method EXACT ($¢, $s) {
+    my $LVL is context = callm($¢);
     my $len = $s.chars;
-    if substr($!targ, $from, $len) eq $s {
-        my $r = Match.new(:from($from),:to($from+$len));
+    if substr($!targ, $¢, $len) eq $s {
+        my $r = Match.new(:from($¢),:to($¢+$len));
         retm($r);
     }
     else {
-        say "EXACT $s didn't match {substr($!targ,$from,$len)} at $from $len";
+        say "EXACT $s didn't match {substr($!targ,$¢,$len)} at $¢ $len";
         return ();
     }
 }
 
-method DIGIT ($S) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
-    my $char = substr($!targ, $from, 1);
+method DIGIT ($¢) {
+    my $LVL is context = callm($¢);
+    my $char = substr($!targ, $¢, 1);
     if "0" le $char le "9" {
-        my $r = Match.new(:from($from),:to($from+1));
+        my $r = Match.new(:from($¢),:to($¢+1));
         return retm($r);
     }
     else {
-        say "DIGIT didn't match {substr($!targ,$from,1)} at $from";
+        say "DIGIT didn't match {substr($!targ,$¢,1)} at $¢";
         return ();
     }
 }
 
-method REDUCE ($S, $tag) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
-    say "Success $tag from $+FROM to $from\n";
-    $S;
+method REDUCE ($¢, $tag) {
+    my $LVL is context = callm($¢);
+    say "Success $tag from $+FROM to $¢\n";
+    Match.new(:from($¢),:to($¢));
 }
 
 END
