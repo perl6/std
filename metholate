@@ -609,8 +609,7 @@ sub unbalanced {
             $result[0];
         }
         else {
-            my $result = ::indent(join("\nalt\n", @result));
-            $result =~ s/^    alt/alt/gm;
+            my $result = ::indent(join("\n||\n", @result));
             $result;
         }
     };
@@ -656,11 +655,11 @@ sub unbalanced {
                     }
                     $quant = "$rep$h(\$S, $rest, ";
                 }
+                $result = $quant . "-> \$S {\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
             }
             else {
-                $quant = "SINGLE(\$S, ";
+                $result = $$self{atom}->walk(@_);
             }
-            $result = $quant . "-> \$S {\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
         }
         else {
             $result = '"' . $$self{atom} . '"';
@@ -733,7 +732,7 @@ sub unbalanced {
             $result[0];
         }
         else {
-            my $result = ::indent(join("\norwith\n", @result));
+            my $result = ::indent('(' . join("\n||\n", @result) . ')');
             $result;
         }
     };
@@ -857,18 +856,6 @@ sub BRACKET ($S, &block) {
     my $from = $S.to;
     my @r = block($S);
     return unless @r == 1;
-    my $r = @r[0];
-    retm($r);
-}
-
-sub SINGLE ($S, &block) {
-    my $LVL is context = callm($S);
-    my $from = $S.to;
-    my @r = block($S);
-    if @r != 1 {
-        say "SINGLE got {+@r} elements from block!";
-        return ();
-    }
     my $r = @r[0];
     retm($r);
 }
