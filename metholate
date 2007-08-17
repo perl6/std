@@ -56,7 +56,9 @@ last if $NAME eq 'category';
         $out .= <<"END";
 method$ws$NAME$args
 {
+    my \$LVL is context = callm(\$S);
     my \$FROM is context = \$S.to;
+    map { retm(\$_) },
     map { Match.new(:from(\$FROM), :to(\$_.to)) },
 END
 
@@ -626,8 +628,8 @@ sub unbalanced {
             my $q = $$self{quant};
             if ($q) {
                 my ($qfer,$how,$rest) = @{$$self{quant}};
-                my $h = $how eq '!' ? 'G' :
-                        $how eq '?' ? 'F' :
+                my $h = $how eq '!' ? 'g' :
+                        $how eq '?' ? 'f' :
                                       '';
                 if ($qfer eq '*') {
                     $quant = "STAR$h(\$S, ";
@@ -746,135 +748,161 @@ sub supportstuff {
 
 has $.targ;
 
-our class Match is Capture {
+our class Match does Capture {
     has $.from;
     has $.to;
 }
 
-sub STARF ($S, &block) {
-    my $from = $S.to;
-    my $x = $S;
-    gather {
-        take Match.new(:from($from), :to($from));
-        while $x = block($x) {
-            take Match.new(:from($from), :to($x.to));
-        }
-    }
+my $LVL is context = 0;
+
+sub callm (Match $s) {
+    warn $s.perl unless $s ~~ Match;
+    my $lvl = 0;
+    while Pugs::Internals::caller(Any,$lvl,"") { $lvl++ }
+    say ' ' x $lvl, caller.subname, " called at $s.to()";
+    $lvl;
 }
 
-sub STARG ($S, &block) {
+sub retm (Match $r) {
+    say ' ' x $+LVL, caller.subname, " returning $r.from()..$r.to()";
+    $r;
+}
+
+sub STARf ($S, &block) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
-    my $x = $S;
-    reverse gather {
-        take Match.new(:from($from), :to($from));
-        while $x = block($x) {
-            take Match.new(:from($from), :to($x.to));
-        }
-    }
+
+    map { retm($_) },
+        Match.new(:from($from), :to($from)),
+        PLUSf($S, &block);
+}
+
+sub STARg ($S, &block) {
+    my $LVL is context = callm($S);
+    my $from = $S.to;
+
+    map { retm($_) }, reverse
+        Match.new(:from($from), :to($from)),
+        PLUSf($S, &block);
 }
 
 sub STAR ($S, &block) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
     my $to = $from;
     my $x = $S;
     my @all = gather {
         loop {
-            $x = block($x);
-        last unless defined $x;
+            my @x = block($x);
+            say @x.perl;
+        last unless @x;
+            $x = @x[0];  # no backtracking into block on ratchet
             take $x;
             $to = $x.to;
         }
     }
     my $r = Match.new(:from($from), :to($to));
-    $r;
+    retm($r);
 }
 
-sub PLUSF ($S, &block) {
+sub PLUSf ($S, &block) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
     my $x = $S;
+
+    map { retm($_) },
     gather {
-        while $x = block($x) {
-            take Match.new(:from($from), :to($x.to));
+        for block($x) -> $x {
+            take map { Match.new(:from($from), :to($_.to)) }, $x, PLUSf($x, &block);
         }
     }
 }
 
-sub PLUSG ($S, &block) {
-    my $from = $S.to;
-    my $x = $S;
-    reverse gather {
-        while $x = block($x) {
-            take Match.new(:from($from), :to($x.to));
-        }
-    }
+sub PLUSg ($S, &block) {
+    my $LVL is context = callm($S);
+
+    reverse PLUSf($S, &block);
 }
 
 sub PLUS ($S, &block) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
     my $to;
     my $x = $S;
     my @all = gather {
         loop {
-            $x = block($x);
-        last unless defined $x;
+            my @x = block($x);
+            say @x.perl;
+        last unless @x;
+            $x = @x[0];  # no backtracking into block on ratchet
             take $x;
             $to = $x.to;
         }
     }
-    return unless @all;
+    return () unless @all;
     my $r = Match.new(:from($from), :to($to));
-    $r;
+    retm($r);
 }
 
 sub OPT ($S, &block) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
-    say "OPT called at $from";
-    my $x = block($S);
+    my $x = block($S)[0];
     my $r = $x // Match.new(:from($from),:to($from));
-    say "OPT returning at $r.to()";
-    $r;
+    retm($r);
 }
 
 sub BRACKET ($S, &block) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
-    say "BRACKET called at $from";
     my @r = block($S);
     return unless @r == 1;
     my $r = @r[0];
-    say "BRACKET returning at $r.to()";
-    $r;
+    retm($r);
 }
 
 sub SINGLE ($S, &block) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
-    say "SINGLE called at $from";
     my @r = block($S);
-    say "SINGLE returning {+@r} elements";
-    return () unless @r == 1;
+    if @r != 1 {
+        say "SINGLE got {+@r} elements from block!";
+        return ();
+    }
     my $r = @r[0];
-    say "SINGLE returning at $r.to()";
-    $r;
+    retm($r);
 }
 
 method EXACT ($S, $s) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
     my $len = $s.chars;
-    substr($!targ, $from, $len) eq $s and
-        return Match.new(:from($from),:to($from+$len));
-    say "EXACT $s didn't match {substr($!targ,$from,$len)} at $from $len";
-    return;
+    if substr($!targ, $from, $len) eq $s {
+        my $r = Match.new(:from($from),:to($from+$len));
+        retm($r);
+    }
+    else {
+        say "EXACT $s didn't match {substr($!targ,$from,$len)} at $from $len";
+        return ();
+    }
 }
 
 method DIGIT ($S) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
     my $char = substr($!targ, $from, 1);
-    "0" le $char le "9" and
-        return Match.new(:from($from),:to($from+1));
-    say "DIGIT didn't match {substr($!targ,$from,1)} at $from";
-    return;
+    if "0" le $char le "9" {
+        my $r = Match.new(:from($from),:to($from+1));
+        return retm($r);
+    }
+    else {
+        say "DIGIT didn't match {substr($!targ,$from,1)} at $from";
+        return ();
+    }
 }
 
 method REDUCE ($S, $tag) {
+    my $LVL is context = callm($S);
     my $from = $S.to;
     say "Success $tag from $+FROM to $from\n";
     $S;
