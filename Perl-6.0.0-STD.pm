@@ -317,15 +317,15 @@ proto token prefix_circumfix_meta_operator { }
 regex nofat { <!before \h* <?unsp>? '=>' > }
 
 token ws {
-    || <?{ .pos === $!ws_to }> <null>
+    || <?{ $° === $!ws_to }> <null>
     || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
-    || { $!ws_from = .pos }
+    || { $!ws_from = $° }
        [
        | <unsp>              {*}                                #= unsp
        | \v                  {*} <heredoc>                      #= vwhite
        | <unv>               {*}                                #= unv
        ]*  {*}                                                  #= all
-       { $!ws_to = .pos }
+       { $!ws_to = $° }
 }
 
 token unsp {
@@ -454,7 +454,7 @@ token block {
     | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
     | <?unv>? <?before \n > <?ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
-    | {*} { let $+endargs = .pos; }                             #= endargs
+    | {*} { let $+endargs = $°; }                               #= endargs
     ]
     {*}
 }
@@ -475,7 +475,7 @@ token regex_block {  # perhaps parameterize and combine with block someday
     | <?unsp>? <?before <[,:]>> {*}                             #= normal
     | <?unv>? <?before \n > <?ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
-    | {*} { let $+endargs = .pos; }                             #= endargs
+    | {*} { let $+endargs = $°; }                               #= endargs
     ]
     {*}
 }
@@ -544,7 +544,7 @@ token eat_terminator {
     || ';'
     || <?{ $+endstmt === $!ws_from }>
     || <?before <terminator>>
-    || {{ if .pos === $!ws_to { .pos = $!ws_from } }} # undo any line transition
+    || {{ if $° === $!ws_to { $° = $!ws_from } }}   # undo any line transition
         <panic: Statement not terminated properly>  # "can't happen" anyway :)
     ]
 }
@@ -2711,8 +2711,8 @@ regex stdstopper {
     | <statement_mod_cond>
     | <statement_mod_loop>
     | <$+unitstopper>
-    | <?{ .pos == $+endstmt }>
-    | <?{ .pos == $+endargs }>
+    | <?{ $° === $+endstmt }>
+    | <?{ $° === $+endargs }>
     | $
 }
 
