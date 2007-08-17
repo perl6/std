@@ -317,15 +317,15 @@ proto token prefix_circumfix_meta_operator { }
 regex nofat { <!before \h* <?unsp>? '=>' > }
 
 token ws {
-    || <?{ $° === $!ws_to }> <null>
+    || <?{ $¢ === $!ws_to }> <null>
     || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
-    || { $!ws_from = $° }
+    || { $!ws_from = $¢ }
        [
        | <unsp>              {*}                                #= unsp
        | \v                  {*} <heredoc>                      #= vwhite
        | <unv>               {*}                                #= unv
        ]*  {*}                                                  #= all
-       { $!ws_to = $° }
+       { $!ws_to = $¢ }
 }
 
 token unsp {
@@ -454,7 +454,7 @@ token block {
     | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
     | <?unv>? <?before \n > <?ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
-    | {*} { let $+endargs = $°; }                               #= endargs
+    | {*} { let $+endargs = $¢; }                               #= endargs
     ]
     {*}
 }
@@ -475,7 +475,7 @@ token regex_block {  # perhaps parameterize and combine with block someday
     | <?unsp>? <?before <[,:]>> {*}                             #= normal
     | <?unv>? <?before \n > <?ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
-    | {*} { let $+endargs = $°; }                               #= endargs
+    | {*} { let $+endargs = $¢; }                               #= endargs
     ]
     {*}
 }
@@ -544,7 +544,7 @@ token eat_terminator {
     || ';'
     || <?{ $+endstmt === $!ws_from }>
     || <?before <terminator>>
-    || {{ if $° === $!ws_to { $° = $!ws_from } }}   # undo any line transition
+    || {{ if $¢ === $!ws_to { $¢ = $!ws_from } }}   # undo any line transition
         <panic: Statement not terminated properly>  # "can't happen" anyway :)
     ]
 }
@@ -1148,6 +1148,8 @@ token regex_declarator:token { <sym>       <regex_def> {*} }    #= token
 token regex_declarator:rule  { <sym>       <regex_def> {*} }    #= rule
 
 # Most of these special variable rules are there simply to catch old p5 brainos
+
+token special_variable:sym<$¢> { <sym> {*} }                    #= $¢
 
 token special_variable:sym<$!> { <sym> <!before \w> {*} }       #= $!
 
@@ -2711,8 +2713,8 @@ regex stdstopper {
     | <statement_mod_cond>
     | <statement_mod_loop>
     | <$+unitstopper>
-    | <?{ $° === $+endstmt }>
-    | <?{ $° === $+endargs }>
+    | <?{ $¢ === $+endstmt }>
+    | <?{ $¢ === $+endargs }>
     | $
 }
 
