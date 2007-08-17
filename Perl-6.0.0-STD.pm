@@ -798,9 +798,12 @@ token pair {
 }
 
 token colonpair {
+    ':'
     [
-    | ':' '!'? <ident>                                   {*}    #= bool
-    | ':' <ident>? <?unsp>? <postcircumfix>              {*}    #= value
+    | '!' <ident>                                       {*}    #= false
+    | <ident> [ <?unsp> <postcircumfix> ]?              {*}    #= value
+    | <postcircumfix>                                   {*}    #= structural
+    | <sigiltwigil> <desigilname>                       {*}    #= varname
     ]
     {*}
 }
@@ -808,7 +811,7 @@ token colonpair {
 token quotepair {
     ':'
     [
-    | '!' <ident>                                        {*}    #= bool
+    | '!' <ident>                                        {*}    #= false
     | <ident> [ <unsp>? <?before '('> <postcircumfix> ]? {*}    #= value
     | \d+ <[a..z]>+                                             #= nth
     ]
