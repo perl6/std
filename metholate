@@ -19,7 +19,7 @@ $_ = <>;
 my $all = $_;
 
 sub indent {
-    my $x = shift;
+    my $x = shift || '';
     $x =~ s/^/    /mg;
     $x;
 }
@@ -49,6 +49,7 @@ while ($_ ne "") {
 
     if ( s/^(#.*\n)// ) { $out .= $1; next }
 
+    my $remaining = length($_);
     if ( s/^(rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
         local $CONTEXT = $1;
         my $ws = $2;
@@ -56,27 +57,31 @@ while ($_ ne "") {
         my $args = $4;
         $args =~ s/\(/(\$¢, / or
         $args =~ s/^/ (\$¢) /;
-#last if $NAME eq 'category';
+        my $re = regex('\\}');
+
+        my $old = substr($all, length($all) - $remaining, $remaining - length($_)+1);
+        $old =~ s/^/##      /mg;
+        $out .= "$old\n\n";
+
+        my $result = ::indent($re->walk()) . "\n";
         $out .= <<"END";
 method$ws$NAME$args
 {
     my \$LVL is context = callm(\$¢);
     my \$FROM is context = \$¢;
     map { retm(\$_) },
-    map { self.capture(\$FROM, \$_.to) },
-END
-
-        my $re = regex('\\}');
-#        print ::Dump($re);
-        my $result = ::indent($re->walk());
-        $out .= <<"END";
+    map { self.capture(\$FROM, \$_) },
 $result
 END
         next;
     }
 
     if (s/^(.*\n)//) {
-        $out .= $1;
+        my $line = $1;
+        if ($line =~ s/^grammar (\w+)//) {
+            $out .= "use Metholated;\ngrammar $1 is Metholated";
+        }
+        $out .= $line;
     }
 }
 print $out;
@@ -261,7 +266,7 @@ sub atom {
         }
         ws();
         $key =~ s/(['\\])/\\$1/g;
-        return bless { name => 'REDUCE', rest => "('$key')"}, "RE_method";
+        return bless { name => '_REDUCE', rest => "('$key')"}, "RE_method";
     }
     if (/^\{/) {
         my $b = block();
@@ -441,7 +446,6 @@ sub assertion {
             my $code = code('\\)>');
             s/^\)>// or panic "Missing )>";
             $code .= ')';
-            substr($code,1,0) = '$_, ';
             return bless { name => $word, rest => $code }, "RE_method";
         }
         s/^\s*//;
@@ -453,7 +457,12 @@ sub assertion {
     if (/^[\$\@\%]/) {
         my $code = code('>');
         s/^>// or panic "Missing >";
-        return bless { var => $code }, "RE_assertvar";
+        if ($code =~ s/\(.*\)//) {
+            return bless { name => $code, rest => $1 }, "RE_method";
+        }
+        else {
+            return bless { name => $code }, "RE_method_noarg";
+        }
     }
 
     if (/^[+-]?\[/) {
@@ -525,9 +534,9 @@ sub unbalanced {
 { package RE_assertion; use base "REbase";
     sub walk {
         my $self = shift;
-        my $re = ::indent($$self{re}->walk(@_));
+        my $re = $$self{re}->walk(@_);
         if ($$self{assert} eq '!') {
-            "self.NOTBEFORE(\$¢, -> \$¢ {\n" . $re . "\n})";
+            "self._NOTBEFORE(\$¢, -> \$¢ {\n" . ::indent($re) . "\n})";
         }
         else {
             $re;
@@ -551,7 +560,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = ::indent($$self{atom}->walk(@_));
-        "self.BIND(\$¢, '$var', -> \$¢ {\n" . $re . "\n})";
+        "self._BIND(\$¢, '$var', -> \$¢ {\n" . $re . "\n})";
     }
 }
 
@@ -559,7 +568,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "self.BRACKET(\$¢, -> \$¢ {\n" . $re . "\n})";
+        "self._BRACKET(\$¢, -> \$¢ {\n" . $re . "\n})";
     }
 }
 
@@ -574,7 +583,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self.EXACT(\$¢, '" . $text . "')";
+        "self._EXACT(\$¢, '" . $text . "')";
     }
 }
 
@@ -589,37 +598,37 @@ sub unbalanced {
             $not = 1;
         }
         if ($text eq '.') {
-            $code = "self.ANY(\$¢)";
+            $code = "self._ANY(\$¢)";
         }
         elsif ($text eq '^') {
-            $code = "self.BOS(\$¢)";
+            $code = "self._BOS(\$¢)";
         }
         elsif ($text eq '^^') {
-            $code = "self.BOL(\$¢)";
+            $code = "self._BOL(\$¢)";
         }
         elsif ($text eq '$') {
-            $code = "self.EOS(\$¢)";
+            $code = "self._EOS(\$¢)";
         }
         elsif ($text eq '$$') {
-            $code = "self.EOL(\$¢)";
+            $code = "self._EOL(\$¢)";
         }
         elsif ($text eq '\\d') {
-            $code = "self.DIGIT(\$¢)";
+            $code = "self._DIGIT(\$¢)";
         }
         elsif ($text eq '\\w') {
-            $code = "self.ALNUM(\$¢)";
+            $code = "self._ALNUM(\$¢)";
         }
         elsif ($text eq '\\s') {
-            $code = "self.SPACE(\$¢)";
+            $code = "self._SPACE(\$¢)";
         }
         elsif ($text eq '\\h') {
-            $code = "self.HSPACE(\$¢)";
+            $code = "self._HSPACE(\$¢)";
         }
         elsif ($text eq '\\v') {
-            $code = "self.VSPACE(\$¢)";
+            $code = "self._VSPACE(\$¢)";
         }
         if ($not) { # XXX or maybe just .NOT on the end...
-            $code = "self.NOTBEFORE(\$¢, -> \$¢ { $code })";
+            $code = "self._NOTBEFORE(\$¢, -> \$¢ { $code })";
         }
         $code;
     }
@@ -636,8 +645,8 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = $$self{re};
-        $re = $re->walk(@_);
-        'self.' . $$self{name} . "(\$¢, -> \$¢ { $re })";
+        $re = ::indent($re->walk(@_));
+        'self.' . $$self{name} . "(\$¢, -> \$¢ {\n$re\n})";
     }
 }
 
@@ -701,7 +710,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "self.PAREN(\$¢, -> \$¢ {\n" . $re . "\n})";
+        "self._PAREN(\$¢, -> \$¢ {\n" . $re . "\n})";
     }
 }
 
@@ -713,7 +722,7 @@ sub unbalanced {
         #print $$self{quant},"\n";
         if (ref $$self{atom}) {
             my $quant = "";
-            my $rep = "REP";
+            my $rep = "_REP";
             my $q = $$self{quant};
             if ($q) {
                 my ($qfer,$how,$rest) = @{$$self{quant}};
@@ -721,22 +730,22 @@ sub unbalanced {
                         $how eq '?' ? 'f' :
                                       'r';
                 if ($qfer eq '*') {
-                    $quant = "self.STAR$h(\$¢, ";
+                    $quant = "self._STAR$h(\$¢, ";
                 }
                 elsif ($qfer eq '+') {
-                    $quant = "self.PLUS$h(\$¢, ";
+                    $quant = "self._PLUS$h(\$¢, ";
                 }
                 elsif ($qfer eq '?') {
-                    $quant = "self.OPT$h(\$¢, ";
+                    $quant = "self._OPT$h(\$¢, ";
                 }
                 elsif ($qfer eq '**') {
                     if (ref $rest) {
                         if (ref $rest eq "RE_block") {
-                            $rep = "REPINDIRECT";
+                            $rep = "_REPINDIRECT";
                             $rest = $rest->walk();
                         }
                         else {
-                            $rep = "REPSEP";
+                            $rep = "_REPSEP";
                             $rest = "-> \$¢ {\n" . ::indent($rest->walk()) . "\n}";
                         }
                     }
@@ -772,7 +781,7 @@ sub unbalanced {
         }
         my $result = pop @result;
         for (reverse @result) {
-            $result = "gather for map({.to}, $_) -> \$¢ {\n" . ::indent("take " . $result) . "\n}";
+            $result = "gather for $_ -> \$¢ {\n" . ::indent("take " . $result) . "\n}";
         }
         $result;
     };
@@ -783,7 +792,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self.EXACT(\$¢, '" . $text . "')";
+        "self._EXACT(\$¢, '" . $text . "')";
     }
 }
 
@@ -850,20 +859,20 @@ sub unbalanced {
         my $var = $$self{var};
         if ($var =~ /^\$/) {
             if ($var =~ /^\$(\d+)$/) {
-                "self.BACKREFp(\$¢, $1 )";
+                "self._BACKREFp(\$¢, $1 )";
             }
             elsif ($var =~ /^\$<(.*)>$/) {
-                "self.BACKREFn(\$¢, '$1' )";
+                "self._BACKREFn(\$¢, '$1' )";
             }
             else {
-                "self.EXACT(\$¢, $var )";
+                "self._EXACT(\$¢, $var )";
             }
         }
         elsif ($var =~ /^\@/) {
-            "self.ARRAY(\$¢, $var )";
+            "self._ARRAY(\$¢, $var )";
         }
         elsif ($var =~ /^\%/) {
-            "self.HASH(\$¢, $var )";
+            "self._HASH(\$¢, $var )";
         }
     }
 }
