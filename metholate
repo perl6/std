@@ -69,8 +69,7 @@ method$ws$NAME$args
 {
     my \$LVL is context = callm(\$¢);
     my \$FROM is context = \$¢;
-    map { retm(\$_) },
-    map { self.capture(\$FROM, \$_) },
+    map { retm(self.capture(\$FROM, \$_)) },
 $result
 END
         next;
@@ -226,7 +225,7 @@ sub quantifier {
                 $x = $1;
             }
             elsif (/^\{/) {
-                $x = block();
+                $x = block('thunk');
             }
             else {
                 $x = atom();
@@ -269,7 +268,7 @@ sub atom {
         return bless { name => '_REDUCE', rest => "('$key')"}, "RE_method";
     }
     if (/^\{/) {
-        my $b = block();
+        my $b = block('void');
         ws();
         return $b;
     }
@@ -471,7 +470,7 @@ sub assertion {
         return bless { var => $cclass }, "RE_cclass";
     }
     if (/^\{/) {
-        my $b = block();
+        my $b = block('bool');
         s/^>// or panic "Missing >";
         ws();
         return $b;
@@ -481,11 +480,12 @@ sub assertion {
 
 sub block {
     # XXX
+    my $context = shift;
     s/^({+)//;
     my $term = '\\}' x length($1);
     my $block = code($term);
     s/^$term// or panic "Missing }" ;
-    return bless { text => $block }, "RE_block";
+    return bless { text => $block, context => $context }, "RE_block";
 }
 
 sub code {
@@ -551,7 +551,16 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $text = $$self{text};
-        "-> \$¢ {" . $text . "}";
+        my $ctx = $$self{context};
+        if ($ctx eq 'void') {
+            "({$text}() xx 0, \$¢)";
+        }
+        elsif ($ctx eq 'bool') {
+            "(\$¢ xx ?{$text}())";
+        }
+        else {
+            "{$text}";
+        }
     }
 }
 
@@ -611,6 +620,15 @@ sub unbalanced {
         }
         elsif ($text eq '$$') {
             $code = "self._EOL(\$¢)";
+        }
+        elsif ($text eq ':') {
+            $code = "self._COMMITATOM(\$¢)";
+        }
+        elsif ($text eq '::') {
+            $code = "self._COMMITBRANCH(\$¢)";
+        }
+        elsif ($text eq ':::') {
+            $code = "self._COMMITRULE(\$¢)";
         }
         elsif ($text eq '\\d') {
             $code = "self._DIGIT(\$¢)";
