@@ -828,7 +828,11 @@ sub unbalanced {
             $result[0];
         }
         else {
-            my $result = ::indent(join("\nSUBMATCH\n", @result));
+            my $against = shift @result;
+            my $pattern = ::indent(shift @result);
+            $against =~ s/BACK//;
+            $against .= "";
+            my $result = "self.SUBMATCH($against, -> \$¢ {\n$pattern\n})";
             $result;
         }
     };

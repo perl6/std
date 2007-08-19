@@ -1374,7 +1374,7 @@ token special_variable:sym<$;> {
 
 token special_variable:sym<$'> { #'
     <sym> <?before \s | ',' | <terminator> >
-    <obs(q/$' variable/, 'explicit pattern after )>')> #'
+    <obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
 }
 
 token special_variable:sym<$"> {
@@ -1387,7 +1387,7 @@ token special_variable:sym<$,> {
     <obs(q/$, variable/, ".join() method")>
 }
 
-token special_variable:sym«$<» {
+token special_variable:sym{'$<'} {
     <sym> <!before \s* \w+ \s* '>' >
     <obs('$< variable', "$*UID")>
 }
@@ -1686,7 +1686,7 @@ token finish_subst ($pat, :%thisop is context<rw>) {
           <?ws>
           <infix>            # looking for pseudoassign here
           { %+thisop<prec> == %item_assignment<prec> or
-              panic("Bracketed subst must use some form of assignment" }
+              panic("Bracketed subst must use some form of assignment") }
           $<repl> := <EXPR(%item_assignment)>
     # unbracketed form
     | $<repl> := <q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
