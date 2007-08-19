@@ -52,6 +52,7 @@ while ($_ ne "") {
     my $remaining = length($_);
     if ( s/^(rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
         local $CONTEXT = $1;
+        local $PAREN = 0;
         my $ws = $2;
         local $NAME = $3;
         my $args = $4;

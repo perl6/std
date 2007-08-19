@@ -513,7 +513,7 @@ token label {
     ]?
 
     # add label as a pseudo type
-    {{ COMPILING::{"::$<ident>"} = Label.new($<ident>) }}  # XXX need statement ref too?
+    {{ eval 'COMPILING::{"::$<ident>"} = Label.new($<ident>)' }}  # XXX need statement ref too?
 
     {*}
 }
@@ -883,7 +883,7 @@ regex prefix_circumfix_meta_operator:reduce (:%thisop? is context ) {
     [ <!{ %+thisop<prec> eq %conditional<prec> }>
         || <panic: Can't reduce a conditional operator> ]
 
-    { $<prec> := %thisop<prec> }
+    { $<prec> := %+thisop<prec> }
 
     {*}                                                         #= [ ]
 }
@@ -1291,11 +1291,11 @@ token special_variable:sym<$+> {
 
 token special_variable:sym<${^ }> {
     ( <sigil> '{^' (.*?) '}' )
-    <obscaret($0, $<sigil>, $1)> }
+    <obscaret($0, $<sigil>, $1)>
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
-multi method obscaret (Str, $var, Str $sigil, Str $name) {
+multi method obscaret (Str $var, Str $sigil, Str $name) {
     my $repl = do given $sigil {
         when '$' {
             given $name {
@@ -1333,7 +1333,7 @@ multi method obscaret (Str, $var, Str $sigil, Str $name) {
             }
         }
         when * { "a global form such as $sigil*$0" }
-    }
+    }; # XXX pugs needs semi here for some reason
     return $.obs("$var variable", $repl);
 }
 
@@ -1685,7 +1685,7 @@ token finish_subst ($pat, :%thisop is context<rw>) {
     | <?{ $pat<delim> == 2 }> ::
           <?ws>
           <infix>            # looking for pseudoassign here
-          { %thisop<prec> == %item_assignment<prec> or
+          { %+thisop<prec> == %item_assignment<prec> or
               panic("Bracketed subst must use some form of assignment" }
           $<repl> := <EXPR(%item_assignment)>
     # unbracketed form
