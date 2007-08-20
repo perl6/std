@@ -43,7 +43,7 @@ understand Perl 6 code.
 
 =end comment overview
 
-token TOP { <UNIT( $+unitstop or /$/ )> {*} }
+token TOP { <UNIT( $+unitstopper or "null" )> {*} }
 
 # This grammar also assumes transitive longest-token semantics, though
 # we make a feeble attempt to order rules so a procedural | can usually
@@ -185,18 +185,21 @@ class Terminator      does PrecOp[|%terminator]             {}
 # the => (fatarrow) construct.  Note that endsym isn't called if <sym>
 # isn't called.
 
-my $endsym is context = / <null> /;
+my $endsym is context = "null";
+my $unitstopper is context = "null";
+my $endstmt is context;
+my $endargs is context;
 
 # XXX the only magic we're assuming here is that someone set up $+sym for us.
 #  (well, and endsym, but that's set explicitly in the proto sigs below,
 #  (which theoretically propagate to the sigs of the multis they control...))
-multi method sym (Str $pat = $+sym) {
-    m:p/ $pat <$+endsym> /;
+token sym (Str $pat = $+sym) {
+    $pat <$+endsym>
 }
 
-multi method sym ($pat = $+sym) {
-    m:p/ <$pat> <$+endsym> /;
-}
+#multi method sym ($¢, $pat = $+sym) {
+#    m:p/ <$pat> <$+endsym> /;
+#}
 
 proto token category { }
 
@@ -360,7 +363,7 @@ ex:     say
 =end perlhints
 
 token block_comment {
-    ^^ '#' <?{ ($<start>,$<stop>) = $.peek_brackets() }>
+    ^^ '#' <?{ ($<start>,$<stop>) = $.peek_brackets($¢) }>
     $<start> \N* \n                        # eat the #{ line
     [
     ||  [
@@ -390,9 +393,9 @@ token pod_comment {
 
 # Top-level rules
 
-method UNIT ($unitstop is context = /$/) {
+method UNIT ($¢, $unitstopper is context = "null") {
     UNIT: do {
-        m:p/ <comp_unit> /;
+        self.compunit($¢);
     }
 }
 
@@ -403,7 +406,7 @@ rule comp_unit (:$begin_compunit is context = 1,
                 :$endargs        is context<rw> = 0)
 {
     <statementlist>
-    [ <$+unitstop> || <panic: Can't understand next input--giving up> ]
+    [ <$+unitstopper> || <panic: Can't understand next input--giving up> ]
     {*}
 }
 
@@ -746,7 +749,7 @@ token adverbs {
     [ <colonpair> <?ws> ]+
     {
         my $prop = $+prevop err
-            panic('No previous operator visible to adverbial pair (' ~
+            $.panic($¢, 'No previous operator visible to adverbial pair (' ~
                 $<colonpair> ~ ')');
         $prop.adverb($<colonpair>)
     }
@@ -908,7 +911,7 @@ token infix_prefix_meta_operator:sym<!> (--> Chaining) {
     || <panic: Only boolean infix operators may be negated>
     ]
 
-    { %+thisop<hyper> and panic("Negation of hyper operator not allowed") }
+    { %+thisop<hyper> and $.panic($¢, "Negation of hyper operator not allowed") }
 
     {*}                                                         #= !
 }
@@ -1025,7 +1028,7 @@ token methodop {
     | <ident>
     | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]>> <quote>
-        { $<quote> ~~ /\W/ or panic("Useless use of quotes") }
+        { $<quote> ~~ /\W/ or $.panic($¢, "Useless use of quotes") }
     ] <?unsp>? 
 
     [
@@ -1112,7 +1115,7 @@ token package_def {
     [
     || <?{ $+begin_compunit }> :: ';'
         {
-            $<module_name> err panic("Compilation unit cannot be anonymous");
+            $<module_name> err $.panic($¢, "Compilation unit cannot be anonymous");
             $begin_compunit = 0;
         }
         {*}                                                     #= semi
@@ -1334,7 +1337,7 @@ multi method obscaret (Str $var, Str $sigil, Str $name) {
         }
         when * { "a global form such as $sigil*$0" }
     }; # XXX pugs needs semi here for some reason
-    return $.obs("$var variable", $repl);
+    return $.obs($¢, "$var variable", $repl);
 }
 
 token special_variable:sym<${ }> {
@@ -1599,7 +1602,7 @@ class Herestub {
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
-method heredoc {
+method heredoc ($¢) {
     while my $herestub = shift @herestub_queue {
         my $delim = $herestub.delim;
         my $lang = $herestub.lang;
@@ -1623,7 +1626,7 @@ method heredoc {
             $herestub.orignode<doc> = $doc;
         }
         else {
-            panic("Ending delimiter $delim not found");
+            $.panic($¢, "Ending delimiter $delim not found");
         }
     }
 }
@@ -1686,7 +1689,7 @@ token finish_subst ($pat, :%thisop is context<rw>) {
           <?ws>
           <infix>            # looking for pseudoassign here
           { %+thisop<prec> == %item_assignment<prec> or
-              panic("Bracketed subst must use some form of assignment") }
+              $.panic($¢, "Bracketed subst must use some form of assignment") }
           $<repl> := <EXPR(%item_assignment)>
     # unbracketed form
     | $<repl> := <q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
@@ -1960,23 +1963,23 @@ constant %open2close = {
 
 # assumes whitespace is eaten already
 
-method peek_delimiters {
+method peek_delimiters ($¢) {
     return peek_brackets ||
         substr($_,0,1) xx 2;
 }
 
-method peek_brackets {
+method peek_brackets ($¢) {
     my $start;
     my $stop;
     if m:p/ \s / {
-        panic("Whitespace not allowed as delimiter");
+        $.panic($¢, "Whitespace not allowed as delimiter");
     }
     elsif m:p/ <?before <isPe>> / {
-        panic("Use a closing delimiter for an opener is reserved");
+        $.panic($¢, "Use a closing delimiter for an opener is reserved");
     }
     elsif m:p/ <?before $start := [ (leftbrack) $0* ] > / {
         $stop = %open2close{$0} err
-            panic("Don't know how to flip $start bracket");
+            $.panic($¢, "Don't know how to flip $start bracket");
         $stop x= $start.chars;
         return $start, $stop;
     }
@@ -1986,19 +1989,19 @@ method peek_brackets {
 }
 
 regex bracketed ($lang = qlang("Q")) {
-     <?{ ($<start>,$<stop>) = $.peek_brackets() }>
+     <?{ ($<start>,$<stop>) = $.peek_brackets($¢) }>
      $<q> := <q_balanced($lang, $<start>, $<stop>)>
     {*}
 }
 
 regex q_pickdelim ($lang) {
     {{
-       ($<start>,$<stop>) = $.peek_delimiters();
+       ($<start>,$<stop>) = $.peek_delimiters($¢);
        if $<start> eq $<stop> {
-           $<q> := self.q_unbalanced($lang, $<stop>);
+           $<q> := self.q_unbalanced($¢, $lang, $<stop>);
        }
        else {
-           $<q> := self.q_balanced($lang, $<start>, $<stop>);
+           $<q> := self.q_balanced($¢, $lang, $<start>, $<stop>);
        }
     }}
     {*}
@@ -2006,7 +2009,7 @@ regex q_pickdelim ($lang) {
 
 regex rx_pickdelim ($lang) {
     [
-    | <?{ ($<start>,$<stop>) = $.peek_delimiters() }>
+    | <?{ ($<start>,$<stop>) = $.peek_delimiters($¢) }>
       $<start>
       $<r> := <regex($<stop>)>        # counts its own brackets, we hope
     | [ $<stop> := [\S] || <panic: Regex delimiter must not be whitespace> ]
@@ -2017,7 +2020,7 @@ regex rx_pickdelim ($lang) {
 
 regex tr_pickdelim ($lang) {
     [
-    | <?{ ($<start>,$<stop>) = $.peek_delimiters() }>
+    | <?{ ($<start>,$<stop>) = $.peek_delimiters($¢) }>
       $<start>
       $<r> := <transliterator($<stop>)>
     | [ $<stop> := [\S] || <panic: tr delimiter must not be whitespace> ]
@@ -2226,8 +2229,8 @@ token parameter {
     [
         <default_value> {{
             given $<quantchar> {
-              when '!' { panic("Can't put a default on a required parameter") }
-              when '*' { panic("Can't put a default on a slurpy parameter") }
+              when '!' { $.panic($¢, "Can't put a default on a required parameter") }
+              when '*' { $.panic($¢, "Can't put a default on a slurpy parameter") }
             }
             let $<quant> := '?';
         }}
@@ -2239,10 +2242,10 @@ token parameter {
             when '!' {
                 given $+zone {
                     when 'posopt' {
-panic("Can't use required parameter in optional zone");
+$.panic($¢, "Can't use required parameter in optional zone");
                     }
                     when 'var' {
-panic("Can't use required parameter in variadic zone");
+$.panic($¢, "Can't use required parameter in variadic zone");
                     }
                 }
             }
@@ -2250,7 +2253,7 @@ panic("Can't use required parameter in variadic zone");
                 given $+zone {
                     when 'posreq' { $+zone = 'posopt' }
                     when 'var' {
-panic("Can't use optional positional parameter in variadic zone");
+$.panic($¢, "Can't use optional positional parameter in variadic zone");
                     }
                 }
             }
@@ -2710,40 +2713,42 @@ token terminator:sym<!!> ( --> Terminator)
     { <?before '!!' > {*} }                                     #= !!
 
 regex stdstopper {
+    | $
     | <terminator>
     | <statement_mod_cond>
     | <statement_mod_loop>
-    | <$+unitstopper>
     | <?{ $¢ === $+endstmt }>
     | <?{ $¢ === $+endargs }>
-    | $
+    | <$+unitstopper>
 }
 
 token assertstopper { <stdstopper> | '>' }
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR (%preclim = %LOOSEST,
+method EXPR ($¢, %preclim = %LOOSEST,
                 :$stop = &stdstopper,
-                :$seen = $.expect_term())
+               # :$seen = $.expect_term($¢)
+                )
 {
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
-    if m:p/ <?before <$stop>> / {
-        return;
-    }
+#    my @terminator = self.before($¢, -> $¢ { $stop(self: $¢) } );
+#    return () if @terminator and @terminator[0].bool;
     my $prevop is context<rw>;
     my %thisop is context<rw>;
     my @termstack;
     my @opstack;
 
     push @opstack, %terminator;         # (just a sentinel value)
+    my $seen = self.expect_term($¢);
     push @termstack, $seen;
 
     my sub reduce () {
         my $op = pop @opstack;
         given $op<assoc> {
             when 'chain' {
+                say "reducing chain";
                 my @chain;
                 push @chain, pop(@termstack);
                 push @chain, $op;
@@ -2757,6 +2762,7 @@ method EXPR (%preclim = %LOOSEST,
                 push @termstack, $op<top>;
             }
             when 'list' {
+                say "reducing list";
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
@@ -2769,6 +2775,8 @@ method EXPR (%preclim = %LOOSEST,
                 push @termstack, $op<top>;
             }
             default {
+                say "reducing";
+                my @list;
                 $op<top><right> = pop @termstack;
                 $op<top><left> = pop @termstack;
                 push @termstack, $op<top>;
@@ -2776,12 +2784,14 @@ method EXPR (%preclim = %LOOSEST,
         }
     }
 
-    while not m:p/ <?before <$stop>> / {
+    loop {
+        my @terminator = self.before($¢, -> $¢ { $stop(self: $¢) } );
+    last if @terminator and @terminator[0].bool;
         %thisop = ();
-        my $infix := $.expect_tight_infix($preclim);
+        my $infix := $.expect_tight_infix($¢, $preclim);
         
         # XXX might want to allow this in a declaration though
-        if not $infix { panic("Can't have two terms in a row") }
+        if not $infix { $.panic($¢, "Can't have two terms in a row") }
 
         if not defined %thisop<prec> {
             %thisop = %terminator;
@@ -2799,24 +2809,25 @@ method EXPR (%preclim = %LOOSEST,
         # Equal precedence, so use associativity to decide.
         if @opstack[-1]<prec> eq $newprec {
             given %thisop<assoc> {
-                when 'non'   { panic(qq["$infix" is not associative]) }
+                when 'non'   { $.panic($¢, qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if %thisop<top><sym> !eqv @opstack[-1]<top><sym>;
                 }
-                default { panic(qq[Unknown associativity "$_" for "$infix"]) }
+                default { $.panic($¢, qq[Unknown associativity "$_" for "$infix"]) }
             }
         }
         push @opstack, %thisop;
-        if m:p/ <?before <$stop>> / {
-            panic("$infix.perl() is missing right term");
+        my @terminator = self.before($¢, -> $¢ { $stop(self: $¢) } );
+        if @terminator and @terminator[0].bool {
+            $.panic($¢, "$infix.perl() is missing right term");
         }
         %thisop = ();
-        push @termstack, $.expect_term();
+        push @termstack, $.expect_term($¢);
     }
     reduce() if @termstack > 1;
-    @termstack == 1 or panic("Internal operator parser error");
+    @termstack == 1 or $.panic($¢, "Internal operator parser error");
     return @termstack[0];
 }
 
@@ -3098,12 +3109,13 @@ token quantmod { [ '?' | '!' | ':' | '+' ]? }
 rule panic (Str $s) { <commit> <fail($s)> }
 
 # 3rd arg assumes more things will become obsolete after Perl 6 comes out...
-method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
-    $.panic("Obsolete use of $old;$when please use $new instead");
+method obs ($¢, Str $old, Str $new, Str $when = ' in Perl 6') {
+    $.panic($¢, "Obsolete use of $old;$when please use $new instead");
 }
 
 say "Starting...";
 $_ = '42';
-say Perl.new.EXPR().perl;
+my $result = Perl.new(:targ('42+1')).EXPR(0);
+print $result.yaml;
 
 ## vim: expandtab sw=4

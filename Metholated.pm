@@ -1,5 +1,7 @@
 grammar Metholated;
 
+# XXX still full of ASCII assumptions
+
 has $.targ;
 
 our class MCont {
@@ -162,6 +164,21 @@ method before ($¢, &block) {
     return ();
 }
 
+method after ($¢, &block) {
+    my $LVL is context = callm($¢);
+    my $end = self.capture($¢, $¢);
+    my @all = block($end);          # Make sure .from == .to
+    if (@all and @all[0].bool) {
+        return retm($end);
+    }
+    return ();
+}
+
+method null ($¢) {
+    my $LVL is context = callm($¢);
+    return retm(self.capture($¢, $¢));
+}
+
 method _ASSERT ($¢, &block) {
     my $LVL is context = callm($¢);
     my @all = block($¢);
@@ -191,6 +208,20 @@ method _EXACT ($¢, $s) {
     }
 }
 
+method _vEXACT ($¢, $s) {
+    my $LVL is context = callm($¢);
+    my $len = $s.chars;
+    my $from = $¢.from - $len;
+    if $from >= 0 and substr($!targ, $from, $len) eq $s {
+        my $r = self.capture($from, $¢);
+        retm($r);
+    }
+    else {
+        say "vEXACT $s didn't match {substr($!targ,$from,$len)} at $from $len";
+        return ();
+    }
+}
+
 method _DIGIT ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.to;
@@ -200,7 +231,121 @@ method _DIGIT ($¢) {
         return retm($r);
     }
     else {
-        say "DIGIT didn't match {substr($!targ,$from,1)} at $from";
+        say "DIGIT didn't match $char at $from";
+        return ();
+    }
+}
+
+method _vDIGIT ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.from - 1;
+    if $from < 0 {
+        say "vDIGIT didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($!targ, $from, 1);
+    if "0" le $char le "9" {
+        my $r = self.capture($from, $¢);
+        return retm($r);
+    }
+    else {
+        say "vDIGIT didn't match $char at $from";
+        return ();
+    }
+}
+
+method _ALNUM ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.to;
+    my $char = substr($!targ, $from, 1);
+    if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' {
+        my $r = self.capture($¢, $from+1);
+        return retm($r);
+    }
+    else {
+        say "ALNUM didn't match $char at $from";
+        return ();
+    }
+}
+
+method _vALNUM ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.from - 1;
+    if $from < 0 {
+        say "vALNUM didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($!targ, $from, 1);
+    if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' {
+        my $r = self.capture($from, $¢);
+        return retm($r);
+    }
+    else {
+        say "vALNUM didn't match $char at $from";
+        return ();
+    }
+}
+
+method _HSPACE ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.to;
+    my $char = substr($!targ, $from, 1);
+    if $char eq " " | "\t" | "\r" {
+        my $r = self.capture($¢, $from+1);
+        return retm($r);
+    }
+    else {
+        say "HSPACE didn't match $char at $from";
+        return ();
+    }
+}
+
+method _vHSPACE ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.from - 1;
+    if $from < 0 {
+        say "vHSPACE didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($!targ, $from, 1);
+    if $char eq " " | "\t" | "\r" {
+        my $r = self.capture($from, $¢);
+        return retm($r);
+    }
+    else {
+        say "vHSPACE didn't match $char at $from";
+        return ();
+    }
+}
+
+method _VSPACE ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.to;
+    my $char = substr($!targ, $from, 1);
+    if $char eq "\n" | "\f" {
+        my $r = self.capture($¢, $from+1);
+        return retm($r);
+    }
+    else {
+        say "VSPACE didn't match $char at $from";
+        return ();
+    }
+}
+
+method _vVSPACE ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.from - 1;
+    if $from < 0 {
+        say "vVSPACE didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($!targ, $from, 1);
+    if $char eq "\n" | "\f" {
+        my $r = self.capture($from, $¢);
+        return retm($r);
+    }
+    else {
+        say "vVSPACE didn't match $char at $from";
         return ();
     }
 }
@@ -213,6 +358,40 @@ method _ANY ($¢) {
     }
     else {
         say "ANY didn't match anything at $from";
+        return ();
+    }
+}
+
+method _BOS ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.to;
+    if $from == 0 {
+        retm(self.capture($¢, $¢));
+    }
+    else {
+        return ();
+    }
+}
+
+method _BOL ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.to;
+    # XXX should define in terms of BOL or after vVSPACE
+    if $from == 0 or substr($!targ, $from-1, 1) eq "\n" or substr($!targ, $from-2, 2) eq "\r\n" {
+        retm(self.capture($¢, $¢));
+    }
+    else {
+        return ();
+    }
+}
+
+method _EOS ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.to;
+    if $from == $!targ.chars {
+        retm(self.capture($¢, $¢));
+    }
+    else {
         return ();
     }
 }
