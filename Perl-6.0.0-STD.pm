@@ -1636,7 +1636,7 @@ token quote:sym«< >»   { <?before '<'  > <quotesnabber(":q", ":w")>  }
 
 token quote:sym</ />   {
     <?before '/'  > <quotesnabber(":regex")>
-    [ (< i g s m x c e ]>+) 
+    [ (< i g s m x c e ] >+) 
         # note: only the submatch fails here on the obs call
         [ $0 ~~ 'i' <obs("/i",":i")> ]?
         [ $0 ~~ 'g' <obs("/g",":g")> ]?
@@ -1883,11 +1883,12 @@ token quotesnabber (*@q, :$delim is context<rw> = '') {
 
     [ (<quotepair>) { push @q, $0 } <?ws> ]*
 
-    { let $<lang> = qlang('Q', @q) }
-
     # Dispatch to current lang's subparser.
-    $<delimited> := <$($<lang>.parser)($<lang>)>
-    { let $<delim> = $delim }
+    {{
+        let $<lang> = qlang('Q', @q);
+        $<delimited> := $<lang>.parser.($<lang>);  # XXX probably wrong
+        let $<delim> = $delim;
+    }}
     {*}
 }
 
@@ -1991,7 +1992,7 @@ regex bracketed ($lang = qlang("Q")) {
 }
 
 regex q_pickdelim ($lang) {
-    {
+    {{
        ($<start>,$<stop>) = $.peek_delimiters();
        if $<start> eq $<stop> {
            $<q> := self.q_unbalanced($lang, $<stop>);
@@ -1999,7 +2000,7 @@ regex q_pickdelim ($lang) {
        else {
            $<q> := self.q_balanced($lang, $<start>, $<stop>);
        }
-    }
+    }}
     {*}
 }
 
@@ -2060,8 +2061,8 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
 }
 
 # We get here only for escapes in escape set, even though more are defined.
-regex q_escape ($lang) {
-    <$($lang<escrule>)>
+method q_escape ($¢, $lang) {
+    $lang<escrule>(self, $¢);
     {*}
 }
 
@@ -2893,9 +2894,9 @@ token regex_metachar:sym<\\\\> { \\\\ :: <fail> }
 token regex_metachar:quant { <regex_quantifier> <panic: quantifier quantifies nothing> }
 
 # "normal" metachars
-token regex_metachar:sym<{ }> {                                          #= { }
+token regex_metachar:sym<{ }> {
     <block>
-    { @<sym> := <{ }> }
+    {{ @<sym> := <{ }> }}
     {*}                                                         #= { }
 }
 
@@ -3029,7 +3030,7 @@ token regex_assertion:method {
 }
 token regex_assertion:ident { <ident> [               # is qq right here?
                                 | ':' <?ws>
-                                    <q_unbalanced(qlang('Q',':qq'), :stop«>»))>
+                                    <q_unbalanced(qlang('Q',':qq'), :stop«>»)>
                                 | '(' <semilist> ')'
                                 | <?ws> <EXPR(%LOOSEST,&assertstopper)>
                                 ]?

@@ -10,6 +10,7 @@ our $NAME = "";
 our $CONTEXT = "prog";
 our $PARSEBIND = 0;
 our $PAREN = 0;
+our %adverbs = ();
 
 my $TRACE = 0;
 
@@ -296,12 +297,19 @@ sub atom {
 
     if (s/^ (: !? \w+)//x) {
         my $adverb = $1;
+        local %adverbs = %adverbs;
         
         # XXX chintzy
-        if (s/^(\(.*?\))//) { $adverb .= $1 }
+        if (s/^(\(.*?\))//) {
+            $adverbs{$adverb} = $1;
+        }
+        else {
+            my $not = $adverb =~ s/!//;
+            $adverbs{$adverb} = !$not;
+        }
         ws();
 
-        return bless { item => $adverb }, "RE_adverb";
+        return atom();
     }
 
     # check unbalanced angles before assertions
@@ -468,7 +476,7 @@ sub assertion {
     if (/^[+-]?\[/) {
         my $cclass = unbalanced('>');
         s/^>// or panic "Missing >";
-        return bless { var => $cclass }, "RE_cclass";
+        return bless { text => $cclass }, "RE_cclass";
     }
     if (/^\{/) {
         my $b = block('bool');
@@ -583,9 +591,20 @@ sub unbalanced {
 }
 
 { package RE_cclass; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+        $text =~ s/(['\\])/\\$1/g;
+        "self._CCLASS(\$¢, '" . $text . "')";
+    }
 }
 
 { package RE_double; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+        'self._EXACT($¢, "' . $text . '")';
+    }
 }
 
 { package RE_exact; use base "REbase";
@@ -787,6 +806,10 @@ sub unbalanced {
 }
 
 { package RE_qw; use base "REbase";
+    sub walk {
+        my $self = shift;
+        "self._ARRAY(\$¢, $$self{text} )";
+    }
 }
 
 { package RE_sequence; use base "REbase";
