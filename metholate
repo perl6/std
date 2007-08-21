@@ -12,6 +12,7 @@ our $CONTEXT = "prog";
 our $PARSEBIND = 0;
 our $PAREN = 0;
 our %adverbs = ();
+our %fixedprefix;
 
 my $TRACE = 0;
 
@@ -62,18 +63,28 @@ while ($_ ne "") {
         my $coercion = "";
         $args =~ s/\(/(\$¢, / or
         $args =~ s/^/ (\$¢) /;
+        my $p = "";
 
         if ($args =~ s/ --> (\w*)\)/\)/) {
             $coercion = $1 . ".coerce";
         }
-        if ($args =~ s/, *:(\$sym is context .*)\)/\)/) {
-            $sym = $1;
-            $sym =~ s/is rw //;
-            $sym = "my $sym;\n";
+        if ($args =~ s/, *:\$sym is context (?:is rw )?= (.*)\)/\)/) {
+            $p = $1;
+            $sym = "my \$sym is context = $1;\n";
         }
         if ($args =~ s/, *:(\$endsym is context .*)\)/\)/) {
             $sym .= "my $1;\n";
         }
+
+        if ($NAME =~ /_/) {
+            if ($p and /^\s*<sym>/) {
+                $fixedprefix{$NAME} = $p;
+            }
+            elsif (/^\s*('\S*'\s)/) {
+                $fixedprefix{$NAME} = $1;
+            }
+        }
+
         my $re = regex('\\}');
 
         my $old = substr($all, length($all) - $remaining, $remaining - length($_)+1);
@@ -916,7 +927,14 @@ sub unbalanced {
         my @result;
         if ($$self{Kids}) {
             foreach my $kid (@{$$self{Kids}}) {
-                push @result, $kid->walk(@_);
+                my $r = $kid->walk(@_);
+                if ($r and $r =~ /^self\.(\w+)/) {
+                    my $name = $1;
+                    if (my $p = $fixedprefix{$name}) {
+                        $r = "self._EQ(\$¢, $p) && " . $r;
+                    }
+                }
+                push @result, $r;
             }
         }
         if (@result == 1) {

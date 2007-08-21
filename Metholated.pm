@@ -194,6 +194,13 @@ method _BIND ($¢, $var is rw, &block) {
         block($¢);
 }
 
+method _EQ ($¢, $s) {
+    my $from = $¢.to;
+    my $len = $s.chars;
+    return True if substr($!targ, $from, $len) eq $s;
+    return ();
+}
+
 method _EXACT ($¢, $s) {
     my $LVL is context = callm($¢);
     my $from = $¢.to;
