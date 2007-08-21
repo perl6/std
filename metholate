@@ -59,14 +59,19 @@ while ($_ ne "") {
         local $NAME = $3;
         my $args = $4;
         my $sym = "";
+        my $coercion = "";
         $args =~ s/\(/(\$¢, / or
         $args =~ s/^/ (\$¢) /;
-        if ($args =~ s/, :(\$sym is context .*)\)/\)/) {
+
+        if ($args =~ s/ --> (\w*)\)/\)/) {
+            $coercion = $1 . ".coerce";
+        }
+        if ($args =~ s/, *:(\$sym is context .*)\)/\)/) {
             $sym = $1;
             $sym =~ s/is rw //;
             $sym = "my $sym;\n";
         }
-        if ($args =~ s/, :(\$endsym is context .*)\)/\)/) {
+        if ($args =~ s/, *:(\$endsym is context .*)\)/\)/) {
             $sym .= "my $1;\n";
         }
         my $re = regex('\\}');
@@ -82,7 +87,7 @@ method$ws$NAME$args
     my \$LVL is context = callm(\$¢);
     my \$FROM is context = \$¢;
     $sym
-    map { retm(self.capture(\$FROM, \$_)) },
+    map { retm($coercion(self.capture(\$FROM, \$_))) },
 $result
 END
         next;

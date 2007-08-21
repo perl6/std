@@ -76,6 +76,7 @@ while (<>) {
 	my $newparm = ":\$sym is context is rw = $newdflt";
 
 	my $newsig = $protosig{$name} || "";
+        if ($sig and $sig =~ s/( --> \w*$)//) { $newsig .= ' ' . $1 }
 	if ($newsig =~ /^\s*-->/) {
 	    $newsig =~ s/-->/$newparm -->/;
 	}

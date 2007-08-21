@@ -4,9 +4,9 @@ grammar Metholated;
 
 has $.targ;
 
-our class MCont {
+our class MCont does Hash {
     has Metholated $.matcher;
-    has Bool $.bool = 1;
+    has Bool $.bool is rw = 1;
     has StrPos $.from;
     has StrPos $.to;
     has $!item;
@@ -40,7 +40,7 @@ sub callm ($¢) is export {
     $lvl;
 }
 
-sub retm (Match $r) is export {
+sub retm (MCont $r) is export {
     say ' ' x $+LVL, substr(caller.subname,1), " returning $r.from()..$r.to()";
     $r;
 }
@@ -50,7 +50,7 @@ method _STARf ($¢, &block) {
 
     map { retm($_) },
         self.capture($¢, $¢),
-        self.PLUSf($¢, &block);
+        self._PLUSf($¢, &block);
 }
 
 method _STARg ($¢, &block) {
@@ -58,7 +58,7 @@ method _STARg ($¢, &block) {
 
     map { retm($_) }, reverse
         self.capture($¢, $¢),
-        self.PLUSf($¢, &block);
+        self._PLUSf($¢, &block);
 }
 
 method _STARr ($¢, &block) {
@@ -85,7 +85,7 @@ method _PLUSf ($¢, &block) {
     map { retm($_) },
     gather {
         for block($x) -> $x {
-            take map { self.capture($¢, $_) }, $x, self.PLUSf($x, &block);
+            take map { self.capture($¢, $_) }, $x, self._PLUSf($x, &block);
         }
     }
 }
@@ -93,7 +93,7 @@ method _PLUSf ($¢, &block) {
 method _PLUSg ($¢, &block) {
     my $LVL is context = callm($¢);
 
-    reverse self.PLUSf($¢, &block);
+    reverse self._PLUSf($¢, &block);
 }
 
 method _PLUSr ($¢, &block) {
@@ -102,9 +102,9 @@ method _PLUSr ($¢, &block) {
     my @all = gather {
         loop {
             my @matches = block($to);  # XXX shouldn't read whole list
-            say @matches.perl;
         last unless @matches;
             my $first = @matches[0];  # no backtracking into block on ratchet
+            #say $matches.perl;
             take $first;
             $to = $first;
         }
@@ -258,7 +258,7 @@ method _ALNUM ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.to;
     my $char = substr($!targ, $from, 1);
-    if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' {
+    if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
         my $r = self.capture($¢, $from+1);
         return retm($r);
     }
@@ -276,12 +276,26 @@ method _vALNUM ($¢) {
         return ();
     }
     my $char = substr($!targ, $from, 1);
-    if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' {
+    if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
         my $r = self.capture($from, $¢);
         return retm($r);
     }
     else {
         say "vALNUM didn't match $char at $from";
+        return ();
+    }
+}
+
+method alpha ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.to;
+    my $char = substr($!targ, $from, 1);
+    if 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
+        my $r = self.capture($¢, $from+1);
+        return retm($r);
+    }
+    else {
+        say "alpha didn't match $char at $from";
         return ();
     }
 }
@@ -398,7 +412,27 @@ method _EOS ($¢) {
 
 method _REDUCE ($¢, $tag) {
     my $LVL is context = callm($¢);
-    say "Success $tag from $+FROM to $¢.to()\n";
+    say "Success $tag from $+FROM.to() to $¢.to()\n";
     self.capture($¢, $¢);
 }
+
+method _COMMITBRANCH ($¢) {
+    my $LVL is context = callm($¢);
+    say "Commit branch to $¢.to()\n";
+    self.capture($¢, $¢);  # XXX currently noop
+}
+
+method _COMMITRULE ($¢) {
+    my $LVL is context = callm($¢);
+    say "Commit rule to $¢.to()\n";
+    self.capture($¢, $¢);  # XXX currently noop
+}
+
+method commit ($¢) {
+    my $LVL is context = callm($¢);
+    say "Commit match to $¢.to()\n";
+    self.capture($¢, $¢);  # XXX currently noop
+}
+
+method fail ($¢, $m) { die $m }
 
