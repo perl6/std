@@ -2555,10 +2555,10 @@ token infix:sym<~~> ( --> Chaining)
     { <sym> {*} }                                               #= ~~
 
 token infix:sym<!~> ( --> Chaining)
-    { <obs('!~ to do negated pattern matching', '!~~')> }
+    { <sym> <obs('!~ to do negated pattern matching', '!~~')> }
 
 token infix:sym<=~> ( --> Chaining)
-    { <obs('=~ to do pattern matching', '~~')> }
+    { <sym> <obs('=~ to do pattern matching', '~~')> }
 
 token infix:sym<eq> ( --> Chaining)
     { <sym> {*} }                                               #= eq
@@ -2621,7 +2621,7 @@ token infix:sym<?? !!> ( --> Conditional) {
 }
 
 token infix:sym<?> ( --> Conditional)
-    { <obs('?: for the conditional operator', '??!!')> }
+    { <sym> <obs('?: for the conditional operator', '??!!')> }
 
 
 ## assignment
