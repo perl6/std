@@ -75,6 +75,9 @@ while ($_ ne "") {
         if ($args =~ s/, *:(\$endsym is context .*)\)/\)/) {
             $sym .= "my $1;\n";
         }
+        if ($args =~ s/, *StrPos :(\$endargs is context .*)\)/\)/) {
+            $sym .= "my StrPos $1;\n";
+        }
         if ($args =~ s/, *StrPos :(\$endstmt is context .*)\)/\)/) {
             $sym .= "my StrPos $1;\n";
         }

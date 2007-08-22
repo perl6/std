@@ -372,6 +372,38 @@ method alpha ($¢) {
     }
 }
 
+method _SPACE ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.to;
+    my $char = substr($!targ, $from, 1);
+    if $char eq " " | "\t" | "\r" | "\n" | "\f" {
+        my $r = self.capture($¢, $from+1);
+        return retm($r);
+    }
+    else {
+        say "SPACE didn't match $char at $from";
+        return ();
+    }
+}
+
+method _SPACE_rev ($¢) {
+    my $LVL is context = callm($¢);
+    my $from = $¢.from - 1;
+    if $from < 0 {
+        say "vSPACE didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($!targ, $from, 1);
+    if $char eq " " | "\t" | "\r" | "\n" | "\f" {
+        my $r = self.capture_rev($from, $¢);
+        return retm($r);
+    }
+    else {
+        say "vSPACE didn't match $char at $from";
+        return ();
+    }
+}
+
 method _HSPACE ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.to;
