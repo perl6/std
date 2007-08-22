@@ -10,8 +10,17 @@ our class MCont does Hash {
     has StrPos $.from;
     has StrPos $.to;
     has $!item;
-    has @.list;
-    has %.hash;
+
+    # XXX for some pugsian reason can't make these work as ordinary attributes.
+    method setname($k) {
+        self{'hash'}{$k} = self;
+        self;
+    }
+
+    method setpos($k) {
+        self{'array'}[$k] = self;
+        self;
+    }
 
     method item {
         if not defined $!item {
@@ -19,15 +28,43 @@ our class MCont does Hash {
         }
         $!item;
     }
+
+    submethod BUILD (:$!matcher, :$!from, :$!to, :$capt) {
+        self{'hash'} = {} unless self.exists('hash');
+        self{'array'} = [] unless self.exists('array');
+        if defined $capt {
+#            say "BUILDING with ", $capt.WHAT;
+            if $capt ~~ MCont {
+                for $capt.{'hash'}.kv -> $k, $v {
+                    say "Building $k";
+                    self<hash>{$k} = $v;  # XXX need to add push semantics here?
+                }
+                for $capt.{'array'}.kv -> $k, $v {
+                    say "Building $k";
+                    self<array>{$k} = $v;
+                }
+            }
+        }
+    }
 }
 
-method capture ($fpos, $tpos) {
-    my $from = $fpos ~~ MCont ?? $fpos.to !! $fpos;
-    my $to   = $tpos ~~ MCont ?? $tpos.to !! $tpos;
+method capture (MCont $from, StrPos $tpos) {
     MCont.new(
         :matcher(self),
-        :from($from),
-        :to($to),
+        :from($from.to // 0),
+        :to($tpos),
+        :capt($from),
+        #:positional($from.positional);
+    );
+}
+
+method capture_rev (StrPos $fpos, MCont $to) {
+    MCont.new(
+        :matcher(self),
+        :from($fpos),
+        :to($to.from),
+        :capt($to),
+        #:positional($to.positional);
     );
 }
 
@@ -40,8 +77,20 @@ sub callm ($¢) is export {
     $lvl;
 }
 
+sub whats (MCont $r) {
+    if $r<hash>.keys {
+        say "Named:";
+        for $r<hash>.kv -> $k, $v { say " $k =\t{$v.from} {$v.to} {$v.item}" }
+    }
+    if $r<array>.keys {
+        say "Positional:";
+        for $r<array>.kv -> $k, $v { say " $k =\t{$v.from} {$v.to} {$v.item}" }
+    }
+}
+
 sub retm (MCont $r) is export {
     say ' ' x $+LVL, substr(caller.subname,1), " returning $r.from()..$r.to()";
+    whats($r);
     $r;
 }
 
@@ -49,7 +98,7 @@ method _STARf ($¢, &block) {
     my $LVL is context = callm($¢);
 
     map { retm($_) },
-        self.capture($¢, $¢),
+        self.capture($¢, $¢.to),
         self._PLUSf($¢, &block);
 }
 
@@ -57,7 +106,7 @@ method _STARg ($¢, &block) {
     my $LVL is context = callm($¢);
 
     map { retm($_) }, reverse
-        self.capture($¢, $¢),
+        self.capture($¢, $¢.to),
         self._PLUSf($¢, &block);
 }
 
@@ -74,7 +123,7 @@ method _STARr ($¢, &block) {
             $to = $first;
         }
     }
-    my $r = self.capture($¢, $to);
+    my $r = self.capture($¢, $to.to);
     retm($r);
 }
 
@@ -85,7 +134,7 @@ method _PLUSf ($¢, &block) {
     map { retm($_) },
     gather {
         for block($x) -> $x {
-            take map { self.capture($¢, $_) }, $x, self._PLUSf($x, &block);
+            take map { self.capture($¢, $_.to) }, $x, self._PLUSf($x, &block);
         }
     }
 }
@@ -110,14 +159,14 @@ method _PLUSr ($¢, &block) {
         }
     }
     return () unless @all;
-    my $r = self.capture($¢, $to);
+    my $r = self.capture($¢, $to.to);
     retm($r);
 }
 
 method _OPTr ($¢, &block) {
     my $LVL is context = callm($¢);
     my $x = block($¢)[0]; # ratchet
-    my $r = $x // self.capture($¢,$¢);
+    my $r = $x // self.capture($¢,$¢.to);
     retm($r);
 }
 
@@ -126,13 +175,13 @@ method _OPTg ($¢, &block) {
     my @x = block($¢);
     map { retm($_) },
         block($¢),
-        self.capture($¢,$¢);
+        self.capture($¢,$¢.to);
 }
 
 method _OPTf ($¢, &block) {
     my $LVL is context = callm($¢);
     map { retm($_) },
-        self.capture($¢,$¢),
+        self.capture($¢,$¢.to),
         block($¢);
 }
 
@@ -151,22 +200,26 @@ method _PAREN ($¢, &block) {
 method _NOTBEFORE ($¢, &block) {
     my $LVL is context = callm($¢);
     my @all = block($¢);
-    return () if @all;
-    return retm(self.capture($¢, $¢));
+    return () if @all;  # XXX loses continuation
+    return retm(self.capture($¢, $¢.to));
 }
 
 method before ($¢, &block) {
+    say $¢.WHICH;
     my $LVL is context = callm($¢);
     my @all = block($¢);
     if (@all and @all[0].bool) {
-        return retm(self.capture($¢, $¢));
+        say "true";
+        whats($¢);
+        say $¢.WHICH;
+        return retm(self.capture($¢, $¢.to));
     }
     return ();
 }
 
 method after ($¢, &block) {
     my $LVL is context = callm($¢);
-    my $end = self.capture($¢, $¢);
+    my $end = self.capture($¢, $¢.to);
     my @all = block($end);          # Make sure .from == .to
     if (@all and @all[0].bool) {
         return retm($end);
@@ -176,21 +229,33 @@ method after ($¢, &block) {
 
 method null ($¢) {
     my $LVL is context = callm($¢);
-    return retm(self.capture($¢, $¢));
+    return retm(self.capture($¢, $¢.to));
 }
 
 method _ASSERT ($¢, &block) {
     my $LVL is context = callm($¢);
     my @all = block($¢);
     if (@all and @all[0].bool) {
-        return retm(self.capture($¢, $¢));
+        return retm(self.capture($¢, $¢.to));
     }
     return ();
 }
 
-method _BIND ($¢, $var is rw, &block) {
+method _BINDVAR ($¢, $var is rw, &block) {
     my $LVL is context = callm($¢);
-    map { $var := $_; retm($_) },
+    map { $var := $_; retm($_) },  # XXX doesn't "let"
+        block($¢);
+}
+
+method _BINDPOS ($¢, $var is rw, &block) {
+    my $LVL is context = callm($¢);
+    map { retm(.setpos($var)) },
+        block($¢);
+}
+
+method _BINDNAMED ($¢ is rw, $var is rw, &block) {
+    my $LVL is context = callm($¢);
+    map { retm(.setname($var)) },
         block($¢);
 }
 
@@ -215,12 +280,12 @@ method _EXACT ($¢, $s) {
     }
 }
 
-method _vEXACT ($¢, $s) {
+method _EXACT_rev ($¢, $s) {
     my $LVL is context = callm($¢);
     my $len = $s.chars;
     my $from = $¢.from - $len;
     if $from >= 0 and substr($!targ, $from, $len) eq $s {
-        my $r = self.capture($from, $¢);
+        my $r = self.capture_rev($from, $¢);
         retm($r);
     }
     else {
@@ -243,7 +308,7 @@ method _DIGIT ($¢) {
     }
 }
 
-method _vDIGIT ($¢) {
+method _DIGIT_rev ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.from - 1;
     if $from < 0 {
@@ -252,7 +317,7 @@ method _vDIGIT ($¢) {
     }
     my $char = substr($!targ, $from, 1);
     if "0" le $char le "9" {
-        my $r = self.capture($from, $¢);
+        my $r = self.capture_rev($from, $¢);
         return retm($r);
     }
     else {
@@ -275,7 +340,7 @@ method _ALNUM ($¢) {
     }
 }
 
-method _vALNUM ($¢) {
+method _ALNUM_rev ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.from - 1;
     if $from < 0 {
@@ -284,7 +349,7 @@ method _vALNUM ($¢) {
     }
     my $char = substr($!targ, $from, 1);
     if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
-        my $r = self.capture($from, $¢);
+        my $r = self.capture_rev($from, $¢);
         return retm($r);
     }
     else {
@@ -321,7 +386,7 @@ method _HSPACE ($¢) {
     }
 }
 
-method _vHSPACE ($¢) {
+method _HSPACE_rev ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.from - 1;
     if $from < 0 {
@@ -330,7 +395,7 @@ method _vHSPACE ($¢) {
     }
     my $char = substr($!targ, $from, 1);
     if $char eq " " | "\t" | "\r" {
-        my $r = self.capture($from, $¢);
+        my $r = self.capture_rev($from, $¢);
         return retm($r);
     }
     else {
@@ -353,7 +418,7 @@ method _VSPACE ($¢) {
     }
 }
 
-method _vVSPACE ($¢) {
+method _VSPACE_rev ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.from - 1;
     if $from < 0 {
@@ -362,7 +427,7 @@ method _vVSPACE ($¢) {
     }
     my $char = substr($!targ, $from, 1);
     if $char eq "\n" | "\f" {
-        my $r = self.capture($from, $¢);
+        my $r = self.capture_rev($from, $¢);
         return retm($r);
     }
     else {
@@ -375,7 +440,7 @@ method _ANY ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.to;
     if $from < $!targ.chars {
-        retm(self.capture($from, $from+1));
+        retm(self.capture($¢, $from+1));
     }
     else {
         say "ANY didn't match anything at $from";
@@ -387,7 +452,7 @@ method _BOS ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.to;
     if $from == 0 {
-        retm(self.capture($¢, $¢));
+        retm(self.capture($¢, $¢.to));
     }
     else {
         return ();
@@ -399,7 +464,7 @@ method _BOL ($¢) {
     my $from = $¢.to;
     # XXX should define in terms of BOL or after vVSPACE
     if $from == 0 or substr($!targ, $from-1, 1) eq "\n" or substr($!targ, $from-2, 2) eq "\r\n" {
-        retm(self.capture($¢, $¢));
+        retm(self.capture($¢, $¢.to));
     }
     else {
         return ();
@@ -410,7 +475,7 @@ method _EOS ($¢) {
     my $LVL is context = callm($¢);
     my $from = $¢.to;
     if $from == $!targ.chars {
-        retm(self.capture($¢, $¢));
+        retm(self.capture($¢, $¢.to));
     }
     else {
         return ();
@@ -419,26 +484,31 @@ method _EOS ($¢) {
 
 method _REDUCE ($¢, $tag) {
     my $LVL is context = callm($¢);
-    say "Success $tag from $+FROM.to() to $¢.to()\n";
-    self.capture($¢, $¢);
+    say "Success $tag from $+FROM.to() to $¢.to()";
+    whats($¢);
+    $¢;
+#    self.capture($¢, $¢.to);
 }
 
 method _COMMITBRANCH ($¢) {
     my $LVL is context = callm($¢);
     say "Commit branch to $¢.to()\n";
-    self.capture($¢, $¢);  # XXX currently noop
+#    self.capture($¢, $¢);  # XXX currently noop
+    $¢;
 }
 
 method _COMMITRULE ($¢) {
     my $LVL is context = callm($¢);
     say "Commit rule to $¢.to()\n";
-    self.capture($¢, $¢);  # XXX currently noop
+#    self.capture($¢, $¢);  # XXX currently noop
+    $¢;
 }
 
 method commit ($¢) {
     my $LVL is context = callm($¢);
     say "Commit match to $¢.to()\n";
-    self.capture($¢, $¢);  # XXX currently noop
+#    self.capture($¢, $¢);  # XXX currently noop
+    $¢;
 }
 
 method fail ($¢, $m) { die $m }

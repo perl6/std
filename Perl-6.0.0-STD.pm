@@ -1,5 +1,7 @@
 grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
+BEGIN { say "compiling STD" }
+
 has StrPos $.ws_from;
 has StrPos $.ws_to;
 
@@ -2788,8 +2790,15 @@ method EXPR ($¢, %preclim = %LOOSEST,
                 say "reducing";
                 my @list;
                 say +@termstack;
-                $op<top><right> = pop @termstack;
-                $op<top><left> = pop @termstack;
+
+                #$op<top><right> = pop @termstack;
+                #$op<top><left> = pop @termstack;
+
+                my %_op = $op;   # XXX anti-pugs hack
+                %_op<top><right> = pop @termstack;
+                %_op<top><left> = pop @termstack;
+                $op = %_op;
+
                 push @termstack, $op<top>;
             }
         }
