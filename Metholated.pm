@@ -106,9 +106,10 @@ method _STARg ($¢, &block) {
     my $LVL is context = callm($¢);
 
     map { retm($_) }, reverse
-        #XXX extra parens to prevent string reverse
-        (self.capture($¢, $¢.to),
-        self._PLUSf($¢, &block));
+        #XXX voodoo fix to prevent bogus stringification
+        map { .perl.say; $_ },
+            self.capture($¢, $¢.to),
+            self._PLUSf($¢, &block);
 }
 
 method _STARr ($¢, &block) {
