@@ -322,7 +322,7 @@ proto token prefix_circumfix_meta_operator { }
 regex nofat { <!before \h* <?unsp>? '=>' > }
 
 token ws {
-    || <?{ $¢ === $!ws_to }> <null>
+    || <?{ $¢.to === $!ws_to }> <null>
     || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
     || { $!ws_from = $¢.to }
        [
@@ -553,7 +553,7 @@ token eat_terminator {
     || ';'
     || <?{ $+endstmt === $!ws_from }>
     || <?before <terminator>>
-    || {{ if $¢ === $!ws_to { $¢ = $!ws_from } }}   # undo any line transition
+    || {{ if $¢.to === $!ws_to { $¢ = $!ws_from } }}   # undo any line transition
         <panic: Statement not terminated properly>  # "can't happen" anyway :)
     ]
 }
@@ -865,6 +865,10 @@ token dottyop {
 # as a lookahead by the quote interpolator.
 
 token expect_postfix {
+
+    # last whitespace didn't end here (or was zero width)
+    <?{ $¢.to !=== $!ws_to or $!ws_to === $!ws_from  }>
+
     [
     | \\ <?before '.'>
     | <?unsp>?
