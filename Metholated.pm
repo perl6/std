@@ -144,8 +144,7 @@ method _PLUSf ($¢, &block) {
 method _PLUSg ($¢, &block) {
     my $LVL is context = callm($¢);
 
-    #XXX extra parens to prevent string reverse
-    reverse (self._PLUSf($¢, &block),);
+    reverse self._PLUSf($¢, &block);
 }
 
 method _PLUSr ($¢, &block) {
