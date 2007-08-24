@@ -3145,11 +3145,7 @@ method obs ($/, Str $old, Str $new, Str $when = ' in Perl 6') {
     self.panic($/, "Obsolete use of $old;$when please use $new instead");
 }
 
-#XXX Needs a better impl
-# doesn't handle things like
-# Int|Str
-# Array of Int
-# int64
+#XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
 my @typenames = <Bit Int Str Num Complex Bool Rat>,
     <Exception Code Block List Seq Range Set Bag Junction Pair>,
     <Mapping Signature Capture Blob Whatever Undef Failure>,
@@ -3157,8 +3153,9 @@ my @typenames = <Bit Int Str Num Complex Bool Rat>,
     <bit int uint buf num complex bool rat>,
     <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
     <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>;
-sub is_type($x) {
-    return True if $x eq any @typenames;
+sub is_type($name) {
+    return True if $name eq any @typenames;
+    #return True if GLOBAL::{$name}.:exists;
     return False;
 }
 
