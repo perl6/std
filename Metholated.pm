@@ -15,7 +15,6 @@ our class MCont does Hash {
     has Str $.name;
     has $!item;
 
-    # XXX for some pugsian reason can't make these work as ordinary attributes.
     method setname($k) {
         $!name = ~$k;
         self;
@@ -28,20 +27,6 @@ our class MCont does Hash {
         $!item;
     }
 
-#    submethod BUILD (:$!matcher, :$!from, :$!to, :$prior) {
-#        self{'hash'} = {} unless self.exists('hash');
-#        self{'array'} = [] unless self.exists('array');
-#        if defined $prior {
-
-#            say "BUILDING with ", $capt.WHAT;
-#            if $capt ~~ MCont {
-#                for $capt.kv -> $k, $v {
-#                    say "Building $k";
-#                    self{$k} = $v;  # XXX need to add push semantics here?
-#                }
-#            }
-#        }
-#    }
 }
 
 method capture_all (MCont $prior, StrPos $fpos, StrPos $tpos) {
@@ -49,28 +34,25 @@ method capture_all (MCont $prior, StrPos $fpos, StrPos $tpos) {
         :matcher(self),
         :from($fpos),
         :to($tpos),
-        :prior($prior),
-        #:positional($from.positional);
+        :prior(defined $prior.name ?? $prior !! $prior.prior),
     );
 }
 
-method capture (MCont $from, StrPos $tpos) {
+method capture (MCont $prior, StrPos $tpos) {
     MCont.new(
         :matcher(self),
-        :from($from.to // 0),
+        :from($prior.to // 0),
         :to($tpos),
-        :prior($from),
-        #:positional($from.positional);
+        :prior(defined $prior.name ?? $prior !! $prior.prior),
     );
 }
 
-method capture_rev (StrPos $fpos, MCont $to) {
+method capture_rev (StrPos $fpos, MCont $prior) {
     MCont.new(
         :matcher(self),
         :from($fpos),
-        :to($to.from),
-        :prior($to),
-        #:positional($to.positional);
+        :to($prior.from),
+        :prior(defined $prior.name ?? $prior !! $prior.prior),
     );
 }
 
@@ -85,11 +67,7 @@ sub callm ($/) is export {
 }
 
 sub whats (MCont $r) {
-    say $r.yaml if $VERBOSE;
-#    if $r.keys {
-#        say "Named:";
-#        for $r.kv -> $k, $v { say " $k =\t{$v.from} {$v.to} {$v.item}" }
-#    }
+    say $r.perl if $VERBOSE;
 }
 
 sub retm (MCont $r) is export {
@@ -290,7 +268,7 @@ method _EXACT_rev ($/, $s) {
     my $len = $s.chars;
     my $from = $/.from - $len;
     if $from >= 0 and substr($!targ, $from, $len) eq $s {
-        my $r = self.capture_rev($from, $¢);
+        my $r = self.capture_rev($from, $/);
         retm($r);
     }
     else {
@@ -321,7 +299,7 @@ method _DIGIT_rev ($/) {
     }
     my $char = substr($!targ, $from, 1);
     if "0" le $char le "9" {
-        my $r = self.capture_rev($from, $¢);
+        my $r = self.capture_rev($from, $/);
         return retm($r);
     }
     else {
@@ -352,7 +330,7 @@ method _ALNUM_rev ($/) {
     }
     my $char = substr($!targ, $from, 1);
     if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
-        my $r = self.capture_rev($from, $¢);
+        my $r = self.capture_rev($from, $/);
         return retm($r);
     }
     else {
@@ -396,7 +374,7 @@ method _SPACE_rev ($/) {
     }
     my $char = substr($!targ, $from, 1);
     if $char eq " " | "\t" | "\r" | "\n" | "\f" {
-        my $r = self.capture_rev($from, $¢);
+        my $r = self.capture_rev($from, $/);
         return retm($r);
     }
     else {
@@ -427,7 +405,7 @@ method _HSPACE_rev ($/) {
     }
     my $char = substr($!targ, $from, 1);
     if $char eq " " | "\t" | "\r" {
-        my $r = self.capture_rev($from, $¢);
+        my $r = self.capture_rev($from, $/);
         return retm($r);
     }
     else {
@@ -459,7 +437,7 @@ method _VSPACE_rev ($/) {
     }
     my $char = substr($!targ, $from, 1);
     if $char eq "\n" | "\f" {
-        my $r = self.capture_rev($from, $¢);
+        my $r = self.capture_rev($from, $/);
         return retm($r);
     }
     else {
