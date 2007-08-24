@@ -3146,7 +3146,17 @@ method obs ($/, Str $old, Str $new, Str $when = ' in Perl 6') {
 }
 
 #XXX Needs a better impl
-my @typenames = <Int Num Rat Str Bool Any Junction Code Pair Hash List Scalar Array Signature Capture>;
+# doesn't handle things like
+# Int|Str
+# Array of Int
+# int64
+my @typenames = <Bit Int Str Num Complex Bool Rat>,
+    <Exception Code Block List Seq Range Set Bag Junction Pair>,
+    <Mapping Signature Capture Blob Whatever Undef Failure>,
+    <StrPos StrLen Version P6opaque>,
+    <bit int uint buf num complex bool rat>,
+    <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
+    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>;
 sub is_type($x) {
     return True if $x eq any @typenames;
     return False;
