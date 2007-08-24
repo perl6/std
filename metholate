@@ -61,8 +61,8 @@ while ($_ ne "") {
         my $args = $4;
         my $sym = "";
         my $coercion = "";
-        $args =~ s/\(/(\$¢, / or
-        $args =~ s/^/ (\$¢) /;
+        $args =~ s/\(/(\$\/, / or
+        $args =~ s/^/ (\$\/) /;
         my $p = "";
 
         if ($args =~ s/ --> (\w*)\)/\)/) {
@@ -104,10 +104,10 @@ while ($_ ne "") {
         $out .= <<"END";
 method$ws$NAME$args
 {
-    my \$LVL is context = callm(\$¢);
+    my (\$¢, \$LVL is context) = callm(\$/);
     my \$FROM is context = \$¢;
     $sym
-    map { retm($coercion(self.capture(\$¢, \$_.to))) },
+    map { retm($coercion(self.capture_all(\$_, \$FROM, \$_.to))) },
 $result
 END
         next;
@@ -588,7 +588,7 @@ sub unbalanced {
         my $self = shift;
         my $re = $$self{re}->walk(@_);
         if ($$self{assert} eq '!') {
-            "self._NOTBEFORE(\$¢, -> \$¢ {\n" . ::indent($re) . "\n})";
+            "self._NOTBEFORE(\$/, -> \$/ {\n" . ::indent($re) . "\n})";
         }
         else {
             $re;
@@ -605,10 +605,10 @@ sub unbalanced {
         my $text = $$self{text};
         my $ctx = $$self{context};
         if ($ctx eq 'void') {
-            "({$text}() xx 0, \$¢)";
+            "({$text}() xx 0, \$/)";
         }
         elsif ($ctx eq 'bool') {
-            "(\$¢ xx ?{$text}())";
+            "(\$/ xx ?{$text}())";
         }
         else {
             "{$text}";
@@ -621,7 +621,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = ::indent($$self{atom}->walk(@_));
-        "self._BINDVAR$REV(\$¢, '$var', -> \$¢ {\n" . $re . "\n})";
+        "self._BINDVAR$REV(\$/, '$var', -> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -630,7 +630,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = ::indent($$self{atom}->walk(@_));
-        "self._BINDNAMED$REV(\$¢, '$var', -> \$¢ {\n" . $re . "\n})";
+        "self._BINDNAMED$REV(\$/, '$var', -> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -639,7 +639,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = ::indent($$self{atom}->walk(@_));
-        "self._BINDPOS$REV(\$¢, $var, -> \$¢ {\n" . $re . "\n})";
+        "self._BINDPOS$REV(\$/, $var, -> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -647,7 +647,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "self._BRACKET$REV(\$¢, -> \$¢ {\n" . $re . "\n})";
+        "self._BRACKET$REV(\$/, -> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -656,7 +656,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self._CCLASS$REV(\$¢, '" . $text . "')";
+        "self._CCLASS$REV(\$/, '" . $text . "')";
     }
 }
 
@@ -664,7 +664,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $text = $$self{text};
-        'self._EXACT' . $REV . '($¢, "' . $text . '")';
+        'self._EXACT' . $REV . '($/, "' . $text . '")';
     }
 }
 
@@ -673,7 +673,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self._EXACT$REV(\$¢, '" . $text . "')";
+        "self._EXACT$REV(\$/, '" . $text . "')";
     }
 }
 
@@ -688,46 +688,46 @@ sub unbalanced {
             $not = 1;
         }
         if ($text eq '.') {
-            $code = "self._ANY$REV(\$¢)";
+            $code = "self._ANY$REV(\$/)";
         }
         elsif ($text eq '^') {
-            $code = "self._BOS$REV(\$¢)";
+            $code = "self._BOS$REV(\$/)";
         }
         elsif ($text eq '^^') {
-            $code = "self._BOL$REV(\$¢)";
+            $code = "self._BOL$REV(\$/)";
         }
         elsif ($text eq '$') {
-            $code = "self._EOS$REV(\$¢)";
+            $code = "self._EOS$REV(\$/)";
         }
         elsif ($text eq '$$') {
-            $code = "self._EOL$REV(\$¢)";
+            $code = "self._EOL$REV(\$/)";
         }
         elsif ($text eq ':') {
-            $code = "self._COMMITATOM$REV(\$¢)";
+            $code = "self._COMMITATOM$REV(\$/)";
         }
         elsif ($text eq '::') {
-            $code = "self._COMMITBRANCH$REV(\$¢)";
+            $code = "self._COMMITBRANCH$REV(\$/)";
         }
         elsif ($text eq ':::') {
-            $code = "self._COMMITRULE$REV(\$¢)";
+            $code = "self._COMMITRULE$REV(\$/)";
         }
         elsif ($text eq '\\d') {
-            $code = "self._DIGIT$REV(\$¢)";
+            $code = "self._DIGIT$REV(\$/)";
         }
         elsif ($text eq '\\w') {
-            $code = "self._ALNUM$REV(\$¢)";
+            $code = "self._ALNUM$REV(\$/)";
         }
         elsif ($text eq '\\s') {
-            $code = "self._SPACE$REV(\$¢)";
+            $code = "self._SPACE$REV(\$/)";
         }
         elsif ($text eq '\\h') {
-            $code = "self._HSPACE$REV(\$¢)";
+            $code = "self._HSPACE$REV(\$/)";
         }
         elsif ($text eq '\\v') {
-            $code = "self._VSPACE$REV(\$¢)";
+            $code = "self._VSPACE$REV(\$/)";
         }
         if ($not) { # XXX or maybe just .NOT on the end...
-            $code = "self._NOTBEFORE(\$¢, -> \$¢ { $code })";
+            $code = "self._NOTBEFORE(\$/, -> \$/ { $code })";
         }
         $code;
     }
@@ -737,7 +737,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         ::panic("Can't reverse submatch") if $REV;
-        'self.' . $$self{name} . '($¢)';
+        'self.' . $$self{name} . '($/)';
     }
 }
 
@@ -749,7 +749,7 @@ sub unbalanced {
         local $REV = '_rev' if $$self{name} eq 'after';
         $re = ::indent($re->walk(@_));
         $REV = '';
-        'self.' . $$self{name} . "(\$¢, -> \$¢ {\n$re\n})";
+        'self.' . $$self{name} . "(\$/, -> \$/ {\n$re\n})";
     }
 }
 
@@ -759,7 +759,7 @@ sub unbalanced {
         my $str = $$self{str};
         ::panic("Can't reverse submatch") if $REV;
         $str =~ s/(['\\])/\\$1/g;
-        'self.' . $$self{name} . "(\$¢, '$str')";
+        'self.' . $$self{name} . "(\$/, '$str')";
     }
 }
 
@@ -768,7 +768,7 @@ sub unbalanced {
         my $self = shift;
         my $rest = $$self{rest};
         ::panic("Can't reverse submatch") if $REV;
-        substr($rest,1,0) = '$¢, ';
+        substr($rest,1,0) = '$/, ';
         'self.' . $$self{name} . $rest;
     }
 }
@@ -817,7 +817,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "self._${REV}PAREN(\$¢, -> \$¢ {\n" . $re . "\n})";
+        "self._${REV}PAREN(\$/, -> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -837,13 +837,13 @@ sub unbalanced {
                         $how eq '?' ? 'f' :
                                       'r';
                 if ($qfer eq '*') {
-                    $quant = "self._STAR$h$REV(\$¢, ";
+                    $quant = "self._STAR$h$REV(\$/, ";
                 }
                 elsif ($qfer eq '+') {
-                    $quant = "self._PLUS$h$REV(\$¢, ";
+                    $quant = "self._PLUS$h$REV(\$/, ";
                 }
                 elsif ($qfer eq '?') {
-                    $quant = "self._OPT$h$REV(\$¢, ";
+                    $quant = "self._OPT$h$REV(\$/, ";
                 }
                 elsif ($qfer eq '**') {
                     if (ref $rest) {
@@ -853,15 +853,15 @@ sub unbalanced {
                         }
                         else {
                             $rep = "_REPSEP$REV";
-                            $rest = "-> \$¢ {\n" . ::indent($rest->walk()) . "\n}";
+                            $rest = "-> \$/ {\n" . ::indent($rest->walk()) . "\n}";
                         }
                     }
                     else {
                         $rest = "'$rest'";
                     }
-                    $quant = "$rep$h(\$¢, $rest, ";
+                    $quant = "$rep$h(\$/, $rest, ";
                 }
-                $result = $quant . "-> \$¢ {\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
+                $result = $quant . "-> \$/ {\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
             }
             else {
                 $result = $$self{atom}->walk(@_);
@@ -877,7 +877,7 @@ sub unbalanced {
 { package RE_qw; use base "REbase";
     sub walk {
         my $self = shift;
-        "self._ARRAY$REV(\$¢, $$self{text} )";
+        "self._ARRAY$REV(\$/, $$self{text} )";
     }
 }
 
@@ -893,7 +893,7 @@ sub unbalanced {
         @result = reverse @result if $REV;
         my $result = pop @result;
         for (reverse @result) {
-            $result = "gather for $_ -> \$¢ {\n" . ::indent("take " . $result) . "\n}";
+            $result = "gather for $_ -> \$/ {\n" . ::indent("take " . $result) . "\n}";
         }
         $result;
     };
@@ -904,7 +904,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self._EXACT$REV(\$¢, '" . $text . "')";
+        "self._EXACT$REV(\$/, '" . $text . "')";
     }
 }
 
@@ -926,7 +926,7 @@ sub unbalanced {
             my $pattern = ::indent(shift @result);
             $against =~ s/BACK//;
             $against .= "";
-            my $result = "self.SUBMATCH($against, -> \$¢ {\n$pattern\n})";
+            my $result = "self.SUBMATCH($against, -> \$/ {\n$pattern\n})";
             $result;
         }
     };
@@ -983,20 +983,20 @@ sub unbalanced {
         my $var = $$self{var};
         if ($var =~ /^\$/) {
             if ($var =~ /^\$(\d+)$/) {
-                "self._BACKREFp$REV(\$¢, $1 )";
+                "self._BACKREFp$REV(\$/, $1 )";
             }
             elsif ($var =~ /^\$<(.*)>$/) {
-                "self._BACKREFn$REV(\$¢, '$1' )";
+                "self._BACKREFn$REV(\$/, '$1' )";
             }
             else {
-                "self._EXACT$REV(\$¢, $var )";
+                "self._EXACT$REV(\$/, $var )";
             }
         }
         elsif ($var =~ /^\@/) {
-            "self._ARRAY$REV(\$¢, $var )";
+            "self._ARRAY$REV(\$/, $var )";
         }
         elsif ($var =~ /^\%/) {
-            "self._HASH$REV(\$¢, $var )";
+            "self._HASH$REV(\$/, $var )";
         }
     }
 }

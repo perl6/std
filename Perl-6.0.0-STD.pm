@@ -199,7 +199,7 @@ token sym (Str $pat = $+sym) {
     $pat <$+endsym>
 }
 
-#multi method sym ($¢, $pat = $+sym) {
+#multi method sym ($/, $pat = $+sym) {
 #    m:p/ <$pat> <$+endsym> /;
 #}
 
@@ -322,15 +322,15 @@ proto token prefix_circumfix_meta_operator { }
 regex nofat { <!before \h* <?unsp>? '=>' > }
 
 token ws {
-    || <?{ $¢.to === $!ws_to }> <null>
+    || <?{ $¢ === $!ws_to }> <null>
     || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
-    || { $!ws_from = $¢.to }
+    || { $!ws_from = $¢ }
        [
        | <unsp>              {*}                                #= unsp
        | \v                  {*} <heredoc>                      #= vwhite
        | <unv>               {*}                                #= unv
        ]*  {*}                                                  #= all
-       { $!ws_to = $¢.to }
+       { $!ws_to = $¢ }
 }
 
 token unsp {
@@ -399,9 +399,9 @@ token pod_comment {
 
 # Top-level rules
 
-method UNIT ($¢, $unitstopper is context = "_EOS") {
+method UNIT ($/, $unitstopper is context = "_EOS") {
     UNIT: do {
-        self.compunit($¢);
+        self.compunit($/);
     }
 }
 
@@ -463,7 +463,7 @@ token block {
     | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
     | <?unv>? <?before \n > <?ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
-    | {*} { let $+endargs = $¢.to; }                               #= endargs
+    | {*} { let $+endargs = $¢; }                               #= endargs
     ]
     {*}
 }
@@ -484,7 +484,7 @@ token regex_block {  # perhaps parameterize and combine with block someday
     | <?unsp>? <?before <[,:]>> {*}                             #= normal
     | <?unv>? <?before \n > <?ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
-    | {*} { let $+endargs = $¢.to; }                               #= endargs
+    | {*} { let $+endargs = $¢; }                               #= endargs
     ]
     {*}
 }
@@ -553,7 +553,7 @@ token eat_terminator {
     || ';'
     || <?{ $+endstmt === $!ws_from }>
     || <?before <terminator>>
-    || {{ if $¢.to === $!ws_to { $¢ = $!ws_from } }}   # undo any line transition
+    || {{ if $¢ === $!ws_to { $¢ = $!ws_from } }}   # undo any line transition
         <panic: Statement not terminated properly>  # "can't happen" anyway :)
     ]
 }
@@ -723,10 +723,10 @@ token expect_term {
     <adverbs>?
 
     # now push ops over the noun according to precedence.
-    { return self.nounphrase($¢, |$/) }
+    { return self.nounphrase($/, |$/) }
 }
 
-method nounphrase ($¢, :$noun, :@pre is rw, :@post is rw, *%_) {
+method nounphrase ($/, :$noun, :@pre is rw, :@post is rw, *%_) {
     my $nounphrase = $noun;
     my $pre = pop @pre;
     my $post = shift @post;
@@ -749,14 +749,14 @@ method nounphrase ($¢, :$noun, :@pre is rw, :@post is rw, *%_) {
         $nounphrase<term> = $oldterm;
     }
 #    return $nounphrase;
-    return $¢;  # XXX need to attach noun too!
+    return $/;  # XXX need to attach noun too!
 }
 
 token adverbs {
     [ <colonpair> <?ws> ]+
     {
         my $prop = $+prevop err
-            self.panic($¢, 'No previous operator visible to adverbial pair (' ~
+            self.panic($/, 'No previous operator visible to adverbial pair (' ~
                 $<colonpair> ~ ')');
         $prop.adverb($<colonpair>)
     }
@@ -867,7 +867,7 @@ token dottyop {
 token expect_postfix {
 
     # last whitespace didn't end here (or was zero width)
-    <?{ $¢.to !=== $!ws_to or $!ws_to === $!ws_from  }>
+    <?{ $¢ !=== $!ws_to or $!ws_to === $!ws_from  }>
 
     [
     | \\ <?before '.'>
@@ -922,7 +922,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     || <panic: Only boolean infix operators may be negated>
     ]
 
-    { %+thisop<hyper> and self.panic($¢, "Negation of hyper operator not allowed") }
+    { %+thisop<hyper> and self.panic($/, "Negation of hyper operator not allowed") }
 
     {*}                                                         #= !
 }
@@ -1039,7 +1039,7 @@ token methodop {
     | <ident>
     | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]>> <quote>
-        { $<quote> ~~ /\W/ or self.panic($¢, "Useless use of quotes") }
+        { $<quote> ~~ /\W/ or self.panic($/, "Useless use of quotes") }
     ] <?unsp>? 
 
     [
@@ -1126,7 +1126,7 @@ token package_def {
     [
     || <?{ $+begin_compunit }> :: ';'
         {
-            $<module_name> err self.panic($¢, "Compilation unit cannot be anonymous");
+            $<module_name> err self.panic($/, "Compilation unit cannot be anonymous");
             $begin_compunit = 0;
         }
         {*}                                                     #= semi
@@ -1350,7 +1350,7 @@ multi method obscaret (Str $var, Str $sigil, Str $name) {
         }
         when * { "a global form such as $sigil*$0" }
     }; # XXX pugs needs semi here for some reason
-    return self.obs($¢, "$var variable", $repl);
+    return self.obs($/, "$var variable", $repl);
 }
 
 token special_variable:sym<${ }> {
@@ -1615,7 +1615,7 @@ class Herestub {
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
-method heredoc ($¢) {
+method heredoc ($/) {
     while my $herestub = shift @herestub_queue {
         my $delim = $herestub.delim;
         my $lang = $herestub.lang;
@@ -1639,7 +1639,7 @@ method heredoc ($¢) {
             $herestub.orignode<doc> = $doc;
         }
         else {
-            self.panic($¢, "Ending delimiter $delim not found");
+            self.panic($/, "Ending delimiter $delim not found");
         }
     }
 }
@@ -1702,7 +1702,7 @@ token finish_subst ($pat, :%thisop is context<rw>) {
           <?ws>
           <infix>            # looking for pseudoassign here
           { %+thisop<prec> == %item_assignment<prec> or
-              self.panic($¢, "Bracketed subst must use some form of assignment") }
+              self.panic($/, "Bracketed subst must use some form of assignment") }
           $<repl> := <EXPR(%item_assignment)>
     # unbracketed form
     | $<repl> := <q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
@@ -1976,23 +1976,23 @@ constant %open2close = {
 
 # assumes whitespace is eaten already
 
-method peek_delimiters ($¢) {
+method peek_delimiters ($/) {
     return peek_brackets ||
         substr($_,0,1) xx 2;
 }
 
-method peek_brackets ($¢) {
+method peek_brackets ($/) {
     my $start;
     my $stop;
     if m:p/ \s / {
-        self.panic($¢, "Whitespace not allowed as delimiter");
+        self.panic($/, "Whitespace not allowed as delimiter");
     }
     elsif m:p/ <?before <isPe>> / {
-        self.panic($¢, "Use a closing delimiter for an opener is reserved");
+        self.panic($/, "Use a closing delimiter for an opener is reserved");
     }
     elsif m:p/ <?before $start := [ (leftbrack) $0* ] > / {
         $stop = %open2close{$0} err
-            self.panic($¢, "Don't know how to flip $start bracket");
+            self.panic($/, "Don't know how to flip $start bracket");
         $stop x= $start.chars;
         return $start, $stop;
     }
@@ -2002,19 +2002,19 @@ method peek_brackets ($¢) {
 }
 
 regex bracketed ($lang = qlang("Q")) {
-     <?{ ($<start>,$<stop>) = self.peek_brackets($¢) }>
+     <?{ ($<start>,$<stop>) = self.peek_brackets($/) }>
      $<q> := <q_balanced($lang, $<start>, $<stop>)>
     {*}
 }
 
 regex q_pickdelim ($lang) {
     {{
-       ($<start>,$<stop>) = self.peek_delimiters($¢);
+       ($<start>,$<stop>) = self.peek_delimiters($/);
        if $<start> eq $<stop> {
-           $<q> := self.q_unbalanced($¢, $lang, $<stop>);
+           $<q> := self.q_unbalanced($/, $lang, $<stop>);
        }
        else {
-           $<q> := self.q_balanced($¢, $lang, $<start>, $<stop>);
+           $<q> := self.q_balanced($/, $lang, $<start>, $<stop>);
        }
     }}
     {*}
@@ -2022,7 +2022,7 @@ regex q_pickdelim ($lang) {
 
 regex rx_pickdelim ($lang) {
     [
-    | <?{ ($<start>,$<stop>) = self.peek_delimiters($¢) }>
+    | <?{ ($<start>,$<stop>) = self.peek_delimiters($/) }>
       $<start>
       $<r> := <regex($<stop>)>        # counts its own brackets, we hope
     | [ $<stop> := [\S] || <panic: Regex delimiter must not be whitespace> ]
@@ -2033,7 +2033,7 @@ regex rx_pickdelim ($lang) {
 
 regex tr_pickdelim ($lang) {
     [
-    | <?{ ($<start>,$<stop>) = self.peek_delimiters($¢) }>
+    | <?{ ($<start>,$<stop>) = self.peek_delimiters($/) }>
       $<start>
       $<r> := <transliterator($<stop>)>
     | [ $<stop> := [\S] || <panic: tr delimiter must not be whitespace> ]
@@ -2077,8 +2077,8 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
 }
 
 # We get here only for escapes in escape set, even though more are defined.
-method q_escape ($¢, $lang) {
-    $lang<escrule>(self, $¢);
+method q_escape ($/, $lang) {
+    $lang<escrule>(self, $/);
     {*}
 }
 
@@ -2242,8 +2242,8 @@ token parameter {
     [
         <default_value> {{
             given $<quantchar> {
-              when '!' { self.panic($¢, "Can't put a default on a required parameter") }
-              when '*' { self.panic($¢, "Can't put a default on a slurpy parameter") }
+              when '!' { self.panic($/, "Can't put a default on a required parameter") }
+              when '*' { self.panic($/, "Can't put a default on a slurpy parameter") }
             }
             let $<quant> := '?';
         }}
@@ -2255,10 +2255,10 @@ token parameter {
             when '!' {
                 given $+zone {
                     when 'posopt' {
-self.panic($¢, "Can't use required parameter in optional zone");
+self.panic($/, "Can't use required parameter in optional zone");
                     }
                     when 'var' {
-self.panic($¢, "Can't use required parameter in variadic zone");
+self.panic($/, "Can't use required parameter in variadic zone");
                     }
                 }
             }
@@ -2266,7 +2266,7 @@ self.panic($¢, "Can't use required parameter in variadic zone");
                 given $+zone {
                     when 'posreq' { $+zone = 'posopt' }
                     when 'var' {
-self.panic($¢, "Can't use optional positional parameter in variadic zone");
+self.panic($/, "Can't use optional positional parameter in variadic zone");
                     }
                 }
             }
@@ -2730,8 +2730,8 @@ regex stdstopper {
     | <terminator>
     | <statement_mod_cond>
     | <statement_mod_loop>
-    | <?{ $¢.to === $+endstmt }>
-    | <?{ $¢.to === $+endargs }>
+    | <?{ $¢ === $+endstmt }>
+    | <?{ $¢ === $+endargs }>
 #    | <$+unitstopper>
 }
 
@@ -2740,14 +2740,14 @@ token assertstopper { <stdstopper> | '>' }
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR ($¢, %preclim = %LOOSEST,
+method EXPR ($/, %preclim = %LOOSEST,
                 :$stop = &stdstopper,
-               # :$seen = self.expect_term($¢)
+               # :$seen = self.expect_term($/)
                 )
 {
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
-#    my @terminator = self.before($¢, -> $¢ { $stop(self: $¢) } );
+#    my @terminator = self.before($/, -> $/ { $stop(self: $/) } );
 #    return () if @terminator and @terminator[0].bool;
     my $prevop is context<rw>;
     my %thisop is context<rw>;
@@ -2755,7 +2755,7 @@ method EXPR ($¢, %preclim = %LOOSEST,
     my @opstack;
 
     push @opstack, %term;         # (just a sentinel value)
-    my @t = self.expect_term($¢);
+    my @t = self.expect_term($/);
     my $seen = @t[0];
     push @termstack, $seen;
 
@@ -2809,7 +2809,7 @@ method EXPR ($¢, %preclim = %LOOSEST,
     }
 
     loop {
-        my @terminator = self.before($seen, -> $¢ { $stop(self: $¢) } );
+        my @terminator = self.before($seen, -> $/ { $stop(self: $/) } );
         my $t = @terminator[0];
     last if defined $t and @terminator[0].bool;
         %thisop = ();
@@ -2819,7 +2819,7 @@ method EXPR ($¢, %preclim = %LOOSEST,
         $seen = $infix;
         
         # XXX might want to allow this in a declaration though
-        if not $infix { self.panic($¢, "Can't have two terms in a row") }
+        if not $infix { self.panic($/, "Can't have two terms in a row") }
 
         if not defined %thisop<prec> {
             say "No prec given in thisop!";
@@ -2838,19 +2838,19 @@ method EXPR ($¢, %preclim = %LOOSEST,
         # Equal precedence, so use associativity to decide.
         if @opstack[-1]<prec> eq $newprec {
             given %thisop<assoc> {
-                when 'non'   { self.panic($¢, qq["$infix" is not associative]) }
+                when 'non'   { self.panic($/, qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if %thisop<top><sym> !eqv @opstack[-1]<top><sym>;
                 }
-                default { self.panic($¢, qq[Unknown associativity "$_" for "$infix"]) }
+                default { self.panic($/, qq[Unknown associativity "$_" for "$infix"]) }
             }
         }
-        push @opstack, %thisop;
-        my @terminator = self.before($seen, -> $¢ { $stop(self: $¢) } );
+        push @opstack, item %thisop;
+        my @terminator = self.before($seen, -> $/ { $stop(self: $/) } );
         if @terminator and @terminator[0].bool {
-            self.panic($¢, "$infix.perl() is missing right term");
+            self.panic($/, "$infix.perl() is missing right term");
         }
         %thisop = ();
         my @t = self.expect_term($seen);
@@ -2859,7 +2859,7 @@ method EXPR ($¢, %preclim = %LOOSEST,
         say "after push: " ~ +@termstack;
     }
     reduce() while +@termstack > 1;
-    @termstack == 1 or self.panic($¢, "Internal operator parser error, termstack == {+@termstack}");
+    @termstack == 1 or self.panic($/, "Internal operator parser error, termstack == {+@termstack}");
     return @termstack[0];
 }
 
@@ -3141,8 +3141,8 @@ token quantmod { [ '?' | '!' | ':' | '+' ]? }
 rule panic (Str $s) { <commit> <fail($s)> }
 
 # 3rd arg assumes more things will become obsolete after Perl 6 comes out...
-method obs ($¢, Str $old, Str $new, Str $when = ' in Perl 6') {
-    self.panic($¢, "Obsolete use of $old;$when please use $new instead");
+method obs ($/, Str $old, Str $new, Str $when = ' in Perl 6') {
+    self.panic($/, "Obsolete use of $old;$when please use $new instead");
 }
 
 #XXX Needs a real impl
