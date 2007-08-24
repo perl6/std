@@ -9,8 +9,8 @@ has $.targ;
 our class MCont does Hash {
     has Metholated $.matcher;
     has Bool $.bool is rw = 1;
-    has StrPos $.from;
-    has StrPos $.to;
+    has StrPos $.from = 0;
+    has StrPos $.to = 0;
     has MCont $.prior;
     has Str $.name;
     has $!item;
