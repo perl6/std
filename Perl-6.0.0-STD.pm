@@ -3145,8 +3145,12 @@ method obs ($/, Str $old, Str $new, Str $when = ' in Perl 6') {
     self.panic($/, "Obsolete use of $old;$when please use $new instead");
 }
 
-#XXX Needs a real impl
-sub is_type($x) { return True; }
+#XXX Needs a better impl
+my @typenames = <Int Num Rat Str Bool Any Junction Code Pair Hash List Scalar Array Signature Capture>;
+sub is_type($x) {
+    return True if $x eq any @typenames;
+    return False;
+}
 
 say "Starting...";
 $_ = '42';
