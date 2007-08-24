@@ -3162,6 +3162,6 @@ sub is_type($name) {
 say "Starting...";
 $_ = '42';
 my $result = Perl.new(:targ('42+1')).EXPR(MCont.new());
-print $result.perl;
+say $result.perl;
 
 ## vim: expandtab sw=4
