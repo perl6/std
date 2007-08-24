@@ -62,7 +62,7 @@ sub callm ($/) is export {
     my $¢ = $/.to;
     my $lvl = 0;
     while Pugs::Internals::caller(Any,$lvl,"") { $lvl++ }
-    say ' ' x $lvl, substr(caller.subname,1), " called at ", +$/.from;
+    say ' ' x $lvl, substr(caller.subname,1), " called at $¢";
     ($¢, $lvl);
 }
 
