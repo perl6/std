@@ -108,6 +108,7 @@ method$ws$NAME$args
     my \$FROM is context = \$¢;
     $sym
     map { retm($coercion(self.capture_all(\$_, \$FROM, \$_.to))) },
+    map { .matchify },
 $result
 END
         next;
@@ -303,7 +304,7 @@ sub atom {
         }
         ws();
         $key =~ s/(['\\])/\\$1/g;
-        return bless { name => '_REDUCE', rest => "('$key')"}, "RE_method";
+        return bless { name => '_REDUCE', nobind => 1, rest => "('$key')"}, "RE_method";
     }
     if (/^\{/) {
         my $b = block('void');
@@ -409,6 +410,7 @@ sub atom {
                 ws();
                 local $PARSEBIND = 1;
                 my $atom = quantified_atom(@_);
+                $atom->{nobind} = 1;
                 ws();
                 if ($code =~ s/\$<(.*)>/$1/) {
                     return bless { var => $code, atom => $atom }, "RE_bindnamed";
@@ -473,6 +475,7 @@ sub assertion {
 
     if (s/^[!?]//) {
         my $rest = assertion();
+        $rest->{nobind} = 1;
         return bless { assert => $assert, re => $rest }, "RE_assertion";
     }
 
@@ -736,8 +739,13 @@ sub unbalanced {
 { package RE_method_noarg; use base "REbase";
     sub walk {
         my $self = shift;
+        my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
-        'self.' . $$self{name} . '($/)';
+        my $re = 'self.' . $name . '($/)';
+        if (not $$self{nobind}) {
+            $re = "self._BINDNAMED$REV(\$/, '$name', -> \$/ {\n" . ::indent($re) . "\n})";
+        }
+        $re;
     }
 }
 
@@ -745,11 +753,17 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = $$self{re};
+        my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
-        local $REV = '_rev' if $$self{name} eq 'after';
+        local $REV = '_rev' if $name eq 'after';
         $re = ::indent($re->walk(@_));
         $REV = '';
-        'self.' . $$self{name} . "(\$/, -> \$/ {\n$re\n})";
+        $re = 'self.' . $$self{name} . "(\$/, -> \$/ {\n$re\n})";
+        if (not $$self{nobind}) {
+            $re = "self._BINDNAMED$REV(\$/,
+                '$name', -> \$/ {\n" . ::indent($re) . "\n})";
+        }
+        $re;
     }
 }
 
@@ -757,9 +771,15 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $str = $$self{str};
+        my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
         $str =~ s/(['\\])/\\$1/g;
-        'self.' . $$self{name} . "(\$/, '$str')";
+        my $re = 'self.' . $name . "(\$/, '$str')";
+        if (not $$self{nobind}) {
+            $re = "self._BINDNAMED$REV(\$/,
+                '$name', -> \$/ {\n" . ::indent($re) . "\n})";
+        }
+        $re;
     }
 }
 
@@ -767,9 +787,14 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $rest = $$self{rest};
+        my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
         substr($rest,1,0) = '$/, ';
-        'self.' . $$self{name} . $rest;
+        my $re = 'self.' . $name . $rest;
+        if (not $$self{nobind}) {
+            $re = "self._BINDNAMED$REV(\$/, '$name', -> \$/ {\n" . ::indent($re) . "\n})";
+        }
+        $re;
     }
 }
 

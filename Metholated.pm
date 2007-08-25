@@ -1,6 +1,6 @@
 grammar Metholated;
 
-my $VERBOSE = 0;
+my $VERBOSE = 1;
 
 # XXX still full of ASCII assumptions
 
@@ -12,6 +12,7 @@ our class MCont does Hash {
     has StrPos $.from = 0;
     has StrPos $.to = 0;
     has MCont $.prior;
+    has %.mykeys;
     has Str $.name;
     has $!item;
 
@@ -27,6 +28,31 @@ our class MCont does Hash {
         $!item;
     }
 
+    method matchify {
+        my %bindings;
+        my MCont $m;
+        my $next;
+        loop ($m = $!prior; $m; $m = $next) {
+            $next = $m.prior;
+            undefine $m.prior;
+            my $n = $m.name;
+            if not %bindings{$n} {
+                %bindings{$n} = [];
+#                %.mykeys = Hash.new unless defined %!mykeys;
+                %.mykeys{$n}++;
+            }
+            unshift %bindings{$n}, $m;
+        }
+        for %bindings.kv -> $k, $v {
+            self{$k} = $v;
+            # XXX alas, gets lost in the next capture...
+            say "copied $k ", $v;
+        }
+        undefine $!prior;
+        self.item;
+        self;
+    }
+
 }
 
 method capture_all (MCont $prior, StrPos $fpos, StrPos $tpos) {
@@ -35,6 +61,7 @@ method capture_all (MCont $prior, StrPos $fpos, StrPos $tpos) {
         :from($fpos),
         :to($tpos),
         :prior(defined $prior.name ?? $prior !! $prior.prior),
+        :mykeys(hash($prior.mykeys.pairs)),
     );
 }
 
@@ -44,6 +71,7 @@ method capture (MCont $prior, StrPos $tpos) {
         :from($prior.to // 0),
         :to($tpos),
         :prior(defined $prior.name ?? $prior !! $prior.prior),
+        :mykeys(hash($prior.mykeys.pairs)),
     );
 }
 
@@ -53,6 +81,7 @@ method capture_rev (StrPos $fpos, MCont $prior) {
         :from($fpos),
         :to($prior.from),
         :prior(defined $prior.name ?? $prior !! $prior.prior),
+        :mykeys(hash($prior.mykeys.pairs)),
     );
 }
 
@@ -67,7 +96,11 @@ sub callm ($/) is export {
 }
 
 sub whats (MCont $r) {
-    say $r.perl if $VERBOSE;
+    my @k = $r.mykeys.keys;
+    say "  $r.WHICH() ===> $r.from() $r.to() $r.item() (@k[])";
+    for @k -> $k {
+        say "   $k => {$r{$k}.perl}";
+    }
 }
 
 sub retm (MCont $r) is export {
@@ -177,7 +210,7 @@ method _BRACKET ($/, &block) {
 
 method _PAREN ($/, &block) {
     my ($¢, $LVL is context) = callm($/);
-    map { retm($_) },
+    map { retm(.matchify) },
         block($/);
 }
 
