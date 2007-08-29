@@ -61,8 +61,8 @@ while ($_ ne "") {
         my $args = $4;
         my $sym = "";
         my $coercion = "";
-        $args =~ s/\(/(\$\/, / or
-        $args =~ s/^/ (\$\/) /;
+        $args =~ s/\(/(, / or
+        $args =~ s/^/ () /;
         my $p = "";
 
         if ($args =~ s/ --> (\w*)\)/\)/) {
@@ -84,6 +84,7 @@ while ($_ ne "") {
         if ($args =~ s/, *(\$stop is context)(.*)\)/, \$stop_$2\)/) {
             $sym .= "my $1 = \$stop_;\n";
         }
+        $args =~ s/\(,/(/;
 
         if ($NAME =~ /_/) {
             if ($p and /^\s*<sym>/) {
@@ -104,10 +105,12 @@ while ($_ ne "") {
         $out .= <<"END";
 method$ws$NAME$args
 {
-    my (\$¢, \$LVL is context) = callm(\$/);
+    my \$LVL is context = self.callm();
+    my \$/ := self;
+    my \$¢ = self.cursor;
     my \$FROM is context = \$¢;
     $sym
-    map { retm($coercion(self.capture_all(\$_, \$FROM, \$_.to))) },
+    map { $coercion(\$_.capture_all(\$FROM, \$_.to)).retm },
     map { .matchify },
 $result
 END
@@ -117,7 +120,7 @@ END
     if (s/^(.*\n)//) {
         my $line = $1;
         if ($line =~ s/^grammar (\w+)//) {
-            $out .= "use Metholated;\ngrammar $1 is Metholated";
+            $out .= "use Cursor;\ngrammar $1 is Cursor";
         }
         $out .= $line;
     }
@@ -591,7 +594,7 @@ sub unbalanced {
         my $self = shift;
         my $re = $$self{re}->walk(@_);
         if ($$self{assert} eq '!') {
-            "self._NOTBEFORE(\$/, -> \$/ {\n" . ::indent($re) . "\n})";
+            "\$/._NOTBEFORE(-> \$/ {\n" . ::indent($re) . "\n})";
         }
         else {
             $re;
@@ -624,7 +627,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = ::indent($$self{atom}->walk(@_));
-        "self._BINDVAR$REV(\$/, '$var', -> \$/ {\n" . $re . "\n})";
+        "\$/._BINDVAR$REV('$var', -> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -633,7 +636,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = ::indent($$self{atom}->walk(@_));
-        "self._BINDNAMED$REV(\$/, '$var', -> \$/ {\n" . $re . "\n})";
+        "\$/._BINDNAMED$REV('$var', -> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -642,7 +645,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = ::indent($$self{atom}->walk(@_));
-        "self._BINDPOS$REV(\$/, $var, -> \$/ {\n" . $re . "\n})";
+        "\$/._BINDPOS$REV($var, -> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -650,7 +653,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "self._BRACKET$REV(\$/, -> \$/ {\n" . $re . "\n})";
+        "\$/._BRACKET$REV(-> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -659,7 +662,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self._CCLASS$REV(\$/, '" . $text . "')";
+        "\$/._CCLASS$REV('" . $text . "')";
     }
 }
 
@@ -667,7 +670,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $text = $$self{text};
-        'self._EXACT' . $REV . '($/, "' . $text . '")';
+        '$/._EXACT' . $REV . '("' . $text . '")';
     }
 }
 
@@ -676,7 +679,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self._EXACT$REV(\$/, '" . $text . "')";
+        "\$/._EXACT$REV('" . $text . "')";
     }
 }
 
@@ -691,46 +694,46 @@ sub unbalanced {
             $not = 1;
         }
         if ($text eq '.') {
-            $code = "self._ANY$REV(\$/)";
+            $code = "\$/._ANY$REV()";
         }
         elsif ($text eq '^') {
-            $code = "self._BOS$REV(\$/)";
+            $code = "\$/._BOS$REV()";
         }
         elsif ($text eq '^^') {
-            $code = "self._BOL$REV(\$/)";
+            $code = "\$/._BOL$REV()";
         }
         elsif ($text eq '$') {
-            $code = "self._EOS$REV(\$/)";
+            $code = "\$/._EOS$REV()";
         }
         elsif ($text eq '$$') {
-            $code = "self._EOL$REV(\$/)";
+            $code = "\$/._EOL$REV()";
         }
         elsif ($text eq ':') {
-            $code = "self._COMMITATOM$REV(\$/)";
+            $code = "\$/._COMMITATOM$REV()";
         }
         elsif ($text eq '::') {
-            $code = "self._COMMITBRANCH$REV(\$/)";
+            $code = "\$/._COMMITBRANCH$REV()";
         }
         elsif ($text eq ':::') {
-            $code = "self._COMMITRULE$REV(\$/)";
+            $code = "\$/._COMMITRULE$REV()";
         }
         elsif ($text eq '\\d') {
-            $code = "self._DIGIT$REV(\$/)";
+            $code = "\$/._DIGIT$REV()";
         }
         elsif ($text eq '\\w') {
-            $code = "self._ALNUM$REV(\$/)";
+            $code = "\$/._ALNUM$REV()";
         }
         elsif ($text eq '\\s') {
-            $code = "self._SPACE$REV(\$/)";
+            $code = "\$/._SPACE$REV()";
         }
         elsif ($text eq '\\h') {
-            $code = "self._HSPACE$REV(\$/)";
+            $code = "\$/._HSPACE$REV()";
         }
         elsif ($text eq '\\v') {
-            $code = "self._VSPACE$REV(\$/)";
+            $code = "\$/._VSPACE$REV()";
         }
         if ($not) { # XXX or maybe just .NOT on the end...
-            $code = "self._NOTBEFORE(\$/, -> \$/ { $code })";
+            $code = "\$/._NOTBEFORE(-> \$/ { $code })";
         }
         $code;
     }
@@ -741,9 +744,9 @@ sub unbalanced {
         my $self = shift;
         my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
-        my $re = 'self.' . $name . '($/)';
+        my $re = '$/.' . $name . '()';
         if (not $$self{nobind}) {
-            $re = "self._BINDNAMED$REV(\$/, '$name', -> \$/ {\n" . ::indent($re) . "\n})";
+            $re = "\$/._BINDNAMED$REV('$name', -> \$/ {\n" . ::indent($re) . "\n})";
         }
         $re;
     }
@@ -758,10 +761,9 @@ sub unbalanced {
         local $REV = '_rev' if $name eq 'after';
         $re = ::indent($re->walk(@_));
         $REV = '';
-        $re = 'self.' . $$self{name} . "(\$/, -> \$/ {\n$re\n})";
+        $re = '$/.' . $$self{name} . "(-> \$/ {\n$re\n})";
         if (not $$self{nobind}) {
-            $re = "self._BINDNAMED$REV(\$/,
-                '$name', -> \$/ {\n" . ::indent($re) . "\n})";
+            $re = "\$/._BINDNAMED$REV('$name', -> \$/ {\n" . ::indent($re) . "\n})";
         }
         $re;
     }
@@ -774,9 +776,9 @@ sub unbalanced {
         my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
         $str =~ s/(['\\])/\\$1/g;
-        my $re = 'self.' . $name . "(\$/, '$str')";
+        my $re = '$/.' . $name . "('$str')";
         if (not $$self{nobind}) {
-            $re = "self._BINDNAMED$REV(\$/,
+            $re = "\$/._BINDNAMED$REV(
                 '$name', -> \$/ {\n" . ::indent($re) . "\n})";
         }
         $re;
@@ -789,10 +791,9 @@ sub unbalanced {
         my $rest = $$self{rest};
         my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
-        substr($rest,1,0) = '$/, ';
-        my $re = 'self.' . $name . $rest;
+        my $re = '$/.' . $name . $rest;
         if (not $$self{nobind}) {
-            $re = "self._BINDNAMED$REV(\$/, '$name', -> \$/ {\n" . ::indent($re) . "\n})";
+            $re = "\$/._BINDNAMED$REV('$name', -> \$/ {\n" . ::indent($re) . "\n})";
         }
         $re;
     }
@@ -842,7 +843,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "self._${REV}PAREN(\$/, -> \$/ {\n" . $re . "\n})";
+        "\$/._${REV}PAREN(-> \$/ {\n" . $re . "\n})";
     }
 }
 
@@ -862,13 +863,13 @@ sub unbalanced {
                         $how eq '?' ? 'f' :
                                       'r';
                 if ($qfer eq '*') {
-                    $quant = "self._STAR$h$REV(\$/, ";
+                    $quant = "\$/._STAR$h$REV(";
                 }
                 elsif ($qfer eq '+') {
-                    $quant = "self._PLUS$h$REV(\$/, ";
+                    $quant = "\$/._PLUS$h$REV(";
                 }
                 elsif ($qfer eq '?') {
-                    $quant = "self._OPT$h$REV(\$/, ";
+                    $quant = "\$/._OPT$h$REV(";
                 }
                 elsif ($qfer eq '**') {
                     if (ref $rest) {
@@ -884,7 +885,7 @@ sub unbalanced {
                     else {
                         $rest = "'$rest'";
                     }
-                    $quant = "$rep$h(\$/, $rest, ";
+                    $quant = "$rep$h($rest, ";
                 }
                 $result = $quant . "-> \$/ {\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
             }
@@ -902,7 +903,7 @@ sub unbalanced {
 { package RE_qw; use base "REbase";
     sub walk {
         my $self = shift;
-        "self._ARRAY$REV(\$/, $$self{text} )";
+        "\$/._ARRAY$REV($$self{text} )";
     }
 }
 
@@ -929,7 +930,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "self._EXACT$REV(\$/, '" . $text . "')";
+        "\$/._EXACT$REV('" . $text . "')";
     }
 }
 
@@ -951,7 +952,7 @@ sub unbalanced {
             my $pattern = ::indent(shift @result);
             $against =~ s/BACK//;
             $against .= "";
-            my $result = "self.SUBMATCH($against, -> \$/ {\n$pattern\n})";
+            my $result = "\$/.SUBMATCH($against, -> \$/ {\n$pattern\n})";
             $result;
         }
     };
@@ -983,10 +984,10 @@ sub unbalanced {
         if ($$self{Kids}) {
             foreach my $kid (@{$$self{Kids}}) {
                 my $r = $kid->walk(@_);
-                if ($r and $r =~ /^self\.(\w+)/) {
+                if ($r and $r =~ /^\$\/\.(\w+)/) {
                     my $name = $1;
                     if (my $p = $fixedprefix{$name}) {
-                        $r = "self._EQ(\$¢, $p) && " . $r;
+                        $r = "\$/._EQ(\$¢, $p) && " . $r;
                     }
                 }
                 push @result, $r;
@@ -1008,20 +1009,20 @@ sub unbalanced {
         my $var = $$self{var};
         if ($var =~ /^\$/) {
             if ($var =~ /^\$(\d+)$/) {
-                "self._BACKREFp$REV(\$/, $1 )";
+                "\$/._BACKREFp$REV($1)";
             }
             elsif ($var =~ /^\$<(.*)>$/) {
-                "self._BACKREFn$REV(\$/, '$1' )";
+                "\$/._BACKREFn$REV('$1')";
             }
             else {
-                "self._EXACT$REV(\$/, $var )";
+                "\$/._EXACT$REV($var)";
             }
         }
         elsif ($var =~ /^\@/) {
-            "self._ARRAY$REV(\$/, $var )";
+            "\$/._ARRAY$REV($var)";
         }
         elsif ($var =~ /^\%/) {
-            "self._HASH$REV(\$/, $var )";
+            "\$/._HASH$REV($var)";
         }
     }
 }
