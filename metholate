@@ -8,6 +8,7 @@ use YAML;
 our $STOP = "";
 our $REV = "";
 our $NAME = "";
+our $BINDING = "";
 our $CONTEXT = "prog";
 our $PARSEBIND = 0;
 our $PAREN = 0;
@@ -58,6 +59,8 @@ while ($_ ne "") {
         local $PAREN = 0;
         my $ws = $2;
         local $NAME = $3;
+        local $BINDING;
+        undef $BINDING;
         my $args = $4;
         my $sym = "";
         my $coercion = "";
@@ -84,13 +87,17 @@ while ($_ ne "") {
         if ($args =~ s/, *(\$stop is context)(.*)\)/, \$stop_$2\)/) {
             $sym .= "my $1 = \$stop_;\n";
         }
-        $args =~ s/\(,/(/;
+        $args =~ s/(.*)\)/$1, :\$bind)/;
+        $args =~ s/\(, */(/;
 
         if ($NAME =~ /_/) {
-            if ($p and /^\s*<sym>/) {
+            if ($p and /^\s*(?:<\??before>\s+)?<sym>/) {
                 $fixedprefix{$NAME} = $p;
             }
-            elsif (/^\s*('\S*'\s)/) {
+            elsif (/^\s*(?:<\??before>\s+)?('\S*'\s)/) {
+                $fixedprefix{$NAME} = $1;
+            }
+            elsif (/^\s*(?:<\??before>\s+)?("\S*"\s)/) {
                 $fixedprefix{$NAME} = $1;
             }
         }
@@ -107,10 +114,10 @@ method$ws$NAME$args
 {
     my \$LVL is context = self.callm();
     my \$/ := self;
-    my \$¢ = self.cursor;
+    my \$¢ = self.pos;
     my \$FROM is context = \$¢;
     $sym
-    map { $coercion(\$_.capture_all(\$FROM, \$_.to)).retm },
+    map { $coercion(\$_.cursor_all(\$FROM, \$_.to)).retm(\$bind) },
     map { .matchify },
 $result
 END
@@ -415,7 +422,7 @@ sub atom {
                 my $atom = quantified_atom(@_);
                 $atom->{nobind} = 1;
                 ws();
-                if ($code =~ s/\$<(.*)>/$1/) {
+                if ($code =~ s/[\$\@%]<(.*)>/$1/) {
                     return bless { var => $code, atom => $atom }, "RE_bindnamed";
                 }
                 return bless { var => $code, atom => $atom }, "RE_bindvar";
@@ -627,7 +634,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = ::indent($$self{atom}->walk(@_));
-        "\$/._BINDVAR$REV('$var', -> \$/ {\n" . $re . "\n})";
+        "$var := $re.matchify";
     }
 }
 
@@ -635,8 +642,12 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $var = $$self{var};
+        local $BINDING = $var;
         my $re = ::indent($$self{atom}->walk(@_));
-        "\$/._BINDNAMED$REV('$var', -> \$/ {\n" . $re . "\n})";
+        if (defined $BINDING) {
+            $re = "\$/._BINDNAMED$REV(-> \$/ {\n" . $re . "\n}, :bind<$var>)";
+        }
+        $re;
     }
 }
 
@@ -644,8 +655,12 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $var = $$self{var};
+        local $BINDING = $var;
         my $re = ::indent($$self{atom}->walk(@_));
-        "\$/._BINDPOS$REV($var, -> \$/ {\n" . $re . "\n})";
+        if (defined $BINDING) {
+            $re = "\$/._BINDPOS$REV(-> \$/ {\n" . $re . "\n}, :bind<$var>)";
+        }
+        $re;
     }
 }
 
@@ -744,11 +759,20 @@ sub unbalanced {
         my $self = shift;
         my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
-        my $re = '$/.' . $name . '()';
-        if (not $$self{nobind}) {
-            $re = "\$/._BINDNAMED$REV('$name', -> \$/ {\n" . ::indent($re) . "\n})";
+
+        my $binding;
+        if ($$self{nobind}) {
+            $binding = '',
         }
-        $re;
+        elsif (defined $BINDING) {
+            $binding = ":bind<$BINDING>";
+            undef $BINDING;
+        }
+        else {
+            $binding = ":bind<$name>";
+        }
+
+        my $re = '$/.' . $name . "($binding)";
     }
 }
 
@@ -761,11 +785,20 @@ sub unbalanced {
         local $REV = '_rev' if $name eq 'after';
         $re = ::indent($re->walk(@_));
         $REV = '';
-        $re = '$/.' . $$self{name} . "(-> \$/ {\n$re\n})";
-        if (not $$self{nobind}) {
-            $re = "\$/._BINDNAMED$REV('$name', -> \$/ {\n" . ::indent($re) . "\n})";
+
+        my $binding;
+        if ($$self{nobind}) {
+            $binding = '',
         }
-        $re;
+        elsif (defined $BINDING) {
+            $binding = ", :bind<$BINDING>";
+            undef $BINDING;
+        }
+        else {
+            $binding = ", :bind<$name>";
+        }
+
+        '$/.' . $name . "(-> \$/ {\n$re\n}$binding)";
     }
 }
 
@@ -776,12 +809,20 @@ sub unbalanced {
         my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
         $str =~ s/(['\\])/\\$1/g;
-        my $re = '$/.' . $name . "('$str')";
-        if (not $$self{nobind}) {
-            $re = "\$/._BINDNAMED$REV(
-                '$name', -> \$/ {\n" . ::indent($re) . "\n})";
+
+        my $binding;
+        if ($$self{nobind}) {
+            $binding = '',
         }
-        $re;
+        elsif (defined $BINDING) {
+            $binding = ", :bind<$BINDING>";
+            undef $BINDING;
+        }
+        else {
+            $binding = ", :bind<$name>";
+        }
+
+        '$/.' . $name . "('$str'$binding)";
     }
 }
 
@@ -791,11 +832,22 @@ sub unbalanced {
         my $rest = $$self{rest};
         my $name = $$self{name};
         ::panic("Can't reverse submatch") if $REV;
-        my $re = '$/.' . $name . $rest;
-        if (not $$self{nobind}) {
-            $re = "\$/._BINDNAMED$REV('$name', -> \$/ {\n" . ::indent($re) . "\n})";
+
+        my $binding;
+        if ($$self{nobind}) {
+            $binding = '',
         }
-        $re;
+        elsif (defined $BINDING) {
+            $binding = ", :bind<$BINDING>";
+            undef $BINDING;
+        }
+        else {
+            $binding = ", :bind<$name>";
+        }
+
+        $rest =~ s/\)/$binding)/ or die "Oops";
+        $rest =~ s/\(, */(/;
+        '$/.' . $name . $rest;
     }
 }
 

@@ -2765,7 +2765,7 @@ method EXPR (%preclim = %LOOSEST,
         $here = @t[0];
     }
     push @termstack, $here;
-    say "In EXPR, at ", $here.cursor();
+    say "In EXPR, at ", $here.pos;
 
     my &reduce := -> {
         say "entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack;
@@ -2817,7 +2817,7 @@ method EXPR (%preclim = %LOOSEST,
     }
 
     loop {
-        say "In loop, at ", $here.cursor();
+        say "In loop, at ", $here.pos;
         my @terminator = $here.before(-> $s { $stop($s:) } );
         my $t = @terminator[0];
     last if defined $t and @terminator[0].bool;
