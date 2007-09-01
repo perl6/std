@@ -14,6 +14,8 @@ our $PARSEBIND = 0;
 our $PAREN = 0;
 our %adverbs = ();
 our %fixedprefix;
+our $PURE;
+our $TOKEN;
 
 my $TRACE = 0;
 
@@ -89,6 +91,12 @@ while ($_ ne "") {
         }
         $args =~ s/(.*)\)/$1, :\$bind)/;
         $args =~ s/\(, */(/;
+        $args =~ s/\((.*)\)/$1/s;
+        my $callargs = $args;
+        $callargs =~ s/\*([@%])/$1/g;
+        $callargs =~ s/= [^,]*//g;
+        $callargs =~ s/is context\s*//g;
+        $callargs =~ s/is rw\s*//g;
 
         if ($NAME =~ /_/) {
             if ($p and /^\s*(?:<\??before>\s+)?<sym>/) {
@@ -108,10 +116,39 @@ while ($_ ne "") {
         $old =~ s/^/##      /mg;
         $out .= "$old\n\n";
 
+        local $TOKEN;
+        local $PURE = 1;
         my $result = ::indent($re->walk()) . "\n";
-        $out .= <<"END";
-method$ws$NAME$args
-{
+
+        if ($TOKEN) {
+            $out .= <<"END";
+sub$ws${NAME}_ACTION (\$/, \$lvl, \$FROM, $args) {
+    my \$LVL is context = \$lvl;
+    map { $coercion(\$_.cursor_all(\$FROM, \$_.to)).retm(\$bind) },
+    map { .matchify },
+$result
+}
+
+method$ws${NAME}_TOKEN ($args) {
+    my \$LVL is context = self.callm();
+    my \$/ := self;
+    my \$¢ = self.pos;
+    my \$FROM is context = \$¢;
+$TOKEN
+}
+
+method$ws${NAME} ($args){
+    $sym
+    gather for self.${NAME}_TOKEN($callargs) -> \@m {
+        say "LENGTH = ",\@m[1].pos;
+        take \@m[0](\@m[1],\@m[2], \@m[3], $callargs);
+    }
+
+END
+        }
+        else {
+            $out .= <<"END";
+method$ws$NAME ($args) {
     my \$LVL is context = self.callm();
     my \$/ := self;
     my \$¢ = self.pos;
@@ -121,6 +158,7 @@ method$ws$NAME$args
     map { .matchify },
 $result
 END
+        }
         next;
     }
 
@@ -565,6 +603,8 @@ sub unbalanced {
     return $1;
 }
 
+##########################################################
+
 { package REbase;
     sub walk {
         my $self = shift;
@@ -579,10 +619,9 @@ sub unbalanced {
             return ref $self;
         }
         return $result;
-    };
-}
+    }
 
-##########################################################
+}
 
 { package RE; use base "REbase";
     sub walk {
@@ -590,7 +629,7 @@ sub unbalanced {
         if ($$self{re}) {
             return $$self{re}->walk(@_);
         }
-    };
+    }
 }
 
 { package RE_adverb; use base "REbase";
@@ -618,12 +657,14 @@ sub unbalanced {
         my $text = $$self{text};
         my $ctx = $$self{context};
         if ($ctx eq 'void') {
+            $PURE = 0;
             "({$text}() xx 0, \$/)";
         }
         elsif ($ctx eq 'bool') {
             "(\$/ xx ?{$text}())";
         }
         else {
+            $PURE = 0;
             "{$text}";
         }
     }
@@ -727,9 +768,11 @@ sub unbalanced {
             $code = "\$/._COMMITATOM$REV()";
         }
         elsif ($text eq '::') {
+            $PURE = 0;
             $code = "\$/._COMMITBRANCH$REV()";
         }
         elsif ($text eq ':::') {
+            $PURE = 0;
             $code = "\$/._COMMITRULE$REV()";
         }
         elsif ($text eq '\\d') {
@@ -856,6 +899,7 @@ sub unbalanced {
         my $self = shift;
         my @result;
         if ($$self{Kids}) {
+            $PURE = 0 if @{$$self{Kids}} > 1;
             foreach my $kid (@{$$self{Kids}}) {
                 push @result, $kid->walk(@_);
             }
@@ -876,6 +920,7 @@ sub unbalanced {
         my $self = shift;
         my @result;
         if ($$self{Kids}) {
+            $PURE = 0 if @{$$self{Kids}} > 1;
             foreach my $kid (@{$$self{Kids}}) {
                 push @result, $kid->walk(@_);
             }
@@ -888,7 +933,7 @@ sub unbalanced {
             my $result = ::indent(join("\n||\n", @result));
             $result;
         }
-    };
+    }
 }
 
 { package RE_paren; use base "REbase";
@@ -949,7 +994,7 @@ sub unbalanced {
             $result = '"' . $$self{atom} . '"';
         }
         $result;
-    };
+    }
 }
 
 { package RE_qw; use base "REbase";
@@ -963,18 +1008,33 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my @result;
+        my @pure;
         if ($$self{Kids}) {
-            foreach my $kid (@{$$self{Kids}}) {
-                push @result, $kid->walk(@_);
+            my @kids = @{$$self{Kids}};
+            @kids = reverse @kids if $REV;
+            foreach my $kid (@kids) {
+                my $pure = $PURE;
+                my $r = $kid->walk(@_);
+                if ($pure != $PURE) {
+                    @pure = @result;
+                    @result = ();
+                }
+                push @result, $r;
             }
         }
-        @result = reverse @result if $REV;
         my $result = pop @result;
         for (reverse @result) {
             $result = "gather for $_ -> \$/ {\n" . ::indent("take " . $result) . "\n}";
         }
+        if (@pure) {
+            my $pure = '[&' . $NAME . '_ACTION, $/, $LVL, $FROM, $bind]';
+            for (reverse @pure) {
+                $pure = "gather for $_ -> \$/ {\n" . ::indent("take " . $pure) . "\n}";
+            }
+            $TOKEN = ::indent($pure);
+        }
         $result;
-    };
+    }
 }
 
 { package RE_single; use base "REbase";
@@ -991,6 +1051,7 @@ sub unbalanced {
         my $self = shift;
         my @result;
         if ($$self{Kids}) {
+            $PURE = 0 if @{$$self{Kids}} > 1;
             foreach my $kid (@{$$self{Kids}}) {
                 push @result, $kid->walk(@_);
             }
@@ -1007,7 +1068,7 @@ sub unbalanced {
             my $result = "\$/.SUBMATCH($against, -> \$/ {\n$pattern\n})";
             $result;
         }
-    };
+    }
 }
 
 { package RE_unordered_conjunction; use base "REbase";
@@ -1015,6 +1076,7 @@ sub unbalanced {
         my $self = shift;
         my @result;
         if ($$self{Kids}) {
+            $PURE = 0 if @{$$self{Kids}} > 1;
             foreach my $kid (@{$$self{Kids}}) {
                 push @result, $kid->walk(@_);
             }
@@ -1026,7 +1088,7 @@ sub unbalanced {
             my $result = ::indent(join("\nSAMEwith\n", @result));
             $result;
         }
-    };
+    }
 }
 
 { package RE_unordered_disjunction; use base "REbase";
@@ -1034,6 +1096,7 @@ sub unbalanced {
         my $self = shift;
         my @result;
         if ($$self{Kids}) {
+            $PURE = 0 if @{$$self{Kids}} > 1;
             foreach my $kid (@{$$self{Kids}}) {
                 my $r = $kid->walk(@_);
                 if ($r and $r =~ /^\$\/\.(\w+)/) {
@@ -1052,13 +1115,14 @@ sub unbalanced {
             my $result = ::indent('(' . join("\n||\n", @result) . ')');
             $result;
         }
-    };
+    }
 }
 
 { package RE_var; use base "REbase";
     sub walk {
         my $self = shift;
         my $var = $$self{var};
+        $PURE = 0;
         if ($var =~ /^\$/) {
             if ($var =~ /^\$(\d+)$/) {
                 "\$/._BACKREFp$REV($1)";
