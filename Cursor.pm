@@ -109,7 +109,7 @@ method whats () {
 method retm ($bind?) {
     say "Returning non-Cursor: self.WHAT" unless self ~~ Cursor;
     my $binding;
-    if defined $bind {
+    if defined $bind and $bind ne '' {
         $!name = $bind;
         $binding = "      :bind<$bind>";
     }
@@ -181,7 +181,7 @@ method _PLUSg (&block, :$bind) {
     reverse self._PLUSf(&block);
 }
 
-method _PLUSr (&block, :$bind) {
+method _PLUSr (&block, :$bind = '') {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
