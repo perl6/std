@@ -723,7 +723,7 @@ token expect_term {
     <adverbs>?
 
     # now push ops over the noun according to precedence.
-    { return $/.nounphrase(:noun($<noun>), :pre(@<pre>), :post(@<post>)) }
+    { $/ := $/.nounphrase(:noun($<noun>), :pre(@<pre>), :post(@<post>)) }
 }
 
 method nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
@@ -1578,7 +1578,7 @@ token rad_number {
             $<radfrac> := [ '.' <[ 0..9 a..z A..Z ]>+ ]? ]
             [ '*' $<base> := <radint> '**' $<exp> := <radint> ]?
        '>'
-      { return radcalc($<radix>, $<radint>, $<radfrac>, $<base>, $<exp>) }
+      { $/ := radcalc($<radix>, $<radint>, $<radfrac>, $<base>, $<exp>) }
     || <?before '['> <postcircumfix>
     || <?before '('> <postcircumfix>
     ]
