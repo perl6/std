@@ -16,6 +16,7 @@ our %adverbs = ();
 our %fixedprefix;
 our $PURE;
 our $TOKEN;
+our $MAYBACKTRACK;
 
 my $TRACE = 0;
 
@@ -69,6 +70,11 @@ while ($_ ne "") {
         $args =~ s/\(/(, / or
         $args =~ s/^/ () /;
         my $p = "";
+
+        local $MAYBACKTRACK = 1;  # XXX ratchet current broken
+        if ($CONTEXT eq 'regex') {
+            $MAYBACKTRACK = 1;
+        }
 
         if ($args =~ s/ --> (\w*)\)/\)/) {
             $coercion = $1 . ".coerce";
@@ -319,6 +325,7 @@ sub quantifier {
             }
         }
         ws();
+        $MAYBACKTRACK = 1 unless $m eq ':';
         return [$q,$m,$x];
     }
 }
@@ -527,6 +534,18 @@ sub assertion {
         return bless { assert => $assert, re => $rest }, "RE_assertion";
     }
 
+    if (/^[+-]?\[/) {
+        my $cclass = unbalanced('>');
+        s/^>// or panic "Missing >";
+        return bless { text => $cclass }, "RE_cclass";
+    }
+
+    if (s/^\+//) {
+        my $rest = assertion();
+        $rest->{nobind} = 1;
+        return $rest;
+    }
+
     if (s/^([a-zA-Z]\w*)//) {
         my $word = $1;
         my $ch = substr($_,0,1);
@@ -567,11 +586,6 @@ sub assertion {
         }
     }
 
-    if (/^[+-]?\[/) {
-        my $cclass = unbalanced('>');
-        s/^>// or panic "Missing >";
-        return bless { text => $cclass }, "RE_cclass";
-    }
     if (/^\{/) {
         my $b = block('bool');
         s/^>// or panic "Missing >";
@@ -643,7 +657,7 @@ sub unbalanced {
             "\$/._NOTBEFORE(-> \$/ {\n" . ::indent($re) . "\n})";
         }
         else {
-            $re;
+            "\$/.before(-> \$/ {\n" . ::indent($re) . "\n})";
         }
     }
 }
@@ -1005,6 +1019,23 @@ sub unbalanced {
 }
 
 { package RE_sequence; use base "REbase";
+    sub wrapone {
+        my ($outer, $inner) = @_;
+        if ($MAYBACKTRACK) {
+            "gather for $outer -> \$/ {\n" .
+                ::indent("take " . $inner) .
+            "\n}";
+        }
+        else {
+            "do {given ($outer,)[0] -> \$/ { if \$/ {\n" .
+                ::indent($inner) .
+            "\n}}}[0]";
+#            "-> \$/ {\n  my \$t := $outer and -> \$/ {\n" .
+#                ::indent($inner) .
+#            "\n  }(\$t)\n}(\$/)";
+        }
+    }
+
     sub walk {
         my $self = shift;
         my @result;
@@ -1024,12 +1055,12 @@ sub unbalanced {
         }
         my $result = pop @result;
         for (reverse @result) {
-            $result = "gather for $_ -> \$/ {\n" . ::indent("take " . $result) . "\n}";
+            $result = wrapone($_,$result);
         }
         if (@pure) {
             my $pure = '[&' . $NAME . '_ACTION, $/, $LVL, $FROM, $bind]';
             for (reverse @pure) {
-                $pure = "gather for $_ -> \$/ {\n" . ::indent("take " . $pure) . "\n}";
+                $pure = wrapone($_,$pure);
             }
             $TOKEN = ::indent($pure);
         }

@@ -235,7 +235,7 @@ token category:postfix { <sym> }
 proto token postfix is defequiv(%autoincrement) { }
 
 token category:dotty { <sym> }
-proto token dotty (:$endsym is context = / <?unsp>? /) { }
+proto token dotty (:$endsym is context = / <+unsp>? /) { }
 
 token category:circumfix { <sym> }
 proto token circumfix { }
@@ -319,7 +319,7 @@ proto token prefix_circumfix_meta_operator { }
 # Lexical routines
 
 # make sure we're not an autoquoted identifier
-regex nofat { <!before \h* <?unsp>? '=>' > }
+regex nofat { <!before \h* <+unsp>? '=>' > }
 
 token ws {
     || <?{ $¢ === $!ws_to }> <null>
@@ -343,10 +343,10 @@ token unsp {
 
 token unv {
    | \h+                 {*}                                    #= hwhite
-   | ^^ [ <?block_comment> | <?pod_comment> ]  {*}              #= multiline
+   | ^^ [ <+block_comment> | <+pod_comment> ]  {*}              #= multiline
    | '#' [
         # assuming <bracketed> defaults to standard set
-        | <?bracketed>   {*}                                    #= embedded
+        | <+bracketed>   {*}                                    #= embedded
         | \N*            {*}                                    #= end
         ]
 }
@@ -369,7 +369,7 @@ token block_comment {
     $<start> \N* \n                        # eat the #{ line
     [
     ||  [
-        || [ <?block_comment> | <?pod_comment> ] \n # inner blocks must match too
+        || [ <+block_comment> | <+pod_comment> ] \n # inner blocks must match too
         || \N* \n
         ]*?                                # 0 or more inner lines
         ^^ '#' $<stop> <differ> \N*        # the #} line (leave final \n there)
@@ -388,10 +388,10 @@ token ident {
 # XXX We need to parse the pod eventually to support $= variables.
 
 token pod_comment {
-    ^^ '=' <?unsp>?
+    ^^ '=' <+unsp>?
     [
-    | begin <?ws> <ident> .*? \n
-      '=' <?unsp>? 'end' <?ws> $<ident> \N*         {*}         #= block
+    | begin <+ws> <ident> .*? \n
+      '=' <+unsp>? 'end' <+ws> $<ident> \N*         {*}         #= block
     | \N*                                           {*}         #= misc
     ]
     {*}
@@ -460,8 +460,8 @@ token block {
     <statementlist>
     [ '}' || <panic: Missing right brace> ]
     [
-    | \h* <?unsp>? <?before <[,:]>> {*}                         #= normal 
-    | <?unv>? <?before \n > <?ws>
+    | \h* <+unsp>? <?before <[,:]>> {*}                         #= normal 
+    | <+unv>? <?before \n > <+ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = $¢; }                               #= endargs
     ]
@@ -481,8 +481,8 @@ token regex_block {  # perhaps parameterize and combine with block someday
     <regex '}'>
     [ '}' || <panic: Missing right brace> ]
     [
-    | <?unsp>? <?before <[,:]>> {*}                             #= normal
-    | <?unv>? <?before \n > <?ws>
+    | <+unsp>? <?before <[,:]>> {*}                             #= normal
+    | <+unv>? <?before \n > <+ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = $¢; }                               #= endargs
     ]
@@ -515,7 +515,7 @@ ex:     INNER:
 =end perlhints
 
 token label {
-    <ident> ':' \s <?ws>
+    <ident> ':' \s <+ws>
 
     [ <?{ is_type($<ident>) }>
       <suppose("You tried to use an existing name $/{'ident'} as a label")>
@@ -699,7 +699,7 @@ token version:sym<v> {
 ###################################################
 
 token expect_term {
-    <?ws>
+    <+ws>
 
     # queue up the prefixes to interleave with postfixes
     @<pre> := (
@@ -719,7 +719,7 @@ token expect_term {
 
     # also queue up any postfixes, since adverbs could change things
     @<post> := <expect_postfix>*                        {*}     #= postfix
-    <?ws>
+    <+ws>
     <adverbs>?
 
     # now push ops over the noun according to precedence.
@@ -753,7 +753,7 @@ method nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
 }
 
 token adverbs {
-    [ <colonpair> <?ws> ]+
+    [ <colonpair> <+ws> ]+
     {
         my $prop = $+prevop err
             $/.panic('No previous operator visible to adverbial pair (' ~
@@ -801,7 +801,7 @@ token pair {
     [
     | $<key>:=<ident> \h* '=>' $<val>:=<EXPR(%item_assignment)>
                                                         {*}     #= fat
-    | [ <colonpair> <?ws> ]+
+    | [ <colonpair> <+ws> ]+
                                                         {*}     #= colon
     ]
     {*}
@@ -811,7 +811,7 @@ token colonpair {
     ':'
     [
     | '!' <ident>                                       {*}    #= false
-    | <ident> [ <?unsp>? <postcircumfix> ]?              {*}    #= value
+    | <ident> [ <+unsp>? <postcircumfix> ]?              {*}    #= value
     | <postcircumfix>                                   {*}    #= structural
     | <sigiltwigil> <desigilname>                       {*}    #= varname
     ]
@@ -871,10 +871,10 @@ token expect_postfix {
 
     [
     | \\ <?before '.'>
-    | <?unsp>?
+    | <+unsp>?
     ]
 
-    [ ['.' <?unsp>?]? <postfix_prefix_meta_operator> <?unsp>? ]*
+    [ ['.' <+unsp>?]? <postfix_prefix_meta_operator> <+unsp>? ]*
 
     [
     | <dotty>
@@ -1040,10 +1040,10 @@ token methodop {
     | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]>> <quote>
         { $<quote> ~~ /\W/ or $/.panic("Useless use of quotes") }
-    ] <?unsp>? 
+    ] <+unsp>? 
 
     [
-    | '.'? <?unsp>? '(' <semilist> ')'
+    | '.'? <+unsp>? '(' <semilist> ')'
     | ':' <?before \s> <!{ $+inquote }> <arglist>
     | <null>
     ]
@@ -1053,11 +1053,11 @@ token methodop {
 token arglist (StrPos :$endargs is context<rw> = 0) { <EXPR(%list_prefix)> }
 
 token anglewords($stop) {
-    <?ws> [ <!before $stop> .]*  # XXX need to split
+    <+ws> [ <!before $stop> .]*  # XXX need to split
 }
 
 token shellwords($stop) {
-    <?ws> [ <!before $stop> .]*  # XXX need to split
+    <+ws> [ <!before $stop> .]*  # XXX need to split
 }
 
 token circumfix:sym<{ }> ( --> Circumfix) {
@@ -1069,16 +1069,16 @@ token variable_decl {
     <variable>
     [   # Is it a shaped array or hash declaration?
         <?{ $<variable><sigiltwigil><sigil> eq '@' | '%' }>
-        <?ws>
+        <+ws>
         <?before [ '<' | '(' |  '[' | '{' ] >
         <postcircumfix>
     ]?
 
     <trait>*
-    <?ws>
+    <+ws>
     [
-    | '=' <?ws> <EXPR(%item_assignment)>
-    | '.=' <?ws> <EXPR(%item_assignment)>
+    | '=' <+ws> <EXPR(%item_assignment)>
+    | '.=' <+ws> <EXPR(%item_assignment)>
     ]
 }
 
@@ -1444,7 +1444,7 @@ token variable {
         ]
         [
         | <?{ $<sigiltwigil><twigil> eq '.' }>
-            <?unsp>? <?before '('> <postcircumfix> {*}          #= methcall
+            <+unsp>? <?before '('> <postcircumfix> {*}          #= methcall
         | <null> {*}                                            #= $?foo
         ]
     | <sigil> \d+ {*}                                           #= $0
@@ -1500,7 +1500,7 @@ token sublongname {
 
 token subcall {
     # XXX should this be sublongname?
-    <subshortname> <?unsp>? '.'? '(' <semilist> ')'
+    <subshortname> <+unsp>? '.'? '(' <semilist> ')'
     {*}
 }
 
@@ -1520,13 +1520,13 @@ token typename {
         is_type($<name>)
     }>
     # parametric type?
-    <?unsp>? [ <?before '['> <postcircumfix> ]?
+    <+unsp>? [ <?before '['> <postcircumfix> ]?
     {*}
 }
 
 regex fulltypename {
     <typename>
-    [ <?ws> of <?ws> <fulltypename> ]?
+    [ <+ws> of <+ws> <fulltypename> ]?
     {*}
 }
 
@@ -1571,7 +1571,7 @@ token dec_number {
 }
 
 token rad_number {
-    ':' $<radix> := [\d+] <?unsp>?      # XXX optional dot here?
+    ':' $<radix> := [\d+] <+unsp>?      # XXX optional dot here?
     [
     || '<'
             $<radint> := [<[ 0..9 a..z A..Z ]>+
@@ -1699,7 +1699,7 @@ token finish_subst ($pat, :%thisop is context<rw>) {
     [
     # bracketed form
     | <?{ $pat<delim> == 2 }> ::
-          <?ws>
+          <+ws>
           <infix>            # looking for pseudoassign here
           { %+thisop<prec> == %item_assignment<prec> or
               $/.panic("Bracketed subst must use some form of assignment") }
@@ -1713,7 +1713,7 @@ token finish_trans ($pat) {
     [
     # bracketed form
     | <?{ $pat<delim> == 2 }> ::
-          <?ws>
+          <+ws>
           $<repl> := <q_pickdelim(qlang('Q',':tr'))>
     # unbracketed form
     | $<repl> := <q_unbalanced(qlang('Q',':tr'), $pat<delim>[0])>
@@ -1895,9 +1895,9 @@ class TR_tweaker does QLang {
 
 token quotesnabber (*@q, :$delim is context<rw> = '') {
     <!before \w> <nofat> ::
-    <?ws>
+    <+ws>
 
-    [ (<quotepair>) { push @q, $0 } <?ws> ]*
+    [ (<quotepair>) { push @q, $0 } <+ws> ]*
 
     # Dispatch to current lang's subparser.
     {{
@@ -2198,13 +2198,13 @@ token param_var {
     <sigiltwigil>
     [
         # Is it a longname declaration?
-    || <?{ $<sigiltwigil><sigil> eq '&' }> <?before <?ident> > ::
+    || <?{ $<sigiltwigil><sigil> eq '&' }> <?ident> ::
         $<ident> := <sublongname>
 
     ||  # Is it a shaped array or hash declaration?
         <?{ $<sigiltwigil><sigil> eq '@' | '%' }>
         <ident>?
-        <?ws>
+        <+ws>
         <?before <[ \< \( \[ \{ ]> >
         <postcircumfix>
 
@@ -2225,7 +2225,7 @@ token parameter {
     |   [ $<named> :=
             [ $<quantchar>:=[ ':' ]
                 [
-                | $<name>:=<?ident> '(' <param_var>  ')'
+                | $<name>:=<+ident> '(' <param_var>  ')'
                 | <param_var> { $<name> := $<param_var><ident> }
                 ]
                 { let $<quant> := '*' }
@@ -3015,8 +3015,8 @@ token regex_metachar:sym<" "> { <?before '"'  > <quotesnabber(":qq")> }
 
 token regex_metachar:var {
     <!before '$$'>
-    $<sym>:=<variable> <?ws>
-    $<binding> := ( ':=' <?ws> <regex_quantified_atom> )?
+    $<sym>:=<variable> <+ws>
+    $<binding> := ( ':=' <+ws> <regex_quantified_atom> )?
     {*}                                                         #= var
 }
 
@@ -3081,10 +3081,10 @@ token regex_assertion:method {
     {*}                                                        #= method
 }
 token regex_assertion:ident { <ident> [               # is qq right here?
-                                | ':' <?ws>
+                                | ':' <+ws>
                                     <q_unbalanced(qlang('Q',':qq'), :stop«>»)>
                                 | '(' <semilist> ')'
-                                | <?ws> <EXPR(%LOOSEST,&assertstopper)>
+                                | <+ws> <EXPR(%LOOSEST,&assertstopper)>
                                 ]?
 }
 
@@ -3128,7 +3128,7 @@ token regex_mod_internal:oops { <panic: unrecognized regex modifier> }
 token regex_quantifier:sym<*>  { <sym> <quantmod> }
 token regex_quantifier:sym<+>  { <sym> <quantmod> }
 token regex_quantifier:sym<?>  { <sym> <quantmod> }
-token regex_quantifier:sym<**> { <sym> <quantmod> <?ws>
+token regex_quantifier:sym<**> { <sym> <quantmod> <+ws>
     [
     | \d+ [ '..' [ \d+ | '*' ] ]?
     | <block>

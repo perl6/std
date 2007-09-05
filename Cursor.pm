@@ -91,10 +91,15 @@ method cursor_rev (StrPos $fpos) {
 
 my $LVL is context = 0;
 
-method callm () is export {
+method callm ($arg?) {
     my $lvl = 0;
     while Pugs::Internals::caller(Any,$lvl,"") { $lvl++ }
-    say ' ' x $lvl, substr(caller.subname,1), " called at {self.pos}";
+    my $caller = caller;
+    my $name = substr($caller.subname,1);
+    if defined $arg { 
+        $name ~= " " ~ $arg;
+    }
+    say self.pos,"\t", ':' x $lvl, ' ', $name, " [", $caller.file, ":", $caller.line, "]";
     $lvl;
 }
 
@@ -113,8 +118,8 @@ method retm ($bind?) {
         $!name = $bind;
         $binding = "      :bind<$bind>";
     }
-    say ' ' x $+LVL, substr(caller.subname,1), " returning {self.from}..{self.to}$binding";
-    self.whats();
+    say self.pos, "\t", ':' x $+LVL, ' ', substr(caller.subname,1), " returning {self.from}..{self.to}$binding";
+#    self.whats();
     self;
 }
 
@@ -148,7 +153,7 @@ method _STARr (&block, :$bind) {
     my @all = gather {
         loop {
             my @matches = block($to);  # XXX shouldn't read whole list
-            say @matches.perl;
+#            say @matches.perl;
         last unless @matches;
             my $first = @matches[0];  # no backtracking into block on ratchet
             take $first;
@@ -255,15 +260,15 @@ method _NOTBEFORE (&block, :$bind) {
 }
 
 method before (&block, :$bind) {
-    say $¢.WHICH;
+#    say $¢.WHICH;
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
     my @all = block($/);
     if (@all and @all[0].bool) {
-        say "true";
-        self.whats;
-        say $¢.WHICH;
+#        say "true";
+#        self.whats;
+#        say $¢.WHICH;
         return self.cursor($¢).retm($bind);
     }
     return ();
@@ -331,17 +336,17 @@ method _EQ ($¢, $s, :$bind) {
 }
 
 method _EXACT ($s, :$bind) {
-    my $LVL is context = self.callm;
+    my $LVL is context = self.callm($s);
     my $/ := self;
     my $¢ = self.pos;
     my $len = $s.chars;
     if substr($!targ, $¢, $len) eq $s {
-        say "EXACT $s matched {substr($!targ,$¢,$len)} at $¢ $len";
+#        say "EXACT $s matched {substr($!targ,$¢,$len)} at $¢ $len";
         my $r = self.cursor($¢+$len);
         $r.retm($bind);
     }
     else {
-        say "EXACT $s didn't match {substr($!targ,$¢,$len)} at $¢ $len";
+#        say "EXACT $s didn't match {substr($!targ,$¢,$len)} at $¢ $len";
         return ();
     }
 }
@@ -357,7 +362,7 @@ method _EXACT_rev ($s, :$bind) {
         $r.retm($bind);
     }
     else {
-        say "vEXACT $s didn't match {substr($!targ,$from,$len)} at $from $len";
+#        say "vEXACT $s didn't match {substr($!targ,$from,$len)} at $from $len";
         return ();
     }
 }
@@ -372,7 +377,7 @@ method _DIGIT (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "DIGIT didn't match $char at $¢";
+#        say "DIGIT didn't match $char at $¢";
         return ();
     }
 }
@@ -383,7 +388,7 @@ method _DIGIT_rev (:$bind) {
     my $¢ = self.pos;
     my $from = $/.from - 1;
     if $from < 0 {
-        say "vDIGIT didn't match $char at $from";
+#        say "vDIGIT didn't match $char at $from";
         return ();
     }
     my $char = substr($!targ, $from, 1);
@@ -392,7 +397,7 @@ method _DIGIT_rev (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "vDIGIT didn't match $char at $from";
+#        say "vDIGIT didn't match $char at $from";
         return ();
     }
 }
@@ -407,7 +412,7 @@ method _ALNUM (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "ALNUM didn't match $char at $¢";
+#        say "ALNUM didn't match $char at $¢";
         return ();
     }
 }
@@ -418,7 +423,7 @@ method _ALNUM_rev (:$bind) {
     my $¢ = self.pos;
     my $from = $/.from - 1;
     if $from < 0 {
-        say "vALNUM didn't match $char at $from";
+#        say "vALNUM didn't match $char at $from";
         return ();
     }
     my $char = substr($!targ, $from, 1);
@@ -427,7 +432,7 @@ method _ALNUM_rev (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "vALNUM didn't match $char at $from";
+#        say "vALNUM didn't match $char at $from";
         return ();
     }
 }
@@ -442,7 +447,7 @@ method alpha (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "alpha didn't match $char at $¢";
+#        say "alpha didn't match $char at $¢";
         return ();
     }
 }
@@ -457,7 +462,7 @@ method _SPACE (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "SPACE didn't match $char at $¢";
+#        say "SPACE didn't match $char at $¢";
         return ();
     }
 }
@@ -468,7 +473,7 @@ method _SPACE_rev (:$bind) {
     my $¢ = self.pos;
     my $from = $/.from - 1;
     if $from < 0 {
-        say "vSPACE didn't match $char at $from";
+#        say "vSPACE didn't match $char at $from";
         return ();
     }
     my $char = substr($!targ, $from, 1);
@@ -477,7 +482,7 @@ method _SPACE_rev (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "vSPACE didn't match $char at $from";
+#        say "vSPACE didn't match $char at $from";
         return ();
     }
 }
@@ -492,7 +497,7 @@ method _HSPACE (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "HSPACE didn't match $char at $¢";
+#        say "HSPACE didn't match $char at $¢";
         return ();
     }
 }
@@ -503,7 +508,7 @@ method _HSPACE_rev (:$bind) {
     my $¢ = self.pos;
     my $from = $/.from - 1;
     if $from < 0 {
-        say "vHSPACE didn't match $char at $from";
+#        say "vHSPACE didn't match $char at $from";
         return ();
     }
     my $char = substr($!targ, $from, 1);
@@ -512,7 +517,7 @@ method _HSPACE_rev (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "vHSPACE didn't match $char at $from";
+#        say "vHSPACE didn't match $char at $from";
         return ();
     }
 }
@@ -527,7 +532,7 @@ method _VSPACE (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "VSPACE didn't match $char at $¢";
+#        say "VSPACE didn't match $char at $¢";
         return ();
     }
 }
@@ -538,7 +543,7 @@ method _VSPACE_rev (:$bind) {
     my $¢ = self.pos;
     my $from = $/.from - 1;
     if $from < 0 {
-        say "vVSPACE didn't match $char at $from";
+#        say "vVSPACE didn't match $char at $from";
         return ();
     }
     my $char = substr($!targ, $from, 1);
@@ -547,7 +552,7 @@ method _VSPACE_rev (:$bind) {
         return $r.retm($bind);
     }
     else {
-        say "vVSPACE didn't match $char at $from";
+#        say "vVSPACE didn't match $char at $from";
         return ();
     }
 }
@@ -560,7 +565,7 @@ method _ANY (:$bind) {
         self.cursor($¢+1).retm($bind);
     }
     else {
-        say "ANY didn't match anything at $¢";
+#        say "ANY didn't match anything at $¢";
         return ();
     }
 }
@@ -606,8 +611,8 @@ method _REDUCE ($tag) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    say "Success $tag from $+FROM to $¢";
-    self.whats;
+#    say "Success $tag from $+FROM to $¢";
+#    self.whats;
     $/;
 #    self.cursor($¢);
 }

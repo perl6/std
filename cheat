@@ -105,7 +105,7 @@ continue {
 foreach my $name (sort keys %multis) {
     print "token $name {\n";
     for (@{$multis{$name}}) {
-	print "    | <?$_>\n";
+	print "    | <+$_>\n";
     }
     print "}\n\n";
 }
