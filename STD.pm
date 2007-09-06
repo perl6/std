@@ -755,7 +755,7 @@ method nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
 token adverbs {
     [ <colonpair> <+ws> ]+
     {
-        my $prop = $+prevop err
+        my $prop = $+prevop orelse
             $/.panic('No previous operator visible to adverbial pair (' ~
                 $<colonpair> ~ ')');
         $prop.adverb($<colonpair>)
@@ -1126,7 +1126,7 @@ token package_def {
     [
     || <?{ $+begin_compunit }> :: ';'
         {
-            $<module_name> err $/.panic("Compilation unit cannot be anonymous");
+            $<module_name> orelse $/.panic("Compilation unit cannot be anonymous");
             $begin_compunit = 0;
         }
         {*}                                                     #= semi
@@ -1749,7 +1749,7 @@ role QLang {
         else {
             my $tail = pop @pedigree;
             my $self = qlang(@pedigree).clone
-                err fail "Can't clone {@pedigree}: $!";
+                orelse fail "Can't clone {@pedigree}: $!";
             return $self.tweak($tail);
         }
     }
@@ -1991,7 +1991,7 @@ method peek_brackets () {
         self.panic("Use a closing delimiter for an opener is reserved");
     }
     elsif m:p/ <?before $start := [ (leftbrack) $0* ] > / {
-        $stop = %open2close{$0} err
+        $stop = %open2close{$0} orelse
             self.panic("Don't know how to flip $start bracket");
         $stop x= $start.chars;
         return $start, $stop;
@@ -2689,6 +2689,9 @@ token prefix:listop ( --> List_prefix)
 token infix:sym<and> ( --> Loose_and)
     { <sym> {*} }                                               #= and
 
+token infix:sym<andthen> ( --> Loose_and)
+    { <sym> {*} }                                               #= andthen
+
 ## loose or
 token infix:sym<or> ( --> Loose_or)
     { <sym> {*} }                                               #= or
@@ -2696,8 +2699,8 @@ token infix:sym<or> ( --> Loose_or)
 token infix:sym<xor> ( --> Loose_or)
     { <sym> {*} }                                               #= xor
 
-token infix:sym<err> ( --> Loose_or)
-    { <sym> {*} }                                               #= err
+token infix:sym<orelse> ( --> Loose_or)
+    { <sym> {*} }                                               #= orelse
 
 ## expression terminator
 

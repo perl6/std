@@ -155,7 +155,7 @@ class Carp {
         #   $mess ~= "\n\t{$caller.package}::{$caller.subname}() at {$caller.file} line {$caller.line}";
         #}
         loop (;;) {
-            my $caller = Control::Caller::caller(skip => $i++) err last;
+            my $caller = Control::Caller::caller(skip => $i++) orelse last;
             $mess ~= "\n\t{$caller.package}::{$caller.subname}() at {$caller.file} line {$caller.line}";
         };
 
