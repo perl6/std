@@ -20,7 +20,10 @@ our $MAYBACKTRACK;
 
 my $TRACE = 0;
 
-$_ = <>;
+{
+    local $/;
+    $_ = <>;
+}
 my $all = $_;
 
 sub indent {
@@ -129,12 +132,12 @@ while ($_ ne "") {
 sub$ws${NAME}_ACTION (\$_, \$lvl, \$FROM, $args) {
     my \$LVL is context = \$lvl;
 
-    map { $coercion(\$_.cursor_all(\$FROM, \$_.to)).retm(\$bind) },
+    map { $coercion(.cursor_all(\$FROM, .to)).retm(\$bind) },
     map { .matchify },
 $result
 }
 
-method$ws${NAME}_TOKEN ($_: $args) {
+method$ws${NAME}_TOKEN (\$_: $args) {
     my \$LVL is context = self.callm();
     my \$¢ = self.pos;
     my \$FROM is context = \$¢;
@@ -154,13 +157,13 @@ END
         }
         else {
             $out .= <<"END";
-method$ws$NAME ($_: $args) {
+method$ws$NAME (\$_: $args) {
     my \$LVL is context = self.callm();
     my \$¢ = self.pos;
     my \$FROM is context = \$¢;
     $sym
 
-    map { $coercion(\$_.cursor_all(\$FROM, \$_.to)).retm(\$bind) },
+    map { $coercion(.cursor_all(\$FROM, .to)).retm(\$bind) },
     map { .matchify },
 $result
 END

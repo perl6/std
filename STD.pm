@@ -345,45 +345,20 @@ token unsp {
 }
 
 token unv {
-   | \h+                 {*}                                    #= hwhite
-   | ^^ [ <.block_comment> | <.pod_comment> ]  {*}              #= multiline
-   | '#' [
+   || \h+                 {*}                                   #= hwhite
+   || ^^ [
+       | <.pod_comment>  {*}                                    #= multiline
+       | '#' [
+            | <.bracketed> <panic: Can't use embedded comments in column 1>
+            | \N*            {*}                                #= end
+       ]
+   ]
+   || '#' [
         # assuming <bracketed> defaults to standard set
         | <.bracketed>   {*}                                    #= embedded
         | \N*            {*}                                    #= end
-        ]
+   ]
 }
-
-=begin perlhints #{ #}
-token:  block_comment
-syn:    #{ <arbitrary text> }
-name:   block comment
-desc:   #{ starts a comment that is terminated by #}. Inside the comment \
-        brackets may be nested.
-ex:     say 
-        #{ 
-        this is a comment
-        #} 
-        "something"; 
-=end perlhints
-
-token block_comment {
-    <; my ($start, $stop) ;>
-    ^^ '#' <?{ ($start,$stop) = .peek_brackets($¢) }>
-    $start \N* \n                        # eat the #{ line
-    [
-    ||  [
-        || [ <.block_comment> | <.pod_comment> ] \n # inner blocks must match too
-        || \N* \n
-        ]*?                                # 0 or more inner lines
-        ^^ '#' $stop <differ> \N*        # the #} line (leave final \n there)
-    || <panic: Unterminated block comment> # (hopefully adds current position)
-    ]
-    {*}                                                         #= block
-}
-
-regex same   { <?after (.)> <?before $0> }
-regex differ { <?after (.)> <!before $0> }
 
 token ident {
     <alpha> \w*
@@ -538,14 +513,14 @@ rule statement () {
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
-    | $0=<expect_term> $expr=<EXPR(:seen($0))>  {*}         #= expr
+    | $x=<expect_term> <expr=EXPR(:seen($x))>  {*}         #= expr
         [
         || <?before <stdstopper>>
-        || <statement_mod_loop> $loopx=<EXPR> {*}            #= mod loop
-        || <statement_mod_cond> $condx=<EXPR>
+        || <statement_mod_loop> <loopx=EXPR> {*}            #= mod loop
+        || <statement_mod_cond> <condx=EXPR>
             [
             || <?before <stdstopper>> {*}                       #= mod cond
-            || <statement_mod_loop> $loopx=<EXPR> {*}        #= mod condloop
+            || <statement_mod_loop> <loopx=EXPR> {*}        #= mod condloop
             ]
         ]
         {*}                                                     #= modexpr
@@ -579,9 +554,9 @@ rule statement_control:if {
     <sym>
     <EXPR>                           {*}                        #= if expr
     <pblock>                         {*}                        #= if block
-    @elsif = ( elsif <EXPR>       {*}                        #= elsif expr
+    @<elsif> = ( elsif <EXPR>       {*}                        #= elsif expr
                         <pblock>     {*} )*                     #= elsif block
-    @else = ( else <pblock>       {*} )?                     #= else
+    @<else> = ( else <pblock>       {*} )?                     #= else
     {*}
 }
 
@@ -619,7 +594,7 @@ rule statement_control:repeat {
 }
 rule statement_control:loop {
     <sym>
-    $eee = (
+    $<eee> = (
         '('
             $e1 = <EXPR> ';'   {*}                           #= loop e1
             $e2 = <EXPR> ';'   {*}                           #= loop e2
@@ -712,17 +687,17 @@ token expect_term {
     @pre = (
         [
         | <prefix>
-            { $prec = $prefix<prec> }
+            { $<prec> = $prefix<prec> }
                                                         {*}     #= prefix
         | <prefix_circumfix_meta_operator>
-            { $prec = $<prefix_circumfix_meta_operator><prec> }
+            { $<prec> = $<prefix_circumfix_meta_operator><prec> }
                                                         {*}     #= precircum
         ]
         # XXX assuming no precedence change
         <prefix_postfix_meta_operator>*                 {*}     #= prepost
     )*
 
-    <noun>                                              {*}     #= noun
+    $noun = <noun>                                      {*}     #= noun
 
     # also queue up any postfixes, since adverbs could change things
     @post = <expect_postfix>*                        {*}     #= postfix
@@ -730,7 +705,7 @@ token expect_term {
     <adverbs>?
 
     # now push ops over the noun according to precedence.
-    { reduce .nounphrase(:noun($noun), :pre(@pre), :post(@post)) }
+    { make .nounphrase(:noun($noun), :pre(@pre), :post(@post)) }
 }
 
 method nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
@@ -805,7 +780,7 @@ ex:     my %continents = (
 
 token pair {
     [
-    | $key=<ident> \h* '=>' $val=<EXPR(%item_assignment)>
+    | <key=ident> \h* '=>' <val=EXPR(%item_assignment)>
                                                         {*}     #= fat
     | [ <colonpair> <.ws> ]+
                                                         {*}     #= colon
@@ -894,9 +869,9 @@ token expect_postfix {
 # (Also backtracks if on \op when no \op infix exists.)
 regex prefix_circumfix_meta_operator:reduce () {
     <; my %thisop is context<rw> ;>
-    @sym = [ '[' \\?? ]   # prefer no meta \ if op has \
+    @<sym> = [ '[' \\?? ]   # prefer no meta \ if op has \
     <infix_nospace>
-    @sym = [ ']' ]
+    @<sym> = [ ']' ]
 
     [ <!{ %+thisop<assoc> eq 'non' }>
         || <panic: Can't reduce a non-associative operator> ]
@@ -1581,14 +1556,14 @@ token dec_number {
 }
 
 token rad_number {
-    ':' $radix = [\d+] <.unsp>?      # XXX optional dot here?
+    ':' $<radix> = [\d+] <.unsp>?      # XXX optional dot here?
     [
     || '<'
-            $radint = [<[ 0..9 a..z A..Z ]>+
-            $radfrac = [ '.' <[ 0..9 a..z A..Z ]>+ ]? ]
-            [ '*' $base = <radint> '**' $exp = <radint> ]?
+            $<radint> = [<[ 0..9 a..z A..Z ]>+
+            $<radfrac> = [ '.' <[ 0..9 a..z A..Z ]>+ ]? ]
+            [ '*' <base=radint> '**' <exp=radint> ]?
        '>'
-      { reduce radcalc($radix, $radint, $radfrac, $base, $exp) }
+      { make radcalc($radix, $radint, $radfrac, $base, $exp) }
     || <?before '['> <postcircumfix>
     || <?before '('> <postcircumfix>
     ]
@@ -1697,13 +1672,13 @@ token quote:rx { <sym> <quotesnabber(':regex')> }
 token quote:m { <sym>  <quotesnabber(':regex')> }
 token quote:mm { <sym> <quotesnabber(':regex', ':s')> }
 
-token quote:s { <sym>  $pat = <quotesnabber(':regex')>
-                        <finish_subst($pat)> }
-token quote:ss { <sym> $pat = <quotesnabber(':regex', ':s')>
-                        <finish_subst($pat)> }
+token quote:s { <sym>  <pat=quotesnabber(':regex')>
+                        <finish_subst($<pat>)> }
+token quote:ss { <sym> <pat=quotesnabber(':regex', ':s')>
+                        <finish_subst($<pat>)> }
 
-token quote:tr { <sym> $pat = <quotesnabber(':trans')>
-                        <finish_trans(<$pat>)> }
+token quote:tr { <sym> <pat=quotesnabber(':trans')>
+                        <finish_trans($<pat>)> }
 
 token finish_subst ($pat) {
     <; my %thisop is context<rw> ;>
@@ -1714,9 +1689,9 @@ token finish_subst ($pat) {
           <infix>            # looking for pseudoassign here
           { %+thisop<prec> == %item_assignment<prec> or
               .panic("Bracketed subst must use some form of assignment") }
-          $repl = <EXPR(%item_assignment)>
+          <repl=EXPR(%item_assignment)>
     # unbracketed form
-    | $repl = <q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
+    | <repl=q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
     ]
 }
 
@@ -1725,9 +1700,9 @@ token finish_trans ($pat) {
     # bracketed form
     | <?{ $pat<delim> == 2 }> ::
           <.ws>
-          $repl = <q_pickdelim(qlang('Q',':tr'))>
+          <repl=q_pickdelim(qlang('Q',':tr'))>
     # unbracketed form
-    | $repl = <q_unbalanced(qlang('Q',':tr'), $pat<delim>[0])>
+    | <repl=q_unbalanced(qlang('Q',':tr'), $pat<delim>[0])>
     ]
 }
 
@@ -1990,22 +1965,21 @@ constant %open2close = {
 
 method peek_delimiters () {
     return peek_brackets ||
-        substr($_,0,1) xx 2;
+        substr(self._,0,1) xx 2;
 }
 
 method peek_brackets () {
-    my $start;
-    my $stop;
-    if m:p/ \s / {
+    if m:p(self) / \s / {
         self.panic("Whitespace not allowed as delimiter");
     }
-    elsif m:p/ <?before <isPe>> / {
+    elsif m:p(self) / <+isPe>> / {
         self.panic("Use a closing delimiter for an opener is reserved");
     }
-    elsif m:p/ <?before $start = [ (leftbrack) $0* ] > / {
-        $stop = %open2close{$0} orelse
-            self.panic("Don't know how to flip $start bracket");
-        $stop x= $start.chars;
+    elsif m:p(self) / (.) ** <?same> > / {
+        my $start = ~$/;
+        my $rightbrack = %open2close{$0} orelse
+            return ();
+        my $stop = $rightbrack x $start.chars;
         return $start, $stop;
     }
     else {
@@ -2014,8 +1988,8 @@ method peek_brackets () {
 }
 
 regex bracketed ($lang = qlang("Q")) {
-     <?{ ($start,$stop) = .peek_brackets() }>
-     $q = <q_balanced($lang, $start, $stop)>
+    <?{ ($start,$stop) = .peek_brackets() }>
+    <q=q_balanced($lang, $start, $stop)>
     {*}
 }
 
@@ -2036,9 +2010,9 @@ regex rx_pickdelim ($lang) {
     [
     | <?{ ($start,$stop) = .peek_delimiters() }>
       $start
-      $r = <regex($stop)>        # counts its own brackets, we hope
+      <rx=regex($stop)>        # counts its own brackets, we hope
     | [ $stop = [\S] || <panic: Regex delimiter must not be whitespace> ]
-      $r = <regex($stop)>
+      <rx=regex($stop)>
     ]
     {*}
 }
@@ -2047,9 +2021,9 @@ regex tr_pickdelim ($lang) {
     [
     | <?{ ($start,$stop) = .peek_delimiters() }>
       $start
-      $r = <transliterator($stop)>
+      <tr=transliterator($stop)>
     | [ $stop = [\S] || <panic: tr delimiter must not be whitespace> ]
-      $r = <transliterator($stop)>
+      <tr=transliterator($stop)>
     ]
     {*}
 }
@@ -2059,32 +2033,32 @@ regex transliterator($stop) {
 }
 
 regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
-    $start = <$start>
-    $text = [.*?]
-    @more = (
+    <start=$start>
+    $<text> = [.*?]
+    @<more> = (
         <!before <$stop>>
         [ # XXX triple rule should just be in escapes to be customizable
         | <?before <$start> ** 3>
-            $dequote = <EXPR(%LOOSEST,/<$stop> ** 3/)>
+            $<dequote> = <EXPR(%LOOSEST,/<$stop> ** 3/)>
         | <?before <$start>>
-            $subtext = <q_balanced($lang, $start, $stop, :@esc)>
+            $<subtext> = <q_balanced($lang, $start, $stop, :@esc)>
         | <?before @esc>
-            $escape = [ <q_escape($lang)> ]
+            $<escape> = [ <q_escape($lang)> ]
         ]
-        $text = [.*?]
+        $<text> = [.*?]
     )*
-    $stop = <$stop>
+    <stop=$stop>
     {*}
 }
 
 regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
-    $text = [.*?]
-    @more = (
+    $<text> = [.*?]
+    @<more> = (
       <!before <$stop>>
-      <?before @esc> $escape = [ <q_escape($lang)> ]
-      $text = [.*?]
+      <?before @esc> $<escape> = [ <q_escape($lang)> ]
+      $<text> = [.*?]
     )*
-    $stop = <$stop>
+    <stop=$stop>
     {*}
 }
 
@@ -2177,7 +2151,7 @@ token sigterm {
 
 rule signature () {
     <; my $zone is context<rw> = 'posreq' ;>
-    @parsep = ( <parameter>
+    @<parsep> = ( <parameter>
                     ( ',' | ':' | ';' | ';;' | <?before '-->' | ')' | '{' > )
                  )*
     [ '-->' <fulltypename> ]?
@@ -2213,7 +2187,7 @@ token param_var {
     [
         # Is it a longname declaration?
     || <?{ $sigiltwigil<sigil> eq '&' }> <?ident> ::
-        $ident = <sublongname>
+        <ident=sublongname>
 
     ||  # Is it a shaped array or hash declaration?
         <?{ $sigiltwigil<sigil> eq '@' | '%' }>
@@ -2234,20 +2208,20 @@ token parameter {
 
     <type_constraint>*
     [
-    | $slurp = [ $quantchar=[ '*' ] <param_var> ]
+    | $<slurp> = [ $<quantchar>=[ '*' ] <param_var> ]
         { let $quant := '*' }
-    |   [ $named =
-            [ $quantchar=[ ':' ]
+    |   [ $<named> =
+            [ $<quantchar> = [ ':' ]
                 [
-                | $name=<ident> '(' <param_var>  ')'
-                | <param_var> { $name := $param_var<ident> }
+                | <name=ident> '(' <param_var>  ')'
+                | <param_var> { $<name> := $param_var<ident> }
                 ]
                 { let $quant = '*' }
             ]
         | <param_var>
             { let $quant := '!'; }
         ]
-        [ $quantchar = <[ ? ! ]> { let $quant := $quantchar } ]?
+        [ $<quantchar> = <[ ? ! ]> { let $quant := $quantchar } ]?
     ]
     <trait>*
 
@@ -2255,7 +2229,7 @@ token parameter {
 
     [
         <default_value> {{
-            given $quantchar {
+            given $<quantchar> {
               when '!' { .panic("Can't put a default on a required parameter") }
               when '*' { .panic("Can't put a default on a slurpy parameter") }
             }
@@ -2320,10 +2294,10 @@ token term:sym<*> ( --> Term)
     { <sym> {*} }                                               #= *
 
 token circumfix:sigil ( --> Term)
-    { $sym=<sigil> $sym='(' <semilist> $sym=')' {*} }    #= $( ) 
+    { <sigil> '(' <semilist> ')' {*} }                          #= $( ) 
 
 token circumfix:typecast ( --> Term)
-    { $sym=<typename> $sym='(' <semilist> $sym=')' {*} } #= Type( ) 
+    { <typename> '(' <semilist> ')' {*} }                       #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
     { '(' <statementlist> ')'  {*} }                            #= ( )
@@ -2682,16 +2656,16 @@ token infix:sym<minmax> ( --> List_infix)
     { <sym> {*} }                                               #= minmax
 
 token prefix:sigil ( --> List_prefix)
-    { $sym=<sigil> \s <arglist> {*} }                          #= $
+    { <sym=sigil> \s <arglist> {*} }                                #= $
 
 token prefix:typecast ( --> List_prefix)
-    { $sym=<typename> \s <arglist> {*} }                       #= Type
+    { <sym=typename> \s <arglist> {*} }                             #= Type
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last prefix: rule)
 token prefix:listop ( --> List_prefix)
     { ::                        # call this rule last (as "shortest" token)
-        $sym=<ident>
+        <sym=ident>
         [
         || \s <nofat> <arglist> {*}                             #= listop args
         || <nofat> {*}                                          #= listop noarg
@@ -3032,8 +3006,8 @@ token regex_metachar:sym<" "> { <?before '"'  > <quotesnabber(":qq")> }
 
 token regex_metachar:var {
     <!before '$$'>
-    $sym=<variable> <.ws>
-    $binding = ( ':=' <.ws> <regex_quantified_atom> )?
+    <sym=variable> <.ws>
+    $<binding> = ( ':=' <.ws> <regex_quantified_atom> )?
     {*}                                                         #= var
 }
 
@@ -3187,7 +3161,7 @@ sub is_type($name) {
 
 say "Starting...";
 $_ = '42';
-my $result = Perl.new(:targ('42+1')).EXPR;
+my $result = Perl.new(:_('42+1')).EXPR;
 say $result.perl;
 
 ## vim: expandtab sw=4

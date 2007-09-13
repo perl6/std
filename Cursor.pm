@@ -4,7 +4,7 @@ my $VERBOSE = 1;
 
 # XXX still full of ASCII assumptions
 
-has $.targ;
+has $._;
 
 has Bool $.bool is rw = 1;
 has StrPos $.from = 0;
@@ -22,7 +22,7 @@ method setname($k) {
 
 method item {
     if not defined $!item {
-        $!item = substr($.targ, $.from, $.to - $.from);
+        $!item = substr($._, $.from, $.to - $.from);
     }
     $!item;
 }
@@ -56,7 +56,7 @@ method matchify {
 
 method cursor_all (StrPos $fpos, StrPos $tpos) {
     my $r = self.new(
-        :targ(self.targ),
+        :_(self._),
         :from($fpos),
         :to($tpos),
         :pos($tpos),
@@ -69,7 +69,7 @@ method cursor_all (StrPos $fpos, StrPos $tpos) {
 
 method cursor (StrPos $tpos) {
     self.new(
-        :targ(self.targ),
+        :_(self._),
         :from(self.pos // 0),
         :to($tpos),
         :pos($tpos),
@@ -80,7 +80,7 @@ method cursor (StrPos $tpos) {
 
 method cursor_rev (StrPos $fpos) {
     self.new(
-        :targ(self.targ),
+        :_(self._),
         :pos($fpos),
         :from($fpos),
         :to(self.from),
@@ -331,7 +331,7 @@ method _BINDNAMED (&block, :$bind) {
 # fast rejection of current prefix
 method _EQ ($¢, $s, :$bind) {
     my $len = $s.chars;
-    return True if substr($!targ, $¢, $len) eq $s;
+    return True if substr($!_, $¢, $len) eq $s;
     return ();
 }
 
@@ -340,13 +340,13 @@ method _EXACT ($s, :$bind) {
     my $/ := self;
     my $¢ = self.pos;
     my $len = $s.chars;
-    if substr($!targ, $¢, $len) eq $s {
-#        say "EXACT $s matched {substr($!targ,$¢,$len)} at $¢ $len";
+    if substr($!_, $¢, $len) eq $s {
+#        say "EXACT $s matched {substr($!_,$¢,$len)} at $¢ $len";
         my $r = self.cursor($¢+$len);
         $r.retm($bind);
     }
     else {
-#        say "EXACT $s didn't match {substr($!targ,$¢,$len)} at $¢ $len";
+#        say "EXACT $s didn't match {substr($!_,$¢,$len)} at $¢ $len";
         return ();
     }
 }
@@ -357,12 +357,12 @@ method _EXACT_rev ($s, :$bind) {
     my $¢ = self.pos;
     my $len = $s.chars;
     my $from = $/.from - $len;
-    if $from >= 0 and substr($!targ, $from, $len) eq $s {
+    if $from >= 0 and substr($!_, $from, $len) eq $s {
         my $r = self.cursor_rev($from);
         $r.retm($bind);
     }
     else {
-#        say "vEXACT $s didn't match {substr($!targ,$from,$len)} at $from $len";
+#        say "vEXACT $s didn't match {substr($!_,$from,$len)} at $from $len";
         return ();
     }
 }
@@ -371,7 +371,7 @@ method _DIGIT (:$bind) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    my $char = substr($!targ, $¢, 1);
+    my $char = substr($!_, $¢, 1);
     if "0" le $char le "9" {
         my $r = self.cursor($¢+1);
         return $r.retm($bind);
@@ -391,7 +391,7 @@ method _DIGIT_rev (:$bind) {
 #        say "vDIGIT didn't match $char at $from";
         return ();
     }
-    my $char = substr($!targ, $from, 1);
+    my $char = substr($!_, $from, 1);
     if "0" le $char le "9" {
         my $r = self.cursor_rev($from);
         return $r.retm($bind);
@@ -406,7 +406,7 @@ method _ALNUM (:$bind) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    my $char = substr($!targ, $¢, 1);
+    my $char = substr($!_, $¢, 1);
     if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
         my $r = self.cursor($¢+1);
         return $r.retm($bind);
@@ -426,7 +426,7 @@ method _ALNUM_rev (:$bind) {
 #        say "vALNUM didn't match $char at $from";
         return ();
     }
-    my $char = substr($!targ, $from, 1);
+    my $char = substr($!_, $from, 1);
     if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
         my $r = self.cursor_rev($from);
         return $r.retm($bind);
@@ -441,7 +441,7 @@ method alpha (:$bind) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    my $char = substr($!targ, $¢, 1);
+    my $char = substr($!_, $¢, 1);
     if 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
         my $r = self.cursor($¢+1);
         return $r.retm($bind);
@@ -456,7 +456,7 @@ method _SPACE (:$bind) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    my $char = substr($!targ, $¢, 1);
+    my $char = substr($!_, $¢, 1);
     if $char eq " " | "\t" | "\r" | "\n" | "\f" {
         my $r = self.cursor($¢+1);
         return $r.retm($bind);
@@ -476,7 +476,7 @@ method _SPACE_rev (:$bind) {
 #        say "vSPACE didn't match $char at $from";
         return ();
     }
-    my $char = substr($!targ, $from, 1);
+    my $char = substr($!_, $from, 1);
     if $char eq " " | "\t" | "\r" | "\n" | "\f" {
         my $r = self.cursor_rev($from);
         return $r.retm($bind);
@@ -491,7 +491,7 @@ method _HSPACE (:$bind) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    my $char = substr($!targ, $¢, 1);
+    my $char = substr($!_, $¢, 1);
     if $char eq " " | "\t" | "\r" {
         my $r = self.cursor($¢+1);
         return $r.retm($bind);
@@ -511,7 +511,7 @@ method _HSPACE_rev (:$bind) {
 #        say "vHSPACE didn't match $char at $from";
         return ();
     }
-    my $char = substr($!targ, $from, 1);
+    my $char = substr($!_, $from, 1);
     if $char eq " " | "\t" | "\r" {
         my $r = self.cursor_rev($from);
         return $r.retm($bind);
@@ -526,7 +526,7 @@ method _VSPACE (:$bind) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    my $char = substr($!targ, $¢, 1);
+    my $char = substr($!_, $¢, 1);
     if $char eq "\n" | "\f" {
         my $r = self.cursor($¢+1);
         return $r.retm($bind);
@@ -546,7 +546,7 @@ method _VSPACE_rev (:$bind) {
 #        say "vVSPACE didn't match $char at $from";
         return ();
     }
-    my $char = substr($!targ, $from, 1);
+    my $char = substr($!_, $from, 1);
     if $char eq "\n" | "\f" {
         my $r = self.cursor_rev($from);
         return $r.retm($bind);
@@ -561,7 +561,7 @@ method _ANY (:$bind) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    if $¢ < $!targ.chars {
+    if $¢ < $!_.chars {
         self.cursor($¢+1).retm($bind);
     }
     else {
@@ -587,7 +587,7 @@ method _BOL (:$bind) {
     my $/ := self;
     my $¢ = self.pos;
     # XXX should define in terms of BOL or after vVSPACE
-    if $¢ == 0 or substr($!targ, $¢-1, 1) eq "\n" or substr($!targ, $¢-2, 2) eq "\r\n" {
+    if $¢ == 0 or substr($!_, $¢-1, 1) eq "\n" or substr($!_, $¢-2, 2) eq "\r\n" {
         self.cursor($¢).retm($bind);
     }
     else {
@@ -599,7 +599,7 @@ method _EOS (:$bind) {
     my $LVL is context = self.callm;
     my $/ := self;
     my $¢ = self.pos;
-    if $¢ == $!targ.chars {
+    if $¢ == $!_.chars {
         self.cursor($¢).retm($bind);
     }
     else {
