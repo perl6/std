@@ -48,7 +48,10 @@ understand Perl 6 code.
 
 =end comment overview
 
-token TOP { <UNIT( $+unitstopper or "_EOS" )> {*} }
+token TOP {
+    <UNIT( $+unitstopper or "_EOS" )>
+    {*}
+}
 
 # This grammar also assumes transitive longest-token semantics, though
 # we make a feeble attempt to order rules so a procedural | can usually
@@ -325,8 +328,8 @@ proto token prefix_circumfix_meta_operator { }
 regex nofat { <!before \h* <.unsp>? '=>' > }
 
 token ws {
-    || <?{ $¢ === $!ws_to }> <null>
-    || <?after \w> <?before \w> ::: <fail>        # must \s+ between words
+    || <?{ $¢ === $!ws_to }>
+    || <?after \w> <?before \w> ::: <!>        # must \s+ between words
     || { $!ws_from = $¢ }
        [
        | <unsp>              {*}                                #= unsp
@@ -370,7 +373,7 @@ token pod_comment {
     ^^ '=' <.unsp>?
     [
     | begin <.ws> <ident> .*? \n
-      '=' <.unsp>? 'end' <.ws> $ident \N*         {*}         #= block
+      '=' <.unsp>? 'end' <.ws> $<ident> \N*         {*}         #= block
     | \N*                                           {*}         #= misc
     ]
     {*}
@@ -388,9 +391,9 @@ method UNIT ($unitstopper is context = "_EOS") {
 # we might be embedded in something else.
 rule comp_unit ()
 {
-    <; my $begin_compunit is context = 1;
-       my $endstmt        is context<rw> = -1;
-       my $endargs        is context<rw> = -1;>
+    :my $begin_compunit is context = 1;
+    :my $endstmt        is context<rw> = -1;
+    :my $endargs        is context<rw> = -1;
 
     <statementlist>
     [ <$+unitstopper> || <panic: Can't understand next input--giving up> ]
@@ -498,18 +501,18 @@ ex:     INNER:
 token label {
     <ident> ':' \s <.ws>
 
-    [ <?{ is_type($ident) }>
-      <suppose("You tried to use an existing name '$ident' as a label")>
+    [ <?{ is_type($<ident>) }>
+      <suppose("You tried to use an existing name $/{'ident'} as a label")>
     ]?
 
     # add label as a pseudo type
-    {{ eval 'COMPILING::{"::$ident"} = Label.new($ident)' }}  # XXX need statement ref too?
+    {{ eval 'COMPILING::{"::$<ident>"} = Label.new($<ident>)' }}  # XXX need statement ref too?
 
     {*}
 }
 
 rule statement () {
-    <; my StrPos :$endstmt is context<rw> = -1 ;>
+    :my StrPos :$endstmt is context<rw> = -1;
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
@@ -684,10 +687,10 @@ token expect_term {
     <.ws>
 
     # queue up the prefixes to interleave with postfixes
-    @pre = (
+    @<pre> = (
         [
         | <prefix>
-            { $<prec> = $prefix<prec> }
+            { $<prec> = $<prefix><prec> }
                                                         {*}     #= prefix
         | <prefix_circumfix_meta_operator>
             { $<prec> = $<prefix_circumfix_meta_operator><prec> }
@@ -697,15 +700,15 @@ token expect_term {
         <prefix_postfix_meta_operator>*                 {*}     #= prepost
     )*
 
-    $noun = <noun>                                      {*}     #= noun
+    $<noun> = <noun>                                      {*}     #= noun
 
     # also queue up any postfixes, since adverbs could change things
-    @post = <expect_postfix>*                        {*}     #= postfix
+    @<post> = <expect_postfix>*                        {*}     #= postfix
     <.ws>
     <adverbs>?
 
     # now push ops over the noun according to precedence.
-    { make .nounphrase(:noun($noun), :pre(@pre), :post(@post)) }
+#    { make $¢.nounphrase(:noun($<noun>), :pre(@<pre>), :post(@<post>)) }
 }
 
 method nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
@@ -738,8 +741,8 @@ token adverbs {
     {
         my $prop = $+prevop orelse
             .panic('No previous operator visible to adverbial pair (' ~
-                $colonpair ~ ')');
-        $prop.adverb($colonpair)
+                $<colonpair> ~ ')');
+        $prop.adverb($<colonpair>)
     }
     {*}
 }
@@ -861,14 +864,14 @@ token expect_postfix {
     | <dotty>
     | <postop>
     ]
-    { $prec = $postop<prec> }
+    { .<prec> = $<postop><prec> }
     {*}
 }
 
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
 # (Also backtracks if on \op when no \op infix exists.)
 regex prefix_circumfix_meta_operator:reduce () {
-    <; my %thisop is context<rw> ;>
+    :my %thisop is context<rw>;
     @<sym> = [ '[' \\?? ]   # prefer no meta \ if op has \
     <infix_nospace>
     @<sym> = [ ']' ]
@@ -879,7 +882,7 @@ regex prefix_circumfix_meta_operator:reduce () {
     [ <!{ %+thisop<prec> eq %conditional<prec> }>
         || <panic: Can't reduce a conditional operator> ]
 
-    { $prec := %+thisop<prec> }
+    { .<prec> := %+thisop<prec> }
 
     {*}                                                         #= [ ]
 }
@@ -1012,8 +1015,8 @@ token postcircumfix:sym<« »> ( --> Methodcall)
     { '«' <shellwords> '»' {*} }                                #= « »
 
 token postop {
-    | <postfix>         { $prec := $postfix<prec> }
-    | <postcircumfix>   { $prec := $postcircumfix<prec> }
+    | <postfix>         { .<prec> := $<postfix><prec> }
+    | <postcircumfix>   { .<prec> := $<postcircumfix><prec> }
 }
 
 token methodop {
@@ -1021,7 +1024,7 @@ token methodop {
     | <ident>
     | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]>> <quote>
-        { $quote ~~ /\W/ or .panic("Useless use of quotes") }
+        { $<quote> ~~ /\W/ or .panic("Useless use of quotes") }
     ] <.unsp>? 
 
     [
@@ -1033,7 +1036,7 @@ token methodop {
 }
 
 token arglist () {
-    <; my StrPos $endargs is context<rw> = 0;>
+    :my StrPos $endargs is context<rw> = 0;
     <EXPR(%list_prefix)>
 }
 
@@ -1053,7 +1056,7 @@ token circumfix:sym<{ }> ( --> Circumfix) {
 token variable_decl {
     <variable>
     [   # Is it a shaped array or hash declaration?
-        <?{ $variable<sigiltwigil><sigil> eq '@' | '%' }>
+        <?{ $<variable><sigiltwigil><sigil> eq '@' | '%' }>
         <.ws>
         <?before [ '<' | '(' |  '[' | '{' ] >
         <postcircumfix>
@@ -1111,8 +1114,8 @@ token package_def {
     [
     || <?{ $+begin_compunit }> :: ';'
         {
-            $module_name orelse .panic("Compilation unit cannot be anonymous");
-            $begin_compunit = 0;
+            $<module_name> orelse .panic("Compilation unit cannot be anonymous");
+            $+begin_compunit = 0;
         }
         {*}                                                     #= semi
     || <block>
@@ -1202,7 +1205,7 @@ token special_variable:sym<$%> {
 # Note: this works because placeholders are restricted to lowercase
 token special_variable:sym<$^X> {
     ( <sigil> '^' (<[A..Z]>) \W )
-    <obscaret($0, $sigil, $1)>
+    <obscaret($0, $<sigil>, $1)>
 }
 
 token special_variable:sym<$^> {
@@ -1292,7 +1295,7 @@ token special_variable:sym<$+> {
 
 token special_variable:sym<${^ }> {
     ( <sigil> '{^' (.*?) '}' )
-    <obscaret($0, $sigil, $1)>
+    <obscaret($0, $<sigil>, $1)>
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
@@ -1423,12 +1426,12 @@ token variable {
     | <special_variable> {*}                                    #= special
     | <sigiltwigil>
         [
-        || <?{ $sigiltwigil<sigil> eq '&' }> ::
+        || <?{ $<sigiltwigil><sigil> eq '&' }> ::
             <sublongname> {*}                                   #= subnoun
         || <desigilname> {*}                                    #= desigilname
         ]
         [
-        | <?{ $sigiltwigil<twigil> eq '.' }>
+        | <?{ $<sigiltwigil><twigil> eq '.' }>
             <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
         | <null> {*}                                            #= $?foo
         ]
@@ -1502,7 +1505,7 @@ token value {
 token typename {
     <name>
     <?{
-        is_type($name)
+        is_type($<name>)
     }>
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -1542,9 +1545,9 @@ token radint {
     [
     | <integer>
     | <rad_number> <?{
-                        defined $rad_number<radint>
+                        defined $<rad_number><radint>
                         and
-                        not defined $rad_number<radfrac>
+                        not defined $<rad_number><radfrac>
                    }>
     ]
     {*}
@@ -1563,7 +1566,7 @@ token rad_number {
             $<radfrac> = [ '.' <[ 0..9 a..z A..Z ]>+ ]? ]
             [ '*' <base=radint> '**' <exp=radint> ]?
        '>'
-      { make radcalc($radix, $radint, $radfrac, $base, $exp) }
+      { make radcalc($<radix>, $<radint>, $<radfrac>, $<base>, $<exp>) }
     || <?before '['> <postcircumfix>
     || <?before '('> <postcircumfix>
     ]
@@ -1652,9 +1655,9 @@ token quote:sym</ />   {
 
 # handle composite forms like qww
 token quote:qq { <sym> <quote_mod>
-    <quotesnabber(':qq', $quote_mod)> }
+    <quotesnabber(':qq', $<quote_mod>)> }
 token quote:q { <sym>  <quote_mod>
-    <quotesnabber(':q', $quote_mod)> }
+    <quotesnabber(':q', $<quote_mod>)> }
 
 token quote_mod:w  { <sym> }
 token quote_mod:ww { <sym> }
@@ -1681,7 +1684,7 @@ token quote:tr { <sym> <pat=quotesnabber(':trans')>
                         <finish_trans($<pat>)> }
 
 token finish_subst ($pat) {
-    <; my %thisop is context<rw> ;>
+    :my %thisop is context<rw>;
     [
     # bracketed form
     | <?{ $pat<delim> == 2 }> ::
@@ -1880,7 +1883,7 @@ class TR_tweaker does QLang {
 }
 
 token quotesnabber (*@q) {
-    <; my $delim is context<rw> = '' ;>
+    :my $delim is context<rw> = '' ;
     <!before \w> <nofat> ::
     <.ws>
 
@@ -1888,9 +1891,9 @@ token quotesnabber (*@q) {
 
     # Dispatch to current lang's subparser.
     {{
-        let $lang = qlang('Q', @q);
-        $delimited := $lang.parser.($lang);  # XXX probably wrong
-        let $delim = $delim;
+        my $lang = qlang('Q', @q);
+        $<delimited> := $lang.parser.($lang);  # XXX probably wrong
+        $<delim> = $delim;
     }}
     {*}
 }
@@ -1965,7 +1968,7 @@ constant %open2close = {
 
 method peek_delimiters () {
     return peek_brackets ||
-        substr(self._,0,1) xx 2;
+        substr(self.orig,0,1) xx 2;
 }
 
 method peek_brackets () {
@@ -1988,19 +1991,21 @@ method peek_brackets () {
 }
 
 regex bracketed ($lang = qlang("Q")) {
+    :my ($start,$stop);
     <?{ ($start,$stop) = .peek_brackets() }>
     <q=q_balanced($lang, $start, $stop)>
     {*}
 }
 
 regex q_pickdelim ($lang) {
+    :my ($start,$stop);
     {{
        ($start,$stop) = .peek_delimiters();
        if $start eq $stop {
-           $q := .q_unbalanced($lang, $stop);
+           $<q> := .q_unbalanced($lang, $stop);
        }
        else {
-           $q := .q_balanced($lang, $start, $stop);
+           $<q> := .q_balanced($lang, $start, $stop);
        }
     }}
     {*}
@@ -2008,22 +2013,22 @@ regex q_pickdelim ($lang) {
 
 regex rx_pickdelim ($lang) {
     [
-    | <?{ ($start,$stop) = .peek_delimiters() }>
-      $start
-      <rx=regex($stop)>        # counts its own brackets, we hope
-    | [ $stop = [\S] || <panic: Regex delimiter must not be whitespace> ]
-      <rx=regex($stop)>
+    || { ($<start>,$<stop>) = .peek_delimiters() }
+      $<start>
+      <rx=regex($<stop>)>        # counts its own brackets, we hope
+    || $<stop> = [ [\S] || <panic: Regex delimiter must not be whitespace> ]
+      <rx=regex($<stop>)>
     ]
     {*}
 }
 
 regex tr_pickdelim ($lang) {
     [
-    | <?{ ($start,$stop) = .peek_delimiters() }>
-      $start
-      <tr=transliterator($stop)>
-    | [ $stop = [\S] || <panic: tr delimiter must not be whitespace> ]
-      <tr=transliterator($stop)>
+    || { ($<start>,$<stop>) = .peek_delimiters() }
+      $<start>
+      <tr=transliterator($<stop>)>
+    || $<stop> = [ [\S] || <panic: tr delimiter must not be whitespace> ]
+      <tr=transliterator($<stop>)>
     ]
     {*}
 }
@@ -2081,7 +2086,7 @@ token quote_escapes {
 
 # Note, backtracks!  So expect_postfix mustn't commit to anything permanent.
 regex extrapost () {
-    <; my $inquote is context = 1 ;>
+    :my $inquote is context = 1;
     <expect_postfix>*
     # XXX Shouldn't need a backslash on anything but the right square here
     <?after <[ \] \} \> \) ]> > 
@@ -2150,7 +2155,7 @@ token sigterm {
 }
 
 rule signature () {
-    <; my $zone is context<rw> = 'posreq' ;>
+    :my $zone is context<rw> = 'posreq';
     @<parsep> = ( <parameter>
                     ( ',' | ':' | ';' | ';;' | <?before '-->' | ')' | '{' > )
                  )*
@@ -2186,11 +2191,11 @@ token param_var {
     <sigiltwigil>
     [
         # Is it a longname declaration?
-    || <?{ $sigiltwigil<sigil> eq '&' }> <?ident> ::
+    || <?{ $<sigiltwigil><sigil> eq '&' }> <?ident> ::
         <ident=sublongname>
 
     ||  # Is it a shaped array or hash declaration?
-        <?{ $sigiltwigil<sigil> eq '@' | '%' }>
+        <?{ $<sigiltwigil><sigil> eq '@' | '%' }>
         <ident>?
         <.ws>
         <?before <[ \< \( \[ \{ ]> >
@@ -2205,7 +2210,7 @@ token param_var {
 }
 
 token parameter {
-
+    :my $quant;
     <type_constraint>*
     [
     | $<slurp> = [ $<quantchar>=[ '*' ] <param_var> ]
@@ -2214,14 +2219,14 @@ token parameter {
             [ $<quantchar> = [ ':' ]
                 [
                 | <name=ident> '(' <param_var>  ')'
-                | <param_var> { $<name> := $param_var<ident> }
+                | <param_var> { $<name> := $<param_var><ident> }
                 ]
                 { let $quant = '*' }
             ]
         | <param_var>
             { let $quant := '!'; }
         ]
-        [ $<quantchar> = <[ ? ! ]> { let $quant := $quantchar } ]?
+        [ $<quantchar> = <[ ? ! ]> { let $quant := $<quantchar> } ]?
     ]
     <trait>*
 
@@ -2590,7 +2595,7 @@ token infix:sym<||> ( --> Tight_or)
 
 token infix:sym<^^> ( --> Tight_or)  {
     <sym>
-    { $assoc := 'list' }  # override Tight_or's 'left' associativity
+    { .<assoc> := 'list' }  # override Tight_or's 'left' associativity
     {*}                                                         #= ^^
 }
 
@@ -2908,7 +2913,7 @@ rule regex_sequence {
 rule regex_quantified_atom {
     <regex_atom>
     [ <regex_quantifier>
-        <?{ $regex_atom.max_width }>
+        <?{ $<regex_atom>.max_width }>
             || <panic: "Can't quantify zero-width atom")
     ]?
     {*}
@@ -2939,25 +2944,25 @@ token regex_metachar:quant { <regex_quantifier> <panic: quantifier quantifies no
 # "normal" metachars
 token regex_metachar:sym<{ }> {
     <block>
-    {{ @sym := <{ }> }}
+    {{ $/<sym> := <{ }> }}
     {*}                                                         #= { }
 }
 
 token regex_metachar:mod {
     <regex_mod_internal>
-    { @sym := $regex_mod_internal<sym> }
+    { $/<sym> := $<regex_mod_internal><sym> }
     {*}                                                         #= :mod
 }
 
 token regex_metachar:sym<[ ]> {
     '[' <regex ']'> ']'
-    { @sym:=<[ ]> }
+    { $/<sym>:=<[ ]> }
     {*}                                                         #= [ ]
 }
 
 token regex_metachar:sym<( )> {
     '(' <regex ')'> ')'
-    { @sym:=<( )> }
+    { $/<sym>:=<( )> }
     {*}                                                         #= ( )
 }
 
@@ -3099,14 +3104,14 @@ token cclass_elem {
 token regex_mod_arg { '(' <semilist> ')' }
 
 token regex_mod_internal:adv {
-    <quotepair> { @sym := «: $quotepair<key>» }
+    <quotepair> { $/<sym> := «: $<quotepair><key>» }
 }
 token regex_mod_internal:sym<:i> { <sym> <regex_mod_arg>? }
 token regex_mod_internal:sym<:!i> { <sym> }
 token regex_mod_internal:oops { <panic: unrecognized regex modifier> }
 
 # token regex_mod_external:adv {
-#    <quotepair> { @sym := «: $quotepair<key>» }
+#    <quotepair> { $/<sym> := «: $<quotepair><key>» }
 #}
 # token regex_mod_external:sym<:g> { <sym> <regex_mod_arg> }
 # token regex_mod_external:sym<:global> { <sym> <regex_mod_arg> }
@@ -3160,8 +3165,6 @@ sub is_type($name) {
 }
 
 say "Starting...";
-$_ = '42';
-my $result = Perl.new(:_('42+1')).EXPR;
-say $result.perl;
+say Perl.new(:orig('42+1')).EXPR.perl;
 
 ## vim: expandtab sw=4
