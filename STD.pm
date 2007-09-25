@@ -328,15 +328,15 @@ proto token prefix_circumfix_meta_operator { }
 regex nofat { <!before \h* <.unsp>? '=>' > }
 
 token ws {
-    || <?{ $¢ === $!ws_to }>
+    || <?{ $¢.pos === $!ws_to }>
     || <?after \w> <?before \w> ::: <!>        # must \s+ between words
-    || { $!ws_from = $¢ }
+    || { $!ws_from = $¢.pos }
        [
        | <unsp>              {*}                                #= unsp
        | \v                  {*} <heredoc>                      #= vwhite
        | <unv>               {*}                                #= unv
        ]*  {*}                                                  #= all
-       { $!ws_to = $¢ }
+       { $!ws_to = $¢.pos }
 }
 
 token unsp {
@@ -447,7 +447,7 @@ token block {
     | \h* <.unsp>? <?before < ,: >> {*}                         #= normal 
     | <.unv>? <?before \n > <.ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
-    | {*} { let $+endargs = $¢; }                               #= endargs
+    | {*} { let $+endargs = $¢.pos; }                               #= endargs
     ]
     {*}
 }
@@ -468,7 +468,7 @@ token regex_block {  # perhaps parameterize and combine with block someday
     | <.unsp>? <?before <[,:]>> {*}                             #= normal
     | <.unv>? <?before \n > <.ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
-    | {*} { let $+endargs = $¢; }                               #= endargs
+    | {*} { let $+endargs = $¢.pos; }                               #= endargs
     ]
     {*}
 }
@@ -513,6 +513,7 @@ token label {
 
 rule statement () {
     :my StrPos :$endstmt is context<rw> = -1;
+    :my $x;
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
@@ -538,7 +539,7 @@ token eat_terminator {
     || ';'
     || <?{ $+endstmt === $!ws_from }>
     || <?before <terminator>>
-    || {{ if $¢ === $!ws_to { $¢ = $!ws_from } }}   # undo any line transition
+    || {{ if $¢.pos === $!ws_to { $¢.pos = $!ws_from } }}   # undo any line transition
         <panic: Statement not terminated properly>  # "can't happen" anyway :)
     ]
 }
@@ -599,9 +600,9 @@ rule statement_control:loop {
     <sym>
     $<eee> = (
         '('
-            $e1 = <EXPR> ';'   {*}                           #= loop e1
-            $e2 = <EXPR> ';'   {*}                           #= loop e2
-            $e3 = <EXPR>       {*}                             #= loop e3
+            $<e1> = <EXPR> ';'   {*}                           #= loop e1
+            $<e2> = <EXPR> ';'   {*}                           #= loop e2
+            $<e3> = <EXPR>       {*}                             #= loop e3
         ')'                      {*}                            #= loop eee
     )?
     <block>                     {*}                             #= loop block
@@ -851,7 +852,7 @@ token dottyop {
 token expect_postfix {
 
     # last whitespace didn't end here (or was zero width)
-    <?{ $¢ !=== $!ws_to or $!ws_to === $!ws_from  }>
+    <?{ $¢.pos !=== $!ws_to or $!ws_to === $!ws_from  }>
 
     [
     | \\ <?before '.'>
@@ -1584,11 +1585,11 @@ token hexint {
 our @herestub_queue;
 
 token q_herestub ($lang) {
-    $delimstr = <quotesnabber()>  # force raw semantics on /END/ marker
+    $<delimstr> = <quotesnabber()>  # force raw semantics on /END/ marker
     {
         push @herestub_queue:
             new Herestub:
-                delim => $delimstr<delimited><q><text>, # XXX or some such
+                delim => $<delimstr><delimited><q><text>, # XXX or some such
                 orignode => $_,
                 lang => $lang;
     }
@@ -2726,8 +2727,8 @@ regex stdstopper {
     | <terminator>
     | <statement_mod_cond>
     | <statement_mod_loop>
-    | <?{ $¢ === $+endstmt }>
-    | <?{ $¢ === $+endargs }>
+    | <?{ $¢.pos === $+endstmt }>
+    | <?{ $¢.pos === $+endargs }>
 #    | <$+unitstopper>
 }
 
@@ -3165,6 +3166,10 @@ sub is_type($name) {
 }
 
 say "Starting...";
-say Perl.new(:orig('42+1')).EXPR.perl;
+my $r = Perl.new(:orig('42+1')).EXPR()[0];
+say "WHAT\t", $r.WHAT;
+say "BOOL\t", $r.bool;
+say "FROM\t", $r.from;
+say "TO\t", $r.to;
 
 ## vim: expandtab sw=4

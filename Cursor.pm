@@ -4,7 +4,9 @@ my $VERBOSE = 1;
 
 # XXX still full of ASCII assumptions
 
-has $.orig;
+# most cursors just copy forward the previous value of the following two items:
+has $.orig;        # per match, the original string we are matching against
+has %.lexer;       # per language, the cache of lexers, keyed by (|) location
 
 has Bool $.bool is rw = 1;
 has StrPos $.from = 0;
@@ -14,6 +16,50 @@ has Cursor $.prior;
 has %.mykeys;
 has Str $.name;
 has $!item;
+
+our class Lexet {
+    has $.pat;
+    has @.act;
+}
+
+sub lexet ($branch, *@lexets) is export {
+    my $pat = "";
+    my @act;
+    @act = "#", $branch if $branch ne '';
+
+    for @lexets -> $lexet {
+        given $lexet {
+            when Str { $pat ~= $_ }
+            when Lexet { $pat ~= .pat; push @act, .act }
+            when Array {
+                fail "notimpl" if $_.elems > 1;
+                $pat ~= $_[0].pat; push @act, $_[0].act;
+            }
+        }
+    }
+    return Lexet.new(:$pat, :@act);
+}
+
+method _AUTOLEX ($key, &block) {
+    %.lexer{$key} //= do {
+        my @lexets = block(self);
+        my $lexer = sub ($¢) {
+            my $i = 0;
+            for @lexets -> $lx {
+                my $s = $lx.pat;
+                if $¢._EQ($¢.pos, $s) {
+                    say "BINGO /$s/ { $lx.act }";
+                    return $i, $lx.act;
+                }
+                else {
+                    say "bongo /$s/";
+                }
+                $i++;
+            }
+        }
+        hash(:lexets[@lexets], :lexer($lexer));
+    }
+}
 
 method setname($k) {
     $!name = ~$k;
@@ -31,7 +77,7 @@ method matchify {
     my %bindings;
     my Cursor $m;
     my $next;
-    say "MATCHIFY";
+    say "MATCHIFY", self.WHAT;
     loop ($m = $!prior; $m; $m = $next) {
         $next = $m.prior;
         undefine $m.prior;
@@ -57,6 +103,7 @@ method matchify {
 method cursor_all (StrPos $fpos, StrPos $tpos) {
     my $r = self.new(
         :orig(self.orig),
+        :lexer(self.lexer),
         :from($fpos),
         :to($tpos),
         :pos($tpos),
@@ -70,6 +117,7 @@ method cursor_all (StrPos $fpos, StrPos $tpos) {
 method cursor (StrPos $tpos) {
     self.new(
         :orig(self.orig),
+        :lexer(self.lexer),
         :from(self.pos // 0),
         :to($tpos),
         :pos($tpos),
@@ -81,6 +129,7 @@ method cursor (StrPos $tpos) {
 method cursor_rev (StrPos $fpos) {
     self.new(
         :orig(self.orig),
+        :lexer(self.lexer),
         :pos($fpos),
         :from($fpos),
         :to(self.from),
@@ -89,7 +138,7 @@ method cursor_rev (StrPos $fpos) {
     );
 }
 
-my $LVL is context = 0;
+my $CTX is context = { lvl => 0 };
 
 method callm ($arg?) {
     my $lvl = 0;
@@ -99,8 +148,10 @@ method callm ($arg?) {
     if defined $arg { 
         $name ~= " " ~ $arg;
     }
-    say self.pos,"\t", ':' x $lvl, ' ', $name, " [", $caller.file, ":", $caller.line, "]";
-    $lvl;
+    my $pos = 0;
+    $pos = self.pos if defined self;
+    say $pos,"\t", ':' x $lvl, ' ', $name, " [", $caller.file, ":", $caller.line, "]";
+    {lvl => $lvl};
 }
 
 method whats () {
@@ -118,38 +169,41 @@ method retm ($bind?) {
         $!name = $bind;
         $binding = "      :bind<$bind>";
     }
-    say self.pos, "\t", ':' x $+LVL, ' ', substr(caller.subname,1), " returning {self.from}..{self.to}$binding";
+    say self.pos, "\t", ':' x $+CTX<lvl>, ' ', substr(caller.subname,1), " returning {self.from}..{self.to}$binding";
 #    self.whats();
     self;
 }
 
+method _MATCHIFY ($bind, *@results) {
+    map { .cursor_all(self.pos, .to).retm($bind) },
+    map { .matchify }, @results;
+}
+
+method _SEQUENCE (@array, &block) {
+    map &block, @array;
+}
+
 method _STARf (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
 
     map { .retm($bind) },
-        self.cursor($P),
+        self.cursor(self.pos),
         self._PLUSf(&block);
 }
 
 method _STARg (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
 
     map { .retm($bind) }, reverse
         #XXX voodoo fix to prevent bogus stringification
         map { .perl.say; $_ },
-            self.cursor($P),
+            self.cursor(self.pos),
             self._PLUSf(&block);
 }
 
 method _STARr (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $to = $¢;
+    my $CTX is context = self.callm;
+    my $to = self;
     my @all = gather {
         loop {
             my @matches = block($to);  # XXX shouldn't read whole list
@@ -165,10 +219,8 @@ method _STARr (&block, :$bind) {
 }
 
 method _PLUSf (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $x = $¢;
+    my $CTX is context = self.callm;
+    my $x = self;
 
     map { .retm($bind) },
     gather {
@@ -179,18 +231,14 @@ method _PLUSf (&block, :$bind) {
 }
 
 method _PLUSg (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
 
     reverse self._PLUSf(&block);
 }
 
 method _PLUSr (&block, :$bind = '') {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $to = $¢;
+    my $CTX is context = self.callm;
+    my $to = self;
     my @all = gather {
         loop {
             my @matches = block($to);  # XXX shouldn't read whole list
@@ -207,78 +255,59 @@ method _PLUSr (&block, :$bind = '') {
 }
 
 method _OPTr (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $x = block($¢)[0]; # ratchet
-    my $r = $x // self.cursor($P);
+    my $CTX is context = self.callm;
+
+    my $x = block(self)[0]; # ratchet
+    my $r = $x // self.cursor(self.pos);
     $r.retm($bind);
 }
 
 method _OPTg (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my @x = block($¢);
+    my $CTX is context = self.callm;
+    my @x = block(self);
     map { .retm($bind) },
-        block($¢),
-        self.cursor($P);
+        block(self),
+        self.cursor(self.pos);
 }
 
 method _OPTf (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
     map { .retm($bind) },
-        self.cursor($P),
-        block($¢);
+        self.cursor(self.pos),
+        block(self);
 }
 
 method _BRACKET (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
     map { .retm($bind) },
-        block($¢);
+        block(self);
 }
 
 method _PAREN (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
     map { .matchify.retm($bind) },
-        block($¢);
+        block(self);
 }
 
 method _NOTBEFORE (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my @all = block($¢);
+    my $CTX is context = self.callm;
+    my @all = block(self);
     return () if @all;  # XXX loses continuation
-    return self.cursor($P).retm($bind);
+    return self.cursor(self.pos).retm($bind);
 }
 
 method before (&block, :$bind) {
-#    say $P.WHICH;
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my @all = block($¢);
+    my $CTX is context = self.callm;
+    my @all = block(self);
     if (@all and @all[0].bool) {
-#        say "true";
-#        self.whats;
-#        say $P.WHICH;
-        return self.cursor($P).retm($bind);
+        return self.cursor(self.pos).retm($bind);
     }
     return ();
 }
 
 method after (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $end = self.cursor($P);
+    my $CTX is context = self.callm;
+    my $end = self.cursor(self.pos);
     my @all = block($end);          # Make sure .from == .to
     if (@all and @all[0].bool) {
         return $end.retm($bind);
@@ -287,45 +316,35 @@ method after (&block, :$bind) {
 }
 
 method null (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    return self.cursor($P).retm($bind);
+    my $CTX is context = self.callm;
+    return self.cursor(self.pos).retm($bind);
 }
 
 method _ASSERT (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my @all = block($¢);
+    my $CTX is context = self.callm;
+    my @all = block(self);
     if (@all and @all[0].bool) {
-        return self.cursor($P).retm($bind);
+        return self.cursor(self.pos).retm($bind);
     }
     return ();
 }
 
 method _BINDVAR ($var is rw, &block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
     map { $var := $_; .retm($bind) },  # XXX doesn't "let"
-        block($¢);
+        block(self);
 }
 
 method _BINDPOS (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
     map { .retm($bind) },
-        block($¢);
+        block(self);
 }
 
 method _BINDNAMED (&block, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
     map { .retm($bind) },
-        block($¢);
+        block(self);
 }
 
 # fast rejection of current prefix
@@ -336,8 +355,7 @@ method _EQ ($P, $s, :$bind) {
 }
 
 method _EXACT ($s, :$bind) {
-    my $LVL is context = self.callm($s);
-    my $¢ := self;
+    my $CTX is context = self.callm($s);
     my $P = self.pos;
     my $len = $s.chars;
     if substr($!orig, $P, $len) eq $s {
@@ -352,11 +370,9 @@ method _EXACT ($s, :$bind) {
 }
 
 method _EXACT_rev ($s, :$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm;
     my $len = $s.chars;
-    my $from = $¢.from - $len;
+    my $from = self.from - $len;
     if $from >= 0 and substr($!orig, $from, $len) eq $s {
         my $r = self.cursor_rev($from);
         $r.retm($bind);
@@ -368,8 +384,7 @@ method _EXACT_rev ($s, :$bind) {
 }
 
 method _DIGIT (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     my $char = substr($!orig, $P, 1);
     if "0" le $char le "9" {
@@ -383,10 +398,8 @@ method _DIGIT (:$bind) {
 }
 
 method _DIGIT_rev (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $from = $¢.from - 1;
+    my $CTX is context = self.callm;
+    my $from = self.from - 1;
     if $from < 0 {
 #        say "vDIGIT didn't match $char at $from";
         return ();
@@ -403,8 +416,7 @@ method _DIGIT_rev (:$bind) {
 }
 
 method _ALNUM (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     my $char = substr($!orig, $P, 1);
     if "0" le $char le "9" or 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
@@ -418,10 +430,8 @@ method _ALNUM (:$bind) {
 }
 
 method _ALNUM_rev (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $from = $¢.from - 1;
+    my $CTX is context = self.callm;
+    my $from = self.from - 1;
     if $from < 0 {
 #        say "vALNUM didn't match $char at $from";
         return ();
@@ -438,8 +448,7 @@ method _ALNUM_rev (:$bind) {
 }
 
 method alpha (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     my $char = substr($!orig, $P, 1);
     if 'A' le $char le 'Z' or 'a' le $char le 'z' or $char eq '_' {
@@ -453,8 +462,7 @@ method alpha (:$bind) {
 }
 
 method _SPACE (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     my $char = substr($!orig, $P, 1);
     if $char eq " " | "\t" | "\r" | "\n" | "\f" {
@@ -468,10 +476,8 @@ method _SPACE (:$bind) {
 }
 
 method _SPACE_rev (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $from = $¢.from - 1;
+    my $CTX is context = self.callm;
+    my $from = self.from - 1;
     if $from < 0 {
 #        say "vSPACE didn't match $char at $from";
         return ();
@@ -488,8 +494,7 @@ method _SPACE_rev (:$bind) {
 }
 
 method _HSPACE (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     my $char = substr($!orig, $P, 1);
     if $char eq " " | "\t" | "\r" {
@@ -503,10 +508,8 @@ method _HSPACE (:$bind) {
 }
 
 method _HSPACE_rev (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $from = $¢.from - 1;
+    my $CTX is context = self.callm;
+    my $from = self.from - 1;
     if $from < 0 {
 #        say "vHSPACE didn't match $char at $from";
         return ();
@@ -523,8 +526,7 @@ method _HSPACE_rev (:$bind) {
 }
 
 method _VSPACE (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     my $char = substr($!orig, $P, 1);
     if $char eq "\n" | "\f" {
@@ -538,10 +540,8 @@ method _VSPACE (:$bind) {
 }
 
 method _VSPACE_rev (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
-    my $from = $¢.from - 1;
+    my $CTX is context = self.callm;
+    my $from = self.from - 1;
     if $from < 0 {
 #        say "vVSPACE didn't match $char at $from";
         return ();
@@ -558,8 +558,7 @@ method _VSPACE_rev (:$bind) {
 }
 
 method _ANY (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     if $P < $!orig.chars {
         self.cursor($P+1).retm($bind);
@@ -571,8 +570,7 @@ method _ANY (:$bind) {
 }
 
 method _BOS (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     if $P == 0 {
         self.cursor($P).retm($bind);
@@ -583,8 +581,7 @@ method _BOS (:$bind) {
 }
 
 method _BOL (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     # XXX should define in terms of BOL or after vVSPACE
     if $P == 0 or substr($!orig, $P-1, 1) eq "\n" or substr($!orig, $P-2, 2) eq "\r\n" {
@@ -596,8 +593,7 @@ method _BOL (:$bind) {
 }
 
 method _EOS (:$bind) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     if $P == $!orig.chars {
         self.cursor($P).retm($bind);
@@ -608,40 +604,36 @@ method _EOS (:$bind) {
 }
 
 method _REDUCE ($tag) {
-    my $LVL is context = self.callm;
-    my $¢ := self;
-    my $P = self.pos;
+    my $CTX is context = self.callm($tag);
+#    my $P = self.pos;
 #    say "Success $tag from $+FROM to $P";
 #    self.whats;
-    $¢;
+    self;
 #    self.cursor($P);
 }
 
 method _COMMITBRANCH () {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     say "Commit branch to $P\n";
 #    self.cursor($P);  # XXX currently noop
-    $¢;
+    self;
 }
 
 method _COMMITRULE () {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     say "Commit rule to $P\n";
 #    self.cursor($P);  # XXX currently noop
-    $¢;
+    self;
 }
 
 method commit () {
-    my $LVL is context = self.callm;
-    my $¢ := self;
+    my $CTX is context = self.callm;
     my $P = self.pos;
     say "Commit match to $P\n";
 #    self.cursor($P);  # XXX currently noop
-    $¢;
+    self;
 }
 
 method fail ($m) { die $m }
