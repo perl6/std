@@ -31,12 +31,17 @@ our @TOKENS;
 our @TOKEN;
 our $MAYBACKTRACK;
 our @DECL;
+our $SYM;
 
 my $TRACE = 0;
+
+my %impure = ('ws', 1, 'fail', 1);
 
 {
     local $/;
     $_ = <>;
+    my @impure = m/^method (\w+)/mg;
+    @impure{@impure} = (1) x @impure;
 }
 my $all = $_;
 
@@ -82,6 +87,7 @@ while ($_ ne "") {
         local $BINDING;
         undef $BINDING;
         local @DECL;
+        local $SYM;
         my $args = $4;
         my $sym = "";
         my $coercion = "";
@@ -98,7 +104,7 @@ while ($_ ne "") {
             $coercion = $1 . ".coerce";
         }
         if ($args =~ s/, *:\$sym is context (?:is rw )?= (.*)\)/\)/) {
-            $p = $1;
+            $SYM = $1;
             $sym = "    my \$sym is context = $1;\n";
         }
         if ($args =~ s/, *:(\$endsym is context .*)\)/\)/) {
@@ -125,8 +131,8 @@ while ($_ ne "") {
         $callargs =~ s/is rw\s*//g;
 
         if ($NAME =~ /_/) {
-            if ($p and /^\s*(?:<\??before>\s+)?<sym>/) {
-                $fixedprefix{$NAME} = $p;
+            if ($SYM and /^\s*(?:<\??before>\s+)?<sym>/) {
+                $fixedprefix{$NAME} = $SYM;
             }
             elsif (/^\s*(?:<\??before>\s+)?('\S*'\s)/) {
                 $fixedprefix{$NAME} = $1;
@@ -144,14 +150,14 @@ while ($_ ne "") {
 
         local @TOKENS;
         local $PURE = 1;
-        my $meat = ::indent($re->walk(), 3);
+        my $meat = ::indent($re->walk(), 2);
 
         $out .= <<"END";
 method$ws$NAME (\$¢: $args) {
 END
         my $body = <<'END';
     my $CTX is context = $¢.callm();
-    <<DECL>>
+<<DECL>>
     my $binding;
     my @try;
     my $lexets = -> $¢ {
@@ -184,11 +190,17 @@ END
         $body =~ s/<<MEAT>>/$meat/;
         if (@TOKENS > 1) {
             my $i = 0;
-            for (@TOKENS) { $_ = "lexet($i, $_)"; $i++; }
+            for (@TOKENS) {
+                s/\$¢\.sym\('\?'\)/$SYM/;
+                $_ = "lexet($i, $_)"; $i++;
+            }
             $body =~ s/<<TRY>>/'0..^' . (@TOKENS+0)/e;
         }
         else {
-            for (@TOKENS) { $_ = "lexet('', $_)"; }
+            for (@TOKENS) {
+                s/\$¢\.sym\('\?'\)/$SYM/;
+                $_ = "lexet('', $_)";
+            }
             $body =~ s/<<TRY>>/'0'/;
         }
         $body =~ s/<<TOKENS>>/join(",\n        ",@TOKENS)/e;
@@ -541,26 +553,25 @@ sub backslash {
     
     if ($ch =~ /^\w$/) {
         if ($ch =~ /^[ftnr]/) {
-            $ch =~ tr/ftnr/\f\t\n\r/;
-            return bless { text => $ch }, "RE_exact";
+            return bless { text => '\\' . $ch }, "RE_double";
         }
         if ($ch eq 'x') {
             s/^\[?([0-9a-fA-f]*)\]?//;
-            return bless { text => chr(hex($1)) }, "RE_exact";
+            return bless { text => '\\x' . $1 }, "RE_double";
         }
         if ($ch eq 'o') {
             s/^\[?([0-7]*)\]?//;
-            return bless { text => chr(oct($1)) }, "RE_exact";
+            return bless { text => '\\o' . $1 }, "RE_double";
         }
         if ($ch =~ /^[hvdswHVDSWNRTBF]/) {
-            return bless { text => "\\$ch"}, "RE_meta";
+            return bless { text => "\\$ch" }, "RE_meta";
         }
         panic "Unrecognized \\$ch";
     }
     if ($ch eq '\\') {
-        return bless { text => '\\'}, "RE_exact";
+        return bless { text => '\\' }, "RE_exact";
     }
-    return bless { text => $ch}, "RE_exact";
+    return bless { text => $ch }, "RE_exact";
 }
 
 sub assertion {
@@ -893,9 +904,10 @@ sub unbalanced {
         my $self = shift;
         my $name = $$self{name};
         ::panic("Can't reverse $name") if $REV;
-        push @TOKEN, "\$¢.$name('?')" if $PURE;
+        $PURE = 0 if $impure{$name};
 
         my $binding = $self->binding;
+        push @TOKEN, "\$¢.$name('?')" if $PURE;
         my $re = '$¢.' . $name . "($binding\@fate)";
     }
 }
@@ -906,6 +918,7 @@ sub unbalanced {
         my $name = $$self{name};
         my $args = $$self{args};
         ::panic("Can't reverse $name") if $REV;
+        $PURE = 0 if $impure{$name};
 
         my $re = '$¢.' . $name . "($args)";
     }
@@ -917,12 +930,13 @@ sub unbalanced {
         my $re = $$self{re};
         my $name = $$self{name};
         ::panic("Can't reverse $name") if $REV;
-        push @TOKEN, "\$¢.$name('?')" if $PURE;
+        $PURE = 0 if $impure{$name};
         local $REV = '_rev' if $name eq 'after';
         $re = ::indent($re->walk(@_));
         $REV = '';
 
         my $binding = ', ' . $self->binding;
+        push @TOKEN, "\$¢.$name(-> \$¢ {\n$re\n}, '?')" if $PURE;
         '$¢.' . $name . "(-> \$¢ {\n$re\n}$binding\@fate)";
     }
 }
@@ -933,10 +947,11 @@ sub unbalanced {
         my $str = $$self{str};
         my $name = $$self{name};
         ::panic("Can't reverse $name") if $REV;
-        push @TOKEN, "\$¢.$name('?')" if $PURE;
+        $PURE = 0 if $impure{$name};
         $str =~ s/(['\\])/\\$1/g;
 
         my $binding = ', ' . $self->binding;
+        push @TOKEN, "\$¢.$name('$str','?')" if $PURE;
         '$¢.' . $name . "('$str'$binding\@fate)";
     }
 }
@@ -947,12 +962,13 @@ sub unbalanced {
         my $rest = $$self{rest};
         my $name = $$self{name};
         ::panic("Can't reverse $name") if $REV;
-        push @TOKEN, "\$¢.$name('?')" if $PURE;
+        $PURE = 0 if $impure{$name};
 
-        my $binding = ', ' . $self->binding;
-        $rest =~ s/\)/$binding\@fate)/ or die "Oops";
+        my $binding = $self->binding;
+        $rest =~ s/\)$/, /;
         $rest =~ s/\(, */(/;
-        '$¢.' . $name . $rest;
+        push @TOKEN, "\$¢.$name$rest'?')" if $PURE;
+        "\$¢.$name$rest$binding\@fate)";
     }
 }
 
@@ -1081,9 +1097,9 @@ sub unbalanced {
     sub wrapone {
         my ($outer, $inner) = @_;
         if ($MAYBACKTRACK) {
-            "map -> \$¢ {\n" .
+            "($outer).map(-> \$¢ {\n" .
                 ::indent($inner) .
-            "\n}, $outer";
+            "\n})";
         }
         else {
             "$outer andthen\n$inner\n}";

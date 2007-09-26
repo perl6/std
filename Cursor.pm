@@ -41,24 +41,25 @@ sub lexet ($branch, *@lexets) is export {
 }
 
 method _AUTOLEX ($key, &block) {
-    %.lexer{$key} //= do {
-        my @lexets = block(self);
-        my $lexer = sub ($¢) {
-            my $i = 0;
-            for @lexets -> $lx {
-                my $s = $lx.pat;
-                if $¢._EQ($¢.pos, $s) {
-                    say "BINGO /$s/ { $lx.act }";
-                    return $i, $lx.act;
-                }
-                else {
-                    say "bongo /$s/";
-                }
-                $i++;
+    # XXX should just use //= here but it seems to store Array instead of Hash
+    return %.lexer{$key} if %.lexer.exists($key);
+
+    my @lexets = block(self);
+    my $lexer = sub ($¢) {
+        my $i = 0;
+        for @lexets -> $lx {
+            my $s = $lx.pat;
+            if $¢._EQ($¢.pos, $s) {
+                say "BINGO /$s/ { $lx.act }";
+                return $i, $lx.act;
             }
+            else {
+                say "bongo /$s/";
+            }
+            $i++;
         }
-        hash(:lexets[@lexets], :lexer($lexer));
     }
+    %.lexer{$key} = hash(:lexets[@lexets], :lexer($lexer));
 }
 
 method setname($k) {
@@ -148,8 +149,8 @@ method callm ($arg?) {
     if defined $arg { 
         $name ~= " " ~ $arg;
     }
-    my $pos = 0;
-    $pos = self.pos if defined self;
+    my $pos = '?';
+    $pos = self.pos if defined self.orig;
     say $pos,"\t", ':' x $lvl, ' ', $name, " [", $caller.file, ":", $caller.line, "]";
     {lvl => $lvl};
 }

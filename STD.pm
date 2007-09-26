@@ -2739,7 +2739,8 @@ token assertstopper { <stdstopper> | '>' }
 
 method EXPR (%preclim = %LOOSEST,
                 :$stop = &stdstopper,
-                :$seen
+                :$seen,
+                *@fate
             )
 {
     my $preclim = %preclim<prec>;
