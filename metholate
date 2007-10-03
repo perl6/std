@@ -35,13 +35,15 @@ our $SYM;
 
 my $TRACE = 0;
 
-my %impure = ('ws', 1, 'fail', 1);
+my @impure = qw/ ws fail commit after panic /;
+my %impure;
 
 {
     local $/;
     $_ = <>;
-    my @impure = m/^method (\w+)/mg;
+    push @impure, m/^method (\w+)/mg;
     @impure{@impure} = (1) x @impure;
+    #warn "@impure\n";
 }
 my $all = $_;
 
@@ -152,32 +154,44 @@ while ($_ ne "") {
         local $PURE = 1;
         my $meat = ::indent($re->walk(), 2);
 
+        my $lex = Dump($re);
+        $lex =~ s[!!perl/hash:][!pugs/Object:]g;
+#        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
+        mkdir("tmpyaml");
+        open YAML, ">tmpyaml/$NAME.yml" or die "Can't create tmpyaml/$NAME.yml: $!";
+        print YAML $lex;
+        close YAML;
+
         $out .= <<"END";
 method$ws$NAME (\$¢: $args) {
 END
         my $body = <<'END';
-    my $CTX is context = $¢.callm();
+    my $CTX is context = $¢.callm(~@fate);
 <<DECL>>
-    my $binding;
     my @try;
-    my $lexets = -> $¢ {
-        <<TOKENS>>
-    };
-    my $autolex = $¢._AUTOLEX('<<NAME>>', $lexets);
-    while $_ = @fate.shift {
-        when '?' {
-            return $autolex<lexets>;
-        }
-        when '=' {
-            $binding := @fate.shift;
-        }
-
-        when '#' { @try = @fate.shift; }
-        when '*' { @try = <<TRY>>; }
+    my $binding;
+    if @fate[0] eq '?' {
+        return <<PEEK>>;
     }
+END
+
+    # XXX the following loses the current pad in pugs for some reason
+    #while $_ = @fate.shift {
+    #    when '?' {
+    #        return <<PEEK>>;
+    #    }
+    #    when '=' {
+    #        $binding := @fate.shift;
+    #    }
+    #
+    #    when '#' { @try = @fate.shift; }
+    #    when '*' { @try = <<TRY>>; }
+    #}
+
+    $body .= <<'END';
 
     if not @try {
-        @fate = $autolex<lexer>(self);
+        @fate = $¢._AUTOLEXnow('<<NAME>>').(self);
         @try = @fate.shift;
     }
 
@@ -185,25 +199,32 @@ END
 <<MEAT>>
     );
 END
-        $body =~ s/<<NAME>>/$NAME/;
+
+        if ($impure{$NAME}) {
+            $body =~ s/<<PEEK>>/''/;
+        }
+        else {
+            $body =~ s/<<PEEK>>/\$¢._AUTOLEXpeek('<<NAME>>')/;
+        }
+        $body =~ s/<<NAME>>/$NAME/g;
         $body =~ s/<<DECL>>/$sym@DECL/;
         $body =~ s/<<MEAT>>/$meat/;
         if (@TOKENS > 1) {
-            my $i = 0;
-            for (@TOKENS) {
-                s/\$¢\.sym\('\?'\)/$SYM/;
-                $_ = "lexet($i, $_)"; $i++;
-            }
+#            my $i = 0;
+#            for (@TOKENS) {
+#                s/\$¢\.sym\(.*?\)/$SYM/;
+#                $_ = "lexet($i, $_)"; $i++;
+#            }
             $body =~ s/<<TRY>>/'0..^' . (@TOKENS+0)/e;
         }
         else {
-            for (@TOKENS) {
-                s/\$¢\.sym\('\?'\)/$SYM/;
-                $_ = "lexet('', $_)";
-            }
+#            for (@TOKENS) {
+#                s/\$¢\.sym\(.*?\)/$SYM/;
+#                $_ = "lexet('', $_)";
+#            }
             $body =~ s/<<TRY>>/'0'/;
         }
-        $body =~ s/<<TOKENS>>/join(",\n        ",@TOKENS)/e;
+#        $body =~ s/<<TOKENS>>/join(",\n#        ",@TOKENS)/e;
         $out .= $body;
         next;
     }
@@ -227,6 +248,19 @@ sub here {
 #############################################3333
 
 sub ws {
+    return if $CONTEXT eq 'rule';  # meta whitespace parsed in atom
+    for (;;) {
+        next if s/^\s+//;
+        next if s/^#\(.*?\)//s;
+        next if s/^#\{.*?\}//s;
+        next if s/^#\[.*?\]//s;
+        next if s/^#\<.*?\>//s;
+        next if s/^#.*\n//;
+        last;
+    }
+}
+
+sub wsany {
     for (;;) {
         next if s/^\s+//;
         next if s/^#\(.*?\)//s;
@@ -244,10 +278,9 @@ sub regex {
     local $STOP = shift;
 
     my @decl;
-    while (s/^:(my|state|our|constant)\b/$1/) {
+    while (s/^\s*:(my|state|our|constant)\b/$1/) {
         my $code = unbalanced(";");
         s/^;// or panic "Missing ;";
-        ws();
         push @decl, bless { text => $code }, "RE_decl";
     }
 
@@ -266,7 +299,8 @@ sub ordered_disjunction {
         ws();
     } while s/^\|\|//;
 
-    return bless { Kids => [@kids] }, "RE_ordered_disjunction";
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids] }, "RE_ordered_disjunction";
 }
 
 sub ordered_conjunction {
@@ -279,7 +313,8 @@ sub ordered_conjunction {
         ws();
     } while s/^\&\&//;
 
-    return bless { Kids => [@kids] }, "RE_ordered_conjunction";
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids] }, "RE_ordered_conjunction";
 }
 
 sub submatch {
@@ -292,7 +327,8 @@ sub submatch {
         ws();
     } while s/^\!?\~\~//;
 
-    return bless { Kids => [@kids] }, "RE_submatch";
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids] }, "RE_submatch";
 }
 
 sub unordered_disjunction {
@@ -307,7 +343,8 @@ sub unordered_disjunction {
         ws();
     } while s/^ \| (?!\|) //x;
 
-    return bless { Kids => [@kids] }, "RE_unordered_disjunction";
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids] }, "RE_unordered_disjunction";
 }
 
 sub unordered_conjunction {
@@ -320,7 +357,8 @@ sub unordered_conjunction {
         ws();
     } while s/^ \& (?!\&) //x;
 
-    return bless { Kids => [@kids] }, "RE_unordered_conjunction";
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids] }, "RE_unordered_conjunction";
 }
 
 sub sequence {
@@ -332,22 +370,25 @@ sub sequence {
         push(@kids, $k);
     }
 
-    return bless { Kids => [@kids] }, "RE_sequence";
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids] }, "RE_sequence";
 }
 
 sub quantified_atom {
     here();
     my $atom = atom();
     return unless defined $atom;
+    return $atom if $atom->{noquant};
     my $quant = quantifier();
+    return $atom unless $quant;
     return bless { atom => $atom, quant => $quant }, "RE_quantified_atom";
 }
 
 sub quantifier {
-    if (s/^(\*\*)([?!:+]?)// or
-        s/^(\*)([?!:+]?)// or
-        s/^(\+)([?!:+]?)// or
-        s/^(\?)([?!:+]?)//) {
+    if (s/^\s*(\*\*)([?!:+]?)// or
+        s/^\s*(\*)([?!:+]?)// or
+        s/^\s*(\+)([?!:+]?)// or
+        s/^\s*(\?)([?!:+]?)//) {
         my ($q,$m) = ($1,$2);
         if (not $m) {
             if ($CONTEXT eq 'rule' or $CONTEXT eq 'token') {
@@ -361,15 +402,16 @@ sub quantifier {
                 $m = '!';
         }
         my $x = "";
-        ws();
         if ($q eq '**') {
-            if (s/^(\d+(\.\.(\d+|\*))?)//) {
+            if (s/^\s*(\d+(\.\.(\d+|\*))?)//) {
                 $x = $1;
             }
-            elsif (/^\{/) {
+            elsif (/^\s*\{/) {
+                wsany();
                 $x = block('thunk');
             }
             else {
+                wsany();
                 $x = atom();
             }
         }
@@ -381,6 +423,10 @@ sub quantifier {
 
 sub atom {
     here();
+    if (/^[\s\#]/ and $CONTEXT eq 'rule') {
+        wsany();
+        return bless { name => 'ws', nobind => 1, noquant => 1 }, "RE_method_noarg";
+    }
     return if /^ [\]&|)] /x;   # XXX an approximation
     return if /^ (?:
         >(?!>) |
@@ -393,12 +439,12 @@ sub atom {
     if (s/^ (\w+) (?! \s* [*+?]) //x) {
         my $word = $1;
         ws();
-        return bless { text => $word }, "RE_exact";
+        return bless { text => $word }, "RE_string";
     }
     if (s/^ (\w) //x) {
         my $word = $1;
         ws();
-        return bless { text => $word }, "RE_exact";
+        return bless { text => $word }, "RE_string";
     }
 
     if (s/^\{\*\}//) {
@@ -451,7 +497,7 @@ sub atom {
         }
         ws();
 
-        return atom();
+        return quantified_atom();
     }
 
     # check unbalanced angles before assertions
@@ -491,7 +537,7 @@ sub atom {
         my $re = unbalanced("'");
         s/^'// or panic "Missing '";
         ws();
-        return bless { text => $re }, "RE_single";
+        return bless { text => $re }, "RE_string";
     }
     if (s/^"//) {
         my $re = unbalanced('"');
@@ -512,7 +558,7 @@ sub atom {
         }
         if (defined $code) {
             ws();
-            if (s/^=//) {
+            if (s/^\s*=\s*//) {
                 ws();
                 local $PARSEBIND = 1;
                 my $atom = quantified_atom(@_);
@@ -569,9 +615,9 @@ sub backslash {
         panic "Unrecognized \\$ch";
     }
     if ($ch eq '\\') {
-        return bless { text => '\\' }, "RE_exact";
+        return bless { text => '\\' }, "RE_string";
     }
-    return bless { text => $ch }, "RE_exact";
+    return bless { text => $ch }, "RE_string";
 }
 
 sub assertion {
@@ -676,8 +722,8 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $result = "";
-        if ($$self{Kids}) {
-            foreach my $kid (@{$$self{Kids}}) {
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
                 my $x = $kid->walk(@_);
                 $result .= $x if defined $x;
             }
@@ -726,11 +772,15 @@ sub unbalanced {
 { package RE_assertion; use base "REbase";
     sub walk {
         my $self = shift;
-        my $re = $$self{re}->walk(@_);
+        local($PURE);
+        local(@TOKEN);
+        local(@TOKENS);
         if ($$self{assert} eq '!') {
+            my $re = $$self{re}->walk(@_);
             "\$¢._NOTBEFORE(-> \$¢ {\n" . ::indent($re) . "\n})";
         }
         else {
+            my $re = $$self{re}->walk(@_);
             "\$¢.before(-> \$¢ {\n" . ::indent($re) . "\n})";
         }
     }
@@ -831,7 +881,7 @@ sub unbalanced {
     }
 }
 
-{ package RE_exact; use base "REbase";
+{ package RE_string; use base "REbase";
     sub walk {
         my $self = shift;
         my $text = $$self{text};
@@ -893,6 +943,7 @@ sub unbalanced {
             $code = "\$¢._VSPACE$REV()";
         }
         if ($not) { # XXX or maybe just .NOT on the end...
+            $PURE = 0;
             $code = "\$¢._NOTBEFORE(-> \$¢ { $code })";
         }
         $code;
@@ -907,6 +958,18 @@ sub unbalanced {
         $PURE = 0 if $impure{$name};
 
         my $binding = $self->binding;
+        if ($name eq "sym") {
+            my $s = $SYM;
+            $s =~ s/^'(.*)'$/$1/ or
+            $s =~ s/^"(.*)"$/$1/ or
+            $s =~ s/^<(.*)>$/$1/ or
+            $s =~ s/^«(.*)»$/$1/ or
+            $s =~ s/^\{'(.*)','(.*)'\}$/$1 $2/ or
+            $s =~ s/^\{'(.*)'\}$/$1/;
+            $s =~ s/^\s+//;
+            $s =~ s/\s+$//;
+            $$self{sym} = $s;
+        }
         push @TOKEN, "\$¢.$name('?')" if $PURE;
         my $re = '$¢.' . $name . "($binding\@fate)";
     }
@@ -936,7 +999,14 @@ sub unbalanced {
         $REV = '';
 
         my $binding = ', ' . $self->binding;
-        push @TOKEN, "\$¢.$name(-> \$¢ {\n$re\n}, '?')" if $PURE;
+        if ($PURE) {
+            if ($name eq 'before') {
+                push @TOKEN, $re;
+            }
+            else {
+                push @TOKEN, "\$¢.$name(-> \$¢ {\n$re\n}, '?')";
+            }
+        }
         '$¢.' . $name . "(-> \$¢ {\n$re\n}$binding\@fate)";
     }
 }
@@ -983,9 +1053,9 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my @result;
-        if ($$self{Kids}) {
-            $PURE = 0 if @{$$self{Kids}} > 1;
-            foreach my $kid (@{$$self{Kids}}) {
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
                 push @result, $kid->walk(@_);
             }
         }
@@ -1004,9 +1074,9 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my @result;
-        if ($$self{Kids}) {
-            $PURE = 0 if @{$$self{Kids}} > 1;
-            foreach my $kid (@{$$self{Kids}}) {
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
                 push @result, $kid->walk(@_);
             }
         }
@@ -1109,10 +1179,9 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my @result;
-        my @pure;
         my @decl;
-        if ($$self{Kids}) {
-            my @kids = @{$$self{Kids}};
+        if ($$self{zyg}) {
+            my @kids = @{$$self{zyg}};
 
             while (@kids and ref $kids[0] eq 'RE_decl') {
                 push @decl, shift(@kids)->walk(@_);
@@ -1120,12 +1189,7 @@ sub unbalanced {
 
             @kids = reverse @kids if $REV;
             foreach my $kid (@kids) {
-#                my $pure = $PURE;
                 my $r = $kid->walk(@_);
-#                if ($pure != $PURE) {
-#                    @pure = @result;
-#                    @result = ();
-#                }
                 push @result, $r;
             }
         }
@@ -1133,24 +1197,7 @@ sub unbalanced {
         for (reverse @result) {
             $result = wrapone($_,$result);
         }
-#        if (@pure) {
-#            my $pure = '[&' . $NAME . '_ACTION, $¢, $CTX, $FROM, $bind]';
-#            for (reverse @pure) {
-#                $pure = wrapone($_,$pure);
-#            }
-#            $TOKEN = ::indent($pure);
-#        }
         join('', @decl, $result || '');
-    }
-}
-
-{ package RE_single; use base "REbase";
-    sub walk {
-        my $self = shift;
-        my $text = $$self{text};
-        $text =~ s/(['\\])/\\$1/g;
-        push @TOKEN, "'" . $text . "'" if $PURE;
-        "\$¢._EXACT$REV('" . $text . "')";
     }
 }
 
@@ -1158,9 +1205,9 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my @result;
-        if ($$self{Kids}) {
-            $PURE = 0 if @{$$self{Kids}} > 1;
-            foreach my $kid (@{$$self{Kids}}) {
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
                 push @result, $kid->walk(@_);
             }
         }
@@ -1183,9 +1230,9 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my @result;
-        if ($$self{Kids}) {
-            $PURE = 0 if @{$$self{Kids}} > 1;
-            foreach my $kid (@{$$self{Kids}}) {
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
                 push @result, $kid->walk(@_);
             }
         }
@@ -1203,9 +1250,10 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my @result;
-        if ($$self{Kids}) {
-            $PURE = 0 if @{$$self{Kids}} > 1;
-            foreach my $kid (@{$$self{Kids}}) {
+        my $alt = 0;
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
                 local @TOKEN;
                 local $PURE = 1;
                 my $r = $kid->walk(@_);
@@ -1218,11 +1266,12 @@ sub unbalanced {
                 push @result, $r;
                 my $token;
                 if (@TOKEN) {
-                    $token = join(',',@TOKEN);
+                    $token = '(' . join(' X ',@TOKEN) . ')';
                 }
                 else {
                     $token = "''";
                 }
+                $kid->{alt} = $alt++;
                 push @TOKENS, $token;
             }
         }

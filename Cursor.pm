@@ -1,6 +1,7 @@
 class Cursor;
 
 my $VERBOSE = 1;
+my $callouts = 0;
 
 # XXX still full of ASCII assumptions
 
@@ -17,49 +18,40 @@ has %.mykeys;
 has Str $.name;
 has $!item;
 
-our class Lexet {
-    has $.pat;
-    has @.act;
-}
 
-sub lexet ($branch, *@lexets) is export {
-    my $pat = "";
-    my @act;
-    @act = "#", $branch if $branch ne '';
-
-    for @lexets -> $lexet {
-        given $lexet {
-            when Str { $pat ~= $_ }
-            when Lexet { $pat ~= .pat; push @act, .act }
-            when Array {
-                fail "notimpl" if $_.elems > 1;
-                $pat ~= $_[0].pat; push @act, $_[0].act;
-            }
+method _AUTOLEXpeek ($key) {
+    die "Null key" if $key eq '';
+    if %.lexer{$key} {
+        if %+AUTOLEXED{$key} {
+            die "left recursion in $key";
+            return ();   # no left recursion allowed in lexer!
+        }
+        elsif %.lexer{$key}.WHAT eq Hash {
+            return %.lexer{$key}<lexets>;
         }
     }
-    return Lexet.new(:$pat, :@act);
+    my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
+    my $lexer = self._AUTOLEXgen($ast);
+    %.lexer{$key} = hash(:$ast, :$lexer);
+    return $ast;
 }
 
-method _AUTOLEX ($key, &block) {
-    # XXX should just use //= here but it seems to store Array instead of Hash
-    return %.lexer{$key} if %.lexer.exists($key);
-
-    my @lexets = block(self);
-    my $lexer = sub ($¢) {
-        my $i = 0;
-        for @lexets -> $lx {
-            my $s = $lx.pat;
-            if $¢._EQ($¢.pos, $s) {
-                say "BINGO /$s/ { $lx.act }";
-                return $i, $lx.act;
-            }
-            else {
-                say "bongo /$s/";
-            }
-            $i++;
-        }
+method _AUTOLEXnow ($key) {
+    if %.lexer.exists($key) {
+        return %.lexer{$key}
     }
-    %.lexer{$key} = hash(:lexets[@lexets], :lexer($lexer));
+    my %AUTOLEXED is context<rw>;
+    my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
+    my $lexer = self._AUTOLEXgen($ast);
+    %.lexer{$key} = hash(:$ast, :$lexer);
+    return $lexer;
+}
+
+method _AUTOLEXgen ($ast) {
+    my %AUTOLEXED is context<rw>;
+    sub ($¢) {
+        $ast.lexer($¢).perl.say;
+    }
 }
 
 method setname($k) {
@@ -638,4 +630,230 @@ method commit () {
 }
 
 method fail ($m) { die $m }
+
+my sub here ($arg?) {
+    my $lvl = 0;
+    while Pugs::Internals::caller(Any,$lvl,"") { $lvl++ }
+    my $caller = caller;
+    my $package = $caller.package;
+    my $name = $package ~ '::' ~ substr($caller.subname,1);
+    if defined $arg { 
+        $name ~= " " ~ $arg;
+    }
+    say ':' x $lvl, ' ', $name, " [", $caller.file, ":", $caller.line, "]";
+}
+
+our class REbase {
+    method lexer ($¢) { here "UNIMPL {self.WHAT}"; "" }
+}
+our class RE is REbase {
+    method lexer ($¢) {
+        here;
+        my $PURE is context<rw> = 1;
+        self.<re>.lexer($¢);
+    }
+}
+
+our class RE_adverb is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_assertion is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_assertvar is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_block is REbase {
+    method lexer ($¢) { '' }
+}
+
+our class RE_bindvar is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_bindnamed is REbase {
+    method lexer ($¢) { here; self.<atom>.lexer($¢) }
+}
+
+our class RE_bindpos is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_bracket is REbase {
+    method lexer ($¢) { here; '(' ~ self.<re>.lexer($¢) ~ ')' }
+}
+
+our class RE_cclass is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_decl is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_double is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_string is REbase {
+    method lexer ($¢) { here ~self.<text>; self.<text> }
+}
+
+our class RE_meta is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_method_noarg is REbase {
+    method lexer ($¢) {
+        my $name = self.<name>;
+        here $name;
+        given $name {
+            when '' {
+                $+PURE = 0;
+                return '';
+            }
+            when 'ws' {
+                $+PURE = 0;
+                return '';
+            }
+            when 'EXPR' {
+                $+PURE = 0;
+                return '';
+            }
+            when 'sym' {
+                return self.<sym>;
+            }
+            when 'alpha' {
+                return '[a-z_A-Z]';
+            }
+            default {
+                my $ast = $¢.$name('?')[0];
+                return $ast.lexer($¢);
+            }
+        }
+    }
+}
+
+our class RE_method_internal is REbase {
+    method lexer ($¢) {
+        $+PURE = 0;
+        '';
+    }
+}
+
+our class RE_method_re is REbase {
+    method lexer ($¢) {
+        my $name = self.<name>;
+        here $name;
+        my $re = self.<re>;
+        given $name {
+            when '' {
+                $+PURE = 0;
+                return '';
+            }
+            when 'after' {
+                return '';
+            }
+            when 'before' {
+                my $result = $re.lexer($¢);
+                $+PURE = 0;
+                return $result;
+            }
+            default {
+                my $ast = $¢.$name($re, '?')[0];
+                return $ast.lexer($¢);
+            }
+        }
+    }
+}
+
+our class RE_method_str is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_method is REbase {
+    method lexer ($¢) {
+        $+PURE = 0;
+        '';
+    }
+}
+
+our class RE_noop is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_ordered_conjunction is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_ordered_disjunction is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_paren is REbase {
+    method lexer ($¢) { here; '(' ~ self.<re>.lexer($¢) ~ ')' }
+}
+
+our class RE_quantified_atom is REbase {
+    method lexer ($¢) {
+        here;
+        my $atom = self.<atom>.lexer($¢);
+        if self.<quant>[0] eq '+' {
+            return $atom;
+        }
+        else {
+            return "|$atom";
+        }
+    }
+}
+
+our class RE_qw is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_sequence is REbase {
+    method lexer ($¢) {
+        my $PURE is context<rw> = 1;
+        my $chunks := self.<zyg>;
+        here +@$chunks;
+        my @result;
+        for @$chunks {
+            my $next = .lexer($¢);
+            last if $next eq '';
+            push @result, $next;
+            last unless $PURE;
+        }
+        join '', @result;
+    }
+}
+
+our class RE_submatch is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_unordered_conjunction is REbase {
+    #method lexer ($¢) { ... }
+}
+
+our class RE_unordered_disjunction is REbase {
+    method lexer ($¢) {
+        my $alts := self.<zyg>;
+        here +@$alts;
+        my @result;
+        for @$alts -> $alt{
+            my $pat = $alt.lexer($¢);
+            $pat ~= "(?C{ $alt.<alt> })" if $callouts;
+            push @result, $pat;
+        }
+        join '|', @result;
+    }
+}
+
+our class RE_var is REbase {
+    #method lexer ($¢) { ... }
+}
+
 

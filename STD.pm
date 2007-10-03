@@ -685,8 +685,6 @@ token version:sym<v> {
 ###################################################
 
 token expect_term {
-    <.ws>
-
     # queue up the prefixes to interleave with postfixes
     @<pre> = (
         [
@@ -888,19 +886,17 @@ regex prefix_circumfix_meta_operator:reduce () {
     {*}                                                         #= [ ]
 }
 
-token prefix_postfix_meta_operator:sym< « >    { <sym> {*} }    #= hyper
-token prefix_postfix_meta_operator:sym« << » { <sym> {*} }      #= HYPER
+token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' {*} }    #= hyper
 
-token postfix_prefix_meta_operator:sym< » >    { <sym> {*} }    #= hyper
-token postfix_prefix_meta_operator:sym« >> » { <sym> {*} }      #= HYPER
+token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' {*} }    #= hyper
 
 token infix:pre { <infix_prefix_meta_operator> }
 token infix:circ { <infix_circumfix_meta_operator> }
 
 token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
-    <sym> <!before '!'> <infix_nospace>
+    <?lex1: negation>
 
-    <?nonest: negation>
+    <sym> <!before '!'> <infix_nospace>
 
     [
     || <?{ %+thisop<assoc> eq 'chain'}>
@@ -913,67 +909,34 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     {*}                                                         #= !
 }
 
-regex nonest (Str $s) {
-    <!{{ %+thisop{$s}++ }}> || <panic: Nested $s metaoperators not allowed>
+method lex1 (Str $s) {
+    if %+thisop{$s}++ { self.panic("Nested $s metaoperators not allowed"); }
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
+    <?lex1: cross>
     X <infix_nospace> X
-    <nonest: cross>
     {*}                                                         #= X X
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
-    '«' <infix_nospace> '»'
-    <nonest: hyper>
+    <lex1: hyper>
+    [
+    | '«' <infix_nospace> '»'
+    | '«' <infix_nospace> '«'
+    | '»' <infix_nospace> '»'
+    | '»' <infix_nospace> '«'
+    | '<<' <infix_nospace> '>>'
+    | '<<' <infix_nospace> '<<'
+    | '>>' <infix_nospace> '>>'
+    | '>>' <infix_nospace> '<<'
+    ]
     {*}                                                         #= « »
 }
 
-token infix_circumfix_meta_operator:sym<« «> ( --> Hyper) {
-    '«' <infix_nospace> '«'
-    <nonest: hyper>
-    {*}                                                         #= « «
-}
-
-token infix_circumfix_meta_operator:sym<» »> ( --> Hyper) {
-    '»' <infix_nospace> '»'
-    <nonest: hyper>
-    {*}                                                         #= » » 
-}
-
-token infix_circumfix_meta_operator:sym<» «> ( --> Hyper) {
-    '»' <infix_nospace> '«'
-    <nonest: hyper>
-    {*}                                                         #= » «
-}
-
-token infix_circumfix_meta_operator:sym« << >> » ( --> Hyper) {
-    '<<' <infix_nospace> '>>'
-    <nonest: hyper>
-    {*}                                                         #= << >>
-}
-
-token infix_circumfix_meta_operator:sym« << << » ( --> Hyper) {
-    '<<' <infix_nospace> '<<'
-    <nonest: hyper>
-    {*}                                                         #= << <<
-}
-
-token infix_circumfix_meta_operator:sym« >> >> » ( --> Hyper) {
-    '>>' <infix_nospace> '>>'
-    <nonest: hyper>
-    {*}                                                         #= >> >>
-}
-
-token infix_circumfix_meta_operator:sym« >> << » ( --> Hyper) {
-    '>>' <infix_nospace> '<<'
-    <nonest: hyper>
-    {*}                                                         #= >> <<
-}
-
 token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
+    <?lex1: assignment>
     '='
-    <nonest: assignment>
 
     [
     || <?{ %+thisop<prec> gt %item_assignment<prec> }>
@@ -1007,13 +970,13 @@ token postcircumfix:sym<{ }> ( --> Methodcall)
     { '{' <semilist> '}' {*} }                                  #= { }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <anglewords> '>' {*} }                                #= < >
+    { '<' <anglewords '>' > '>' {*} }                                #= < >
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <shellwords> '>>' {*}}                               #= << >>
+    { '<<' <shellwords '>>' > '>>' {*}}                               #= << >>
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <shellwords> '»' {*} }                                #= « »
+    { '«' <shellwords '»' > '»' {*} }                                #= « »
 
 token postop {
     | <postfix>         { .<prec> := $<postfix><prec> }
@@ -2312,7 +2275,7 @@ token circumfix:sym<[ ]> ( --> Term)
     { '[' <statementlist> ']' {*} }                             #= [ ]
 
 token circumfix:sym«< >» ( --> Term)
-    { '<'  <anglewords '>'> '>'  {*} }                        #'#= < >
+    { '<'  <anglewords '>' > '>'  {*} }                        #'#= < >
 token circumfix:sym«<< >>» ( --> Term)
     { '<<' <shellwords '>>'> '>>' {*} }                       #'#= << >>
 token circumfix:sym<« »> ( --> Term)
