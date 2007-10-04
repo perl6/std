@@ -1524,6 +1524,7 @@ token dec_number {
 
 token rad_number {
     ':' $<radix> = [\d+] <.unsp>?      # XXX optional dot here?
+    ::           # don't recurse in lexer
     [
     || '<'
             $<radint> = [<[ 0..9 a..z A..Z ]>+
@@ -3130,7 +3131,9 @@ sub is_type($name) {
 }
 
 say "Starting...";
-my $r = Perl.new(:orig('42+1')).EXPR()[0];
+my $r = Perl.new(:orig('42')).expect_term();
+say $r;
+exit;
 say "WHAT\t", $r.WHAT;
 say "BOOL\t", $r.bool;
 say "FROM\t", $r.from;

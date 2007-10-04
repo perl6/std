@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/local/bin/perl
 
 # This is a completely hacky attempt to get STD.pm to turn itself into
 # runnable and hopefully not-very-hacky Perl 6 code, where "runnable" is
@@ -15,7 +15,7 @@
 use strict;
 use warnings;
 
-use YAML;
+use YAML::Syck;
 
 our $STOP = "";
 our $REV = "";
@@ -191,10 +191,13 @@ END
     $body .= <<'END';
 
     if not @try {
-        @fate = $¢._AUTOLEXnow('<<NAME>>').(self);
+        return  $¢._AUTOLEXnow('<<NAME>>').(self);
+#        @fate = $¢._AUTOLEXnow('<<NAME>>').(self);
         @try = @fate.shift;
     }
+END
 
+    my $junk = <<'END';
     $¢._MATCHIFY($binding,
 <<MEAT>>
     );
@@ -232,7 +235,7 @@ END
     if (s/^(.*\n)//) {
         my $line = $1;
         if ($line =~ s/^grammar (\w+)//) {
-            $out .= "use Cursor;\ngrammar $1 is Cursor";
+            $out .= "use Cursor;\ngrammar $1 is Cursor; my %AUTOLEXED is context<rw>";
         }
         $out .= $line;
     }
@@ -281,40 +284,49 @@ sub regex {
     while (s/^\s*:(my|state|our|constant)\b/$1/) {
         my $code = unbalanced(";");
         s/^;// or panic "Missing ;";
-        push @decl, bless { text => $code }, "RE_decl";
+        push @decl, bless { text => $code, min => 0, max => 0 }, "RE_decl";
     }
 
-    return bless { decl => [@decl], re => ordered_disjunction() }, "RE";
+    my $od = ordered_disjunction();
+    return bless { decl => [@decl], re => $od, min => $od->{min} }, "RE";
 }
 
 sub ordered_disjunction {
     here();
     my @kids;
+    my $min = 1_000_000_000;
 
     s/^\|\|//;
 
     do {
         ws();
-        push @kids, ordered_conjunction();
+        my $k = ordered_conjunction();
+        push @kids, $k;
+        my $kidmin = $k->{min};
+        $min = $kidmin if $kidmin < $min;
         ws();
     } while s/^\|\|//;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids] }, "RE_ordered_disjunction";
+    return bless { zyg => [@kids], min => $min}, "RE_ordered_disjunction";
 }
 
 sub ordered_conjunction {
     here();
     my @kids;
+    my $min = 0;
 
     do {
         ws();
-        push @kids, submatch();
+        my $k = submatch();
+        push @kids, $k;
+        my $kidmin = $k->{min};
+        $min = $kidmin if $kidmin > $min;
         ws();
     } while s/^\&\&//;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids] }, "RE_ordered_conjunction";
+    return bless { zyg => [@kids], min => $min }, "RE_ordered_conjunction";
 }
 
 sub submatch {
@@ -328,50 +340,62 @@ sub submatch {
     } while s/^\!?\~\~//;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids] }, "RE_submatch";
+    return bless { zyg => [@kids], min => 0 }, "RE_submatch";
 }
 
 sub unordered_disjunction {
     here();
     my @kids;
+    my $min = 1_000_000_000;
 
     s/^ \| (?!\|) //x;
 
     do {
         ws();
-        push @kids, unordered_conjunction();
+        my $k = unordered_conjunction();
+        push @kids, $k;
+        my $kidmin = $k->{min};
+        $min = $kidmin if $kidmin < $min;
         ws();
     } while s/^ \| (?!\|) //x;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids] }, "RE_unordered_disjunction";
+    return bless { zyg => [@kids], min => $min }, "RE_unordered_disjunction";
 }
 
 sub unordered_conjunction {
     here();
     my @kids;
+    my $min = 0;
 
     do {
         ws();
-        push @kids, sequence();
+        my $k = sequence();
+        push @kids, $k;
+        my $kidmin = $k->{min};
+        warn "$k\n" unless defined $kidmin;
+        $min = $kidmin if $kidmin > $min;
         ws();
     } while s/^ \& (?!\&) //x;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids] }, "RE_unordered_conjunction";
+    return bless { zyg => [@kids], min => $min }, "RE_unordered_conjunction";
 }
 
 sub sequence {
     here();
     my @kids;
     my $k;
+    my $min = 0;
 
     while ($k = quantified_atom()) {
         push(@kids, $k);
+        my $kidmin = $k->{min};
+        $min += $kidmin;
     }
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids] }, "RE_sequence";
+    return bless { zyg => [@kids], min => $min }, "RE_sequence";
 }
 
 sub quantified_atom {
@@ -381,7 +405,9 @@ sub quantified_atom {
     return $atom if $atom->{noquant};
     my $quant = quantifier();
     return $atom unless $quant;
-    return bless { atom => $atom, quant => $quant }, "RE_quantified_atom";
+    my $min = $atom * $quant->[3];
+    return bless { atom => $atom, quant => $quant, min => $min },
+        "RE_quantified_atom";
 }
 
 sub quantifier {
@@ -390,6 +416,7 @@ sub quantifier {
         s/^\s*(\+)([?!:+]?)// or
         s/^\s*(\?)([?!:+]?)//) {
         my ($q,$m) = ($1,$2);
+        my $min = 0;
         if (not $m) {
             if ($CONTEXT eq 'rule' or $CONTEXT eq 'token') {
                 $m = ':';
@@ -403,21 +430,27 @@ sub quantifier {
         }
         my $x = "";
         if ($q eq '**') {
-            if (s/^\s*(\d+(\.\.(\d+|\*))?)//) {
+            if (s/^\s*((\d+)(\.\.(\d+|\*))?)//) {
                 $x = $1;
+                $min = $2;
             }
             elsif (/^\s*\{/) {
                 wsany();
                 $x = block('thunk');
+                $min = 0;
             }
             else {
                 wsany();
                 $x = atom();
+                $min = 1;
             }
+        }
+        elsif ($q eq '+') {
+            $min = 1;
         }
         ws();
         $MAYBACKTRACK = 1 unless $m eq ':';
-        return [$q,$m,$x];
+        return [$q,$m,$x,$min];
     }
 }
 
@@ -425,7 +458,8 @@ sub atom {
     here();
     if (/^[\s\#]/ and $CONTEXT eq 'rule') {
         wsany();
-        return bless { name => 'ws', nobind => 1, noquant => 1 }, "RE_method_noarg";
+        return bless { name => 'ws', nobind => 1, noquant => 1, min => 0 },
+            "RE_method_noarg";
     }
     return if /^ [\]&|)] /x;   # XXX an approximation
     return if /^ (?:
@@ -439,12 +473,12 @@ sub atom {
     if (s/^ (\w+) (?! \s* [*+?]) //x) {
         my $word = $1;
         ws();
-        return bless { text => $word }, "RE_string";
+        return bless { text => $word, min => length($word) }, "RE_string";
     }
     if (s/^ (\w) //x) {
         my $word = $1;
         ws();
-        return bless { text => $word }, "RE_string";
+        return bless { text => $word, min => length($word) }, "RE_string";
     }
 
     if (s/^\{\*\}//) {
@@ -454,7 +488,7 @@ sub atom {
         }
         ws();
         $key =~ s/(['\\])/\\$1/g;
-        return bless { name => '_REDUCE', args => "'$key'"},
+        return bless { name => '_REDUCE', args => "'$key'", min => 0, max => 0},
                      "RE_method_internal";
     }
     if (/^\{/) {
@@ -478,7 +512,8 @@ sub atom {
         ws();
         $re = bless $re, "RE_paren";
         if (not $PARSEBIND) {  # XXX leaves quantifier outside?
-            $re = bless { var => $PAREN++, atom => $re }, "RE_bindpos";
+            $re = bless { var => $PAREN++, atom => $re, min => $re->{min} },
+                "RE_bindpos";
         }
         return $re;
     }
@@ -505,21 +540,25 @@ sub atom {
     if (s/^(<<|>>|«|»)//) {
         my $boundary = $1;
         ws();
-        return bless { text => $boundary }, "RE_meta";
+        return bless { text => $boundary, min => 0 }, "RE_meta";
     }
 
     if (s/^(<\(|\)>)//) {
         my $boundary = $1;
         ws();
-        return bless { text => $boundary }, "RE_meta";
+        return bless { text => $boundary, min => 0 }, "RE_meta";
     }
 
     if (/^<\s/) {
         my $re = unbalanced(">");
         s/^>// or panic "Missing >";
+        my @elems = split(' ', $re);
+        shift @elems;
+        my $min = 1_000_000_000;
+        for (@elems) { $min = length($_) if length($_) < $min }
         $re .= '>';
         ws();
-        return bless { text => $re }, "RE_qw";
+        return bless { text => $re, min => $min }, "RE_qw";
     }
 
     # assertions
@@ -537,13 +576,16 @@ sub atom {
         my $re = unbalanced("'");
         s/^'// or panic "Missing '";
         ws();
-        return bless { text => $re }, "RE_string";
+        return bless { text => $re, min => length($re) }, "RE_string";
     }
     if (s/^"//) {
         my $re = unbalanced('"');
         s/^"// or panic 'Missing "';
+        my $tmp = $re;
+        $tmp =~ s/\\\w/X/g;    # XXX ignoring \x and \o for now
+        $tmp =~ s/\$\w+//g;    # assume vars interpolate nothing
         ws();
-        return bless { text => $re }, "RE_double";
+        return bless { text => $re, min => length($tmp) }, "RE_double";
     }
 
     if (/^[\$\@\%]/) {
@@ -565,12 +607,15 @@ sub atom {
                 $atom->{nobind} = 1;
                 ws();
                 if ($code =~ s/([\$\@%]<.*?>)/$1/) {
-                    return bless { var => $code, atom => $atom }, "RE_bindnamed";
+                    return bless { var => $code,
+                                   atom => $atom,
+                                   min => $atom->{min}
+                                 }, "RE_bindnamed";
                 }
-                return bless { var => $code, atom => $atom }, "RE_bindvar";
+                return bless { var => $code, atom => $atom, min => $atom->{min} }, "RE_bindvar";
             }
             else {
-                return bless { var => $code }, "RE_var";
+                return bless { var => $code, min => 0 }, "RE_var";
             }
         }
     }
@@ -579,16 +624,16 @@ sub atom {
     if (s/^([\^\$]{1,2})//) {
         my $anchor = $1;
         ws();
-        return bless { text => $anchor}, "RE_meta";
+        return bless { text => $anchor, min => 0 }, "RE_meta";
     }
     if (s/^(:+)//) {
         my $colons = $1;
         ws();
-        return bless { text => $colons}, "RE_meta";
+        return bless { text => $colons, min => 0 }, "RE_meta";
     }
     if (s/^\.//) {
         ws();
-        return bless { text => '.'}, "RE_meta";
+        return bless { text => '.', min => 1 }, "RE_meta";
     }
 
     panic "unrecognized metacharacter @{[ substr($_,0,1) ]}";
@@ -599,25 +644,25 @@ sub backslash {
     
     if ($ch =~ /^\w$/) {
         if ($ch =~ /^[ftnr]/) {
-            return bless { text => '\\' . $ch }, "RE_double";
+            return bless { text => '\\' . $ch, min => 1  }, "RE_double";
         }
         if ($ch eq 'x') {
             s/^\[?([0-9a-fA-f]*)\]?//;
-            return bless { text => '\\x' . $1 }, "RE_double";
+            return bless { text => '\\x' . $1, min => 1  }, "RE_double";
         }
         if ($ch eq 'o') {
             s/^\[?([0-7]*)\]?//;
-            return bless { text => '\\o' . $1 }, "RE_double";
+            return bless { text => '\\o' . $1, min => 1  }, "RE_double";
         }
         if ($ch =~ /^[hvdswHVDSWNRTBF]/) {
-            return bless { text => "\\$ch" }, "RE_meta";
+            return bless { text => "\\$ch", min => 1  }, "RE_meta";
         }
         panic "Unrecognized \\$ch";
     }
     if ($ch eq '\\') {
-        return bless { text => '\\' }, "RE_string";
+        return bless { text => '\\', min => 1  }, "RE_string";
     }
-    return bless { text => $ch }, "RE_string";
+    return bless { text => $ch, min => 1 }, "RE_string";
 }
 
 sub assertion {
@@ -627,16 +672,17 @@ sub assertion {
     if (s/^[!?]//) {
         my $rest = assertion();
         $rest->{nobind} = 1;
-        return bless { assert => $assert, re => $rest }, "RE_assertion";
+        return bless { assert => $assert, re => $rest, min => 0 },
+            "RE_assertion";
     }
     if (s/^>//) {
-        return bless { }, "RE_noop";
+        return bless { min => 0 }, "RE_noop";
     }
 
     if (/^[+-]?\[/) {
         my $cclass = unbalanced('>');
         s/^>// or panic "Missing >";
-        return bless { text => $cclass }, "RE_cclass";
+        return bless { text => $cclass, min => 1 }, "RE_cclass";
     }
 
     if (s/^\.//) {
@@ -650,38 +696,42 @@ sub assertion {
         my $ch = substr($_,0,1);
         if ($ch eq '>') {
             s/^>// or panic "Missing >";
-            return bless { name => $word }, "RE_method_noarg";
+            return bless { name => $word, min => 12345 }, "RE_method_noarg";
         }
         if ($ch eq ':') {
             s/^:\s*//;
             my $str = unbalanced('>');
             s/^>// or panic "Missing >";
             if ($word eq 'after') {
-                my $x = bless { name => '_vEXACT', str => $str }, "RE_method_str";
-                return bless { name => $word, rest => $x }, "RE_method";
+                my $x = bless { name => '_vEXACT', str => $str, min => 0 },
+                    "RE_method_str";
+                return bless { name => $word, rest => $x, min => 0 },
+                    "RE_method";
             }
-            return bless { name => $word, str => $str }, "RE_method_str";
+            return bless { name => $word, str => $str, min => 0 },
+                "RE_method_str";
         }
         if ($ch eq '(') {
             my $code = code('\\)>');
             s/^\)>// or panic "Missing )>";
             $code .= ')';
-            return bless { name => $word, rest => $code }, "RE_method";
+            return bless { name => $word, rest => $code, min => 0 },
+                "RE_method";
         }
         s/^\s*//;
         my $re = regex('\\>');
         s/^>// or panic "Missing >";
-        return bless { name => $word, re => $re }, "RE_method_re";
+        return bless { name => $word, re => $re, min => 0 }, "RE_method_re";
     }
 
     if (/^[\$\@\%]/) {
         my $code = code('>');
         s/^>// or panic "Missing >";
         if ($code =~ s/\(.*\)//) {
-            return bless { name => $code, rest => $1 }, "RE_method";
+            return bless { name => $code, rest => $1, min => 0 }, "RE_method";
         }
         else {
-            return bless { name => $code }, "RE_method_noarg";
+            return bless { name => $code, min => 0 }, "RE_method_noarg";
         }
     }
 
@@ -701,7 +751,7 @@ sub block {
     my $term = '\\}' x length($1);
     my $block = code($term);
     s/^$term// or panic "Missing }" ;
-    return bless { text => $block, context => $context }, "RE_block";
+    return bless { text => $block, context => $context, min => 0 }, "RE_block";
 }
 
 sub code {
@@ -1271,7 +1321,7 @@ sub unbalanced {
                 else {
                     $token = "''";
                 }
-                $kid->{alt} = $alt++;
+                $kid->{alt} = $NAME . '/' . $alt++;
                 push @TOKENS, $token;
             }
         }

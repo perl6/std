@@ -1,13 +1,13 @@
 class Cursor;
 
 my $VERBOSE = 1;
-my $callouts = 0;
+my $callouts = 1;
 
 # XXX still full of ASCII assumptions
 
 # most cursors just copy forward the previous value of the following two items:
 has $.orig;        # per match, the original string we are matching against
-has %.lexer;       # per language, the cache of lexers, keyed by (|) location
+our %lexer;       # per language, the cache of lexers, keyed by (|) location
 
 has Bool $.bool is rw = 1;
 has StrPos $.from = 0;
@@ -18,39 +18,48 @@ has %.mykeys;
 has Str $.name;
 has $!item;
 
+method lexer { %lexer }   # XXX should be different per language, sigh
+
+my $fakepos = 1;
 
 method _AUTOLEXpeek ($key) {
     die "Null key" if $key eq '';
     if %.lexer{$key} {
-        if %+AUTOLEXED{$key} {
-            die "left recursion in $key";
-            return ();   # no left recursion allowed in lexer!
+        if %+AUTOLEXED{$key} {   # no left recursion allowed in lexer!
+            die "left recursion in $key" if $fakepos == %+AUTOLEXED{$key};
+            return -> $¢ { '' };  # (but if we advanced just assume a :: here)
         }
         elsif %.lexer{$key}.WHAT eq Hash {
-            return %.lexer{$key}<lexets>;
+            return %.lexer{$key}<lexer> // -> $¢ { '' };
         }
+        say "oops ", $key.WHAT;
     }
     my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
-    my $lexer = self._AUTOLEXgen($ast);
-    %.lexer{$key} = hash(:$ast, :$lexer);
-    return $ast;
+    %.lexer{$key} = hash(:$ast, :lexer(-> $¢ { '' }));
+    my $lexer = self._AUTOLEXgen($key,$ast);
+    %.lexer{$key}<lexer> = $lexer;
+    return $lexer;
 }
 
 method _AUTOLEXnow ($key) {
     if %.lexer.exists($key) {
-        return %.lexer{$key}
+        return %.lexer{$key}<lexer>;
     }
     my %AUTOLEXED is context<rw>;
     my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
-    my $lexer = self._AUTOLEXgen($ast);
-    %.lexer{$key} = hash(:$ast, :$lexer);
+    %.lexer{$key} = hash(:$ast, :lexer(undef));
+    my $lexer = self._AUTOLEXgen($key,$ast);
+    %.lexer{$key}<lexer> = $lexer;
     return $lexer;
 }
 
-method _AUTOLEXgen ($ast) {
-    my %AUTOLEXED is context<rw>;
+method _AUTOLEXgen ($key,$ast) {
+    my $oldfakepos = %+AUTOLEXED{$key} // 0;
+    %+AUTOLEXED{$key} = $fakepos;
+    my $lexer = $ast.lexer(self);
+    %+AUTOLEXED{$key} = $oldfakepos;
     sub ($¢) {
-        $ast.lexer($¢).perl.say;
+        $lexer;
     }
 }
 
@@ -96,7 +105,7 @@ method matchify {
 method cursor_all (StrPos $fpos, StrPos $tpos) {
     my $r = self.new(
         :orig(self.orig),
-        :lexer(self.lexer),
+        #:lexer(self.lexer),
         :from($fpos),
         :to($tpos),
         :pos($tpos),
@@ -110,7 +119,7 @@ method cursor_all (StrPos $fpos, StrPos $tpos) {
 method cursor (StrPos $tpos) {
     self.new(
         :orig(self.orig),
-        :lexer(self.lexer),
+        #:lexer(self.lexer),
         :from(self.pos // 0),
         :to($tpos),
         :pos($tpos),
@@ -122,7 +131,7 @@ method cursor (StrPos $tpos) {
 method cursor_rev (StrPos $fpos) {
     self.new(
         :orig(self.orig),
-        :lexer(self.lexer),
+        #:lexer(self.lexer),
         :pos($fpos),
         :from($fpos),
         :to(self.from),
@@ -631,12 +640,19 @@ method commit () {
 
 method fail ($m) { die $m }
 
+#############################################################3
+
+my sub indent (Str $s is copy) {
+    $s ~~ s:P5:g/\n/\n  /;
+    "  " ~ $s;
+}
+
 my sub here ($arg?) {
     my $lvl = 0;
     while Pugs::Internals::caller(Any,$lvl,"") { $lvl++ }
     my $caller = caller;
     my $package = $caller.package;
-    my $name = $package ~ '::' ~ substr($caller.subname,1);
+    my $name = $package;   # ~ '::' ~ substr($caller.subname,1);
     if defined $arg { 
         $name ~= " " ~ $arg;
     }
@@ -644,8 +660,9 @@ my sub here ($arg?) {
 }
 
 our class REbase {
-    method lexer ($¢) { here "UNIMPL {self.WHAT}"; "" }
+    method lexer ($¢) { here "UNIMPL {self.WHAT}"; self.WHAT.substr(3).uc }
 }
+
 our class RE is REbase {
     method lexer ($¢) {
         here;
@@ -659,19 +676,37 @@ our class RE_adverb is REbase {
 }
 
 our class RE_assertion is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        given self.<assert> {
+            when '?' {
+                my $re = self.<re>;
+                if $re.<name> eq 'before' {
+                    my $result = $re.lexer($¢);
+                    $+PURE = 0;
+                    return $result;
+                }
+            }
+        }
+        '[]';
+    }
 }
 
 our class RE_assertvar is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        $+PURE = 0;
+        '';
+    }
 }
 
 our class RE_block is REbase {
-    method lexer ($¢) { '' }
+    method lexer ($¢) {
+        $+PURE = 0;
+        '';
+    }
 }
 
 our class RE_bindvar is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) { here; self.<atom>.lexer($¢) }
 }
 
 our class RE_bindnamed is REbase {
@@ -679,31 +714,58 @@ our class RE_bindnamed is REbase {
 }
 
 our class RE_bindpos is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) { here; self.<atom>.lexer($¢) }
 }
 
 our class RE_bracket is REbase {
-    method lexer ($¢) { here; '(' ~ self.<re>.lexer($¢) ~ ')' }
+    method lexer ($¢) { here; "(\n" ~ indent(self.<re>.lexer($¢)) ~ "\n)" }
 }
 
 our class RE_cclass is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        here ~self.<text>;
+        $fakepos++;
+        my $cc = self.<text>;
+        $cc ~~ s:P5/^\-\[/[^/;
+        $cc ~~ s:P5/^\+\[/[/;
+        $cc ~~ s:P5:g/\s*\.\.\s*/-/;
+        $cc ~~ s:P5:g/\s*//;
+        $cc;
+    }
 }
 
 our class RE_decl is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) { '[]' }
 }
 
 our class RE_double is REbase {
-    #method lexer ($¢) { ... }
-}
-
-our class RE_string is REbase {
-    method lexer ($¢) { here ~self.<text>; self.<text> }
+    # XXX inadequate for "\n" without interpolation
+    method lexer ($¢) {
+        $+PURE = 0;
+        '';
+    }
 }
 
 our class RE_meta is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        my $text = self.<text>;
+        here $text;
+        given $text {
+            when '^' | '$' | '.' | '\\w' | '\\s' | '\\d' {
+                return $text;
+            }
+            when '\\h' {
+                return '[\\x20\\t]';
+            }
+            when '::' {
+                $+PURE = 0;
+                return '';
+            }
+            default {
+                return "META[$text]"
+            }
+        }
+    }
 }
 
 our class RE_method_noarg is REbase {
@@ -711,6 +773,9 @@ our class RE_method_noarg is REbase {
         my $name = self.<name>;
         here $name;
         given $name {
+            when 'null' {
+                return '';
+            }
             when '' {
                 $+PURE = 0;
                 return '';
@@ -724,14 +789,16 @@ our class RE_method_noarg is REbase {
                 return '';
             }
             when 'sym' {
+                $fakepos++;
                 return self.<sym>;
             }
             when 'alpha' {
+                $fakepos++;
                 return '[a-z_A-Z]';
             }
             default {
-                my $ast = $¢.$name('?')[0];
-                return $ast.lexer($¢);
+                my $lexer = $¢.$name('?')[0];
+                return $lexer($¢);
             }
         }
     }
@@ -755,7 +822,7 @@ our class RE_method_re is REbase {
                 return '';
             }
             when 'after' {
-                return '';
+                return '[]';
             }
             when 'before' {
                 my $result = $re.lexer($¢);
@@ -763,8 +830,8 @@ our class RE_method_re is REbase {
                 return $result;
             }
             default {
-                my $ast = $¢.$name($re, '?')[0];
-                return $ast.lexer($¢);
+                my $lexer = $¢.$name($re, '?')[0];
+                return $lexer($¢);
             }
         }
     }
@@ -782,51 +849,115 @@ our class RE_method is REbase {
 }
 
 our class RE_noop is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        '[]';
+    }
 }
 
 our class RE_ordered_conjunction is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        $+PURE = 0;
+        '';
+    }
 }
 
 our class RE_ordered_disjunction is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        my $alts := self.<zyg>;
+        here +@$alts;
+        my @result;
+        for @$alts -> $alt {
+            my $pat = $alt.lexer($¢);
+            $pat ~= ':' ~ $alt.<alt> if $callouts;
+            push @result, $pat;
+            last;
+        }
+        my $result = @result[0] ~ "|(LATER)";
+        say $result;
+        $result;
+    }
 }
 
 our class RE_paren is REbase {
-    method lexer ($¢) { here; '(' ~ self.<re>.lexer($¢) ~ ')' }
+    method lexer ($¢) { here; "(\n" ~ indent(self.<re>.lexer($¢)) ~ "\n)" }
 }
 
 our class RE_quantified_atom is REbase {
     method lexer ($¢) {
         here;
+        my $oldfakepos = $fakepos++;
         my $atom = self.<atom>.lexer($¢);
         if self.<quant>[0] eq '+' {
-            return $atom;
+            return "$atom+";
+        }
+        elsif self.<quant>[0] eq '*' {
+            $fakepos = $oldfakepos;
+            return "$atom*";
+        }
+        elsif self.<quant>[0] eq '?' {
+            $fakepos = $oldfakepos;
+            return "$atom?";
+        }
+        elsif self.<quant>[0] eq '**' {
+            my $x = self.<quant>[2];
+            $x ~~ s:P5/\.\./,/;
+            $x ~~ s:P5/\*//;
+            $fakepos = $oldfakepos if $x ~~ m:P5/^0/;
+            return $atom ~ '{' ~ $x ~ '}';
         }
         else {
-            return "|$atom";
+            $+PURE = 0;
+            return '';
         }
     }
 }
 
 our class RE_qw is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        my $text = self.<text>;
+        here $text;
+        $fakepos++;
+        $text ~~ s:P5/^<\s*//;
+        $text ~~ s:P5/\s*>$//;
+        $text ~~ s:P5/\s+/|/;
+        $text;
+    }
 }
 
 our class RE_sequence is REbase {
     method lexer ($¢) {
         my $PURE is context<rw> = 1;
-        my $chunks := self.<zyg>;
-        here +@$chunks;
+        my $c := self.<zyg>;
+        my @chunks = @$c;
+        here +@chunks;
         my @result;
-        for @$chunks {
+        my $last;
+#        while @chunks and
+#            $last = @chunks[-1] and  # XXX sb *-1 someday
+#            not $last.<min>
+#        {
+#                pop @chunks;
+#        }
+        for @chunks {
             my $next = .lexer($¢);
             last if $next eq '';
+            $next = '' if $next eq '[]';
             push @result, $next;
             last unless $PURE;
         }
         join '', @result;
+    }
+}
+
+our class RE_string is REbase {
+    # XXX needs quoting
+    method lexer ($¢) {
+        here ~self.<text>;
+        my $text = self.<text>;
+        $fakepos++ if self.<min>;
+        $text ~~ s:P5:g/([][\\*+?.^${}<>()]#)/\\$0/;
+        $text ~~ s:P5:g/\s/\\s/;  # XXX bogus, but who uses ws in tokens?
+        $text;
     }
 }
 
@@ -835,7 +966,10 @@ our class RE_submatch is REbase {
 }
 
 our class RE_unordered_conjunction is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        $+PURE = 0;
+        '';
+    }
 }
 
 our class RE_unordered_disjunction is REbase {
@@ -843,17 +977,28 @@ our class RE_unordered_disjunction is REbase {
         my $alts := self.<zyg>;
         here +@$alts;
         my @result;
-        for @$alts -> $alt{
+        my $oldfakepos = $fakepos;
+        my $minfakepos = $fakepos + 1;
+        for @$alts -> $alt {
+            $fakepos = $oldfakepos;
             my $pat = $alt.lexer($¢);
-            $pat ~= "(?C{ $alt.<alt> })" if $callouts;
+            $pat ~= ' -> ' ~ $alt.<alt> if $callouts;
             push @result, $pat;
+            $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
-        join '|', @result;
+        my $result = "(\n" ~ indent(join "\n| ", @result) ~ "\n)";
+        say $result;
+        $fakepos = $minfakepos;  # Did all branches advance?
+        $result;
     }
 }
 
 our class RE_var is REbase {
     #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        $+PURE = 0;
+        '';
+    }
 }
 
 
