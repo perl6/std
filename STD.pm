@@ -113,12 +113,14 @@ token TOP {
 # Users should specify precedence only in relation to existing levels.
 
 constant %term              = { :prec<z=>                           };
-constant %methodcall        = { :prec<w=>                           };
-constant %autoincrement     = { :prec<v=>, :lvalue                  };
-constant %exponentiation    = { :prec<u=>, :assoc<right>, :assign   };
-constant %symbolic_unary    = { :prec<t=>                           };
-constant %multiplicative    = { :prec<s=>, :assoc<left>,  :assign   };
-constant %additive          = { :prec<r=>, :assoc<left>,  :assign   };
+constant %methodcall        = { :prec<y=>                           };
+constant %autoincrement     = { :prec<x=>, :lvalue                  };
+constant %exponentiation    = { :prec<w=>, :assoc<right>, :assign   };
+constant %symbolic_unary    = { :prec<v=>                           };
+constant %multiplicative    = { :prec<u=>, :assoc<left>,  :assign   };
+constant %additive          = { :prec<t=>, :assoc<left>,  :assign   };
+constant %replication       = { :prec<s=>, :assoc<left>,  :assign   };
+constant %concatenation     = { :prec<r=>, :assoc<left>,  :assign   };
 constant %junctive_and      = { :prec<q=>, :assoc<list>,  :assign   };
 constant %junctive_or       = { :prec<p=>, :assoc<list>,  :assign   };
 constant %named_unary       = { :prec<o=>,                          };
@@ -165,6 +167,8 @@ class Exponentiation  does PrecOp[|%exponentiation]         {}
 class Symbolic_unary  does PrecOp[|%symbolic_unary]         {}
 class Multiplicative  does PrecOp[|%multiplicative]         {}
 class Additive        does PrecOp[|%additive]               {}
+class Replication     does PrecOp[|%replication]            {}
+class Concatenation   does PrecOp[|%concatenation]          {}
 class Junctive_and    does PrecOp[|%junctive_and]           {}
 class Junctive_or     does PrecOp[|%junctive_or]            {}
 class Named_unary     does PrecOp[|%named_unary]            {}
@@ -697,6 +701,7 @@ token expect_term {
         ]
         # XXX assuming no precedence change
         <prefix_postfix_meta_operator>*                 {*}     #= prepost
+        <.ws>
     )*
 
     $<noun> = <noun>                                      {*}     #= noun
@@ -811,11 +816,6 @@ token quotepair {
     {*}
 }
 
-regex infix_nospace {
-    <expect_infix>
-    <!{ $<expect_infix> ~~ /\s/ }>
-}
-
 token expect_tight_infix ($loosest) {
     <!before '{' | <lambda> >     #'  # presumably a statement control block
     <expect_infix>
@@ -823,8 +823,11 @@ token expect_tight_infix ($loosest) {
 }
 
 token expect_infix {
-    <infix>
-    <infix_postfix_meta_operator>*
+    [
+    | <infix><infix_postfix_meta_operator>*
+    | <infix_prefix_meta_operator>
+    | <infix_circumfix_meta_operator>
+    ]
     {*}
 }
 
@@ -872,7 +875,7 @@ token expect_postfix {
 regex prefix_circumfix_meta_operator:reduce () {
     :my %thisop is context<rw>;
     @<sym> = [ '[' \\?? ]   # prefer no meta \ if op has \
-    <infix_nospace>
+    <expect_infix>
     @<sym> = [ ']' ]
 
     [ <!{ %+thisop<assoc> eq 'non' }>
@@ -890,13 +893,10 @@ token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' {*} }    #= hyper
 
 token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' {*} }    #= hyper
 
-token infix:pre { <infix_prefix_meta_operator> }
-token infix:circ { <infix_circumfix_meta_operator> }
-
 token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     <?lex1: negation>
 
-    <sym> <!before '!'> <infix_nospace>
+    <sym> <!before '!'> <infix> ::
 
     [
     || <?{ %+thisop<assoc> eq 'chain'}>
@@ -915,28 +915,28 @@ method lex1 (Str $s) {
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
     <?lex1: cross>
-    X <infix_nospace> X
+    X <infix> X
     {*}                                                         #= X X
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
     <lex1: hyper>
     [
-    | '«' <infix_nospace> '»'
-    | '«' <infix_nospace> '«'
-    | '»' <infix_nospace> '»'
-    | '»' <infix_nospace> '«'
-    | '<<' <infix_nospace> '>>'
-    | '<<' <infix_nospace> '<<'
-    | '>>' <infix_nospace> '>>'
-    | '>>' <infix_nospace> '<<'
+    | '«' <infix> '»'
+    | '«' <infix> '«'
+    | '»' <infix> '»'
+    | '»' <infix> '«'
+    | '<<' <infix> '>>'
+    | '<<' <infix> '<<'
+    | '>>' <infix> '>>'
+    | '>>' <infix> '<<'
     ]
     {*}                                                         #= « »
 }
 
 token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
     <?lex1: assignment>
-    '='
+    '=' ::
 
     [
     || <?{ %+thisop<prec> gt %item_assignment<prec> }>
@@ -1136,33 +1136,33 @@ token special_variable:sym<$/> {
 }
 
 token special_variable:sym<$~> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$~ variable', 'Form module')>
 }
 
 token special_variable:sym<$`> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('$` variable', 'explicit pattern before <(')>
 }
 
 token special_variable:sym<$@> {
-    <sym>
+    <sym> ::
     <obs('$@ variable as eval error', '$!')>
 }
 
 token special_variable:sym<$#> {
-    <sym>
+    <sym> ::
     [
     || (\w+) <obs("\$#$0 variable", "@{$0}.end")>
     || <obs('$# variable', '.fmt')>
     ]
 }
 token special_variable:sym<$$> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('$$ variable', '$*PID')>
 }
 token special_variable:sym<$%> {
-    <sym>
+    <sym> ::
     <obs('$% variable', 'Form module')>
 }
 
@@ -1173,42 +1173,42 @@ token special_variable:sym<$^X> {
 }
 
 token special_variable:sym<$^> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$^ variable', 'Form module')>
 }
 
 token special_variable:sym<$&> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('$& variable', '$/ or $()')>
 }
 
 token special_variable:sym<$*> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$* variable', '^^ and $$')>
 }
 
 token special_variable:sym<$)> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('$) variable', "$*EGID")>
 }
 
 token special_variable:sym<$-> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$- variable', 'Form module')>
 }
 
 token special_variable:sym<$=> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$= variable', 'Form module')>
 }
 
 token special_variable:sym<@+> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('@+ variable', '.to method')>
 }
 
 token special_variable:sym<%+> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('%+ variable', '.to method')>
 }
 
@@ -1228,12 +1228,12 @@ token special_variable:sym<@+{ }> {
 }
 
 token special_variable:sym<@-> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('@- variable', '.from method')>
 }
 
 token special_variable:sym<%-> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('%- variable', '.from method')>
 }
 
@@ -1253,12 +1253,12 @@ token special_variable:sym<@+{ }> {
 }
 
 token special_variable:sym<$+> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('$+ variable', 'Form module')>
 }
 
 token special_variable:sym<${^ }> {
-    ( <sigil> '{^' (.*?) '}' )
+    ( <sigil> '{^' :: (.*?) '}' )
     <obscaret($0, $<sigil>, $1)>
 }
 
@@ -1311,67 +1311,67 @@ token special_variable:sym<${ }> {
 }
 
 token special_variable:sym<$[> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$[ variable', 'user-defined array indices')>
 }
 
 token special_variable:sym<$]> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('$] variable', '$*PERL_VERSION')>
 }
 
 token special_variable:sym<$\\> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$\\ variable', "the filehandle's :ors attribute")>
 }
 
 token special_variable:sym<$|> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$| variable', 'Form module')>
 }
 
 token special_variable:sym<$:> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$: variable', 'Form module')>
 }
 
 token special_variable:sym<$;> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$; variable', 'real multidimensional hashes')>
 }
 
 token special_variable:sym<$'> { #'
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
 }
 
 token special_variable:sym<$"> {
-    <sym> <?before \s | ',' | '=' | <terminator> >
+    <sym> :: <?before \s | ',' | '=' | <terminator> >
     <obs('$" variable', '.join() method')>
 }
 
 token special_variable:sym<$,> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs(q/$, variable/, ".join() method")>
 }
 
 token special_variable:sym{'$<'} {
-    <sym> <!before \s* \w+ \s* '>' >
+    <sym> :: <!before \s* \w+ \s* '>' >
     <obs('$< variable', "$*UID")>
 }
 
 token special_variable:sym«$>» {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs("$() variable", "$*EUID")>
 }
 
 token special_variable:sym<$.> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs(q/$. variable/, "filehandle's .line method")>
 }
 
 token special_variable:sym<$?> {
-    <sym> <?before \s | ',' | <terminator> >
+    <sym> :: <?before \s | ',' | <terminator> >
     <obs('$? variable as child error', '$!')>
 }
 
@@ -2359,13 +2359,6 @@ token infix:sym</> ( --> Multiplicative)
 token infix:sym<%> ( --> Multiplicative)
     { <sym> {*} }                                               #= %
 
-# Note: no word boundary check after x, relies on longest token for x2 xx2 etc
-token infix:sym<x> ( --> Multiplicative)
-    { <sym> {*} }                                               #= x
-
-token infix:sym<xx> ( --> Multiplicative)
-    { <sym> {*} }                                               #= xx
-
 token infix:sym<+&> ( --> Multiplicative)
     { <sym> {*} }                                               #= +&
 
@@ -2398,9 +2391,6 @@ token infix:sym<+> ( --> Additive)
 token infix:sym<-> ( --> Additive)
     { <sym> {*} }                                               #= -
 
-token infix:sym<~> ( --> Additive)
-    { <sym> {*} }                                               #= ~
-
 token infix:sym<+|> ( --> Additive)
     { <sym> {*} }                                               #= +|
 
@@ -2418,6 +2408,18 @@ token infix:sym<?|> ( --> Additive)
 
 token infix:sym<?^> ( --> Additive)
     { <sym> {*} }                                               #= ?^
+
+## replication
+# Note: no word boundary check after x, relies on longest token for x2 xx2 etc
+token infix:sym<x> ( --> Replication)
+    { <sym> {*} }                                               #= x
+
+token infix:sym<xx> ( --> Replication)
+    { <sym> {*} }                                               #= xx
+
+## concatenation
+token infix:sym<~> ( --> Concatenation)
+    { <sym> {*} }                                               #= ~
 
 
 ## junctive and (all)
@@ -3131,7 +3133,7 @@ sub is_type($name) {
 }
 
 say "Starting...";
-my $r = Perl.new(:orig('42')).expect_term();
+my $r = Perl.new(:orig('42')).expect_infix();
 say $r;
 exit;
 say "WHAT\t", $r.WHAT;
