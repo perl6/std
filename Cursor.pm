@@ -7,7 +7,7 @@ my $callouts = 1;
 
 # most cursors just copy forward the previous value of the following two items:
 has $.orig;        # per match, the original string we are matching against
-our %lexer;       # per language, the cache of lexers, keyed by (|) location
+our %lexers;       # per language, the cache of lexers, keyed by (|) location
 
 has Bool $.bool is rw = 1;
 has StrPos $.from = 0;
@@ -18,38 +18,41 @@ has %.mykeys;
 has Str $.name;
 has $!item;
 
-method lexer { %lexer }   # XXX should be different per language, sigh
+method lexers { %lexers }   # XXX should be different per language, sigh
 
 my $fakepos = 1;
 
 method _AUTOLEXpeek ($key) {
     die "Null key" if $key eq '';
-    if %.lexer{$key} {
+    if %.lexers{$key} {
         if %+AUTOLEXED{$key} {   # no left recursion allowed in lexer!
-            die "left recursion in $key" if $fakepos == %+AUTOLEXED{$key};
+            die "Left recursion in $key" if $fakepos == %+AUTOLEXED{$key};
+            warn "Suppressing lexer recursion on $key";
             return -> $¢ { '' };  # (but if we advanced just assume a :: here)
         }
-        elsif %.lexer{$key}.WHAT eq Hash {
-            return %.lexer{$key}<lexer> // -> $¢ { '' };
+        elsif %.lexers{$key}.WHAT eq Hash {
+            return %.lexers{$key}<lexer> // -> $¢ { '' };
         }
-        say "oops ", $key.WHAT;
+        else {
+            say "oops ", $key.WHAT;
+        }
     }
     my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
-    %.lexer{$key} = hash(:$ast, :lexer(-> $¢ { '' }));
+    %.lexers{$key} = hash(:$ast, :lexer(-> $¢ { '' }));
     my $lexer = self._AUTOLEXgen($key,$ast);
-    %.lexer{$key}<lexer> = $lexer;
+    %.lexers{$key}<lexer> = $lexer;
     return $lexer;
 }
 
 method _AUTOLEXnow ($key) {
-    if %.lexer.exists($key) {
-        return %.lexer{$key}<lexer>;
+    if %.lexers.exists($key) {
+        return %.lexers{$key}<lexer>;
     }
     my %AUTOLEXED is context<rw>;
     my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
-    %.lexer{$key} = hash(:$ast, :lexer(undef));
+    %.lexers{$key} = hash(:$ast, :lexer(undef));
     my $lexer = self._AUTOLEXgen($key,$ast);
-    %.lexer{$key}<lexer> = $lexer;
+    %.lexers{$key}<lexer> = $lexer;
     return $lexer;
 }
 
@@ -59,6 +62,7 @@ method _AUTOLEXgen ($key,$ast) {
     my $lexer = $ast.lexer(self);
     %+AUTOLEXED{$key} = $oldfakepos;
     sub ($¢) {
+        1 while $lexer ~~ s:P5/\n[\x20\t]*\n/\n/;
         $lexer;
     }
 }
@@ -105,7 +109,7 @@ method matchify {
 method cursor_all (StrPos $fpos, StrPos $tpos) {
     my $r = self.new(
         :orig(self.orig),
-        #:lexer(self.lexer),
+        #:lexers(self.lexers),
         :from($fpos),
         :to($tpos),
         :pos($tpos),
@@ -119,7 +123,7 @@ method cursor_all (StrPos $fpos, StrPos $tpos) {
 method cursor (StrPos $tpos) {
     self.new(
         :orig(self.orig),
-        #:lexer(self.lexer),
+        #:lexers(self.lexers),
         :from(self.pos // 0),
         :to($tpos),
         :pos($tpos),
@@ -131,7 +135,7 @@ method cursor (StrPos $tpos) {
 method cursor_rev (StrPos $fpos) {
     self.new(
         :orig(self.orig),
-        #:lexer(self.lexer),
+        #:lexers(self.lexers),
         :pos($fpos),
         :from($fpos),
         :to(self.from),
@@ -718,7 +722,7 @@ our class RE_bindpos is REbase {
 }
 
 our class RE_bracket is REbase {
-    method lexer ($¢) { here; "(\n" ~ indent(self.<re>.lexer($¢)) ~ "\n)" }
+    method lexer ($¢) { here; indent("\n(\n" ~ indent(self.<re>.lexer($¢)) ~ "\n)") }
 }
 
 our class RE_cclass is REbase {
@@ -790,7 +794,7 @@ our class RE_method_noarg is REbase {
             }
             when 'sym' {
                 $fakepos++;
-                return self.<sym>;
+                return quotemeta(self.<sym>);
             }
             when 'alpha' {
                 $fakepos++;
@@ -838,7 +842,24 @@ our class RE_method_re is REbase {
 }
 
 our class RE_method_str is REbase {
-    #method lexer ($¢) { ... }
+    method lexer ($¢) {
+        my $name = self.<name>;
+        here $name;
+        my $str = self.<str>;
+        given $name {
+            when 'lex1' {
+                return '[]';
+            }
+            when 'panic' | 'obs' {
+                $+PURE = 0;
+                return '';
+            }
+            default {
+                my $lexer = $¢.$name($str, '?')[0];
+                return $lexer($¢);
+            }
+        }
+    }
 }
 
 our class RE_method is REbase {
@@ -879,7 +900,7 @@ our class RE_ordered_disjunction is REbase {
 }
 
 our class RE_paren is REbase {
-    method lexer ($¢) { here; "(\n" ~ indent(self.<re>.lexer($¢)) ~ "\n)" }
+    method lexer ($¢) { here; indent("\n(\n" ~ indent(self.<re>.lexer($¢)) ~ "\n)") }
 }
 
 our class RE_quantified_atom is REbase {
@@ -945,19 +966,17 @@ our class RE_sequence is REbase {
             push @result, $next;
             last unless $PURE;
         }
-        join '', @result;
+        join ' ', @result;
     }
 }
 
 our class RE_string is REbase {
     # XXX needs quoting
-    method lexer ($¢) {
+    method lexer ($c) {
         here ~self.<text>;
         my $text = self.<text>;
         $fakepos++ if self.<min>;
-        $text ~~ s:P5:g/([][\\*+?.^${}<>()]#)/\\$0/;
-        $text ~~ s:P5:g/\s/\\s/;  # XXX bogus, but who uses ws in tokens?
-        $text;
+        quotemeta($text);
     }
 }
 
@@ -986,7 +1005,7 @@ our class RE_unordered_disjunction is REbase {
             push @result, $pat;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
-        my $result = "(\n" ~ indent(join "\n| ", @result) ~ "\n)";
+        my $result = "\n(\n  " ~ indent(join "\n| ", @result) ~ "\n)";
         say $result;
         $fakepos = $minfakepos;  # Did all branches advance?
         $result;
