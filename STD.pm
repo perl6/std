@@ -1484,8 +1484,8 @@ regex fulltypename {
 
 token number {
     [
-    | <integer>
     | <dec_number>
+    | <integer>
     | <rad_number>
     ]
     {*}
