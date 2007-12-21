@@ -1400,7 +1400,11 @@ token variable {
         | <null> {*}                                            #= $?foo
         ]
     | <sigil> \d+ {*}                                           #= $0
+    # Note: $() can also parse as contextualizer in an expression; should have same effect
     | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
+    # Note: any ::() are handled within <name>, and subscript must be final part.
+    # A bare ::($foo) is not considered a variable, but ::($foo)::<$bar> is.
+    # (The point being that we want a sigil either first or last but not both.)
     | <name> '::' <?before '<' | '«' | '{' > <postcircumfix> {*} #= FOO::<$x>
     ]
     {*}
@@ -1431,10 +1435,18 @@ token twigil:sym<=> { <sym> }
 
 token name {
     [
-    | <ident> <nofat> [ '::' <ident> ]*
-    | [ '::' <ident> ]+
+    | <ident> <nofat> <morename>*
+    | <morename>+
     ]
     {*}
+}
+
+token morename {
+    '::'
+    [
+    | <ident>
+    | '(' <EXPR> ')'
+    ]
 }
 
 token subshortname {
