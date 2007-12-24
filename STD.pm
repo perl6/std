@@ -657,14 +657,13 @@ rule modifier_expr { <EXPR> {*} }
 
 rule statement_mod_cond:if     { <sym> <modifier_expr> {*} }    #= mod if
 rule statement_mod_cond:unless { <sym> <modifier_expr> {*} }    #= mod unless
-rule statement_mod_cond:when   { <sym> <modifier_expr> {*} }    #= mod for
+rule statement_mod_cond:when   { <sym> <modifier_expr> {*} }    #= mod when
 
 rule statement_mod_loop:while { <sym> <modifier_expr> {*} }     #= mod while
 rule statement_mod_loop:until { <sym> <modifier_expr> {*} }     #= mod until
 
 rule statement_mod_loop:for   { <sym> <modifier_expr> {*} }     #= mod for
 rule statement_mod_loop:given { <sym> <modifier_expr> {*} }     #= mod given
-rule statement_mod_loop:when  { <sym> <modifier_expr> {*} }     #= mod when
 
 token module_name {
     <name>                                          {*}         #= name
