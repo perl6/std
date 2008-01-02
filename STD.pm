@@ -1520,9 +1520,9 @@ token radint {
     [
     | <integer>
     | <rad_number> <?{
-                        defined $<rad_number><radint>
+                        defined $<rad_number><intpart>
                         and
-                        not defined $<rad_number><radfrac>
+                        not defined $<rad_number><fracpart>
                    }>
     ]
     {*}
