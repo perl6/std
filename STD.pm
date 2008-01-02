@@ -3018,6 +3018,7 @@ token qq_backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
 token qq_backslash:r { <sym> }
 token qq_backslash:t { <sym> }
 token qq_backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+token qq_backslash:sym<0> { <sym> }
 token qq_backslash:misc { :: \W || <panic: unrecognized backslash sequence> }
 
 token regex_backslash:a { :i <sym> }
