@@ -1538,11 +1538,11 @@ token rad_number {
     ::           # don't recurse in lexer
     [
     || '<'
-            $<radint> = [<[ 0..9 a..z A..Z ]>+
-            $<radfrac> = [ '.' <[ 0..9 a..z A..Z ]>+ ]?
+            $<intpart> = [<[ 0..9 a..z A..Z ]>+
+            $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ ]?
             [ '*' <base=radint> '**' <exp=radint> ]?
        '>'
-      { make radcalc($<radix>, $<radint>, $<radfrac>, $<base>, $<exp>) }
+      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
     || <?before '['> <postcircumfix>
     || <?before '('> <postcircumfix>
     ]
