@@ -1539,7 +1539,7 @@ token rad_number {
     [
     || '<'
             $<radint> = [<[ 0..9 a..z A..Z ]>+
-            $<radfrac> = [ '.' <[ 0..9 a..z A..Z ]>+ ]? ]
+            $<radfrac> = [ '.' <[ 0..9 a..z A..Z ]>+ ]?
             [ '*' <base=radint> '**' <exp=radint> ]?
        '>'
       { make radcalc($<radix>, $<radint>, $<radfrac>, $<base>, $<exp>) }
