@@ -2628,6 +2628,9 @@ token prefix:sym<not> ( --> Loose_unary)
 token infix:sym<,> ( --> Comma)
     { <sym> {*} }                                               #= ,
 
+token infix:sym« p5=> » ( --> Comma)
+    { <sym> {*} }                                               #= p5=>
+
 ## list infix
 token infix:sym<X> ( --> List_infix)
     { <sym> {*} }                                               #= X
