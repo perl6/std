@@ -2978,7 +2978,6 @@ token regex_metachar:sym<$$> {
 token regex_metachar:sym<$>  {
     '$'
     <before
-    | $
     | \s
     | '|'
     | ')'
