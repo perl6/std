@@ -3060,6 +3060,7 @@ token regex_assertion:method {
     {*}                                                        #= method
 }
 token regex_assertion:ident { <ident> [               # is qq right here?
+                                | '=' <regex_assertion>
                                 | ':' <.ws>
                                     <q_unbalanced(qlang('Q',':qq'), :stop«>»)>
                                 | '(' <semilist> ')'
