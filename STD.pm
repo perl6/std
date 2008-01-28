@@ -1030,7 +1030,7 @@ token variable_decl {
     [
     | '=' <.ws> <EXPR(%item_assignment)>
     | '.=' <.ws> <EXPR(%item_assignment)>
-    ]
+    ]?
 }
 
 rule scoped {
