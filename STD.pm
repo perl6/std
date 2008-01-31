@@ -2641,15 +2641,15 @@ token infix:sym<Z> ( --> List_infix)
 token infix:sym<minmax> ( --> List_infix)
     { <sym> {*} }                                               #= minmax
 
-token prefix:sigil ( --> List_prefix)
+token term:sigil ( --> List_prefix)
     { <sym=sigil> \s <arglist> {*} }                                #= $
 
-token prefix:typecast ( --> List_prefix)
+token term:typecast ( --> List_prefix)
     { <sym=typename> \s <arglist> {*} }                             #= Type
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last prefix: rule)
-token prefix:listop ( --> List_prefix)
+token term:listop ( --> List_prefix)
     { ::                        # call this rule last (as "shortest" token)
         <sym=ident>
         [
