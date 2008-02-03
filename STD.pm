@@ -2271,6 +2271,9 @@ token term:sym<undef> ( --> Term) {
     {*}                                                         #= undef
 }
 
+token term:sym<self> ( --> Term)
+    { <sym> {*} }                                               #= self
+
 token term:sym<*> ( --> Term)
     { <sym> {*} }                                               #= *
 
@@ -2648,7 +2651,7 @@ token term:typecast ( --> List_prefix)
     { <sym=typename> \s <arglist> {*} }                             #= Type
 
 # unrecognized identifiers are assumed to be post-declared listops.
-# (XXX for cheating purposes this rule must be the last prefix: rule)
+# (XXX for cheating purposes this rule must be the last term: rule)
 token term:listop ( --> List_prefix)
     { ::                        # call this rule last (as "shortest" token)
         <sym=ident>
