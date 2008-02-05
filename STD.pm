@@ -1427,6 +1427,7 @@ token sigil:sym<::> { <sym> }
 token twigil:sym<.> { <sym> }
 token twigil:sym<!> { <sym> }
 token twigil:sym<^> { <sym> }
+token twigil:sym<:> { <sym> }
 token twigil:sym<*> { <sym> }
 token twigil:sym<+> { <sym> }
 token twigil:sym<?> { <sym> }
