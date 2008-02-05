@@ -12,18 +12,34 @@
 # Why functions and not yaml?  I've found it easier to read and use.
 #
 # Development
-#  Currently slowly working through the various constructs,
-#  reducing the unprocessed residue.
-#perl -w STD_extract|grep '^\w'|sort|less
-
+#  Set of constructs recognized (almost?) complete.
+#    Rest sufficiently unique to likely to remain residue.
+# Todo
+#  inherit proto args
+#  condition arguments
+#  inquire questions
+#  
 # Questions
-#  why does  token arglist () {  have an empty arglist?
+#  why doesn't  token parameter {  have an empty arglist?
+#   all other occurances of :my are associated with arglists.
+#  why isn't proto rule  statement_control (:$endsym is context = / \s <nofat> /) { }  instead \s+ ?
+#
 
 use warnings;
 use strict;
 use utf8;
 binmode(STDOUT, ":utf8");
 binmode(STDERR, ":utf8");
+sub print_usage_and_exit {
+    print STDERR "Usage: $0 [--data|--rest|--both|--data-sorted|--summary]\n";
+    exit(2);
+}
+my $opt = '--data';
+if(@ARGV && $ARGV[0] =~ /^--(\w+)/) {
+    $opt = shift;
+} else {
+    print_usage_and_exit;
+}
 my $std_file = $ARGV[0] || "./STD.pm";
 open(F,"<$std_file") or die $!; binmode(F,":utf8");
 my $std = join("",<F>); close(F);
@@ -60,7 +76,7 @@ sub replace_sym {
     $s =~ s/<sym>/'$sym'/g; # these '' are for the rx literal.
     $s;
 }
-sub strip_oneliners {
+sub strip_oneliners { # bad idea - ws is significant.
     my($s)=@_;
     return $s if $s =~ /\n/;
     $s =~ s/^\s+//;
@@ -74,77 +90,141 @@ sub remove_solo_whatever {
 }
 sub extract {
     local $_ = $_;
+    my $braces = "{([^\n]*?|.*?^)}"; #/sm
     my $out = "";
+    my($data,$rest,$both) = ("","","");
+    my @data_list;
     while (1) {
-	if(/^(class (\w+) +does PrecOp\[\|%(.*?)\] *{} *\n)/) {
+	if(/\A(class (\w+) +does PrecOp\[\|%(.*?)\] *{} *\n)/) {
 	    my($all,$name,$prec)=($1,$2,$3);
 	    die "assert" if lc($name) ne $prec;
 	    $out .= "class_does_PrecOp('$prec');\n";
-	    $_ = substr($_,length($all)); next;
+	    $_ = substr($_,length($all));
 	}
-	if(/^(constant \%(\w+) += {\s*(.*?\S) *}; *\n)/) {
+	elsif(/\A(class (\w+) +does QLang +{(.*?)^} *\n)/sm) {
+	    my($all,$name,$block)=($1,$2,$3);
+	    $block = quote($block);
+	    $out .= "class_does_QLang('$name','$block');\n";
+	    $_ = substr($_,length($all));
+	}
+	elsif(/\A(constant \%(\w+) += {\s*(.*?\S) *}; *\n)/) {
 	    my($all,$name,$prec)=($1,$2,$3);
 	    $prec =~ s/ +/ /g;
 	    $prec =~ s/:(prec|assoc)<(.*?)>,?/$2/g;
 	    $out .= "constant_prec('$name','$prec');\n";
-	    $_ = substr($_,length($all)); next;
+	    $_ = substr($_,length($all));
 	}
-	if(/^(rule statement_control:(\w+) +{ <sym> <block> {\*} }.*\n)/) {
+	elsif(/\A((multi )?(method|sub) +(\w+) *\(([^\)]*?)\)[ \n]*{(.*?)^} *\n)/sm) {
+	    my($all,$multi,$methsub,$name,$args,$block)=($1,($2||""),$3,$4,$5,$6);
+	    $multi = 'multi_' if $multi;
+	    $args = quote($args);
+	    $block = quote($block);
+	    $out .= "grammar_$multi$methsub('$name','$args','$block');\n";
+	    $_ = substr($_,length($all));
+	}
+	elsif(/\A(proto token (\w+) { } *\n)/) {
+	    $out .= "proto_token_simple('$2');\n";
+	    $_ = substr($_,length($1));
+	}
+	elsif(/\A(proto (token|rule) +(\w+) \(:\$endsym is context = \/ >> <nofat> \/\) { } *\n)/) {
+	    $out .= "proto_endsym_nofat_angle_$2('$3');\n";
+	    $_ = substr($_,length($1));
+	}
+	elsif(/\A(proto token (\w+) is defequiv\(%(\w+)\) { } *\n)/) {
+	    $out .= "proto_token_defequiv('$2','$3');\n";
+	    $_ = substr($_,length($1));
+	}
+	elsif(/\A(proto (token|rule) +(\w+) \(:\$endsym is context = \/([^\/]+?)\/\) { } *\n)/) {
+	    $out .= "proto_endsym_other_${2}('$3','$4');\n";
+	    $_ = substr($_,length($1));
+	}
+	elsif(/\A(rule statement_control:(\w+) +{ <sym> <block> {\*} }.*\n)/) {
 	    $out .= "rule_statement_control_block('$2');\n";
-	    $_ = substr($_,length($1)); next;
+	    $_ = substr($_,length($1));
 	}
-	if(/^(rule statement_control:(\w+) +{ *\n(.*?\n)} *\n)/s) {
+	elsif(/\A(rule statement_control:(\w+) +{ *\n(.*?\n)} *\n)/s) {
 	    my($all,$name,$pat)=($1,$2,$3);
 	    $pat = quote(replace_sym($name,$pat));
 	    $out .= "rule_statement_control('$name','$pat');\n";
-	    $_ = substr($_,length($all)); next;
+	    $_ = substr($_,length($all));
 	}
-	if(/^(rule statement_mod_(cond|loop):(\w+) +{ <sym> <modifier_expr> {\*} }.*\n)/) {
+	elsif(/\A(rule statement_mod_(cond|loop):(\w+) +{ <sym> <modifier_expr> {\*} }.*\n)/) {
 	    $out .= "rule_statement_mod_$2('$3');\n";
-	    $_ = substr($_,length($1)); next;
+	    $_ = substr($_,length($1));
 	}
-	if(/^(token category:(\w+) +{ <sym> } *\n)/) {
+	elsif(/\A(token category:(\w+) +{ <sym> } *\n)/) {
 	    $out .= "token_category('$2');\n";
-	    $_ = substr($_,length($1)); next;
+	    $_ = substr($_,length($1));
 	}
-	if(/^(token ([a-z_]+):(?:sym. *(\S+?(?: \S+)?) *[»>\']|(\w+))(?: *\( *--> *(\w+) *\))?[ \n]*{(.*?)}(?: *#= ([^\n]+))? *\n(?=\w|\z))/s) {
+	elsif(/\A((token|rule) ([a-z_]+):(?:sym. *(\S+?(?: \S+)?) *[»>}\]\"\']|(\w+))(?: *\( *--> *(\w+) *\))?[ \n]*$braces(?: *#= ([^\n]+))? *\n(?=\w|\z))/sm) {
 	    # sym\S+ rather than sym. to work around perl 5.8.8 bug.
-	    my($all,$cat,$sym,$sym2,$type,$pat,$callit)=($1,$2,$3,$4,($5||""),$6,($7||""));
+	    my($all,$tr,$cat,$sym,$sym2,$type,$pat,$callit)=($1,$2,$3,$4,$5,($6||""),$7,($8||""));
 	    $sym = $sym2 if not defined($sym);
 	    $pat = remove_solo_whatever($pat);
 	    $pat = '' if $pat =~ /^\s*<sym>\s*$/;
 	    $pat = '' if $pat =~ /^\s*\'\Q$sym\E\'\s*$/;
 	    $callit = '' if $callit eq $sym;
-	    $pat = quote(strip_oneliners(replace_sym($sym,$pat)));
+	    $pat = quote(replace_sym($sym,$pat));
 	    $type = lc $type;
-	    $out .= "token_op('$cat','$sym','$type','$pat','$callit');\n";
-	    $_ = substr($_,length($all)); next;
+	    $out .= "${tr}_op('$cat','$sym','$type','$pat','$callit');\n";
+	    $_ = substr($_,length($all));
 	}
-	if(/^((token|rule) (\w+)(?: *\(([^\)]+)\))? *{(.*?)} *\n)/s) {
+	elsif(/\A((token|rule|regex) (\w+)(?: *\(([^\)]*)\))? *$braces *\n)/sm) {
 	    my($all,$tr,$name,$args,$pat)=($1,$2,$3,$4,$5);
 	    $pat = remove_solo_whatever($pat);
-	    $pat = quote(strip_oneliners(replace_sym($name,$pat)));
+	    $pat = quote(replace_sym($name,$pat));
 	    if(defined $args) {
-		$out .= "${tr}_patterm_with_args('$name','$args','$pat');\n";
+		$out .= "${tr}_pattern_with_args('$name','$args','$pat');\n";
 	    }else{
-		$out .= "${tr}_patterm('$name','$pat');\n";
+		$out .= "${tr}_pattern('$name','$pat');\n";
 	    }
-	    $_ = substr($_,length($all)); next;
+	    $_ = substr($_,length($all));
 	}
-	if(/^(rule statement_prefix:(\w+) +{ <sym> <statement> {\*} }.*\n)/) {
+	elsif(/\A(rule statement_prefix:(\w+) +{ <sym> <statement> {\*} }.*\n)/) {
 	    $out .= "rule_statement_prefix('$2');\n";
-	    $_ = substr($_,length($1)); next;
+	    $_ = substr($_,length($1));
 	}
-
-	# development hack
-	if(/^(.*\n)/) {
-	    print $1;
-	    $_ = substr($_,length($1)); next;
+	elsif(/\A(.*\n)/) {
+	    $rest .= $1;
+	    $both .= $1;
+	    $_ = substr($_,length($1));
 	}
-	last;
+	elsif(/\A\z/) {
+	    last;
+	}
+	else {
+	    die "ERROR: match failed.  File doesnt end in newline?\n$_";
+	}
+	if($out =~ /^(?!\A)\w/m) {
+	    die "BUG: a regex overshot, matching:\n$out";
+	}
+	$data .= $out;
+	$both .= $out;
+	push(@data_list,$out);
+	$out = "";
     }
-    my $residue = $_;
-    print $out;
+    if($opt eq '--data') {
+	print $data;
+    }
+    elsif($opt eq '--both') {
+	print $both;
+    }
+    elsif($opt eq '--rest') {
+	print $rest;
+    }
+    elsif($opt eq '--sorted-data') {
+	my @sorted = sort { my $atop = $a=~/^(.+)/;my $btop = $b=~/^(.*)/; $a cmp $b } @data_list;
+	print join("",@sorted);
+    }
+    elsif($opt eq '--summary') {
+	open(F,"|grep '^\\w'|sort") or die;
+	binmode(F, ":utf8");
+	print F $both;
+	close(F);
+    }
+    else {
+	print_usage_and_exit;
+    }
 }
 
 remove_clutter;
