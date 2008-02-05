@@ -1631,10 +1631,14 @@ token quote:sym</ />   {
 }
 
 # handle composite forms like qww
-token quote:qq { <sym> <quote_mod>
-    <quotesnabber(':qq', $<quote_mod>)> }
-token quote:q { <sym>  <quote_mod>
-    <quotesnabber(':q', $<quote_mod>)> }
+token quote:qq {
+    <sym> <quote_mod>
+    <quotesnabber(':qq', $<quote_mod>)>
+}
+token quote:q {
+    <sym>  <quote_mod>
+    <quotesnabber(':q', $<quote_mod>)>
+}
 
 token quote_mod:w  { <sym> }
 token quote_mod:ww { <sym> }
@@ -1652,13 +1656,18 @@ token quote:rx { <sym> <quotesnabber(':regex')> }
 token quote:m { <sym>  <quotesnabber(':regex')> }
 token quote:mm { <sym> <quotesnabber(':regex', ':s')> }
 
-token quote:s { <sym>  <pat=quotesnabber(':regex')>
-                        <finish_subst($<pat>)> }
-token quote:ss { <sym> <pat=quotesnabber(':regex', ':s')>
-                        <finish_subst($<pat>)> }
-
-token quote:tr { <sym> <pat=quotesnabber(':trans')>
-                        <finish_trans($<pat>)> }
+token quote:s {
+    <sym>  <pat=quotesnabber(':regex')>
+    <finish_subst($<pat>)>
+}
+token quote:ss {
+    <sym> <pat=quotesnabber(':regex', ':s')>
+    <finish_subst($<pat>)>
+}
+token quote:tr {
+    <sym> <pat=quotesnabber(':trans')>
+    <finish_trans($<pat>)>
+}
 
 token finish_subst ($pat) {
     :my %thisop is context<rw>;
@@ -2654,14 +2663,14 @@ token term:typecast ( --> List_prefix)
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last term: rule)
 token term:listop ( --> List_prefix)
-    { ::                        # call this rule last (as "shortest" token)
+{ ::                        # call this rule last (as "shortest" token)
         <sym=ident>
         [
         || \s <nofat> <arglist> {*}                             #= listop args
         || <nofat> {*}                                          #= listop noarg
         ]
         {*}                                                     #= listop
-    }
+}
 
 ## loose and
 token infix:sym<and> ( --> Loose_and)
