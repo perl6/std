@@ -1,0 +1,94 @@
+#!/usr/bin/perl -w
+# A script to extract most information from STD.pm,
+# in a simple "functional" form (runable in perl5/ruby/etc),
+# to aid the development of new parsers in p6 bootstrap efforts,
+# by making the information more accessible.
+# 
+# Eg,
+#   class Term            does PrecOp[|%term]                   {}
+# becomes something like
+#   class_does_PrecOp('term');
+#
+# Why functional and not yaml?  I've found it easier to read and use.
+#
+# Development
+#  Currently slowly working through the various constructs,
+#  reducing the unprocessed residue.
+#perl -w STD_extract|grep '^\w'|sort|less
+
+use warnings;
+use strict;
+
+my $std_file = $ARGV[0] || "./STD.pm";
+my $std = `cat $std_file`;
+local $_ = $std;
+
+sub remove_clutter {
+    s/^ *\#.*\n//mg;
+    s/ \# .*//mg;
+    #s/^=begin\s+(.*?\S)\s*\n(?:.|\n)*?^=end\s+\1\s*\n//mg;
+    # no, eg, =begin perlhints <-> matched by =end perlhints .
+    s/^=begin\s+(\S+).*\n(?:.|\n)*?^=end\s+\1.*\n//mg;
+    
+    # grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
+    s/^grammar.*//m;
+    # BEGIN { say "compiling STD" }
+    s/^BEGIN { say.*//m;
+    
+    # say "Starting...";   to end-of-file
+    s/^say .*//ms;
+    
+    while(s/\n *\n/\n/g){}
+    s/^\n+//;
+}
+sub extract {
+    local $_ = $_;
+    my $out = "";
+    while (1) {
+	if(/^(class (\w+) +does PrecOp\[\|%(.*?)\] *{} *\n)/) {
+	    my($all,$name,$prec)=($1,$2,$3);
+	    die "assert" if lc($name) ne $prec;
+	    $out .= "class_does_PrecOp('$prec');\n";
+	    $_ = substr($_,length($all)); next;
+	}
+	if(/^(constant \%(\w+) += {\s*(.*?\S) *}; *\n)/) {
+	    my($all,$name,$prec)=($1,$2,$3);
+	    $prec =~ s/ +/ /g;
+	    $prec =~ s/:(prec|assoc)<(.*?)>,?/$2/g;
+	    $out .= "constant_prec('$name','$prec');\n";
+	    $_ = substr($_,length($all)); next;
+	}
+	if(/^(rule statement_control:(\w+) +{ <sym> <block> {\*} }.*\n)/) {
+	    $out .= "rule_statement_control_block('$2');\n";
+	    $_ = substr($_,length($1)); next;
+	}
+	if(/^(rule statement_control:(\w+) +{ *\n(.*?\n)} *\n)/s) {
+	    my($all,$name,$pat)=($1,$2,$3);
+	    $pat =~ s/<sym>/'$name'/;
+	    $pat =~ s/\\/\\\\/g;
+	    $pat =~ s/\'/\\\'/g;
+	    $out .= "rule_statement_control('$name','$pat');\n";
+	    $_ = substr($_,length($all)); next;
+	}
+	if(/^(rule statement_mod_(cond|loop):(\w+) +{ <sym> <modifier_expr> {\*} }.*\n)/) {
+	    $out .= "rule_statement_mod_$2('$3');\n";
+	    $_ = substr($_,length($1)); next;
+	}
+	if(/^(rule statement_prefix:(\w+) +{ <sym> <statement> {\*} }.*\n)/) {
+	    $out .= "rule_statement_prefix('$2');\n";
+	    $_ = substr($_,length($1)); next;
+	}
+
+	# development hack
+	if(/^(.*\n)/) {
+	    print $1;
+	    $_ = substr($_,length($1)); next;
+	}
+	last;
+    }
+    my $residue = $_;
+    print $out;
+}
+
+remove_clutter;
+extract;
