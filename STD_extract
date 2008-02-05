@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
-# A script to extract most information from STD.pm,
-# in a simple "functional" form (runable in perl5/ruby/etc),
+# A script to extract most parser-related information from STD.pm,
+# in a simple "functions" form (runable in perl5/ruby/etc),
 # to aid the development of new parsers in p6 bootstrap efforts,
 # by making the information more accessible.
 # 
@@ -9,23 +9,30 @@
 # becomes something like
 #   class_does_PrecOp('term');
 #
-# Why functional and not yaml?  I've found it easier to read and use.
+# Why functions and not yaml?  I've found it easier to read and use.
 #
 # Development
 #  Currently slowly working through the various constructs,
 #  reducing the unprocessed residue.
 #perl -w STD_extract|grep '^\w'|sort|less
 
+# Questions
+#  why does  token arglist () {  have an empty arglist?
+
 use warnings;
 use strict;
-
+use utf8;
+binmode(STDOUT, ":utf8");
+binmode(STDERR, ":utf8");
 my $std_file = $ARGV[0] || "./STD.pm";
-my $std = `cat $std_file`;
+open(F,"<$std_file") or die $!; binmode(F,":utf8");
+my $std = join("",<F>); close(F);
 local $_ = $std;
 
 sub remove_clutter {
     s/^ *\#.*\n//mg;
     s/ \# .*//mg;
+    s/(?<=\s)\#\'//g;
     #s/^=begin\s+(.*?\S)\s*\n(?:.|\n)*?^=end\s+\1\s*\n//mg;
     # no, eg, =begin perlhints <-> matched by =end perlhints .
     s/^=begin\s+(\S+).*\n(?:.|\n)*?^=end\s+\1.*\n//mg;
@@ -40,6 +47,30 @@ sub remove_clutter {
     
     while(s/\n *\n/\n/g){}
     s/^\n+//;
+}
+sub quote {
+    my($s)=@_;
+    $s =~ s/\\/\\\\/g;
+    $s =~ s/\'/\\\'/g;
+    $s;
+}
+sub replace_sym {
+    my($sym,$s)=@_;
+    $sym = quote($sym);
+    $s =~ s/<sym>/'$sym'/g; # these '' are for the rx literal.
+    $s;
+}
+sub strip_oneliners {
+    my($s)=@_;
+    return $s if $s =~ /\n/;
+    $s =~ s/^\s+//;
+    $s =~ s/\s+$//;
+    return $s;
+}
+sub remove_solo_whatever {
+    my($s)=@_;
+    my $tmp = $s; $tmp =~ s/{\*\}//; $s = $tmp if $tmp !~ /{\*\}/;
+    return $s;
 }
 sub extract {
     local $_ = $_;
@@ -64,15 +95,41 @@ sub extract {
 	}
 	if(/^(rule statement_control:(\w+) +{ *\n(.*?\n)} *\n)/s) {
 	    my($all,$name,$pat)=($1,$2,$3);
-	    $pat =~ s/<sym>/'$name'/;
-	    $pat =~ s/\\/\\\\/g;
-	    $pat =~ s/\'/\\\'/g;
+	    $pat = quote(replace_sym($name,$pat));
 	    $out .= "rule_statement_control('$name','$pat');\n";
 	    $_ = substr($_,length($all)); next;
 	}
 	if(/^(rule statement_mod_(cond|loop):(\w+) +{ <sym> <modifier_expr> {\*} }.*\n)/) {
 	    $out .= "rule_statement_mod_$2('$3');\n";
 	    $_ = substr($_,length($1)); next;
+	}
+	if(/^(token category:(\w+) +{ <sym> } *\n)/) {
+	    $out .= "token_category('$2');\n";
+	    $_ = substr($_,length($1)); next;
+	}
+	if(/^(token ([a-z_]+):(?:sym. *(\S+?(?: \S+)?) *[»>\']|(\w+))(?: *\( *--> *(\w+) *\))?[ \n]*{(.*?)}(?: *#= ([^\n]+))? *\n(?=\w|\z))/s) {
+	    # sym\S+ rather than sym. to work around perl 5.8.8 bug.
+	    my($all,$cat,$sym,$sym2,$type,$pat,$callit)=($1,$2,$3,$4,($5||""),$6,($7||""));
+	    $sym = $sym2 if not defined($sym);
+	    $pat = remove_solo_whatever($pat);
+	    $pat = '' if $pat =~ /^\s*<sym>\s*$/;
+	    $pat = '' if $pat =~ /^\s*\'\Q$sym\E\'\s*$/;
+	    $callit = '' if $callit eq $sym;
+	    $pat = quote(strip_oneliners(replace_sym($sym,$pat)));
+	    $type = lc $type;
+	    $out .= "token_op('$cat','$sym','$type','$pat','$callit');\n";
+	    $_ = substr($_,length($all)); next;
+	}
+	if(/^((token|rule) (\w+)(?: *\(([^\)]+)\))? *{(.*?)} *\n)/s) {
+	    my($all,$tr,$name,$args,$pat)=($1,$2,$3,$4,$5);
+	    $pat = remove_solo_whatever($pat);
+	    $pat = quote(strip_oneliners(replace_sym($name,$pat)));
+	    if(defined $args) {
+		$out .= "${tr}_patterm_with_args('$name','$args','$pat');\n";
+	    }else{
+		$out .= "${tr}_patterm('$name','$pat');\n";
+	    }
+	    $_ = substr($_,length($all)); next;
 	}
 	if(/^(rule statement_prefix:(\w+) +{ <sym> <statement> {\*} }.*\n)/) {
 	    $out .= "rule_statement_prefix('$2');\n";
