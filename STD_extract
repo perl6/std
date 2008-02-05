@@ -25,6 +25,8 @@
 #   all other occurances of :my are associated with arglists.
 #  why isn't proto rule  statement_control (:$endsym is context = / \s <nofat> /) { }  instead \s+ ?
 #
+# Why am I reinventing cheat/metholate?
+#
 
 use warnings;
 use strict;
