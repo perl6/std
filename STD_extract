@@ -23,9 +23,12 @@
 # Questions
 #  why doesn't  token parameter {  have an empty arglist?
 #   all other occurances of :my are associated with arglists.
+#       Answer: the () was a fossil from when I had to do context vars as parameters because :my hadn't been invented yet.
 #  why isn't proto rule  statement_control (:$endsym is context = / \s <nofat> /) { }  instead \s+ ?
+#	Answer: because statement control rules will eat \s+ anyway via sigspace, and because this ought to have been a lookahead anyway.
 #
 # Why am I reinventing cheat/metholate?
+#	Answer: I don't know.
 #
 
 use warnings;
