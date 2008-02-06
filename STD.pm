@@ -300,7 +300,7 @@ token category:statement_prefix { <sym> }
 proto rule  statement_prefix (:$endsym is context = / >> <nofat> /) { }
 
 token category:statement_control { <sym> }
-proto rule  statement_control (:$endsym is context = / \s <nofat> /) { }
+proto rule  statement_control (:$endsym is context = / <nofat> <?before \s | '#'> /) { }
 
 token category:statement_mod_cond { <sym> }
 proto rule  statement_mod_cond (:$endsym is context = / >> <nofat> /) { }
@@ -393,8 +393,7 @@ method UNIT ($unitstopper is context = "_EOS") {
 
 # Note: we only check for the unitstopper.  We don't check for ^ because
 # we might be embedded in something else.
-rule comp_unit ()
-{
+rule comp_unit {
     :my $begin_compunit is context = 1;
     :my $endstmt        is context<rw> = -1;
     :my $endargs        is context<rw> = -1;
@@ -515,7 +514,7 @@ token label {
     {*}
 }
 
-rule statement () {
+rule statement {
     :my StrPos :$endstmt is context<rw> = -1;
     :my $x;
     <label>*                                     {*}            #= label
@@ -871,7 +870,7 @@ token expect_postfix {
 
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
 # (Also backtracks if on \op when no \op infix exists.)
-regex prefix_circumfix_meta_operator:reduce () {
+regex prefix_circumfix_meta_operator:reduce {
     :my %thisop is context<rw>;
     @<sym> = [ '[' \\?? ]   # prefer no meta \ if op has \
     <expect_infix>
@@ -998,7 +997,7 @@ token methodop {
     {*}
 }
 
-token arglist () {
+token arglist {
     :my StrPos $endargs is context<rw> = 0;
     <EXPR(%list_prefix)>
 }
@@ -2071,7 +2070,7 @@ token quote_escapes {
 }
 
 # Note, backtracks!  So expect_postfix mustn't commit to anything permanent.
-regex extrapost () {
+regex extrapost {
     :my $inquote is context = 1;
     <expect_postfix>*
     # XXX Shouldn't need a backslash on anything but the right square here
@@ -2140,7 +2139,7 @@ token sigterm {
     {*}
 }
 
-rule signature () {
+rule signature {
     :my $zone is context<rw> = 'posreq';
     @<parsep> = ( <parameter>
                     ( ',' | ':' | ';' | ';;' | <?before '-->' | ')' | '{' > )
