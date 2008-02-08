@@ -11,45 +11,62 @@
 #
 # Why functions and not yaml?  I've found it easier to read and use.
 #
+# What is the difference vis cheat and metholate?
+#  Their focus is on code transformation, with a single target.
+#  Transforming STD.pm into p6 a pugs-level implementation can run directly.
+#  This script is more literary decomposition.  Providing human readable and
+#  metaprogramming bits for the "hand" creation of a bootstrap p6 parser in
+#  non-p6 programming languages.  Only really has to succeed once of course.
+#  cheat and metholate would clearly be sufficient if we had an activily
+#  developed pugs-level p6 implementation, or the hope of having one soon.
+#  That doesn't appear to be the case, and it's not clear 'runs on pugs' is
+#  sufficient?
+#
 # Development
 #  Set of constructs recognized (almost?) complete.
 #    Rest sufficiently unique to likely to remain residue.
 # Todo
 #  inherit proto args
 #  condition arguments
+#   code and pattern element extraction is still quite buggy.
 #  check output is syntactically correct (p5,rb,py?).
 #  inquire questions
 #  
 # Questions
-#  why doesn't  token parameter {  have an empty arglist?
-#   all other occurances of :my are associated with arglists.
-#       Answer: the () was a fossil from when I had to do context vars as parameters because :my hadn't been invented yet.
-#  why isn't proto rule  statement_control (:$endsym is context = / \s <nofat> /) { }  instead \s+ ?
-#	Answer: because statement control rules will eat \s+ anyway via sigspace, and because this ought to have been a lookahead anyway.
 #
-# Why am I reinventing cheat/metholate?
-#	Answer: I don't know.
 #
+# Notes
+#  Q: why isn't
+#    proto rule statement_control (:$endsym is context = / \s <nofat> /) { }
+#   instead \s+ ?
+#   A: because statement control rules will eat \s+ anyway via sigspace,
+#    and because this ought to have been a lookahead anyway.
 
 use warnings;
 use strict;
 use utf8;
+use Regexp::Common;
+
 binmode(STDOUT, ":utf8");
 binmode(STDERR, ":utf8");
 sub print_usage_and_exit {
-    print STDERR "Usage: $0 [--data|--rest|--both|--data-sorted|--summary]\n";
+    print STDERR "Usage: $0 REPORT-DIRECTORY [INPUT-FILE]\n";
     exit(2);
 }
-my $opt = '--data';
-if(@ARGV && $ARGV[0] =~ /^--(\w+)/) {
-    $opt = shift;
-} else {
-    print_usage_and_exit;
-}
-my $std_file = $ARGV[0] || "./STD.pm";
+print_usage_and_exit if not @ARGV or not -d $ARGV[0];
+my $dir = $ARGV[0]; $dir =~ s/\/$//;
+my $std_file = $ARGV[1] || "./STD.pm";
 open(F,"<$std_file") or die $!; binmode(F,":utf8");
 my $std = join("",<F>); close(F);
 local $_ = $std;
+
+sub spew {
+    my($fn,$s)=@_;
+    open(F,">$dir/$fn") or die;
+    binmode(F, ":utf8");
+    print F $s;
+    close(F);
+}
 
 sub remove_clutter {
     s/^ *\#.*\n//mg;
@@ -218,31 +235,19 @@ sub extract {
 	push(@data_list,$out);
 	$out = "";
     }
-    if($opt eq '--data') {
-	print $data;
-    }
-    elsif($opt eq '--both') {
-	print $both;
-    }
-    elsif($opt eq '--rest') {
-	print $rest;
-    }
-    elsif($opt eq '--sorted-data') {
-	my @sorted = sort { my $atop = $a=~/^(.+)/;my $btop = $b=~/^(.*)/; $a cmp $b } @data_list;
-	print join("",@sorted);
-    }
-    elsif($opt eq '--summary') {
-	open(F,"|grep '^\\w'|sort") or die;
-	binmode(F, ":utf8");
-	print F $both;
-	close(F);
-    }
-    elsif($opt eq '--pattern-elements') {
-	print pattern_analysis(\@patterns)->[1];
-    }
-    else {
-	print_usage_and_exit;
-    }
+    spew("item-both.pm",$both);
+    spew("item-data.pm",$data);
+    spew("item-rest.pm",$rest);
+
+    my @sorted = sort { my $atop = $a=~/^(.+)/;my $btop = $b=~/^(.*)/; $a cmp $b } @data_list;
+    spew("item-data-sorted.pm",join("",@sorted));
+
+    open(F,"|grep '^\\w'|sort>$dir/item-summary") or die;
+    binmode(F, ":utf8");
+    print F $both;
+    close(F);
+
+    pattern_analysis(\@patterns);
 }
 sub pattern_analysis {
     my($patterns)=@_;
@@ -250,17 +255,52 @@ sub pattern_analysis {
     local $_ = $pats;
     s/ +/ /g;
     s/\n /\n/g;
-    my $quote_spaces = sub {my($s)=@_;$s=~s/ /\014/g;$s};
-    s/(:my.+)/$quote_spaces->($1)/eg;
-    s/((?<!\')#.+)/$quote_spaces->($1)/eg;
-    s/(?<=\s)(<[^>]+?>)/$quote_spaces->($1)/eg;
-    s/(?<=\s)(\([^>]+?\))/$quote_spaces->($1)/eg;
+    my @code;
+    my $re = $RE{balanced}{-parens=>'{}()<>[]'};
+    while(s/(?:(?<=\s)|(?<=^))(\{(?!(?:\.\.\.|\*)\})$re})/{...}/ms) {
+	my $code = $1;
+	$code =~ s/\n/  /g;
+	push(@code,$code."\n");
+    }
+    while(/^\s*(:my.*)/mgc) {
+	push(@code,$1."\n");
+    }
+
+    my $preserve_spaces = sub {my($s)=@_;$s=~s/ /\014/g;$s};
+    s/(:my.+)/$preserve_spaces->($1)/eg;
+    s/((?<!\')#.+)/$preserve_spaces->($1)/eg;
+
+    $re = $RE{delimited}{-delim=>'"'};
+    #s/(?<=\s)($re)/$preserve_spaces->($1)/eg;
+    $re = $RE{delimited}{-delim=>"'"};
+    #s/(?<=\s)($re)/$preserve_spaces->($1)/eg;
+    $re = $RE{delimited}{-delim=>'/'};
+    #s/(?<=\s)($re)/$preserve_spaces->($1)/eg;
+    $re = $RE{balanced}{-parens=>'<>'};
+    s/(?<=\s)($re)/$preserve_spaces->($1)/eg;
+
     s/ /\n/g;
-    s/\n+/\n/g;
     s/\014/ /g;
+    s/\n+/\n/g; s/\A\n//;
     my $elements = $_;
-    return [$pats,$elements];
+
+    spew("pattern-dump",$pats);
+    spew("pattern-elements",$elements);
+    do {
+	my $elems = $elements;
+	local $_ = $elems;
+	s/^#= .+/#= xxx/mg;
+	$elems = $_;
+	my @e = map{"$_\n"} split(/\n/,$elems);
+	my %u = map{($_,1)} @e;
+	my $uniq = join("",sort keys %u);
+	spew("pattern-elements-unique",$uniq);
+    };
+    spew("pattern-code",join("",@code));
 }
 
+spew("file_0.pm",$_);
 remove_clutter;
+spew("file_2.pm",$_);
+system("cd $dir; diff -u file_0.pm file_2.pm > file_1.pm");
 extract;
