@@ -133,6 +133,7 @@ constant %item_assignment   = { :prec<i=>, :assoc<right>, :lvalue   };
 constant %loose_unary       = { :prec<h=>,                          };
 constant %comma             = { :prec<g=>, :assoc<list>,            };
 constant %list_infix        = { :prec<f=>, :assoc<list>,            };
+constant %list_assignment   = { :prec<i=>, :sub<e=>, :assoc<right>, :lvalue };
 constant %list_prefix       = { :prec<e=>,                          };
 constant %loose_and         = { :prec<d=>, :assoc<left>,            };
 constant %loose_or          = { :prec<c=>, :assoc<left>,            };
@@ -181,6 +182,7 @@ class Item_assignment does PrecOp[|%item_assignment]        {}
 class Loose_unary     does PrecOp[|%loose_unary]            {}
 class Comma           does PrecOp[|%comma]                  {}
 class List_infix      does PrecOp[|%list_infix]             {}
+class List_assignment does PrecOp[|%list_assignment]        {}
 class List_prefix     does PrecOp[|%list_prefix]            {}
 class Loose_and       does PrecOp[|%loose_and]              {}
 class Loose_or        does PrecOp[|%loose_or]               {}
@@ -759,7 +761,7 @@ token noun {
     | <regex_declarator>
     | <type_declarator>
     | <circumfix>
-    | <variable>
+    | <variable> { $<sigil> = $<variable><sigil> }
     | <value>
     | <subcall>
     | <capterm>
@@ -796,10 +798,10 @@ token pair {
 token colonpair {
     ':'
     [
-    | '!' <ident>                                       {*}    #= false
+    | '!' <ident>                                        {*}    #= false
     | <ident> [ <.unsp>? <postcircumfix> ]?              {*}    #= value
-    | <postcircumfix>                                   {*}    #= structural
-    | <sigiltwigil> <desigilname>                       {*}    #= varname
+    | <postcircumfix>                                    {*}    #= structural
+    | <sigil> <twigil>? <desigilname>                    {*}    #= varname
     ]
     {*}
 }
@@ -1016,9 +1018,9 @@ token circumfix:sym<{ }> ( --> Circumfix) {
 }
 
 token variable_decl {
-    <variable>
+    <variable> { $<sigil> = $<variable><sigil> }
     [   # Is it a shaped array or hash declaration?
-        <?{ $<variable><sigiltwigil><sigil> eq '@' | '%' }>
+        <?{ $<sigil> eq '@' | '%' }>
         <.ws>
         <?before [ '<' | '(' |  '[' | '{' ] >
         <postcircumfix>
@@ -1027,20 +1029,22 @@ token variable_decl {
     <trait>*
     <.ws>
     [
-    | '=' <.ws> <EXPR(%item_assignment)>
+    | '=' <.ws> <EXPR( $<sigil> eq '$' ?? %item_assignment !! %list_prefix )>
     | '.=' <.ws> <EXPR(%item_assignment)>
     ]?
 }
 
 rule scoped {
     [
-    | <variable_decl>
-    | <typename>? '(' <signature> ')' <trait>*
-    | <package_declarator>
-    | <typename>? <plurality_declarator>
-    | <typename>? <routine_declarator>
     | <regex_declarator>
-    | <typename>? <type_declarator>
+    | <package_declarator>
+    | <typename>*
+        [ <variable_decl>
+        | '(' <signature> ')' <trait>*
+        | <plurality_declarator>
+        | <routine_declarator>
+        | <type_declarator>
+        ]
     ]
     
     {*}
@@ -1373,7 +1377,7 @@ token special_variable:sym<$?> {
     <obs('$? variable as child error', '$!')>
 }
 
-# desigilname should always follow a sigiltwigil
+# desigilname should only follow a sigil/twigil
 
 token desigilname {
     [
@@ -1386,14 +1390,14 @@ token desigilname {
 token variable {
     [
     | <special_variable> {*}                                    #= special
-    | <sigiltwigil>
+    | <sigil> <twigil>?
         [
-        || <?{ $<sigiltwigil><sigil> eq '&' }> ::
+        || <?{ $<sigil> eq '&' }> ::
             <sublongname> {*}                                   #= subnoun
         || <desigilname> {*}                                    #= desigilname
         ]
         [
-        | <?{ $<sigiltwigil><twigil> eq '.' }>
+        | <?{ $<twigil> eq '.' }>
             <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
         | <null> {*}                                            #= $?foo
         ]
@@ -1406,11 +1410,6 @@ token variable {
     | <name> '::' <?before '<' | '«' | '{' > <postcircumfix> {*} #= FOO::<$x>
     ]
     {*}
-}
-
-token sigiltwigil {
-    <sigil> <twigil>?
-    <?{{ {*}; 1 }}>               # XXX right way to allow use in longer token?
 }
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
@@ -2092,7 +2091,7 @@ rule routine_def {
 rule method_def {
     [
     | <ident>  <multisig>?
-    | <?before <sigil> '.' [ '[' | '{' | '(' ] > <sigiltwigil> <postcircumfix>
+    | <?before <sigil> '.' [ '[' | '{' | '(' ] > <sigil> <postcircumfix>
     ]
     <trait>*
     <block>
@@ -2173,14 +2172,14 @@ rule post_constraint {
 }
 
 token param_var {
-    <sigiltwigil>
+    <sigil> <twigil>?
     [
         # Is it a longname declaration?
-    || <?{ $<sigiltwigil><sigil> eq '&' }> <?ident> ::
+    || <?{ $<sigil> eq '&' }> <?ident> ::
         <ident=sublongname>
 
     ||  # Is it a shaped array or hash declaration?
-        <?{ $<sigiltwigil><sigil> eq '@' | '%' }>
+        <?{ $<sigil> eq '@' | '%' }>
         <ident>?
         <.ws>
         <?before <[ \< \( \[ \{ ]> >
@@ -2614,8 +2613,15 @@ token infix:sym<?> ( --> Conditional)
 
 
 ## assignment
-token infix:sym<=> ( --> Item_assignment)
-    { <sym> {*} }                                               #= =
+token infix:sym<=> ()
+{
+    <sym>
+    { self.<sigil> eq '$' 
+        ?? make Item_assignment($/)
+        !! make List_assignment($/);
+    }
+    {*}
+}                                               #= =
 
 token infix:sym<:=> ( --> Item_assignment)
     { <sym> {*} }                                               #= :=
@@ -2824,18 +2830,20 @@ method EXPR (%preclim = %LOOSEST,
             say "No prec given in thisop!";
             %thisop = %terminator;
         }
-        my Str $newprec = %thisop<prec>;
+        my Str $thisprec = %thisop<prec>;
+        # substitute precedence for listops
+        %thisop<prec> = %thisop<sub> if %thisop<sub>;
 
         # Does new infix (or terminator) force any reductions?
-        while @opstack[-1]<prec> lt $newprec {
+        while @opstack[-1]<prec> lt $thisprec {
             reduce();
         }
 
         # Not much point in reducing the sentinels...
-        last if $newprec lt $LOOSEST;
+        last if $thisprec lt $LOOSEST;
 
         # Equal precedence, so use associativity to decide.
-        if @opstack[-1]<prec> eq $newprec {
+        if @opstack[-1]<prec> eq $thisprec {
             given %thisop<assoc> {
                 when 'non'   { $here.panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
