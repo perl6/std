@@ -114,7 +114,7 @@ token TOP {
 
 constant %term              = { :prec<z=>                           };
 constant %methodcall        = { :prec<y=>                           };
-constant %autoincrement     = { :prec<x=>, :lvalue                  };
+constant %autoincrement     = { :prec<x=>,                          };
 constant %exponentiation    = { :prec<w=>, :assoc<right>, :assign   };
 constant %symbolic_unary    = { :prec<v=>                           };
 constant %multiplicative    = { :prec<u=>, :assoc<left>,  :assign   };
@@ -129,14 +129,14 @@ constant %chaining          = { :prec<m=>, :assoc<chain>, :bool     };
 constant %tight_and         = { :prec<l=>, :assoc<left>,  :assign   };
 constant %tight_or          = { :prec<k=>, :assoc<left>,  :assign   };
 constant %conditional       = { :prec<j=>, :assoc<right>,           };
-constant %item_assignment   = { :prec<i=>, :assoc<right>, :lvalue   };
+constant %item_assignment   = { :prec<i=>, :assoc<right>,           };
 constant %loose_unary       = { :prec<h=>,                          };
 constant %comma             = { :prec<g=>, :assoc<list>,            };
-constant %list_infix        = { :prec<f=>, :assoc<list>,            };
-constant %list_assignment   = { :prec<i=>, :sub<e=>, :assoc<right>, :lvalue };
+constant %list_infix        = { :prec<f=>, :assoc<list>,  :assign   };
+constant %list_assignment   = { :prec<i=>, :sub<e=>, :assoc<right>  };
 constant %list_prefix       = { :prec<e=>,                          };
-constant %loose_and         = { :prec<d=>, :assoc<left>,            };
-constant %loose_or          = { :prec<c=>, :assoc<left>,            };
+constant %loose_and         = { :prec<d=>, :assoc<left>,  :assign   };
+constant %loose_or          = { :prec<c=>, :assoc<left>,  :assign   };
 constant %LOOSEST           = { :prec<a=!>,                         };
 constant %terminator        = { :prec<a=>, :assoc<list>             };
 
