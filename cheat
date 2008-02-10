@@ -17,6 +17,7 @@ while (<>) {
     $commentary = $1 if /^ =begin \s+ (\w+)/x;
     s/^/# /, $commentary = '' if /^=end \s+ $commentary/x;
     s/^/# / if $commentary;
+    s/\[\*-1\]/[-1]/g;
     if (/role (\w+)\[\*?(.*?)\]/) {
 	my $name = $1;
 	my $param = $2;
