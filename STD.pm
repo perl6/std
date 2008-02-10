@@ -2773,7 +2773,7 @@ method EXPR (%preclim = %LOOSEST,
                 push @chain, pop(@termstack);
                 push @chain, $op;
                 while @opstack {
-                    last if $op<prec> ne @opstack[-1]<prec>;
+                    last if $op<prec> ne @opstack[*-1]<prec>;
                     push @chain, pop(@termstack);
                     push @chain, pop(@opstack)<top>;
                 }
@@ -2786,7 +2786,7 @@ method EXPR (%preclim = %LOOSEST,
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
-                    last if $op<top><sym> ne @opstack[-1]<top><sym>;
+                    last if $op<top><sym> ne @opstack[*-1]<top><sym>;
                     push @list, pop(@termstack);
                     pop(@opstack);
                 }
@@ -2835,7 +2835,7 @@ method EXPR (%preclim = %LOOSEST,
         %thisop<prec> = %thisop<sub> if %thisop<sub>;
 
         # Does new infix (or terminator) force any reductions?
-        while @opstack[-1]<prec> gt $thisprec {
+        while @opstack[*-1]<prec> gt $thisprec {
             reduce();
         }
 
@@ -2843,13 +2843,13 @@ method EXPR (%preclim = %LOOSEST,
         last if $thisprec lt $LOOSEST;
 
         # Equal precedence, so use associativity to decide.
-        if @opstack[-1]<prec> eq $thisprec {
+        if @opstack[*-1]<prec> eq $thisprec {
             given %thisop<assoc> {
                 when 'non'   { $here.panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
-                    reduce() if %thisop<top><sym> !eqv @opstack[-1]<top><sym>;
+                    reduce() if %thisop<top><sym> !eqv @opstack[*-1]<top><sym>;
                 }
                 default { $here.panic(qq[Unknown associativity "$_" for "$infix"]) }
             }
