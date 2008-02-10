@@ -561,15 +561,66 @@ token eat_terminator {
     ]
 }
 
+=begin perlhints
+
+id:     statement_control:use
+token:  use
+syn:    use MODULE EXPRESSION;
+name:   use
+desc:   Load a module, class, pragma or language
+ex:     use Test;
+ex:     {
+            use v5;
+            # perl 5 code here
+        }
+        # Perl 6 code here
+
+=end perlhints
+
 rule statement_control:use {
     <sym>
     <module_name> <EXPR>? <eat_terminator>           {*}        #= use
 }
 
+=begin perlhints
+
+id:     statement_control:no
+token:  no
+syn:    no MODULE EXPRESSION;
+name:   no
+desc:   Unload a module or class
+ex:     no Test;
+
+=end perlhints
+
 rule statement_control:no {
     <sym>
     <module_name> <EXPR>? <eat_terminator>           {*}        #= no
 }
+
+=begin perlhints
+
+id:     statement_control:if
+token:  if elsif else
+syn:    if EXPRESSION BLOCK
+syn:    if EXPRESSION BLOCK else BLOCK
+syn:    if EXPRESSION elsif EXPRESSION BLOCK
+name:   if
+desc:   executes a code block only if an yields True.
+        There can be an arbitrary number of elsif blocks, and one or no 
+        else block
+ex:     if a < b {
+            say "b is larger than a";
+        }
+ex:     if a < b {
+            say "b is smaller than a";
+        } elsif a == b {
+            say "b is as large as a";
+        } else {
+            say "b is larger than a"
+        }
+
+=end perlhints
 
 rule statement_control:if {
     <sym>
@@ -581,12 +632,39 @@ rule statement_control:if {
     {*}
 }
 
+=begin perlhints
+
+id:     statement_control:unless
+token:  unless
+syn:    unless EXPRESSION BLOCK
+name:   unless
+desc:   executes a code block only if an expression yields False.
+        Unlike the if-statement no else-block is allowed
+ex:     unless $allowed {
+            die "Insufficent permissions, aborting"
+        }
+
+=end perlhints
+
 rule statement_control:unless {
     <sym> 
     <EXPR>                           {*}                        #= unless expr
     <pblock>                         {*}                        #= unless block
     {*}
 }
+
+=begin perlhints
+
+id:     statement_control:while
+token:  while
+syn:    while EXPRESSION BLOCK
+name:   while
+desc:   executes a code block as long as a controlling expression yields True
+ex:     unless $allowed {
+            die "Insufficent permissions, aborting"
+        }
+
+=end perlhints
 
 rule statement_control:while {
     <sym>
