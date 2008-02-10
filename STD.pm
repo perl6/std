@@ -2750,7 +2750,7 @@ method EXPR (%preclim = %LOOSEST,
     my @termstack;
     my @opstack;
 
-    push @opstack, %term;         # (just a sentinel value)
+    push @opstack, %terminator;         # (just a sentinel value)
 
     my $here;
     if $seen {
@@ -2835,7 +2835,7 @@ method EXPR (%preclim = %LOOSEST,
         %thisop<prec> = %thisop<sub> if %thisop<sub>;
 
         # Does new infix (or terminator) force any reductions?
-        while @opstack[-1]<prec> lt $thisprec {
+        while @opstack[-1]<prec> gt $thisprec {
             reduce();
         }
 
