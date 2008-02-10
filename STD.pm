@@ -416,32 +416,38 @@ token pblock {
     [ <lambda> <signature> ]? <block>
 }
 
-=begin perlhints ->
-token:  lambda
-syn:    -> <signature> { <statements> }
+=begin perlhints
+
+id:     lambda
+token:  ->
+syn:    -> SIGNATURE { STATEMENTS }
 name:   lambda
-desc:   -> introduces a (possibly empty) signature to a block
+desc:   introduces a (possibly empty) signature to a block
 ex:     for @list -> $a { say $a; }
         my &function := -> { say 42; };
-=end perlhints
 
-=begin perlhints <->
-token:  lambda
-syn:    <-> <signature> { <statements> }
+id:     lambda
+token:  <->
+syn:    <-> SIGNATURE { STATEMENTS }
 name:   lambda rw
-desc:   <-> introduces a (possibly empty) signature to a block, applying the \
+desc:   introduces a (possibly empty) signature to a block, applying the
         'is rw' trait on all arguments
 ex:     for @list <-> $a { $a++ }
+
 =end perlhints
 
 token lambda { '->' | '<->' }
 
-=begin perlhints { }
-token:  block
+=begin perlhints
+
+id:     block
+token:  { }
 syn:    { <statemts> }
 name:   block
-desc:   { ... } groups statements and introduces a new scope
+# XXX what kind of scope?
+desc:   groups statements and introduces a new scope
 ex:     for @list -> $a { say $a }
+
 =end perlhints
 
 token block {
@@ -457,12 +463,15 @@ token block {
     {*}
 }
 
-=begin perlhints { }
-token:  regex_block
+=begin perlhints
+
+id:     regex_block
+token:  { }
 syn:    regex { <regex> }
 name:   regex block
 desc:   delimits a regex, rule or token
 ex:     regex word { <alpha>+ }
+
 =end perlhints
 
 token regex_block {  # perhaps parameterize and combine with block someday
@@ -490,17 +499,20 @@ rule semilist {
     {*}
 }
 
-=begin perlhints :
-token:  label
-syn:    <identifier>:
+=begin perlhints
+
+id:     label
+token:  :
+syn:    IDENTIFIER:
 name:   label
-desc:   <identifier>: assigns a name to a block or statement
+desc:   assigns a name to a block or statement
 ex:     INNER: 
         for @list { 
             if m/something/ { 
                 last INNER; 
             } 
         }
+
 =end perlhints
 
 token label {
@@ -672,12 +684,15 @@ token module_name {
     {*}
 }
 
-=begin perlhints *
-token:  whatever
+=begin perlhints
+
+id:     whatever
+token:  *
 syn:    @list[*]
 name:   whatever star
 desc:   * in context of list index means "all the indices"
-ex:     @list.pick(*)  # randomly pick all elements of @list
+ex:     @list.pick(*)  # pick all elements of @list in random order
+
 =end perlhints
 
 token whatever { '*' {*} }
@@ -772,17 +787,20 @@ token noun {
     {*}
 }
 
-=begin perlhints =>
-token:  pair
-syn:    <key> => <value>
+=begin perlhints 
+
+token:  =>
+id:     pair
+syn:    KEY => VALUE
 name:   pair
-desc:   <key> => <value> constructs a pair, usually building a hash
+desc:   constructs a pair, usually building a hash or named arguments
 ex:     my %continents = (
             England => 'Europe',
             Brazil  => 'South America',
             India   => 'Asia'
         );
-# XXX perhaps a non-hash example?
+ex:     say @list.grep(matcher => &my_function);
+
 =end perlhints
 
 token pair {
@@ -3176,4 +3194,4 @@ say "BOOL\t", $r.bool;
 say "FROM\t", $r.from;
 say "TO\t", $r.to;
 
-## vim: expandtab sw=4
+## vim: expandtab sw=4 syn=perl6
