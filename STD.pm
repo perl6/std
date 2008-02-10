@@ -2821,7 +2821,7 @@ method EXPR (%preclim = %LOOSEST,
 #        my @infix = $here.expect_tight_infix($preclim);
         my @infix = $here.expect_infix();
         my $infix = @infix[0];
-        $here = $infix;
+        $here = $infix.ws();
         
         # XXX might want to allow this in a declaration though
         if not $infix { $here.panic("Can't have two terms in a row") }
