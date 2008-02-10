@@ -660,9 +660,10 @@ token:  while
 syn:    while EXPRESSION BLOCK
 name:   while
 desc:   executes a code block as long as a controlling expression yields True
-ex:     unless $allowed {
-            die "Insufficent permissions, aborting"
+ex:     while $a < $b {
+            $a *= 2;
         }
+        say $a;
 
 =end perlhints
 
@@ -674,6 +675,20 @@ rule statement_control:while {
     <pblock>                           {*}                      #= while block
     {*}
 }
+
+=begin perlhints
+
+id:     statement_control:until
+token:  until
+syn:    until EXPRESSION BLOCK
+name:   until
+desc:   executes a code block as long as a controlling expression yields False
+ex:     until $a > $b {
+            $a *= 2;
+        }
+        say $a;
+
+=end perlhints
 
 rule statement_control:until {
     <sym>
@@ -871,6 +886,7 @@ token:  =>
 id:     pair
 syn:    KEY => VALUE
 name:   pair
+token:  =>
 desc:   constructs a pair, usually building a hash or named arguments
 ex:     my %continents = (
             England => 'Europe',
