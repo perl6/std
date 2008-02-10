@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl
 
 # This is a completely hacky attempt to get STD.pm to turn itself into
 # runnable and hopefully not-very-hacky Perl 6 code, where "runnable" is
@@ -197,7 +197,7 @@ END
     }
 END
 
-    my $junk = <<'END';
+    $body .= <<'END';
     $¢._MATCHIFY($binding,
 <<MEAT>>
     );
