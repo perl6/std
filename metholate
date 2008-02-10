@@ -191,8 +191,8 @@ END
     $body .= <<'END';
 
     if not @try {
-        return  $¢._AUTOLEXnow('<<NAME>>').(self);
-#        @fate = $¢._AUTOLEXnow('<<NAME>>').(self);
+#        return  $¢._AUTOLEXnow('<<NAME>>').(self);
+        @fate = $¢._AUTOLEXnow('<<NAME>>').(self);
         @try = @fate.shift;
     }
 END
