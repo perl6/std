@@ -389,7 +389,7 @@ token pod_comment {
 
 method UNIT ($unitstopper is context = "_EOS") {
     UNIT: do {
-        self.compunit();
+        self.comp_unit();
     }
 }
 
