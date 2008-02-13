@@ -2,6 +2,7 @@ class Cursor;
 
 my $VERBOSE = 1;
 my $callouts = 1;
+my $RE_verbose = 0;
 
 # XXX still full of ASCII assumptions
 
@@ -69,10 +70,13 @@ method _AUTOLEXnow ($key) {
 	    use re::engine::TRE;
 	    print "LEN: ", length($buf),"\n";
 	    print "PAT: ", $pat,"\n";
-	    while ($buf =~ m/$pat/xgc) {	# XXX does this recompile $pat every time?
-		print "\nLAST: ", scalar(@-)-1, ": [@-] [@+]\n";
-		my $max = @+;
-		for my $x ( 1 .. $max-1) {
+	    my $result = "";
+	    if ($buf =~ m/$pat/xgc) {	# XXX does this recompile $pat every time?
+		my $max = @+ - 1;
+		my $last = @- - 1;	# ignore '$0'
+		print "\nLAST: $last: [@-] [@+]\n";
+		$result = $fate->[$last] || "OOPS";
+		for my $x ( 1 .. $max) {
 		    my $beg = @-[$x];
 		    next unless defined $beg;
 		    my $end = @+[$x];
@@ -80,7 +84,8 @@ method _AUTOLEXnow ($key) {
 		    print "\$$x: $beg..$end\t$$x\t----> $f\n";
 		}
 	    }
-	    exit;
+	    print "$result\n";
+	    $result;
 	}
     }
 }
@@ -90,10 +95,12 @@ method _AUTOLEXgen ($key) {
     my $oldfakepos = %+AUTOLEXED{$key} // 0;
     my $FATES is context<rw>;
     $FATES = [];
+
     %+AUTOLEXED{$key} = $fakepos;
     my $pat = $ast.longest(self);
     %+AUTOLEXED{$key} = $oldfakepos;
-    $mumble::buf := $.orig;
+
+    for @$FATES { s:P5:g/\w+\///; }
     return { PAT => $pat, FATES => $FATES, AST => $ast };
 }
 
@@ -703,7 +710,7 @@ my sub here ($arg?) {
     if defined $arg { 
         $name ~= " " ~ $arg;
     }
-    say ':' x $lvl, ' ', $name, " [", $caller.file, ":", $caller.line, "]";
+    say ':' x $lvl, ' ', $name, " [", $caller.file, ":", $caller.line, "]" if $RE_verbose;
 }
 
 our class REbase {
@@ -944,7 +951,7 @@ our class RE_ordered_disjunction is REbase {
             push @result, $pat;
             last;
         }
-        my $result = @result[0] ~ "|(LATER)";
+        my $result = @result[0];
         say $result;
         $result;
     }

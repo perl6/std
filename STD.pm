@@ -3279,13 +3279,4 @@ sub is_type($name) {
     return False;
 }
 
-say "Starting...";
-my $r = Perl.new(:orig('42')).number();
-say $r;
-exit;
-say "WHAT\t", $r.WHAT;
-say "BOOL\t", $r.bool;
-say "FROM\t", $r.from;
-say "TO\t", $r.to;
-
 ## vim: expandtab sw=4 syn=perl6

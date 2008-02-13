@@ -34,6 +34,7 @@ our @DECL;
 our $SYM;
 
 my $TRACE = 0;
+my $METHOD = "method";
 
 my @impure = qw/ ws fail commit after panic /;
 my %impure;
@@ -162,8 +163,11 @@ while ($_ ne "") {
         print YAML $lex;
         close YAML;
 
+        # generated submethods, must regen for subclass
+        $METHOD = "submethod" if $NAME eq 'category';
+
         $out .= <<"END";
-method$ws$NAME (\$¢: $args) {
+$METHOD$ws$NAME (\$¢: $args) {
 END
         my $body = <<'END';
     my $CTX is context = $¢.callm(~@fate);
@@ -172,6 +176,10 @@ END
     my $binding;
     if @fate[0] eq '?' {
         return <<PEEK>>;
+    }
+    if @fate[0] eq '=' {
+        @fate.shift;
+        $binding = @fate.shift;
     }
 END
 
@@ -188,14 +196,26 @@ END
     #    when '*' { @try = <<TRY>>; }
     #}
 
-    $body .= <<'END';
+    if (@TOKENS > 1) {
+        $body .= <<'END';
 
-    if not @fate {
-#        return  $¢._AUTOLEXnow('<<NAME>>').(self);
-        @fate = $¢._AUTOLEXnow('<<NAME>>').(self);
-        @try = @fate.shift // <<TRY>>;
+    if @fate {
+        say "Fate passed to <<NAME>>: @fate[]";
+        @try = @fate.shift;
+    }
+    else {
+        @fate = $¢._AUTOLEXnow('<<NAME>>').(self).split;
+        if @fate {
+            say "Fate generated in <<NAME>>: @fate[]";
+            @try = @fate.shift;
+        }
+        else {
+            say "In <<NAME>>: no fate";
+            @try = <<TRY>>;
+        }
     }
 END
+    }
 
     $body .= <<'END';
     $¢._MATCHIFY($binding,
@@ -213,21 +233,11 @@ END
         $body =~ s/<<DECL>>/$sym@DECL/;
         $body =~ s/<<MEAT>>/$meat/;
         if (@TOKENS > 1) {
-#            my $i = 0;
-#            for (@TOKENS) {
-#                s/\$¢\.sym\(.*?\)/$SYM/;
-#                $_ = "lexet($i, $_)"; $i++;
-#            }
             $body =~ s/<<TRY>>/'0..^' . (@TOKENS+0)/e;
         }
         else {
-#            for (@TOKENS) {
-#                s/\$¢\.sym\(.*?\)/$SYM/;
-#                $_ = "lexet('', $_)";
-#            }
             $body =~ s/<<TRY>>/'0'/;
         }
-#        $body =~ s/<<TOKENS>>/join(",\n#        ",@TOKENS)/e;
         $out .= $body;
         next;
     }
