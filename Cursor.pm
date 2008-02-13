@@ -28,43 +28,73 @@ method _AUTOLEXpeek ($key) {
         if %+AUTOLEXED{$key} {   # no left recursion allowed in lexer!
             die "Left recursion in $key" if $fakepos == %+AUTOLEXED{$key};
             warn "Suppressing lexer recursion on $key";
-            return -> $¢ { '' };  # (but if we advanced just assume a :: here)
+            return hash();  # (but if we advanced just assume a :: here)
         }
         elsif %.lexers{$key}.WHAT eq Hash {
-            return %.lexers{$key}<lexer> // -> $¢ { '' };
+            return %.lexers{$key} // hash();
         }
         else {
             say "oops ", $key.WHAT;
         }
     }
-    my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
-    %.lexers{$key} = hash(:$ast, :lexer(-> $¢ { '' }));
-    my $lexer = self._AUTOLEXgen($key,$ast);
-    %.lexers{$key}<lexer> = $lexer;
-    return $lexer;
+    return %.lexers{$key} = self._AUTOLEXgen($key);
 }
 
 method _AUTOLEXnow ($key) {
-    if %.lexers.exists($key) {
-        return %.lexers{$key}<lexer>;
+    my $lexer = %.lexers{$key} // do {
+	my %AUTOLEXED is context<rw>;
+	self._AUTOLEXpeek($key);
     }
-    my %AUTOLEXED is context<rw>;
-    my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
-    %.lexers{$key} = hash(:$ast, :lexer(undef));
-    my $lexer = self._AUTOLEXgen($key,$ast);
-    %.lexers{$key}<lexer> = $lexer;
-    return $lexer;
+
+    $lexer<MATCH> //= do {
+	say $key,":";
+	my $pat = '^' ~ $lexer<PAT>;
+
+	say $pat;
+	say '=' x 72;
+
+	# remove whitespace that will confuse TRE greatly
+	$pat ~~ s:P5:g/!START.*//;
+	$pat ~~ s:P5:g/!END.*//;
+	$pat ~~ s:P5:g/\s+//;
+
+	my $fate = $lexer<FATES>;
+	unshift @$fate, "";	# start at $1
+	my $i = 0;
+	for @$fate { say $i++, ':', $_ }
+	my $buf := $.orig;	# XXX this might lose pos()...
+	# generate match closure at the last moment
+	sub ($C) {
+	    use v5;
+	    use re::engine::TRE;
+	    print "LEN: ", length($buf),"\n";
+	    print "PAT: ", $pat,"\n";
+	    while ($buf =~ m/$pat/xgc) {	# XXX does this recompile $pat every time?
+		print "\nLAST: ", scalar(@-)-1, ": [@-] [@+]\n";
+		my $max = @+;
+		for my $x ( 1 .. $max-1) {
+		    my $beg = @-[$x];
+		    next unless defined $beg;
+		    my $end = @+[$x];
+		    my $f = $fate->[$x];
+		    print "\$$x: $beg..$end\t$$x\t----> $f\n";
+		}
+	    }
+	    exit;
+	}
+    }
 }
 
-method _AUTOLEXgen ($key,$ast) {
+method _AUTOLEXgen ($key) {
+    my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
     my $oldfakepos = %+AUTOLEXED{$key} // 0;
+    my $FATES is context<rw>;
+    $FATES = [];
     %+AUTOLEXED{$key} = $fakepos;
-    my $lexer = $ast.lexer(self);
+    my $pat = $ast.longest(self);
     %+AUTOLEXED{$key} = $oldfakepos;
-    sub ($¢) {
-        1 while $lexer ~~ s:P5/\n[\x20\t]*\n/\n/;
-        $lexer;
-    }
+    $mumble::buf := $.orig;
+    return { PAT => $pat, FATES => $FATES, AST => $ast };
 }
 
 method setname($k) {
@@ -651,6 +681,19 @@ my sub indent (Str $s is copy) {
     "  " ~ $s;
 }
 
+my sub qm ($s) {
+    my $r = '';
+    for $s.comb(/./) {
+	when " "	{ $r ~= '\x20' }
+	when "\t"	{ $r ~= '\t' }
+	when "\n"	{ $r ~= '\n' }
+	when /^\w$/	{ $r ~= $_ }
+	when '<' | '>'	{ $r ~= $_ }
+	default { $r ~= '\\' ~ $_ }
+    }
+    $r;
+}
+
 my sub here ($arg?) {
     my $lvl = 0;
     while Pugs::Internals::caller(Any,$lvl,"") { $lvl++ }
@@ -664,28 +707,28 @@ my sub here ($arg?) {
 }
 
 our class REbase {
-    method lexer ($¢) { here "UNIMPL {self.WHAT}"; self.WHAT.substr(3).uc }
+    method longest ($¢) { here "UNIMPL {self.WHAT}"; self.WHAT.substr(3).uc }
 }
 
 our class RE is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         here;
         my $PURE is context<rw> = 1;
-        self.<re>.lexer($¢);
+        self.<re>.longest($¢);
     }
 }
 
 our class RE_adverb is REbase {
-    #method lexer ($¢) { ... }
+    #method longest ($¢) { ... }
 }
 
 our class RE_assertion is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         given self.<assert> {
             when '?' {
                 my $re = self.<re>;
                 if $re.<name> eq 'before' {
-                    my $result = $re.lexer($¢);
+                    my $result = $re.longest($¢);
                     $+PURE = 0;
                     return $result;
                 }
@@ -696,37 +739,37 @@ our class RE_assertion is REbase {
 }
 
 our class RE_assertvar is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         $+PURE = 0;
         '';
     }
 }
 
 our class RE_block is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         $+PURE = 0;
         '';
     }
 }
 
 our class RE_bindvar is REbase {
-    method lexer ($¢) { here; self.<atom>.lexer($¢) }
+    method longest ($¢) { here; self.<atom>.longest($¢) }
 }
 
 our class RE_bindnamed is REbase {
-    method lexer ($¢) { here; self.<atom>.lexer($¢) }
+    method longest ($¢) { here; self.<atom>.longest($¢) }
 }
 
 our class RE_bindpos is REbase {
-    method lexer ($¢) { here; self.<atom>.lexer($¢) }
+    method longest ($¢) { here; self.<atom>.longest($¢) }
 }
 
 our class RE_bracket is REbase {
-    method lexer ($¢) { here; indent("\n(\n" ~ indent(self.<re>.lexer($¢)) ~ "\n)") }
+    method longest ($¢) { here; indent("\n(?:\n" ~ indent(self.<re>.longest($¢)) ~ "\n)") }
 }
 
 our class RE_cclass is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         here ~self.<text>;
         $fakepos++;
         my $cc = self.<text>;
@@ -739,19 +782,19 @@ our class RE_cclass is REbase {
 }
 
 our class RE_decl is REbase {
-    method lexer ($¢) { '[]' }
+    method longest ($¢) { '[]' }
 }
 
 our class RE_double is REbase {
     # XXX inadequate for "\n" without interpolation
-    method lexer ($¢) {
+    method longest ($¢) {
         $+PURE = 0;
         '';
     }
 }
 
 our class RE_meta is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         my $text = self.<text>;
         here $text;
         given $text {
@@ -773,7 +816,7 @@ our class RE_meta is REbase {
 }
 
 our class RE_method_noarg is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         my $name = self.<name>;
         here $name;
         given $name {
@@ -794,29 +837,37 @@ our class RE_method_noarg is REbase {
             }
             when 'sym' {
                 $fakepos++;
-                return quotemeta(self.<sym>);
+                return qm(self.<sym>);
             }
             when 'alpha' {
                 $fakepos++;
                 return '[a-z_A-Z]';
             }
             default {
+		# XXX should be ."$name"
                 my $lexer = $¢.$name('?')[0];
-                return $lexer($¢);
+		my $prefix = "";
+		if @$+FATES {
+		    $prefix = @$+FATES[-1] ~ " ";
+		}
+		for @($lexer<FATES>) -> $fate {
+		    push @$+FATES, "$prefix$fate";
+		}
+                return $lexer<PAT>;
             }
         }
     }
 }
 
 our class RE_method_internal is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         $+PURE = 0;
         '';
     }
 }
 
 our class RE_method_re is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         my $name = self.<name>;
         here $name;
         my $re = self.<re>;
@@ -829,20 +880,20 @@ our class RE_method_re is REbase {
                 return '[]';
             }
             when 'before' {
-                my $result = $re.lexer($¢);
+                my $result = $re.longest($¢);
                 $+PURE = 0;
                 return $result;
             }
             default {
                 my $lexer = $¢.$name($re, '?')[0];
-                return $lexer($¢);
+                return $lexer<PAT>;
             }
         }
     }
 }
 
 our class RE_method_str is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         my $name = self.<name>;
         here $name;
         my $str = self.<str>;
@@ -856,40 +907,40 @@ our class RE_method_str is REbase {
             }
             default {
                 my $lexer = $¢.$name($str, '?')[0];
-                return $lexer($¢);
+                return $lexer<PAT>;
             }
         }
     }
 }
 
 our class RE_method is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         $+PURE = 0;
         '';
     }
 }
 
 our class RE_noop is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         '[]';
     }
 }
 
 our class RE_ordered_conjunction is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         $+PURE = 0;
         '';
     }
 }
 
 our class RE_ordered_disjunction is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         my $alts := self.<zyg>;
         here +@$alts;
         my @result;
         for @$alts -> $alt {
-            my $pat = $alt.lexer($¢);
-            $pat ~= ':' ~ $alt.<alt> if $callouts;
+            my $pat = $alt.longest($¢);
+#            $pat ~= ':' ~ $alt.<alt> if $callouts;
             push @result, $pat;
             last;
         }
@@ -900,14 +951,14 @@ our class RE_ordered_disjunction is REbase {
 }
 
 our class RE_paren is REbase {
-    method lexer ($¢) { here; indent("\n(\n" ~ indent(self.<re>.lexer($¢)) ~ "\n)") }
+    method longest ($¢) { here; unshift @$+FATES, ""; indent("\n(\n" ~ indent(self.<re>.longest($¢)) ~ "\n)") }
 }
 
 our class RE_quantified_atom is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         here;
         my $oldfakepos = $fakepos++;
-        my $atom = self.<atom>.lexer($¢);
+        my $atom = self.<atom>.longest($¢);
         if self.<quant>[0] eq '+' {
             return "$atom+";
         }
@@ -924,7 +975,7 @@ our class RE_quantified_atom is REbase {
             $x ~~ s:P5/\.\./,/;
             $x ~~ s:P5/\*//;
             $fakepos = $oldfakepos if $x ~~ m:P5/^0/;
-            return $atom ~ '{' ~ $x ~ '}';
+            return "$atom{$x}";
         }
         else {
             $+PURE = 0;
@@ -934,7 +985,7 @@ our class RE_quantified_atom is REbase {
 }
 
 our class RE_qw is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         my $text = self.<text>;
         here $text;
         $fakepos++;
@@ -946,7 +997,7 @@ our class RE_qw is REbase {
 }
 
 our class RE_sequence is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         my $PURE is context<rw> = 1;
         my $c := self.<zyg>;
         my @chunks = @$c;
@@ -960,39 +1011,38 @@ our class RE_sequence is REbase {
 #                pop @chunks;
 #        }
         for @chunks {
-            my $next = .lexer($¢);
+            my $next = .longest($¢);
             last if $next eq '';
             $next = '' if $next eq '[]';
             push @result, $next;
             last unless $PURE;
         }
-        join ' ', @result;
+        "(?: { join(' ', @result) } )";
     }
 }
 
 our class RE_string is REbase {
-    # XXX needs quoting
-    method lexer ($c) {
+    method longest ($c) {
         here ~self.<text>;
         my $text = self.<text>;
         $fakepos++ if self.<min>;
-        quotemeta($text);
+        qm($text);
     }
 }
 
 our class RE_submatch is REbase {
-    #method lexer ($¢) { ... }
+    #method longest ($¢) { ... }
 }
 
 our class RE_unordered_conjunction is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         $+PURE = 0;
         '';
     }
 }
 
 our class RE_unordered_disjunction is REbase {
-    method lexer ($¢) {
+    method longest ($¢) {
         my $alts := self.<zyg>;
         here +@$alts;
         my @result;
@@ -1000,12 +1050,13 @@ our class RE_unordered_disjunction is REbase {
         my $minfakepos = $fakepos + 1;
         for @$alts -> $alt {
             $fakepos = $oldfakepos;
-            my $pat = $alt.lexer($¢);
-            $pat ~= ' -> ' ~ $alt.<alt> if $callouts;
+	    push @$+FATES, $alt.<alt>;
+            my $pat = indent($alt.longest($¢));
+            $pat = "(!START $alt.<alt>\n$pat)!END $alt.<alt>" if $callouts;
             push @result, $pat;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
-        my $result = "\n(\n  " ~ indent(join "\n| ", @result) ~ "\n)";
+        my $result = "\n(?:\n  " ~ indent(join "\n| ", @result) ~ "\n)";
         say $result;
         $fakepos = $minfakepos;  # Did all branches advance?
         $result;
@@ -1013,8 +1064,8 @@ our class RE_unordered_disjunction is REbase {
 }
 
 our class RE_var is REbase {
-    #method lexer ($¢) { ... }
-    method lexer ($¢) {
+    #method longest ($¢) { ... }
+    method longest ($¢) {
         $+PURE = 0;
         '';
     }

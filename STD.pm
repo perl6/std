@@ -3280,7 +3280,7 @@ sub is_type($name) {
 }
 
 say "Starting...";
-my $r = Perl.new(:orig('42')).expect_infix();
+my $r = Perl.new(:orig('42')).number();
 say $r;
 exit;
 say "WHAT\t", $r.WHAT;
