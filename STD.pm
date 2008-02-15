@@ -696,6 +696,25 @@ rule statement_control:until {
     <pblock>                           {*}                      #= until block
     {*}
 }
+
+=begin perlhints
+
+id:     statement_control:repeat
+token:  repeat
+syn:    repeat BLOCK while EXPR
+syn:    repeat BLOCK until EXPR
+syn:    repeat while EXPR BLOCK
+syn:    repeat until EXPR BLOCK
+name:   repeat
+desc:   Repeatedly executes a block controlled by a condition
+ex:     my $in;
+        repeat {
+            say "greet me"
+            $in = =$*IN;
+        } until $in ~~ m/hi|hello|cheers/ 
+
+=end perlhints
+
 rule statement_control:repeat {
     <sym>
     [
@@ -706,6 +725,21 @@ rule statement_control:repeat {
     ]
     {*}
 }
+
+=begin perlhints
+
+id:    statement_control:loop
+token: loop
+syn:   loop(EXPR1; EXPR2; EXPR3) BLOCK
+name:  loop
+desc:  C-Style for-Loop. 
+       It is roughly equivalent to EXPR1; while EXPR2 { BLOCK; EXPR3 }
+ex:     loop(my $i = 1; $i < $limit; $i *= 2){
+            say $i;  
+        }
+            
+=end perlhints
+
 rule statement_control:loop {
     <sym>
     $<eee> = (
@@ -718,6 +752,25 @@ rule statement_control:loop {
     <block>                     {*}                             #= loop block
     {*}
 }
+
+=begin perlhints
+
+id:    statement_control:for
+token: for
+syn:   for LIST PBLOCK
+name:  for
+desc:  Iterate over LIST, and execute the block for each item
+ex:     for <a b c d e> -> $a {
+            say $a;  
+        }
+ex:     for @list Z 0 .. * -> $item, $index {
+            say "The item No. $index is '$item'";
+        }
+ex:     for @list {
+            .say    # use $_ as implicit topic
+        }
+
+=end perlhints
 
 rule statement_control:for {
     <sym>
