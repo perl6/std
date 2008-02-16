@@ -2,7 +2,7 @@ class Cursor;
 
 my $VERBOSE = 1;
 my $callouts = 1;
-my $RE_verbose = 0;
+my $RE_verbose = 1;
 
 # XXX still full of ASCII assumptions
 
@@ -41,6 +41,32 @@ method _AUTOLEXpeek ($key) {
     return %.lexers{$key} = self._AUTOLEXgen($key);
 }
 
+method _AUTOLEXgen ($key) {
+    say "gen0";
+    my $lexer = { :x<y> };
+    if "lexcache/$key.pl" !~~ :s {
+	say "gen1";
+
+	my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
+	my $oldfakepos = %+AUTOLEXED{$key} // 0;
+	my $FATES is context<rw>;
+	$FATES = [];
+
+	%+AUTOLEXED{$key} = $fakepos;
+	my $pat = $ast.longest(self);
+	%+AUTOLEXED{$key} = $oldfakepos;
+
+	for @$FATES { s:P5:g/\w+\///; }
+	$lexer = { PAT => $pat, FATES => $FATES };
+	say "gen2";
+	my $cache = open("lexcache/$key.pl", :w) // warn "Can't print: $!";
+	$cache.print($lexer.perl) // warn "Can't print: $!";
+	$cache.close // warn "Can't close: $!";
+	say "gen3";
+    }
+    $lexer;
+}
+
 method _AUTOLEXnow ($key) {
     my $lexer = %.lexers{$key} // do {
 	my %AUTOLEXED is context<rw>;
@@ -49,33 +75,50 @@ method _AUTOLEXnow ($key) {
 
     $lexer<MATCH> //= do {
 	say $key,":";
-	my $pat = '^' ~ $lexer<PAT>;
 
-	say $pat;
-	say '=' x 72;
-
-	# remove whitespace that will confuse TRE greatly
-	$pat ~~ s:P5:g/!START.*//;
-	$pat ~~ s:P5:g/!END.*//;
-	$pat ~~ s:P5:g/\s+//;
-
-	my $fate = $lexer<FATES>;
-	unshift @$fate, "";	# start at $1
-	my $i = 0;
-	for @$fate { say $i++, ':', $_ }
 	my $buf := $.orig;	# XXX this might lose pos()...
+	say "AT: ", substr($buf,0,20);
+
 	# generate match closure at the last moment
 	sub ($C) {
 	    use v5;
-	    use re::engine::TRE;
+	    $| = 1;
 	    print "LEN: ", length($buf),"\n";
+
+	    my %stuff;
+	    if (-e "lexcache/$key.pl") {
+		%stuff = do "lexcache/$key.pl";
+	    }
+	    else {
+		%stuff = ("PAT", $lexer->{PAT}, "FATES", $lexer->{FATES});
+	    }
+
+	    my $pat = '^' . $stuff{PAT};
+	    print '=' x 72, "\n";
 	    print "PAT: ", $pat,"\n";
+	    print '=' x 72, "\n";
+	    print "#FATES: ", @$fate + 0,"\n";
+
+	    # remove whitespace that will confuse TRE greatly
+	    $pat =~ s/\s+//g;
+
+	    my $fate = $stuff{FATES};
+	    unshift @$fate, "";	# start at $1
+	    my $i = 0;
+	    for (@$fate) { print $i++, ':', $_, "\n" }
 	    my $result = "";
+
+	    #########################################
+	    # No normal p5 match/subst below here!!!
+	    #########################################
+	    {
+	    use re::engine::TRE;
+
 	    if ($buf =~ m/$pat/xgc) {	# XXX does this recompile $pat every time?
 		my $max = @+ - 1;
 		my $last = @- - 1;	# ignore '$0'
 		print "\nLAST: $last: [@-] [@+]\n";
-		$result = $fate->[$last] || "OOPS";
+		$result = $fate->[$last] // "OOPS";
 		for my $x ( 1 .. $max) {
 		    my $beg = @-[$x];
 		    next unless defined $beg;
@@ -84,24 +127,14 @@ method _AUTOLEXnow ($key) {
 		    print "\$$x: $beg..$end\t$$x\t----> $f\n";
 		}
 	    }
+	    else {
+		print "NO LEXER MATCH at", substr($buf,pos($buf),10), "\n";
+	    }
 	    print "$result\n";
 	    $result;
+	    }
 	}
     }
-}
-
-method _AUTOLEXgen ($key) {
-    my $ast = eval("tmpyaml/$key.yml".slurp, :lang<yaml>);
-    my $oldfakepos = %+AUTOLEXED{$key} // 0;
-    my $FATES is context<rw>;
-    $FATES = [];
-
-    %+AUTOLEXED{$key} = $fakepos;
-    my $pat = $ast.longest(self);
-    %+AUTOLEXED{$key} = $oldfakepos;
-
-    for @$FATES { s:P5:g/\w+\///; }
-    return { PAT => $pat, FATES => $FATES, AST => $ast };
 }
 
 method setname($k) {
@@ -694,7 +727,7 @@ my sub qm ($s) {
 	when " "	{ $r ~= '\x20' }
 	when "\t"	{ $r ~= '\t' }
 	when "\n"	{ $r ~= '\n' }
-	when /^\w$/	{ $r ~= $_ }
+	when m:P5/^\w$/	{ $r ~= $_ }
 	when '<' | '>'	{ $r ~= $_ }
 	default { $r ~= '\\' ~ $_ }
     }
@@ -966,6 +999,7 @@ our class RE_quantified_atom is REbase {
         here;
         my $oldfakepos = $fakepos++;
         my $atom = self.<atom>.longest($¢);
+	return '' if $atom eq '';
         if self.<quant>[0] eq '+' {
             return "$atom+";
         }
@@ -1024,7 +1058,12 @@ our class RE_sequence is REbase {
             push @result, $next;
             last unless $PURE;
         }
-        "(?: { join(' ', @result) } )";
+	if @result {
+	    "(?: { join(' ', @result) } )";
+	}
+	else {
+	    "";
+	}
     }
 }
 
@@ -1059,7 +1098,8 @@ our class RE_unordered_disjunction is REbase {
             $fakepos = $oldfakepos;
 	    push @$+FATES, $alt.<alt>;
             my $pat = indent($alt.longest($¢));
-            $pat = "(!START $alt.<alt>\n$pat)!END $alt.<alt>" if $callouts;
+	    next if $pat ~~ m:P5/^\s*$/;
+            $pat = "( (?#START $alt.<alt>)\n$pat)\n(?#END $alt.<alt>)" if $callouts;
             push @result, $pat;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }

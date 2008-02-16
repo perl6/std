@@ -529,7 +529,7 @@ token label {
 }
 
 rule statement {
-    :my StrPos :$endstmt is context<rw> = -1;
+    :my StrPos $endstmt is context<rw> = -1;
     :my $x;
     <label>*                                     {*}            #= label
     [
@@ -905,7 +905,7 @@ token adverbs {
     [ <colonpair> <.ws> ]+
     {
         my $prop = $+prevop orelse
-            .panic('No previous operator visible to adverbial pair (' ~
+            $¢.panic('No previous operator visible to adverbial pair (' ~
                 $<colonpair> ~ ')');
         $prop.adverb($<colonpair>)
     }
@@ -914,7 +914,7 @@ token adverbs {
 
 token noun {
     [
-    | <pair>
+    | <fatarrow>
     | <package_declarator>
     | <scope_declarator>
     | <plurality_declarator>
@@ -922,13 +922,14 @@ token noun {
     | <regex_declarator>
     | <type_declarator>
     | <circumfix>
+    | <subcall>
     | <variable> { $<sigil> = $<variable><sigil> }
     | <value>
-    | <subcall>
     | <capterm>
     | <sigterm>
     | <term>
     | <statement_prefix>
+    | <colonpair>
     ]
     {*}
 }
@@ -936,7 +937,7 @@ token noun {
 =begin perlhints 
 
 token:  =>
-id:     pair
+id:     fatarrow
 syn:    KEY => VALUE
 name:   pair
 token:  =>
@@ -950,14 +951,8 @@ ex:     say @list.grep(matcher => &my_function);
 
 =end perlhints
 
-token pair {
-    [
-    | <key=ident> \h* '=>' <val=EXPR(%item_assignment)>
-                                                        {*}     #= fat
-    | [ <colonpair> <.ws> ]+
-                                                        {*}     #= colon
-    ]
-    {*}
+token fatarrow {
+    <key=ident> \h* '=>' <val=EXPR(%item_assignment)>
 }
 
 token colonpair {
@@ -1031,7 +1026,7 @@ token expect_postfix {
     | <dotty>
     | <postop>
     ]
-    { .<prec> = $<postop><prec> }
+    { $<prec> = $<postop><prec> }
     {*}
 }
 
@@ -1049,7 +1044,7 @@ regex prefix_circumfix_meta_operator:reduce {
     [ <!{ %+thisop<prec> eq %conditional<prec> }>
         || <panic: Can't reduce a conditional operator> ]
 
-    { .<prec> := %+thisop<prec> }
+    { $<prec> := %+thisop<prec> }
 
     {*}                                                         #= [ ]
 }
@@ -1069,7 +1064,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     || <panic: Only boolean infix operators may be negated>
     ]
 
-    { %+thisop<hyper> and .panic("Negation of hyper operator not allowed") }
+    { %+thisop<hyper> and $¢.panic("Negation of hyper operator not allowed") }
 
     {*}                                                         #= !
 }
@@ -1144,8 +1139,8 @@ token postcircumfix:sym<« »> ( --> Methodcall)
     { '«' <shellwords '»' > '»' {*} }                                #= « »
 
 token postop {
-    | <postfix>         { .<prec> := $<postfix><prec> }
-    | <postcircumfix>   { .<prec> := $<postcircumfix><prec> }
+    | <postfix>         { $<prec> := $<postfix><prec> }
+    | <postcircumfix>   { $<prec> := $<postcircumfix><prec> }
 }
 
 token methodop {
@@ -1153,7 +1148,7 @@ token methodop {
     | <ident>
     | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]>> <quote>
-        { $<quote> ~~ /\W/ or .panic("Useless use of quotes") }
+        { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
 
     [
@@ -1245,7 +1240,7 @@ token package_def {
     [
     || <?{ $+begin_compunit }> :: ';'
         {
-            $<module_name> orelse .panic("Compilation unit cannot be anonymous");
+            $<module_name> orelse $¢.panic("Compilation unit cannot be anonymous");
             $+begin_compunit = 0;
         }
         {*}                                                     #= semi
@@ -1356,7 +1351,7 @@ token special_variable:sym<$*> {
 
 token special_variable:sym<$)> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$) variable', "$*EGID")>
+    <obs('$) variable', '$*EGID')>
 }
 
 token special_variable:sym<$-> {
@@ -1430,7 +1425,7 @@ token special_variable:sym<${^ }> {
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
-multi method obscaret (Str $var, Str $sigil, Str $name) {
+method obscaret (Str $var, Str $sigil, Str $name) {
     my $repl = do given $sigil {
         when '$' {
             given $name {
@@ -1522,14 +1517,14 @@ token special_variable:sym<$,> {
     <obs(q/$, variable/, ".join() method")>
 }
 
-token special_variable:sym{'$<'} {
+token special_variable:sym['$<'] {
     <sym> :: <!before \s* \w+ \s* '>' >
-    <obs('$< variable', "$*UID")>
+    <obs('$< variable', '$*UID')>
 }
 
 token special_variable:sym«$>» {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs("$() variable", "$*EUID")>
+    <obs("$() variable", '$*EUID')>
 }
 
 token special_variable:sym<$.> {
@@ -1726,11 +1721,12 @@ our @herestub_queue;
 token q_herestub ($lang) {
     $<delimstr> = <quotesnabber()>  # force raw semantics on /END/ marker
     {
-        push @herestub_queue:
-            new Herestub:
+        push @herestub_queue,
+            Herestub.new(
                 delim => $<delimstr><delimited><q><text>, # XXX or some such
                 orignode => $_,
-                lang => $lang;
+                lang => $lang,
+            );
     }
     {*}
 }
@@ -1840,7 +1836,7 @@ token finish_subst ($pat) {
           <.ws>
           <infix>            # looking for pseudoassign here
           { %+thisop<prec> == %item_assignment<prec> or
-              .panic("Bracketed subst must use some form of assignment") }
+              $¢.panic("Bracketed subst must use some form of assignment") }
           <repl=EXPR(%item_assignment)>
     # unbracketed form
     | <repl=q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
@@ -2141,7 +2137,7 @@ method peek_brackets () {
 
 regex bracketed ($lang = qlang("Q")) {
     :my ($start,$stop);
-    <?{ ($start,$stop) = .peek_brackets() }>
+    <?{ ($start,$stop) = $¢.peek_brackets() }>
     <q=q_balanced($lang, $start, $stop)>
     {*}
 }
@@ -2149,12 +2145,12 @@ regex bracketed ($lang = qlang("Q")) {
 regex q_pickdelim ($lang) {
     :my ($start,$stop);
     {{
-       ($start,$stop) = .peek_delimiters();
+       ($start,$stop) = $¢.peek_delimiters();
        if $start eq $stop {
-           $<q> := .q_unbalanced($lang, $stop);
+           $<q> := $¢.q_unbalanced($lang, $stop);
        }
        else {
-           $<q> := .q_balanced($lang, $start, $stop);
+           $<q> := $¢.q_balanced($lang, $start, $stop);
        }
     }}
     {*}
@@ -2162,7 +2158,7 @@ regex q_pickdelim ($lang) {
 
 regex rx_pickdelim ($lang) {
     [
-    || { ($<start>,$<stop>) = .peek_delimiters() }
+    || { ($<start>,$<stop>) = $¢.peek_delimiters() }
       $<start>
       <rx=regex($<stop>)>        # counts its own brackets, we hope
     || $<stop> = [ [\S] || <panic: Regex delimiter must not be whitespace> ]
@@ -2173,7 +2169,7 @@ regex rx_pickdelim ($lang) {
 
 regex tr_pickdelim ($lang) {
     [
-    || { ($<start>,$<stop>) = .peek_delimiters() }
+    || { ($<start>,$<stop>) = $¢.peek_delimiters() }
       $<start>
       <tr=transliterator($<stop>)>
     || $<stop> = [ [\S] || <panic: tr delimiter must not be whitespace> ]
@@ -2384,8 +2380,8 @@ token parameter {
     [
         <default_value> {{
             given $<quantchar> {
-              when '!' { .panic("Can't put a default on a required parameter") }
-              when '*' { .panic("Can't put a default on a slurpy parameter") }
+              when '!' { $¢.panic("Can't put a default on a required parameter") }
+              when '*' { $¢.panic("Can't put a default on a slurpy parameter") }
             }
             let $quant := '?';
         }}
@@ -2397,10 +2393,10 @@ token parameter {
             when '!' {
                 given $+zone {
                     when 'posopt' {
-.panic("Can't use required parameter in optional zone");
+$¢.panic("Can't use required parameter in optional zone");
                     }
                     when 'var' {
-.panic("Can't use required parameter in variadic zone");
+$¢.panic("Can't use required parameter in variadic zone");
                     }
                 }
             }
@@ -2408,7 +2404,7 @@ token parameter {
                 given $+zone {
                     when 'posreq' { $+zone = 'posopt' }
                     when 'var' {
-.panic("Can't use optional positional parameter in variadic zone");
+$¢.panic("Can't use optional positional parameter in variadic zone");
                     }
                 }
             }
@@ -2424,12 +2420,12 @@ rule default_value {
     '=' <EXPR(%item_assignment)>
 }
 
-rule statement_prefix:do      { <sym> <statement> {*} }         #= do
-rule statement_prefix:try     { <sym> <statement> {*} }         #= try
-rule statement_prefix:gather  { <sym> <statement> {*} }         #= gather
-rule statement_prefix:contend { <sym> <statement> {*} }         #= contend
-rule statement_prefix:async   { <sym> <statement> {*} }         #= async
-rule statement_prefix:lazy    { <sym> <statement> {*} }         #= lazy
+token statement_prefix:do      { <sym> <statement> {*} }        #= do
+token statement_prefix:try     { <sym> <statement> {*} }        #= try
+token statement_prefix:gather  { <sym> <statement> {*} }        #= gather
+token statement_prefix:contend { <sym> <statement> {*} }        #= contend
+token statement_prefix:async   { <sym> <statement> {*} }        #= async
+token statement_prefix:lazy    { <sym> <statement> {*} }        #= lazy
 
 ## term
 token term:sym<undef> ( --> Term) {
@@ -2749,7 +2745,7 @@ token infix:sym<||> ( --> Tight_or)
 
 token infix:sym<^^> ( --> Tight_or)  {
     <sym>
-    { .<assoc> := 'list' }  # override Tight_or's 'left' associativity
+    { $<assoc> := 'list' }  # override Tight_or's 'left' associativity
     {*}                                                         #= ^^
 }
 

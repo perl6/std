@@ -1,0 +1,1442 @@
+#!/usr/bin/perl
+
+# This is a version of "metholate" that spits out Perl 5 instead of Perl 6.
+# If metholate is hacky, I hate to think what this is...
+
+use strict;
+use warnings;
+
+use YAML::Syck;
+
+our $STOP = "";
+our $REV = "";
+our $NAME = "";
+our $BINDING = "";
+our $CONTEXT = "prog";
+our $PARSEBIND = 0;
+our $PAREN = 0;
+our %adverbs = ();
+our %fixedprefix;
+our $PURE;
+our @TOKENS;
+our @TOKEN;
+our $MAYBACKTRACK;
+our @DECL;
+our $SYM;
+
+my $TRACE = 0;
+my $METHOD = "method";
+
+my @impure = qw/ ws fail commit after panic /;
+my %impure;
+
+sub unangle {
+    my $s = shift;
+    $s =~ s/<(\w*)>/{$1}/g;
+    $s =~ s/<([^>]*)>/{'$1'}/g;
+    $s =~ s/«([^»]*)»/{'$1'}/g;
+    $s =~ s/ /','/g;
+    $s;
+}
+
+sub un6 {
+    my $t = shift;
+    $t =~ s/:(\w+)<(.*?)>/$1 => '$2'/g;
+    $t =~ s/:(\w+)\((.*?)\)/$1 => ($2)/g;
+    $t =~ s/:(\w+)/$1 => 1/g;
+    $t =~ s/\%\+?(\w+)((<[^>]*>)+)/'$' . $1 . unangle($2)/eg;
+    $t =~ s/\%\+?(\w+)\{/\$$1\{/g;
+    $t =~ s/\$(\w+)((<[^>]*>)+)/'$' . $1 . '->' . unangle($2)/eg;
+    $t =~ s/\$((<[^>]*>)+)/'$M->' . unangle($1)/eg;
+    $t =~ s/ \.((<[^>]*>)+)/' $_->' . unangle($1)/eg;
+    $t =~ s/(<[^>]*>)/qw$1/g;
+    $t =~ s/«([^»]*)»/qw($1)/g;
+    $t =~ s/¢/C/g;
+    $t =~ s/\$C\./\$C->/g;
+    $t =~ s/\$!(\w+)/\$self->{$1}/g;
+    $t =~ s/!===?/!=/g;
+    $t =~ s/===/==/g;
+    $t =~ s/ is rw//g;
+    $t =~ s/my (?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is context\s+= (.*);/local $1 = $2;/;
+    $t =~ s/my (?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is context\s*;/local $1;/;
+    $t =~ s/\bif (.*?) \{/if ($1) {/;
+    $t =~ s/\bwhile (.*?) \{/while ($1) {/;
+    $t =~ s/orelse/or/;
+    $t =~ s/\.panic/->panic/;
+    $t =~ s/(\s)~(\s)/$1.$2/g;
+    $t =~ s/(\s):=(\s)/$1=$2/g;
+    $t =~ s/(\s)\?\?(\s)/$1?$2/g;
+    $t =~ s/(\s)!!(\s)/$1:$2/g;
+    $t;
+}
+
+{
+    local $/;
+    $_ = <>;
+    push @impure, m/^method (\w+)/mg;
+    @impure{@impure} = (1) x @impure;
+    #warn "@impure\n";
+}
+my $all = $_;
+
+sub indent {
+    my $x = shift || '';
+    my $i = shift || 1;
+    my $s = '    ' x $i;
+    $x =~ s/^/$s/mg;
+    $x;
+}
+
+sub panic {
+    my $line = 0;
+    while (length($all) > length($_)) {
+        if ($all =~ s/^#line (\d+)\n//) {
+            $line = $1;
+        }
+        else {
+            $all =~ s/^.*\n//;
+            $line++;
+        }
+    }
+    die @_,
+        " at line ", $line - 1,
+        " near '", /^(.{0,30}) /,
+        "'\n";
+}
+
+my $out = "";
+
+s/^(\s+)// and $out .= $1;
+while ($_ ne "") {
+    if ( s/^(#line.*\n)// ) { next }
+
+    if ( s/^(#.*\n)// ) { $out .= $1; next }
+
+    my $remaining = length($_);
+    if ( s/^    method coerce.*?\n    }\n//s ) {
+        $out .= <<'END';
+    sub coerce {
+        my $self = shift;
+        my ($m) = @_;
+        for my $k (keys(%term)) { $m{$k} //= $term{$k} };
+        $thisop{top} = $m;
+        if (not $m->{transparent}) {
+            $thisop{prec} = $m->{prec};
+            $thisop{assoc} = $m->{assoc};
+        }
+        return $m;
+    }
+END
+        next;
+    }
+
+    if ( s/^(rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
+        local $CONTEXT = $1;
+        local $PAREN = 0;
+        my $ws = $2;
+        local $NAME = $3;
+        local $BINDING;
+        undef $BINDING;
+        local @DECL;
+        local $SYM;
+        my $args = $4;
+        my $coercion = "";
+        $args =~ s/\(/(, / or
+        $args =~ s/^/ () /;
+        my $p = "";
+
+        local $MAYBACKTRACK = 1;  # XXX ratchet current broken
+        if ($CONTEXT eq 'regex') {
+            $MAYBACKTRACK = 1;
+        }
+
+        if ($args =~ s/ --> (\w*)\)/\)/) {
+            $coercion = $1 . "->coerce";
+        }
+        $args =~ s/\( *, *//;
+        my $sym = "";
+        for (;;) {
+            if ($args =~ s/:\$sym is context (?:is rw )?= (.*)\)/\)/) {
+                $SYM = ::un6($1);
+                $sym .= "    local \$sym = $SYM;\n";
+            }
+            elsif ($args =~ s/, *:\$endsym is context(.*)\)/\)/) {
+                $sym .= "    local \$endsym$1;\n";
+            }
+            elsif ($args =~ s/, *StrPos :\$endargs is context(.*)\)/\)/) {
+                $sym .= "    local \$endargs$1;\n";
+            }
+            elsif ($args =~ s/, *StrPos :\$endstmt is context(.*)\)/\)/) {
+                $sym .= "    local \$endstmt$1;\n";
+            }
+            elsif ($args =~ s/, *\$stop is context(.*)\)/\)/) {
+                $sym .= "    local \$stop = shift;\n";
+            }
+            else {
+                last;
+            }
+        }
+        $sym .= "    my \@fate = \@_;\n";
+
+        if ($NAME =~ /_/) {
+            if ($SYM and /^\s*(?:<\??before>\s+)?<sym>/) {
+                $fixedprefix{$NAME} = $SYM;
+            }
+            elsif (/^\s*(?:<\??before>\s+)?('\S*'\s)/) {
+                $fixedprefix{$NAME} = $1;
+            }
+            elsif (/^\s*(?:<\??before>\s+)?("\S*"\s)/) {
+                $fixedprefix{$NAME} = $1;
+            }
+        }
+
+        my $re = regex('\\}');
+
+        my $old = substr($all, length($all) - $remaining, $remaining - length($_)+1);
+        $old =~ s/^/##      /mg;
+        $out .= "$old\n\n";
+
+        local @TOKENS;
+        local $PURE = 1;
+        my $meat = ::indent($re->walk(), 2);
+
+        my $lex = Dump($re);
+#        $lex =~ s[!!perl/hash:][!pugs/Object:]g;
+#        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
+        mkdir("yamlg5");
+        open YAML, ">yamlg5/$NAME.yml" or die "Can't create tmpyaml/$NAME.yml: $!";
+        print YAML $lex;
+        close YAML;
+
+        $out .= <<"END";
+sub$ws$NAME {
+    my \$C = shift;
+END
+        my $body = <<'END';
+    local $CTX = $C->callm("@fate");
+<<DECL>>
+    my @try;
+    my $binding;
+    if (@fate) {
+        if ($fate[0] eq '?') {
+            return <<PEEK>>;
+        }
+        if ($fate[0] eq '=') {
+            shift @fate;
+            $binding = shift @fate;
+        }
+    }
+END
+
+    if (@TOKENS > 1) {
+        $body .= <<'END';
+
+    if (@fate) {
+        print "Fate passed to <<NAME>>: @fate\n";
+        @try = shift @fate;
+    }
+    else {
+        @fate = split(' ', $C->_AUTOLEXnow('<<NAME>>')->($C));
+        if (@fate) {
+            print "Fate generated in <<NAME>>: @fate\n";
+            @try = shift @fate;
+        }
+        else {
+            print "In <<NAME>>: no fate\n";
+            @try = <<TRY>>;
+        }
+    }
+END
+    }
+
+    $body .= <<'END';
+    $C->_MATCHIFY($binding,
+<<MEAT>>
+    );
+END
+
+        if ($impure{$NAME}) {
+            $body =~ s/<<PEEK>>/''/;
+        }
+        else {
+            $body =~ s/<<PEEK>>/\$C->_AUTOLEXpeek('<<NAME>>')/;
+        }
+        $body =~ s/<<NAME>>/$NAME/g;
+        $body =~ s/<<DECL>>/$sym@DECL/;
+        $body =~ s/<<MEAT>>/$meat/;
+        if (@TOKENS > 1) {
+            $body =~ s/<<TRY>>/'0..' . (@TOKENS-1)/e;
+        }
+        else {
+            $body =~ s/<<TRY>>/'0'/;
+        }
+        $body =~ s/\$\+(\w+)/\$$1/g;
+        $out .= $body;
+        next;
+    }
+
+    if (s/^(.*\n)//) {
+        my $line = un6($1);
+        if ($line =~ s/^grammar (\w+);//) {
+            $out .= "#use Cursor5;\npackage $1;\n#use base 'Cursor5';\nlocal %AUTOLEXED;";
+            $out .= '$\ = "\n";' . "\n";
+        }
+        $line =~ s/^(\s*has) /#$1 /;
+        $line =~ s/^proto /#proto /;
+        $line =~ s/\bsay /print /;
+        $line =~ s/([\$\@%])\+(\w+)/$1$2/g;       # assume localized
+        if ($line =~ s/^constant %/our %/) {
+            $line =~ tr/{}/()/;
+            $line = ::un6($line);
+        }
+        $line =~ s/^constant /my /;
+        $line =~ s/class (\w+)\s+\{/{ package $1;/;
+        $line =~ s/do given\s+(.*?\S)\s+\{/do { \$_ = $1; if (0) {}/;
+        $line =~ s/given\s+(.*?\S)\s+\{/ for (scalar($1)) { if (0) {}/;
+        $line =~ s/when\s+\*\s+\{/ else {/;
+        $line =~ s/when\s+(.*?\S)\s+\{/ elsif (\$_ eq $1) {/;
+        if ($line =~ m/method UNIT/) {
+            $line =~ s/method UNIT \(\$unitstopper is context = "_EOS"\) \{/sub UNIT {
+    my \$self = shift;
+    local \$unitstopper = shift || "_EOS";/;
+        }
+        elsif ($line =~ m/method nounphrase/) {
+            $line = <<'END';
+sub nounphrase {
+    my $self = shift;
+    my %args = @_;
+    my $noun = $args{noun};
+    my $pre = $args{noun};
+    my $post = $args{noun};
+END
+        }
+        elsif ($line =~ s/^(\s*)method (\w+)\s*(.*?)\{/$1sub $2 { my \$self = shift; my $3= \@_; /) {
+            $line =~ s/Match //g;
+            $line =~ s/Str //g;
+        }
+
+        $out .= $line;
+    }
+}
+print $out;
+
+sub here {
+    warn +(caller(1))[3],": ",/^(.{0,20})/,"\n" if $TRACE;
+}
+
+#############################################3333
+## Regex
+#############################################3333
+
+sub ws {
+    return if $CONTEXT eq 'rule';  # meta whitespace parsed in atom
+    for (;;) {
+        next if s/^\s+//;
+        next if s/^#\(.*?\)//s;
+        next if s/^#\{.*?\}//s;
+        next if s/^#\[.*?\]//s;
+        next if s/^#\<.*?\>//s;
+        next if s/^#.*\n//;
+        last;
+    }
+}
+
+sub wsany {
+    for (;;) {
+        next if s/^\s+//;
+        next if s/^#\(.*?\)//s;
+        next if s/^#\{.*?\}//s;
+        next if s/^#\[.*?\]//s;
+        next if s/^#\<.*?\>//s;
+        next if s/^#.*\n//;
+        last;
+    }
+}
+
+sub regex {
+    here();
+    ws();
+    local $STOP = shift;
+
+    my @decl;
+    while (s/^\s*:(my|state|our|constant)\b/$1/) {
+        my $code = unbalanced(";");
+        s/^;// or panic "Missing ;";
+        push @decl, bless { text => $code, min => 0, max => 0 }, "RE_decl";
+    }
+
+    my $od = ordered_disjunction();
+    return bless { decl => [@decl], re => $od, min => $od->{min} }, "RE";
+}
+
+sub ordered_disjunction {
+    here();
+    my @kids;
+    my $min = 1_000_000_000;
+
+    s/^\|\|//;
+
+    do {
+        ws();
+        my $k = ordered_conjunction();
+        push @kids, $k;
+        my $kidmin = $k->{min};
+        $min = $kidmin if $kidmin < $min;
+        ws();
+    } while s/^\|\|//;
+
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids], min => $min}, "RE_ordered_disjunction";
+}
+
+sub ordered_conjunction {
+    here();
+    my @kids;
+    my $min = 0;
+
+    do {
+        ws();
+        my $k = submatch();
+        push @kids, $k;
+        my $kidmin = $k->{min};
+        $min = $kidmin if $kidmin > $min;
+        ws();
+    } while s/^\&\&//;
+
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids], min => $min }, "RE_ordered_conjunction";
+}
+
+sub submatch {
+    here();
+    my @kids;
+
+    do {
+        ws();
+        push @kids, unordered_disjunction();
+        ws();
+    } while s/^\!?\~\~//;
+
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids], min => 0 }, "RE_submatch";
+}
+
+sub unordered_disjunction {
+    here();
+    my @kids;
+    my $min = 1_000_000_000;
+
+    s/^ \| (?!\|) //x;
+
+    do {
+        ws();
+        my $k = unordered_conjunction();
+        push @kids, $k;
+        my $kidmin = $k->{min};
+        $min = $kidmin if $kidmin < $min;
+        ws();
+    } while s/^ \| (?!\|) //x;
+
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids], min => $min }, "RE_unordered_disjunction";
+}
+
+sub unordered_conjunction {
+    here();
+    my @kids;
+    my $min = 0;
+
+    do {
+        ws();
+        my $k = sequence();
+        push @kids, $k;
+        my $kidmin = $k->{min};
+        warn "$k\n" unless defined $kidmin;
+        $min = $kidmin if $kidmin > $min;
+        ws();
+    } while s/^ \& (?!\&) //x;
+
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids], min => $min }, "RE_unordered_conjunction";
+}
+
+sub sequence {
+    here();
+    my @kids;
+    my $k;
+    my $min = 0;
+
+    while ($k = quantified_atom()) {
+        push(@kids, $k);
+        my $kidmin = $k->{min};
+        $min += $kidmin;
+    }
+
+    return $kids[0] if @kids == 1;
+    return bless { zyg => [@kids], min => $min }, "RE_sequence";
+}
+
+sub quantified_atom {
+    here();
+    my $atom = atom();
+    return unless defined $atom;
+    return $atom if $atom->{noquant};
+    my $quant = quantifier();
+    return $atom unless $quant;
+    my $min = $atom * $quant->[3];
+    return bless { atom => $atom, quant => $quant, min => $min },
+        "RE_quantified_atom";
+}
+
+sub quantifier {
+    if (s/^\s*(\*\*)([?!:+]?)// or
+        s/^\s*(\*)([?!:+]?)// or
+        s/^\s*(\+)([?!:+]?)// or
+        s/^\s*(\?)([?!:+]?)//) {
+        my ($q,$m) = ($1,$2);
+        my $min = 0;
+        if (not $m) {
+            if ($CONTEXT eq 'rule' or $CONTEXT eq 'token') {
+                $m = ':';
+            }
+            else {
+                $m = '!';
+            }
+        }
+        elsif ($m eq '+') {
+                $m = '!';
+        }
+        my $x = "";
+        if ($q eq '**') {
+            if (s/^\s*((\d+)(\.\.(\d+|\*))?)//) {
+                $x = $1;
+                $min = $2;
+            }
+            elsif (/^\s*\{/) {
+                wsany();
+                $x = block('thunk');
+                $min = 0;
+            }
+            else {
+                wsany();
+                $x = atom();
+                $min = 1;
+            }
+        }
+        elsif ($q eq '+') {
+            $min = 1;
+        }
+        ws();
+        $MAYBACKTRACK = 1 unless $m eq ':';
+        return [$q,$m,$x,$min];
+    }
+}
+
+sub atom {
+    here();
+    if (/^[\s\#]/ and $CONTEXT eq 'rule') {
+        wsany();
+        return bless { name => 'ws', nobind => 1, noquant => 1, min => 0 },
+            "RE_method_noarg";
+    }
+    return if /^ [\]&|)] /x;   # XXX an approximation
+    return if /^ (?:
+        >(?!>) |
+        !?~~
+    )/x;
+    return if /^ ( $STOP )/x;
+
+    if (/^[*+?]/) { panic "quantifier quantifies nothing"; }
+
+    if (s/^ (\w+) (?! \s* [*+?]) //x) {
+        my $word = $1;
+        ws();
+        return bless { text => $word, min => length($word) }, "RE_string";
+    }
+    if (s/^ (\w) //x) {
+        my $word = $1;
+        ws();
+        return bless { text => $word, min => length($word) }, "RE_string";
+    }
+
+    if (s/^\{\*\}//) {
+        my $key = $NAME;
+        if (s/^(.*?)\s*#=\s+(.*)/$1/) {
+            $key .= " $2";
+        }
+        ws();
+        $key =~ s/(['\\])/\\$1/g;
+        return bless { name => '_REDUCE', args => "'$key'", min => 0, max => 0},
+                     "RE_method_internal";
+    }
+    if (/^\{/) {
+        my $b = block('void');
+        ws();
+        return $b;
+    }
+
+    if (s/^\\//) { my $bs = backslash(); ws(); return $bs; }
+
+    if (s/^\[//) {
+        my $re = regex('\\]');
+        s/^\]// or panic "Missing ]";
+        ws();
+        return bless $re, "RE_bracket";
+    }
+
+    if (s/^\(//) {
+        my $re = regex('\\)');
+        s/^\)// or panic "Missing )";
+        ws();
+        $re = bless $re, "RE_paren";
+        if (not $PARSEBIND) {  # XXX leaves quantifier outside?
+            $re = bless { var => $PAREN++, atom => $re, min => $re->{min} },
+                "RE_bindpos";
+        }
+        return $re;
+    }
+
+    if (s/^ (: !? \w+)//x) {
+        my $adverb = $1;
+        local %adverbs = %adverbs;
+        
+        # XXX chintzy
+        if (s/^(\(.*?\))//) {
+            $adverbs{$adverb} = $1;
+        }
+        else {
+            my $not = $adverb =~ s/!//;
+            $adverbs{$adverb} = !$not;
+        }
+        ws();
+
+        return quantified_atom();
+    }
+
+    # check unbalanced angles before assertions
+
+    if (s/^(<<|>>|«|»)//) {
+        my $boundary = $1;
+        ws();
+        return bless { text => $boundary, min => 0 }, "RE_meta";
+    }
+
+    if (s/^(<\(|\)>)//) {
+        my $boundary = $1;
+        ws();
+        return bless { text => $boundary, min => 0 }, "RE_meta";
+    }
+
+    if (/^<\s/) {
+        my $re = unbalanced(">");
+        s/^>// or panic "Missing >";
+        my @elems = split(' ', $re);
+        shift @elems;
+        my $min = 1_000_000_000;
+        for (@elems) { $min = length($_) if length($_) < $min }
+        $re .= '>';
+        ws();
+        return bless { text => $re, min => $min }, "RE_qw";
+    }
+
+    # assertions
+
+    s/^<(\w+)=/\$<$1>=</;
+    if (s/^<//) {
+        my $re = assertion();
+        ws();
+        return $re;
+    }
+
+    # now the rest of the metas
+
+    if (s/^'//) {
+        my $re = unbalanced("'");
+        s/^'// or panic "Missing '";
+        ws();
+        return bless { text => $re, min => length($re) }, "RE_string";
+    }
+    if (s/^"//) {
+        my $re = unbalanced('"');
+        s/^"// or panic 'Missing "';
+        my $tmp = $re;
+        $tmp =~ s/\\\w/X/g;    # XXX ignoring \x and \o for now
+        $tmp =~ s/\$\w+//g;    # assume vars interpolate nothing
+        ws();
+        return bless { text => $re, min => length($tmp) }, "RE_double";
+    }
+
+    if (/^[\$\@\%]/) {
+        my $code;
+        if (/^[\$\@\%]</) {
+            $code = unbalanced('>');
+            s/^>// or panic "Missing >";
+            $code .= '>';
+        }
+        if (s/^([\$\@\%][.!?*+]?\w+)//) {
+            $code = $1;
+        }
+        if (defined $code) {
+            ws();
+            if (s/^\s*=\s*//) {
+                ws();
+                local $PARSEBIND = 1;
+                my $atom = quantified_atom(@_);
+                $atom->{nobind} = 1;
+                ws();
+                if ($code =~ s/([\$\@%]<.*?>)/$1/) {
+                    return bless { var => $code,
+                                   atom => $atom,
+                                   min => $atom->{min}
+                                 }, "RE_bindnamed";
+                }
+                return bless { var => $code, atom => $atom, min => $atom->{min} }, "RE_bindvar";
+            }
+            else {
+                return bless { var => $code, min => 0 }, "RE_var";
+            }
+        }
+    }
+
+    # must follow variables
+    if (s/^([\^\$]{1,2})//) {
+        my $anchor = $1;
+        ws();
+        return bless { text => $anchor, min => 0 }, "RE_meta";
+    }
+    if (s/^(:+)//) {
+        my $colons = $1;
+        ws();
+        return bless { text => $colons, min => 0 }, "RE_meta";
+    }
+    if (s/^\.//) {
+        ws();
+        return bless { text => '.', min => 1 }, "RE_meta";
+    }
+
+    panic "unrecognized metacharacter @{[ substr($_,0,1) ]}";
+}
+
+sub backslash {
+    my $ch = substr($_,0,1,"");
+    
+    if ($ch =~ /^\w$/) {
+        if ($ch =~ /^[ftnr]/) {
+            return bless { text => '\\' . $ch, min => 1  }, "RE_double";
+        }
+        if ($ch eq 'x') {
+            s/^\[?([0-9a-fA-f]*)\]?//;
+            return bless { text => '\\x' . $1, min => 1  }, "RE_double";
+        }
+        if ($ch eq 'o') {
+            s/^\[?([0-7]*)\]?//;
+            return bless { text => '\\o' . $1, min => 1  }, "RE_double";
+        }
+        if ($ch =~ /^[hvdswHVDSWNRTBF]/) {
+            return bless { text => "\\$ch", min => 1  }, "RE_meta";
+        }
+        panic "Unrecognized \\$ch";
+    }
+    if ($ch eq '\\') {
+        return bless { text => '\\', min => 1  }, "RE_string";
+    }
+    return bless { text => $ch, min => 1 }, "RE_string";
+}
+
+sub assertion {
+    here();
+    my $assert = substr($_,0,1);
+
+    if (s/^[!?]//) {
+        my $rest = assertion();
+        $rest->{nobind} = 1;
+        return bless { assert => $assert, re => $rest, min => 0 },
+            "RE_assertion";
+    }
+    if (s/^>//) {
+        return bless { min => 0 }, "RE_noop";
+    }
+
+    if (/^[+-]?\[/) {
+        my $cclass = unbalanced('>');
+        s/^>// or panic "Missing >";
+        return bless { text => $cclass, min => 1 }, "RE_cclass";
+    }
+
+    if (s/^\.//) {
+        my $rest = assertion();
+        $rest->{nobind} = 1;
+        return $rest;
+    }
+
+    if (s/^([a-zA-Z]\w*)//) {
+        my $word = $1;
+        my $ch = substr($_,0,1);
+        if ($ch eq '>') {
+            s/^>// or panic "Missing >";
+            return bless { name => $word, min => 12345 }, "RE_method_noarg";
+        }
+        if ($ch eq ':') {
+            s/^:\s*//;
+            my $str = unbalanced('>');
+            s/^>// or panic "Missing >";
+            if ($word eq 'after') {
+                my $x = bless { name => '_vEXACT', str => $str, min => 0 },
+                    "RE_method_str";
+                return bless { name => $word, rest => $x, min => 0 },
+                    "RE_method";
+            }
+            return bless { name => $word, str => $str, min => 0 },
+                "RE_method_str";
+        }
+        if ($ch eq '(') {
+            my $code = code('\\)>');
+            s/^\)>// or panic "Missing )>";
+            $code .= ')';
+            return bless { name => $word, rest => $code, min => 0 },
+                "RE_method";
+        }
+        s/^\s*//;
+        my $re = regex('\\>');
+        s/^>// or panic "Missing >";
+        return bless { name => $word, re => $re, min => 0 }, "RE_method_re";
+    }
+
+    if (/^[\$\@\%]/) {
+        my $code = code('>');
+        s/^>// or panic "Missing >";
+        if ($code =~ s/\(.*\)//) {
+            return bless { name => $code, rest => $1, min => 0 }, "RE_method";
+        }
+        else {
+            return bless { name => $code, min => 0 }, "RE_method_noarg";
+        }
+    }
+
+    if (/^\{/) {
+        my $b = block('bool');
+        s/^>// or panic "Missing >";
+        ws();
+        return $b;
+    }
+
+}
+
+sub block {
+    # XXX
+    my $context = shift;
+    s/^({+)//;
+    my $term = '\\}' x length($1);
+    my $block = code($term);
+    s/^$term// or panic "Missing }" ;
+    return bless { text => $block, context => $context, min => 0 }, "RE_block";
+}
+
+sub code {
+    # XXX
+    my $code = unbalanced(@_);
+    return $code;
+}
+
+sub unbalanced {
+    my $terminator = shift;
+    s/^ ( (\\. | . )*? ) (?=$terminator)//sx;
+    return $1;
+}
+
+##########################################################
+
+{ package REbase;
+    sub walk {
+        my $self = shift;
+        my $result = "";
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
+                my $x = $kid->walk(@_);
+                $result .= $x if defined $x;
+            }
+        }
+        else {
+            return ref $self;
+        }
+        return $result;
+    }
+
+    sub binding {
+        my $binding;
+        my $self = shift;
+        if ($$self{nobind}) {
+            $binding = '',
+        }
+        elsif (defined $BINDING) {
+            $binding = "qw< = $BINDING>, ";
+            undef $BINDING;
+        }
+        else {
+            my $name = $$self{name};
+            $binding = "qw< = $name>, ";
+        }
+        $binding;
+    }
+}
+
+{ package RE; use base "REbase";
+    sub walk {
+        my $self = shift;
+        if ($$self{decl}) {
+            for my $decl (@{$$self{decl}}) {
+                push @DECL, "    " . $decl->walk(@_) . "\n";
+            }
+        }
+        if ($$self{re}) {
+            return $$self{re}->walk(@_);
+        }
+    }
+}
+
+{ package RE_adverb; use base "REbase";
+}
+
+{ package RE_assertion; use base "REbase";
+    sub walk {
+        my $self = shift;
+        local($PURE);
+        local(@TOKEN);
+        local(@TOKENS);
+        if ($$self{assert} eq '!') {
+            my $re = $$self{re}->walk(@_);
+            "\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+        }
+        else {
+            my $re = $$self{re}->walk(@_);
+            "\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+        }
+    }
+}
+
+{ package RE_assertvar; use base "REbase";
+}
+
+{ package RE_block; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = ::un6($$self{text});
+        my $ctx = $$self{context};
+        if ($text =~ s/\bmake\b/scalar/g) {  # XXX hack, avoid using $<make>
+            "sub { my \$M=shift; $text}->(\$C->matchify)";
+        }
+        elsif ($ctx eq 'void') {
+            $PURE = 0;
+            "scalar(do {$text}, \$C)";
+        }
+        elsif ($ctx eq 'bool') {
+            "((\$C) x !!do {$text})";
+        }
+        else {
+            $PURE = 0;
+            " sub { my \$C=shift;$text}";
+        }
+    }
+}
+
+{ package RE_bindvar; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $var = $$self{var};
+        my $re = $$self{atom}->walk(@_);
+#        $var = "my $var" unless $var =~ /::/;
+        "bindvar($var,$re)" . '->matchify';
+    }
+}
+
+{ package RE_bindnamed; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $var = $$self{var};
+        local $BINDING = $var;
+        my $re = ::indent($$self{atom}->walk(@_));
+        if (defined $BINDING) {
+            $re = "\$C->_BINDNAMED$REV( sub { my \$C=shift;\n" . $re . "\n}, qw< = $var>)";
+        }
+        $re;
+    }
+}
+
+{ package RE_bindpos; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $var = $$self{var};
+        local $BINDING = $var;
+        my $re = ::indent($$self{atom}->walk(@_));
+        if (defined $BINDING) {
+            $re = "\$C->_BINDPOS$REV( sub { my \$C=shift;\n" . $re . "\n}, qw< = $var>)";
+        }
+        $re;
+    }
+}
+
+{ package RE_bracket; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $re = ::indent($$self{re}->walk(@_));
+        "\$C->_BRACKET$REV( sub { my \$C=shift;\n" . $re . "\n})";
+    }
+}
+
+{ package RE_cclass; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+        $text =~ s/(['\\])/\\$1/g;
+        "\$C->_CCLASS$REV('" . $text . "')";
+    }
+}
+
+{ package RE_decl; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = ::un6($$self{text} . ';');
+        $text;
+    }
+}
+
+{ package RE_double; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+        push @TOKEN, '"' . $text . '"' if $PURE;
+        '$C->_EXACT' . $REV . '("' . $text . '")';
+    }
+}
+
+{ package RE_string; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+        $text =~ s/(['\\])/\\$1/g;
+        push @TOKEN, "'" . $text . "'" if $PURE;
+        "\$C->_EXACT$REV('" . $text . "')";
+    }
+}
+
+{ package RE_meta; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+        my $not = 0;
+        my $code = "";
+        if ($text =~ /^(\\[A-Z])(.*)/) {
+            $text = lc($1) . $2;
+            $not = 1;
+        }
+        if ($text eq '.') {
+            $code = "\$C->_ANY$REV()";
+        }
+        elsif ($text eq '^') {
+            $code = "\$C->_BOS$REV()";
+        }
+        elsif ($text eq '^^') {
+            $code = "\$C->_BOL$REV()";
+        }
+        elsif ($text eq '$') {
+            $code = "\$C->_EOS$REV()";
+        }
+        elsif ($text eq '$$') {
+            $code = "\$C->_EOL$REV()";
+        }
+        elsif ($text eq ':') {
+            $code = "\$C->_COMMITATOM$REV()";
+        }
+        elsif ($text eq '::') {
+            $PURE = 0;
+            $code = "\$C->_COMMITBRANCH$REV()";
+        }
+        elsif ($text eq ':::') {
+            $PURE = 0;
+            $code = "\$C->_COMMITRULE$REV()";
+        }
+        elsif ($text eq '\\d') {
+            $code = "\$C->_DIGIT$REV()";
+        }
+        elsif ($text eq '\\w') {
+            $code = "\$C->_ALNUM$REV()";
+        }
+        elsif ($text eq '\\s') {
+            $code = "\$C->_SPACE$REV()";
+        }
+        elsif ($text eq '\\h') {
+            $code = "\$C->_HSPACE$REV()";
+        }
+        elsif ($text eq '\\v') {
+            $code = "\$C->_VSPACE$REV()";
+        }
+        if ($not) { # XXX or maybe just .NOT on the end...
+            $PURE = 0;
+            $code = "\$C->_NOTBEFORE( sub { my \$C=shift; $code })";
+        }
+        $code;
+    }
+}
+
+{ package RE_method_noarg; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $name = $$self{name};
+        ::panic("Can't reverse $name") if $REV;
+        $PURE = 0 if $impure{$name};
+
+        my $binding = $self->binding;
+        if ($name eq "sym") {
+            my $s = $SYM;
+            $s =~ s/^'(.*)'$/$1/ or
+            $s =~ s/^"(.*)"$/$1/ or
+            $s =~ s/^<(.*)>$/$1/ or
+            $s =~ s/^«(.*)»$/$1/ or
+            $s =~ s/^\{'(.*)','(.*)'\}$/$1 $2/ or
+            $s =~ s/^\{'(.*)'\}$/$1/;
+            $s =~ s/^\s+//;
+            $s =~ s/\s+$//;
+            $$self{sym} = $s;
+        }
+        push @TOKEN, "\$C->$name('?')" if $PURE;
+        my $re = '$C->' . $name . "($binding\@fate)";
+    }
+}
+
+{ package RE_method_internal; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $name = $$self{name};
+        my $args = ::un6($$self{args});
+        ::panic("Can't reverse $name") if $REV;
+        $PURE = 0 if $impure{$name};
+
+        my $re = '$C->' . $name . "($args)";
+    }
+}
+
+{ package RE_method_re; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $re = $$self{re};
+        my $name = $$self{name};
+        ::panic("Can't reverse $name") if $REV;
+        $PURE = 0 if $impure{$name};
+        local $REV = '_rev' if $name eq 'after';
+        $re = ::indent($re->walk(@_));
+        $REV = '';
+
+        my $binding = ', ' . $self->binding;
+        if ($PURE) {
+            if ($name eq 'before') {
+                push @TOKEN, $re;
+            }
+            else {
+                push @TOKEN, "\$C->$name( sub { my \$C=shift;\n$re\n}, '?')";
+            }
+        }
+        '$C->' . $name . "( sub { my \$C=shift;\n$re\n}$binding\@fate)";
+    }
+}
+
+{ package RE_method_str; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $str = $$self{str};
+        my $name = $$self{name};
+        ::panic("Can't reverse $name") if $REV;
+        $PURE = 0 if $impure{$name};
+        $str =~ s/(['\\])/\\$1/g;
+
+        my $binding = ', ' . $self->binding;
+        push @TOKEN, "\$C->$name('$str','?')" if $PURE;
+        '$C->' . $name . "('$str'$binding\@fate)";
+    }
+}
+
+{ package RE_method; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $rest = ::un6($$self{rest});
+        my $name = $$self{name};
+        ::panic("Can't reverse $name") if $REV;
+        $PURE = 0 if $impure{$name};
+
+        my $binding = $self->binding;
+        $rest =~ s/\)$/, /;
+        $rest =~ s/\(, */(/;
+        push @TOKEN, "\$C->$name$rest'?')" if $PURE;
+        "\$C->$name$rest$binding\@fate)";
+    }
+}
+
+{ package RE_noop; use base "REbase";
+    sub walk {
+        my $self = shift;
+        '$C';
+    }
+}
+
+{ package RE_ordered_conjunction; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my @result;
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
+                push @result, $kid->walk(@_);
+            }
+        }
+        if (@result == 1) {
+            $result[0];
+        }
+        else {
+            ::panic("Can't reverse ordered conjunction") if $REV;
+            my $result = ::indent(join("\nSAME\n", @result));
+            $result;
+        }
+    };
+}
+
+{ package RE_ordered_disjunction; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my @result;
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
+                push @result, $kid->walk(@_);
+            }
+        }
+        if (@result == 1) {
+            $result[0];
+        }
+        else {
+            ::panic("Can't reverse ordered disjunction") if $REV;
+            my $result = ::indent(join("\n||\n", @result));
+            $result;
+        }
+    }
+}
+
+{ package RE_paren; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $re = ::indent($$self{re}->walk(@_));
+        "\$C->_${REV}PAREN( sub { my \$C=shift;\n" . $re . "\n})";
+    }
+}
+
+{ package RE_quantified_atom; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $result;
+        #print ::Dump($self);
+        #print $$self{quant},"\n";
+        if (ref $$self{atom}) {
+            my $quant = "";
+            my $rep = "_REP";
+            my $q = $$self{quant};
+            if ($q) {
+                my ($qfer,$how,$rest) = @{$$self{quant}};
+                my $h = $how eq '!' ? 'g' :
+                        $how eq '?' ? 'f' :
+                                      'r';
+                if ($qfer eq '*') {
+                    $PURE = 0;
+                    $quant = "\$C->_STAR$h$REV(";
+                }
+                elsif ($qfer eq '+') {
+                    $quant = "\$C->_PLUS$h$REV(";
+                }
+                elsif ($qfer eq '?') {
+                    $PURE = 0;
+                    $quant = "\$C->_OPT$h$REV(";
+                }
+                elsif ($qfer eq '**') {
+                    if (ref $rest) {
+                        if (ref $rest eq "RE_block") {
+                            $PURE = 0;
+                            $rep = "_REPINDIRECT$REV";
+                            $rest = $rest->walk();
+                        }
+                        else {
+                            $rep = "_REPSEP$REV";
+                            $rest = " sub { my \$C=shift;\n" . ::indent($rest->walk()) . "\n}";
+                        }
+                    }
+                    else {
+                        $PURE = 0 if $rest =~ /^0/;
+                        $rest = "'$rest'";
+                    }
+                    $quant = "$rep$h($rest, ";
+                }
+                $result = $quant . " sub { my \$C=shift;\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
+            }
+            else {
+                $result = $$self{atom}->walk(@_);
+            }
+        }
+        else {
+            $result = '"' . $$self{atom} . '"';
+        }
+        $result;
+    }
+}
+
+{ package RE_qw; use base "REbase";
+    sub walk {
+        my $self = shift;
+        "\$C->_ARRAY$REV(qw$$self{text} )";
+    }
+}
+
+{ package RE_sequence; use base "REbase";
+    sub wrapone {
+        my ($outer, $inner) = @_;
+        if ($MAYBACKTRACK) {
+            "(map { my \$C=shift;\n" .
+                ::indent($inner) .
+            "\n} $outer)";
+        }
+        else {
+            "$outer andthen\n$inner\n}";
+        }
+    }
+
+    sub walk {
+        my $self = shift;
+        my @result;
+        my @decl;
+        if ($$self{zyg}) {
+            my @kids = @{$$self{zyg}};
+
+            while (@kids and ref $kids[0] eq 'RE_decl') {
+                push @decl, shift(@kids)->walk(@_);
+            }
+
+            @kids = reverse @kids if $REV;
+            foreach my $kid (@kids) {
+                my $r = $kid->walk(@_);
+                push @result, $r;
+            }
+        }
+        my $result = pop @result;
+        for (reverse @result) {
+            $result = wrapone($_,$result);
+        }
+        join('', @decl, $result || '');
+    }
+}
+
+{ package RE_submatch; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my @result;
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
+                push @result, $kid->walk(@_);
+            }
+        }
+        if (@result == 1) {
+            $result[0];
+        }
+        else {
+            ::panic("Can't reverse submatch") if $REV;
+            my $against = shift @result;
+            my $pattern = ::indent(shift @result);
+            $against =~ s/BACK//;
+            $against .= "";
+            my $result = "\$C->SUBMATCH($against, sub {\n$pattern\n})";
+            $result;
+        }
+    }
+}
+
+{ package RE_unordered_conjunction; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my @result;
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
+                push @result, $kid->walk(@_);
+            }
+        }
+        if (@result == 1) {
+            $result[0];
+        }
+        else {
+            my $result = ::indent(join("\nSAMEwith\n", @result));
+            $result;
+        }
+    }
+}
+
+{ package RE_unordered_disjunction; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my @result;
+        my $alt = 0;
+        if ($$self{zyg}) {
+            $PURE = 0 if @{$$self{zyg}} > 1;
+            foreach my $kid (@{$$self{zyg}}) {
+                local @TOKEN;
+                local $PURE = 1;
+                my $r = $kid->walk(@_);
+                if ($r and $r =~ /^\$C->(\w+)/) {
+                    my $name = $1;
+                    if (my $p = $fixedprefix{$name}) {
+                        $r = "\$C->_EQ(\$C->pos, $p) && " . $r;
+                    }
+                }
+                push @result, $r;
+                my $token;
+                if (@TOKEN) {
+                    $token = '(' . join(' X ',@TOKEN) . ')';
+                }
+                else {
+                    $token = "''";
+                }
+                $kid->{alt} = $NAME . '/' . $alt++;
+                push @TOKENS, $token;
+            }
+        }
+        if (@result == 1) {
+            $result[0];
+        }
+        else {
+            for (@result) { $_ = " sub { my \$C=shift; $_ }," }
+            my $result = "do { my \@gather = (); for my \$block ((\n" . ::indent(join("\n", @result)) . "\n)[\@try]) { push \@gather, \$block->(\$C) }}";
+            $result;
+        }
+    }
+}
+
+{ package RE_var; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $var = $$self{var};
+        $PURE = 0;
+        if ($var =~ /^\$/) {
+            if ($var =~ /^\$(\d+)$/) {
+                "\$C->_BACKREFp$REV($1)";
+            }
+            elsif ($var =~ /^\$<(.*)>$/) {
+                "\$C->_BACKREFn$REV('$1')";
+            }
+            else {
+                "\$C->_EXACT$REV($var)";
+            }
+        }
+        elsif ($var =~ /^\@/) {
+            "\$C->_ARRAY$REV($var)";
+        }
+        elsif ($var =~ /^\%/) {
+            "\$C->_HASH$REV($var)";
+        }
+    }
+}
+
+## vim: expandtab sw=4
