@@ -43,28 +43,40 @@ sub unangle {
 
 sub un6 {
     my $t = shift;
-    $t =~ s/:(\w+)<(.*?)>/$1 => '$2'/g;
-    $t =~ s/:(\w+)\((.*?)\)/$1 => ($2)/g;
-    $t =~ s/:(\w+)/$1 => 1/g;
+    $t =~ s/ ::([A-Z]\w+)/ '$1'/g;
+    $t =~ s/([^:]):(\w+)<(.*?)>/$1$2 => '$3'/g;
+    $t =~ s/([^:]):(\w+)\((.*?)\)/$1$2 => ($3)/g;
+    $t =~ s/([^:]):(\w+)/$1$2 => 1/g;
     $t =~ s/\%\+?(\w+)((<[^>]*>)+)/'$' . $1 . unangle($2)/eg;
     $t =~ s/\%\+?(\w+)\{/\$$1\{/g;
     $t =~ s/\$(\w+)((<[^>]*>)+)/'$' . $1 . '->' . unangle($2)/eg;
     $t =~ s/\$((<[^>]*>)+)/'$M->' . unangle($1)/eg;
     $t =~ s/ \.((<[^>]*>)+)/' $_->' . unangle($1)/eg;
-    $t =~ s/(<[^>]*>)/qw$1/g;
-    $t =~ s/«([^»]*)»/qw($1)/g;
+    $t =~ s/(\s)<([^>)]*)>/$1qw($2)/g;
+    $t =~ s/(\s)<([^>]*)>/$1qw[$2]/g;
+    $t =~ s/(^|\s)«([^»]*)»/$1qw($2)/g;
+    $t =~ s/ «\s*([^»]+)»/my $x=$1; $x =~ s! !','!g; "['$x']"/eg;
+    $t =~ s/ <\s*([^>]+)>/my $x=$1; $x =~ s! !','!g; "['$x']"/eg;
+    $t =~ s/(\w+)((<[^>]*>)+)/$1 . '->' . unangle($2)/eg;
+    $t =~ s/(\w+)((«[^»]*»)+)/$1 . '->' . unangle($2)/eg;
     $t =~ s/¢/C/g;
     $t =~ s/(\$\w+)\./$1->/g;
-    $t =~ s/\$!(\w+)/\$self->{$1}/g;
+    $t =~ s/\$[!.](\w+)/\$self->{$1}/g;
+    $t =~ s/\@[!.](\w+)/\@{\$self->{$1}}/g;
+    $t =~ s/\%[!.](\w+)/\%{\$self->{$1}}/g;
+    $t =~ s/\.([a-z]\w+)/->$1/g;
+    $t =~ s/\@\((.*?)\)/\@{$1}/g;
     $t =~ s/!===?/!=/g;
     $t =~ s/===/==/g;
     $t =~ s/ is rw//g;
     $t =~ s/my (?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is context\s+= (.*);/local $1 = $2;/;
     $t =~ s/my (?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is context\s*;/local $1;/;
-    $t =~ s/\bif (.*?) \{/if ($1) {/;
-    $t =~ s/\bwhile (.*?) \{/while ($1) {/;
-    $t =~ s/orelse/or/;
-    $t =~ s/\.panic/->panic/;
+    $t =~ s/\bif (.*?) \{/if ($1) {/g;
+    $t =~ s/\bwhile (.*?) \{/while ($1) {/g;
+    $t =~ s/\bfor (.*?) \{/for ($1) {/g;
+    $t =~ s/\borelse\b/or/g;
+    $t =~ s/\bfail\b/die/g;
+    $t =~ s/\.panic/->panic/g;
     $t =~ s/(\s)~(\s)/$1.$2/g;
     $t =~ s/(\s):=(\s)/$1=$2/g;
     $t =~ s/(\s)\?\?(\s)/$1?$2/g;
@@ -159,8 +171,8 @@ END
         my $sym = "";
         for (;;) {
             if ($args =~ s/:\$sym is context (?:is rw )?= (.*)\)/\)/) {
-                $SYM = ::un6($1);
-                $sym .= "    local \$sym = $SYM;\n";
+                $SYM = $1;
+                $sym .= ::un6("    local \$sym = $SYM;\n");
             }
             elsif ($args =~ s/, *:\$endsym is context(.*)\)/\)/) {
                 $sym .= "    local \$endsym$1;\n";
@@ -277,6 +289,51 @@ END
         next;
     }
 
+    if (s/^method heredoc.*?\n}\n//s) {
+        $out .= <<'END';
+sub heredoc { my $self = shift;  
+    my $here = self;
+    while (my $herestub = shift @herestub_queue) {
+        local $delim = $herestub->delim;
+        my $lang = $herestub->lang;
+        my $doc;
+        my $ws = "";
+        $here = $here->q_unbalanced_rule($lang, stop => \&theredoc).MATCHIFY;
+        if ($here) {
+            if ($ws) {
+                my $wsequiv = $ws;
+                $wsequiv =~ s/^(\t+)/' ' x ($1 * 8)/e; # per spec
+                $here->{text}[0] =~ s/^/\n/; # so we don't match ^^ after escapes
+                for (@{$here->{text}}) {
+                    s{\n($ws|[ \t]*)}!do {
+                        my $white = $1;
+                        if ($white eq $ws) {
+                            '';
+                        }
+                        else {
+                            $white =~ s{^(\t+)}{
+                                ' ' x (length($1) * 8)
+                            }e;
+                            $white =~ s/^$wsequiv//
+                                ? $white
+                                : '';
+                        }
+                    }!eg;
+                }
+                $here->{text}[0] ~~ s/^\n//;
+            }
+            $herestub->orignode->{doc} = $here;
+        }
+        else {
+            self->panic("Ending delimiter $delim not found");
+        }
+    }
+    return $here;
+}
+END
+        next;
+    }
+
     if (s/^(.*\n)//) {
         my $line = un6($1);
         if ($line =~ s/^grammar (\w+);//) {
@@ -293,10 +350,18 @@ END
         }
         $line =~ s/^constant /my /;
         $line =~ s/class (\w+)\s+\{/{ package $1;/;
+        $line =~ s/role (\w+)\s+\{/{ package $1;/;
+        $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package $1; use base '$2';/;
         $line =~ s/do given\s+(.*?\S)\s+\{/do { \$_ = $1; if (0) {}/;
+        $line =~ s/try \{/eval {/;
         $line =~ s/given\s+(.*?\S)\s+\{/ for (scalar($1)) { if (0) {}/;
         $line =~ s/when\s+\*\s+\{/ else {/;
         $line =~ s/when\s+(.*?\S)\s+\{/ elsif (\$_ eq $1) {/;
+        $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
+        $line =~ s/(\S+) xx /($1) x /;
+        $line =~ s/(\S+) xx /($1) x /;
+        $line =~ s/\|%start/%start/;
+
         if ($line =~ m/method UNIT/) {
             $line =~ s/method UNIT \(\$unitstopper is context = "_EOS"\) \{/sub UNIT {
     my \$self = shift;
@@ -316,6 +381,7 @@ END
             $line =~ s/Match //g;
             $line =~ s/Str //g;
             $line =~ s/my \(\) = \@_;//g;
+            $line =~ s/my *= \@_;//g;
         }
 
         $out .= $line;

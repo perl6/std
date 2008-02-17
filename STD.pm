@@ -1757,7 +1757,7 @@ method heredoc () {
                 $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
                 $here<text>[0] ~~ s/^/\n/; # so we don't match ^^ after escapes
                 for @($here<text>) {
-                    s:g[\n ($ws | \h*)] = do {
+                    s:g[\n ($ws || \h*)] = do {
                         my $white = $0;
                         if $white eq $ws {
                             '';
@@ -1765,8 +1765,10 @@ method heredoc () {
                         else {
                             $white ~~ s[^ (\t+) ] = do {
                                 ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
-                            }
-                            $white ~~ s/^ $wsequiv // ?? $white !! '';
+                            };
+                            $white ~~ s/^ $wsequiv //
+                                ?? $white
+                                !! '';
                         }
                     }
                 }
@@ -1791,14 +1793,14 @@ token quote:sym</ />   {
     <?before '/'  > <quotesnabber(":regex")>
     [ (< i g s m x c e ] >+) 
         # note: only the submatch fails here on the obs call
-        [ $0 ~~ 'i' <obs("/i",":i")> ]?
-        [ $0 ~~ 'g' <obs("/g",":g")> ]?
-        [ $0 ~~ 's' <obs("/s","^^ and $$ anchors")> ]?
-        [ $0 ~~ 'm' <obs("/m",". or \N")> ]?
-        [ $0 ~~ 'x' <obs("/x","normal default whitespace")> ]?
-        [ $0 ~~ 'c' <obs("/c",":c or :p")> ]?
-        [ $0 ~~ 'e' <obs("/e","interpolated {...} or s{} = ... form")> ]?
-        <obs("suffix regex modifiers","prefix adverbs")>
+        [ $0 ~~ 'i' <obs('/i',':i')> ]?
+        [ $0 ~~ 'g' <obs('/g',':g')> ]?
+        [ $0 ~~ 's' <obs('/s','^^ and $$ anchors')> ]?
+        [ $0 ~~ 'm' <obs('/m','. or \N')> ]?
+        [ $0 ~~ 'x' <obs('/x','normal default whitespace')> ]?
+        [ $0 ~~ 'c' <obs('/c',':c or :p')> ]?
+        [ $0 ~~ 'e' <obs('/e','interpolated {...} or s{} = ... form')> ]?
+        <obs('suffix regex modifiers','prefix adverbs')>
     ]?
 }
 
