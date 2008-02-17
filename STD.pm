@@ -2906,6 +2906,7 @@ regex stdstopper {
     | <terminator>
     | <statement_mod_cond>
     | <statement_mod_loop>
+    | <?before '{'><?after \s>
     | <?{ $¢.pos === $+endstmt }>
     | <?{ $¢.pos === $+endargs }>
 #    | <$+unitstopper>
