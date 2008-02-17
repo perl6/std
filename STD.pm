@@ -1758,7 +1758,7 @@ method heredoc () {
                 $here<text>[0] ~~ s/^/\n/; # so we don't match ^^ after escapes
                 for @($here<text>) {
                     s:g[\n ($ws | \h*)] = do {
-                        my $white = $1;
+                        my $white = $0;
                         if $white eq $ws {
                             '';
                         }
