@@ -1,6 +1,6 @@
 grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
-BEGIN { say "compiling STD" }
+BEGIN { warn "compiling STD\n" }
 
 has StrPos $.ws_from;
 has StrPos $.ws_to;
@@ -1737,35 +1737,48 @@ class Herestub {
     has $.lang;
 }
 
+token theredoc {
+    ^^ $<ws>=(\h*?) $+delim \h* $$ \n?
+}
+
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
 method heredoc () {
+    my $here = self;
     while my $herestub = shift @herestub_queue {
-        my $delim = $herestub.delim;
+        my $delim is context = $herestub.delim;
         my $lang = $herestub.lang;
         my $doc;
         my $ws = "";
-        my $stoppat = $delim eq "" ?? rx[^^ \h* $$]
-                                   !! rx[^^ $ws:=(\h*?) $delim \h* $$ \n?];
-        my @heredoc_initial_ws is context<rw>;
-        if m:p/$doc=<q_unbalanced($lang, :stop($stoppat))>/ {
-            if $ws and @heredoc_initial_ws {
+        $here = $here.q_unbalanced_rule($lang, :stop(&theredoc)).MATCHIFY;
+        if $here {
+            if $ws {
                 my $wsequiv = $ws;
                 $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
-                for @heredoc_initial_ws {
-                    next if s/^ $ws //;   # reward consistent tabbing
-                    s/^^ (\t+) /{
-                        ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
-                    }/;
-                    s/^ $wsequiv // or s/^ \h+ //;
+                $here<text>[0] ~~ s/^/\n/; # so we don't match ^^ after escapes
+                for @($here<text>) {
+                    s:g[\n ($ws | \h*)] = do {
+                        my $white = $1;
+                        if $white eq $ws {
+                            '';
+                        }
+                        else {
+                            $white ~~ s[^ (\t+) ] = do {
+                                ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
+                            }
+                            $white ~~ s/^ $wsequiv // ?? $white !! '';
+                        }
+                    }
                 }
+                $here<text>[0] ~~ s/^ \n //;
             }
-            $herestub.orignode<doc> = $doc;
+            $herestub.orignode<doc> = $here;
         }
         else {
             self.panic("Ending delimiter $delim not found");
         }
     }
+    return $here;
 }
 
 token quote:sym<' '>   { <?before "'"  > <quotesnabber(":q")>        }
@@ -2183,32 +2196,37 @@ regex transliterator($stop) {
 }
 
 regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
-    <start=$start>
-    $<text> = [.*?]
-    @<more> = (
-        <!before <$stop>>
+    $start
+    $<text> = [.*?] ** [
+        <!before $stop>
         [ # XXX triple rule should just be in escapes to be customizable
-        | <?before <$start> ** 3>
+        | <?before $start ** 3>
             $<dequote> = <EXPR(%LOOSEST,/<$stop> ** 3/)>
         | <?before <$start>>
             $<subtext> = <q_balanced($lang, $start, $stop, :@esc)>
         | <?before @esc>
             $<escape> = [ <q_escape($lang)> ]
         ]
-        $<text> = [.*?]
-    )*
+    ]
+    $stop
+    {*}
+}
+
+regex q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {
+    $<text> = [.*?] ** [
+        <!before <$stop>>
+        <?before @esc> <escape=q_escape($lang)>
+    ]
     <stop=$stop>
     {*}
 }
 
 regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
-    $<text> = [.*?]
-    @<more> = (
-      <!before <$stop>>
-      <?before @esc> $<escape> = [ <q_escape($lang)> ]
-      $<text> = [.*?]
-    )*
-    <stop=$stop>
+    $<text> = [.*?] ** [
+        <!before $stop>
+        <?before @esc> <escape=q_escape($lang)>
+    ]
+    $stop
     {*}
 }
 
@@ -3229,16 +3247,19 @@ token regex_assertion:sym<?> { <sym> <regex_assertion> }
 token regex_assertion:sym<!> { <sym> <regex_assertion> }
 
 token regex_assertion:sym<{ }> { <block> }
+
 token regex_assertion:variable {
     <?before <sigil>>  # note: semantics must be determined per-sigil
     <EXPR(%LOOSEST,&assertstopper)>
     {*}                                                        #= variable
 }
+
 token regex_assertion:method {
     <?before '.' <!before '>'> >
     <EXPR(%LOOSEST,&assertstopper)>
     {*}                                                        #= method
 }
+
 token regex_assertion:ident { <ident> [               # is qq right here?
                                 | '=' <regex_assertion>
                                 | ':' <.ws>
