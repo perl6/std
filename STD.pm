@@ -1172,8 +1172,8 @@ token shellwords($stop) {
     <.ws> [ <!before $stop> .]*  # XXX need to split
 }
 
-token circumfix:sym<{ }> ( --> Circumfix) {
-    <?before '{'> <block>
+token circumfix:sym<{ }> ( --> Term) {
+    <?before '{' | <lambda> > <pblock>
     {*}                                                         #= { }
 }
 
@@ -2906,7 +2906,7 @@ regex stdstopper {
     | <terminator>
     | <statement_mod_cond>
     | <statement_mod_loop>
-    | <?before '{'><?after \s>
+    | <?before '{' | <lambda> ><?after \s>
     | <?{ $¢.pos === $+endstmt }>
     | <?{ $¢.pos === $+endargs }>
 #    | <$+unitstopper>
