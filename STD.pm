@@ -231,6 +231,9 @@ proto token special_variable { }
 token category:version { <sym> }
 proto token version { }
 
+token category:module_name { <sym> }
+proto token module_name { }
+
 token category:term { <sym> }
 proto token term { }
 
@@ -824,11 +827,13 @@ rule statement_mod_loop:until { <sym> <modifier_expr> {*} }     #= mod until
 rule statement_mod_loop:for   { <sym> <modifier_expr> {*} }     #= mod for
 rule statement_mod_loop:given { <sym> <modifier_expr> {*} }     #= mod given
 
-token module_name {
+token module_name:normal {
     <name>                                          {*}         #= name
     <colonpair>*
     {*}
 }
+
+token module_name:deprecated { 'v6-alpha' }
 
 =begin perlhints
 
@@ -1116,10 +1121,6 @@ token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
     {*}                                                         #= =
 }
 
-token postfix:i       ( --> Autoincrement) { <sym> {*} }         #= i
-token postfix:sym<++> ( --> Autoincrement) { <sym> {*} }         #= incr
-token postfix:sym<--> ( --> Autoincrement) { <sym> {*} }         #= decr
-
 token postcircumfix:sym<( )> ( --> Methodcall)
     { '(' <semilist> ')' {*} }                                  #= ( )
 
@@ -1234,7 +1235,7 @@ token package_declarator:trusts {
     {*}
 }
 
-token package_def {
+rule package_def {
     <module_name>?
     <trait>* {*}                                                #= traits
     [
@@ -2506,6 +2507,7 @@ token prefix:sym<++> ( --> Autoincrement)
 token prefix:sym<--> ( --> Autoincrement)
     { <sym> {*} }                                               #= --
 
+token postfix:i       ( --> Autoincrement) { <sym> {*} }        #= i
 
 ## exponentiation
 token infix:sym<**> ( --> Exponentiate)
