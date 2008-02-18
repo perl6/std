@@ -392,7 +392,7 @@ token pod_comment {
 
 method UNIT ($unitstopper is context = "_EOS") {
     UNIT: do {
-        self.comp_unit();
+        self.comp_unit([]);
     }
 }
 
@@ -881,6 +881,7 @@ token expect_term {
 #    { make $¢.nounphrase(:noun($<noun>), :pre(@<pre>), :post(@<post>)) }
 }
 
+# XXX no @fate, so may not be called as a rule
 method nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
     my $nounphrase = $noun;
     my $pre = pop @pre;
@@ -1074,8 +1075,8 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     {*}                                                         #= !
 }
 
-method lex1 (Str $s) {
-    if %+thisop{$s}++ { self.panic("Nested $s metaoperators not allowed"); }
+method lex1 (@fate, Str $s) {
+    if %+thisop{$s}++ { self.panic(@fate, "Nested $s metaoperators not allowed"); }
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
@@ -1426,7 +1427,7 @@ token special_variable:sym<${^ }> {
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
-method obscaret (Str $var, Str $sigil, Str $name) {
+method obscaret (@fate, Str $var, Str $sigil, Str $name) {
     my $repl = do given $sigil {
         when '$' {
             given $name {
@@ -1465,7 +1466,7 @@ method obscaret (Str $var, Str $sigil, Str $name) {
         }
         when * { "a global form such as $sigil*$0" }
     }; # XXX pugs needs semi here for some reason
-    return self.obs("$var variable", $repl);
+    return self.obs(@fate, "$var variable", $repl);
 }
 
 token special_variable:sym<${ }> {
@@ -1744,14 +1745,14 @@ token theredoc {
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
-method heredoc () {
+method heredoc (@fate) {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $delim is context = $herestub.delim;
         my $lang = $herestub.lang;
         my $doc;
         my $ws = "";
-        $here = $here.q_unbalanced_rule($lang, :stop(&theredoc)).MATCHIFY;
+        $here = $here.q_unbalanced_rule(@fate,$lang, :stop(&theredoc)).MATCHIFY;
         if $here {
             if $ws {
                 my $wsequiv = $ws;
@@ -1778,7 +1779,7 @@ method heredoc () {
             $herestub.orignode<doc> = $here;
         }
         else {
-            self.panic("Ending delimiter $delim not found");
+            self.panic([],"Ending delimiter $delim not found");
         }
     }
     return $here;
@@ -2159,8 +2160,8 @@ constant %open2close = (
 
 # assumes whitespace is eaten already
 
-method peek_delimiters () {
-    return peek_brackets ||
+method peek_delimiters (@fate) {
+    return self.peek_brackets([]) ||
         substr(self.orig,self.pos,1) xx 2;
 }
 
@@ -2264,7 +2265,7 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
 }
 
 # We get here only for escapes in escape set, even though more are defined.
-method q_escape ($lang) {
+method q_escape (@fate, $lang) {
     $lang<escrule>(self);
     {*}
 }
@@ -2521,7 +2522,7 @@ token circumfix:sym<« »> ( --> Term)
 token infix:sym<.> ( --> Methodcall)
     { '.' <obs('. to concatenate strings', '~')> }
 
-token postfix:sym{'->'} ( --> Methodcall)
+token postfix:sym['->'] ( --> Methodcall)
     { '->' <obs('-> to call a method', '.')> }
 
 ## autoincrement
@@ -2949,10 +2950,10 @@ token assertstopper { <stdstopper> | '>' }
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR (%preclim = %LOOSEST,
+method EXPR (@fate,
+                %preclim = %LOOSEST,
                 :$stop = &stdstopper,
                 :$seen,
-                *@fate
             )
 {
     my $preclim = %preclim<prec>;
@@ -3365,9 +3366,9 @@ token quantmod { [ '?' | '!' | ':' | '+' ]? }
 
 rule panic (Str $s) { <commit> <fail($s)> }
 
-# 3rd arg assumes more things will become obsolete after Perl 6 comes out...
-method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
-    self.panic("Obsolete use of $old;$when please use $new instead");
+# "when" arg assumes more things will become obsolete after Perl 6 comes out...
+method obs (@fate, Str $old, Str $new, Str $when = ' in Perl 6') {
+    self.panic(@fate,"Obsolete use of $old;$when please use $new instead");
 }
 
 #XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash

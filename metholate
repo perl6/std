@@ -122,8 +122,9 @@ while ($_ ne "") {
         if ($args =~ s/, *(\$stop is context)(.*)\)/, \$stop_$2\)/) {
             $sym .= "    my $1 = \$stop_;\n";
         }
-        $args =~ s/(.*)\)/$1, *\@fate is copy )/; # XXX pugs needs 'is copy'
         $args =~ s/\( *, */(/;
+        $args =~ s/\((.*)/(\@fate is copy, $1/;
+        $args =~ s/, *\)/)/;
         $args =~ s/\((.*)\)/$1/s;
         $args =~ s/^ *, *//;
 
@@ -174,27 +175,13 @@ END
 <<DECL>>
     my @try;
     my $binding;
-    if @fate[0] eq '?' {
-        return <<PEEK>>;
-    }
-    if @fate[0] eq '=' {
-        @fate.shift;
+    if @fate {
         $binding = @fate.shift;
+        if $binding eq '?' {
+            return <<PEEK>>;
+        }
     }
 END
-
-    # XXX the following loses the current pad in pugs for some reason
-    #while $_ = @fate.shift {
-    #    when '?' {
-    #        return <<PEEK>>;
-    #    }
-    #    when '=' {
-    #        $binding := @fate.shift;
-    #    }
-    #
-    #    when '#' { @try = @fate.shift; }
-    #    when '*' { @try = <<TRY>>; }
-    #}
 
     if (@TOKENS > 1) {
         $body .= <<'END';
@@ -798,15 +785,15 @@ sub unbalanced {
         my $binding;
         my $self = shift;
         if ($$self{nobind}) {
-            $binding = '',
+            $binding = "['',\@fate]",
         }
         elsif (defined $BINDING) {
-            $binding = "< = $BINDING>, ";
+            $binding = "['$BINDING', \@fate]";
             undef $BINDING;
         }
         else {
             my $name = $$self{name};
-            $binding = "< = $name>, ";
+            $binding = "['$name', \@fate]";
         }
         $binding;
     }
@@ -1031,7 +1018,7 @@ sub unbalanced {
             $$self{sym} = $s;
         }
         push @TOKEN, "\$¢.$name('?')" if $PURE;
-        my $re = '$¢.' . $name . "($binding\@fate)";
+        my $re = '$¢.' . $name . "($binding)";
     }
 }
 
@@ -1058,7 +1045,7 @@ sub unbalanced {
         $re = ::indent($re->walk(@_));
         $REV = '';
 
-        my $binding = ', ' . $self->binding;
+        my $binding = $self->binding;
         if ($PURE) {
             if ($name eq 'before') {
                 push @TOKEN, $re;
@@ -1067,7 +1054,7 @@ sub unbalanced {
                 push @TOKEN, "\$¢.$name(-> \$¢ {\n$re\n}, '?')";
             }
         }
-        '$¢.' . $name . "(-> \$¢ {\n$re\n}$binding\@fate)";
+        '$¢.' . $name . "($binding, -> \$¢ {\n$re\n})";
     }
 }
 
@@ -1080,9 +1067,9 @@ sub unbalanced {
         $PURE = 0 if $impure{$name};
         $str =~ s/(['\\])/\\$1/g;
 
-        my $binding = ', ' . $self->binding;
+        my $binding = $self->binding;
         push @TOKEN, "\$¢.$name('$str','?')" if $PURE;
-        '$¢.' . $name . "('$str'$binding\@fate)";
+        '$¢.' . $name . "($binding, '$str')";
     }
 }
 
@@ -1096,9 +1083,9 @@ sub unbalanced {
 
         my $binding = $self->binding;
         $rest =~ s/\)$/, /;
-        $rest =~ s/\(, */(/;
+        $rest =~ s/\(,? *//;
         push @TOKEN, "\$¢.$name$rest'?')" if $PURE;
-        "\$¢.$name$rest$binding\@fate)";
+        "\$¢.$name($binding, $rest)";
     }
 }
 
