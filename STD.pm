@@ -1911,40 +1911,51 @@ sub qlang (@pedigree) {
 }
 
 class Q_tweaker does QLang {
-    has @.escapes;
+    has $.escapes;
 
     method escset {
-        @.escapes ||=               # presumably resolves after adverbs
+        $.escapes ||= [              # presumably resolves after adverbs
            '\\' xx ?%.option<b>,
             '$' xx ?%.option<s>,
             '@' xx ?%.option<a>,
             '%' xx ?%.option<h>,
             '&' xx ?%.option<f>,
-            '{' xx ?%.option<c>;
+            '{' xx ?%.option<c>,
+        ];
     } #'
 
+    # begin tweaks
     multi method tweak (:q($single)) {
         $single or panic("Can't turn :q back off");
-        %.option.keys and panic("Too late for :q");
+        %.option and panic("Too late for :q");
         %.option = (:b, :!s, :!a, :!h, :!f, :!c);
     }
 
     multi method tweak (:qq($double)) {
         $double or panic("Can't turn :qq back off");
-        %.option.keys and panic("Too late for :qq");
+        %.option and panic("Too late for :qq");
         %.option = (:b, :s, :a, :h, :f, :c);
     }
 
-    multi method tweak (:b($backslash))   { %.option<b>  = $backslash }
-    multi method tweak (:s($scalar))      { %.option<s>  = $scalar }
-    multi method tweak (:a($array))       { %.option<a>  = $array }
-    multi method tweak (:h($hash))        { %.option<h>  = $hash }
-    multi method tweak (:f($function))    { %.option<f>  = $function }
-    multi method tweak (:c($closure))     { %.option<c>  = $closure }
+    multi method tweak (:$b)              { %.option<b>  = $b }
+    multi method tweak (:backslash($b))   { %.option<b>  = $b }
+    multi method tweak (:$s)              { %.option<s>  = $s}
+    multi method tweak (:scalar($s))      { %.option<s>  = $s}
+    multi method tweak (:$a)              { %.option<a>  = $a}
+    multi method tweak (:array($a))       { %.option<a>  = $a}
+    multi method tweak (:$h)              { %.option<h>  = $h}
+    multi method tweak (:hash($h))        { %.option<h>  = $h}
+    multi method tweak (:$f)              { %.option<f>  = $f}
+    multi method tweak (:function($f))    { %.option<f>  = $f}
+    multi method tweak (:$c)              { %.option<c>  = $c}
+    multi method tweak (:closure($c))     { %.option<c>  = $c}
 
-    multi method tweak (:x($exec))        { %.option<c>  = $exec }
-    multi method tweak (:w($words))       { %.option<w>  = $words }
-    multi method tweak (:ww($quotewords)) { %.option<ww> = $quotewords }
+    multi method tweak (:$x)              { %.option<x>  = $x}
+    multi method tweak (:exec($x))        { %.option<x>  = $x}
+    multi method tweak (:$w)              { %.option<w>  = $w}
+    multi method tweak (:words($w))       { %.option<w>  = $w}
+    multi method tweak (:$ww)             { %.option<ww> = $ww }
+    multi method tweak (:quotewords($ww)) { %.option<ww> = $ww }
 
     multi method tweak (:to($heredoc)) {
         $.parser = &Perl::q_heredoc;
@@ -1973,19 +1984,32 @@ class Q_tweaker does QLang {
     }
 
     multi method tweak (*%x) {
-        panic("Unrecognized quote modifier: %x.keys()");
+        my @k = keys(%x);
+        panic("Unrecognized quote modifier: " ~ @k);
     }
+    # end tweaks
 
 }
 
 class RX_tweaker does QLang {
-    multi method tweak (:g($global))      { %.option<g>  = $global }
-    multi method tweak (:i($ignorecase))  { %.option<i>  = $ignorecase }
-    multi method tweak (:c($continue))    { %.option<c>  = $continue }
-    multi method tweak (:p($pos))         { %.option<p>  = $pos }
-    multi method tweak (:ov($overlap))    { %.option<ov> = $overlap }
-    multi method tweak (:ex($exhaustive)) { %.option<ex> = $exhaustive }
-    multi method tweak (:s($sigspace))    { %.option<s>  = $sigspace }
+    # begin tweaks
+    multi method tweak (:$g)              { %.option<g>  = $g }
+    multi method tweak (:global($g))      { %.option<g>  = $g }
+    multi method tweak (:$i)              { %.option<i>  = $i }
+    multi method tweak (:ignorecase($i))  { %.option<i>  = $i }
+    multi method tweak (:$ii)             { %.option<ii> = $ii }
+    multi method tweak (:$b)              { %.option<b>  = $b }
+    multi method tweak (:$bb)             { %.option<bb> = $bb }
+    multi method tweak (:$c)              { %.option<c>  = $c }
+    multi method tweak (:continue($c))    { %.option<c>  = $c }
+    multi method tweak (:$p)              { %.option<p>  = $p }
+    multi method tweak (:pos($p))         { %.option<p>  = $p }
+    multi method tweak (:$ov)             { %.option<ov> = $ov }
+    multi method tweak (:overlap($ov))    { %.option<ov> = $ov }
+    multi method tweak (:$ex)             { %.option<ex> = $ex }
+    multi method tweak (:exhaustive($ex)) { %.option<ex> = $ex }
+    multi method tweak (:$s)              { %.option<s>  = $s }
+    multi method tweak (:sigspace($s))    { %.option<s>  = $s }
 
     multi method tweak (:$bytes)  { %.option<UNILEVEL> = 'bytes' }
     multi method tweak (:$codes)  { %.option<UNILEVEL> = 'codes' }
@@ -2006,41 +2030,49 @@ class RX_tweaker does QLang {
     }
 
     multi method tweak (:$nth)            { %.option<nth> = $nth }
-    multi method tweak (:x($times))       { %.option<x> = $times }
+    multi method tweak (:$x)              { %.option<x> = $x }
+    multi method tweak (:times($x))       { %.option<x> = $x }
 
     # Ain't we special!
     multi method tweak (*%x) {
-        my $na = %x.keys();
+        my ($na) = keys(%x);
         my ($n,$a) = $na ~~ /^(\d+)(<[a-z]>+)$/
             or panic("Unrecognized regex modifier: $na");
         if $a eq 'x' {
-            %.option{x} = $n;
+            %.option<x> = $n;
         }
         elsif $a eq 'st' | 'nd' | 'rd' | 'th' {
-            %.option{nth} = $n;
+            %.option<nth> = $n;
         }
     }
+    #end tweaks
 }
 
 class P5RX_tweaker does QLang {
+    # begin tweaks
     multi method tweak (:$g) { %.option<g>  = $g }
     multi method tweak (:$i) { %.option<i>  = $i }
     multi method tweak (:$s) { %.option<s>  = $s }
     multi method tweak (:$m) { %.option<m>  = $m }
 
     multi method tweak (*%x) {
-        panic("Unrecognized Perl 5 regex modifier: %x.keys()");
+        my @k = keys(%x);
+        panic("Unrecognized Perl 5 regex modifier: " ~ @k);
     }
+    # end tweaks
 }
 
 class TR_tweaker does QLang {
+    # begin tweaks
     multi method tweak (:$c) { %.option<c>  = $c }
     multi method tweak (:$d) { %.option<d>  = $d }
     multi method tweak (:$s) { %.option<s>  = $s }
 
     multi method tweak (*%x) {
-        panic("Unrecognized transliteration modifier: %x.keys()");
+        my @k = keys(%x);
+        panic("Unrecognized transliteration modifier: " ~ @k);
     }
+    # end tweaks
 }
 
 token quotesnabber (*@q) {
@@ -2060,7 +2092,7 @@ token quotesnabber (*@q) {
 }
 
 # XXX should eventually be derived from current Unicode tables.
-constant %open2close = {
+constant %open2close = (
     "\x0028" => "\x0029", "\x003C" => "\x003E", "\x005B" => "\x005D",
     "\x007B" => "\x007D", "\x00AB" => "\x00BB", "\x0F3A" => "\x0F3B",
     "\x0F3C" => "\x0F3D", "\x169B" => "\x169C", "\x2039" => "\x203A",
@@ -2123,32 +2155,30 @@ constant %open2close = {
     "\xFE5B" => "\xFE5C", "\xFE5D" => "\xFE5E", "\xFF08" => "\xFF09",
     "\xFF1C" => "\xFF1E", "\xFF3B" => "\xFF3D", "\xFF5B" => "\xFF5D",
     "\xFF5F" => "\xFF60", "\xFF62" => "\xFF63",
-};
+);
 
 # assumes whitespace is eaten already
 
 method peek_delimiters () {
     return peek_brackets ||
-        substr(self.orig,0,1) xx 2;
+        substr(self.orig,self.pos,1) xx 2;
 }
 
-method peek_brackets () {
-    if m:p(self) / \s / {
+token peek_brackets {
+    <?before \s> {
         self.panic("Whitespace not allowed as delimiter");
     }
-    elsif m:p(self) / <+isPe>> / {
-        self.panic("Use a closing delimiter for an opener is reserved");
-    }
-    elsif m:p(self) / (.) ** <?same> > / {
+# XXX not defined yet
+#    <?before <+isPe> > {
+#        self.panic("Use a closing delimiter for an opener is reserved");
+#    }
+    (.) ** <?same> {{
         my $start = ~$/;
         my $rightbrack = %open2close{$0} orelse
-            return ();
+            die "No matching close delimiter";
         my $stop = $rightbrack x $start.chars;
-        return $start, $stop;
-    }
-    else {
-        return ();
-    }
+        return($start, $stop);
+    }}
 }
 
 regex bracketed ($lang = qlang("Q")) {

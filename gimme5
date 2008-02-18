@@ -46,7 +46,8 @@ sub un6 {
     $t =~ s/ ::([A-Z]\w+)/ '$1'/g;
     $t =~ s/([^:]):(\w+)<(.*?)>/$1$2 => '$3'/g;
     $t =~ s/([^:]):(\w+)\((.*?)\)/$1$2 => ($3)/g;
-    $t =~ s/([^:]):(\w+)/$1$2 => 1/g;
+    $t =~ s/([^:]):(\w+)/$1$2 => 1/g unless $t =~ /panic/;
+    $t =~ s/([^:]):!(\w+)/$1$2 => 0/g;
     $t =~ s/\%\+?(\w+)((<[^>]*>)+)/'$' . $1 . unangle($2)/eg;
     $t =~ s/\%\+?(\w+)\{/\$$1\{/g;
     $t =~ s/\$(\w+)((<[^>]*>)+)/'$' . $1 . '->' . unangle($2)/eg;
@@ -62,6 +63,8 @@ sub un6 {
     $t =~ s/¢/C/g;
     $t =~ s/(\$\w+)\./$1->/g;
     $t =~ s/\$[!.](\w+)/\$self->{$1}/g;
+    $t =~ s/\@[!.](\w+)->/\$self->{$1}->/g;
+    $t =~ s/\%[!.](\w+)->/\$self->{$1}->/g;
     $t =~ s/\@[!.](\w+)/\@{\$self->{$1}}/g;
     $t =~ s/\%[!.](\w+)/\%{\$self->{$1}}/g;
     $t =~ s/\.([a-z]\w+)/->$1/g;
@@ -72,6 +75,7 @@ sub un6 {
     $t =~ s/my (?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is context\s+= (.*);/local $1 = $2;/;
     $t =~ s/my (?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is context\s*;/local $1;/;
     $t =~ s/\bif (.*?) \{/if ($1) {/g;
+    $t =~ s/\belsif (.*?) \{/elsif ($1) {/g;
     $t =~ s/\bwhile (.*?) \{/while ($1) {/g;
     $t =~ s/\bfor (.*?) \{/for ($1) {/g;
     $t =~ s/\borelse\b/or/g;
@@ -360,7 +364,25 @@ END
         $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
         $line =~ s/(\S+) xx /($1) x /;
         $line =~ s/(\S+) xx /($1) x /;
+        $line =~ s/ x \?/ x !!/;
         $line =~ s/\|%start/%start/;
+        if ($line =~ m/# begin tweaks/) {
+            $line = <<'END'
+  sub tweak {
+    my $self = shift;
+    my ($k, $v) = @_;
+
+    if (0) {}
+END
+        }
+        elsif ($line =~ m/# end tweaks/) {
+            $line = "  }\n";
+        }
+        elsif ($line =~ s/multi method tweak/elsif/) {
+            $line =~ s/\(:\$(\w+)\)(\s+{)/(\$k eq '$1')$2 my \$$1 = \$v; / or
+            $line =~ s/\(:(\w+)\((\$\w+)\)\)(\s+{)/(\$k eq '$1')$3 my \$$2 = \$v; / or
+            $line =~ s/elsif \(\*%x\)(\s+{)/else $1 my %x = (\$k, \$v); /;
+        }
 
         if ($line =~ m/method UNIT/) {
             $line =~ s/method UNIT \(\$unitstopper is context = "_EOS"\) \{/sub UNIT {
