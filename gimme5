@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/local/bin/perl
 
 # This is a version of "metholate" that spits out Perl 5 instead of Perl 6.
 # If metholate is hacky, I hate to think what this is...
@@ -418,7 +418,7 @@ END
         }
         $line = un6($line);
         if ($line =~ s/^grammar (\w+);//) {
-            $out .= "#use Cursor5;\npackage $1;\n#use base 'Cursor5';\nlocal %AUTOLEXED;";
+            $out .= "use Cursor5;\npackage $1;\nuse base 'Cursor5';\nlocal %AUTOLEXED;";
             $out .= '$\ = "\n";' . "\n";
         }
         $line =~ s/^(\s*has) /#$1 /;
