@@ -87,6 +87,7 @@ sub un6 {
         $f =~ s/^\%[!.](\w+)//          	and $t .= qq/\%{\$self->{$1}}/, next;
         $f =~ s/^\@(\w+)([\[{])/$2/             and $t .= qq/\$$1->/, next;
         $f =~ s/^\%(\w+)([\[{])/$2/             and $t .= qq/\$$1->/, next;
+        $f =~ s/^\.pos\b//         	        and $t .= qq/->{pos}/, next;
         $f =~ s/^\.([a-z]\w+)//         	and $t .= qq/->$1/, next;
         $f =~ s/^!===?//                	and $t .= qq/!=/, next;
         $f =~ s/^===//                  	and $t .= qq/==/, next;
@@ -106,6 +107,7 @@ sub un6 {
         $f =~ s/^\btry \{//                     and $t .= qq/eval {/, next;
         $f =~ s/^\bloop \{//                    and $t .= qq/for (;;) {/, next;
         $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/else {/, next;
+        $f =~ s/^\bdefault\s+\{//               and $t .= qq/else {/, next;
 
         # the following must do partial rescan of final expression
 
@@ -259,7 +261,7 @@ END
             $coercion = $1 . "->coerce";
         }
         $args .= ', ';
-        my $sym = "    my \@fate = \@{shift};\n";
+        my $sym = "    my \@fate = \@{shift()};\n";
 
         $args =~ s/is rw//g;
         while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context)?\s*([^=?])/$4/) {
@@ -477,7 +479,7 @@ END
 print $out;
 
 sub here {
-    warn +(caller(1))[3],": ",/^(.{0,20})/,"\n" if $TRACE;
+    warn +(caller(0))[3],": ",/^(.{0,20})/,"\n" if $TRACE;
 }
 
 #############################################3333
@@ -1451,7 +1453,7 @@ sub unbalanced {
     sub wrapone {
         my ($outer, $inner) = @_;
         if ($MAYBACKTRACK) {
-            "(map { my \$C=shift;\n" .
+            "(map { my \$C=$_;\n" .
                 ::indent($inner) .
             "\n} $outer)";
         }
@@ -1544,7 +1546,7 @@ sub unbalanced {
                 if ($r and $r =~ /^\$C->(\w+)/) {
                     my $name = $1;
 #                    if (my $p = $fixedprefix{$name}) {
-#                        $r = "\$C->_EQ(\$C->pos, $p) && " . $r;
+#                        $r = "\$C->_EQ(\$C->{pos}, $p) && " . $r;
 #                    }
                 }
                 push @result, $r;

@@ -1,5 +1,15 @@
 package Cursor5;
 
+use Carp;
+
+$SIG{__DIE__} = sub { confess(@_) };
+
+sub new {
+    my $class = shift;
+    my %args = 'pos' => 0, @_;
+    bless \%args, ref $class || $class;
+}
+
 use YAML::Syck;
 
 my $VERBOSE = 1;
@@ -12,14 +22,14 @@ my $RE_verbose = 1;
 #has $self->{orig};        # per match, the original string we are matching against
 our %lexers;       # per language, the cache of lexers, keyed by (|) location
 
-#has Bool $self->{bool} = 1;
-#has StrPos $self->{from} = 0;
-#has StrPos $self->{to} = 0;
-#has StrPos $self->{pos} = 0;
-#has Cursor $self->{prior};
-#has %{$self->{mykeys}};
-#has Str $self->{name};
-#has $self->{item};
+#has Bool $.bool = 1;
+#has StrPos $.from = 0;
+#has StrPos $.to = 0;
+#has StrPos $.pos = 0;
+#has Cursor $.prior;
+#has %.mykeys};
+#has Str $.name;
+#has $.item;
 
 sub lexers { my $self = shift;
     %lexers;    # XXX should be different per language, sigh
@@ -30,18 +40,19 @@ my $fakepos = 1;
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
 
+    print "peek $key";
     die "Null key" if $key eq '';
-    if ($self->{lexers}.{$key}) {
+    if ($self->{lexers}->{$key}) {
         if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
             die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
             warn "Suppressing lexer recursion on $key";
             return hash();  # (but if we advanced just assume a :: here)
         }
-        elsif ($self->{lexers}.{$key}.WHAT eq Hash) {
-            return $self->{lexers}.{$key} // hash();
+        elsif (ref($self->{lexers}->{$key}) eq 'Hash') {
+            return $self->{lexers}->{$key} // hash();
         }
         else {
-            print "oops ", $key->WHAT;
+            print "oops ", ref($key);
         }
     }
     return $self->{lexers}{$key} = $self->_AUTOLEXgen($key);
@@ -50,7 +61,7 @@ sub _AUTOLEXpeek { my $self = shift;
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
 
-    print "gen0";
+    print "gen0 $key";
     my $lexer = { x => 'y' };
     if (! -s "lexcache5/$key.yml") {
 	print "gen1";
@@ -62,13 +73,13 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$AUTOLEXED{$key} = $fakepos;
 	my $pat = $ast->longest($self);
+	warn $pat;
 	$AUTOLEXED{$key} = $oldfakepos;
 
 	for (@$FATES) { s/\w+\///g; }
 	$lexer = { PAT => $pat, FATES => $FATES };
 	print "gen2";
 	open(my $cache, '>', "lexcache5/$key.yml") // warn "Can't print: $!";
-	# XXX
 	print $cache Dump($lexer) or warn "Can't print: $!";
 	close($cache) or warn "Can't close: $!";
 	print "gen3";
@@ -79,7 +90,8 @@ sub _AUTOLEXgen { my $self = shift;
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
 
-    my $lexer = $self->{lexers}.{$key} // do {
+    print "now $key";
+    my $lexer = $self->{lexers}->{$key} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
     };
@@ -168,11 +180,11 @@ sub matchify { my $self = shift;
     my %bindings;
     my $m;
     my $next;
-    print "MATCHIFY", $self->WHAT;
+    print "MATCHIFY", ref $self;
     for ($m = $self->{prior}; $m; $m = $next) {
-        $next = $m->prior;
-        undefine $m->prior;
-        my $n = $m->name;
+        $next = $m->{prior};
+        undefine $m->{prior};
+        my $n = $m->{name};
         print "MATCHIFY $n";
         if (not $bindings{$n}) {
             $bindings{$n} = [];
@@ -187,7 +199,7 @@ sub matchify { my $self = shift;
         print "copied $k ", $v;
     }
     undefine $self->{prior};
-    $self->item;
+    $self->{item};
     $self;
 }
 
@@ -196,15 +208,15 @@ sub cursor_all { my $self = shift;
     my $tpos = shift;
 
     my $r = $self->new(
-        orig => ($self->orig),
+        orig => ($self->{orig}),
         #lexers => ($self->lexers),
         from => ($fpos),
         to => ($tpos),
         pos => ($tpos),
-        prior => (defined $self->name ? $self : $self->prior),
-        mykeys => $self->mykeys,
+        prior => (defined $self->{name} ? $self : $self->{prior}),
+        mykeys => $self->{mykeys},
     );
-    print "PRIOR ", $r->prior->name if defined $r->prior;
+    print "PRIOR ", $r->{prior}->{name} if defined $r->{prior};
     $r;
 }
 
@@ -212,13 +224,13 @@ sub cursor { my $self = shift;
     my $tpos = shift;
 
     $self->new(
-        orig => ($self->orig),
+        orig => ($self->{orig}),
         #lexers => ($self->lexers),
-        from => ($self->pos // 0),
+        from => ($self->{pos} // 0),
         to => ($tpos),
         pos => ($tpos),
-        prior => (defined $self->name ? $self : $self->prior),
-        mykeys => $self->mykeys,
+        prior => (defined $self->{name} ? $self : $self->{prior}),
+        mykeys => $self->{mykeys},
     );
 }
 
@@ -226,13 +238,13 @@ sub cursor_rev { my $self = shift;
     my $fpos = shift;
 
     $self->new(
-        orig => ($self->orig),
+        orig => ($self->{orig}),
         #lexers => ($self->lexers),
         pos => ($fpos),
         from => ($fpos),
-        to => ($self->from),
-        prior => (defined $self->name ? $self : $self->prior),
-        mykeys => $self->mykeys,
+        to => ($self->{from}),
+        prior => (defined $self->{name} ? $self : $self->{prior}),
+        mykeys => $self->{mykeys},
     );
 }
 
@@ -242,24 +254,24 @@ sub callm { my $self = shift;
     my $ar = shift;
 
     my $lvl = 0;
-    while (Pugs::Internals::caller(Any,$lvl,"")) { $lvl++ }
-    my $caller = caller;
-    my $name = substr($caller->subname,1);
+    while (caller($lvl)) { $lvl++ }
+    my ($package, $file, $line, $subname, $hasargs) = caller(0);
+    my $name = $subname;
     if (defined $arg) { 
         $name .= " " . $arg;
     }
     my $pos = '?';
-    $pos = $self->pos if defined $self->orig;
-    print $pos,"\t", ':' x $lvl, ' ', $name, " [", $caller->file, ":", $caller->line, "]";
+    $pos = $self->{pos} if defined $self->{orig};
+    print $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]";
     {lvl => $lvl};
 }
 
 sub whats { my $self = shift;
 
-    my @k = keys(%{$self->mykeys});
-    print "  $.WHICH ===> $.from $.to $.item (@k)";
+    my @k = keys(%{$self->{mykeys}});
+    print "  $self ===> @{[$self->{from}.' '. $self->{to}.' '. $self->{item}]} (@k)";
     for my $k (@ksub) {
-        print "   $k => @{[$self->mykeys->{$k}]}";
+        print "   $k => @{[$self->{mykeys}->{$k}]}";
     }
 }
 
@@ -272,7 +284,8 @@ sub retm { my $self = shift;
         $self->{name} = $bind;
         $binding = "      :bind<$bind>";
     }
-    print $self->pos, "\t", ':' x $CTX->{lvl}, ' ', substr(caller->subname,1), " returning @{[$self->from]}..@{[$self->to]}$binding";
+    my ($package, $file, $line, $subname, $hasargs) = caller(0);
+    print $self->{pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{from}]}..@{[$self->{to}]}$binding";
 #    $self->whats();
     $self;
 }
@@ -280,15 +293,8 @@ sub retm { my $self = shift;
 sub _MATCHIFY { my $self = shift;
     my $bind = shift;
 
-    map { $_->cursor_all($self->pos, $_->to)->retm($bind) }
+    map { $_->cursor_all($self->{pos}, $_->{to})->retm($bind) }
     map { $_->matchify } @results;
-}
-
-sub _SEQUENCE { my $self = shift;
-    my @array = shift;
-    my $block = shift;
-
-    map { $block->($_) } @array;
 }
 
 sub _STARf { my $self = shift;
@@ -297,7 +303,7 @@ sub _STARf { my $self = shift;
     local $CTX = $self->callm;
 
     map { $_->retm($bind) }
-        $self->cursor($self->pos),
+        $self->cursor($self->{pos}),
         $self->_PLUSf($block);
 }
 
@@ -309,7 +315,7 @@ sub _STARg { my $self = shift;
     map { $_->retm($bind) } reverse
         #XXX voodoo fix to prevent bogus stringification
         map { $_->perl->say; $_ }
-            $self->cursor($self->pos),
+            $self->cursor($self->{pos}),
             $self->_PLUSf($block);
 }
 
@@ -323,12 +329,12 @@ sub _STARr { my $self = shift;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
 #            say @matches.perl;
     last unless @matches;
-	my $first = $matches->[0];  # no backtracking into block on ratchet
+	my $first = $matches[0];  # no backtracking into block on ratchet
 	push @all, $first;
 	$to = $first;
     }
 #    $self->cursor($to.to).retm($bind);
-    $self->cursor($to->to);  # XXX $_->retm blows up pugs for unfathomable reasons
+    $self->cursor($to->{to});  # XXX $_->retm blows up pugs for unfathomable reasons
 }
 
 sub _PLUSf { my $self = shift;
@@ -340,7 +346,7 @@ sub _PLUSf { my $self = shift;
     my @result;
     map { $_->retm($bind) } do {
 	for my $x ($block->($self)) {
-	    push @result, map { $self->cursor($_->to) } $x, $self->_PLUSf($x, $block);
+	    push @result, map { $self->cursor($_->{to}) } $x, $self->_PLUSf($x, $block);
 	}
     };
     @result;
@@ -371,7 +377,7 @@ sub _PLUSr { my $self = shift;
 	$to = $first;
     }
     return () unless @all;
-    my $r = $self->cursor($to->to);
+    my $r = $self->cursor($to->{to});
     $r->retm($bind);
 }
 
@@ -381,7 +387,7 @@ sub _OPTr { my $self = shift;
     local $CTX = $self->callm;
 
     my $x = $block->($self)[0]; # ratchet
-    my $r = $x // $self->cursor($self->pos);
+    my $r = $x // $self->cursor($self->{pos});
     $r->retm($bind);
 }
 
@@ -392,7 +398,7 @@ sub _OPTg { my $self = shift;
     my @x = $block->($self);
     map { $_->retm($bind) }
         $block->($self),
-        $self->cursor($self->pos);
+        $self->cursor($self->{pos});
 }
 
 sub _OPTf { my $self = shift;
@@ -400,7 +406,7 @@ sub _OPTf { my $self = shift;
 
     local $CTX = $self->callm;
     map { $_->retm($bind) }
-        $self->cursor($self->pos),
+        $self->cursor($self->{pos}),
         $block->($self);
 }
 
@@ -426,7 +432,7 @@ sub _NOTBEFORE { my $self = shift;
     local $CTX = $self->callm;
     my @all = $block->($self);
     return () if @all;  # XXX loses continuation
-    return $self->cursor($self->pos)->retm($bind);
+    return $self->cursor($self->{pos})->retm($bind);
 }
 
 sub before { my $self = shift;
@@ -434,8 +440,8 @@ sub before { my $self = shift;
 
     local $CTX = $self->callm;
     my @all = $block->($self);
-    if ((@all and $all->[0]->bool)) {
-        return $self->cursor($self->pos)->retm($bind);
+    if ((@all and $all->[0]->{bool})) {
+        return $self->cursor($self->{pos})->retm($bind);
     }
     return ();
 }
@@ -444,9 +450,9 @@ sub after { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    my $end = $self->cursor($self->pos);
-    my @all = $block->($end);          # Make sure $_->from == $_->to
-    if ((@all and $all->[0]->bool)) {
+    my $end = $self->cursor($self->{pos});
+    my @all = $block->($end);          # Make sure $_->{from} == $_->{to}
+    if ((@all and $all->[0]->{bool})) {
         return $end->retm($bind);
     }
     return ();
@@ -455,7 +461,7 @@ sub after { my $self = shift;
 sub null { my $self = shift;
 
     local $CTX = $self->callm;
-    return $self->cursor($self->pos)->retm($bind);
+    return $self->cursor($self->{pos})->retm($bind);
 }
 
 sub _ASSERT { my $self = shift;
@@ -463,8 +469,8 @@ sub _ASSERT { my $self = shift;
 
     local $CTX = $self->callm;
     my @all = $block->($self);
-    if ((@all and $all->[0]->bool)) {
-        return $self->cursor($self->pos)->retm($bind);
+    if ((@all and $all->[0]->{bool})) {
+        return $self->cursor($self->{pos})->retm($bind);
     }
     return ();
 }
@@ -474,7 +480,7 @@ sub _BINDVAR { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    map { $var = $_; $_->retm($bind) }  # XXX doesn't "let"
+    map { $$var = $_; $_->retm($bind) }  # XXX doesn't "let"
         $block->($self);
 }
 
@@ -499,7 +505,7 @@ sub _EQ { my $self = shift;
     my $P = shift;
     my $s = shift;
 
-    my $len = $s->chars;
+    my $len = length($s);
     return True if substr($self->{orig}, $P, $len) eq $s;
     return ();
 }
@@ -508,8 +514,8 @@ sub _EXACT { my $self = shift;
     my $s = shift;
 
     local $CTX = $self->callm($s);
-    my $P = $self->pos;
-    my $len = $s->chars;
+    my $P = $self->{pos};
+    my $len = length($s);
     if (substr($self->{orig}, $P, $len) eq $s) {
 #        say "EXACT $s matched {substr($!orig,$P,$len)} at $P $len";
         my $r = $self->cursor($P+$len);
@@ -525,8 +531,8 @@ sub _EXACT_rev { my $self = shift;
     my $s = shift;
 
     local $CTX = $self->callm;
-    my $len = $s->chars;
-    my $from = $self->from - $len;
+    my $len = length($s);
+    my $from = $self->{from} - $len;
     if ($from >= 0 and substr($self->{orig}, $from, $len) eq $s) {
         my $r = $self->cursor_rev($from);
         $r->retm($bind);
@@ -540,7 +546,7 @@ sub _EXACT_rev { my $self = shift;
 sub _DIGIT { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
     if ("0" le $char and $char le "9") {
         my $r = $self->cursor($P+1);
@@ -555,7 +561,7 @@ sub _DIGIT { my $self = shift;
 sub _DIGIT_rev { my $self = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->from - 1;
+    my $from = $self->{from} - 1;
     if ($from < 0) {
 #        say "vDIGIT didn't match $char at $from";
         return ();
@@ -574,7 +580,7 @@ sub _DIGIT_rev { my $self = shift;
 sub _ALNUM { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
     if ("0" le $char and $char le "9" or 'A' le $char and $char le 'Z' or 'a' le $char and $char le 'z' or $char eq '_') {
         my $r = $self->cursor($P+1);
@@ -589,7 +595,7 @@ sub _ALNUM { my $self = shift;
 sub _ALNUM_rev { my $self = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->from - 1;
+    my $from = $self->{from} - 1;
     if ($from < 0) {
 #        say "vALNUM didn't match $char at $from";
         return ();
@@ -608,7 +614,7 @@ sub _ALNUM_rev { my $self = shift;
 sub alpha { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
     if ('A' le $char and $char le 'Z' or 'a' le $char and $char le 'z' or $char eq '_') {
         my $r = $self->cursor($P+1);
@@ -623,7 +629,7 @@ sub alpha { my $self = shift;
 sub _SPACE { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
     if ($char eq " " | "\t" | "\r" | "\n" | "\f") {
         my $r = $self->cursor($P+1);
@@ -638,7 +644,7 @@ sub _SPACE { my $self = shift;
 sub _SPACE_rev { my $self = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->from - 1;
+    my $from = $self->{from} - 1;
     if ($from < 0) {
 #        say "vSPACE didn't match $char at $from";
         return ();
@@ -657,7 +663,7 @@ sub _SPACE_rev { my $self = shift;
 sub _HSPACE { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
     if ($char eq " " | "\t" | "\r") {
         my $r = $self->cursor($P+1);
@@ -672,7 +678,7 @@ sub _HSPACE { my $self = shift;
 sub _HSPACE_rev { my $self = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->from - 1;
+    my $from = $self->{from} - 1;
     if ($from < 0) {
 #        say "vHSPACE didn't match $char at $from";
         return ();
@@ -691,7 +697,7 @@ sub _HSPACE_rev { my $self = shift;
 sub _VSPACE { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
     if ($char eq "\n" | "\f") {
         my $r = $self->cursor($P+1);
@@ -706,7 +712,7 @@ sub _VSPACE { my $self = shift;
 sub _VSPACE_rev { my $self = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->from - 1;
+    my $from = $self->{from} - 1;
     if ($from < 0) {
 #        say "vVSPACE didn't match $char at $from";
         return ();
@@ -725,8 +731,8 @@ sub _VSPACE_rev { my $self = shift;
 sub _ANY { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
-    if ($P < $self->{orig}->chars) {
+    my $P = $self->{pos};
+    if ($P < length($self->{orig})) {
         $self->cursor($P+1)->retm($bind);
     }
     else {
@@ -738,7 +744,7 @@ sub _ANY { my $self = shift;
 sub _BOS { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     if ($P == 0) {
         $self->cursor($P)->retm($bind);
     }
@@ -750,7 +756,7 @@ sub _BOS { my $self = shift;
 sub _BOL { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     # XXX should define in terms of BOL or after vVSPACE
     if ($P == 0 or substr($self->{orig}, $P-1, 1) eq "\n" or substr($self->{orig}, $P-2, 2) eq "\r\n") {
         $self->cursor($P)->retm($bind);
@@ -763,8 +769,8 @@ sub _BOL { my $self = shift;
 sub _EOS { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
-    if ($P == $self->{orig}->chars) {
+    my $P = $self->{pos};
+    if ($P == length($self->{orig})) {
         $self->cursor($P)->retm($bind);
     }
     else {
@@ -776,7 +782,7 @@ sub _REDUCE { my $self = shift;
     my $tag = shift;
 
     local $CTX = $self->callm($tag);
-#    my $P = $self->pos;
+#    my $P = $self->{pos};
 #    say "Success $tag from $+FROM to $P";
 #    $self->whats;
     $self;
@@ -786,7 +792,7 @@ sub _REDUCE { my $self = shift;
 sub _COMMITBRANCH { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     print "Commit branch to $P\n";
 #    $self->cursor($P);  # XXX currently noop
     $self;
@@ -795,7 +801,7 @@ sub _COMMITBRANCH { my $self = shift;
 sub _COMMITRULE { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     print "Commit rule to $P\n";
 #    $self->cursor($P);  # XXX currently noop
     $self;
@@ -804,7 +810,7 @@ sub _COMMITRULE { my $self = shift;
 sub commit { my $self = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->pos;
+    my $P = $self->{pos};
     print "Commit match to $P\n";
 #    $self->cursor($P);  # XXX currently noop
     $self;
@@ -829,23 +835,24 @@ sub fail { my $self = shift;
 	    if ($_ eq " ") { $r .= '\x20' }
 	    elsif ($_ eq "\t") { $r .= '\t' }
 	    elsif ($_ eq "\n") { $r .= '\n' }
-	    elsif ($_ eq m/^\w$/) { $r .= $_ }
-	    elsif ($_ eq '<' | '>') { $r .= $_ }
-	    default { $r .= '\\' . $_ }
+	    elsif ($_ =~ m/^\w$/) { $r .= $_ }
+	    elsif ($_ eq '<' | $_ eq '>') { $r .= $_ }
+	    else { $r .= '\\' . $_ }
 	}
 	$r;
     }
 
     sub here { my $arg = shift;
 	my $lvl = 0;
-	while (Pugs::Internals::caller(Any,$lvl,"")) { $lvl++ }
-	my $caller = caller;
-	my $package = $caller->package;
-	my $name = $package;   # . '::' . substr($caller->subname,1);
+	while (caller($lvl)) { $lvl++ }
+        my ($package, $file, $line, $subname, $hasargs) = caller(0);
+
+	my $package = $package;
+	my $name = $package;   # . '::' . substr($subname,1);
 	if (defined $arg) { 
 	    $name .= " " . $arg;
 	}
-	print ':' x $lvl, ' ', $name, " [", $caller->file, ":", $caller->line, "]" if $RE_verbose;
+	print ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]" if $RE_verbose;
     }
 }
 
@@ -951,7 +958,7 @@ sub fail { my $self = shift;
                 $PURE = 0;
                 return '';
             }
-            default {
+            else {
                 return "META[$text]"
             }
         }
@@ -986,9 +993,9 @@ sub fail { my $self = shift;
                 $fakepos++;
                 return '[a-z_A-Z]';
             }
-            default {
+            else {
 		# XXX should be ."$name"
-                my $lexer = $C.$name->('?')[0];
+                my $lexer = $C->$name(['?']);
 		my $prefix = "";
 		if (@$FATES) {
 		    $prefix = @$FATES[-1] . " ";
@@ -1027,8 +1034,8 @@ sub fail { my $self = shift;
                 $PURE = 0;
                 return $result;
             }
-            default {
-                my $lexer = $C.$name->($re, '?')[0];
+            else {
+                my $lexer = $C->$name(['?'], $re);
                 return $lexer->{PAT};
             }
         }
@@ -1048,8 +1055,8 @@ sub fail { my $self = shift;
                 $PURE = 0;
                 return '';
             }
-            default {
-                my $lexer = $C.$name->($str, '?')[0];
+            else {
+                my $lexer = $C->$name(['?'], $str);
                 return $lexer->{PAT};
             }
         }
@@ -1162,7 +1169,7 @@ sub fail { my $self = shift;
             last unless $PURE;
         }
 	if (@result) {
-	    "(?: { join(' ', @result) } )";
+	    "(?: @{[ join(' ', @result) ]} )";
 	}
 	else {
 	    "";
@@ -1199,10 +1206,11 @@ sub fail { my $self = shift;
         my $minfakepos = $fakepos + 1;
         for my $alt (@$alts) {
             $fakepos = $oldfakepos;
-	    push @$FATES, $alt->{'alt'};
+	    my $a = $alt->{alt};
+	    push @$FATES, $a;
             my $pat = ::indent($alt->longest($C));
 	    next if $pat =~ m/^\s*$/;
-            $pat = "( (?#START $alt.<alt>)\n$pat)\n(?#END $alt.<alt>)" if $callouts;
+            $pat = "( (?#START $a)\n$pat)\n(?#END $a)" if $callouts;
             push @result, $pat;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
