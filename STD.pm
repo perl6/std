@@ -521,7 +521,7 @@ ex:     INNER:
 token label {
     <ident> ':' \s <.ws>
 
-    [ <?{ is_type($<ident>) }>
+    [ <?{ $¢.is_type($<ident>) }>
       <suppose("You tried to use an existing name $/{'ident'} as a label")>
     ]?
 
@@ -1641,7 +1641,7 @@ token value {
 token typename {
     <name>
     <?{
-        is_type($<name>)
+        $¢.is_type($<name>)
     }>
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -1925,7 +1925,7 @@ class Q_tweaker does QLang {
         ];
     } #'
 
-    # begin tweaks
+    # begin tweaks (DO NOT ERASE)
     multi method tweak (:q($single)) {
         $single or panic("Can't turn :q back off");
         %.option and panic("Too late for :q");
@@ -1988,12 +1988,12 @@ class Q_tweaker does QLang {
         my @k = keys(%x);
         panic("Unrecognized quote modifier: " ~ @k);
     }
-    # end tweaks
+    # end tweaks (DO NOT ERASE)
 
 }
 
 class RX_tweaker does QLang {
-    # begin tweaks
+    # begin tweaks (DO NOT ERASE)
     multi method tweak (:$g)              { %.option<g>  = $g }
     multi method tweak (:global($g))      { %.option<g>  = $g }
     multi method tweak (:$i)              { %.option<i>  = $i }
@@ -2046,11 +2046,11 @@ class RX_tweaker does QLang {
             %.option<nth> = $n;
         }
     }
-    #end tweaks
+    # end tweaks (DO NOT ERASE)
 }
 
 class P5RX_tweaker does QLang {
-    # begin tweaks
+    # begin tweaks (DO NOT ERASE)
     multi method tweak (:$g) { %.option<g>  = $g }
     multi method tweak (:$i) { %.option<i>  = $i }
     multi method tweak (:$s) { %.option<s>  = $s }
@@ -2060,11 +2060,11 @@ class P5RX_tweaker does QLang {
         my @k = keys(%x);
         panic("Unrecognized Perl 5 regex modifier: " ~ @k);
     }
-    # end tweaks
+    # end tweaks (DO NOT ERASE)
 }
 
 class TR_tweaker does QLang {
-    # begin tweaks
+    # begin tweaks (DO NOT ERASE)
     multi method tweak (:$c) { %.option<c>  = $c }
     multi method tweak (:$d) { %.option<d>  = $d }
     multi method tweak (:$s) { %.option<s>  = $s }
@@ -2073,7 +2073,7 @@ class TR_tweaker does QLang {
         my @k = keys(%x);
         panic("Unrecognized transliteration modifier: " ~ @k);
     }
-    # end tweaks
+    # end tweaks (DO NOT ERASE)
 }
 
 token quotesnabber (*@q) {
@@ -2267,7 +2267,6 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
 # We get here only for escapes in escape set, even though more are defined.
 method q_escape (@fate, $lang) {
     $lang<escrule>(self);
-    {*}
 }
 
 token quote_escapes {
@@ -3025,21 +3024,21 @@ method EXPR (@fate,
                 push @termstack, $op<top>;
             }
         }
-    }
+    };
 
     loop {
         say "In loop, at ", $here.pos;
-        my @terminator = $here.before(-> $s { $stop($s:) } );
+        my @terminator = $here.before([], -> $s { $stop($s:) } );
         my $t = @terminator[0];
     last if defined $t and @terminator[0].bool;
         %thisop = ();
-#        my @infix = $here.expect_tight_infix($preclim);
-        my @infix = $here.expect_infix();
+#        my @infix = $here.expect_tight_infix([], $preclim);
+        my @infix = $here.expect_infix([]);
         my $infix = @infix[0];
-        $here = $infix.ws();
+        $here = $infix.ws([]);
         
         # XXX might want to allow this in a declaration though
-        if not $infix { $here.panic("Can't have two terms in a row") }
+        if not $infix { $here.panic([],"Can't have two terms in a row") }
 
         if not defined %thisop<prec> {
             say "No prec given in thisop!";
@@ -3060,28 +3059,28 @@ method EXPR (@fate,
         # Equal precedence, so use associativity to decide.
         if @opstack[*-1]<prec> eq $thisprec {
             given %thisop<assoc> {
-                when 'non'   { $here.panic(qq["$infix" is not associative]) }
+                when 'non'   { $here.panic([],qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if %thisop<top><sym> !eqv @opstack[*-1]<top><sym>;
                 }
-                default { $here.panic(qq[Unknown associativity "$_" for "$infix"]) }
+                default { $here.panic([],qq[Unknown associativity "$_" for "$infix"]) }
             }
         }
         push @opstack, item %thisop;
-        my @terminator = $here.before(-> $s { $stop($s:) } );
+        my @terminator = $here.before([], -> $s { $stop($s:) } );
         if @terminator and @terminator[0].bool {
-            $here.panic("$infix.perl() is missing right term");
+            $here.panic([], "$infix.perl() is missing right term");
         }
         %thisop = ();
-        my @t = $here.expect_term();
+        my @t = $here.expect_term([]);
         $here = @t[0];
         push @termstack, $here;
         say "after push: " ~ +@termstack;
     }
     reduce() while +@termstack > 1;
-    @termstack == 1 or $here.panic("Internal operator parser error, termstack == {+@termstack}");
+    @termstack == 1 or $here.panic([], "Internal operator parser error, termstack == {+@termstack}");
     return @termstack[0];
 }
 
@@ -3173,13 +3172,13 @@ token regex_metachar:mod {
 
 token regex_metachar:sym<[ ]> {
     '[' <regex ']'> ']'
-    { $/<sym>:=<[ ]> }
+    { $/<sym> := <[ ]> }
     {*}                                                         #= [ ]
 }
 
 token regex_metachar:sym<( )> {
     '(' <regex ')'> ')'
-    { $/<sym>:=<( )> }
+    { $/<sym> := <( )> }
     {*}                                                         #= ( )
 }
 
@@ -3372,15 +3371,18 @@ method obs (@fate, Str $old, Str $new, Str $when = ' in Perl 6') {
 }
 
 #XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
-my @typenames = <Bit Int Str Num Complex Bool Rat>,
+my @typenames = (<Bit Int Str Num Complex Bool Rat>,
     <Exception Code Block List Seq Range Set Bag Junction Pair>,
     <Mapping Signature Capture Blob Whatever Undef Failure>,
     <StrPos StrLen Version P6opaque>,
     <bit int uint buf num complex bool rat>,
     <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
-    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>;
-sub is_type($name) {
-    return True if $name eq any @typenames;
+    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>);
+my %typenames;
+%typenames{@typenames} = (1 xx @typenames);
+
+method is_type ($name) {
+    return True if %typenames{$name};
     #return True if GLOBAL::{$name}.:exists;
     return False;
 }

@@ -45,25 +45,30 @@ sub un6 {
     my $f = shift;
     my $t;
     while ($f ne "") {
+        $f =~ s/^\)</.</                  	and $t .= ')', next;
         $f =~ s!^('.*?')!!              	and $t .= $1, next;
         $f =~ s!^(".*?")!!              	and $t .= $1, next;
         $f =~ s!^q/(.*?)/!!              	and $t .= "q/$1/", next;
         $f =~ s!^/(.+?)/!!              	and $t .= "qr/$1/", next;
         $f =~ s/^\$¢//                  	and $t .= qq/\$C/, next;
+        $f =~ s/^\$\/</.</                  	and $t .= qq/\$M/, next;
         $f =~ s/^ ::([A-Z]\w+)//        	and $t .= qq/ '$1'/, next;
         $f =~ s/^([^:]):([\$\@%])(\w+)//        and $t .= qq/$1$3 => $2$3/, next;
         $f =~ s/^([^:]):(\w+)<(.*?)>//  	and $t .= qq/$1$2 => '$3'/, next;
+        $f =~ s/^([^:]):(\w+)«(.*?)»//  	and $t .= qq/$1$2 => '$3'/, next;
         $f =~ s/^([^:]):(\w+)\((.*?)\)// 	and $t .= qq/$1$2 => ($3)/, next;
         $f =~ s/^([^:]):(\w+)//         	and $t .= qq/$1$2 => 1/, next;
         $f =~ s/^([^:]):!(\w+)//        	and $t .= qq/$1$2 => 0/, next;
         $f =~ s/^\%\+?(\w+)((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
+        $f =~ s/^\%\+?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
         $f =~ s/^\%\+?(\w+)\{//         	and $t .= qq/\$$1\{/, next;
         $f =~ s/^\$(\w+)((<[^>]*>)+)//  	and $t .= ('$' . $1 . '->' . unangle($2)), next;
         $f =~ s/^\$((<[^>]*>)+)//       	and $t .= ('$M->' . unangle($1)), next;
         $f =~ s/^ \.((<[^>]*>)+)//      	and $t .= (' $_->' . unangle($1)), next;
         $f =~ s/^(\s)<([^>)]*)>//       	and $t .= qq/$1qw($2)/, next;
         $f =~ s/^(\s)<([^>]*)>//        	and $t .= qq/$1qw[$2]/, next;
-        $f =~ s/^(^|\s)«([^»]*)»//      	and $t .= qq/$1qw($2)/, next;
+        $f =~ s/^«([^»)]*)»//      	        and $t .= qq/qw($1)/, next;
+        $f =~ s/^«([^»]*)»//      	        and $t .= qq/qw[$1]/, next;
         $f =~ s/^ «\s*([^»]+)»//        	and $t .= do {my $x=$1; $x =~ s! !','!g; "['$x']"}, next;
         $f =~ s/^ <\s*([^>]+)>//        	and $t .= do {my $x=$1; $x =~ s! !','!g; "['$x']"}, next;
         $f =~ s/^\.<\s*([^>]+)>//             	and $t .= do {my $x=$1; $x =~ s! !','!g; "->{'$x'}"}, next;
@@ -71,16 +76,23 @@ sub un6 {
         $f =~ s/^(\w+)((<[^>]*>)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
         $f =~ s/^(\w+)((«[^»]*»)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
         $f =~ s/^(\$\w+)\.//            	and $t .= qq/$1->/, next;
+        $f =~ s/^(\$\w+)\(/(/            	and $t .= qq/$1->/, next;
+        $f =~ s/^\(\$s:\)//            	        and $t .= qq/(\$s)/, next;
         $f =~ s/^\$[!.](\w+)//          	and $t .= qq/\$self->{$1}/, next;
         $f =~ s/^\@[!.](\w+)\././               and $t .= qq/\$self->{$1}/, next;
         $f =~ s/^\%[!.](\w+)\././               and $t .= qq/\$self->{$1}/, next;
-        $f =~ s/^\@[!.](\w+)([\[{<])/.$2/    and $t .= qq/\$self->{$1}/, next;
-        $f =~ s/^\%[!.](\w+)([\[{<])/.$2/    and $t .= qq/\$self->{$1}/, next;
+        $f =~ s/^\@[!.](\w+)([\[{<])/.$2/       and $t .= qq/\$self->{$1}/, next;
+        $f =~ s/^\%[!.](\w+)([\[{<])/.$2/       and $t .= qq/\$self->{$1}/, next;
         $f =~ s/^\@[!.](\w+)//          	and $t .= qq/\@{\$self->{$1}}/, next;
         $f =~ s/^\%[!.](\w+)//          	and $t .= qq/\%{\$self->{$1}}/, next;
+        $f =~ s/^\@(\w+)([\[{])/$2/             and $t .= qq/\$$1->/, next;
+        $f =~ s/^\%(\w+)([\[{])/$2/             and $t .= qq/\$$1->/, next;
         $f =~ s/^\.([a-z]\w+)//         	and $t .= qq/->$1/, next;
         $f =~ s/^!===?//                	and $t .= qq/!=/, next;
         $f =~ s/^===//                  	and $t .= qq/==/, next;
+        $f =~ s/^!eqv//                	        and $t .= qq/ne/, next;
+        $f =~ s/^eqv//                	        and $t .= qq/eq/, next;
+        $f =~ s/^item %//                	and $t .= qq/\\%/, next;
         $f =~ s/^ is rw//               	and $t .= qq//, next;
         $f =~ s/^my\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context\s*(?:is\s+rw)?\s*;//
                                         	and $t .= qq/local $1;/, next;
@@ -92,6 +104,7 @@ sub un6 {
         $f =~ s/^(\s)\?\?(\s)//         	and $t .= qq/$1?$2/, next;
         $f =~ s/^(\s)!!(\s)//           	and $t .= qq/$1:$2/, next;
         $f =~ s/^\btry \{//                     and $t .= qq/eval {/, next;
+        $f =~ s/^\bloop \{//                    and $t .= qq/for (;;) {/, next;
         $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/else {/, next;
 
         # the following must do partial rescan of final expression
@@ -175,14 +188,56 @@ END
         next;
     }
 
-    if ( s/^(rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
+    if (s/^method heredoc.*?\n}\n//s) {
+        $out .= <<'END';
+sub heredoc { my $self = shift;  
+    my $here = self;
+    while (my $herestub = shift @herestub_queue) {
+        local $delim = $herestub->delim;
+        my $lang = $herestub->lang;
+        my $doc;
+        my $ws = "";
+        $here = $here->q_unbalanced_rule($lang, stop => \&theredoc).MATCHIFY;
+        if ($here) {
+            if ($ws) {
+                my $wsequiv = $ws;
+                $wsequiv =~ s/^(\t+)/' ' x ($1 * 8)/e; # per spec
+                $here->{text}[0] =~ s/^/\n/; # so we don't match ^^ after escapes
+                for (@{$here->{text}}) {
+                    s{\n($ws|[ \t]*)}!do {
+                        my $white = $1;
+                        if ($white eq $ws) {
+                            '';
+                        }
+                        else {
+                            $white =~ s{^(\t+)}{
+                                ' ' x (length($1) * 8)
+                            }e;
+                            $white =~ s/^$wsequiv//
+                                ? $white
+                                : '';
+                        }
+                    }!eg;
+                }
+                $here->{text}[0] ~~ s/^\n//;
+            }
+            $herestub->orignode->{doc} = $here;
+        }
+        else {
+            self->panic("Ending delimiter $delim not found");
+        }
+    }
+    return $here;
+}
+END
+        next;
+    }
+
+    if ( s/^(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
         local $CONTEXT = $1;
         local $PAREN = 0;
         my $ws = $2;
         local $NAME = $3;
-        local $BINDING;
-        undef $BINDING;
-        local @DECL;
         local $SYM;
         my $argstuff = $4;
         my $args = "";
@@ -246,17 +301,17 @@ END
             $args =~ s/^,\s*//;
         }
 
-#        if ($NAME =~ /_/) {
-#            if ($SYM and /^\s*(?:<\??before>\s+)?<sym>/) {
-#                $fixedprefix{$NAME} = $SYM;
-#            }
-#            elsif (/^\s*(?:<\??before>\s+)?('\S*'\s)/) {
-#                $fixedprefix{$NAME} = $1;
-#            }
-#            elsif (/^\s*(?:<\??before>\s+)?("\S*"\s)/) {
-#                $fixedprefix{$NAME} = $1;
-#            }
-#        }
+        if ($CONTEXT eq 'method') {
+            $out .= <<"END";
+sub $NAME { my \$self = shift;
+$sym
+END
+            next;
+        }
+
+        local $BINDING;
+        undef $BINDING;
+        local @DECL;
 
         my $re = regex('\\}');
 
@@ -340,53 +395,23 @@ END
         next;
     }
 
-    if (s/^method heredoc.*?\n}\n//s) {
-        $out .= <<'END';
-sub heredoc { my $self = shift;  
-    my $here = self;
-    while (my $herestub = shift @herestub_queue) {
-        local $delim = $herestub->delim;
-        my $lang = $herestub->lang;
-        my $doc;
-        my $ws = "";
-        $here = $here->q_unbalanced_rule($lang, stop => \&theredoc).MATCHIFY;
-        if ($here) {
-            if ($ws) {
-                my $wsequiv = $ws;
-                $wsequiv =~ s/^(\t+)/' ' x ($1 * 8)/e; # per spec
-                $here->{text}[0] =~ s/^/\n/; # so we don't match ^^ after escapes
-                for (@{$here->{text}}) {
-                    s{\n($ws|[ \t]*)}!do {
-                        my $white = $1;
-                        if ($white eq $ws) {
-                            '';
-                        }
-                        else {
-                            $white =~ s{^(\t+)}{
-                                ' ' x (length($1) * 8)
-                            }e;
-                            $white =~ s/^$wsequiv//
-                                ? $white
-                                : '';
-                        }
-                    }!eg;
-                }
-                $here->{text}[0] ~~ s/^\n//;
-            }
-            $herestub->orignode->{doc} = $here;
-        }
-        else {
-            self->panic("Ending delimiter $delim not found");
-        }
-    }
-    return $here;
-}
-END
-        next;
-    }
-
+    # from here on we assume all nibbles are line-sized or less.
     if (s/^(.*\n)//) {
         my $line = $1;
+        if ($line =~ m/# begin tweaks/) {
+            $out .= <<'END';
+  sub tweak { # begin tweaks
+    my $self = shift;
+    my ($k, $v) = @_;
+
+    if (0) {}
+END
+            next;
+        }
+        elsif ($line =~ m/# end tweaks/) {
+            $out .= "  } # end tweaks\n";
+            next;
+        }
         if ($line =~ m/^#/) {
             $out .= $line;
             next;
@@ -399,12 +424,17 @@ END
         $line =~ s/^(\s*has) /#$1 /;
         $line =~ s/^proto /#proto /;
         $line =~ s/\bsay /print /;
+        $line =~ s/&reduce = ->/\$reduce = sub/;
+        $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
+        $line =~ s/ -> {/sub {/;
+        $line =~ s/\breduce\(\)/\$reduce->()/;
         $line =~ s/([\$\@%])\+(\w+)/$1$2/g;       # assume localized
         if ($line =~ s/^constant %/our %/) {
             $line =~ tr/{}/()/;
             $line = ::un6($line);
         }
         $line =~ s/^constant /my /;
+        $line =~ s/\bmy ([A-Z]\w+) /my /;
         $line =~ s/class (\w+)\s+\{/{ package $1;/;
         $line =~ s/role (\w+)\s+\{/{ package $1;/;
         $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package $1; use base '$2';/;
@@ -413,19 +443,7 @@ END
         $line =~ s/(\S+) xx /($1) x /;
         $line =~ s/ x \?/ x !!/;
         $line =~ s/\|%start/%start/;
-        if ($line =~ m/# begin tweaks/) {
-            $line = <<'END'
-  sub tweak {
-    my $self = shift;
-    my ($k, $v) = @_;
-
-    if (0) {}
-END
-        }
-        elsif ($line =~ m/# end tweaks/) {
-            $line = "  }\n";
-        }
-        elsif ($line =~ s/multi method tweak/elsif/) {
+        if ($line =~ s/multi method tweak/elsif/) {
             $line =~ s/\(:\$(\w+)\)(\s+{)/(\$k eq '$1')$2 my \$$1 = \$v; / or
             $line =~ s/\(:(\w+)\((\$\w+)\)\)(\s+{)/(\$k eq '$1')$3 my \$$2 = \$v; / or
             $line =~ s/elsif \(\*%x\)(\s+{)/else $1 my %x = (\$k, \$v); /;
@@ -442,8 +460,8 @@ sub nounphrase {
     my $self = shift;
     my %args = @_;
     my $noun = $args{noun};
-    my $pre = $args{noun};
-    my $post = $args{noun};
+    my $pre = $args{pre};
+    my $post = $args{post};
 END
         }
         elsif ($line =~ s/^(\s*)method (\w+)\s*(.*?)\{/$1sub $2 { my \$self = shift; my $3= \@_; /) {
