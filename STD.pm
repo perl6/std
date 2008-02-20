@@ -878,11 +878,11 @@ token expect_term {
     <adverbs>?
 
     # now push ops over the noun according to precedence.
-#    { make $¢.nounphrase(:noun($<noun>), :pre(@<pre>), :post(@<post>)) }
+    { make $¢.nounphrase(:noun($<noun>), :pre(@<pre>), :post(@<post>)) }
 }
 
 # XXX no @fate, so may not be called as a rule
-method nounphrase (:$noun, :@pre is rw, :@post is rw, *%_) {
+method nounphrase (:$noun, :@pre is rw, :@post is rw) {
     my $nounphrase = $noun;
     my $pre = pop @pre;
     my $post = shift @post;
@@ -1401,18 +1401,18 @@ token special_variable:sym<%-> {
     <obs('%- variable', '.from method')>
 }
 
-token special_variable:sym<$+[ ]> {
-    '$+['
+token special_variable:sym<$-[ ]> {
+    '$-['
     <obs('@- variable', '.from method')>
 }
 
-token special_variable:sym<@+[ ]> {
-    '@+['
+token special_variable:sym<@-[ ]> {
+    '@-['
     <obs('@- variable', '.from method')>
 }
 
-token special_variable:sym<@+{ }> {
-    '@+{'
+token special_variable:sym<%-{ }> {
+    '@-{'
     <obs('%- variable', '.from method')>
 }
 
@@ -1427,7 +1427,7 @@ token special_variable:sym<${^ }> {
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
-method obscaret (@fate, Str $var, Str $sigil, Str $name) {
+method obscaret ($fate, Str $var, Str $sigil, Str $name) {
     my $repl = do given $sigil {
         when '$' {
             given $name {
@@ -1466,7 +1466,7 @@ method obscaret (@fate, Str $var, Str $sigil, Str $name) {
         }
         when * { "a global form such as $sigil*$0" }
     }; # XXX pugs needs semi here for some reason
-    return self.obs(@fate, "$var variable", $repl);
+    return self.obs($fate, "$var variable", $repl);
 }
 
 token special_variable:sym<${ }> {
@@ -1894,7 +1894,7 @@ role QLang {
         if @pedigree == 1 {
 #           my %start = try { self."root_of_@pedigree[0]" } //
             my %start = try { self.root_of_Q } //
-                panic("Quote construct @pedigree[0] not recognized");
+                panic("Quote construct " ~ @pedigree.[0] ~ "not recognized");
             return self.bless(|%start);
         }
         else {
@@ -1926,41 +1926,32 @@ class Q_tweaker does QLang {
     } #'
 
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:q($single)) {
-        $single or panic("Can't turn :q back off");
+    multi method tweak (:single(:$q)) {
+        $q or panic("Can't turn :q back off");
         %.option and panic("Too late for :q");
         %.option = (:b, :!s, :!a, :!h, :!f, :!c);
     }
 
-    multi method tweak (:qq($double)) {
-        $double or panic("Can't turn :qq back off");
+    multi method tweak (:double(:$qq)) {
+        $qq or panic("Can't turn :qq back off");
         %.option and panic("Too late for :qq");
         %.option = (:b, :s, :a, :h, :f, :c);
     }
 
-    multi method tweak (:$b)              { %.option<b>  = $b }
-    multi method tweak (:backslash($b))   { %.option<b>  = $b }
-    multi method tweak (:$s)              { %.option<s>  = $s}
-    multi method tweak (:scalar($s))      { %.option<s>  = $s}
-    multi method tweak (:$a)              { %.option<a>  = $a}
-    multi method tweak (:array($a))       { %.option<a>  = $a}
-    multi method tweak (:$h)              { %.option<h>  = $h}
-    multi method tweak (:hash($h))        { %.option<h>  = $h}
-    multi method tweak (:$f)              { %.option<f>  = $f}
-    multi method tweak (:function($f))    { %.option<f>  = $f}
-    multi method tweak (:$c)              { %.option<c>  = $c}
-    multi method tweak (:closure($c))     { %.option<c>  = $c}
+    multi method tweak (:backslash(:$b))   { %.option<b>  = $b }
+    multi method tweak (:scalar(:$s))      { %.option<s>  = $s }
+    multi method tweak (:array(:$a))       { %.option<a>  = $a }
+    multi method tweak (:hash(:$h))        { %.option<h>  = $h }
+    multi method tweak (:function(:$f))    { %.option<f>  = $f }
+    multi method tweak (:closure(:$c))     { %.option<c>  = $c }
 
-    multi method tweak (:$x)              { %.option<x>  = $x}
-    multi method tweak (:exec($x))        { %.option<x>  = $x}
-    multi method tweak (:$w)              { %.option<w>  = $w}
-    multi method tweak (:words($w))       { %.option<w>  = $w}
-    multi method tweak (:$ww)             { %.option<ww> = $ww }
-    multi method tweak (:quotewords($ww)) { %.option<ww> = $ww }
+    multi method tweak (:exec(:$x))        { %.option<x>  = $x }
+    multi method tweak (:words(:$w))       { %.option<w>  = $w }
+    multi method tweak (:quotewords(:$ww)) { %.option<ww> = $ww }
 
-    multi method tweak (:to($heredoc)) {
+    multi method tweak (:heredoc(:$to)) {
         $.parser = &Perl::q_heredoc;
-        %.option<to> = $heredoc;
+        %.option<to> = $to;
     }
 
     multi method tweak (:$regex) {
@@ -1994,23 +1985,16 @@ class Q_tweaker does QLang {
 
 class RX_tweaker does QLang {
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:$g)              { %.option<g>  = $g }
-    multi method tweak (:global($g))      { %.option<g>  = $g }
-    multi method tweak (:$i)              { %.option<i>  = $i }
-    multi method tweak (:ignorecase($i))  { %.option<i>  = $i }
-    multi method tweak (:$ii)             { %.option<ii> = $ii }
-    multi method tweak (:$b)              { %.option<b>  = $b }
-    multi method tweak (:$bb)             { %.option<bb> = $bb }
-    multi method tweak (:$c)              { %.option<c>  = $c }
-    multi method tweak (:continue($c))    { %.option<c>  = $c }
-    multi method tweak (:$p)              { %.option<p>  = $p }
-    multi method tweak (:pos($p))         { %.option<p>  = $p }
-    multi method tweak (:$ov)             { %.option<ov> = $ov }
-    multi method tweak (:overlap($ov))    { %.option<ov> = $ov }
-    multi method tweak (:$ex)             { %.option<ex> = $ex }
-    multi method tweak (:exhaustive($ex)) { %.option<ex> = $ex }
-    multi method tweak (:$s)              { %.option<s>  = $s }
-    multi method tweak (:sigspace($s))    { %.option<s>  = $s }
+    multi method tweak (:global(:$g))      { %.option<g>  = $g }
+    multi method tweak (:ignorecase(:$i))  { %.option<i>  = $i }
+    multi method tweak (:samecase(:$ii))   { %.option<ii> = $ii }
+    multi method tweak (:basechar(:$b))    { %.option<b>  = $b }
+    multi method tweak (:samebase(:$bb))   { %.option<bb> = $bb }
+    multi method tweak (:continue(:$c))    { %.option<c>  = $c }
+    multi method tweak (:pos(:$p))         { %.option<p>  = $p }
+    multi method tweak (:overlap(:$ov))    { %.option<ov> = $ov }
+    multi method tweak (:exhaustive(:$ex)) { %.option<ex> = $ex }
+    multi method tweak (:sigspace(:$s))    { %.option<s>  = $s }
 
     multi method tweak (:$bytes)  { %.option<UNILEVEL> = 'bytes' }
     multi method tweak (:$codes)  { %.option<UNILEVEL> = 'codes' }
@@ -2023,16 +2007,15 @@ class RX_tweaker does QLang {
     multi method tweak (:$panic)   { %.option<panic>   = $panic }
 
     # XXX probably wrong
-    multi method tweak (:P5($Perl5)) {
-        %.option<P5> = $Perl5;
+    multi method tweak (:Perl5(:$P5)) {
+        %.option<P5> = $P5;
         $.tweaker = ::P5RX_tweaker,
         $.parser = &Perl::p5rx_pickdelim;
         $.escrule = &Perl::p5regex_metachar;
     }
 
-    multi method tweak (:$nth)            { %.option<nth> = $nth }
-    multi method tweak (:$x)              { %.option<x> = $x }
-    multi method tweak (:times($x))       { %.option<x> = $x }
+    multi method tweak (:$nth)       { %.option<nth> = $nth }
+    multi method tweak (:times(:$x)) { %.option<x> = $x }
 
     # Ain't we special!
     multi method tweak (*%x) {
@@ -2051,10 +2034,10 @@ class RX_tweaker does QLang {
 
 class P5RX_tweaker does QLang {
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:$g) { %.option<g>  = $g }
-    multi method tweak (:$i) { %.option<i>  = $i }
-    multi method tweak (:$s) { %.option<s>  = $s }
-    multi method tweak (:$m) { %.option<m>  = $m }
+    multi method tweak (:global(:$g))     { %.option<g>  = $g }
+    multi method tweak (:ignorecase(:$i)) { %.option<i>  = $i }
+    multi method tweak (:sanedot(:$s))    { %.option<s>  = $s }
+    multi method tweak (:multiline(:$m))  { %.option<m>  = $m }
 
     multi method tweak (*%x) {
         my @k = keys(%x);
@@ -2065,9 +2048,9 @@ class P5RX_tweaker does QLang {
 
 class TR_tweaker does QLang {
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:$c) { %.option<c>  = $c }
-    multi method tweak (:$d) { %.option<d>  = $d }
-    multi method tweak (:$s) { %.option<s>  = $s }
+    multi method tweak (:complement(:$c)) { %.option<c>  = $c }
+    multi method tweak (:delete(:$d))     { %.option<d>  = $d }
+    multi method tweak (:squeeze(:$s))    { %.option<s>  = $s }
 
     multi method tweak (*%x) {
         my @k = keys(%x);
@@ -3069,7 +3052,7 @@ method EXPR (@fate,
             }
         }
         push @opstack, item %thisop;
-        my @terminator = $here.before([], -> $s { $stop($s:) } );
+        @terminator = $here.before([], -> $s { $stop($s:) } );
         if @terminator and @terminator[0].bool {
             $here.panic([], "$infix.perl() is missing right term");
         }
@@ -3371,13 +3354,15 @@ method obs (@fate, Str $old, Str $new, Str $when = ' in Perl 6') {
 }
 
 #XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
-my @typenames = (<Bit Int Str Num Complex Bool Rat>,
+my @typenames = (      # (need parens for gimme5 translator)
+    <Bit Int Str Num Complex Bool Rat>,
     <Exception Code Block List Seq Range Set Bag Junction Pair>,
     <Mapping Signature Capture Blob Whatever Undef Failure>,
     <StrPos StrLen Version P6opaque>,
     <bit int uint buf num complex bool rat>,
     <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
-    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>);
+    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>
+);
 my %typenames;
 %typenames{@typenames} = (1 xx @typenames);
 

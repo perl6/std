@@ -1,12 +1,26 @@
+our $CTX;
+$CTX->{lvl} = 0;
 package Cursor5;
 
+use strict;
+use warnings;
+
+our %AUTOLEXED;
+our $FATES;
+our $PURE;
+
+binmode(STDERR, ":utf8");
+binmode(STDOUT, ":utf8");
+
 use Carp;
+use utf8;
 
 $SIG{__DIE__} = sub { confess(@_) };
 
 sub new {
     my $class = shift;
-    my %args = 'pos' => 0, @_;
+    my %args = ('pos' => 0, @_);
+    print length($args{orig});
     bless \%args, ref $class || $class;
 }
 
@@ -103,32 +117,41 @@ sub _AUTOLEXnow { my $self = shift;
 	print "AT: ", substr($buf,0,20);
 
 	# generate match closure at the last moment
-	sub ($C) {
-	    use v5;
+	sub {
 	    $| = 1;
+	    my $C = shift;
+
 	    print "LEN: ", length($buf),"\n";
 
-	    my %stuff;
+	    my $stuff;
 	    if ((-e "lexcache5/$key.yml")) {
-		%stuff = LoadFile("lexcache5/$key.yml");
+		$stuff = LoadFile("lexcache5/$key.yml");
 	    }
 	    else {
-		%stuff = ("PAT", $lexer->{PAT}, "FATES", $lexer->{FATES});
+		$stuff = {"PAT" => $lexer->{PAT}, "FATES" => $lexer->{FATES}};
 	    }
 
-	    my $pat = '^' . $stuff{PAT};
+	    die "Huh?  No PAT!!!\n" unless $stuff->{PAT};
+
+	    my $pat = '^' . $stuff->{PAT};
 	    print '=' x 72, "\n";
 	    print "PAT: ", $pat,"\n";
-	    print '=' x 72, "\n";
-	    print "#FATES: ", @$fate + 0,"\n";
+	    $pat =~ s/\(\?#.*?\)//g;
+	    $pat =~ s/^[ \t]*\n//gm;
 
 	    # remove whitespace that will confuse TRE greatly
 	    $pat =~ s/\s+//g;
 
-	    my $fate = $stuff{FATES};
+	    print "PAT: ", $pat,"\n";
+	    print '=' x 72, "\n";
+
+	    my $fate = $stuff->{FATES};
+	    print "#FATES: ", @$fate + 0;
+
 	    unshift @$fate, "";	# start at $1
-	    my $i = 0;
-	    for ((@$fate)) { print $i++, ':', $_, "\n" }
+	    for my $i (1..@$fate-1) {
+		print $i, ': ', $fate->[$i];
+	    }
 	    my $result = "";
 
 	    #########################################
@@ -140,18 +163,19 @@ sub _AUTOLEXnow { my $self = shift;
 	    if (($buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 		my $max = @+ - 1;
 		my $last = @- - 1;	# ignore '$0'
-		print "\nLAST: $last: [@-] [@+]\n";
+		print "LAST: $last";
 		$result = $fate->[$last] // "OOPS";
 		for my $x (1 .. $max) {
-		    my $beg = @-[$x];
+		    my $beg = $-[$x];
 		    next unless defined $beg;
-		    my $end = @+[$x];
+		    my $end = $+[$x];
 		    my $f = $fate->[$x];
+		    no strict 'refs';
 		    print "\$$x: $beg..$end\t$$x\t----> $f\n";
 		}
 	    }
 	    else {
-		print "NO LEXER MATCH at", substr($buf,pos($buf),10), "\n";
+		print "NO LEXER MATCH at", substr($buf,$C->{pos},10), "\n";
 	    }
 	    print "$result\n";
 	    $result;
@@ -180,10 +204,10 @@ sub matchify { my $self = shift;
     my %bindings;
     my $m;
     my $next;
-    print "MATCHIFY", ref $self;
+    print "MATCHIFY ", ref $self;
     for ($m = $self->{prior}; $m; $m = $next) {
         $next = $m->{prior};
-        undefine $m->{prior};
+        undef $m->{prior};
         my $n = $m->{name};
         print "MATCHIFY $n";
         if (not $bindings{$n}) {
@@ -198,8 +222,7 @@ sub matchify { my $self = shift;
         # XXX alas, gets lost in the next cursor...
         print "copied $k ", $v;
     }
-    undefine $self->{prior};
-    $self->{item};
+    undef $self->{prior};
     $self;
 }
 
@@ -251,11 +274,11 @@ sub cursor_rev { my $self = shift;
 local $CTX = { lvl => 0 };
 
 sub callm { my $self = shift;
-    my $ar = shift;
+    my $arg = shift;
 
     my $lvl = 0;
     while (caller($lvl)) { $lvl++ }
-    my ($package, $file, $line, $subname, $hasargs) = caller(0);
+    my ($package, $file, $line, $subname, $hasargs) = caller(1);
     my $name = $subname;
     if (defined $arg) { 
         $name .= " " . $arg;
@@ -270,21 +293,21 @@ sub whats { my $self = shift;
 
     my @k = keys(%{$self->{mykeys}});
     print "  $self ===> @{[$self->{from}.' '. $self->{to}.' '. $self->{item}]} (@k)";
-    for my $k (@ksub) {
+    for my $k (@k) {
         print "   $k => @{[$self->{mykeys}->{$k}]}";
     }
 }
 
 sub retm { my $self = shift;
-    my $bin = shift;
+    my $bind = shift;
 
     print "Returning non-Cursor: $self" unless exists $self->{pos};
-    my $binding;
+    my $binding = "";
     if (defined $bind and $bind ne '') {
         $self->{name} = $bind;
         $binding = "      :bind<$bind>";
     }
-    my ($package, $file, $line, $subname, $hasargs) = caller(0);
+    my ($package, $file, $line, $subname, $hasargs) = caller(1);
     print $self->{pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{from}]}..@{[$self->{to}]}$binding";
 #    $self->whats();
     $self;
@@ -294,11 +317,13 @@ sub _MATCHIFY { my $self = shift;
     my $bind = shift;
 
     map { $_->cursor_all($self->{pos}, $_->{to})->retm($bind) }
-    map { $_->matchify } @results;
+    map { $_->matchify } @_;
 }
 
 sub _STARf { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
 
@@ -309,6 +334,8 @@ sub _STARf { my $self = shift;
 
 sub _STARg { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
 
@@ -339,6 +366,8 @@ sub _STARr { my $self = shift;
 
 sub _PLUSf { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $x = $self;
@@ -357,7 +386,7 @@ sub _PLUSg { my $self = shift;
 
     local $CTX = $self->callm;
 
-    reverse $self->_PLUSf($block);
+    reverse $self->_PLUSf($block, @_);
 }
 
 sub _PLUSr { my $self = shift;
@@ -371,7 +400,7 @@ sub _PLUSr { my $self = shift;
     for (;;) {
 	my @matches = $block->($to);  # XXX shouldn't read whole list
     last unless @matches;
-	my $first = $matches->[0];  # no backtracking into block on ratchet
+	my $first = $matches[0];  # no backtracking into block on ratchet
 	#print $matches->perl;
 	push @all, $first;
 	$to = $first;
@@ -383,6 +412,8 @@ sub _PLUSr { my $self = shift;
 
 sub _OPTr { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
 
@@ -393,6 +424,8 @@ sub _OPTr { my $self = shift;
 
 sub _OPTg { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my @x = $block->($self);
@@ -403,6 +436,8 @@ sub _OPTg { my $self = shift;
 
 sub _OPTf { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     map { $_->retm($bind) }
@@ -412,6 +447,8 @@ sub _OPTf { my $self = shift;
 
 sub _BRACKET { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     map { $_->retm($bind) }
@@ -420,6 +457,8 @@ sub _BRACKET { my $self = shift;
 
 sub _PAREN { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     map { $_->matchify->retm($bind) }
@@ -428,6 +467,8 @@ sub _PAREN { my $self = shift;
 
 sub _NOTBEFORE { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my @all = $block->($self);
@@ -437,10 +478,12 @@ sub _NOTBEFORE { my $self = shift;
 
 sub before { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my @all = $block->($self);
-    if ((@all and $all->[0]->{bool})) {
+    if ((@all and $all[0]->{bool})) {
         return $self->cursor($self->{pos})->retm($bind);
     }
     return ();
@@ -448,17 +491,22 @@ sub before { my $self = shift;
 
 sub after { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $end = $self->cursor($self->{pos});
+    warn ref($block);
     my @all = $block->($end);          # Make sure $_->{from} == $_->{to}
-    if ((@all and $all->[0]->{bool})) {
+    if ((@all and $all[0]->{bool})) {
         return $end->retm($bind);
     }
     return ();
 }
 
 sub null { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     return $self->cursor($self->{pos})->retm($bind);
@@ -466,10 +514,12 @@ sub null { my $self = shift;
 
 sub _ASSERT { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my @all = $block->($self);
-    if ((@all and $all->[0]->{bool})) {
+    if ((@all and $all[0]->{bool})) {
         return $self->cursor($self->{pos})->retm($bind);
     }
     return ();
@@ -478,6 +528,8 @@ sub _ASSERT { my $self = shift;
 sub _BINDVAR { my $self = shift;
     my $var = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     map { $$var = $_; $_->retm($bind) }  # XXX doesn't "let"
@@ -486,6 +538,8 @@ sub _BINDVAR { my $self = shift;
 
 sub _BINDPOS { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     map { $_->retm($bind) }
@@ -494,6 +548,8 @@ sub _BINDPOS { my $self = shift;
 
 sub _BINDNAMED { my $self = shift;
     my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     map { $_->retm($bind) }
@@ -506,12 +562,14 @@ sub _EQ { my $self = shift;
     my $s = shift;
 
     my $len = length($s);
-    return True if substr($self->{orig}, $P, $len) eq $s;
+    return 1 if substr($self->{orig}, $P, $len) eq $s;
     return ();
 }
 
 sub _EXACT { my $self = shift;
     my $s = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm($s);
     my $P = $self->{pos};
@@ -529,6 +587,8 @@ sub _EXACT { my $self = shift;
 
 sub _EXACT_rev { my $self = shift;
     my $s = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $len = length($s);
@@ -544,6 +604,8 @@ sub _EXACT_rev { my $self = shift;
 }
 
 sub _DIGIT { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -559,6 +621,8 @@ sub _DIGIT { my $self = shift;
 }
 
 sub _DIGIT_rev { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
@@ -578,6 +642,8 @@ sub _DIGIT_rev { my $self = shift;
 }
 
 sub _ALNUM { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -593,6 +659,8 @@ sub _ALNUM { my $self = shift;
 }
 
 sub _ALNUM_rev { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
@@ -612,6 +680,8 @@ sub _ALNUM_rev { my $self = shift;
 }
 
 sub alpha { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -627,6 +697,8 @@ sub alpha { my $self = shift;
 }
 
 sub _SPACE { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -642,6 +714,8 @@ sub _SPACE { my $self = shift;
 }
 
 sub _SPACE_rev { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
@@ -661,6 +735,8 @@ sub _SPACE_rev { my $self = shift;
 }
 
 sub _HSPACE { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -676,6 +752,8 @@ sub _HSPACE { my $self = shift;
 }
 
 sub _HSPACE_rev { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
@@ -695,6 +773,8 @@ sub _HSPACE_rev { my $self = shift;
 }
 
 sub _VSPACE { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -710,6 +790,8 @@ sub _VSPACE { my $self = shift;
 }
 
 sub _VSPACE_rev { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
@@ -729,6 +811,8 @@ sub _VSPACE_rev { my $self = shift;
 }
 
 sub _ANY { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -742,6 +826,8 @@ sub _ANY { my $self = shift;
 }
 
 sub _BOS { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -754,6 +840,8 @@ sub _BOS { my $self = shift;
 }
 
 sub _BOL { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -767,6 +855,8 @@ sub _BOL { my $self = shift;
 }
 
 sub _EOS { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
@@ -847,7 +937,6 @@ sub fail { my $self = shift;
 	while (caller($lvl)) { $lvl++ }
         my ($package, $file, $line, $subname, $hasargs) = caller(0);
 
-	my $package = $package;
 	my $name = $package;   # . '::' . substr($subname,1);
 	if (defined $arg) { 
 	    $name .= " " . $arg;
@@ -959,7 +1048,7 @@ sub fail { my $self = shift;
                 return '';
             }
             else {
-                return "META[$text]"
+                return $text;
             }
         }
     }
@@ -1094,7 +1183,7 @@ sub fail { my $self = shift;
             push @result, $pat;
             last;
         }
-        my $result = $result->[0];
+        my $result = $result[0];
         print $result;
         $result;
     }
@@ -1126,7 +1215,7 @@ sub fail { my $self = shift;
             $x =~ s/\.\./,/;
             $x =~ s/\*//;
             $fakepos = $oldfakepos if $x =~ m/^0/;
-            return "$atom{$x}";
+            return $atom . "{$x}";
         }
         else {
             $PURE = 0;
