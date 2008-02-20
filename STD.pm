@@ -267,6 +267,9 @@ proto token regex_backslash { }
 token category:regex_assertion { <sym> }
 proto token regex_assertion { }
 
+token category:regex_quantifier { <sym> }
+proto token regex_quantifier { }
+
 token category:regex_mod_internal { <sym> }
 proto token regex_mod_internal { }
 
@@ -2927,14 +2930,11 @@ regex stdstopper {
 #    | <$+unitstopper>
 }
 
-# XXX not the correct way to add in a terminator for a sublanguage...
-token assertstopper { <stdstopper> | '>' }
-
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
 method EXPR (@fate,
                 %preclim = %LOOSEST,
-                :$stop = &stdstopper,
+                :$stop = self.can('stdstopper'),
                 :$seen,
             )
 {
@@ -3071,271 +3071,286 @@ method EXPR (@fate,
 ## Regex
 #############################################3333
 
-rule regex ($stop is context) {
-    <regex_ordered_disjunction>
-    {*}
+grammar Regex is Perl {
+
+    token <ws> {
+        <?{ not $+sigspace }>
+        <SUPER::ws>;
+    }
+
+    token stdstopper { '>' | <SUPER::stdstopper> }
+
+    rule regex ($stop is context) {
+        <regex_ordered_disjunction>
+        {*}
+    }
+
+    rule regex_ordered_disjunction {
+        '||'?
+        <regex_ordered_conjunction> ** '||'
+        {*}
+    }
+
+    rule regex_ordered_conjunction {
+        <regex_submatch> ** '&&'
+        {*}
+    }
+
+    rule regex_submatch {
+        <regex_unordered_disjunction> ** [ \!?'~~' ]
+        {*}
+    }
+
+    rule regex_unordered_disjunction {
+        [ '|' <!before '|'> ]?
+        <regex_unordered_conjunction> ** [ '|' <!before '|'> ]
+        {*}
+    }
+
+    rule regex_unordered_conjunction {
+        <regex_sequence> ** [ '&' <!before '&'> ]
+        {*}
+    }
+
+    rule regex_sequence {
+        <regex_quantified_atom>+
+        # Could combine unquantified atoms into one here...
+        {*}
+    }
+
+    rule regex_quantified_atom {
+        <regex_atom>
+        [ <regex_quantifier>
+            <?{ $<regex_atom>.max_width }>
+                || <panic: "Can't quantify zero-width atom")
+        ]?
+        {*}
+    }
+
+    rule regex_atom {
+        [
+        || <$+stop> :: <fail>
+        || <regex_metachar>
+        || (\w)
+        || <panic: "unrecognized metacharacter">
+        ]
+        {*}
+    }
+
+    # sequence stoppers
+    token regex_metachar:sym« > » { '>'  :: <fail> }
+    token regex_metachar:sym<&&>  { '&&' :: <fail> }
+    token regex_metachar:sym<&>   { '&'  :: <fail> }
+    token regex_metachar:sym<||>  { '||' :: <fail> }
+    token regex_metachar:sym<|>   { '|'  :: <fail> }
+    token regex_metachar:sym<]>   { ']'  :: <fail> }
+    token regex_metachar:sym<)>   { ')'  :: <fail> }
+    token regex_metachar:sym<\\\\> { \\\\ :: <fail> }
+
+    token regex_metachar:quant { <regex_quantifier> <panic: quantifier quantifies nothing> }
+
+    # "normal" metachars
+    token regex_metachar:sigwhite {
+        <SUPER::ws>   # significant whitespace
+    }
+
+    token regex_metachar:sym<{ }> {
+        <block>
+        {{ $/<sym> := <{ }> }}
+        {*}                                                         #= { }
+    }
+
+    token regex_metachar:mod {
+        <regex_mod_internal>
+        { $/<sym> := $<regex_mod_internal><sym> }
+        {*}                                                         #= :mod
+    }
+
+    token regex_metachar:sym<[ ]> {
+        '[' <regex ']'> ']'
+        { $/<sym> := <[ ]> }
+        {*}                                                         #= [ ]
+    }
+
+    token regex_metachar:sym<( )> {
+        '(' <regex ')'> ')'
+        { $/<sym> := <( )> }
+        {*}                                                         #= ( )
+    }
+
+    token regex_metachar:sym« <( » { '<(' {*} }                     #= <(
+    token regex_metachar:sym« )> » { ')>' {*} }                     #= )>
+
+    token regex_metachar:sym« << » { '<<' {*} }                     #= <<
+    token regex_metachar:sym« >> » { '>>' {*} }                     #= >>
+    token regex_metachar:sym< « > { '«' {*} }                       #= «
+    token regex_metachar:sym< » > { '»' {*} }                       #= »
+
+    token regex_metachar:qw {
+        <?before '<' \s >  # (note required whitespace)
+        <quote>
+        {*}                                                         #= quote
+    }
+
+    token regex_metachar:sym«< >» {
+        '<' <unsp>? <regex_assertion> '>'
+        {*}                                                         #= < >
+    }
+    token regex_metachar:sym<\\> { <sym> <regex_backslash> {*} }    #= \
+    token regex_metachar:sym<.>  { <sym> {*} }                      #= .
+    token regex_metachar:sym<^^> { <sym> {*} }                      #= ^^
+    token regex_metachar:sym<^>  { <sym> {*} }                      #= ^
+    token regex_metachar:sym<$$> {
+        <sym>
+        [ <?before (\w+)> <obs("\$\$$0 to deref var inside a regex","\$(\$$0)")> ]?
+        {*}
+    }
+    token regex_metachar:sym<$>  {
+        '$'
+        <before
+        | \s
+        | '|'
+        | ')'
+        | ']'
+        | '>'
+        >
+        {*}                                                         #= $
+    }
+
+    token regex_metachar:sym<' '> { <?before "'"  > <quotesnabber(":q")>  }
+    token regex_metachar:sym<" "> { <?before '"'  > <quotesnabber(":qq")> }
+
+    token regex_metachar:var {
+        <!before '$$'>
+        <sym=variable> <.ws>
+        $<binding> = ( ':=' <.ws> <regex_quantified_atom> )?
+        {*}                                                         #= var
+    }
+
+    token codepoint {
+        '[' (.*?) ']'
+    }
+
+    token q_backslash:qq { <?before qq> <quote> }
+    token q_backslash:sym<\\> { <sym> }
+    token q_backslash:misc { :: (.) }
+
+    token qq_backslash:a { <sym> }
+    token qq_backslash:b { <sym> }
+    token qq_backslash:c { <sym>
+        [
+        || '[' <-[ \] \v ]>* ']'
+        || <codepoint>
+        ]
+    }
+    token qq_backslash:e { <sym> }
+    token qq_backslash:f { <sym> }
+    token qq_backslash:n { <sym> }
+    token qq_backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
+    token qq_backslash:r { <sym> }
+    token qq_backslash:t { <sym> }
+    token qq_backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+    token qq_backslash:sym<0> { <sym> }
+    token qq_backslash:misc { :: \W || <panic: unrecognized backslash sequence> }
+
+    token regex_backslash:a { :i <sym> }
+    token regex_backslash:b { :i <sym> }
+    token regex_backslash:c { :i <sym>
+        [
+        || '[' <-[ \] \v ]>* ']'
+        || <codepoint>
+        ]
+    }
+    token regex_backslash:d { :i <sym> }
+    token regex_backslash:e { :i <sym> }
+    token regex_backslash:f { :i <sym> }
+    token regex_backslash:h { :i <sym> }
+    token regex_backslash:n { :i <sym> }
+    token regex_backslash:o { :i <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
+    token regex_backslash:r { :i <sym> }
+    token regex_backslash:t { :i <sym> }
+    token regex_backslash:v { :i <sym> }
+    token regex_backslash:w { :i <sym> }
+    token regex_backslash:x { :i <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+    token regex_backslash:oops { :: <panic: unrecognized regex backslash sequence> }
+
+    token regex_assertion:sym<?> { <sym> <regex_assertion> }
+    token regex_assertion:sym<!> { <sym> <regex_assertion> }
+
+    token regex_assertion:sym<{ }> { <block> }
+
+    token regex_assertion:variable {
+        <?before <sigil>>  # note: semantics must be determined per-sigil
+        <EXPR(%LOOSEST)>
+        {*}                                                        #= variable
+    }
+
+    token regex_assertion:method {
+        <?before '.' <!before '>'> >
+        <EXPR(%LOOSEST)>
+        {*}                                                        #= method
+    }
+
+    token regex_assertion:ident { <ident> [               # is qq right here?
+                                    | '=' <regex_assertion>
+                                    | ':' <.ws>
+                                        <q_unbalanced(qlang('Q',':qq'), :stop«>»)>
+                                    | '(' <semilist> ')'
+                                    | <.ws> <EXPR(%LOOSEST)>
+                                    ]?
+    }
+
+    token regex_assertion:sym<[> { <before '[' > <cclass_elem>+ }
+    token regex_assertion:sym<+> { <before '+' > <cclass_elem>+ }
+    token regex_assertion:sym<-> { <before '-' > <cclass_elem>+ }
+    token regex_assertion:sym<.> { <sym> }
+    token regex_assertion:sym<,> { <sym> }
+    token regex_assertion:sym<~~> { <sym> <desigilname>? }
+
+    token regex_assertion:bogus { <panic: unrecognized regex assertion> }
+
+    token cclass_elem {
+        [ '+' | '-' | <null> ]
+        [
+        | <name>
+        | <before '['> <bracketed(QLang('cclass'))>
+        ]
+    }
+
+    token regex_mod_arg { '(' <semilist> ')' }
+
+    token regex_mod_internal:adv {
+        <quotepair> { $/<sym> := «: $<quotepair><key>» }
+    }
+    token regex_mod_internal:sym<:i> { <sym> <regex_mod_arg>? }
+    token regex_mod_internal:sym<:!i> { <sym> }
+    token regex_mod_internal:oops { <panic: unrecognized regex modifier> }
+
+    # token regex_mod_external:adv {
+    #    <quotepair> { $/<sym> := «: $<quotepair><key>» }
+    #}
+    # token regex_mod_external:sym<:g> { <sym> <regex_mod_arg> }
+    # token regex_mod_external:sym<:global> { <sym> <regex_mod_arg> }
+    # token regex_mod_external:sym<:s> { <sym> <regex_mod_arg> }
+    # token regex_mod_external:sym<:sigspace> { <sym> <regex_mod_arg> }
+    # token regex_mod_external:sym<:nth> { <sym> <regex_mod_arg> }
+    # token regex_mod_external:nth { ':'\d+ ( x | st | nd | rd | th ) }
+    # token regex_mod_external:oops { <panic: unrecognized regex modifier> }
+
+    token regex_quantifier:sym<*>  { <sym> <quantmod> }
+    token regex_quantifier:sym<+>  { <sym> <quantmod> }
+    token regex_quantifier:sym<?>  { <sym> <quantmod> }
+    token regex_quantifier:sym<**> { <sym> <sigspace> <quantmod> <sigspace>
+        [
+        | \d+ [ '..' [ \d+ | '*' ] ]?
+        | <block>
+        | <regex_quantified_atom>
+        ]
+    }
+
+    token quantmod { [ '?' | '!' | ':' | '+' ]? }
+
 }
-
-rule regex_ordered_disjunction {
-    '||'?
-    <regex_ordered_conjunction> ** '||'
-    {*}
-}
-
-rule regex_ordered_conjunction {
-    <regex_submatch> ** '&&'
-    {*}
-}
-
-rule regex_submatch {
-    <regex_unordered_disjunction> ** [ \!?'~~' ]
-    {*}
-}
-
-rule regex_unordered_disjunction {
-    [ '|' <!before '|'> ]?
-    <regex_unordered_conjunction> ** [ '|' <!before '|'> ]
-    {*}
-}
-
-rule regex_unordered_conjunction {
-    <regex_sequence> ** [ '&' <!before '&'> ]
-    {*}
-}
-
-rule regex_sequence {
-    <regex_quantified_atom>+
-    # Could combine unquantified atoms into one here...
-    {*}
-}
-
-rule regex_quantified_atom {
-    <regex_atom>
-    [ <regex_quantifier>
-        <?{ $<regex_atom>.max_width }>
-            || <panic: "Can't quantify zero-width atom")
-    ]?
-    {*}
-}
-
-rule regex_atom {
-    [
-    || <$+stop> :: <fail>
-    || <regex_metachar>
-    || (\w)
-    || <panic: "unrecognized metacharacter">
-    ]
-    {*}
-}
-
-# sequence stoppers
-token regex_metachar:sym« > » { '>'  :: <fail> }
-token regex_metachar:sym<&&>  { '&&' :: <fail> }
-token regex_metachar:sym<&>   { '&'  :: <fail> }
-token regex_metachar:sym<||>  { '||' :: <fail> }
-token regex_metachar:sym<|>   { '|'  :: <fail> }
-token regex_metachar:sym<]>   { ']'  :: <fail> }
-token regex_metachar:sym<)>   { ')'  :: <fail> }
-token regex_metachar:sym<\\\\> { \\\\ :: <fail> }
-
-token regex_metachar:quant { <regex_quantifier> <panic: quantifier quantifies nothing> }
-
-# "normal" metachars
-token regex_metachar:sym<{ }> {
-    <block>
-    {{ $/<sym> := <{ }> }}
-    {*}                                                         #= { }
-}
-
-token regex_metachar:mod {
-    <regex_mod_internal>
-    { $/<sym> := $<regex_mod_internal><sym> }
-    {*}                                                         #= :mod
-}
-
-token regex_metachar:sym<[ ]> {
-    '[' <regex ']'> ']'
-    { $/<sym> := <[ ]> }
-    {*}                                                         #= [ ]
-}
-
-token regex_metachar:sym<( )> {
-    '(' <regex ')'> ')'
-    { $/<sym> := <( )> }
-    {*}                                                         #= ( )
-}
-
-token regex_metachar:sym« <( » { '<(' {*} }                     #= <(
-token regex_metachar:sym« )> » { ')>' {*} }                     #= )>
-
-token regex_metachar:sym« << » { '<<' {*} }                     #= <<
-token regex_metachar:sym« >> » { '>>' {*} }                     #= >>
-token regex_metachar:sym< « > { '«' {*} }                       #= «
-token regex_metachar:sym< » > { '»' {*} }                       #= »
-
-token regex_metachar:qw {
-    <?before '<' \s >  # (note required whitespace)
-    <quote>
-    {*}                                                         #= quote
-}
-
-token regex_metachar:sym«< >» {
-    '<' <unsp>? <regex_assertion> '>'
-    {*}                                                         #= < >
-}
-token regex_metachar:sym<\\> { <sym> <regex_backslash> {*} }    #= \
-token regex_metachar:sym<.>  { <sym> {*} }                      #= .
-token regex_metachar:sym<^^> { <sym> {*} }                      #= ^^
-token regex_metachar:sym<^>  { <sym> {*} }                      #= ^
-token regex_metachar:sym<$$> {
-    <sym>
-    [ <?before (\w+)> <obs("\$\$$0 to deref var inside a regex","\$(\$$0)")> ]?
-    {*}
-}
-token regex_metachar:sym<$>  {
-    '$'
-    <before
-    | \s
-    | '|'
-    | ')'
-    | ']'
-    | '>'
-    >
-    {*}                                                         #= $
-}
-
-token regex_metachar:sym<' '> { <?before "'"  > <quotesnabber(":q")>  }
-token regex_metachar:sym<" "> { <?before '"'  > <quotesnabber(":qq")> }
-
-token regex_metachar:var {
-    <!before '$$'>
-    <sym=variable> <.ws>
-    $<binding> = ( ':=' <.ws> <regex_quantified_atom> )?
-    {*}                                                         #= var
-}
-
-token codepoint {
-    '[' (.*?) ']'
-}
-
-token q_backslash:qq { <?before qq> <quote> }
-token q_backslash:sym<\\> { <sym> }
-token q_backslash:misc { :: (.) }
-
-token qq_backslash:a { <sym> }
-token qq_backslash:b { <sym> }
-token qq_backslash:c { <sym>
-    [
-    || '[' <-[ \] \v ]>* ']'
-    || <codepoint>
-    ]
-}
-token qq_backslash:e { <sym> }
-token qq_backslash:f { <sym> }
-token qq_backslash:n { <sym> }
-token qq_backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
-token qq_backslash:r { <sym> }
-token qq_backslash:t { <sym> }
-token qq_backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
-token qq_backslash:sym<0> { <sym> }
-token qq_backslash:misc { :: \W || <panic: unrecognized backslash sequence> }
-
-token regex_backslash:a { :i <sym> }
-token regex_backslash:b { :i <sym> }
-token regex_backslash:c { :i <sym>
-    [
-    || '[' <-[ \] \v ]>* ']'
-    || <codepoint>
-    ]
-}
-token regex_backslash:d { :i <sym> }
-token regex_backslash:e { :i <sym> }
-token regex_backslash:f { :i <sym> }
-token regex_backslash:h { :i <sym> }
-token regex_backslash:n { :i <sym> }
-token regex_backslash:o { :i <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
-token regex_backslash:r { :i <sym> }
-token regex_backslash:t { :i <sym> }
-token regex_backslash:v { :i <sym> }
-token regex_backslash:w { :i <sym> }
-token regex_backslash:x { :i <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
-token regex_backslash:oops { :: <panic: unrecognized regex backslash sequence> }
-
-token regex_assertion:sym<?> { <sym> <regex_assertion> }
-token regex_assertion:sym<!> { <sym> <regex_assertion> }
-
-token regex_assertion:sym<{ }> { <block> }
-
-token regex_assertion:variable {
-    <?before <sigil>>  # note: semantics must be determined per-sigil
-    <EXPR(%LOOSEST,&assertstopper)>
-    {*}                                                        #= variable
-}
-
-token regex_assertion:method {
-    <?before '.' <!before '>'> >
-    <EXPR(%LOOSEST,&assertstopper)>
-    {*}                                                        #= method
-}
-
-token regex_assertion:ident { <ident> [               # is qq right here?
-                                | '=' <regex_assertion>
-                                | ':' <.ws>
-                                    <q_unbalanced(qlang('Q',':qq'), :stop«>»)>
-                                | '(' <semilist> ')'
-                                | <.ws> <EXPR(%LOOSEST,&assertstopper)>
-                                ]?
-}
-
-token regex_assertion:sym<[> { <before '[' > <cclass_elem>+ }
-token regex_assertion:sym<+> { <before '+' > <cclass_elem>+ }
-token regex_assertion:sym<-> { <before '-' > <cclass_elem>+ }
-token regex_assertion:sym<.> { <sym> }
-token regex_assertion:sym<,> { <sym> }
-token regex_assertion:sym<~~> { <sym> <desigilname>? }
-
-token regex_assertion:bogus { <panic: unrecognized regex assertion> }
-
-token cclass_elem {
-    [ '+' | '-' | <null> ]
-    [
-    | <name>
-    | <before '['> <bracketed(QLang('cclass'))>
-    ]
-}
-
-token regex_mod_arg { '(' <semilist> ')' }
-
-token regex_mod_internal:adv {
-    <quotepair> { $/<sym> := «: $<quotepair><key>» }
-}
-token regex_mod_internal:sym<:i> { <sym> <regex_mod_arg>? }
-token regex_mod_internal:sym<:!i> { <sym> }
-token regex_mod_internal:oops { <panic: unrecognized regex modifier> }
-
-# token regex_mod_external:adv {
-#    <quotepair> { $/<sym> := «: $<quotepair><key>» }
-#}
-# token regex_mod_external:sym<:g> { <sym> <regex_mod_arg> }
-# token regex_mod_external:sym<:global> { <sym> <regex_mod_arg> }
-# token regex_mod_external:sym<:s> { <sym> <regex_mod_arg> }
-# token regex_mod_external:sym<:sigspace> { <sym> <regex_mod_arg> }
-# token regex_mod_external:sym<:nth> { <sym> <regex_mod_arg> }
-# token regex_mod_external:nth { ':'\d+ ( x | st | nd | rd | th ) }
-# token regex_mod_external:oops { <panic: unrecognized regex modifier> }
-
-token regex_quantifier:sym<*>  { <sym> <quantmod> }
-token regex_quantifier:sym<+>  { <sym> <quantmod> }
-token regex_quantifier:sym<?>  { <sym> <quantmod> }
-token regex_quantifier:sym<**> { <sym> <quantmod> <.ws>
-    [
-    | \d+ [ '..' [ \d+ | '*' ] ]?
-    | <block>
-    | <regex_atom>
-    ]
-}
-
-token quantmod { [ '?' | '!' | ':' | '+' ]? }
 
 # The <panic: message> rule is called for syntax errors.
 # If there are any <suppose> points, backtrack and retry parse
