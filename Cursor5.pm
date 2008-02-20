@@ -4,11 +4,13 @@ package Cursor5;
 
 use strict;
 use warnings;
+use Encode;
 
 our %AUTOLEXED;
 our $FATES;
 our $PURE;
 
+binmode(STDIN, ":utf8");
 binmode(STDERR, ":utf8");
 binmode(STDOUT, ":utf8");
 
@@ -81,6 +83,7 @@ sub _AUTOLEXgen { my $self = shift;
 	print "gen1";
 
 	my $ast = LoadFile("yamlg5/$key.yml");
+	Encode::_utf8_on($ast);
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
 	local $FATES;
 	$FATES = [];
@@ -88,9 +91,11 @@ sub _AUTOLEXgen { my $self = shift;
 	$AUTOLEXED{$key} = $fakepos;
 	my $pat = $ast->longest($self);
 	warn $pat;
+	if (Encode::is_utf8($pat)) { print "UTF8 ON" } else { print "UTF8 OFF" }
+	if ($pat =~ /Â/) { print "bad Â" }
+
 	$AUTOLEXED{$key} = $oldfakepos;
 
-	for (@$FATES) { s/\w+\///g; }
 	$lexer = { PAT => $pat, FATES => $FATES };
 	print "gen2";
 	open(my $cache, '>', "lexcache5/$key.yml") // warn "Can't print: $!";
@@ -133,14 +138,27 @@ sub _AUTOLEXnow { my $self = shift;
 
 	    die "Huh?  No PAT!!!\n" unless $stuff->{PAT};
 
-	    my $pat = '^' . $stuff->{PAT};
+	    my $pat = '^' . decode('utf8', $stuff->{PAT});
+	    Encode::_utf8_off($pat);
+	    $pat = decode('utf8', $pat);
+	    if (Encode::is_utf8($pat)) { print "UTF8 ON" } else { print "UTF8 OFF" }
+	    
 	    print '=' x 72, "\n";
+	    {
+		my $i = 1;
+		$pat =~ s/\((?!\?[#:])/(?#@{[$i++]})(/g;
+	    }
 	    print "PAT: ", $pat,"\n";
 	    $pat =~ s/\(\?#.*?\)//g;
 	    $pat =~ s/^[ \t]*\n//gm;
 
 	    # remove whitespace that will confuse TRE greatly
 	    $pat =~ s/\s+//g;
+
+	    1 while $pat =~ s/\(((\?:)?)\)/($1 !!!OOPS!!! )/;
+	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
+	    my $tmp = $pat;
+	    "42" =~ /$tmp/ and print "PARSES!";
 
 	    print "PAT: ", $pat,"\n";
 	    print '=' x 72, "\n";
@@ -178,6 +196,7 @@ sub _AUTOLEXnow { my $self = shift;
 		print "NO LEXER MATCH at", substr($buf,$C->{pos},10), "\n";
 	    }
 	    print "$result\n";
+	    $result =~ s/\w+\///g;
 	    $result;
 	    }
 	}
@@ -919,7 +938,7 @@ sub fail { my $self = shift;
 	"  " . $s;
     }
 
-    sub qm { my $s = shift;
+    sub qm { my $s = Encode::decode('utf8', shift);
 	my $r = '';
 	for (split(//,$s)) {
 	    if ($_ eq " ") { $r .= '\x20' }
@@ -1084,11 +1103,13 @@ sub fail { my $self = shift;
             }
             else {
 		# XXX should be ."$name"
-                my $lexer = $C->$name(['?']);
-		my $prefix = "";
+		my $prefix;
 		if (@$FATES) {
 		    $prefix = @$FATES[-1] . " ";
 		}
+		my $flen = 0+@$FATES;
+                my $lexer = $C->$name(['?']);
+		warn "FATES CHANGED" unless $flen == 0+@$FATES;
 		for my $fate (@{$lexer->{FATES}}) {
 		    push @$FATES, "$prefix$fate";
 		}
@@ -1212,15 +1233,15 @@ sub fail { my $self = shift;
         }
         elsif ($self->{'quant'}[0] eq '**') {
             my $x = $self->{'quant'}[2];
-            $x =~ s/\.\./,/;
-            $x =~ s/\*//;
-            $fakepos = $oldfakepos if $x =~ m/^0/;
-            return $atom . "{$x}";
+	    if ($x =~ /^\d/) {
+		$x =~ s/\.\./,/;
+		$x =~ s/\*//;
+		$fakepos = $oldfakepos if $x =~ m/^0/;
+		return $atom . "{$x}";
+	    }
         }
-        else {
-            $PURE = 0;
-            return '';
-        }
+	$PURE = 0;
+	return '';
     }
 }
 
@@ -1298,7 +1319,7 @@ sub fail { my $self = shift;
 	    my $a = $alt->{alt};
 	    push @$FATES, $a;
             my $pat = ::indent($alt->longest($C));
-	    next if $pat =~ m/^\s*$/;
+	    $pat = "OOPS" if $pat =~ m/^\s*$/;
             $pat = "( (?#START $a)\n$pat)\n(?#END $a)" if $callouts;
             push @result, $pat;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;

@@ -363,6 +363,7 @@ END
 #        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
         mkdir("yamlg5");
         open YAML, ">yamlg5/$NAME.yml" or die "Can't create tmpyaml/$NAME.yml: $!";
+        binmode(YAML, ":utf8");
         print YAML $lex;
         close YAML;
 
@@ -491,6 +492,7 @@ use base 'Cursor5';
 use strict;
 use warnings; no warnings 'qw';
 use feature 'state';
+use utf8;
 END
             $out .= '$\ = "\n";' . "\n";
         }
@@ -718,7 +720,7 @@ sub quantified_atom {
     return $atom if $atom->{noquant};
     my $quant = quantifier();
     return $atom unless $quant;
-    my $min = $atom * $quant->[3];
+    my $min = $atom->{min} * $quant->[3];
     return bless { atom => $atom, quant => $quant, min => $min },
         "RE_quantified_atom";
 }
