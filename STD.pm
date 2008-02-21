@@ -1893,7 +1893,7 @@ role QLang {
             escrule => &Perl::quote_escapes;
     }
 
-    method new (@pedigree) {
+    method new (*@pedigree) {
         if @pedigree == 1 {
 #           my %start = try { self."root_of_@pedigree[0]" } //
             my %start = try { self.root_of_Q } //
@@ -1909,9 +1909,9 @@ role QLang {
     }
 }
 
-sub qlang (@pedigree) {
-    my $pedigree = @pedigree.join;
-    (state %qlang){$pedigree} //= new QLang(@pedigree);
+sub qlang (*@pedigree) {
+    my $pedigree = ~@pedigree;
+    (state %qlang){$pedigree} //= QLang.new(@pedigree);
 }
 
 class Q_tweaker does QLang {
@@ -3073,14 +3073,18 @@ method EXPR (@fate,
 
 grammar Regex is Perl {
 
-    token <ws> {
-        <?{ not $+sigspace }>
-        <SUPER::ws>;
+    token ws {
+        <!{ $+sigspace }>
+        <nextsame>      # still get all the pod goodness, hopefully
     }
 
-    token stdstopper { '>' | <SUPER::stdstopper> }
+    token stdstopper { '>' | <nextsame> }
 
     rule regex ($stop is context) {
+        :my $sigspace    is context<rw> = $+sigspace    // 0;
+        :my $ratchet     is context<rw> = $+ratchet     // 0;
+        :my $insensitive is context<rw> = $+insensitive // 0;
+        :my $basechar    is context<rw> = $+basechar    // 0;
         <regex_ordered_disjunction>
         {*}
     }
@@ -3122,7 +3126,7 @@ grammar Regex is Perl {
         <regex_atom>
         [ <regex_quantifier>
             <?{ $<regex_atom>.max_width }>
-                || <panic: "Can't quantify zero-width atom")
+                || <panic: Can't quantify zero-width atom>
         ]?
         {*}
     }
@@ -3150,8 +3154,9 @@ grammar Regex is Perl {
     token regex_metachar:quant { <regex_quantifier> <panic: quantifier quantifies nothing> }
 
     # "normal" metachars
+
     token regex_metachar:sigwhite {
-        <SUPER::ws>   # significant whitespace
+        <?before \s|'#'> <SUPER::ws>   # significant whitespace
     }
 
     token regex_metachar:sym<{ }> {
@@ -3322,20 +3327,25 @@ grammar Regex is Perl {
     token regex_mod_internal:adv {
         <quotepair> { $/<sym> := «: $<quotepair><key>» }
     }
-    token regex_mod_internal:sym<:i> { <sym> <regex_mod_arg>? }
-    token regex_mod_internal:sym<:!i> { <sym> }
-    token regex_mod_internal:oops { <panic: unrecognized regex modifier> }
 
-    # token regex_mod_external:adv {
-    #    <quotepair> { $/<sym> := «: $<quotepair><key>» }
-    #}
-    # token regex_mod_external:sym<:g> { <sym> <regex_mod_arg> }
-    # token regex_mod_external:sym<:global> { <sym> <regex_mod_arg> }
-    # token regex_mod_external:sym<:s> { <sym> <regex_mod_arg> }
-    # token regex_mod_external:sym<:sigspace> { <sym> <regex_mod_arg> }
-    # token regex_mod_external:sym<:nth> { <sym> <regex_mod_arg> }
-    # token regex_mod_external:nth { ':'\d+ ( x | st | nd | rd | th ) }
-    # token regex_mod_external:oops { <panic: unrecognized regex modifier> }
+    token regex_mod_internal:sym<:i> { <sym> { $+insensitive = 1 } }
+    token regex_mod_internal:sym<:!i> { <sym> { $+insensitive = 0 } }
+    # XXX will this please work somehow ???
+    token regex_mod_internal:sym<:i( )> { <sym> <regex_mod_arg> { $+insensitive = $<regex_mod_arg>.eval } }
+
+    token regex_mod_internal:sym<:b> { <sym> { $+basechar = 1 } }
+    token regex_mod_internal:sym<:!b> { <sym> { $+basechar = 0 } }
+    token regex_mod_internal:sym<:b( )> { <sym> <regex_mod_arg> { $+basechar = $<regex_mod_arg>.eval } }
+
+    token regex_mod_internal:sym<:r> { <sym> { $+sigspace = 1 } }
+    token regex_mod_internal:sym<:!r> { <sym> { $+sigspace = 0 } }
+    token regex_mod_internal:sym<:r( )> { <sym> <regex_mod_arg> { $+sigspace = $<regex_mod_arg>.eval } }
+
+    token regex_mod_internal:sym<:ratchet> { <sym> { $+ratchet = 1 } }
+    token regex_mod_internal:sym<:!ratchet> { <sym> { $+ratchet = 0 } }
+    token regex_mod_internal:sym<:ratchet( )> { <sym> <regex_mod_arg> { $+ratchet = $<regex_mod_arg>.eval } }
+
+    token regex_mod_internal:oops { <panic: unrecognized regex modifier> }
 
     token regex_quantifier:sym<*>  { <sym> <quantmod> }
     token regex_quantifier:sym<+>  { <sym> <quantmod> }

@@ -172,7 +172,7 @@ sub panic {
     }
     die @_,
         " at line ", $line - 1,
-        " near '", /^(.{0,30}) /,
+        " near '", /^(.{0,30}) /s,
         "'\n";
 }
 
@@ -249,13 +249,14 @@ END
         next;
     }
 
-    if ( s/^(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
-        local $KIND = $1;
-        my $ws = $2;
-        local $NAME = $3;
-        my $argstuff = $4;
+    if ( s/^([ \t]*)(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
+        my $indent = $1;
+        local $KIND = $2;
+        my $ws = $3;
+        local $NAME = $4;
+        my $argstuff = $5;
 
-        my $comment = "$1$2$3$4\n";
+        my $comment = "$1$2$3$4$5\n";
         $comment =~ s/^/## /mg;
         $out .= $comment;
 
@@ -338,7 +339,7 @@ END
 
         if ($KIND eq 'method') {
             $out .= <<"END";
-sub $NAME { my \$self = shift;
+${indent}sub $NAME { my \$self = shift;
 $sym
 END
             next;
@@ -511,6 +512,7 @@ END
         $line =~ s/^constant /my /;
         $line =~ s/\bmy ([A-Z]\w+) /my /;
         $line =~ s/class (\w+)\s+\{/{ package $1;/;
+        $line =~ s/grammar (\w+)\s+is\s+(\w+)\s*\{/{ package $1; our \@ISA = '$2';/;
         $line =~ s/role (\w+)\s+\{/{ package $1;/;
         $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package $1; use base '$2';/;
         $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
@@ -545,6 +547,7 @@ END
             $line =~ s/Match //g;
             $line =~ s/Str //g;
             $line =~ s/my \(\) = \@_;//g;
+            $line =~ s/\*\@/\@/;
             $line =~ s/my *= \@_;//g;
         }
 
@@ -552,9 +555,11 @@ END
     }
 }
 
+print "# Emulate context vars by localizing 'our' vars living in main\n";
 for (sort keys(%OUR)) {
     print "our $_;\n";
 }
+print "\n";
 print $out;
 
 sub here {

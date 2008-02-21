@@ -53,7 +53,7 @@ while (<>) {
 	$proto{$name}++;
 	$protosig{$name} = $3;
     }
-    elsif (s/^(?:multi\s+)?
+    elsif (s/^([ \t]*)(?:multi\s+)?
 	(regex|rule|token) \s+
 	(\w+) ( :\w+ ( <.*?>
 	            | «.*?»
@@ -62,10 +62,11 @@ while (<>) {
 		    )?
 	      ) \s*
 	(?:\(([^)]*)\))?//x) {
-	my $type = $1;
-	my $name = $2;
-	my $adv = $3;
-	my $sig = $5;
+	my $indent = $1;
+	my $kind = $2;
+	my $name = $3;
+	my $adv = $4;
+	my $sig = $6;
 
 	my $newdflt = $adv;
 	$newdflt =~ s/:(\w+)$/'$1'/ or
@@ -90,13 +91,21 @@ while (<>) {
 	else {
 	    $newsig = $newparm;
 	}
-	my $mangle = $name . $adv;
-	$mangle =~ s/:(sym)?/_/;
+	my $mangle = $adv;
+	$mangle =~ s/:(sym)?//;
+	$mangle =~ s/</_l_/g;
+	$mangle =~ s/>/_r_/g;
+	$mangle =~ s/«/_L_/g;
+	$mangle =~ s/»/_R_/g;
+	$mangle =~ s/\[/_lb_/g;
+	$mangle =~ s/\]/_rb_/g;
+	$mangle =~ s/ /_sp_/g;
 	$mangle =~ s/(\W)/sprintf("_%02x_",ord($1))/eg;
 	$mangle =~ s/__/_/g;
 	$mangle =~ s/_$//;
+	$mangle = $name . '__' . $mangle;
 	push(@{$multis{$name}}, $mangle);
-	substr($_,0,0,"$type $mangle ($newsig) ")
+	substr($_,0,0,"$indent$kind $mangle ($newsig) ")
     }
 }
 continue {

@@ -79,7 +79,7 @@ sub _AUTOLEXgen { my $self = shift;
 
     print "gen0 $key";
     my $lexer = { x => 'y' };
-    if (! -s "lexcache5/$key.yml") {
+    if (! -s "lex/$key.yml") {
 	print "gen1";
 
 	my $ast = LoadFile("yamlg5/$key.yml");
@@ -98,7 +98,7 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$lexer = { PAT => $pat, FATES => $FATES };
 	print "gen2";
-	open(my $cache, '>', "lexcache5/$key.yml") // warn "Can't print: $!";
+	open(my $cache, '>', "lex/$key.yml") // warn "Can't print: $!";
 	print $cache Dump($lexer) or warn "Can't print: $!";
 	close($cache) or warn "Can't close: $!";
 	print "gen3";
@@ -129,8 +129,8 @@ sub _AUTOLEXnow { my $self = shift;
 	    print "LEN: ", length($buf),"\n";
 
 	    my $stuff;
-	    if ((-e "lexcache5/$key.yml")) {
-		$stuff = LoadFile("lexcache5/$key.yml");
+	    if ((-e "lex/$key.yml")) {
+		$stuff = LoadFile("lex/$key.yml");
 	    }
 	    else {
 		$stuff = {"PAT" => $lexer->{PAT}, "FATES" => $lexer->{FATES}};
