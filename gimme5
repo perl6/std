@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl
 
 # This is a version of "metholate" that spits out Perl 5 instead of Perl 6.
 # If metholate is hacky, I hate to think what this is...
