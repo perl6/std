@@ -29,6 +29,9 @@ our @DECL;
 our $SYM;
 our $NEEDMATCH;
 our %NEEDSEMI;
+our $NEEDORIGARGS;
+our $PKG = "main";
+our @PKG = ();
 
 my $TRACE = 0;
 my $METHOD = "method";
@@ -262,6 +265,7 @@ END
 
         local $PAREN = 0;
         local $SYM;
+        local $NEEDORIGARGS = 0;
         my $args = "";
         my $coercion = "";
         if ($argstuff =~ s/\((.*)\)//s) {
@@ -282,7 +286,7 @@ END
         }
         $args .= ', ';
         my $sym = "";
-        $sym .= "    my \@fate = \@{shift()};\n" unless $KIND eq 'method';
+        $sym .= "    my (\$binding,\$tag,\$try,\@fate) = (\@{shift()},'');\n" unless $KIND eq 'method';
 
         $args =~ s/is rw//g;
         while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context)?\s*([^=?,]*?),\s*//) {
@@ -363,7 +367,7 @@ END
 #        $lex =~ s[!!perl/hash:][!pugs/Object:]g;
 #        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
         mkdir("yamlg5");
-        open YAML, ">yamlg5/$NAME.yml" or die "Can't create tmpyaml/$NAME.yml: $!";
+        open YAML, ">yamlg5/${PKG}::$NAME.yml" or die "Can't create tmpyaml/${PKG}::$NAME.yml: $!";
         binmode(YAML, ":utf8");
         print YAML $lex;
         close YAML;
@@ -372,37 +376,34 @@ END
 sub$ws$NAME {
     my \$C = my \$self = shift;
 END
+        if ($NEEDORIGARGS) {
+            $out .= "    my \@origargs = \@_;\n";
+        }
         my $body = <<'END';
 <<DECL>>
     local $CTX = $C->callm("@fate");
-    my @try;
-    my $binding;
-    if (@fate) {
-        $binding = shift @fate;
-        if ($binding eq '?') {
-            return <<PEEK>>;
-        }
-    }
+    $binding eq '?' and return <<PEEK>>;
+
+    my @try = <<TRY>>;
 END
 
     if (@TOKENS > 1) {
         $body .= <<'END';
 
-    if (@fate) {
-        print "Fate passed to <<NAME>>: @fate\n";
-        @try = shift @fate;
+    if ($tag) {
+        print "Fate passed to <<NAME>>: $tag $try @fate\n";
     }
     else {
-        @fate = split(' ', $C->_AUTOLEXnow('<<NAME>>')->($C));
-        if (@fate) {
-            print "Fate generated in <<NAME>>: @fate\n";
-            @try = shift @fate;
+        ($tag,$try,@fate) = split(' ', $C->_AUTOLEXnow('<<PKG>>::<<NAME>>')->($C));
+        if ($tag) {
+            print "Fate generated in <<NAME>>: $tag $try @fate\n";
         }
         else {
             print "In <<NAME>>: no fate\n";
-            @try = <<TRY>>;
         }
     }
+    unshift @try, splice(@try,$try,1);
+    print "Attempting order: @try\n";
 END
     }
 
@@ -416,8 +417,9 @@ END
             $body =~ s/<<PEEK>>/''/;
         }
         else {
-            $body =~ s/<<PEEK>>/\$C->_AUTOLEXpeek('<<NAME>>')/;
+            $body =~ s/<<PEEK>>/\$C->_AUTOLEXpeek('<<PKG>>::<<NAME>>')/;
         }
+        $body =~ s/<<PKG>>/$PKG/g;
         $body =~ s/<<NAME>>/$NAME/g;
         $body =~ s/<<DECL>>/$sym@DECL/;
         $body =~ s/<<MEAT>>/$meat/;
@@ -486,7 +488,8 @@ END
         }
         $line = un6($line);
         if ($line =~ s/^grammar (\w+);//) {
-            $out .= "package $1;\n";
+            $PKG = $1;
+            $out .= "package $PKG;\n";
             $out .= <<'END';
 use Cursor5;
 use base 'Cursor5';
@@ -495,11 +498,10 @@ use warnings; no warnings 'qw';
 use feature 'state';
 use utf8;
 END
-            $out .= '$\ = "\n";' . "\n";
         }
         $line =~ s/^(\s*has) /#$1 /;
         $line =~ s/^proto /#proto /;
-        $line =~ s/\bsay /print /;
+        $line =~ s/\bsay /print / and ($line =~ s/";$/\\n";/ or $line =~ s/;$/,"\\n";/);
         $line =~ s/&reduce = ->/\$reduce = sub/;
         $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
         $line =~ s/ -> {/sub {/;
@@ -512,7 +514,9 @@ END
         $line =~ s/^constant /my /;
         $line =~ s/\bmy ([A-Z]\w+) /my /;
         $line =~ s/class (\w+)\s+\{/{ package $1;/;
-        $line =~ s/grammar (\w+)\s+is\s+(\w+)\s*\{/{ package $1; our \@ISA = '$2';/;
+        $line =~ s/^grammar (\w+)\s+is\s+(\w+)\s*\{/{ package $1; our \@ISA = '$2';/
+                and do { push(@PKG, $PKG); $PKG = $1; };
+        $PKG = pop(@PKG) if @PKG and $line =~ /^}/;
         $line =~ s/role (\w+)\s+\{/{ package $1;/;
         $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package $1; use base '$2';/;
         $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
@@ -1359,6 +1363,10 @@ sub unbalanced {
             $s =~ s/\s+$//;
             $$self{sym} = $s;
         }
+        elsif ($name eq "nextsame") {
+            $NEEDORIGARGS++;
+            return '$self->SUPER::' . $NAME . '(@origargs)';
+        }
         if ($name =~ /^\w/) {
             push @TOKEN, "\$C->$name('?')" if $PURE;
             '$C->' . $name . "($binding)";
@@ -1684,7 +1692,7 @@ END
                 else {
                     $token = "''";
                 }
-                $kid->{alt} = $NAME . '/' . $alt++;
+                $kid->{alt} = $NAME . ' ' . $alt++;
                 push @TOKENS, $token;
             }
         }
@@ -1693,7 +1701,11 @@ END
         }
         else {
             for (@result) { $_ = " sub { my \$C=shift; $_ }," }
-            my $result = "do { my \@gather = (); for my \$block ((\n" . ::indent(join("\n", @result)) . "\n)[\@try]) { push \@gather, \$block->(\$C) }; \@gather }";
+            my $result =
+                'do { my @gather = (); while (my $try = shift(@try)) {' . "\n" .
+                    '  print "Trying $tag $try\n"; push @gather, ((' . "\n"
+                    . ::indent(join("\n", @result))
+                . "\n" . ')[$try])->($C) }; @gather }';
             $result;
         }
     }

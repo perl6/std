@@ -22,7 +22,7 @@ $SIG{__DIE__} = sub { confess(@_) };
 sub new {
     my $class = shift;
     my %args = ('pos' => 0, @_);
-    print length($args{orig});
+    print length($args{orig}), "\n";
     bless \%args, ref $class || $class;
 }
 
@@ -56,7 +56,7 @@ my $fakepos = 1;
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
 
-    print "peek $key";
+    print "peek $key\n";
     die "Null key" if $key eq '';
     if ($self->{lexers}->{$key}) {
         if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
@@ -68,7 +68,7 @@ sub _AUTOLEXpeek { my $self = shift;
             return $self->{lexers}->{$key} // hash();
         }
         else {
-            print "oops ", ref($key);
+            print "oops ", ref($key), "\n";
         }
     }
     return $self->{lexers}{$key} = $self->_AUTOLEXgen($key);
@@ -77,10 +77,10 @@ sub _AUTOLEXpeek { my $self = shift;
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
 
-    print "gen0 $key";
+    print "gen0 $key\n";
     my $lexer = { x => 'y' };
     if (! -s "lex/$key.yml") {
-	print "gen1";
+	print "gen1\n";
 
 	my $ast = LoadFile("yamlg5/$key.yml");
 	Encode::_utf8_on($ast);
@@ -91,17 +91,17 @@ sub _AUTOLEXgen { my $self = shift;
 	$AUTOLEXED{$key} = $fakepos;
 	my $pat = $ast->longest($self);
 	warn $pat;
-	if (Encode::is_utf8($pat)) { print "UTF8 ON" } else { print "UTF8 OFF" }
-	if ($pat =~ /Â/) { print "bad Â" }
+	if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
+	if ($pat =~ /Â/) { print "bad Â\n" }
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
 	$lexer = { PAT => $pat, FATES => $FATES };
-	print "gen2";
+	print "gen2\n";
 	open(my $cache, '>', "lex/$key.yml") // warn "Can't print: $!";
 	print $cache Dump($lexer) or warn "Can't print: $!";
 	close($cache) or warn "Can't close: $!";
-	print "gen3";
+	print "gen3\n";
     }
     $lexer;
 }
@@ -109,21 +109,20 @@ sub _AUTOLEXgen { my $self = shift;
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
 
-    print "now $key";
+    print "now $key\n";
     my $lexer = $self->{lexers}->{$key} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
     };
 
     $lexer->{MATCH} //= do {
-	print $key,":";
+	print $key,":\n";
 
 	my $buf = $self->{orig};	# XXX this might lose pos()...
-	print "AT: ", substr($buf,0,20);
+	print "AT: ", substr($buf,0,20), "\n";
 
 	# generate match closure at the last moment
 	sub {
-	    $| = 1;
 	    my $C = shift;
 
 	    print "LEN: ", length($buf),"\n";
@@ -141,7 +140,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    my $pat = '^' . decode('utf8', $stuff->{PAT});
 	    Encode::_utf8_off($pat);
 	    $pat = decode('utf8', $pat);
-	    if (Encode::is_utf8($pat)) { print "UTF8 ON" } else { print "UTF8 OFF" }
+	    if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
 	    
 	    print '=' x 72, "\n";
 	    {
@@ -158,17 +157,17 @@ sub _AUTOLEXnow { my $self = shift;
 	    1 while $pat =~ s/\(((\?:)?)\)/($1 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
 	    my $tmp = $pat;
-	    "42" =~ /$tmp/ and print "PARSES!";
+	    "42" =~ /$tmp/ and print "PARSES!\n";
 
 	    print "PAT: ", $pat,"\n";
 	    print '=' x 72, "\n";
 
 	    my $fate = $stuff->{FATES};
-	    print "#FATES: ", @$fate + 0;
+	    print "#FATES: ", @$fate + 0, "\n";
 
 	    unshift @$fate, "";	# start at $1
 	    for my $i (1..@$fate-1) {
-		print $i, ': ', $fate->[$i];
+		print $i, ': ', $fate->[$i], "\n";
 	    }
 	    my $result = "";
 
@@ -181,7 +180,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    if (($buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 		my $max = @+ - 1;
 		my $last = @- - 1;	# ignore '$0'
-		print "LAST: $last";
+		print "LAST: $last\n";
 		$result = $fate->[$last] // "OOPS";
 		for my $x (1 .. $max) {
 		    my $beg = $-[$x];
@@ -223,12 +222,12 @@ sub matchify { my $self = shift;
     my %bindings;
     my $m;
     my $next;
-    print "MATCHIFY ", ref $self;
+    print "MATCHIFY ", ref $self, "\n";
     for ($m = $self->{prior}; $m; $m = $next) {
         $next = $m->{prior};
         undef $m->{prior};
         my $n = $m->{name};
-        print "MATCHIFY $n";
+        print "MATCHIFY $n\n";
         if (not $bindings{$n}) {
             $bindings{$n} = [];
 #                %.mykeys = Hash.new unless defined %!mykeys;
@@ -239,7 +238,7 @@ sub matchify { my $self = shift;
     for my $k (keys(%bindings)) { my $v = $bindings{$k};
         $self->{$k} = $v;
         # XXX alas, gets lost in the next cursor...
-        print "copied $k ", $v;
+        print "copied $k ", $v, "\n";
     }
     undef $self->{prior};
     $self;
@@ -258,7 +257,7 @@ sub cursor_all { my $self = shift;
         prior => (defined $self->{name} ? $self : $self->{prior}),
         mykeys => $self->{mykeys},
     );
-    print "PRIOR ", $r->{prior}->{name} if defined $r->{prior};
+    print "PRIOR ", $r->{prior}->{name}, "\n" if defined $r->{prior};
     $r;
 }
 
@@ -303,31 +302,31 @@ sub callm { my $self = shift;
         $name .= " " . $arg;
     }
     my $pos = '?';
-    $pos = $self->{pos} if defined $self->{orig};
-    print $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]";
+    $pos = $self->{pos} if defined $self->{pos};
+    print $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n";
     {lvl => $lvl};
 }
 
 sub whats { my $self = shift;
 
     my @k = keys(%{$self->{mykeys}});
-    print "  $self ===> @{[$self->{from}.' '. $self->{to}.' '. $self->{item}]} (@k)";
+    print "  $self ===> @{[$self->{from}.' '. $self->{to}.' '. $self->{item}]} (@k)\n";
     for my $k (@k) {
-        print "   $k => @{[$self->{mykeys}->{$k}]}";
+        print "   $k => @{[$self->{mykeys}->{$k}]}\n";
     }
 }
 
 sub retm { my $self = shift;
     my $bind = shift;
 
-    print "Returning non-Cursor: $self" unless exists $self->{pos};
+    print "Returning non-Cursor: $self\n" unless exists $self->{pos};
     my $binding = "";
     if (defined $bind and $bind ne '') {
         $self->{name} = $bind;
         $binding = "      :bind<$bind>";
     }
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
-    print $self->{pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{from}]}..@{[$self->{to}]}$binding";
+    print $self->{pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{from}]}..@{[$self->{to}]}$binding\n";
 #    $self->whats();
     $self;
 }
@@ -420,7 +419,7 @@ sub _PLUSr { my $self = shift;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
     last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
-	#print $matches->perl;
+	#print $matches->perl, "\n";
 	push @all, $first;
 	$to = $first;
     }
@@ -591,15 +590,15 @@ sub _EXACT { my $self = shift;
     my $bind = $args{bind} // '';
 
     local $CTX = $self->callm($s);
-    my $P = $self->{pos};
+    my $P = $self->{pos} // 0;
     my $len = length($s);
     if (substr($self->{orig}, $P, $len) eq $s) {
-#        say "EXACT $s matched {substr($!orig,$P,$len)} at $P $len";
+        print "EXACT $s matched {substr($!orig,$P,$len)} at $P $len\n";
         my $r = $self->cursor($P+$len);
         $r->retm($bind);
     }
     else {
-#        say "EXACT $s didn't match {substr($!orig,$P,$len)} at $P $len";
+        print "EXACT $s didn't match {substr($!orig,$P,$len)} at $P $len\n";
         return ();
     }
 }
@@ -960,7 +959,7 @@ sub fail { my $self = shift;
 	if (defined $arg) { 
 	    $name .= " " . $arg;
 	}
-	print ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]" if $RE_verbose;
+	print ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n" if $RE_verbose;
     }
 }
 
@@ -1205,7 +1204,7 @@ sub fail { my $self = shift;
             last;
         }
         my $result = $result[0];
-        print $result;
+        print $result, "\n";
         $result;
     }
 }
@@ -1325,7 +1324,7 @@ sub fail { my $self = shift;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
         my $result = "\n(?:\n  " . ::indent(join "\n| ", @result) . "\n)";
-        print $result;
+        print $result, "\n";
         $fakepos = $minfakepos;  # Did all branches advance?
         $result;
     }
