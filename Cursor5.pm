@@ -236,10 +236,16 @@ sub matchify { my $self = shift;
         unshift @{$bindings{$n}}, $m;
     }
     for my $k (keys(%bindings)) { my $v = $bindings{$k};
-        $self->{$k} = $v;
+	if (ref $v eq 'ARRAY' and @$v == 1) {
+	    $self->{$k} = $v->[0];
+	}
+	else {
+	    $self->{$k} = $v;
+	}
         # XXX alas, gets lost in the next cursor...
         print "copied $k ", $v, "\n";
     }
+    print Dump($self);
     undef $self->{prior};
     $self;
 }
@@ -334,8 +340,13 @@ sub retm { my $self = shift;
 sub _MATCHIFY { my $self = shift;
     my $bind = shift;
 
-    map { $_->cursor_all($self->{pos}, $_->{to})->retm($bind) }
-    map { $_->matchify } @_;
+    my @result = map { $_->cursor_all($self->{pos}, $_->{to})->retm($bind)->matchify } @_;
+    if (wantarray) {
+	@result;
+    }
+    else {
+	$result[0];
+    }
 }
 
 sub _STARf { my $self = shift;
