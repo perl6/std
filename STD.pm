@@ -1696,7 +1696,11 @@ token radint {
 }
 
 token dec_number {
-    \d+[_\d+]* [ '.' \d+[_\d+]* [ <[Ee]> <[+\-]>? \d+ ]? ]
+    \d+[_\d+]*
+        [
+        | '.' \d+[_\d+]* [ <[Ee]> <[+\-]>? \d+ ]?
+        |                  <[Ee]> <[+\-]>? \d+
+        ] # careful to distinguish from both integer and 42.method
     {*}
 }
 
