@@ -23,7 +23,7 @@ our $PAREN = 0;
 our %adverbs = ();
 our %fixedprefix;
 our $PURE;
-our @TOKENS;
+our @ALTS;
 our @TOKEN;
 our $MAYBACKTRACK;
 our @DECL;
@@ -33,6 +33,8 @@ our %NEEDSEMI;
 our $NEEDORIGARGS;
 our $PKG = "main";
 our @PKG = ();
+our $ALTNAME;
+our $ALTNAMES;
 
 my $TRACE = 0;
 my $METHOD = "method";
@@ -287,7 +289,7 @@ END
         }
         $args .= ', ';
         my $sym = "";
-        $sym .= "    my (\$binding,\$tag,\$try,\@fate) = (\@{shift()},'');\n" unless $KIND eq 'method';
+        $sym .= "    my (\$binding,\@fate) = \@{shift()};\n" unless $KIND eq 'method';
 
         $args =~ s/is rw//g;
         while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context)?\s*([^=?,]*?),\s*//) {
@@ -354,13 +356,15 @@ END
         undef $BINDING;
         local @DECL;
 
+        local $ALTNAME = $NAME;
+        local $ALTNAMES = "A";
         my $re = regex('\\}');
 
         my $old = substr($all, length($all) - $remaining, $remaining - length($_)+1);
         $old =~ s/^/##      /mg;
         $out .= "$old\n\n";
 
-        local @TOKENS;
+        local @ALTS;
         local $PURE = 1;
         my $meat = ::indent($re->walk(), 2);
 
@@ -385,30 +389,23 @@ END
     local $CTX = $C->callm("@fate");
     $binding eq '?' and return <<PEEK>>;
 
-    my @try = <<TRY>>;
-END
-
-    if (@TOKENS > 1) {
-        $body .= <<'END';
-
-    if ($tag) {
-        print "Fate passed to <<NAME>>: $tag $try @fate\n";
+    if (@fate) {
+      print "Fate passed to <<NAME>>: @fate\n";
     }
     else {
-        ($tag,$try,@fate) = split(' ', $C->_AUTOLEXnow('<<PKG>>::<<NAME>>')->($C));
-        if ($tag) {
-            print "Fate generated in <<NAME>>: $tag $try @fate\n";
-        }
-        else {
-            print "In <<NAME>>: no fate\n";
-        }
+      @fate = split(' ', $C->_AUTOLEXnow('<<PKG>>::<<NAME>>')->($C));
+      if (@fate) {
+        print "Fate generated in <<NAME>>: @fate\n";
+      }
+      else {
+        print "In <<NAME>>: no fate\n";
+      }
     }
-    unshift @try, splice(@try,$try,1);
-    print "Attempting order: @try\n";
-END
-    }
+    my ($tag,$try);
 
-    $body .= <<'END';
+END
+
+        $body .= <<'END';
     $C->_MATCHIFY($binding,
 <<MEAT>>
     );
@@ -424,12 +421,6 @@ END
         $body =~ s/<<NAME>>/$NAME/g;
         $body =~ s/<<DECL>>/$sym@DECL/;
         $body =~ s/<<MEAT>>/$meat/;
-        if (@TOKENS > 1) {
-            $body =~ s/<<TRY>>/'0..' . (@TOKENS-1)/e;
-        }
-        else {
-            $body =~ s/<<TRY>>/'0'/;
-        }
         $body =~ s/\$\+(\w+)/\$$1/g;
         $out .= $body;
         next;
@@ -672,6 +663,8 @@ sub unordered_disjunction {
     here();
     my @kids;
     my $min = 1_000_000_000;
+    my $altname = $ALTNAME;
+    local $ALTNAME = $NAME . '_' . $ALTNAMES++;
 
     s/^ \| (?!\|) //x;
 
@@ -685,7 +678,8 @@ sub unordered_disjunction {
     } while s/^ \| (?!\|) //x;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => $min }, "RE_unordered_disjunction";
+
+    return bless { zyg => [@kids], min => $min, altname => $altname }, "RE_unordered_disjunction";
 }
 
 sub unordered_conjunction {
@@ -1149,7 +1143,7 @@ sub unbalanced {
         my $self = shift;
         local($PURE);
         local(@TOKEN);
-        local(@TOKENS);
+        local(@ALTS);
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk(@_);
             "\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
@@ -1673,6 +1667,8 @@ END
         my $self = shift;
         my @result;
         my $alt = 0;
+        local @ALTS;
+        my $altname = $self->{altname};
         if ($$self{zyg}) {
             $PURE = 0 if @{$$self{zyg}} > 1;
             foreach my $kid (@{$$self{zyg}}) {
@@ -1693,8 +1689,8 @@ END
                 else {
                     $token = "''";
                 }
-                $kid->{alt} = $NAME . ' ' . $alt++;
-                push @TOKENS, $token;
+                $kid->{alt} = $altname . ' ' . $alt++;
+                push @ALTS, $token;
             }
         }
         if (@result == 1) {
@@ -1702,11 +1698,21 @@ END
         }
         else {
             for (@result) { $_ = " sub { my \$C=shift; $_ }," }
-            my $result =
-                'do { my @gather = (); while (my $try = shift(@try)) {' . "\n" .
-                    '  print "Trying $tag $try\n"; push @gather, ((' . "\n"
-                    . ::indent(join("\n", @result))
-                . "\n" . ')[$try])->($C) }; @gather }';
+            my $result = <<"END";
+do {
+  my \@try = @{[ '0..' . (@ALTS-1) ]};
+  (\$tag, \$try, \@fate) = \@fate;
+  unshift \@try, splice(\@try,\$try,1);
+  print "Attempting order: \@try\\n";
+  my \@gather = ();
+  while (my \$try = shift(\@try)) {
+    print "Trying \$tag \$try\\n"; push \@gather, ((
+@{[ ::indent(join("\n", @result)) ]}
+    )[\$try])->(\$C)
+  };
+  \@gather
+}
+END
             $result;
         }
     }

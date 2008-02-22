@@ -9,6 +9,7 @@ use Encode;
 our %AUTOLEXED;
 our $FATES;
 our $PURE;
+our $ALT;
 
 binmode(STDIN, ":utf8");
 binmode(STDERR, ":utf8");
@@ -982,6 +983,7 @@ sub fail { my $self = shift;
     sub longest { my $self = shift; my ($C) = @_; 
         ::here();
         local $PURE = 1;
+	local $ALT = '';
         $self->{'re'}->longest($C);
     }
 }
@@ -1324,10 +1326,12 @@ sub fail { my $self = shift;
         my @result;
         my $oldfakepos = $fakepos;
         my $minfakepos = $fakepos + 1;
+	my $base = $ALT;
+	$base .= ' ' if $base;
         for my $alt (@$alts) {
             $fakepos = $oldfakepos;
-	    my $a = $alt->{alt};
-	    push @$FATES, $a;
+	    local $ALT = $base . $alt->{alt};
+	    push @$FATES, $ALT;
             my $pat = ::indent($alt->longest($C));
 	    $pat = "OOPS" if $pat =~ m/^\s*$/;
             $pat = "( (?#START $a)\n$pat)\n(?#END $a)" if $callouts;
