@@ -59,6 +59,12 @@ our %lexers;       # per language, the cache of lexers, keyed by rule name
 #has Str $.name;
 #has $.item;
 
+sub bool { $_[0]->{bool} }
+sub from { $_[0]->{from} }
+sub to { $_[0]->{to} }
+sub pos { $_[0]->{pos} }
+sub name { $_[0]->{name} }
+
 sub lexers { my $self = shift;
     %lexers;    # XXX should be different per language, sigh
 }

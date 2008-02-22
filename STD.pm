@@ -2959,7 +2959,7 @@ method EXPR (@fate,
         $here = $seen;
     }
     else {
-        my @t = self.expect_term();
+        my @t = self.expect_term(['',@fate]);
         $here = @t[0];
     }
     push @termstack, $here;
@@ -3016,7 +3016,7 @@ method EXPR (@fate,
 
     loop {
         say "In loop, at ", $here.pos;
-        my @terminator = $here.before([], -> $s { $stop($s:) } );
+        my @terminator = $here.before([], -> $s { $stop($s, []) } );
         my $t = @terminator[0];
     last if defined $t and @terminator[0].bool;
         %thisop = ();
@@ -3057,7 +3057,7 @@ method EXPR (@fate,
             }
         }
         push @opstack, item %thisop;
-        @terminator = $here.before([], -> $s { $stop($s:) } );
+        @terminator = $here.before([], -> $s { $stop($s, []) } );
         if @terminator and @terminator[0].bool {
             $here.panic([], "$infix.perl() is missing right term");
         }
