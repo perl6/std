@@ -157,36 +157,36 @@ role PrecOp[*%defaults] {
         }
         return $m;
     }
-}
+} # end role
 
-class Hyper           does PrecOp[:transparent]             {}
+class Hyper           does PrecOp[:transparent]             {} # end class
 
-class Term            does PrecOp[|%term]                   {}
-class Methodcall      does PrecOp[|%methodcall]             {}
-class Autoincrement   does PrecOp[|%autoincrement]          {}
-class Exponentiation  does PrecOp[|%exponentiation]         {}
-class Symbolic_unary  does PrecOp[|%symbolic_unary]         {}
-class Multiplicative  does PrecOp[|%multiplicative]         {}
-class Additive        does PrecOp[|%additive]               {}
-class Replication     does PrecOp[|%replication]            {}
-class Concatenation   does PrecOp[|%concatenation]          {}
-class Junctive_and    does PrecOp[|%junctive_and]           {}
-class Junctive_or     does PrecOp[|%junctive_or]            {}
-class Named_unary     does PrecOp[|%named_unary]            {}
-class Nonchaining     does PrecOp[|%nonchaining]            {}
-class Chaining        does PrecOp[|%chaining]               {}
-class Tight_and       does PrecOp[|%tight_and]              {}
-class Tight_or        does PrecOp[|%tight_or]               {}
-class Conditional     does PrecOp[|%conditional]            {}
-class Item_assignment does PrecOp[|%item_assignment]        {}
-class Loose_unary     does PrecOp[|%loose_unary]            {}
-class Comma           does PrecOp[|%comma]                  {}
-class List_infix      does PrecOp[|%list_infix]             {}
-class List_assignment does PrecOp[|%list_assignment]        {}
-class List_prefix     does PrecOp[|%list_prefix]            {}
-class Loose_and       does PrecOp[|%loose_and]              {}
-class Loose_or        does PrecOp[|%loose_or]               {}
-class Terminator      does PrecOp[|%terminator]             {}
+class Term            does PrecOp[|%term]                   {} # end class
+class Methodcall      does PrecOp[|%methodcall]             {} # end class
+class Autoincrement   does PrecOp[|%autoincrement]          {} # end class
+class Exponentiation  does PrecOp[|%exponentiation]         {} # end class
+class Symbolic_unary  does PrecOp[|%symbolic_unary]         {} # end class
+class Multiplicative  does PrecOp[|%multiplicative]         {} # end class
+class Additive        does PrecOp[|%additive]               {} # end class
+class Replication     does PrecOp[|%replication]            {} # end class
+class Concatenation   does PrecOp[|%concatenation]          {} # end class
+class Junctive_and    does PrecOp[|%junctive_and]           {} # end class
+class Junctive_or     does PrecOp[|%junctive_or]            {} # end class
+class Named_unary     does PrecOp[|%named_unary]            {} # end class
+class Nonchaining     does PrecOp[|%nonchaining]            {} # end class
+class Chaining        does PrecOp[|%chaining]               {} # end class
+class Tight_and       does PrecOp[|%tight_and]              {} # end class
+class Tight_or        does PrecOp[|%tight_or]               {} # end class
+class Conditional     does PrecOp[|%conditional]            {} # end class
+class Item_assignment does PrecOp[|%item_assignment]        {} # end class
+class Loose_unary     does PrecOp[|%loose_unary]            {} # end class
+class Comma           does PrecOp[|%comma]                  {} # end class
+class List_infix      does PrecOp[|%list_infix]             {} # end class
+class List_assignment does PrecOp[|%list_assignment]        {} # end class
+class List_prefix     does PrecOp[|%list_prefix]            {} # end class
+class Loose_and       does PrecOp[|%loose_and]              {} # end class
+class Loose_or        does PrecOp[|%loose_or]               {} # end class
+class Terminator      does PrecOp[|%terminator]             {} # end class
 
 # Categories are designed to be easily extensible in derived grammars
 # by merely adding more rules in the same category.  The rules within
@@ -1907,7 +1907,7 @@ role QLang {
             return $self.tweak($tail);
         }
     }
-}
+} # end role
 
 sub qlang (*@pedigree) {
     my $pedigree = ~@pedigree;
@@ -1984,7 +1984,7 @@ class Q_tweaker does QLang {
     }
     # end tweaks (DO NOT ERASE)
 
-}
+} # end class
 
 class RX_tweaker does QLang {
     # begin tweaks (DO NOT ERASE)
@@ -2033,7 +2033,7 @@ class RX_tweaker does QLang {
         }
     }
     # end tweaks (DO NOT ERASE)
-}
+} # end class
 
 class P5RX_tweaker does QLang {
     # begin tweaks (DO NOT ERASE)
@@ -2047,7 +2047,7 @@ class P5RX_tweaker does QLang {
         panic("Unrecognized Perl 5 regex modifier: " ~ @k);
     }
     # end tweaks (DO NOT ERASE)
-}
+} # end class
 
 class TR_tweaker does QLang {
     # begin tweaks (DO NOT ERASE)
@@ -2060,7 +2060,7 @@ class TR_tweaker does QLang {
         panic("Unrecognized transliteration modifier: " ~ @k);
     }
     # end tweaks (DO NOT ERASE)
-}
+} # end class
 
 token quotesnabber (*@q) {
     :my $delim is context<rw> = '' ;
@@ -3360,7 +3360,7 @@ grammar Regex is Perl {
 
     token quantmod { [ '?' | '!' | ':' | '+' ]? }
 
-}
+} # end grammar
 
 # The <panic: message> rule is called for syntax errors.
 # If there are any <suppose> points, backtrack and retry parse

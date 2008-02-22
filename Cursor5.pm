@@ -628,7 +628,7 @@ sub _EXACT_rev { my $self = shift;
         $r->retm($bind);
     }
     else {
-#        say "vEXACT $s didn't match {substr($!orig,$from,$len)} at $from $len";
+#        say "EXACT_rev $s didn't match {substr($!orig,$from,$len)} at $from $len";
         return ();
     }
 }
@@ -640,7 +640,7 @@ sub _DIGIT { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
-    if ("0" le $char and $char le "9") {
+    if ($char =~ /^\d$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
     }
@@ -657,16 +657,16 @@ sub _DIGIT_rev { my $self = shift;
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
     if ($from < 0) {
-#        say "vDIGIT didn't match $char at $from";
+#        say "DIGIT_rev didn't match $char at $from";
         return ();
     }
     my $char = substr($self->{orig}, $from, 1);
-    if ("0" le $char and $char le "9") {
+    if ($char =~ /^\d$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
     }
     else {
-#        say "vDIGIT didn't match $char at $from";
+#        say "DIGIT_rev didn't match $char at $from";
         return ();
     }
 }
@@ -678,7 +678,7 @@ sub _ALNUM { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
-    if ("0" le $char and $char le "9" or 'A' le $char and $char le 'Z' or 'a' le $char and $char le 'z' or $char eq '_') {
+    if ($char =~ /^\w$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
     }
@@ -695,16 +695,16 @@ sub _ALNUM_rev { my $self = shift;
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
     if ($from < 0) {
-#        say "vALNUM didn't match $char at $from";
+#        say "ALNUM_rev didn't match $char at $from";
         return ();
     }
     my $char = substr($self->{orig}, $from, 1);
-    if ("0" le $char and $char le "9" or 'A' le $char and $char le 'Z' or 'a' le $char and $char le 'z' or $char eq '_') {
+    if ($char =~ /^\w$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
     }
     else {
-#        say "vALNUM didn't match $char at $from";
+#        say "ALNUM_rev didn't match $char at $from";
         return ();
     }
 }
@@ -716,7 +716,7 @@ sub alpha { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
-    if ('A' le $char and $char le 'Z' or 'a' le $char and $char le 'z' or $char eq '_') {
+    if ($char =~ /^[a-zA-Z]$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
     }
@@ -733,7 +733,7 @@ sub _SPACE { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
-    if ($char eq " " | "\t" | "\r" | "\n" | "\f") {
+    if ($char =~ /^\s$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
     }
@@ -750,16 +750,16 @@ sub _SPACE_rev { my $self = shift;
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
     if ($from < 0) {
-#        say "vSPACE didn't match $char at $from";
+#        say "SPACE_rev didn't match $char at $from";
         return ();
     }
     my $char = substr($self->{orig}, $from, 1);
-    if ($char eq " " | "\t" | "\r" | "\n" | "\f") {
+    if ($char =~ /^\s$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
     }
     else {
-#        say "vSPACE didn't match $char at $from";
+#        say "SPACE_rev didn't match $char at $from";
         return ();
     }
 }
@@ -771,7 +771,7 @@ sub _HSPACE { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
-    if ($char eq " " | "\t" | "\r") {
+    if ($char =~ /^[ \t\r]$/ or ($char =~ /^\s$/ and $char !~ /^[\n\f\0x0b\x{2028}\x{2029}]$/)) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
     }
@@ -788,16 +788,16 @@ sub _HSPACE_rev { my $self = shift;
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
     if ($from < 0) {
-#        say "vHSPACE didn't match $char at $from";
+#        say "HSPACE_rev didn't match $char at $from";
         return ();
     }
     my $char = substr($self->{orig}, $from, 1);
-    if ($char eq " " | "\t" | "\r") {
+    if ($char =~ /^[ \t\r]$/ or ($char =~ /^\s$/ and $char !~ /^[\n\f\0x0b\x{2028}\x{2029}]$/)) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
     }
     else {
-#        say "vHSPACE didn't match $char at $from";
+#        say "HSPACE_rev didn't match $char at $from";
         return ();
     }
 }
@@ -809,7 +809,7 @@ sub _VSPACE { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{pos};
     my $char = substr($self->{orig}, $P, 1);
-    if ($char eq "\n" | "\f") {
+    if ($char =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
     }
@@ -826,16 +826,56 @@ sub _VSPACE_rev { my $self = shift;
     local $CTX = $self->callm;
     my $from = $self->{from} - 1;
     if ($from < 0) {
-#        say "vVSPACE didn't match $char at $from";
+#        say "VSPACE_rev didn't match $char at $from";
         return ();
     }
     my $char = substr($self->{orig}, $from, 1);
-    if ($char eq "\n" | "\f") {
+    if ($char =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
     }
     else {
-#        say "vVSPACE didn't match $char at $from";
+#        say "VSPACE_rev didn't match $char at $from";
+        return ();
+    }
+}
+
+sub _CCLASS { my $self = shift;
+    my $cc = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
+
+    local $CTX = $self->callm;
+    my $P = $self->{pos};
+    my $char = substr($self->{orig}, $P, 1);
+    if ($char =~ /$cc/) {
+        my $r = $self->cursor($P+1);
+        return $r->retm($bind);
+    }
+    else {
+#        say "CCLASS didn't match $char at $P";
+        return ();
+    }
+}
+
+sub _CCLASS_rev { my $self = shift;
+    my $cc = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
+
+    local $CTX = $self->callm;
+    my $from = $self->{from} - 1;
+    if ($from < 0) {
+#        say "CCLASS didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($self->{orig}, $from, 1);
+    if ($char =~ /$cc/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm($bind);
+    }
+    else {
+#        say "CCLASS didn't match $char at $from";
         return ();
     }
 }
@@ -875,8 +915,7 @@ sub _BOL { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    # XXX should define in terms of BOL or after vVSPACE
-    if ($P == 0 or substr($self->{orig}, $P-1, 1) eq "\n" or substr($self->{orig}, $P-2, 2) eq "\r\n") {
+    if ($P == 0 or substr($self->{orig}, $P-1, 1) =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
         $self->cursor($P)->retm($bind);
     }
     else {
@@ -891,6 +930,20 @@ sub _EOS { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{pos};
     if ($P == length($self->{orig})) {
+        $self->cursor($P)->retm($bind);
+    }
+    else {
+        return ();
+    }
+}
+
+sub _EOL { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
+
+    local $CTX = $self->callm;
+    my $P = $self->{pos};
+    if ($P == length($self->{orig}) or substr($self->{orig}, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
         $self->cursor($P)->retm($bind);
     }
     else {

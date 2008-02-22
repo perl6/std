@@ -505,12 +505,17 @@ END
         }
         $line =~ s/^constant /my /;
         $line =~ s/\bmy ([A-Z]\w+) /my /;
-        $line =~ s/class (\w+)\s+\{/{ package $1;/;
-        $line =~ s/^grammar (\w+)\s+is\s+(\w+)\s*\{/{ package $1; our \@ISA = '$2';/
-                and do { push(@PKG, $PKG); $PKG = $1; };
-        $PKG = pop(@PKG) if @PKG and $line =~ /^}/;
-        $line =~ s/role (\w+)\s+\{/{ package $1;/;
-        $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package $1; use base '$2';/;
+
+        $line =~ s/(?:class|role) (\w+)\s+\{/{ package ${PKG}::$1;/
+                and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };    # "our" semantics
+        $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package ${PKG}::$1; our \@ISA = 'Perl::$2';/
+                and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
+
+        $line =~ s/^grammar (\w+)\s+is\s+(\w+)\s*\{/{ package ${PKG}::$1; our \@ISA = '$2';/
+                and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
+
+        $PKG = pop(@PKG) if @PKG and $line =~ /} # end (role|class|grammar)/;
+
         $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
         $line =~ s/(\S+) xx /($1) x /;
         $line =~ s/(\S+) xx /($1) x /;
@@ -1245,8 +1250,10 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $text = $$self{text};
-        $text =~ s/(['\\])/\\$1/g;
-        "\$C->_CCLASS$REV('" . $text . "')";
+        $text =~ s!(\/|\\\/)!\\$1!g;
+        $text =~ s/\s//g;
+        $text =~ s/\.\./-/g;
+        "\$C->_CCLASS$REV(qr/^$text\$/)";
     }
 }
 
@@ -1703,9 +1710,10 @@ do {
   my \@try = @{[ '0..' . (@ALTS-1) ]};
   (\$tag, \$try, \@fate) = \@fate;
   unshift \@try, splice(\@try,\$try,1);
-  print "Attempting order: \@try\\n";
+  print "$altname attempting order: \@try\\n";
   my \@gather = ();
-  while (my \$try = shift(\@try)) {
+  while (\@try) {
+    my \$try = shift(\@try);
     print "Trying \$tag \$try\\n"; push \@gather, ((
 @{[ ::indent(join("\n", @result)) ]}
     )[\$try])->(\$C)

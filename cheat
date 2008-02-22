@@ -24,7 +24,7 @@ while (<>) {
 	$text{$name} = "#line " . ($. + 2) . "\n";
 	while (<>) {
 	    s/\Q$param\E/\$?PARAM/g;
-	    last if /^\}/;
+	    last if /^\} # end role/;
 	    s/method &\./method coerce/;
 	    $text{$name} .= $_;
 	}
