@@ -1712,12 +1712,12 @@ do {
   unshift \@try, splice(\@try,\$try,1);
   print "$altname attempting order: \@try\\n";
   my \@gather = ();
-  while (\@try) {
+  do {
     my \$try = shift(\@try);
     print "Trying \$tag \$try\\n"; push \@gather, ((
 @{[ ::indent(join("\n", @result)) ]}
     )[\$try])->(\$C)
-  };
+  } until \@gather or not \@try;
   \@gather
 }
 END
