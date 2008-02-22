@@ -22,22 +22,33 @@ $SIG{__DIE__} = sub { confess(@_) };
 
 sub new {
     my $class = shift;
-    my %args = ('pos' => 0, @_);
-    print length($args{orig}), "\n";
-    bless \%args, ref $class || $class;
+    my %args = ('pos' => 0, 'from' => 0);
+    while (@_) {
+	my $name = shift;
+	if ($name eq 'orig') {
+	    $args{$name} = \shift;
+	}
+	else {
+	    $args{$name} = shift;
+	}
+    }
+    my $self = bless \%args, ref $class || $class;
+    my $buf = $self->{orig};
+    print " orig ", $$buf,"\n";
+    $self->BUILD;
+    $self;
 }
 
 use YAML::Syck;
 
 my $VERBOSE = 1;
-my $callouts = 1;
 my $RE_verbose = 1;
 
 # XXX still full of ASCII assumptions
 
 # most cursors just copy forward the previous value of the following two items:
 #has $self->{orig};        # per match, the original string we are matching against
-our %lexers;       # per language, the cache of lexers, keyed by (|) location
+our %lexers;       # per language, the cache of lexers, keyed by rule name
 
 #has Bool $.bool = 1;
 #has StrPos $.from = 0;
@@ -120,13 +131,13 @@ sub _AUTOLEXnow { my $self = shift;
 	print $key,":\n";
 
 	my $buf = $self->{orig};	# XXX this might lose pos()...
-	print "AT: ", substr($buf,0,20), "\n";
+	print "AT: ", substr($$buf,0,20), "\n";
 
 	# generate match closure at the last moment
 	sub {
 	    my $C = shift;
 
-	    print "LEN: ", length($buf),"\n";
+	    print "LEN: ", length($$buf),"\n";
 
 	    my $stuff;
 	    if ((-e "lex/$key.yml")) {
@@ -178,7 +189,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    {
 	    use re::engine::TRE;
 
-	    if (($buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
+	    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 		my $max = @+ - 1;
 		my $last = @- - 1;	# ignore '$0'
 		print "LAST: $last\n";
@@ -193,7 +204,7 @@ sub _AUTOLEXnow { my $self = shift;
 		}
 	    }
 	    else {
-		print "NO LEXER MATCH at", substr($buf,$C->{pos},10), "\n";
+		print "NO LEXER MATCH at", substr($$buf,$C->{pos},10), "\n";
 	    }
 	    print "$result\n";
 	    $result =~ s/\w+\///g;
@@ -208,14 +219,6 @@ sub setname { my $self = shift;
 
     $self->{name} = "$k";
     $self;
-}
-
-sub item { my $self = shift;
-
-    if (not defined $self->{item}) {
-        $self->{item} = substr($self->{orig}, $self->{from}, $self->{to} - $self->{from});
-    }
-    $self->{item};
 }
 
 sub matchify { my $self = shift;
@@ -255,45 +258,40 @@ sub cursor_all { my $self = shift;
     my $fpos = shift;
     my $tpos = shift;
 
-    my $r = $self->new(
-        orig => ($self->{orig}),
-        #lexers => ($self->lexers),
-        from => ($fpos),
-        to => ($tpos),
-        pos => ($tpos),
-        prior => (defined $self->{name} ? $self : $self->{prior}),
-        mykeys => $self->{mykeys},
-    );
-    print "PRIOR ", $r->{prior}->{name}, "\n" if defined $r->{prior};
-    $r;
+    my %r = %$self;
+    $r{from} = $fpos;
+    $r{to} = $tpos;
+    $r{pos} = $tpos;
+    $r{prior} = defined $self->{name} ? $self : $self->{prior};
+    print "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
+
+    bless \%r, ref $self;
 }
 
 sub cursor { my $self = shift;
     my $tpos = shift;
 
-    $self->new(
-        orig => ($self->{orig}),
-        #lexers => ($self->lexers),
-        from => ($self->{pos} // 0),
-        to => ($tpos),
-        pos => ($tpos),
-        prior => (defined $self->{name} ? $self : $self->{prior}),
-        mykeys => $self->{mykeys},
-    );
+    my %r = %$self;
+    $r{from} = $self->{pos} // 0;
+    $r{to} = $tpos;
+    $r{pos} = $tpos;
+    $r{prior} = defined $self->{name} ? $self : $self->{prior};
+    print "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
+
+    bless \%r, ref $self;
 }
 
 sub cursor_rev { my $self = shift;
     my $fpos = shift;
 
-    $self->new(
-        orig => ($self->{orig}),
-        #lexers => ($self->lexers),
-        pos => ($fpos),
-        from => ($fpos),
-        to => ($self->{from}),
-        prior => (defined $self->{name} ? $self : $self->{prior}),
-        mykeys => $self->{mykeys},
-    );
+    my %r = %$self;
+    $r{pos} = $fpos;
+    $r{from} = $fpos;
+    $r{to} = $self->{from};
+    $r{prior} = defined $self->{name} ? $self : $self->{prior};
+    print "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
+
+    bless \%r, ref $self;
 }
 
 local $CTX = { lvl => 0 };
@@ -447,7 +445,7 @@ sub _OPTr { my $self = shift;
 
     local $CTX = $self->callm;
 
-    my $x = $block->($self)[0]; # ratchet
+    my $x = ($block->($self))[0];
     my $r = $x // $self->cursor($self->{pos});
     $r->retm($bind);
 }
@@ -507,6 +505,7 @@ sub _NOTBEFORE { my $self = shift;
 }
 
 sub before { my $self = shift;
+    my $fate = shift;
     my $block = shift;
     my %args = @_;
     my $bind = $args{bind} // '';
@@ -520,6 +519,7 @@ sub before { my $self = shift;
 }
 
 sub after { my $self = shift;
+    my $fate = shift;
     my $block = shift;
     my %args = @_;
     my $bind = $args{bind} // '';
@@ -586,16 +586,6 @@ sub _BINDNAMED { my $self = shift;
         $block->($self);
 }
 
-# fast rejection of current prefix
-sub _EQ { my $self = shift;
-    my $P = shift;
-    my $s = shift;
-
-    my $len = length($s);
-    return 1 if substr($self->{orig}, $P, $len) eq $s;
-    return ();
-}
-
 sub _EXACT { my $self = shift;
     my $s = shift;
     my %args = @_;
@@ -604,13 +594,14 @@ sub _EXACT { my $self = shift;
     local $CTX = $self->callm($s);
     my $P = $self->{pos} // 0;
     my $len = length($s);
-    if (substr($self->{orig}, $P, $len) eq $s) {
-        print "EXACT $s matched {substr($!orig,$P,$len)} at $P $len\n";
+    my $buf = $self->{orig};
+    if (substr($$buf, $P, $len) eq $s) {
+        print "EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len\n";
         my $r = $self->cursor($P+$len);
         $r->retm($bind);
     }
     else {
-        print "EXACT $s didn't match {substr($!orig,$P,$len)} at $P $len\n";
+        print "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n";
         return ();
     }
 }
@@ -623,12 +614,13 @@ sub _EXACT_rev { my $self = shift;
     local $CTX = $self->callm;
     my $len = length($s);
     my $from = $self->{from} - $len;
-    if ($from >= 0 and substr($self->{orig}, $from, $len) eq $s) {
+    my $buf = $self->{orig};
+    if ($from >= 0 and substr($$buf, $from, $len) eq $s) {
         my $r = $self->cursor_rev($from);
         $r->retm($bind);
     }
     else {
-#        say "EXACT_rev $s didn't match {substr($!orig,$from,$len)} at $from $len";
+#        say "EXACT_rev $s didn't match @{[substr($!orig,$from,$len)]} at $from $len";
         return ();
     }
 }
@@ -639,7 +631,8 @@ sub _DIGIT { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    my $char = substr($self->{orig}, $P, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $P, 1);
     if ($char =~ /^\d$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
@@ -660,7 +653,8 @@ sub _DIGIT_rev { my $self = shift;
 #        say "DIGIT_rev didn't match $char at $from";
         return ();
     }
-    my $char = substr($self->{orig}, $from, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $from, 1);
     if ($char =~ /^\d$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
@@ -677,7 +671,8 @@ sub _ALNUM { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    my $char = substr($self->{orig}, $P, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $P, 1);
     if ($char =~ /^\w$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
@@ -698,7 +693,8 @@ sub _ALNUM_rev { my $self = shift;
 #        say "ALNUM_rev didn't match $char at $from";
         return ();
     }
-    my $char = substr($self->{orig}, $from, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $from, 1);
     if ($char =~ /^\w$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
@@ -715,7 +711,8 @@ sub alpha { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    my $char = substr($self->{orig}, $P, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $P, 1);
     if ($char =~ /^[a-zA-Z]$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
@@ -732,7 +729,8 @@ sub _SPACE { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    my $char = substr($self->{orig}, $P, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $P, 1);
     if ($char =~ /^\s$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
@@ -753,7 +751,8 @@ sub _SPACE_rev { my $self = shift;
 #        say "SPACE_rev didn't match $char at $from";
         return ();
     }
-    my $char = substr($self->{orig}, $from, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $from, 1);
     if ($char =~ /^\s$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
@@ -770,7 +769,8 @@ sub _HSPACE { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    my $char = substr($self->{orig}, $P, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $P, 1);
     if ($char =~ /^[ \t\r]$/ or ($char =~ /^\s$/ and $char !~ /^[\n\f\0x0b\x{2028}\x{2029}]$/)) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
@@ -791,7 +791,8 @@ sub _HSPACE_rev { my $self = shift;
 #        say "HSPACE_rev didn't match $char at $from";
         return ();
     }
-    my $char = substr($self->{orig}, $from, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $from, 1);
     if ($char =~ /^[ \t\r]$/ or ($char =~ /^\s$/ and $char !~ /^[\n\f\0x0b\x{2028}\x{2029}]$/)) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
@@ -808,7 +809,8 @@ sub _VSPACE { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    my $char = substr($self->{orig}, $P, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $P, 1);
     if ($char =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
@@ -829,7 +831,8 @@ sub _VSPACE_rev { my $self = shift;
 #        say "VSPACE_rev didn't match $char at $from";
         return ();
     }
-    my $char = substr($self->{orig}, $from, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $from, 1);
     if ($char =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
@@ -847,7 +850,8 @@ sub _CCLASS { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    my $char = substr($self->{orig}, $P, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $P, 1);
     if ($char =~ /$cc/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
@@ -869,7 +873,8 @@ sub _CCLASS_rev { my $self = shift;
 #        say "CCLASS didn't match $char at $from";
         return ();
     }
-    my $char = substr($self->{orig}, $from, 1);
+    my $buf = $self->{orig};
+    my $char = substr($$buf, $from, 1);
     if ($char =~ /$cc/) {
         my $r = $self->cursor_rev($from);
         return $r->retm($bind);
@@ -886,7 +891,8 @@ sub _ANY { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    if ($P < length($self->{orig})) {
+    my $buf = $self->{orig};
+    if ($P < length($$buf)) {
         $self->cursor($P+1)->retm($bind);
     }
     else {
@@ -915,7 +921,8 @@ sub _BOL { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    if ($P == 0 or substr($self->{orig}, $P-1, 1) =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
+    my $buf = $self->{orig};
+    if ($P == 0 or substr($$buf, $P-1, 1) =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
         $self->cursor($P)->retm($bind);
     }
     else {
@@ -929,7 +936,8 @@ sub _EOS { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    if ($P == length($self->{orig})) {
+    my $buf = $self->{orig};
+    if ($P == length($$buf)) {
         $self->cursor($P)->retm($bind);
     }
     else {
@@ -943,7 +951,8 @@ sub _EOL { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    if ($P == length($self->{orig}) or substr($self->{orig}, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
+    my $buf = $self->{orig};
+    if ($P == length($$buf) or substr($$buf, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
         $self->cursor($P)->retm($bind);
     }
     else {
@@ -1265,7 +1274,6 @@ sub fail { my $self = shift;
         my @result;
         for my $alt (@$alts) {
             my $pat = $alt->longest($C);
-#            $pat .= ':' . $alt.<alt> if $callouts;
             push @result, $pat;
             last;
         }
@@ -1387,7 +1395,7 @@ sub fail { my $self = shift;
 	    push @$FATES, $ALT;
             my $pat = ::indent($alt->longest($C));
 	    $pat = "OOPS" if $pat =~ m/^\s*$/;
-            $pat = "( (?#START $a)\n$pat)\n(?#END $a)" if $callouts;
+            $pat = "( (?#START $ALT)\n$pat)\n(?#END $ALT)";
             push @result, $pat;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }

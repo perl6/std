@@ -857,26 +857,29 @@ token version:sym<v> {
 
 ###################################################
 
-token expect_term {
-    # queue up the prefixes to interleave with postfixes
-    @<pre> = (
-        [
-        | <prefix>
-            { $<prec> = $<prefix><prec> }
-                                                        {*}     #= prefix
-        | <prefix_circumfix_meta_operator>
-            { $<prec> = $<prefix_circumfix_meta_operator><prec> }
-                                                        {*}     #= precircum
-        ]
-        # XXX assuming no precedence change
-        <prefix_postfix_meta_operator>*                 {*}     #= prepost
-        <.ws>
-    )*
+token pre {
+    [
+    | <prefix>
+        { $<prec> = $<prefix><prec> }
+                                                    {*}     #= prefix
+    | <prefix_circumfix_meta_operator>
+        { $<prec> = $<prefix_circumfix_meta_operator><prec> }
+                                                    {*}     #= precircum
+    ]
+    # XXX assuming no precedence change
+    <prefix_postfix_meta_operator>*                 {*}     #= prepost
+    <.ws>
+    {*}
+}
 
-    $<noun> = <noun>                                      {*}     #= noun
+token expect_term {
+    [
+    | <noun>
+    | <pre>* <noun>
+    ]
 
     # also queue up any postfixes, since adverbs could change things
-    @<post> = <expect_postfix>*                        {*}     #= postfix
+    <post>*
     <.ws>
     <adverbs>?
 
@@ -1019,7 +1022,7 @@ token dottyop {
 # Note, this rule mustn't do anything irreversible because it's used
 # as a lookahead by the quote interpolator.
 
-token expect_postfix {
+token post {
 
     # last whitespace didn't end here (or was zero width)
     <?{ $¢.pos !=== $!ws_to or $!ws_to === $!ws_from  }>
@@ -1740,7 +1743,7 @@ class Herestub {
     has Str $.delim;
     has $.orignode;
     has $.lang;
-}
+} # end class
 
 token theredoc {
     ^^ $<ws>=(\h*?) $+delim \h* $$ \n?
@@ -2147,8 +2150,10 @@ constant %open2close = (
 # assumes whitespace is eaten already
 
 method peek_delimiters (@fate) {
-    return self.peek_brackets([]) ||
-        substr(self.orig,self.pos,1) xx 2;
+    return self.peek_brackets([]) || do {
+        my $buf = self.<orig>;
+        substr($$buf,self.<pos>,1) xx 2;
+    }
 }
 
 token peek_brackets {
@@ -2266,10 +2271,10 @@ token quote_escapes {
     {*}
 }
 
-# Note, backtracks!  So expect_postfix mustn't commit to anything permanent.
+# Note, backtracks!  So post mustn't commit to anything permanent.
 regex extrapost {
     :my $inquote is context = 1;
-    <expect_postfix>*
+    <post>*
     # XXX Shouldn't need a backslash on anything but the right square here
     <?after <[ \] \} \> \) ]> > 
     {*}

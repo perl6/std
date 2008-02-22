@@ -39,7 +39,7 @@ our $ALTNAMES;
 my $TRACE = 0;
 my $METHOD = "method";
 
-my @impure = qw/ ws fail commit after panic /;
+my @impure = qw/ ws fail commit before after panic /;
 my %impure;
 
 sub unangle {
@@ -73,7 +73,7 @@ sub un6 {
         $f =~ s/^\%\+?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
         $f =~ s/^\%\+?(\w+)\{//         	and $t .= qq/\$$1\{/, next;
         $f =~ s/^\$(\w+)((<[^>]*>)+)//  	and $t .= ('$' . $1 . '->' . unangle($2)), next;
-        $f =~ s/^\$((<[^>]*>)+)//       	and $t .= ('$M->' . unangle($1)), $NEEDMATCH++, next;
+        $f =~ s/^[\$\@%]((<[^>]*>)+)//       	and $t .= ('$M->' . unangle($1)), $NEEDMATCH++, next;
         $f =~ s/^ \.((<[^>]*>)+)//      	and $t .= (' $_->' . unangle($1)), next;
         $f =~ s/^(\s)<([^>) ,]*)>//       	and $t .= qq/$1qw($2)/, next;
         $f =~ s/^(\s)<([^>),]*)>//       	and $t .= qq/$1\[qw($2)\]/, next;
@@ -489,6 +489,12 @@ use strict;
 use warnings; no warnings 'qw';
 use feature 'state';
 use utf8;
+
+sub BUILD {
+    my $self = shift;
+    $self->{ws_from} = 0;
+    $self->{ws_to} = 0;
+}
 END
         }
         $line =~ s/^(\s*has) /#$1 /;
@@ -1027,7 +1033,7 @@ sub assertion {
             my $str = unbalanced('>');
             s/^>// or panic "Missing >";
             if ($word eq 'after') {
-                my $x = bless { name => '_vEXACT', str => $str, min => 0 },
+                my $x = bless { name => '_EXACT_rev', str => $str, min => 0 },
                     "RE_method_str";
                 return bless { name => $word, rest => $x, min => 0 },
                     "RE_method";
@@ -1155,7 +1161,8 @@ sub unbalanced {
         }
         else {
             my $re = $$self{re}->walk(@_);
-            "\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+            return $re if $re =~ /^\$C->before/;
+            "\$C->before( ['', \@fate], sub { my \$C=shift;\n" . ::indent($re) . "\n})";
         }
     }
 }
@@ -1377,7 +1384,7 @@ sub unbalanced {
             <<"END";
 do {
     if (ref $name eq 'Regexp') {
-        if (\$C->{orig} =~ m/$name/gc) {
+        if (\${\$C->{orig}} =~ m/$name/gc) {
             \$C->cursor(\$+[0]);
         }
         else {
@@ -1425,7 +1432,7 @@ END
                 push @TOKEN, $re;
             }
             else {
-                push @TOKEN, "\$C->$name( sub { my \$C=shift;\n$re\n}, '?')";
+                push @TOKEN, "\$C->$name( [''], sub { my \$C=shift;\n$re\n} )";
             }
         }
         '$C->' . $name . "($binding, sub { my \$C=shift;\n$re\n})";
