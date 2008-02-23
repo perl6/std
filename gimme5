@@ -372,7 +372,8 @@ END
 #        $lex =~ s[!!perl/hash:][!pugs/Object:]g;
 #        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
         mkdir("yamlg5");
-        open YAML, ">yamlg5/${PKG}::$NAME.yml" or die "Can't create tmpyaml/${PKG}::$NAME.yml: $!";
+        (my $file = "${PKG}::$NAME") =~ s/::/--/g;
+        open YAML, ">yamlg5/$file.yml" or die "Can't create yamlg5/$file.yml: $!";
         binmode(YAML, ":utf8");
         print YAML $lex;
         close YAML;

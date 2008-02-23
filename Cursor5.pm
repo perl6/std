@@ -97,10 +97,11 @@ sub _AUTOLEXgen { my $self = shift;
 
     print "gen0 $key\n";
     my $lexer = { x => 'y' };
-    if (! -s "lex/$key.yml") {
+    (my $file = $key) =~ s/::/--/g;
+    if (! -s "lex/$file.yml") {
 	print "gen1\n";
 
-	my $ast = LoadFile("yamlg5/$key.yml");
+	my $ast = LoadFile("yamlg5/$file.yml");
 	Encode::_utf8_on($ast);
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
 	local $FATES;
@@ -116,7 +117,8 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$lexer = { PAT => $pat, FATES => $FATES };
 	print "gen2\n";
-	open(my $cache, '>', "lex/$key.yml") // warn "Can't print: $!";
+	mkdir("lex") unless -d "lex";
+	open(my $cache, '>', "lex/$file.yml") // warn "Can't print: $!";
 	print $cache Dump($lexer) or warn "Can't print: $!";
 	close($cache) or warn "Can't close: $!";
 	print "gen3\n";
@@ -146,8 +148,9 @@ sub _AUTOLEXnow { my $self = shift;
 	    print "LEN: ", length($$buf),"\n";
 
 	    my $stuff;
-	    if ((-e "lex/$key.yml")) {
-		$stuff = LoadFile("lex/$key.yml");
+	    (my $file = $key) =~ s/::/--/g;
+	    if ((-e "lex/$file.yml")) {
+		$stuff = LoadFile("lex/$file.yml");
 	    }
 	    else {
 		$stuff = {"PAT" => $lexer->{PAT}, "FATES" => $lexer->{FATES}};
