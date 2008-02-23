@@ -116,6 +116,7 @@ sub un6 {
         $f =~ s/^!eqv//                	        and $t .= qq/ne/, next;
         $f =~ s/^eqv//                	        and $t .= qq/eq/, next;
         $f =~ s/^item %//                	and $t .= qq/\\%/, next;
+        $f =~ s/^ \+@//                        	and $t .= qq/ 0+@/, next;
         $f =~ s/^ is rw//               	and $t .= qq//, next;
         $f =~ s/^my\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context\s*(?:is\s+rw)?\s*;//
                                         	and $t .= qq/local $1;/, $OUR{$1}++, next;
@@ -199,29 +200,6 @@ while ($_ ne "") {
     if ( s/^(#.*\n)// ) { $out .= $1; next }
 
     my $remaining = length($_);
-    if ( s/^(    Method coerce[^\n{]*).*?\n    }\n//s ) {
-        $out .= "# $1\n";
-        my $dflthash = lc($PKG);
-        $out .= <<"END";
-    sub coerce {
-        my \$self = shift;
-        my \$m = shift;
-        for my \$k (keys(%$dflthash)) { \$m->{\$k} //= \$$dflthash\{\$k\} };
-        \$thisop{top} = \$m;
-        if (not \$m->{transparent}) {
-            \$thisop{prec} = \$m->{prec};
-            \$thisop{assoc} = \$m->{assoc} // 'left';
-            print "coercing to \$self at prec \$thisop{prec} assoc \$thisop{assoc}\n";
-        }
-        else {
-            print "coercing to \$self transparently\n";
-        }
-        return \$m;
-    }
-END
-        next;
-    }
-
     if (s/^(method heredoc[^\n{]*).*?\n}\n//s) {
         $out .= "# $1\n";
         $out .= <<'END';
@@ -403,7 +381,7 @@ END
     local $CTX = $C->callm("@fate");
     $binding eq '?' and return <<PEEK>>;
 
-    if (@fate) {
+    if (@fate and $fate[0] =~ /^<<NAME>>/) {
       print "Fate passed to <<NAME>>: @fate\n";
     }
     else {
@@ -800,6 +778,9 @@ sub quantifier {
 
 sub atom {
     here();
+    if (s/^\\\s/ /) {
+        wsany();
+    }
     if (/^[\s\#]/ and $KIND eq 'rule') {
         wsany();
         return bless { name => 'ws', nobind => 1, noquant => 1, min => 0 },
@@ -1063,7 +1044,7 @@ sub assertion {
                 "RE_method";
         }
         s/^\s*//;
-        my $re = regex('\\>');
+        my $re = regex('\\>[^>]');
         s/^>// or panic "Missing >";
         return bless { name => $word, re => $re, min => 0 }, "RE_method_re";
     }
@@ -1357,6 +1338,12 @@ sub unbalanced {
         }
         elsif ($text eq '\\v') {
             $code = "\$C->_VSPACE$REV()";
+        }
+        elsif ($text eq '»') {
+            $code = "\$C->_RIGHTWB()";
+        }
+        elsif ($text eq '«') {
+            $code = "\$C->_LEFTWB()";
         }
         if ($not) { # XXX or maybe just .NOT on the end...
             $PURE = 0;

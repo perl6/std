@@ -196,6 +196,7 @@ sub _AUTOLEXnow { my $self = shift;
 		print $i, ': ', $fate->[$i], "\n";
 	    }
 	    my $result = "";
+	    pos($$buf) = $C->{pos};
 
 	    ##########################################
 	    # No normal p5 match/subst below here!!! #
@@ -406,7 +407,7 @@ sub _STARr { my $self = shift;
 	$to = $first;
     }
 #    $self->cursor($to.to).retm($bind);
-    $self->cursor($to->{to});  # XXX $_->retm blows up pugs for unfathomable reasons
+    $self->cursor($to->{pos});  # XXX $_->retm blows up pugs for unfathomable reasons
 }
 
 sub _PLUSf { my $self = shift;
@@ -451,7 +452,7 @@ sub _PLUSr { my $self = shift;
 	$to = $first;
     }
     return () unless @all;
-    my $r = $self->cursor($to->{to});
+    my $r = $self->cursor($to->{pos});
     $r->retm($bind);
 }
 
@@ -977,12 +978,45 @@ sub _EOL { my $self = shift;
     }
 }
 
+sub _RIGHTWB { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
+
+    local $CTX = $self->callm;
+    my $P = $self->{pos};
+    my $buf = $self->{orig};
+    pos($$buf) = $P - 1;
+    if ($$buf =~ /\w\b/) {
+        $self->cursor($P)->retm($bind);
+    }
+    else {
+        return ();
+    }
+}
+
+sub _LEFTWB { my $self = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
+
+    local $CTX = $self->callm;
+    my $P = $self->{pos};
+    my $buf = $self->{orig};
+    pos($$buf) = $P;
+    if ($$buf =~ /\b(?=\w)/) {
+        $self->cursor($P)->retm($bind);
+    }
+    else {
+        return ();
+    }
+}
+
 sub _REDUCE { my $self = shift;
     my $tag = shift;
 
     local $CTX = $self->callm($tag);
-#    my $P = $self->{pos};
-#    say "Success $tag from $+FROM to $P";
+    my $P = $self->{pos};
+    my $F = $self->{from};
+    print "Success $tag from $F to $P\n";
 #    $self->whats;
     $self;
 #    $self->cursor($P);
@@ -1362,9 +1396,9 @@ sub fail { my $self = shift;
 #                pop @chunks;
 #        }
         for (@chunks) {
-            my $next = $_->longest($C);
-            last if $next eq '';
+            my $next = $_->longest($C) // '';
             $next = '' if $next eq '[]';
+            last if $next eq '';
             push @result, $next;
             last unless $PURE;
         }

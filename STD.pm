@@ -239,7 +239,7 @@ proto token module_name { }
 token category:term { <sym> }
 proto token term { }
 
-token category:quote { <sym> }
+token category:quote (:$endsym is context = 'nofat') { <sym> }
 proto token quote { }
 
 token category:prefix { <sym> }
@@ -252,7 +252,7 @@ token category:postfix { <sym> }
 proto token postfix is defequiv(%autoincrement) { }
 
 token category:dotty { <sym> }
-proto token dotty (:$endsym is context = / <.unsp>? /) { }
+proto token dotty (:$endsym is context = 'unspacey') { }
 
 token category:circumfix { <sym> }
 proto token circumfix { }
@@ -275,10 +275,6 @@ proto token regex_quantifier { }
 token category:regex_mod_internal { <sym> }
 proto token regex_mod_internal { }
 
-#token category:regex_mod_external { <sym> }
-#proto token regex_mod_external
-#    (:$endsym is context = / <?before '('> <postcircumfix> /) { }
-
 token category:quote_mod { <sym> }
 proto token quote_mod { }
 
@@ -289,34 +285,34 @@ token category:qq_backslash { <sym> }
 proto token qq_backslash { }
 
 token category:trait_verb { <sym> }
-proto token trait_verb (:$endsym is context = / \s+ <nofat> /) { }
+proto token trait_verb (:$endsym is context = 'nofat_space') { }
 
 token category:trait_auxiliary { <sym> }
-proto token trait_auxiliary (:$endsym is context = / \s+ <nofat> /) { }
+proto token trait_auxiliary (:$endsym is context = 'nofat_space') { }
 
 token category:type_declarator { <sym> }
-proto token type_declarator (:$endsym is context = / >> <nofat> /) { }
+proto token type_declarator (:$endsym is context = 'nofat') { }
 
 token category:scope_declarator { <sym> }
-proto token scope_declarator (:$endsym is context = / >> <nofat> /) { }
+proto token scope_declarator (:$endsym is context = 'nofat') { }
 
 token category:package_declarator { <sym> }
-proto token package_declarator (:$endsym is context = / >> <nofat> /) { }
+proto token package_declarator (:$endsym is context = 'nofat') { }
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator (:$endsym is context = / >> <nofat> /) { }
+proto token routine_declarator (:$endsym is context = 'nofat') { }
 
 token category:statement_prefix { <sym> }
-proto rule  statement_prefix (:$endsym is context = / >> <nofat> /) { }
+proto rule  statement_prefix (:$endsym is context = 'nofat') { }
 
 token category:statement_control { <sym> }
-proto rule  statement_control (:$endsym is context = / <nofat> <?before \s | '#'> /) { }
+proto rule  statement_control (:$endsym is context = 'nofat_space') { }
 
 token category:statement_mod_cond { <sym> }
-proto rule  statement_mod_cond (:$endsym is context = / >> <nofat> /) { }
+proto rule  statement_mod_cond (:$endsym is context = 'nofat') { }
 
 token category:statement_mod_loop { <sym> }
-proto rule  statement_mod_loop (:$endsym is context = / >> <nofat> /) { }
+proto rule  statement_mod_loop (:$endsym is context = 'nofat') { }
 
 token category:infix_prefix_meta_operator { <sym> }
 proto token infix_prefix_meta_operator { }
@@ -336,10 +332,13 @@ proto token prefix_postfix_meta_operator { }
 token category:prefix_circumfix_meta_operator { <sym> }
 proto token prefix_circumfix_meta_operator { }
 
+token unspacey { <.unsp>? }
+token nofat_space { <nofat> <?before \s | '#'> }
+
 # Lexical routines
 
-# make sure we're not an autoquoted identifier
-regex nofat { <!before \h* <.unsp>? '=>' > }
+# make sure we're at end of a non-autoquoted identifier
+regex nofat { <!before » \h* <.unsp>? '=>' > <!before \w> }
 
 token ws {
     || <?{ $¢.pos === $!ws_to }>
@@ -541,8 +540,8 @@ rule statement {
     :my $x;
     <label>*                                     {*}            #= label
     [
-    | <statement_control>                        {*}            #= control
-    | $x=<expect_term> <expr=EXPR(:seen($x))>  {*}         #= expr
+    |<statement_control>                        {*}            #= control
+    |$x=<expect_term> <expr=EXPR(:seen($x))>  {*}         #= expr
         [
         || <?before <stdstopper>>
         || <statement_mod_loop> <loopx=EXPR> {*}            #= mod loop
@@ -553,7 +552,7 @@ rule statement {
             ]
         ]
         {*}                                                     #= modexpr
-    | <?before ';'> {*}                                         #= null
+    |<?before ';'> {*}                                         #= null
     ]
     <eat_terminator>
     {*}
@@ -585,7 +584,7 @@ ex:     {
 
 =end perlhints
 
-rule statement_control:use {
+rule statement_control:use {\
     <sym>
     <module_name> <EXPR>? <eat_terminator>           {*}        #= use
 }
@@ -601,7 +600,7 @@ ex:     no Test;
 
 =end perlhints
 
-rule statement_control:no {
+rule statement_control:no {\
     <sym>
     <module_name> <EXPR>? <eat_terminator>           {*}        #= no
 }
@@ -630,7 +629,7 @@ ex:     if a < b {
 
 =end perlhints
 
-rule statement_control:if {
+rule statement_control:if {\
     <sym>
     <EXPR>                           {*}                        #= if expr
     <pblock>                         {*}                        #= if block
@@ -654,7 +653,7 @@ ex:     unless $allowed {
 
 =end perlhints
 
-rule statement_control:unless {
+rule statement_control:unless {\
     <sym> 
     <EXPR>                           {*}                        #= unless expr
     <pblock>                         {*}                        #= unless block
@@ -675,7 +674,7 @@ ex:     while $a < $b {
 
 =end perlhints
 
-rule statement_control:while {
+rule statement_control:while {\
     <sym>
     [ <?before '(' [[my]? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
         <panic: This appears to be Perl 5 code> ]?
@@ -698,7 +697,7 @@ ex:     until $a > $b {
 
 =end perlhints
 
-rule statement_control:until {
+rule statement_control:until {\
     <sym>
     <EXPR>                             {*}                      #= until expr
     <pblock>                           {*}                      #= until block
@@ -723,7 +722,7 @@ ex:     my $in;
 
 =end perlhints
 
-rule statement_control:repeat {
+rule statement_control:repeat {\
     <sym>
     [
         | (while|until) <EXPR>         {*}                      #= rep wu expr
@@ -748,7 +747,7 @@ ex:     loop(my $i = 1; $i < $limit; $i *= 2){
             
 =end perlhints
 
-rule statement_control:loop {
+rule statement_control:loop {\
     <sym>
     $<eee> = (
         '('
@@ -780,7 +779,7 @@ ex:     for @list {
 
 =end perlhints
 
-rule statement_control:for {
+rule statement_control:for {\
     <sym>
     [ <?before [my]? '$'\w+ '(' >
         <panic: This appears to be Perl 5 code> ]?
@@ -789,48 +788,48 @@ rule statement_control:for {
     {*}
 }
 
-rule statement_control:given {
+rule statement_control:given {\
     <sym>
     <EXPR>                             {*}                      #= given expr
     <pblock>                           {*}                      #= given block
     {*}
 }
-rule statement_control:when {
+rule statement_control:when {\
     <sym>
     <EXPR>                             {*}                      #= when expr
     <pblock>                           {*}                      #= when block
     {*}
 }
-rule statement_control:default   { <sym> <block> {*} }          #= default
+rule statement_control:default {<sym> <block> {*} }            #= default
 
-rule statement_control:BEGIN   { <sym> <block> {*} }            #= BEGIN
-rule statement_control:CHECK   { <sym> <block> {*} }            #= CHECK
-rule statement_control:INIT    { <sym> <block> {*} }            #= INIT
-rule statement_control:END     { <sym> <block> {*} }            #= END
-rule statement_control:START   { <sym> <block> {*} }            #= START
-rule statement_control:ENTER   { <sym> <block> {*} }            #= ENTER
-rule statement_control:LEAVE   { <sym> <block> {*} }            #= LEAVE
-rule statement_control:KEEP    { <sym> <block> {*} }            #= KEEP
-rule statement_control:UNDO    { <sym> <block> {*} }            #= UNDO
-rule statement_control:FIRST   { <sym> <block> {*} }            #= FIRST
-rule statement_control:NEXT    { <sym> <block> {*} }            #= NEXT
-rule statement_control:LAST    { <sym> <block> {*} }            #= LAST
-rule statement_control:PRE     { <sym> <block> {*} }            #= PRE
-rule statement_control:POST    { <sym> <block> {*} }            #= POST
-rule statement_control:CATCH   { <sym> <block> {*} }            #= CATCH
-rule statement_control:CONTROL { <sym> <block> {*} }            #= CONTROL
+rule statement_control:BEGIN   {<sym> <block> {*} }            #= BEGIN
+rule statement_control:CHECK   {<sym> <block> {*} }            #= CHECK
+rule statement_control:INIT    {<sym> <block> {*} }            #= INIT
+rule statement_control:END     {<sym> <block> {*} }            #= END
+rule statement_control:START   {<sym> <block> {*} }            #= START
+rule statement_control:ENTER   {<sym> <block> {*} }            #= ENTER
+rule statement_control:LEAVE   {<sym> <block> {*} }            #= LEAVE
+rule statement_control:KEEP    {<sym> <block> {*} }            #= KEEP
+rule statement_control:UNDO    {<sym> <block> {*} }            #= UNDO
+rule statement_control:FIRST   {<sym> <block> {*} }            #= FIRST
+rule statement_control:NEXT    {<sym> <block> {*} }            #= NEXT
+rule statement_control:LAST    {<sym> <block> {*} }            #= LAST
+rule statement_control:PRE     {<sym> <block> {*} }            #= PRE
+rule statement_control:POST    {<sym> <block> {*} }            #= POST
+rule statement_control:CATCH   {<sym> <block> {*} }            #= CATCH
+rule statement_control:CONTROL {<sym> <block> {*} }            #= CONTROL
 
 rule modifier_expr { <EXPR> {*} }
 
-rule statement_mod_cond:if     { <sym> <modifier_expr> {*} }    #= mod if
-rule statement_mod_cond:unless { <sym> <modifier_expr> {*} }    #= mod unless
-rule statement_mod_cond:when   { <sym> <modifier_expr> {*} }    #= mod when
+rule statement_mod_cond:if     {<sym> <modifier_expr> {*} }    #= mod if
+rule statement_mod_cond:unless {<sym> <modifier_expr> {*} }    #= mod unless
+rule statement_mod_cond:when   {<sym> <modifier_expr> {*} }    #= mod when
 
-rule statement_mod_loop:while { <sym> <modifier_expr> {*} }     #= mod while
-rule statement_mod_loop:until { <sym> <modifier_expr> {*} }     #= mod until
+rule statement_mod_loop:while {<sym> <modifier_expr> {*} }     #= mod while
+rule statement_mod_loop:until {<sym> <modifier_expr> {*} }     #= mod until
 
-rule statement_mod_loop:for   { <sym> <modifier_expr> {*} }     #= mod for
-rule statement_mod_loop:given { <sym> <modifier_expr> {*} }     #= mod given
+rule statement_mod_loop:for   {<sym> <modifier_expr> {*} }     #= mod for
+rule statement_mod_loop:given {<sym> <modifier_expr> {*} }     #= mod given
 
 token module_name:normal {
     <name>                                          {*}         #= name
@@ -1085,6 +1084,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
 
 method lex1 (@fate, Str $s) {
     if %+thisop{$s}++ { self.panic(@fate, "Nested $s metaoperators not allowed"); }
+    self;
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
@@ -2958,7 +2958,7 @@ method EXPR (@fate,
     my @termstack;
     my @opstack;
 
-    push @opstack, %terminator;         # (just a sentinel value)
+    push @opstack, item %terminator;         # (just a sentinel value)
 
     my $here;
     if $seen {
@@ -3010,10 +3010,8 @@ method EXPR (@fate,
                 #$op<top><right> = pop @termstack;
                 #$op<top><left> = pop @termstack;
 
-                my %_op = $op;   # XXX anti-pugs hack
-                %_op<top><right> = pop @termstack;
-                %_op<top><left> = pop @termstack;
-                $op = %_op;
+                $op<top><right> = pop @termstack;
+                $op<top><left> = pop @termstack;
 
                 push @termstack, $op<top>;
             }
@@ -3028,6 +3026,7 @@ method EXPR (@fate,
         %thisop = ();
 #        my @infix = $here.expect_tight_infix([], $preclim);
         my @infix = $here.expect_infix([]);
+        last unless @infix;
         my $infix = @infix[0];
         $here = $infix.ws([]);
         
@@ -3268,6 +3267,8 @@ grammar Regex is Perl {
     token qq_backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
     token qq_backslash:sym<0> { <sym> }
     token qq_backslash:misc { :: \W || <panic: unrecognized backslash sequence> }
+
+    token regex_backslash:unspace { <?before \s> <SUPER::ws> }
 
     token regex_backslash:a { :i <sym> }
     token regex_backslash:b { :i <sym> }
