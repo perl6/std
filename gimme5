@@ -108,6 +108,7 @@ sub un6 {
         $f =~ s/^\%[!.](\w+)//          	and $t .= qq/\%{\$self->{$1}}/, next;
         $f =~ s/^\@(\w+)([\[{])/$2/             and $t .= qq/\$$1/, next;
         $f =~ s/^\%(\w+)([\[{])/$2/             and $t .= qq/\$$1/, next;
+        $f =~ s/^\|%/%/                         and next;
         $f =~ s/^\.pos\b//         	        and $t .= qq/->{pos}/, next;
         $f =~ s/^\.([a-z]\w+)//         	and $t .= qq/->$1/, next;
         $f =~ s/^!===?//                	and $t .= qq/!=/, next;
@@ -125,10 +126,10 @@ sub un6 {
         $f =~ s/^\bFalse\b//             	and $t .= qq/0/, next;
         $f =~ s/^([^\$])self\b//             	and $t .= qq/$1\$self/, next;
         $f =~ s/^\.panic//              	and $t .= qq/->panic/, next;
-        $f =~ s/^(\s)~(\s)//            	and $t .= qq/$1.$2/, next;
-        $f =~ s/^(\s):=(\s)//           	and $t .= qq/$1=$2/, next;
-        $f =~ s/^(\s)\?\?(\s)//         	and $t .= qq/$1?$2/, next;
-        $f =~ s/^(\s)!!(\s)//           	and $t .= qq/$1:$2/, next;
+        $f =~ s/^(\s)~(\s)/$2/            	and $t .= qq/$1./, next;
+        $f =~ s/^(\s):=(\s)/$2/           	and $t .= qq/$1=/, next;
+        $f =~ s/^(\s)\?\?(\s)/$2/         	and $t .= qq/$1?/, next;
+        $f =~ s/^(\s)!!(\s)/$2/           	and $t .= qq/$1:/, next;
         $f =~ s/^\btry \{//                     and $t .= qq/eval {/, next;
         $f =~ s/^\bloop \{//                    and $t .= qq/for (;;) {/, next;
         $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/else {/, next;
@@ -198,19 +199,24 @@ while ($_ ne "") {
     if ( s/^(#.*\n)// ) { $out .= $1; next }
 
     my $remaining = length($_);
-    if ( s/^(    method coerce[^\n{]*).*?\n    }\n//s ) {
+    if ( s/^(    Method coerce[^\n{]*).*?\n    }\n//s ) {
         $out .= "# $1\n";
-        $out .= <<'END';
+        my $dflthash = lc($PKG);
+        $out .= <<"END";
     sub coerce {
-        my $self = shift;
-        my $m = shift;
-        for my $k (keys(%term)) { $m->{$k} //= $term{$k} };
-        $thisop{top} = $m;
-        if (not $m->{transparent}) {
-            $thisop{prec} = $m->{prec};
-            $thisop{assoc} = $m->{assoc};
+        my \$self = shift;
+        my \$m = shift;
+        for my \$k (keys(%$dflthash)) { \$m->{\$k} //= \$$dflthash\{\$k\} };
+        \$thisop{top} = \$m;
+        if (not \$m->{transparent}) {
+            \$thisop{prec} = \$m->{prec};
+            \$thisop{assoc} = \$m->{assoc} // 'left';
+            print "coercing to \$self at prec \$thisop{prec} assoc \$thisop{assoc}\n";
         }
-        return $m;
+        else {
+            print "coercing to \$self transparently\n";
+        }
+        return \$m;
     }
 END
         next;
@@ -292,7 +298,7 @@ END
         }
 
         if ($args =~ s/ --> (\w*)$//) {
-            $coercion = $1 . "->coerce";
+            $coercion = " map { ${PKG}::$1->coerce(\$_) }";
         }
         $args .= ', ';
         my $sym = "";
@@ -406,15 +412,15 @@ END
         print "FATE OF <<PKG>>::<<NAME>>: @fate\n";
       }
       else {
-        print "NO FATE FOR <<PKG>>::<<NAME>> (now backtracking)\n";
+        print "NO FATE FOR <<PKG>>::<<NAME>> (may backtrack)\n";
       }
     }
     my ($tag,$try);
 
 END
 
-        $body .= <<'END';
-    $C->_MATCHIFY($binding,
+        $body .= <<"END";
+    \$C->_MATCHIFY(\$binding,$coercion
 <<MEAT>>
     );
 END
@@ -1391,7 +1397,10 @@ sub unbalanced {
         else {
             <<"END";
 do {
-    if (ref $name eq 'Regexp') {
+    if (not $name) {
+        \$C;
+    }
+    elsif (ref $name eq 'Regexp') {
         if (\${\$C->{orig}} =~ m/$name/gc) {
             \$C->cursor(\$+[0]);
         }
@@ -1736,7 +1745,7 @@ END
 do {
   (\$tag, \$try, \@fate) = \@fate;
 $policy
-  print "$altname attempting order: \@try\\n";
+  print "$altname will try: \@try\\n" if \@try > 1;
   my \@gather = ();
   while (\@try and not \@gather) {
     my \$try = shift(\@try);

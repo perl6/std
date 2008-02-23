@@ -216,9 +216,9 @@ sub _AUTOLEXnow { my $self = shift;
 			my $end = $+[$x];
 			my $f = $fate->[$x];
 			no strict 'refs';
-			print "\$$x: $beg..$end\t$$x\t----> $f",
-			    $x == $last ? " MATCH" : "",
-			    "\n";
+			print "\$$x: $beg..$end\t$$x\t ",
+			    $x == $last ? "====>" : "---->",
+			    " $f\n";
 		    }
 		    print "success at '", substr($$buf,$C->{pos},10), "'\n";
 		}
