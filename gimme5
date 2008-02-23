@@ -9,6 +9,13 @@ use 5.010;
 use strict;
 use warnings;
 
+my $failover = 0;
+while (@ARGV) {
+    if ($ARGV[0] eq '-fo') {
+        $failover = 1; shift;
+    }
+}
+
 use YAML::Syck;
 
 our %OUR = ( '$CTX' => 1 );
@@ -1713,6 +1720,9 @@ END
         }
         else {
             for (@result) { $_ = " sub { my \$C=shift; $_ }," }
+            my $whatnow = $failover
+                        ? 'not @try'
+                        : 'die "Giving up without fallback to @try"';
             my $result = <<"END";
 do {
   my \@try = @{[ '0..' . (@ALTS-1) ]};
@@ -1725,7 +1735,7 @@ do {
     print "Trying \$tag \$try\\n"; push \@gather, ((
 @{[ ::indent(join("\n", @result)) ]}
     )[\$try])->(\$C)
-  } until \@gather or not \@try;
+  } until \@gather or $whatnow;
   \@gather
 }
 END

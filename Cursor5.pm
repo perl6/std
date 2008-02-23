@@ -213,7 +213,7 @@ sub _AUTOLEXnow { my $self = shift;
 		}
 	    }
 	    else {
-		print "NO LEXER MATCH at", substr($$buf,$C->{pos},10), "\n";
+		print "NO LEXER MATCH at '", substr($$buf,$C->{pos},10), "'\n";
 	    }
 	    print "$result\n";
 	    $result =~ s/\w+\///g;
