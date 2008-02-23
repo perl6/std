@@ -105,7 +105,6 @@ sub _AUTOLEXgen { my $self = shift;
     }
     else {
 	my $ast = LoadFile("yamlg5/$file.yml");
-	Encode::_utf8_on($ast);
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
 	local $FATES;
 	$FATES = [];
@@ -518,6 +517,17 @@ sub _NOTBEFORE { my $self = shift;
     my @all = $block->($self);
     return () if @all;  # XXX loses continuation
     return $self->cursor($self->{pos})->retm($bind);
+}
+
+sub _NOTCHAR { my $self = shift;
+    my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
+
+    local $CTX = $self->callm;
+    my @all = $block->($self);
+    return () if @all;  # XXX loses continuation
+    return $self->cursor($self->{pos}+1)->retm($bind);
 }
 
 sub before { my $self = shift;
@@ -1157,6 +1167,7 @@ sub fail { my $self = shift;
     sub longest { my $self = shift; my ($C,$q) = @_; ::here($self->{'text'});
         $fakepos++;
         my $cc = $self->{'text'};
+	Encode::_utf8_on($cc);
         $cc =~ s/^\-\[/[^/;
         $cc =~ s/^\+\[/[/;
         $cc =~ s/\s*\.\.\s*/-/g;
@@ -1173,6 +1184,7 @@ sub fail { my $self = shift;
     # XXX inadequate for "\n" without interpolation
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $text = $self->{'text'};
+	Encode::_utf8_on($text);
         ::here($text);
 	my $fixed = '';
 	if ( $text =~ /^(.*?)[\$\@\%\&\{]/ ) {
@@ -1194,14 +1206,30 @@ sub fail { my $self = shift;
 { package RE_meta; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $text = $self->{'text'};
+	Encode::_utf8_on($text);
         ::here($text);
         for (scalar($text)) { if ((0)) {}
-            elsif ($_ eq '^' | '$' | '.' | '\\w' | '\\s' | '\\d') {
+            elsif ($_ eq '^' or
+		   $_ eq '$' or
+		   $_ eq '.' or
+		   $_ eq '\\w' or
+		   $_ eq '\\s' or
+		   $_ eq '\\d')
+	    {
                 return $text;
             }
             elsif ($_ eq '\\h') {
                 return '[\\x20\\t]';
             }
+            elsif ($_ eq ':' or $_ eq '^^') {
+		return '';
+	    }
+            elsif ($_ eq '»' or $_ eq '>>') {
+		return '\>';
+	    }
+            elsif ($_ eq '«' or $_ eq '<<') {
+		return '\<';
+	    }
             elsif ($_ eq '::') {
                 $PURE = 0;
                 return '';
@@ -1216,6 +1244,7 @@ sub fail { my $self = shift;
 { package RE_method_noarg; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $name = $self->{'name'};
+	Encode::_utf8_on($name);
         ::here($name);
         for (scalar($name)) { if ((0)) {}
             elsif ($_ eq 'null') {
@@ -1235,7 +1264,9 @@ sub fail { my $self = shift;
             }
             elsif ($_ eq 'sym') {
                 $fakepos++;
-                return ::qm($self->{'sym'});
+		my $sym = $self->{'sym'};
+		Encode::_utf8_on($sym);
+                return ::qm($sym);
             }
             elsif ($_ eq 'alpha') {
                 $fakepos++;
@@ -1269,6 +1300,7 @@ sub fail { my $self = shift;
 { package RE_method_re; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $name = $self->{'name'};
+	Encode::_utf8_on($name);
         ::here($name);
         my $re = $self->{'re'};
         for (scalar($name)) { if ((0)) {}
@@ -1295,6 +1327,7 @@ sub fail { my $self = shift;
 { package RE_method_str; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $name = $self->{'name'};
+	Encode::_utf8_on($name);
         ::here($name);
         my $str = $self->{'str'};
         for (scalar($name)) { if ((0)) {}
@@ -1390,6 +1423,7 @@ sub fail { my $self = shift;
 { package RE_qw; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $text = $self->{'text'};
+	Encode::_utf8_on($text);
         ::here($text);
         $fakepos++;
         $text =~ s/^<\s*//;
@@ -1434,6 +1468,7 @@ sub fail { my $self = shift;
 { package RE_string; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $text = $self->{'text'};
+	Encode::_utf8_on($text);
         ::here($text);
         $fakepos++ if $self->{'min'};
         $text = ::qm($text);

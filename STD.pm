@@ -211,7 +211,7 @@ token sym (Str $pat = $+sym) {
 }
 
 token try {
-    'foo'* 'bar'
+    foo» (\S)
 }
 
 proto token category { }
@@ -483,7 +483,7 @@ token regex_block {  # perhaps parameterize and combine with block someday
     <regex '}'>
     [ '}' || <panic: Missing right brace> ]
     [
-    | <.unsp>? <?before <[,:]>> {*}                             #= normal
+    | <.unsp>? <?before <[,:]> > {*}                             #= normal
     | <.unv>? <?before \n > <.ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = $¢.pos; }                               #= endargs
@@ -1154,7 +1154,7 @@ token methodop {
     [
     | <ident>
     | <?before '$' | '@' > <variable>
-    | <?before <[ ' " ]>> <quote>
+    | <?before <[ ' " ]> > <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
 
@@ -1290,7 +1290,7 @@ token special_variable:sym<$!> { <sym> <!before \w> {*} }       #= $!
 
 token special_variable:sym<$!{ }> {
     # XXX the backslashes are necessary here for bootstrapping, not for P6...
-    ( '$!\{' (.*?) '\}' )
+    ( '$!{' (.*?) '}' )
     <obs("$0 variable", 'smart match against $!')>
 }
 
@@ -2279,7 +2279,7 @@ regex extrapost {
     :my $inquote is context = 1;
     <post>*
     # XXX Shouldn't need a backslash on anything but the right square here
-    <?after <[ \] \} \> \) ]> > 
+    <?after <[ \] } > ) ]> > 
     {*}
 }
 

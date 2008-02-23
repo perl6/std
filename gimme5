@@ -1022,9 +1022,9 @@ sub assertion {
     }
 
     if (/^[+-]?\[/) {
-        my $cclass = unbalanced('>');
-        s/^>// or panic "Missing >";
-        return bless { text => $cclass, min => 1 }, "RE_cclass";
+        my $cclass = unbalanced(']>');
+        s/^]>// or panic "Missing ]>";
+        return bless { text => $cclass . ']', min => 1 }, "RE_cclass";
     }
 
     if (s/^\.//) {
@@ -1368,7 +1368,7 @@ sub unbalanced {
         }
         if ($not) { # XXX or maybe just .NOT on the end...
             $PURE = 0;
-            $code = "\$C->_NOTBEFORE( sub { my \$C=shift; $code })";
+            $code = "\$C->_NOTCHAR( sub { my \$C=shift; $code })";
         }
         $code;
     }
