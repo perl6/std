@@ -74,7 +74,8 @@ my $fakepos = 1;
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
 
-    print "peek $key\n";
+    print "?" x 72, "\n";
+    print "AUTOLEXpeek $key\n";
     die "Null key" if $key eq '';
     if ($self->{lexers}->{$key}) {
         if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
@@ -95,12 +96,14 @@ sub _AUTOLEXpeek { my $self = shift;
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
 
-    print "gen0 $key\n";
-    my $lexer = { x => 'y' };
+    print "=" x 72, "\n";
+    print "AUTOLEXgen $key\n";
+    my $lexer = {};
     (my $file = $key) =~ s/::/--/g;
-    if (! -s "lex/$file.yml") {
-	print "gen1\n";
-
+    if (-s "lex/$file.yml") {
+	print "using cached lex/$file.yml\n";
+    }
+    else {
 	my $ast = LoadFile("yamlg5/$file.yml");
 	Encode::_utf8_on($ast);
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
@@ -109,19 +112,18 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$AUTOLEXED{$key} = $fakepos;
 	my $pat = $ast->longest($self);
-	warn $pat;
-	if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
+	print "(null pattern)\n" unless $pat;
+#	if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
 	if ($pat =~ /Â/) { print "bad Â\n" }
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
 	$lexer = { PAT => $pat, FATES => $FATES };
-	print "gen2\n";
 	mkdir("lex") unless -d "lex";
 	open(my $cache, '>', "lex/$file.yml") // warn "Can't print: $!";
 	print $cache Dump($lexer) or warn "Can't print: $!";
 	close($cache) or warn "Can't close: $!";
-	print "gen3\n";
+	print "regenerated lex/$file.yml\n";
     }
     $lexer;
 }
@@ -129,23 +131,26 @@ sub _AUTOLEXgen { my $self = shift;
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
 
-    print "now $key\n";
+    print "!" x 72, "\n";
+    print "AUTOLEXnow $key\n";
     my $lexer = $self->{lexers}->{$key} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
     };
 
     $lexer->{MATCH} //= do {
-	print $key,":\n";
+	print "generating lexer closure for $key:\n";
 
 	my $buf = $self->{orig};	# XXX this might lose pos()...
-	print "AT: ", substr($$buf,0,20), "\n";
+#	print "AT: ", substr($$buf,0,20), "\n";
 
 	# generate match closure at the last moment
 	sub {
 	    my $C = shift;
 
-	    print "LEN: ", length($$buf),"\n";
+	    print '=' x 72, "\n";
+	    print "lexing $key\n";
+	    die "orig disappeared!!!" unless length($$buf);
 
 	    my $stuff;
 	    (my $file = $key) =~ s/::/--/g;
@@ -156,17 +161,18 @@ sub _AUTOLEXnow { my $self = shift;
 		$stuff = {"PAT" => $lexer->{PAT}, "FATES" => $lexer->{FATES}};
 	    }
 
-	    die "Huh?  No PAT!!!\n" unless $stuff->{PAT};
+	    if ($stuff->{PAT} eq '') {
+		return '';
+	    }
 
 	    my $pat = '^' . decode('utf8', $stuff->{PAT});
 	    Encode::_utf8_off($pat);
 	    $pat = decode('utf8', $pat);
-	    if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
+#	    if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
 	    
-	    print '=' x 72, "\n";
 	    {
 		my $i = 1;
-		$pat =~ s/\((?!\?[#:])/(?#@{[$i++]})(/g;
+		$pat =~ s/\((?!\?[#:])/( (?#@{[$i++]})/g;
 	    }
 	    print "PAT: ", $pat,"\n";
 	    $pat =~ s/\(\?#.*?\)//g;
@@ -177,11 +183,10 @@ sub _AUTOLEXnow { my $self = shift;
 
 	    1 while $pat =~ s/\(((\?:)?)\)/($1 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
-	    my $tmp = $pat;
-	    "42" =~ /$tmp/ and print "PARSES!\n";
+#	    my $tmp = $pat;
+#	    "42" =~ /$tmp/ and print "PARSES !\n";
 
-	    print "PAT: ", $pat,"\n";
-	    print '=' x 72, "\n";
+#	    print "PAT: ", $pat,"\n";
 
 	    my $fate = $stuff->{FATES};
 	    print "#FATES: ", @$fate + 0, "\n";
@@ -192,32 +197,35 @@ sub _AUTOLEXnow { my $self = shift;
 	    }
 	    my $result = "";
 
-	    #########################################
-	    # No normal p5 match/subst below here!!!
-	    #########################################
+	    ##########################################
+	    # No normal p5 match/subst below here!!! #
+	    ##########################################
 	    {
-	    use re::engine::TRE;
+		use re::engine::TRE;
 
-	    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
-		my $max = @+ - 1;
-		my $last = @- - 1;	# ignore '$0'
-		print "LAST: $last\n";
-		$result = $fate->[$last] // "OOPS";
-		for my $x (1 .. $max) {
-		    my $beg = $-[$x];
-		    next unless defined $beg;
-		    my $end = $+[$x];
-		    my $f = $fate->[$x];
-		    no strict 'refs';
-		    print "\$$x: $beg..$end\t$$x\t----> $f\n";
+		print "/ running tre match at @{[ pos($$buf) ]} /\n";
+
+		if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
+		    my $max = @+ - 1;
+		    my $last = @- - 1;	# ignore '$0'
+#		    print "LAST: $last\n";
+		    $result = $fate->[$last] // "OOPS";
+		    for my $x (1 .. $max) {
+			my $beg = $-[$x];
+			next unless defined $beg;
+			my $end = $+[$x];
+			my $f = $fate->[$x];
+			no strict 'refs';
+			print "\$$x: $beg..$end\t$$x\t----> $f",
+			    $x == $last ? " MATCH" : "",
+			    "\n";
+		    }
+		    print "success at '", substr($$buf,$C->{pos},10), "'\n";
 		}
-	    }
-	    else {
-		print "NO LEXER MATCH at '", substr($$buf,$C->{pos},10), "'\n";
-	    }
-	    print "$result\n";
-	    $result =~ s/\w+\///g;
-	    $result;
+		else {
+		    print "NO LEXER MATCH at '", substr($$buf,$C->{pos},10), "'\n";
+		}
+		$result;
 	    }
 	}
     };
@@ -1404,7 +1412,12 @@ sub fail { my $self = shift;
 	    push @$FATES, $ALT;
             my $pat = ::indent($alt->longest($C));
 	    $pat = "OOPS" if $pat =~ m/^\s*$/;
-            $pat = "( (?#START $ALT)\n$pat)\n(?#END $ALT)";
+	    if ($pat =~ /\n/) {
+		$pat = "(\t\t(?#START $ALT)\n$pat\n)\t\t(?#END $ALT)";
+	    }
+	    else {
+		$pat = "( (?# $ALT)\t$pat )";
+	    }
             push @result, $pat;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }

@@ -403,10 +403,10 @@ END
     else {
       @fate = split(' ', $C->_AUTOLEXnow('<<PKG>>::<<NAME>>')->($C));
       if (@fate) {
-        print "Fate generated in <<NAME>>: @fate\n";
+        print "FATE OF <<PKG>>::<<NAME>>: @fate\n";
       }
       else {
-        print "In <<NAME>>: no fate\n";
+        print "NO FATE FOR <<PKG>>::<<NAME>> (now backtracking)\n";
       }
     }
     my ($tag,$try);
@@ -1720,23 +1720,32 @@ END
         }
         else {
             for (@result) { $_ = " sub { my \$C=shift; $_ }," }
-            my $whatnow = $failover
-                        ? 'not @try'
-                        : 'die "Giving up without fallback to @try"';
+            my $policy;
+            if ($failover) {
+                $policy = <<"END"
+  my \@try = @{[ '0..' . (@ALTS-1) ]};
+  unshift \@try, splice(\@try,\$try,1) if \$tag;
+END
+            }
+            else {
+                $policy = <<"END"
+  my \@try = \$tag ? (\$try) : ();
+END
+            }
             my $result = <<"END";
 do {
-  my \@try = @{[ '0..' . (@ALTS-1) ]};
   (\$tag, \$try, \@fate) = \@fate;
-  unshift \@try, splice(\@try,\$try,1);
+$policy
   print "$altname attempting order: \@try\\n";
   my \@gather = ();
-  do {
+  while (\@try and not \@gather) {
     my \$try = shift(\@try);
-    print "Trying \$tag \$try\\n"; push \@gather, ((
+    print "Trying \$tag \$try\\n";
+    push \@gather, ((
 @{[ ::indent(join("\n", @result)) ]}
-    )[\$try])->(\$C)
-  } until \@gather or $whatnow;
-  \@gather
+    )[\$try])->(\$C);
+  }
+  \@gather;
 }
 END
             $result;
