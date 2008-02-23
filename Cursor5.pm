@@ -386,8 +386,6 @@ sub _STARg { my $self = shift;
     local $CTX = $self->callm;
 
     map { $_->retm($bind) } reverse
-        #XXX voodoo fix to prevent bogus stringification
-        map { $_->perl->say; $_ }
             $self->cursor($self->{pos}),
             $self->_PLUSf($block);
 }
@@ -419,12 +417,12 @@ sub _PLUSf { my $self = shift;
     my $x = $self;
 
     my @result;
-    map { $_->retm($bind) } do {
+    do {
 	for my $x ($block->($self)) {
 	    push @result, map { $self->cursor($_->{to}) } $x, $self->_PLUSf($x, $block);
 	}
     };
-    @result;
+    map { $_->retm($bind) } @result;
 }
 
 sub _PLUSg { my $self = shift;
@@ -731,7 +729,7 @@ sub alpha { my $self = shift;
     my $P = $self->{pos};
     my $buf = $self->{orig};
     my $char = substr($$buf, $P, 1);
-    if ($char =~ /^[a-zA-Z]$/) {
+    if ($char =~ /^[a-z_A-Z]$/) {
         my $r = $self->cursor($P+1);
         return $r->retm($bind);
     }
@@ -1224,7 +1222,7 @@ sub fail { my $self = shift;
             }
             elsif ($_ eq 'alpha') {
                 $fakepos++;
-                return '[a-z_A-Z]';
+                return '[a-z_A-Z]';	# XXX not unicodey
             }
             else {
 		# XXX should be ."$name"

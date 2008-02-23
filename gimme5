@@ -35,6 +35,7 @@ our @TOKEN;
 our $MAYBACKTRACK;
 our @DECL;
 our $SYM;
+our $ENDSYM;
 our $NEEDMATCH;
 our %NEEDSEMI;
 our $NEEDORIGARGS;
@@ -259,6 +260,7 @@ END
 
         local $PAREN = 0;
         local $SYM;
+        local $ENDSYM;
         local $NEEDORIGARGS = 0;
         my $args = "";
         my $coercion = "";
@@ -314,6 +316,21 @@ END
                 warn $args unless $dflt;
                 $SYM = $dflt;
                 $SYM =~ s/^\s+//;
+                $SYM =~ s/^'(.*)'$/$1/ or
+                $SYM =~ s/^"(.*)"$/$1/ or
+                $SYM =~ s/^<(.*)>$/$1/ or
+                $SYM =~ s/^«(.*)»$/$1/ or
+                $SYM =~ s/^\{'(.*)','(.*)'\}$/$1 $2/ or
+                $SYM =~ s/^\{'(.*)'\}$/$1/;
+                $SYM =~ s/^\s+//;
+                $SYM =~ s/\s+$//;
+            }
+            if ($name eq 'endsym') {
+                warn $args unless $dflt;
+                $ENDSYM = $dflt;
+                $ENDSYM =~ s/^\s+//;
+                $ENDSYM =~ s/^'(.*)'$/$1/ or
+                $ENDSYM =~ s/^"(.*)"$/$1/;
             }
             if ($eq) {
                 $dflt = un6($dflt);
@@ -723,7 +740,7 @@ sub sequence {
 sub quantified_atom {
     here();
     my $atom = atom();
-    return unless defined $atom;
+    return unless defined $atom and $atom ne '';
     return $atom if $atom->{noquant};
     my $quant = quantifier();
     return $atom unless $quant;
@@ -1021,6 +1038,10 @@ sub assertion {
         my $ch = substr($_,0,1);
         if ($ch eq '>') {
             s/^>// or panic "Missing >";
+            if ($word eq 'sym' and $ENDSYM) {
+                s/^/<.$ENDSYM>/;
+                s/^/»/ if $SYM =~ /\w$/;
+            }
             return bless { name => $word, min => 12345 }, "RE_method_noarg";
         }
         if ($ch eq ':') {
@@ -1362,16 +1383,8 @@ sub unbalanced {
 
         my $binding = $self->binding;
         if ($name eq "sym") {
-            my $s = $SYM;
-            $s =~ s/^'(.*)'$/$1/ or
-            $s =~ s/^"(.*)"$/$1/ or
-            $s =~ s/^<(.*)>$/$1/ or
-            $s =~ s/^«(.*)»$/$1/ or
-            $s =~ s/^\{'(.*)','(.*)'\}$/$1 $2/ or
-            $s =~ s/^\{'(.*)'\}$/$1/;
-            $s =~ s/^\s+//;
-            $s =~ s/\s+$//;
-            $$self{sym} = $s;
+            $$self{sym} = $SYM;
+            $$self{endsym} = $ENDSYM if $ENDSYM;
         }
         elsif ($name eq "nextsame") {
             $NEEDORIGARGS++;

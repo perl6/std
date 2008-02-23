@@ -206,16 +206,9 @@ my $unitstopper is context = "_EOS";
 my $endstmt is context = -1;
 my $endargs is context = -1;
 
-# XXX the only magic we're assuming here is that someone set up $+sym for us.
-#  (well, and endsym, but that's set explicitly in the proto sigs below,
-#  (which theoretically propagate to the sigs of the multis they control...))
 token sym (Str $pat = $+sym) {
-    $pat <$+endsym>
+    $pat
 }
-
-#multi method sym ($pat = $+sym) {
-#    m:p/ <$pat> <$+endsym> /;
-#}
 
 proto token category { }
 
@@ -239,8 +232,8 @@ proto token module_name { }
 token category:term { <sym> }
 proto token term { }
 
-token category:quote (:$endsym is context = 'nofat') { <sym> }
-proto token quote { }
+token category:quote { <sym> }
+proto token quote (:$endsym is context = 'nofat') { }
 
 token category:prefix { <sym> }
 proto token prefix is defequiv(%symbolic_unary) { }
@@ -2878,7 +2871,7 @@ token term:typecast ( --> List_prefix)
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last term: rule)
 token term:listop ( --> List_prefix)
-{ ::                        # call this rule last (as "shortest" token)
+{
         <sym=ident>
         [
         || \s <nofat> <arglist> {*}                             #= listop args
