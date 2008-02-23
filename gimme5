@@ -119,7 +119,7 @@ sub un6 {
         $f =~ s/^item %//                	and $t .= qq/\\%/, next;
         $f =~ s/^ \+@//                        	and $t .= qq/ 0+@/, next;
         $f =~ s/^ is rw//               	and $t .= qq//, next;
-        $f =~ s/^my\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context\s*(?:is\s+rw)?\s*;//
+        $f =~ s/^my\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s+rw)?\s*;//
                                         	and $t .= qq/local $1;/, $OUR{$1}++, next;
         $f =~ s/^\borelse\b//           	and $t .= qq/or/, next;
         $f =~ s/^\bfail\b//             	and $t .= qq/die/, next;
@@ -144,7 +144,7 @@ sub un6 {
         $f =~ s/^\belsif\s+(.*?) \{/($1) {/     and $t .= qq/elsif /, next;
         $f =~ s/^\bwhile\s+(.*?) \{/($1) {/     and $t .= qq/while /, next;
         $f =~ s/^\bfor\s+(.*?) \{/($1) {/       and $t .= qq/for /, next;
-        $f =~ s/^\bmy\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context\s*(?:is\s*rw)?\s*=\s*(.*);/$2;/s
+        $f =~ s/^\bmy\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s*rw)?\s*=\s*(.*);/$2;/s
                                         	and $t .= qq/local $1 = /, $OUR{$1}++, next;
         $f =~ s/^\bdo given\s+(.*?\S)\s+\{/$1; if (0) {}/
                                                 and $t .= qq/do { my \$_ = /, next;
@@ -285,7 +285,7 @@ END
         $sym .= "    my (\$binding,\@fate) = \@{shift()};\n" unless $KIND eq 'method';
 
         $args =~ s/is rw//g;
-        while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context)?\s*([^=?,]*?),\s*//) {
+        while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*([^=?,]*?),\s*//) {
             my $type = $1;
             my $var = $2;
             my $decl = $3 ? ($OUR{$var}++, "local") : "my";
@@ -294,7 +294,7 @@ END
             $args =~ s/^,\s*//;
         }
 
-        while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context)?\s*=(.*?),\s*//) {
+        while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*=(.*?),\s*//) {
             my $type = $1;
             my $var = $2;
             my $decl = $3 ? ($OUR{$var}++, "local") : "my";
@@ -304,7 +304,7 @@ END
         }
 
         my $didargs = 0;
-        while ($args =~ s/^([A-Z]\w+)?\s*:([\$\@%&](\w+))\s*(is\s+context)?\s*(=((<[^>]*>|«[^»]*»|.)*?))?,\s*//) {
+        while ($args =~ s/^([A-Z]\w+)?\s*:([\$\@%&](\w+))\s*(is\s+context(?:<rw>)?)?\s*(=((<[^>]*>|«[^»]*»|.)*?))?,\s*//) {
             my $type = $1;
             my $var = $2;
             my $name = $3;
@@ -342,7 +342,7 @@ END
             $args =~ s/^,\s*//;
         }
 
-        if ($args =~ s/^([A-Z]\w+)?\s*\*([\$\@%&]\w+)\s*(is\s+context)?\s*([^=?,]*?),\s*//) {
+        if ($args =~ s/^([A-Z]\w+)?\s*\*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*([^=?,]*?),\s*//) {
             my $type = $1;
             my $var = $2;
             my $decl = $3 ? ($OUR{$var}++, "local") : "my";

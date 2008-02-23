@@ -111,7 +111,7 @@ sub _AUTOLEXgen { my $self = shift;
 	$FATES = [];
 
 	$AUTOLEXED{$key} = $fakepos;
-	my $pat = $ast->longest($self);
+	my $pat = $ast->longest($self,0);
 	print "(null pattern)\n" unless $pat;
 #	if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
 	if ($pat =~ /Â/) { print "bad Â\n" }
@@ -1087,15 +1087,15 @@ sub fail { my $self = shift;
 }
 
 { package REbase;
-    sub longest { my $self = shift; my ($C) = @_;  ::here("UNIMPL @{[ref $self]}"); "$self" }
+    sub longest { my $self = shift; my ($C,$q) = @_;  ::here("UNIMPL @{[ref $self]}"); "$self" }
 }
 
 { package RE; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         ::here();
         local $PURE = 1;
 	local $ALT = '';
-        $self->{'re'}->longest($C);
+        $self->{'re'}->longest($C,$q);
     }
 }
 
@@ -1104,12 +1104,12 @@ sub fail { my $self = shift;
 }
 
 { package RE_assertion; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         for (scalar($self->{'assert'})) { if ((0)) {}
             elsif ($_ eq '?') {
                 my $re = $self->{'re'};
                 if ($re->{'name'} eq 'before') {
-                    my $result = $re->longest($C);
+                    my $result = $re->longest($C,$q);
                     $PURE = 0;
                     return $result;
                 }
@@ -1120,38 +1120,41 @@ sub fail { my $self = shift;
 }
 
 { package RE_assertvar; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }
 }
 
 { package RE_block; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }
 }
 
 { package RE_bindvar; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_;  ::here(); $self->{'atom'}->longest($C) }
+    sub longest { my $self = shift; my ($C,$q) = @_; ::here();
+    $self->{'atom'}->longest($C,$q) }
 }
 
 { package RE_bindnamed; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_;  ::here(); $self->{'atom'}->longest($C) }
+    sub longest { my $self = shift; my ($C,$q) = @_; ::here();
+    $self->{'atom'}->longest($C,$q) }
 }
 
 { package RE_bindpos; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_;  ::here(); $self->{'atom'}->longest($C) }
+    sub longest { my $self = shift; my ($C,$q) = @_; ::here();
+    $self->{'atom'}->longest($C,$q) }
 }
 
 { package RE_bracket; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_;  ::here(); ::indent("\n(?:\n" . ::indent($self->{'re'}->longest($C)) . "\n)") }
+    sub longest { my $self = shift; my ($C,$q) = @_; ::here();
+    ::indent("\n(?:\n" . ::indent($self->{'re'}->longest($C,0)) . "\n)") }
 }
 
 { package RE_cclass; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
-        ::here($self->{'text'});
+    sub longest { my $self = shift; my ($C,$q) = @_; ::here($self->{'text'});
         $fakepos++;
         my $cc = $self->{'text'};
         $cc =~ s/^\-\[/[^/;
@@ -1163,19 +1166,33 @@ sub fail { my $self = shift;
 }
 
 { package RE_decl; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_;  '[]' }
+    sub longest { my $self = shift; my ($C,$q) = @_;  '[]' }
 }
 
 { package RE_double; our @ISA = 'RE_base';
     # XXX inadequate for "\n" without interpolation
-    sub longest { my $self = shift; my ($C) = @_; 
-        $PURE = 0;
-        '';
+    sub longest { my $self = shift; my ($C,$q) = @_; 
+        my $text = $self->{'text'};
+        ::here($text);
+	my $fixed = '';
+	if ( $text =~ /^(.*?)[\$\@\%\&\{]/ ) {
+	    $PURE = 0;
+	    $fixed = $1;
+	}
+	else {
+	    $fixed = $text;
+	}
+	if ($fixed ne '') {
+	    $fakepos++;
+	    ::qm($fixed);
+	    $fixed = "(?: $fixed )" if $q;
+	}
+        $fixed;
     }
 }
 
 { package RE_meta; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         my $text = $self->{'text'};
         ::here($text);
         for (scalar($text)) { if ((0)) {}
@@ -1197,7 +1214,7 @@ sub fail { my $self = shift;
 }
 
 { package RE_method_noarg; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         my $name = $self->{'name'};
         ::here($name);
         for (scalar($name)) { if ((0)) {}
@@ -1243,14 +1260,14 @@ sub fail { my $self = shift;
 }
 
 { package RE_method_internal; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }
 }
 
 { package RE_method_re; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         my $name = $self->{'name'};
         ::here($name);
         my $re = $self->{'re'};
@@ -1263,7 +1280,7 @@ sub fail { my $self = shift;
                 return '[]';
             }
             elsif ($_ eq 'before') {
-                my $result = $re->longest($C);
+                my $result = $re->longest($C,$q);
                 $PURE = 0;
                 return $result;
             }
@@ -1276,7 +1293,7 @@ sub fail { my $self = shift;
 }
 
 { package RE_method_str; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         my $name = $self->{'name'};
         ::here($name);
         my $str = $self->{'str'};
@@ -1297,32 +1314,32 @@ sub fail { my $self = shift;
 }
 
 { package RE_method; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }
 }
 
 { package RE_noop; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         '[]';
     }
 }
 
 { package RE_ordered_conjunction; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }
 }
 
 { package RE_ordered_disjunction; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
         my @result;
         for my $alt (@$alts) {
-            my $pat = $alt->longest($C);
+            my $pat = $alt->longest($C,$q);
             push @result, $pat;
             last;
         }
@@ -1333,14 +1350,17 @@ sub fail { my $self = shift;
 }
 
 { package RE_paren; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; ::here(); unshift @$FATES, ""; ::indent("\n(\n" . ::indent($self->{'re'}->longest($C)) . "\n)") }
+    sub longest { my $self = shift; my ($C,$q) = @_; ::here();
+    unshift @$FATES, "";
+    ::indent("\n(\n" . ::indent($self->{'re'}->longest($C,0)) . "\n)") }
 }
 
 { package RE_quantified_atom; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         ::here();
+	warn "Quantified atom in quantified context" if $q;
         my $oldfakepos = $fakepos++;
-        my $atom = $self->{'atom'}->longest($C);
+        my $atom = $self->{'atom'}->longest($C,1);
 	return '' if $atom eq '';
         if ($self->{'quant'}[0] eq '+') {
             return "$atom+";
@@ -1368,19 +1388,19 @@ sub fail { my $self = shift;
 }
 
 { package RE_qw; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         my $text = $self->{'text'};
         ::here($text);
         $fakepos++;
         $text =~ s/^<\s*//;
         $text =~ s/\s*>$//;
         $text =~ s/\s+/|/;
-        $text;
+        '(?: ' . $text . ')';
     }
 }
 
 { package RE_sequence; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         local $PURE = 1;
         my $c = $self->{'zyg'};
         my @chunks = @$c;
@@ -1394,14 +1414,16 @@ sub fail { my $self = shift;
 #                pop @chunks;
 #        }
         for (@chunks) {
-            my $next = $_->longest($C) // '';
+            my $next = $_->longest($C,0) // '';
             $next = '' if $next eq '[]';
             last if $next eq '';
             push @result, $next;
-            last unless $PURE;
+            last unless $PURE or $_->{min} == 0;
         }
 	if (@result) {
-	    "(?: @{[ join(' ', @result) ]} )";
+	    my $result = "@result";
+	    $result = "(?: $result )" if $q;
+	    $result;
 	}
 	else {
 	    "";
@@ -1410,11 +1432,13 @@ sub fail { my $self = shift;
 }
 
 { package RE_string; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($c) = @_; 
-        ::here($self->{'text'});
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         my $text = $self->{'text'};
+        ::here($text);
         $fakepos++ if $self->{'min'};
-        ::qm($text);
+        $text = ::qm($text);
+	$text = "(?: $text )" if $q;
+	$text;
     }
 }
 
@@ -1423,14 +1447,14 @@ sub fail { my $self = shift;
 }
 
 { package RE_unordered_conjunction; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }
 }
 
 { package RE_unordered_disjunction; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
         my @result;
@@ -1442,7 +1466,7 @@ sub fail { my $self = shift;
             $fakepos = $oldfakepos;
 	    local $ALT = $base . $alt->{alt};
 	    push @$FATES, $ALT;
-            my $pat = ::indent($alt->longest($C));
+            my $pat = ::indent($alt->longest($C,0));
 	    $pat = "OOPS" if $pat =~ m/^\s*$/;
 	    if ($pat =~ /\n/) {
 		$pat = "(\t\t(?#START $ALT)\n$pat\n)\t\t(?#END $ALT)";
@@ -1462,7 +1486,7 @@ sub fail { my $self = shift;
 
 { package RE_var; our @ISA = 'RE_base';
     #method longest ($C) { ... }
-    sub longest { my $self = shift; my ($C) = @_; 
+    sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }

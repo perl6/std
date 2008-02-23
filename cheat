@@ -43,7 +43,7 @@ while (<>) {
     s/\$\.(expect\w+)\((.*?)\)/m:p\/<$1($2)> { return \$<$1> }\//;
     s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
 #    s/\(:(\w+)\((.*?)\)\)/(:$2)/ if /method|sub/;
-    s/is context<rw>/is context is rw/g;
+#    s/is context<rw>/is context is rw/g;
     s/^grammar Perl:ver<(.*?)>:auth<(.*)>;/grammar Perl;/;
 
     if (/^proto \s+ (regex|rule|token) \s+
@@ -75,7 +75,7 @@ while (<>) {
 	$newdflt =~ s/:sym(\(.*?\))/$1/ or
 	$newdflt =~ s/:sym(\[.*?\])/$1/;
 
-	my $newparm = ":\$sym is context is rw = $newdflt";
+	my $newparm = ":\$sym is context<rw> = $newdflt";
 
 	my $newsig = $protosig{$name} || "";
         if ($sig and $sig =~ s/( --> \w*$)//) { $newsig .= ' ' . $1 }

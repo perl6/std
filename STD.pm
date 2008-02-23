@@ -210,6 +210,10 @@ token sym (Str $pat = $+sym) {
     $pat
 }
 
+token try {
+    'foo'* 'bar'
+}
+
 proto token category { }
 
 token category:category { <sym> }
@@ -3376,7 +3380,9 @@ grammar Regex is Perl {
 # In any event, this is only for better diagnostics, and
 # further compilation is suppressed by the <commit><fail>.
 
-rule panic (Str $s) { <commit> <fail($s)> }
+# token panic (Str $s) { <commit> <fail($s)> }
+
+method panic (@fate, Str $s) { warn "############# PARSE FAILED #############\n";die "$s" }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
 method obs (@fate, Str $old, Str $new, Str $when = ' in Perl 6') {
