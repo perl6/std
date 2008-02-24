@@ -182,8 +182,8 @@ sub _AUTOLEXnow { my $self = shift;
 
 	    1 while $pat =~ s/\(((\?:)?)\)/($1 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
-#	    my $tmp = $pat;
-#	    "42" =~ /$tmp/ and print "PARSES !\n";
+	    my $tmp = $pat;
+	    "42" =~ /$tmp/;	# XXX see if p5 parses it
 
 #	    print "PAT: ", $pat,"\n";
 
@@ -418,7 +418,7 @@ sub _PLUSf { my $self = shift;
     my @result;
     do {
 	for my $x ($block->($self)) {
-	    push @result, map { $self->cursor($_->{to}) } $x, $self->_PLUSf($x, $block);
+	    push @result, map { $self->cursor($_->{to}) } $x, $x->_PLUSf($block);
 	}
     };
     map { $_->retm($bind) } @result;
@@ -1070,7 +1070,7 @@ sub fail { my $self = shift;
 	"  " . $s;
     }
 
-    sub qm { my $s = Encode::decode('utf8', shift);
+    sub qm { my $s = shift;
 	my $r = '';
 	for (split(//,$s)) {
 	    if ($_ eq " ") { $r .= '\x20' }
@@ -1284,7 +1284,10 @@ sub fail { my $self = shift;
 		for my $fate (@{$lexer->{FATES}}) {
 		    push @$FATES, "$prefix$fate";
 		}
-                return $lexer->{PAT};
+		my $pat = $lexer->{PAT};
+		return '' unless $pat =~ /\S/;
+		return $pat unless $q;
+                return '(?: ' . $pat . ')';
             }
         }
     }
@@ -1318,7 +1321,10 @@ sub fail { my $self = shift;
             }
             else {
                 my $lexer = $C->$name(['?'], $re);
-                return $lexer->{PAT};
+		my $pat = $lexer->{PAT};
+		return '' unless $pat =~ /\S/;
+		return $pat unless $q;
+                return '(?: ' . $pat . ')';
             }
         }
     }
@@ -1340,7 +1346,10 @@ sub fail { my $self = shift;
             }
             else {
                 my $lexer = $C->$name(['?'], $str);
-                return $lexer->{PAT};
+		my $pat = $lexer->{PAT};
+		return '' unless $pat =~ /\S/;
+		return $pat unless $q;
+                return '(?: ' . $pat . ')';
             }
         }
     }

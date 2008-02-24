@@ -1532,7 +1532,10 @@ END
         }
         else {
             ::panic("Can't reverse ordered disjunction") if $REV;
-            my $result = ::indent(join("\n||\n", @result));
+            for (@result) { s/^/push \@gather, / }
+            my $result = "do { my \@gather;\n" .
+                            ::indent(join("\nor\n", @result)) .
+                          ";\n  \@gather;\n}";
             $result;
         }
     }

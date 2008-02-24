@@ -493,13 +493,13 @@ token regex_block {  # perhaps parameterize and combine with block someday
 
 # statement semantics
 rule statementlist {
-    <statement>*
+    [<statement> ]*
     {*}
 }
 
 # embedded semis, context-dependent semantics
 rule semilist {
-    <statement>*
+    [<statement> ]*
     {*}
 }
 
@@ -532,13 +532,12 @@ token label {
     {*}
 }
 
-rule statement {
+token statement {
     :my StrPos $endstmt is context<rw> = -1;
-    :my $x;
     <label>*                                     {*}            #= label
     [
-    |<statement_control>                        {*}            #= control
-    |$x=<expect_term> <expr=EXPR(:seen($x))>  {*}         #= expr
+    | <statement_control>                        {*}            #= control
+    | <expect_term> <expr=EXPR(:seen($<expect_term>))>  {*}         #= expr
         [
         || <?before <stdstopper>>
         || <statement_mod_loop> <loopx=EXPR> {*}            #= mod loop
@@ -549,7 +548,7 @@ rule statement {
             ]
         ]
         {*}                                                     #= modexpr
-    |<?before ';'> {*}                                         #= null
+    | <?before ';'> {*}                                         #= null
     ]
     <eat_terminator>
     {*}
@@ -873,7 +872,7 @@ token pre {
 token expect_term {
     [
     | <noun>
-    | <pre>* <noun>
+    | <pre>+ <noun>
     ]
 
     # also queue up any postfixes, since adverbs could change things
