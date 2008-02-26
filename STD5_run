@@ -28,6 +28,12 @@ sub main {
 	print_usage_and_exit if !-f $fn;
 	$input = "`cat $fn`";
     }
+    if(-e 'STD.pm' and -e 'cheat') { # We're in the right place.
+	if(!-e 'STD5.pm') {
+	    system("rm -f lex/* out/* yamlg5/*");
+	    system("./cheat STD.pm | ./gimme5 >STD5.pm");
+	}
+    }
     my $cmd = "perl -w -I . -MSTD5 -e 'Perl->new(orig=>$input)->${rule}([]);'";
     print STDERR "# ",$cmd,"\n";
     open(F,"$cmd |") or die "$cmd\npipe open failed: $!\n";
@@ -39,4 +45,3 @@ sub main {
 main;
 
 __END__
-system("rm lex/* out/* yamlg5/*; ./cheat STD.pm | ./gimme5 >STD5.pm") if !-e 'STD5.pm';
