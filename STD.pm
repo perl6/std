@@ -1144,13 +1144,13 @@ token postcircumfix:sym<{ }> ( --> Methodcall)
     { '{' <semilist> '}' {*} }                                  #= { }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <anglewords '>' > '>' {*} }                                #= < >
+    { <?before '<' > <quotesnabber(":q",":w")> {*} }            #= < >
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <shellwords '>>' > '>>' {*}}                               #= << >>
+    { <?before '<<' > <quotesnabber(":qq","ww")> {*}}           #= << >>
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <shellwords '»' > '»' {*} }                                #= « »
+    { <?before '«' > <quotesnabber(":qq","ww")> {*} }           #= « »
 
 token postop {
     | <postfix>         { $<prec> := $<postfix><prec> }
@@ -1176,14 +1176,6 @@ token methodop {
 token arglist {
     :my StrPos $endargs is context<rw> = 0;
     <EXPR(%list_prefix)>
-}
-
-token anglewords($stop) {
-    <.ws> [ <!before $stop> .]*  # XXX need to split
-}
-
-token shellwords($stop) {
-    <.ws> [ <!before $stop> .]*  # XXX need to split
 }
 
 token circumfix:sym<{ }> ( --> Term) {
@@ -2509,13 +2501,6 @@ token circumfix:sym<( )> ( --> Term)
 
 token circumfix:sym<[ ]> ( --> Term)
     { '[' <statementlist> ']' {*} }                             #= [ ]
-
-token circumfix:sym«< >» ( --> Term)
-    { '<'  <anglewords '>' > '>'  {*} }                        #'#= < >
-token circumfix:sym«<< >>» ( --> Term)
-    { '<<' <shellwords '>>'> '>>' {*} }                       #'#= << >>
-token circumfix:sym<« »> ( --> Term)
-    { '«'  <shellwords '»'> '»'  {*} }                          #= « »
 
 ## methodcall
 
