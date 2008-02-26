@@ -575,6 +575,7 @@ print "# Emulate context vars by localizing 'our' vars living in main\n";
 for (sort keys(%OUR)) {
     print "our $_;\n";
 }
+print "our \$moreinput;\n";
 print "\n";
 print $out;
 
@@ -1533,7 +1534,7 @@ END
             ::panic("Can't reverse ordered disjunction") if $REV;
             for (@result) { s/^/push \@gather, / }
             my $result = "do { my \@gather;\n" .
-                            ::indent(join("\nor\n", @result)) .
+                            ::indent(join("or\n", @result)) .
                           ";\n  \@gather;\n}";
             $result;
         }
@@ -1745,6 +1746,18 @@ END
             }
             my $result = <<"END";
 do {
+  if (\@fate and \$fate[0] eq '$altname') {
+    print "Fate passed to $altname: \@fate\\n";
+  }
+  else {
+    \@fate = split(' ', \$C->_AUTOLEXnow('${PKG}::$altname')->(\$C));
+    if (\@fate) {
+      print "FATE OF ${PKG}::$altname: \@fate\\n";
+    }
+    else {
+      print "NO FATE FOR ${PKG}::$altname (will probe)\\n";
+    }
+  }
   (\$tag, \$try, \@fate) = \@fate;
   \$tag //= '';
 $policy
