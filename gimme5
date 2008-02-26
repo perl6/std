@@ -1746,18 +1746,6 @@ END
             }
             my $result = <<"END";
 do {
-  if (\@fate and \$fate[0] eq '$altname') {
-    print "Fate passed to $altname: \@fate\\n";
-  }
-  else {
-    \@fate = split(' ', \$C->_AUTOLEXnow('${PKG}::$altname')->(\$C));
-    if (\@fate) {
-      print "FATE OF ${PKG}::$altname: \@fate\\n";
-    }
-    else {
-      print "NO FATE FOR ${PKG}::$altname (will probe)\\n";
-    }
-  }
   (\$tag, \$try, \@fate) = \@fate;
   \$tag //= '';
 $policy
