@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+# A script to make running STD5.pm easier,
+# by providing it input, and isolating it's Match yaml output.
+use strict;
+use warnings;
+
+sub print_usage_and_exit {
+    print STDERR <<"END"; exit(2);
+$0 GRAMMAR_RULE [ INPUT_FILE | -e INPUT ]
+
+Examples:
+  $0 noun -e 42
+END
+}
+sub main {
+    print_usage_and_exit if @ARGV < 2 || $ARGV[0] eq '--help';
+    my $rule = shift(@ARGV);
+    print_usage_and_exit if $rule !~ /^\w+$/;
+    my $input;
+    if($ARGV[0] eq '-e') {
+	shift(@ARGV);
+	print_usage_and_exit if not @ARGV;
+	$input = shift(@ARGV);
+	$input = 'q{'.quotemeta($input).'}';
+    }
+    else {
+	my $fn = shift(@ARGV);
+	print_usage_and_exit if !-f $fn;
+	$input = "`cat $fn`";
+    }
+    my $cmd = "perl -w -I . -MSTD5 -e 'Perl->new(orig=>$input)->${rule}([]);'";
+    print STDERR "# ",$cmd,"\n";
+    open(F,"$cmd |") or die "$cmd\npipe open failed: $!\n";
+    my $out = join("",<F>); close(F);
+    $out =~ /.*\n(---.+)$/s or die "bug: couldn't find yaml in STD5 output";
+    my $yaml = $1;
+    print $yaml;
+}
+main;
+
+__END__
+system("rm lex/* out/* yamlg5/*; ./cheat STD.pm | ./gimme5 >STD5.pm") if !-e 'STD5.pm';
