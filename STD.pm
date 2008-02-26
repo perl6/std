@@ -210,10 +210,6 @@ token sym (Str $pat = $+sym) {
     $pat
 }
 
-token try {
-    foo» (\S)
-}
-
 proto token category { }
 
 token category:category { <sym> }
@@ -931,6 +927,7 @@ token noun {
     | <regex_declarator>
     | <type_declarator>
     | <circumfix>
+    | <dotty>
     | <subcall>
     | <variable> { $<sigil> = $<variable><sigil> }
     | <value>

@@ -66,7 +66,7 @@ sub pos { $_[0]->{pos} }
 sub name { $_[0]->{name} }
 
 sub lexers { my $self = shift;
-    %lexers;    # XXX should be different per language, sigh
+    \%lexers;    # XXX should be different per language, sigh
 }
 
 my $fakepos = 1;
@@ -77,20 +77,20 @@ sub _AUTOLEXpeek { my $self = shift;
     print "?" x 72, "\n";
     print "AUTOLEXpeek $key\n";
     die "Null key" if $key eq '';
-    if ($self->{lexers}->{$key}) {
+    if ($self->lexers->{$key}) {
         if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
             die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
             warn "Suppressing lexer recursion on $key";
             return hash();  # (but if we advanced just assume a :: here)
         }
-        elsif (ref($self->{lexers}->{$key}) eq 'Hash') {
-            return $self->{lexers}->{$key} // hash();
+        elsif (ref($self->lexers->{$key}) eq 'Hash') {
+            return $self->lexers->{$key} // hash();
         }
         else {
             print "oops ", ref($key), "\n";
         }
     }
-    return $self->{lexers}{$key} = $self->_AUTOLEXgen($key);
+    return $self->lexers->{$key} = $self->_AUTOLEXgen($key);
 }
 
 sub _AUTOLEXgen { my $self = shift;
@@ -132,7 +132,7 @@ sub _AUTOLEXnow { my $self = shift;
 
     print "!" x 72, "\n";
     print "AUTOLEXnow $key\n";
-    my $lexer = $self->{lexers}->{$key} // do {
+    my $lexer = $self->lexers->{$key} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
     };
@@ -177,8 +177,9 @@ sub _AUTOLEXnow { my $self = shift;
 	    $pat =~ s/\(\?#.*?\)//g;
 	    $pat =~ s/^[ \t]*\n//gm;
 
-	    # remove whitespace that will confuse TRE greatly
+	    # remove stuff that will confuse TRE greatly
 	    $pat =~ s/\s+//g;
+	    $pat =~ s/:://g;
 
 	    1 while $pat =~ s/\(((\?:)?)\)/($1 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
@@ -593,9 +594,8 @@ sub _BINDVAR { my $self = shift;
 }
 
 sub _BINDPOS { my $self = shift;
+    my $bind = shift;
     my $block = shift;
-    my %args = @_;
-    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     map { $_->retm($bind) }
@@ -603,9 +603,8 @@ sub _BINDPOS { my $self = shift;
 }
 
 sub _BINDNAMED { my $self = shift;
+    my $bind = shift;
     my $block = shift;
-    my %args = @_;
-    my $bind = $args{bind} // '';
 
     local $CTX = $self->callm;
     map { $_->retm($bind) }
@@ -1125,7 +1124,7 @@ sub fail { my $self = shift;
                 }
             }
         }
-        '[]';
+        '';
     }
 }
 
@@ -1177,7 +1176,7 @@ sub fail { my $self = shift;
 }
 
 { package RE_decl; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C,$q) = @_;  '[]' }
+    sub longest { my $self = shift; my ($C,$q) = @_;  '' }
 }
 
 { package RE_double; our @ISA = 'RE_base';
@@ -1312,7 +1311,7 @@ sub fail { my $self = shift;
                 return '';
             }
             elsif ($_ eq 'after') {
-                return '[]';
+                return '';
             }
             elsif ($_ eq 'before') {
                 my $result = $re->longest($C,$q);
@@ -1338,7 +1337,7 @@ sub fail { my $self = shift;
         my $str = $self->{'str'};
         for (scalar($name)) { if ((0)) {}
             elsif ($_ eq 'lex1') {
-                return '[]';
+                return '';
             }
             elsif ($_ eq 'panic' | 'obs') {
                 $PURE = 0;
@@ -1364,7 +1363,7 @@ sub fail { my $self = shift;
 
 { package RE_noop; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
-        '[]';
+        '';
     }
 }
 
@@ -1449,20 +1448,17 @@ sub fail { my $self = shift;
         my @chunks = @$c;
         ::here(0+@chunks);
         my @result;
-        my $last;
-#        while @chunks and
-#            $last = @chunks[-1] and  # XXX sb *-1 someday
-#            not $last.<min>
-#        {
-#                pop @chunks;
-#        }
+
         for (@chunks) {
             my $next = $_->longest($C,0) // '';
-            $next = '' if $next eq '[]';
             last if $next eq '';
             push @result, $next;
-            last unless $PURE or $_->{min} == 0;
+	    next if $PURE;
+	    last if $_->{min};
+
+	    # previous 
         }
+
 	if (@result) {
 	    my $result = "@result";
 	    $result = "(?: $result )" if $q;

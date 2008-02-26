@@ -365,7 +365,7 @@ END
         local @DECL;
 
         local $ALTNAME = $NAME;
-        local $ALTNAMES = "A";
+        local $ALTNAMES = "00";
         my $re = regex('\\}');
 
         my $old = substr($all, length($all) - $remaining, $remaining - length($_)+1);
@@ -683,7 +683,6 @@ sub unordered_disjunction {
     here();
     my @kids;
     my $min = 1_000_000_000;
-    my $altname = $ALTNAME;
     local $ALTNAME = $NAME . '_' . $ALTNAMES++;
 
     s/^ \| (?!\|) //x;
@@ -699,7 +698,7 @@ sub unordered_disjunction {
 
     return $kids[0] if @kids == 1;
 
-    return bless { zyg => [@kids], min => $min, altname => $altname }, "RE_unordered_disjunction";
+    return bless { zyg => [@kids], min => $min, altname => $ALTNAME }, "RE_unordered_disjunction";
 }
 
 sub unordered_conjunction {
@@ -1242,7 +1241,7 @@ sub unbalanced {
         local $BINDING = $var;
         my $re = ::indent($$self{atom}->walk(@_));
         if (defined $BINDING) {
-            $re = "\$C->_BINDNAMED$REV( sub { my \$C=shift;\n" . $re . "\n}, qw< = $var>)";
+            $re = "\$C->_BINDNAMED$REV('$var', sub { my \$C=shift;\n" . $re . "\n})";
         }
         $re;
     }
@@ -1255,7 +1254,7 @@ sub unbalanced {
         local $BINDING = $var;
         my $re = ::indent($$self{atom}->walk(@_));
         if (defined $BINDING) {
-            $re = "\$C->_BINDPOS$REV( sub { my \$C=shift;\n" . $re . "\n}, qw< = $var>)";
+            $re = "\$C->_BINDPOS$REV('$var', sub { my \$C=shift;\n" . $re . "\n})";
         }
         $re;
     }
@@ -1736,17 +1735,18 @@ END
             if ($failover) {
                 $policy = <<"END"
   my \@try = @{[ '0..' . (@ALTS-1) ]};
-  unshift \@try, splice(\@try,\$try,1) if \$tag;
+  unshift \@try, splice(\@try,\$try,1) if \$tag eq '$altname';
 END
             }
             else {
                 $policy = <<"END"
-  my \@try = \$tag ? (\$try) : ();
+  my \@try = \$tag eq '$altname' ? (\$try) : ();
 END
             }
             my $result = <<"END";
 do {
   (\$tag, \$try, \@fate) = \@fate;
+  \$tag //= '';
 $policy
   print "$altname will try: \@try\\n" if \@try > 1;
   my \@gather = ();
