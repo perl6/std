@@ -339,7 +339,7 @@ token ws {
     || { $!ws_from = $¢.pos }
        [
        | <unsp>              {*}                                #= unsp
-       | \v                  {*} <heredoc>                      #= vwhite
+       | <vws>               {*} <heredoc>
        | <unv>               {*}                                #= unv
        ]*  {*}                                                  #= all
        { $!ws_to = $¢.pos }
@@ -348,9 +348,20 @@ token ws {
 token unsp {
     \\ <?before [\s|'#']>
     [
-    | \v                     {*}                                #= vwhite
+    | <vws>                     {*}                                #= vwhite
     | <unv>                  {*}                                #= unv
     ]*  {*}                                                     #= all
+}
+
+token vws {
+    \v [ $ { $¢.moreinput } ]?
+}
+
+# We provide two mechanisms here:
+# 1) define $+moreinput, or
+# 2) override moreinput method
+method moreinput (@fate) {
+    $+moreinput.() if $+moreinput;
 }
 
 token unv {
