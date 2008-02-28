@@ -1278,7 +1278,7 @@ sub fail { my $self = shift;
             }
             else {
 		# XXX should be ."$name"
-		my $prefix;
+		my $prefix = '';
 		if (@$FATES) {
 		    $prefix = @$FATES[-1] . " ";
 		}
@@ -1288,7 +1288,7 @@ sub fail { my $self = shift;
 		for my $fate (@{$lexer->{FATES}}) {
 		    push @$FATES, "$prefix$fate";
 		}
-		my $pat = $lexer->{PAT};
+		my $pat = $lexer->{PAT} // '';
 		return '' unless $pat =~ /\S/;
 		return $pat unless $q;
                 return '(?: ' . $pat . ')';

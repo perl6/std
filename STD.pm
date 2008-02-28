@@ -1,7 +1,5 @@
 grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
-BEGIN { warn "compiling STD\n" }
-
 has StrPos $.ws_from;
 has StrPos $.ws_to;
 
