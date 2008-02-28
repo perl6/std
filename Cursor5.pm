@@ -558,7 +558,6 @@ sub after { my $self = shift;
 
     local $CTX = $self->callm;
     my $end = $self->cursor($self->{pos});
-    warn ref($block);
     my @all = $block->($end);          # Make sure $_->{from} == $_->{to}
     if ((@all and $all[0]->{bool})) {
         return $end->retm($bind);
@@ -1122,6 +1121,7 @@ sub fail { my $self = shift;
         for (scalar($self->{'assert'})) { if ((0)) {}
             elsif ($_ eq '?') {
                 my $re = $self->{'re'};
+		warn ::Dump($self) unless $re;
                 if ($re->{'name'} eq 'before') {
                     my $result = $re->longest($C,$q);
                     $PURE = 0;
@@ -1505,7 +1505,7 @@ sub fail { my $self = shift;
         my @result;
         my $oldfakepos = $fakepos;
         my $minfakepos = $fakepos + 1;
-	my $base = $ALT;
+	my $base = $ALT // '';
 	$base .= ' ' if $base;
         for my $alt (@$alts) {
             $fakepos = $oldfakepos;

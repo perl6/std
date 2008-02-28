@@ -21,7 +21,7 @@ sub main {
 	shift(@ARGV);
 	print_usage_and_exit if not @ARGV;
 	$input = shift(@ARGV);
-	$input = 'q{'.quotemeta($input).'}';
+	$input = 'qq{'.quotemeta($input).'}';
     }
     else {
 	my $fn = shift(@ARGV);
@@ -38,12 +38,12 @@ sub main {
 	    system("rm -f lex/*");
 	}
     }
-    my $cmd = "perl -w -I . -MSTD5 -e 'Perl->new(orig=>$input)->${rule}([]);'";
+    my $cmd = qq/perl -w -I . -MSTD5 -e 'Perl->new(orig=>$input)->${rule}([""]);'/;
     print STDERR "# ",$cmd,"\n";
     unlink('STD5_run.out');
     open(F,"$cmd |") or die "$cmd\npipe open failed: $!\n";
     my $out = join("",<F>); close(F);
-    $out =~ /.*\n(---.+)$/s or do {
+    $out =~ /.*?\n(---.+)$/s or do {
 	open(OUT, ">STD5_run.out"); 
 	print OUT $out;
 	close OUT;
