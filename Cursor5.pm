@@ -104,6 +104,7 @@ sub _AUTOLEXgen { my $self = shift;
 	print "using cached lex/$file.yml\n";
     }
     else {
+	{ package RE_base; 1; }
 	my $ast = $::RE{$key};	# should be per package
 #	my $ast = LoadFile("yamlg5/$file.yml");
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
