@@ -29,16 +29,26 @@ sub main {
 	$input = "`cat $fn`";
     }
     if(-e 'STD.pm' and -e 'cheat') { # We're in the right place.
-	if(!-e 'STD5.pm') {
-	    system("rm -f lex/* out/* yamlg5/*");
+	# pretend we're 'make'
+	if(!-e 'STD5.pm' or
+		-M 'STD5.pm' > -M 'STD.pm' or
+		-M 'STD5.pm' > -M 'cheat' or
+		-M 'STD5.pm' > -M 'gimme5') {
 	    system("./cheat STD.pm | ./gimme5 >STD5.pm");
+	    system("rm -f lex/*");
 	}
     }
     my $cmd = "perl -w -I . -MSTD5 -e 'Perl->new(orig=>$input)->${rule}([]);'";
     print STDERR "# ",$cmd,"\n";
+    unlink('STD5_run.out');
     open(F,"$cmd |") or die "$cmd\npipe open failed: $!\n";
     my $out = join("",<F>); close(F);
-    $out =~ /.*\n(---.+)$/s or die "bug: couldn't find yaml in STD5 output";
+    $out =~ /.*\n(---.+)$/s or do {
+	open(OUT, ">STD5_run.out"); 
+	print OUT $out;
+	close OUT;
+	die "bug: couldn't find yaml in STD5 output";
+    };
     my $yaml = $1;
     print $yaml;
 }

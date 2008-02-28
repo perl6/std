@@ -19,6 +19,7 @@ while (@ARGV) {
 use YAML::Syck;
 
 our %OUR = ( '$CTX' => 1 );
+our %RE = ();                   # turns into __DATA__ yaml
 
 our $STOP = "";
 our $REV = "";
@@ -192,18 +193,19 @@ sub panic {
         "'\n";
 }
 
-my $out = "";
+sub MAIN {
+    my $out = "";
 
-s/^(\s+)// and $out .= $1;
-while ($_ ne "") {
-    if ( s/^(#line.*\n)// ) { next }
+    s/^(\s+)// and $out .= $1;
+    while ($_ ne "") {
+        if ( s/^(#line.*\n)// ) { next }
 
-    if ( s/^(#.*\n)// ) { $out .= $1; next }
+        if ( s/^(#.*\n)// ) { $out .= $1; next }
 
-    my $remaining = length($_);
-    if (s/^(method heredoc[^\n{]*).*?\n}\n//s) {
-        $out .= "# $1\n";
-        $out .= <<'END';
+        my $remaining = length($_);
+        if (s/^(method heredoc[^\n{]*).*?\n}\n//s) {
+            $out .= "# $1\n";
+            $out .= <<'END';
 sub heredoc { my $self = shift;  
     my $here = $self;
     while (my $herestub = shift @herestub_queue) {
@@ -244,156 +246,157 @@ sub heredoc { my $self = shift;
     return $here;
 }
 END
-        next;
-    }
-
-    if ( s/^([ \t]*)(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
-        my $indent = $1;
-        local $KIND = $2;
-        my $ws = $3;
-        local $NAME = $4;
-        my $argstuff = $5;
-
-        my $comment = "$1$2$3$4$5\n";
-        $comment =~ s/^/## /mg;
-        $out .= $comment;
-
-        local $PAREN = 0;
-        local $SYM;
-        local $ENDSYM;
-        local $NEEDORIGARGS = 0;
-        my $args = "";
-        my $coercion = "";
-        if ($argstuff =~ s/\((.*)\)//s) {
-            $args = $1;
-            $args =~ s/^\s+//;
-            $args =~ s/\s+$//;
-        }
-        warn $argstuff if $argstuff =~ /\S/;
-        my $p = "";
-
-        local $MAYBACKTRACK = 1;  # XXX ratchet current broken
-        if ($KIND eq 'regex') {
-            $MAYBACKTRACK = 1;
-        }
-
-        if ($args =~ s/ --> (\w*)$//) {
-            $coercion = " map { ${PKG}::$1->coerce(\$_) }";
-        }
-        $args .= ', ';
-        my $sym = "";
-        $sym .= "    my (\$binding,\@fate) = \@{shift()};\n" unless $KIND eq 'method';
-
-        $args =~ s/is rw//g;
-        while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*([^=?,]*?),\s*//) {
-            my $type = $1;
-            my $var = $2;
-            my $decl = $3 ? ($OUR{$var}++, "local") : "my";
-            warn $4 if $4;
-            $sym .= "    $decl $var = shift;\n";
-            $args =~ s/^,\s*//;
-        }
-
-        while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*=(.*?),\s*//) {
-            my $type = $1;
-            my $var = $2;
-            my $decl = $3 ? ($OUR{$var}++, "local") : "my";
-            my $dflt = un6($4);
-            $sym .= "    $decl $var = shift() //$dflt;\n";  # XXX close enough
-            $args =~ s/^,\s*//;
-        }
-
-        my $didargs = 0;
-        while ($args =~ s/^([A-Z]\w+)?\s*:([\$\@%&](\w+))\s*(is\s+context(?:<rw>)?)?\s*(=((<[^>]*>|«[^»]*»|.)*?))?,\s*//) {
-            my $type = $1;
-            my $var = $2;
-            my $name = $3;
-            my $decl = $4 ? ($OUR{$var}++, "local") : "my";
-            my $eq = $5;
-            my $dflt = $6;
-            $sym .= "    my %args = \@_;\n" unless $didargs++;   # simulate named args from variadics
-            if ($name eq 'sym') {
-                warn $args unless $dflt;
-                $SYM = $dflt;
-                $SYM =~ s/^\s+//;
-                $SYM =~ s/^'(.*)'$/$1/ or
-                $SYM =~ s/^"(.*)"$/$1/ or
-                $SYM =~ s/^<(.*)>$/$1/ or
-                $SYM =~ s/^«(.*)»$/$1/ or
-                $SYM =~ s/^\{'(.*)','(.*)'\}$/$1 $2/ or
-                $SYM =~ s/^\{'(.*)'\}$/$1/;
-                $SYM =~ s/^\s+//;
-                $SYM =~ s/\s+$//;
-            }
-            if ($name eq 'endsym') {
-                warn $args unless $dflt;
-                $ENDSYM = $dflt;
-                $ENDSYM =~ s/^\s+//;
-                $ENDSYM =~ s/^'(.*)'$/$1/ or
-                $ENDSYM =~ s/^"(.*)"$/$1/;
-            }
-            if ($eq) {
-                $dflt = un6($dflt);
-                $sym .= "    $decl $var = \$args{$name} //$dflt;\n";
-            }
-            else {
-                $sym .= "    $decl $var = \$args{$name};\n";
-            }
-            $args =~ s/^,\s*//;
-        }
-
-        if ($args =~ s/^([A-Z]\w+)?\s*\*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*([^=?,]*?),\s*//) {
-            my $type = $1;
-            my $var = $2;
-            my $decl = $3 ? ($OUR{$var}++, "local") : "my";
-            warn $4 if $4;
-            $sym .= "    $decl $var = \@_;\n";
-            $args =~ s/^,\s*//;
-        }
-        warn $comment if $args =~ /[^, ]/;
-
-        if ($KIND eq 'method') {
-            $out .= <<"END";
-${indent}sub $NAME { my \$self = shift;
-$sym
-END
             next;
         }
 
-        local $BINDING;
-        undef $BINDING;
-        local @DECL;
+        if ( s/^([ \t]*)(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
+            my $indent = $1;
+            local $KIND = $2;
+            my $ws = $3;
+            local $NAME = $4;
+            my $argstuff = $5;
 
-        local $ALTNAME = $NAME;
-        local $ALTNAMES = "00";
-        my $re = regex('\\}');
+            my $comment = "$1$2$3$4$5\n";
+            $comment =~ s/^/## /mg;
+            $out .= $comment;
 
-        my $old = substr($all, length($all) - $remaining, $remaining - length($_)+1);
-        $old =~ s/^/##      /mg;
-        $out .= "$old\n\n";
+            local $PAREN = 0;
+            local $SYM;
+            local $ENDSYM;
+            local $NEEDORIGARGS = 0;
+            my $args = "";
+            my $coercion = "";
+            if ($argstuff =~ s/\((.*)\)//s) {
+                $args = $1;
+                $args =~ s/^\s+//;
+                $args =~ s/\s+$//;
+            }
+            warn $argstuff if $argstuff =~ /\S/;
+            my $p = "";
 
-        local @ALTS;
-        local $PURE = 1;
-        my $meat = ::indent($re->walk(), 2);
+            local $MAYBACKTRACK = 1;  # XXX ratchet current broken
+            if ($KIND eq 'regex') {
+                $MAYBACKTRACK = 1;
+            }
 
-        my $lex = Dump($re);
-#        $lex =~ s[!!perl/hash:][!pugs/Object:]g;
-#        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
-        mkdir("yamlg5");
-        (my $file = "${PKG}::$NAME") =~ s/::/--/g;
-        open YAML, ">yamlg5/$file.yml" or die "Can't create yamlg5/$file.yml: $!";
-        binmode(YAML, ":utf8");
-        print YAML $lex;
-        close YAML;
+            if ($args =~ s/ --> (\w*)$//) {
+                $coercion = " map { ${PKG}::$1->coerce(\$_) }";
+            }
+            $args .= ', ';
+            my $sym = "";
+            $sym .= "    my (\$binding,\@fate) = \@{shift()};\n" unless $KIND eq 'method';
 
-        $out .= <<"END";
+            $args =~ s/is rw//g;
+            while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*([^=?,]*?),\s*//) {
+                my $type = $1;
+                my $var = $2;
+                my $decl = $3 ? ($OUR{$var}++, "local") : "my";
+                warn $4 if $4;
+                $sym .= "    $decl $var = shift;\n";
+                $args =~ s/^,\s*//;
+            }
+
+            while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*=(.*?),\s*//) {
+                my $type = $1;
+                my $var = $2;
+                my $decl = $3 ? ($OUR{$var}++, "local") : "my";
+                my $dflt = un6($4);
+                $sym .= "    $decl $var = shift() //$dflt;\n";  # XXX close enough
+                $args =~ s/^,\s*//;
+            }
+
+            my $didargs = 0;
+            while ($args =~ s/^([A-Z]\w+)?\s*:([\$\@%&](\w+))\s*(is\s+context(?:<rw>)?)?\s*(=((<[^>]*>|«[^»]*»|.)*?))?,\s*//) {
+                my $type = $1;
+                my $var = $2;
+                my $name = $3;
+                my $decl = $4 ? ($OUR{$var}++, "local") : "my";
+                my $eq = $5;
+                my $dflt = $6;
+                $sym .= "    my %args = \@_;\n" unless $didargs++;   # simulate named args from variadics
+                if ($name eq 'sym') {
+                    warn $args unless $dflt;
+                    $SYM = $dflt;
+                    $SYM =~ s/^\s+//;
+                    $SYM =~ s/^'(.*)'$/$1/ or
+                    $SYM =~ s/^"(.*)"$/$1/ or
+                    $SYM =~ s/^<(.*)>$/$1/ or
+                    $SYM =~ s/^«(.*)»$/$1/ or
+                    $SYM =~ s/^\{'(.*)','(.*)'\}$/$1 $2/ or
+                    $SYM =~ s/^\{'(.*)'\}$/$1/;
+                    $SYM =~ s/^\s+//;
+                    $SYM =~ s/\s+$//;
+                }
+                if ($name eq 'endsym') {
+                    warn $args unless $dflt;
+                    $ENDSYM = $dflt;
+                    $ENDSYM =~ s/^\s+//;
+                    $ENDSYM =~ s/^'(.*)'$/$1/ or
+                    $ENDSYM =~ s/^"(.*)"$/$1/;
+                }
+                if ($eq) {
+                    $dflt = un6($dflt);
+                    $sym .= "    $decl $var = \$args{$name} //$dflt;\n";
+                }
+                else {
+                    $sym .= "    $decl $var = \$args{$name};\n";
+                }
+                $args =~ s/^,\s*//;
+            }
+
+            if ($args =~ s/^([A-Z]\w+)?\s*\*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*([^=?,]*?),\s*//) {
+                my $type = $1;
+                my $var = $2;
+                my $decl = $3 ? ($OUR{$var}++, "local") : "my";
+                warn $4 if $4;
+                $sym .= "    $decl $var = \@_;\n";
+                $args =~ s/^,\s*//;
+            }
+            warn $comment if $args =~ /[^, ]/;
+
+            if ($KIND eq 'method') {
+                $out .= <<"END";
+${indent}sub $NAME { my \$self = shift;
+$sym
+END
+                next;
+            }
+
+            local $BINDING;
+            undef $BINDING;
+            local @DECL;
+
+            local $ALTNAME = $NAME;
+            local $ALTNAMES = "00";
+            my $re = regex('\\}');
+
+            my $old = substr($all, length($all) - $remaining, $remaining - length($_)+1);
+            $old =~ s/^/##      /mg;
+            $out .= "$old\n\n";
+
+            local @ALTS;
+            local $PURE = 1;
+            my $meat = ::indent($re->walk(), 2);
+
+            $RE{$PKG . '::' . $NAME} = $re;
+    #        my $lex = Dump($re);
+    #        $lex =~ s[!!perl/hash:][!pugs/Object:]g;
+    #        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
+    #        mkdir("yamlg5");
+    #        (my $file = "${PKG}::$NAME") =~ s/::/--/g;
+    #        open YAML, ">yamlg5/$file.yml" or die "Can't create yamlg5/$file.yml: $!";
+    #        binmode(YAML, ":utf8");
+    #        print YAML $lex;
+    #        close YAML;
+
+            $out .= <<"END";
 sub$ws$NAME {
     my \$C = my \$self = shift;
 END
-        if ($NEEDORIGARGS) {
-            $out .= "    my \@origargs = \@_;\n";
-        }
-        my $body = <<'END';
+            if ($NEEDORIGARGS) {
+                $out .= "    my \@origargs = \@_;\n";
+            }
+            my $body = <<'END';
 <<DECL>>
     local $CTX = $C->callm("@fate");
     $binding eq '?' and return <<PEEK>>;
@@ -414,136 +417,143 @@ END
 
 END
 
-        $body .= <<"END";
+            $body .= <<"END";
     \$C->_MATCHIFY(\$binding,$coercion
 <<MEAT>>
     );
 END
 
-        if ($impure{$NAME}) {
-            $body =~ s/<<PEEK>>/''/;
-        }
-        else {
-            $body =~ s/<<PEEK>>/\$C->_AUTOLEXpeek('<<PKG>>::<<NAME>>')/;
-        }
-        $body =~ s/<<PKG>>/$PKG/g;
-        $body =~ s/<<NAME>>/$NAME/g;
-        $body =~ s/<<DECL>>/$sym@DECL/;
-        $body =~ s/<<MEAT>>/$meat/;
-        $body =~ s/\$\+(\w+)/\$$1/g;
-        $out .= $body;
-        next;
-    }
-
-    if (s/^\s*multi method tweak\s*\((.*?)\)\s+{//) {
-        my $sig = $1;
-        if ($sig =~ m/^:(\w+)\(:(\$(\w+))\)$/) {
-            $out .= "    elsif (\$k eq '$1' or \$k eq '$3') {\n        my $2 = \$v; ";
-        }
-        elsif ($sig =~ m/^:(\w+)\((\$\w+)\)$/) {
-            $out .= "    elsif (\$k eq '$1') {\n        my $2 = \$v; ";
-        }
-        elsif ($sig =~ m/^:(\$(\w+))$/) {
-            $out .= "    elsif (\$k eq '$2') {\n        my $1 = \$v; ";
-        }
-        elsif ($sig =~ m/^\*%x$/) {
-            $out .= "    else {\n        my %x = (\$k, \$v); ";
-        }
-        else {
-            warn "Can't translate tweak: $sig";
-        }
-        next;
-    }
-
-
-    # from here on we assume all nibbles are line-sized or less.
-    if (s/^(.*\n)//) {
-        my $line = $1;
-        if ($line =~ /^(\s*).*?given/) {
-            my $len = length($1);
-            $NEEDSEMI{$len} = 1;
-        }
-        elsif ($line =~ /^(\s*)}\n/) {
-            my $len = length($1);
-            if (delete $NEEDSEMI{$len}) {
-                $line =~ s/}/};/;
+            if ($impure{$NAME}) {
+                $body =~ s/<<PEEK>>/''/;
             }
+            else {
+                $body =~ s/<<PEEK>>/\$C->_AUTOLEXpeek('<<PKG>>::<<NAME>>')/;
+            }
+            $body =~ s/<<PKG>>/$PKG/g;
+            $body =~ s/<<NAME>>/$NAME/g;
+            $body =~ s/<<DECL>>/$sym@DECL/;
+            $body =~ s/<<MEAT>>/$meat/;
+            $body =~ s/\$\+(\w+)/\$$1/g;
+            $out .= $body;
+            next;
         }
-        if ($line =~ m/# begin tweaks/) {
-            $out .= <<'END';
+
+        if (s/^\s*multi method tweak\s*\((.*?)\)\s+{//) {
+            my $sig = $1;
+            if ($sig =~ m/^:(\w+)\(:(\$(\w+))\)$/) {
+                $out .= "    elsif (\$k eq '$1' or \$k eq '$3') {\n        my $2 = \$v; ";
+            }
+            elsif ($sig =~ m/^:(\w+)\((\$\w+)\)$/) {
+                $out .= "    elsif (\$k eq '$1') {\n        my $2 = \$v; ";
+            }
+            elsif ($sig =~ m/^:(\$(\w+))$/) {
+                $out .= "    elsif (\$k eq '$2') {\n        my $1 = \$v; ";
+            }
+            elsif ($sig =~ m/^\*%x$/) {
+                $out .= "    else {\n        my %x = (\$k, \$v); ";
+            }
+            else {
+                warn "Can't translate tweak: $sig";
+            }
+            next;
+        }
+
+
+        # from here on we assume all nibbles are line-sized or less.
+        if (s/^(.*\n)//) {
+            my $line = $1;
+            if ($line =~ /^(\s*).*?given/) {
+                my $len = length($1);
+                $NEEDSEMI{$len} = 1;
+            }
+            elsif ($line =~ /^(\s*)}\n/) {
+                my $len = length($1);
+                if (delete $NEEDSEMI{$len}) {
+                    $line =~ s/}/};/;
+                }
+            }
+            if ($line =~ m/# begin tweaks/) {
+                $out .= <<'END';
   sub tweak { # begin tweaks
     my $self = shift;
     my ($k, $v) = @_;
 
     if (0) {}
 END
-            next;
-        }
-        elsif ($line =~ m/# end tweaks/) {
-            $out .= "  } # end tweaks\n";
-            next;
-        }
-        if ($line =~ m/^#/) {
-            $out .= $line;
-            next;
-        }
-        $line = un6($line);
-        if ($line =~ s/^grammar (\w+);//) {
-            $PKG = $1;
-            $out .= "package $PKG;\n";
-            $out .= <<'END';
+                next;
+            }
+            elsif ($line =~ m/# end tweaks/) {
+                $out .= "  } # end tweaks\n";
+                next;
+            }
+            if ($line =~ m/^#/) {
+                $out .= $line;
+                next;
+            }
+            $line = un6($line);
+            if ($line =~ s/^grammar (\w+);//) {
+                $PKG = $1;
+                $out .= "package $PKG;\n";
+                $out .= <<'END';
 use Cursor5;
 use base 'Cursor5';
 use strict;
 use warnings; no warnings 'qw';
 use feature 'state';
 use utf8;
-
 sub BUILD {
     my $self = shift;
     $self->{ws_from} = 0;
     $self->{ws_to} = 0;
 }
+
+use YAML::Syck;
+{
+    local $/;
+    my $yaml = <DATA>;
+    *::RE = Load($yaml);
+}
+
 END
-        }
-        $line =~ s/^(\s*has) /#$1 /;
-        $line =~ s/^proto /#proto /;
-        $line =~ s/\bsay /print / and ($line =~ s/";$/\\n";/ or $line =~ s/;$/,"\\n";/);
-        $line =~ s/&reduce = ->/\$reduce = sub/;
-        $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
-        $line =~ s/ -> {/sub {/;
-        $line =~ s/\breduce\(\)/\$reduce->()/;
-        $line =~ s/([\$\@%])\+(\w+)/$1$2/g;       # assume localized
-        if ($line =~ s/^constant %/our %/) {
-            $line =~ tr/{}/()/;
-            $line = ::un6($line);
-        }
-        $line =~ s/^constant /my /;
-        $line =~ s/\bmy ([A-Z]\w+) /my /;
+            }
+            $line =~ s/^(\s*has) /#$1 /;
+            $line =~ s/^proto /#proto /;
+            $line =~ s/\bsay /print / and ($line =~ s/";$/\\n";/ or $line =~ s/;$/,"\\n";/);
+            $line =~ s/&reduce = ->/\$reduce = sub/;
+            $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
+            $line =~ s/ -> {/sub {/;
+            $line =~ s/\breduce\(\)/\$reduce->()/;
+            $line =~ s/([\$\@%])\+(\w+)/$1$2/g;       # assume localized
+            if ($line =~ s/^constant %/our %/) {
+                $line =~ tr/{}/()/;
+                $line = ::un6($line);
+            }
+            $line =~ s/^constant /my /;
+            $line =~ s/\bmy ([A-Z]\w+) /my /;
 
-        $line =~ s/(?:class|role) (\w+)\s+\{/{ package ${PKG}::$1;/
-                and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };    # "our" semantics
-        $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package ${PKG}::$1; our \@ISA = 'Perl::$2';/
-                and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
+            $line =~ s/(?:class|role) (\w+)\s+\{/{ package ${PKG}::$1;/
+                    and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };    # "our" semantics
+            $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package ${PKG}::$1; our \@ISA = 'Perl::$2';/
+                    and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
 
-        $line =~ s/^grammar (\w+)\s+is\s+(\w+)\s*\{/{ package ${PKG}::$1; our \@ISA = '$2';/
-                and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
+            $line =~ s/^grammar (\w+)\s+is\s+(\w+)\s*\{/{ package ${PKG}::$1; our \@ISA = '$2';/
+                    and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
 
-        $PKG = pop(@PKG) if @PKG and $line =~ /} # end (role|class|grammar)/;
+            $PKG = pop(@PKG) if @PKG and $line =~ /} # end (role|class|grammar)/;
 
-        $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
-        $line =~ s/(\S+) xx /($1) x /;
-        $line =~ s/(\S+) xx /($1) x /;
-        $line =~ s/ x \?/ x !!/;
-        $line =~ s/\|%start/%start/;
-        if ($line =~ m/method UNIT/) {
-            $OUR{'$unitstopper'}++;
-            $line =~ s/method UNIT \(\$unitstopper is context = "_EOS"\) \{/sub UNIT {
-    my \$self = shift;
-    local \$unitstopper = shift || "_EOS";/;
-        }
-        elsif ($line =~ m/Method nounphrase/) {
-            $line = <<'END';
+            $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
+            $line =~ s/(\S+) xx /($1) x /;
+            $line =~ s/(\S+) xx /($1) x /;
+            $line =~ s/ x \?/ x !!/;
+            $line =~ s/\|%start/%start/;
+            if ($line =~ m/method UNIT/) {
+                $OUR{'$unitstopper'}++;
+                $line =~ s/method UNIT \(\$unitstopper is context = "_EOS"\) \{/sub UNIT {
+        my \$self = shift;
+        local \$unitstopper = shift || "_EOS";/;
+            }
+            elsif ($line =~ m/Method nounphrase/) {
+                $line = <<'END';
 sub nounphrase {
     my $self = shift;
     my %args = @_;
@@ -551,33 +561,36 @@ sub nounphrase {
     my $pre = $args{pre};
     my $post = $args{post};
 END
-        }
-        elsif ($line =~ s/^(\s*)method (\w+)\s*(.*?)\{/$1sub $2 { my \$self = shift; my $3= \@_; /) {
-            $out .= "# $1method $2 $3\n";
-            $line =~ s/Match //g;
-            $line =~ s/Str //g;
-            $line =~ s/my \(\) = \@_;//g;
-            $line =~ s/my *= \@_;//g;
-        }
-        elsif ($line =~ s/^(\s*)sub (\w+)\s*(.*?)\{/$1sub $2 { my $3= \@_; /) {
-            $line =~ s/Match //g;
-            $line =~ s/Str //g;
-            $line =~ s/my \(\) = \@_;//g;
-            $line =~ s/\*\@/\@/;
-            $line =~ s/my *= \@_;//g;
-        }
+            }
+            elsif ($line =~ s/^(\s*)method (\w+)\s*(.*?)\{/$1sub $2 { my \$self = shift; my $3= \@_; /) {
+                $out .= "# $1method $2 $3\n";
+                $line =~ s/Match //g;
+                $line =~ s/Str //g;
+                $line =~ s/my \(\) = \@_;//g;
+                $line =~ s/my *= \@_;//g;
+            }
+            elsif ($line =~ s/^(\s*)sub (\w+)\s*(.*?)\{/$1sub $2 { my $3= \@_; /) {
+                $line =~ s/Match //g;
+                $line =~ s/Str //g;
+                $line =~ s/my \(\) = \@_;//g;
+                $line =~ s/\*\@/\@/;
+                $line =~ s/my *= \@_;//g;
+            }
 
-        $out .= $line;
+            $out .= $line;
+        }
     }
-}
 
-print "# Emulate context vars by localizing 'our' vars living in main\n";
-for (sort keys(%OUR)) {
-    print "our $_;\n";
+    print "# Emulate context vars by localizing 'our' vars living in main\n";
+    for (sort keys(%OUR)) {
+        print "our $_;\n";
+    }
+    print "our \$moreinput;\n";
+    print "\n";
+    print $out;
+    print "__DATA__\n";
+    print Dump(\%RE);
 }
-print "our \$moreinput;\n";
-print "\n";
-print $out;
 
 sub here {
     warn +(caller(0))[3],": ",/^(.{0,20})/,"\n" if $TRACE;
@@ -699,7 +712,9 @@ sub unordered_disjunction {
 
     return $kids[0] if @kids == 1;
 
-    return bless { zyg => [@kids], min => $min, altname => $ALTNAME }, "RE_unordered_disjunction";
+    return $RE{$PKG . '::' . $ALTNAME} =
+        bless { zyg => [@kids], min => $min, altname => $ALTNAME },
+              "RE_unordered_disjunction";
 }
 
 sub unordered_conjunction {
@@ -1746,6 +1761,18 @@ END
             }
             my $result = <<"END";
 do {
+  if (\@fate and \$fate[0] eq '$altname') {
+    print "Fate passed to $altname: \@fate\\n";
+  }
+  else {
+    \@fate = split(' ', \$C->_AUTOLEXnow('${PKG}::$altname')->(\$C));
+    if (\@fate) {
+      print "FATE OF ${PKG}::$altname: \@fate\\n";
+    }
+    else {
+      print "NO FATE FOR ${PKG}::$altname (will probe)\\n";
+    }
+  }
   (\$tag, \$try, \@fate) = \@fate;
   \$tag //= '';
 $policy
@@ -1790,5 +1817,6 @@ END
         }
     }
 }
+MAIN();
 
 ## vim: expandtab sw=4

@@ -104,7 +104,8 @@ sub _AUTOLEXgen { my $self = shift;
 	print "using cached lex/$file.yml\n";
     }
     else {
-	my $ast = LoadFile("yamlg5/$file.yml");
+	my $ast = $::RE{$key};	# should be per package
+#	my $ast = LoadFile("yamlg5/$file.yml");
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
 	local $FATES;
 	$FATES = [];
@@ -153,11 +154,14 @@ sub _AUTOLEXnow { my $self = shift;
 
 	    my $stuff;
 	    (my $file = $key) =~ s/::/--/g;
-	    if ((-e "lex/$file.yml")) {
+	    if (exists $lexer->{PAT}) {
+		$stuff = {"PAT" => $lexer->{PAT}, "FATES" => $lexer->{FATES}};
+	    }
+	    elsif ((-e "lex/$file.yml")) {
 		$stuff = LoadFile("lex/$file.yml");
 	    }
 	    else {
-		$stuff = {"PAT" => $lexer->{PAT}, "FATES" => $lexer->{FATES}};
+		die "No lexer!"
 	    }
 
 	    if ($stuff->{PAT} eq '') {
