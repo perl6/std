@@ -34,7 +34,7 @@ sub new {
     }
     my $self = bless \%args, ref $class || $class;
     my $buf = $self->{orig};
-    print " orig ", $$buf,"\n";
+    warn " orig ", $$buf,"\n";
     $self->BUILD;
     $self;
 }
@@ -74,8 +74,8 @@ my $fakepos = 1;
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
 
-    print "?" x 72, "\n";
-    print "AUTOLEXpeek $key\n";
+    warn "?" x 72, "\n";
+    warn "AUTOLEXpeek $key\n";
     die "Null key" if $key eq '';
     if ($self->lexers->{$key}) {
         if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
@@ -87,7 +87,7 @@ sub _AUTOLEXpeek { my $self = shift;
             return $self->lexers->{$key} // hash();
         }
         else {
-            print "oops ", ref($key), "\n";
+            warn "oops ", ref($key), "\n";
         }
     }
     return $self->lexers->{$key} = $self->_AUTOLEXgen($key);
@@ -96,12 +96,12 @@ sub _AUTOLEXpeek { my $self = shift;
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
 
-    print "=" x 72, "\n";
-    print "AUTOLEXgen $key\n";
+    warn "=" x 72, "\n";
+    warn "AUTOLEXgen $key\n";
     my $lexer = {};
     (my $file = $key) =~ s/::/--/g;
     if (-s "lex/$file.yml") {
-	print "using cached lex/$file.yml\n";
+	warn "using cached lex/$file.yml\n";
     }
     else {
 	{ package RE_base; 1; }
@@ -113,9 +113,9 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$AUTOLEXED{$key} = $fakepos;
 	my $pat = $ast->longest($self,0);
-	print "(null pattern)\n" unless $pat;
-#	if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
-	if ($pat =~ /Â/) { print "bad Â\n" }
+	warn "(null pattern)\n" unless $pat;
+#	if (Encode::is_utf8($pat)) { warn "UTF8 ON\n" } else { warn "UTF8 OFF\n" }
+	if ($pat =~ /Â/) { warn "bad Â\n" }
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
@@ -124,7 +124,7 @@ sub _AUTOLEXgen { my $self = shift;
 	open(my $cache, '>', "lex/$file.yml") // warn "Can't print: $!";
 	print $cache Dump($lexer) or warn "Can't print: $!";
 	close($cache) or warn "Can't close: $!";
-	print "regenerated lex/$file.yml\n";
+	warn "regenerated lex/$file.yml\n";
     }
     $lexer;
 }
@@ -132,25 +132,25 @@ sub _AUTOLEXgen { my $self = shift;
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
 
-    print "!" x 72, "\n";
-    print "AUTOLEXnow $key\n";
+    warn "!" x 72, "\n";
+    warn "AUTOLEXnow $key\n";
     my $lexer = $self->lexers->{$key} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
     };
 
     $lexer->{MATCH} //= do {
-	print "generating lexer closure for $key:\n";
+	warn "generating lexer closure for $key:\n";
 
 	my $buf = $self->{orig};	# XXX this might lose pos()...
-#	print "AT: ", substr($$buf,0,20), "\n";
+#	warn "AT: ", substr($$buf,0,20), "\n";
 
 	# generate match closure at the last moment
 	sub {
 	    my $C = shift;
 
-	    print '=' x 72, "\n";
-	    print "lexing $key\n";
+	    warn '=' x 72, "\n";
+	    warn "lexing $key\n";
 	    die "orig disappeared!!!" unless length($$buf);
 
 	    my $stuff;
@@ -172,13 +172,13 @@ sub _AUTOLEXnow { my $self = shift;
 	    my $pat = '^' . decode('utf8', $stuff->{PAT});
 	    Encode::_utf8_off($pat);
 	    $pat = decode('utf8', $pat);
-#	    if (Encode::is_utf8($pat)) { print "UTF8 ON\n" } else { print "UTF8 OFF\n" }
+#	    if (Encode::is_utf8($pat)) { warn "UTF8 ON\n" } else { warn "UTF8 OFF\n" }
 	    
 	    {
 		my $i = 1;
 		$pat =~ s/\((?!\?[#:])/( (?#@{[$i++]})/g;
 	    }
-	    print "PAT: ", $pat,"\n";
+	    warn "PAT: ", $pat,"\n";
 	    $pat =~ s/\(\?#.*?\)//g;
 	    $pat =~ s/^[ \t]*\n//gm;
 
@@ -191,14 +191,14 @@ sub _AUTOLEXnow { my $self = shift;
 	    my $tmp = $pat;
 	    "42" =~ /$tmp/;	# XXX see if p5 parses it
 
-#	    print "PAT: ", $pat,"\n";
+#	    warn "PAT: ", $pat,"\n";
 
 	    my $fate = $stuff->{FATES};
-	    print "#FATES: ", @$fate + 0, "\n";
+	    warn "#FATES: ", @$fate + 0, "\n";
 
 	    unshift @$fate, "";	# start at $1
 	    for my $i (1..@$fate-1) {
-		print $i, ': ', $fate->[$i], "\n";
+		warn $i, ': ', $fate->[$i], "\n";
 	    }
 	    my $result = "";
 	    pos($$buf) = $C->{pos};
@@ -209,12 +209,12 @@ sub _AUTOLEXnow { my $self = shift;
 	    {
 		use re::engine::TRE;
 
-		print "/ running tre match at @{[ pos($$buf) ]} /\n";
+		warn "/ running tre match at @{[ pos($$buf) ]} /\n";
 
 		if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 		    my $max = @+ - 1;
 		    my $last = @- - 1;	# ignore '$0'
-#		    print "LAST: $last\n";
+#		    warn "LAST: $last\n";
 		    $result = $fate->[$last] // "OOPS";
 		    for my $x (1 .. $max) {
 			my $beg = $-[$x];
@@ -222,14 +222,14 @@ sub _AUTOLEXnow { my $self = shift;
 			my $end = $+[$x];
 			my $f = $fate->[$x];
 			no strict 'refs';
-			print "\$$x: $beg..$end\t$$x\t ",
+			warn "\$$x: $beg..$end\t$$x\t ",
 			    $x == $last ? "====>" : "---->",
 			    " $f\n";
 		    }
-		    print "success at '", substr($$buf,$C->{pos},10), "'\n";
+		    warn "success at '", substr($$buf,$C->{pos},10), "'\n";
 		}
 		else {
-		    print "NO LEXER MATCH at '", substr($$buf,$C->{pos},10), "'\n";
+		    warn "NO LEXER MATCH at '", substr($$buf,$C->{pos},10), "'\n";
 		}
 		$result;
 	    }
@@ -245,20 +245,19 @@ sub setname { my $self = shift;
 }
 
 sub matchify { my $self = shift;
-
     my %bindings;
     my $m;
     my $next;
-    print "MATCHIFY ", ref $self, "\n";
+    warn "MATCHIFY ", ref $self, "\n";
     for ($m = $self->{prior}; $m; $m = $next) {
         $next = $m->{prior};
-        undef $m->{prior};
+#        delete $m->{prior};
         my $n = $m->{name};
-        print "MATCHIFY $n\n";
+        warn "MATCHIFY $n\n";
         if (not $bindings{$n}) {
             $bindings{$n} = [];
 #                %.mykeys = Hash.new unless defined %!mykeys;
-            $self->{mykeys}{$n}++;
+#            $self->{mykeys}{$n}++;
         }
         unshift @{$bindings{$n}}, $m;
     }
@@ -270,10 +269,10 @@ sub matchify { my $self = shift;
 	    $self->{$k} = $v;
 	}
         # XXX alas, gets lost in the next cursor...
-        print "copied $k ", $v, "\n";
+        warn "copied $k ", $v, "\n";
     }
-    print Dump($self);
-    undef $self->{prior};
+    warn Dump($self);
+    delete $self->{prior};
     $self;
 }
 
@@ -281,12 +280,15 @@ sub cursor_all { my $self = shift;
     my $fpos = shift;
     my $tpos = shift;
 
-    my %r = %$self;
+    my %r;
+    $r{orig} = $$self{orig};
+    $r{ws_to} = $$self{ws_to};
+    $r{ws_from} = $$self{ws_from};
     $r{from} = $fpos;
     $r{to} = $tpos;
     $r{pos} = $tpos;
     $r{prior} = defined $self->{name} ? $self : $self->{prior};
-    print "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
+    warn "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
 
     bless \%r, ref $self;
 }
@@ -294,12 +296,15 @@ sub cursor_all { my $self = shift;
 sub cursor { my $self = shift;
     my $tpos = shift;
 
-    my %r = %$self;
+    my %r;
+    $r{orig} = $$self{orig};
+    $r{ws_to} = $$self{ws_to};
+    $r{ws_from} = $$self{ws_from};
     $r{from} = $self->{pos} // 0;
     $r{to} = $tpos;
     $r{pos} = $tpos;
     $r{prior} = defined $self->{name} ? $self : $self->{prior};
-    print "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
+    warn "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
 
     bless \%r, ref $self;
 }
@@ -307,12 +312,15 @@ sub cursor { my $self = shift;
 sub cursor_rev { my $self = shift;
     my $fpos = shift;
 
-    my %r = %$self;
+    my %r;
+    $r{orig} = $$self{orig};
+    $r{ws_to} = $$self{ws_to};
+    $r{ws_from} = $$self{ws_from};
     $r{pos} = $fpos;
     $r{from} = $fpos;
     $r{to} = $self->{from};
     $r{prior} = defined $self->{name} ? $self : $self->{prior};
-    print "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
+    warn "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}}));
 
     bless \%r, ref $self;
 }
@@ -331,30 +339,30 @@ sub callm { my $self = shift;
     }
     my $pos = '?';
     $pos = $self->{pos} if defined $self->{pos};
-    print $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n";
+    warn $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n";
     {lvl => $lvl};
 }
 
 sub whats { my $self = shift;
 
     my @k = keys(%{$self->{mykeys}});
-    print "  $self ===> @{[$self->{from}.' '. $self->{to}.' '. $self->{item}]} (@k)\n";
+    warn "  $self ===> @{[$self->{from}.' '. $self->{to}.' '. $self->{item}]} (@k)\n";
     for my $k (@k) {
-        print "   $k => @{[$self->{mykeys}->{$k}]}\n";
+        warn "   $k => @{[$self->{mykeys}->{$k}]}\n";
     }
 }
 
 sub retm { my $self = shift;
     my $bind = shift;
 
-    print "Returning non-Cursor: $self\n" unless exists $self->{pos};
+    warn "Returning non-Cursor: $self\n" unless exists $self->{pos};
     my $binding = "";
     if (defined $bind and $bind ne '') {
         $self->{name} = $bind;
         $binding = "      :bind<$bind>";
     }
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
-    print $self->{pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{from}]}..@{[$self->{to}]}$binding\n";
+    warn $self->{pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{from}]}..@{[$self->{to}]}$binding\n";
 #    $self->whats();
     $self;
 }
@@ -450,7 +458,7 @@ sub _PLUSr { my $self = shift;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
     last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
-	#print $matches->perl, "\n";
+	#warn $matches->perl, "\n";
 	push @all, $first;
 	$to = $first;
     }
@@ -625,12 +633,12 @@ sub _EXACT { my $self = shift;
     my $len = length($s);
     my $buf = $self->{orig};
     if (substr($$buf, $P, $len) eq $s) {
-        print "EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len\n";
+        warn "EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len\n";
         my $r = $self->cursor($P+$len);
         $r->retm($bind);
     }
     else {
-        print "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n";
+        warn "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n";
         return ();
     }
 }
@@ -1027,7 +1035,7 @@ sub _REDUCE { my $self = shift;
     local $CTX = $self->callm($tag);
     my $P = $self->{pos};
     my $F = $self->{from};
-    print "Success $tag from $F to $P\n";
+    warn "Success $tag from $F to $P\n";
 #    $self->whats;
     $self;
 #    $self->cursor($P);
@@ -1037,7 +1045,7 @@ sub _COMMITBRANCH { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    print "Commit branch to $P\n";
+    warn "Commit branch to $P\n";
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1046,7 +1054,7 @@ sub _COMMITRULE { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    print "Commit rule to $P\n";
+    warn "Commit rule to $P\n";
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1055,7 +1063,7 @@ sub commit { my $self = shift;
 
     local $CTX = $self->callm;
     my $P = $self->{pos};
-    print "Commit match to $P\n";
+    warn "Commit match to $P\n";
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1095,7 +1103,7 @@ sub fail { my $self = shift;
 	if (defined $arg) { 
 	    $name .= " " . $arg;
 	}
-	print ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n" if $RE_verbose;
+	warn ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n" if $RE_verbose;
     }
 }
 
@@ -1390,7 +1398,7 @@ sub fail { my $self = shift;
             last;
         }
         my $result = $result[0];
-        print $result, "\n";
+        warn $result, "\n";
         $result;
     }
 }
@@ -1523,7 +1531,7 @@ sub fail { my $self = shift;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
         my $result = "\n(?:\n  " . ::indent(join "\n| ", @result) . "\n)";
-        print $result, "\n";
+        warn $result, "\n";
         $fakepos = $minfakepos;  # Did all branches advance?
         $result;
     }

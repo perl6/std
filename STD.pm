@@ -153,7 +153,7 @@ role PrecOp[*%defaults] {
         if not $m<transparent> {
             %+thisop<prec> = $m<prec>;
             %+thisop<assoc> = $m<assoc> // 'left';
-            say "coercing to " ~ self;
+            warn "coercing to " ~ self ~ "\n";
         }
         return $m;
     }
@@ -2956,14 +2956,14 @@ method EXPR (@fate,
         $here = @t[0];
     }
     push @termstack, $here;
-    say "In EXPR, at ", $here.pos;
+    warn "In EXPR, at ", $here.pos, "\n";
 
     my &reduce := -> {
-        say "entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack;
+        warn "entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack, "\n";
         my $op = pop @opstack;
         given $op<assoc> {
             when 'chain' {
-                say "reducing chain";
+                warn "reducing chain\n";
                 my @chain;
                 push @chain, pop(@termstack);
                 push @chain, $op;
@@ -2977,7 +2977,7 @@ method EXPR (@fate,
                 push @termstack, $op<top>;
             }
             when 'list' {
-                say "reducing list";
+                warn "reducing list\n";
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
@@ -2990,9 +2990,9 @@ method EXPR (@fate,
                 push @termstack, $op<top>;
             }
             default {
-                say "reducing";
+                warn "reducing\n";
                 my @list;
-                say +@termstack;
+                warn "Termstack size: ", +@termstack, "\n";
 
                 #$op<top><right> = pop @termstack;
                 #$op<top><left> = pop @termstack;
@@ -3006,7 +3006,7 @@ method EXPR (@fate,
     };
 
     loop {
-        say "In loop, at ", $here.pos;
+        warn "In loop, at ", $here.pos, "\n";
         my @terminator = $here.before([], -> $s { $stop($s, []) } );
         my $t = @terminator[0];
     last if defined $t and @terminator[0].bool;
@@ -3021,7 +3021,7 @@ method EXPR (@fate,
         if not $infix { $here.panic([],"Can't have two terms in a row") }
 
         if not defined %thisop<prec> {
-            say "No prec given in thisop!";
+            warn "No prec given in thisop!\n";
             %thisop = %terminator;
         }
         my Str $thisprec = %thisop<prec>;
@@ -3057,7 +3057,7 @@ method EXPR (@fate,
         my @t = $here.expect_term([]);
         $here = @t[0];
         push @termstack, $here;
-        say "after push: " ~ +@termstack;
+        warn "after push: " ~ +@termstack, "\n";
     }
     reduce() while +@termstack > 1;
     @termstack == 1 or $here.panic([], "Internal operator parser error, termstack == {+@termstack}");

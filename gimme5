@@ -10,7 +10,7 @@ use strict;
 use warnings;
 
 my $failover = 0;
-while (@ARGV) {
+if (@ARGV) {
     if ($ARGV[0] eq '-fo') {
         $failover = 1; shift;
     }
@@ -402,15 +402,15 @@ END
     $binding eq '?' and return <<PEEK>>;
 
     if (@fate and $fate[0] =~ /^<<NAME>>/) {
-      print "Fate passed to <<NAME>>: @fate\n";
+      warn "Fate passed to <<NAME>>: @fate\n";
     }
     else {
       @fate = split(' ', $C->_AUTOLEXnow('<<PKG>>::<<NAME>>')->($C));
       if (@fate) {
-        print "FATE OF <<PKG>>::<<NAME>>: @fate\n";
+        warn "FATE OF <<PKG>>::<<NAME>>: @fate\n";
       }
       else {
-        print "NO FATE FOR <<PKG>>::<<NAME>> (may backtrack)\n";
+        warn "NO FATE FOR <<PKG>>::<<NAME>> (may backtrack)\n";
       }
     }
     my ($tag,$try);
@@ -1568,8 +1568,8 @@ END
     sub walk {
         my $self = shift;
         my $result;
-        #print ::Dump($self);
-        #print $$self{quant},"\n";
+        #warn ::Dump($self);
+        #warn $$self{quant},"\n";
         if (ref $$self{atom}) {
             my $quant = "";
             my $rep = "_REP";
@@ -1762,25 +1762,25 @@ END
             my $result = <<"END";
 do {
   if (\@fate and \$fate[0] eq '$altname') {
-    print "Fate passed to $altname: \@fate\\n";
+    warn "Fate passed to $altname: \@fate\\n";
   }
   else {
     \@fate = split(' ', \$C->_AUTOLEXnow('${PKG}::$altname')->(\$C));
     if (\@fate) {
-      print "FATE OF ${PKG}::$altname: \@fate\\n";
+      warn "FATE OF ${PKG}::$altname: \@fate\\n";
     }
     else {
-      print "NO FATE FOR ${PKG}::$altname (will probe)\\n";
+      warn "NO FATE FOR ${PKG}::$altname (will probe)\\n";
     }
   }
   (\$tag, \$try, \@fate) = \@fate;
   \$tag //= '';
 $policy
-  print "$altname will try: \@try\\n" if \@try > 1;
+  warn "$altname will try: \@try\\n" if \@try > 1;
   my \@gather = ();
   while (\@try and not \@gather) {
     my \$try = shift(\@try);
-    print "Trying \$tag \$try\\n";
+    warn "Trying \$tag \$try\\n";
     push \@gather, ((
 @{[ ::indent(join("\n", @result)) ]}
     )[\$try])->(\$C);

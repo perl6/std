@@ -34,23 +34,13 @@ sub main {
 		-M 'STD5.pm' > -M 'STD.pm' or
 		-M 'STD5.pm' > -M 'cheat' or
 		-M 'STD5.pm' > -M 'gimme5') {
-	    system("./cheat STD.pm | ./gimme5 >STD5.pm");
+	    system("./cheat STD.pm | ./gimme5 -fo >STD5.pm");
 	    system("rm -f lex/*");
 	}
     }
-    my $cmd = qq/perl -w -I . -MSTD5 -e 'Perl->new(orig=>$input)->${rule}([""]);'/;
-    print STDERR "# ",$cmd,"\n";
-    unlink('STD5_run.out');
-    open(F,"$cmd |") or die "$cmd\npipe open failed: $!\n";
-    my $out = join("",<F>); close(F);
-    $out =~ /.*?\n(---.+)$/s or do {
-	open(OUT, ">STD5_run.out"); 
-	print OUT $out;
-	close OUT;
-	die "bug: couldn't find yaml in STD5 output";
-    };
-    my $yaml = $1;
-    print $yaml;
+    my $cmd = qq/perl -w -I . -MSTD5 -e 'print Perl::Dump(Perl->new(orig=>$input)->${rule}(["$rule"]));'/;
+    warn "# ",$cmd,"\n";
+    system "$cmd 2>std5.err";
 }
 main;
 
