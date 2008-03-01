@@ -139,7 +139,7 @@ sub _AUTOLEXnow { my $self = shift;
 	$self->_AUTOLEXpeek($key);
     };
 
-    $lexer->{MATCH} //= do {
+    $lexer->{M} //= do {
 	warn "generating lexer closure for $key:\n";
 
 	my $buf = $self->{orig};	# XXX this might lose pos()...
@@ -244,35 +244,42 @@ sub setname { my $self = shift;
     $self;
 }
 
-sub matchify { my $self = shift;
-    my %bindings;
-    my $m;
-    my $next;
-    warn "MATCHIFY ", ref $self, "\n";
-    for ($m = $self->{prior}; $m; $m = $next) {
-        $next = $m->{prior};
-#        delete $m->{prior};
-        my $n = $m->{name};
-        warn "MATCHIFY $n\n";
-        if (not $bindings{$n}) {
-            $bindings{$n} = [];
-#                %.mykeys = Hash.new unless defined %!mykeys;
-#            $self->{mykeys}{$n}++;
-        }
-        unshift @{$bindings{$n}}, $m;
+{ package Match;
+    sub new { my $self = shift;
+	my %args = @_;
+	bless \%args, $self;
     }
-    for my $k (keys(%bindings)) { my $v = $bindings{$k};
+
+    sub from { my $self = shift;
+	$self->{_f};
+    }
+
+    sub to { my $self = shift;
+	$self->{_t};
+    }
+}
+
+sub matchify { my $self = shift;
+    my $bindings;
+    warn "matchify ", ref $self, "\n";
+    $self->{M} = $bindings = 'Match'->new(_f => $self->{from}, _t => $self->{to} );
+    for (my $c = $self->{prior}; $c; $c = $c->{prior}) {
+        my $n = $c->{name};
+        warn "matchify prior $n\n";
+        if (not $bindings->{$n}) {
+            $bindings->{$n} = [];
+        }
+	if ($c->{M}) {
+	    unshift @{$bindings->{$n}}, $c->{M};
+	    last;
+	}
+    }
+    for my $k (keys(%$bindings)) { my $v = $bindings->{$k};
 	if (ref $v eq 'ARRAY' and @$v == 1) {
-	    $self->{$k} = $v->[0];
+	    $bindings->{$k} = $v->[0];
 	}
-	else {
-	    $self->{$k} = $v;
-	}
-        # XXX alas, gets lost in the next cursor...
-        warn "copied $k ", $v, "\n";
     }
     warn Dump($self);
-    delete $self->{prior};
     $self;
 }
 

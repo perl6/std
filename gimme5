@@ -1222,7 +1222,7 @@ sub unbalanced {
         }
         $text = ::un6($text);
         my $ctx = $$self{context};
-        $text = 'my $M = $C->matchify; ' . $text if $NEEDMATCH;
+        $text = 'my $M = $C->matchify->{M}; ' . $text . '; $C; ' if $NEEDMATCH;
         if ($text =~ s/\bmake\b/scalar/g) {  # XXX hack, avoid using $<make>
             "do {$text}";
         }
@@ -1300,7 +1300,7 @@ sub unbalanced {
         my $self = shift;
         local $NEEDMATCH = 0;
         my $text = ::un6($$self{text} . ';');
-        $text = 'my $M = $C->matchify; ' . $text if $NEEDMATCH;
+        $text = 'my $M = $C->matchify->{M}; ' . $text . '; $C; ' if $NEEDMATCH;
         $text;
     }
 }
@@ -1442,7 +1442,7 @@ END
         $PURE = 0 if $impure{$name};
 
         my $re = '$C->' . $name . "($args)";
-        $re = 'do {my $M = $C->matchify; ' . $re . '}' if $NEEDMATCH;
+        $re = 'do {my $M = $C->matchify->{M}; ' . $re . '; $C; }' if $NEEDMATCH;
         $re;
     }
 }
@@ -1500,7 +1500,7 @@ END
         $rest =~ s/\(,? *//;
         push @TOKEN, "\$C->$name$rest'?')" if $PURE;
         my $re = "\$C->$name($binding, $rest)";
-        $re = 'do { my $M = $C->matchify; ' . $re . '}' if $NEEDMATCH;
+        $re = 'do { my $M = $C->matchify->{M}; ' . $re . '; $C; }' if $NEEDMATCH;
     }
 }
 
