@@ -1,0 +1,52 @@
+#!/usr/bin/perl -w
+# ./STD5_run EXPR '-3+2' | ./STD5_run_post
+use strict;
+use warnings;
+use YAML::Syck;
+use Scalar::Util;
+
+my $yaml = join("",<>);
+my $ast = YAML::Syck::Load($yaml);
+Perl->remove_clutter_from($ast);
+print YAML::Syck::Dump($ast);
+exit(0);
+
+{ package Perl;
+  sub remove_clutter {
+    my $self = shift;
+    delete($self->{'prior'});
+    for my $k (keys %$self) {
+      my $v = $self->{$k};
+      Perl->remove_clutter_from($v);
+    }
+  }
+  sub remove_clutter_from {
+    my($cls,$o)=@_;
+    if(Scalar::Util::blessed($o)) {
+      if($o->can('remove_clutter')) {
+        $o->remove_clutter;
+      } else {
+        # do nothing
+      }
+    }
+    elsif(ref($o) eq 'ARRAY') {
+      for my $e (@$o) {
+        $cls->remove_clutter_from($e);
+      }
+    }
+    elsif(ref($o) eq 'HASH') {
+      for my $v (values %$o) {
+        $cls->remove_clutter_from($v);
+      }
+    }
+    else {
+      # do nothing
+    }
+  }
+}
+
+{ package Match;
+  sub remove_clutter {
+    # do nothing
+  }  
+}
