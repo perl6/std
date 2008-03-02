@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# ./STD5_run EXPR '-3+2' | ./STD5_run_post
+# ./STD5_run EXPR -e '-3+2' | ./STD5_run_post
 use strict;
 use warnings;
 use YAML::Syck;
