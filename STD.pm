@@ -427,7 +427,7 @@ token pblock {
 
 =begin perlhints
 
-id:     lambda
+id:     lambda:«->»
 token:  ->
 syn:    -> SIGNATURE { STATEMENTS }
 name:   lambda
@@ -435,7 +435,7 @@ desc:   introduces a (possibly empty) signature to a block
 ex:     for @list -> $a { say $a; }
         my &function := -> { say 42; };
 
-id:     lambda
+id:     lambda:«<->»
 token:  <->
 syn:    <-> SIGNATURE { STATEMENTS }
 name:   lambda rw
@@ -559,6 +559,20 @@ token statement {
     {*}
 }
 
+=begin perlhints
+
+# XXX is this the right place for this?
+id:     eat_terminator
+token:  ;
+syn:    STATEMENT;
+name:   statement terminator
+desc:   terminates a statement. Optional for the last statement in a 
+        block or file.
+ex:     say $a;
+        say $b;
+
+=end perlhints
+
 token eat_terminator {
     [
     || ';'
@@ -617,12 +631,12 @@ name:   if
 desc:   executes a code block only if an yields True.
         There can be an arbitrary number of elsif blocks, and one or no 
         else block
-ex:     if a < b {
+ex:     if $a < $b {
             say "b is larger than a";
         }
-ex:     if a < b {
+ex:     if $a < $b {
             say "b is smaller than a";
-        } elsif a == b {
+        } elsif $a == $b {
             say "b is as large as a";
         } else {
             say "b is larger than a"
@@ -789,6 +803,19 @@ rule statement_control:for {\
     {*}
 }
 
+=begin perlhints
+
+id:     statement_control:given
+token:  given
+syn:    given EXPR BLOCK
+name:   given
+desc:   Sets the topic ($_) in BLOCK to EXPR
+ex:     given @list {
+            .sort.join('|').say
+        }
+
+=end perlhints
+
 rule statement_control:given {\
     <sym>
     <EXPR>                             {*}                      #= given expr
@@ -852,6 +879,18 @@ ex:     @list.pick(*)  # pick all elements of @list in random order
 =end perlhints
 
 token whatever { '*' {*} }
+
+=begin perlhints
+
+id:     version
+token:  v .
+name:   version
+desc:   string
+ex:     v1.2
+ex:     v3.4+
+ex:     v0.*.3
+
+=end perlhints
 
 token version:sym<v> {
     v \d+ [ '.' (\d+ | <whatever>) ]* '+'?            {*}       #= vstyle
@@ -1213,6 +1252,52 @@ rule scoped {
     
     {*}
 }
+
+=begin perlhints
+
+id:     scope_declarator:my
+token:  my
+syn:    my VARIABLE
+name:   my
+desc:   declares a lexically scoped variable
+ex:     my $var = 3;
+ex:     {
+            my $x;
+            # 'my' variable $x is visible in this block
+        }
+        # no $x here.
+ex:     my %hash;
+
+id:     scope_declarator:our
+token:  our
+syn:    our VARIABLE
+name:   our
+desc:   declares a package scoped variable
+ex:     our @foo;
+
+id:     scope_declarator:state
+token:  state
+syn:    state VARIABLE
+name:   state
+desc:   declares a lexically scoped variable whos scope is presevered across
+        multiple executions of the block
+ex:     sub iterator {
+            state $c = 0; # assignment only executed at first call
+            return ++$c;
+        }
+        say iterator(); # prints 1
+        say iterator(); # prints 2
+        say iterator(); # prints 3
+
+id:     scope_declarator:constant
+token:  constant
+syn:    constant VARIABLE = VALUE;
+name:   constant
+desc:   declares a lexically scoped constant. Assignment happens at compile 
+        time.
+ex:     constant $pi = 3.14159;
+
+=end perlhints
 
 token scope_declarator:my       { <sym> <scoped> {*} }          #= my
 token scope_declarator:our      { <sym> <scoped> {*} }          #= our
