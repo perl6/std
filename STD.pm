@@ -2895,6 +2895,8 @@ token infix:sym<?> ( --> Conditional)
 
 
 ## assignment
+# There is no "--> type" because assignment may be coerced to either
+# item assignment or list assignment at "make" time.
 token infix:sym<=> ()
 {
     <sym>
@@ -3457,7 +3459,9 @@ grammar Regex is Perl {
 
 # token panic (Str $s) { <commit> <fail($s)> }
 
-method panic (@fate, Str $s) { warn "############# PARSE FAILED #############\n";die "$s" }
+method panic (@fate, Str $s) {
+    warn "############# PARSE FAILED #############\n";die "$s"
+}
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
 method obs (@fate, Str $old, Str $new, Str $when = ' in Perl 6') {
