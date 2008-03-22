@@ -525,7 +525,7 @@ ex:     INNER:
 =end perlhints
 
 token label {
-    <ident> ':' \s <.ws>
+    <ident> ':' <?before \s> <.ws>
 
     [ <?{ $¢.is_type($<ident>) }>
       <suppose("You tried to use an existing name $/{'ident'} as a label")>
@@ -539,6 +539,7 @@ token label {
 
 token statement {
     :my StrPos $endstmt is context<rw> = -1;
+    <.ws>
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
@@ -979,7 +980,7 @@ ex:     say @list.grep(matcher => &my_function);
 =end perlhints
 
 token fatarrow {
-    <key=ident> \h* '=>' <val=EXPR(%item_assignment)>
+    <key=ident> \h* '=>' <.ws> <val=EXPR(%item_assignment)>
 }
 
 token colonpair {
@@ -1185,6 +1186,7 @@ token methodop {
 
 token arglist {
     :my StrPos $endargs is context<rw> = 0;
+    <.ws>
     <EXPR(%list_prefix)>
 }
 
@@ -2850,6 +2852,7 @@ token infix:sym<//> ( --> Tight_or)
 ## conditional
 token infix:sym<?? !!> ( --> Conditional) {
     '??'
+    <.ws>
     <EXPR(%conditional)>
     [ '!!' ||
         [
@@ -2917,10 +2920,10 @@ token infix:sym<minmax> ( --> List_infix)
     { <sym> {*} }                                               #= minmax
 
 token term:sigil ( --> List_prefix)
-    { <sym=sigil> \s <arglist> {*} }                                #= $
+    { <sym=sigil> <?before \s> <arglist> {*} }                                #= $
 
 token term:typecast ( --> List_prefix)
-    { <sym=typename> \s <arglist> {*} }                             #= Type
+    { <sym=typename> <nofat_space> <arglist> {*} }                             #= Type
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last term: rule)
@@ -2928,7 +2931,7 @@ token term:listop ( --> List_prefix)
 {
         <sym=ident>
         [
-        || \s <nofat> <arglist> {*}                             #= listop args
+        || <nofat_space> <arglist> {*}                          #= listop args
         || <nofat> {*}                                          #= listop noarg
         ]
         {*}                                                     #= listop
@@ -3066,7 +3069,7 @@ method EXPR (@fate,
     loop {
         warn "In loop, at ", $here.pos, "\n";
         %thisop = ();
-        my @t = $here.expect_term([], @f);
+        my @t = $here.expect_term([], @f);       # eats ws too
         die "EXPR failed to match expect_term" unless @t;
         @f = ('');
         $here = @t[0];
@@ -3103,10 +3106,11 @@ method EXPR (@fate,
         my @infix = $here.expect_infix([]);
         last unless @infix;
         my $infix = @infix[0];
-        $here = $infix.ws([]);
         
         # XXX might want to allow this in a declaration though
         if not $infix { $here.panic([],"Can't have two terms in a row") }
+
+        $here = $infix.ws([]);
 
         if not defined %thisop<prec> {
             warn "No prec given in thisop!\n";
