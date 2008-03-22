@@ -2,6 +2,8 @@ our $CTX;
 $CTX->{lvl} = 0;
 package Cursor5;
 
+my $lexverbose = 0;
+
 use strict;
 use warnings;
 use Encode;
@@ -64,6 +66,10 @@ sub from { $_[0]->{from} }
 sub to { $_[0]->{to} }
 sub pos { $_[0]->{pos} }
 sub name { $_[0]->{name} }
+
+# unwarranted chumminess with Perl grammar
+sub ws_from { $_[0]->{name} }
+sub ws_to { $_[0]->{name} }
 
 sub lexers { my $self = shift;
     \%lexers;    # XXX should be different per language, sigh
@@ -178,7 +184,7 @@ sub _AUTOLEXnow { my $self = shift;
 		my $i = 1;
 		$pat =~ s/\((?!\?[#:])/( (?#@{[$i++]})/g;
 	    }
-	    warn "PAT: ", $pat,"\n";
+	    warn "PAT: ", $pat,"\n" if $lexverbose;
 	    $pat =~ s/\(\?#.*?\)//g;
 	    $pat =~ s/^[ \t]*\n//gm;
 
@@ -194,11 +200,11 @@ sub _AUTOLEXnow { my $self = shift;
 #	    warn "PAT: ", $pat,"\n";
 
 	    my $fate = $stuff->{FATES};
-	    warn "#FATES: ", @$fate + 0, "\n";
+	    warn "#FATES: ", @$fate + 0, "\n" if $lexverbose;
 
 	    unshift @$fate, "";	# start at $1
 	    for my $i (1..@$fate-1) {
-		warn $i, ': ', $fate->[$i], "\n";
+		warn $i, ': ', $fate->[$i], "\n" if $lexverbose;
 	    }
 	    my $result = "";
 	    pos($$buf) = $C->{pos};
@@ -222,9 +228,11 @@ sub _AUTOLEXnow { my $self = shift;
 			my $end = $+[$x];
 			my $f = $fate->[$x];
 			no strict 'refs';
-			warn "\$$x: $beg..$end\t$$x\t ",
-			    $x == $last ? "====>" : "---->",
-			    " $f\n";
+			if ($lexverbose or $x == $last) {
+			    warn "\$$x: $beg..$end\t$$x\t ",
+				$x == $last ? "====>" : "---->",
+				" $f\n";
+			}
 		    }
 		    warn "success at '", substr($$buf,$C->{pos},10), "'\n";
 		}
@@ -257,6 +265,22 @@ sub setname { my $self = shift;
     sub to { my $self = shift;
 	$self->{_t};
     }
+
+    sub dump { my $self = shift;
+	my $name = shift // 'Match';
+	my $text = "$name: $$self{_f}..$$self{_t}\n";
+	foreach my $k (sort keys %$self) {
+	    next if $k =~ /^_/;
+	    my $v = $$self{$k};
+	    if (ref $v) {
+		$text .= ::indent($v->dump($k));
+	    }
+	    else {
+		$text .= "$k: $v\n";
+	    }
+	}
+	$text;
+    }
 }
 
 sub matchify { my $self = shift;
@@ -279,8 +303,19 @@ sub matchify { my $self = shift;
 	    $bindings->{$k} = $v->[0];
 	}
     }
-    warn Dump($self);
+    delete $self->{prior};
+    warn $self->dump;
     $self;
+}
+
+sub dump { my $self = shift;
+    my $name = shift // 'Cursor';
+    my $text = "$name: $$self{from}..$$self{to}\n";
+    if ($self->{M}) {
+	$text .= ::indent($self->{M}->dump($$self{name}));
+    }
+    $text =~ s/ +$//;
+    $text;
 }
 
 sub cursor_all { my $self = shift;
@@ -1042,6 +1077,7 @@ sub _REDUCE { my $self = shift;
     local $CTX = $self->callm($tag);
     my $P = $self->{pos};
     my $F = $self->{from};
+    $self->{R} = $tag;
     warn "Success $tag from $F to $P\n";
 #    $self->whats;
     $self;
@@ -1298,7 +1334,7 @@ sub fail { my $self = shift;
 		    $prefix = @$FATES[-1] . " ";
 		}
 		my $flen = 0+@$FATES;
-                my $lexer = $C->$name(['?']);
+                my $lexer = $C->$name(['?', 'peek']);
 		warn "FATES CHANGED" unless $flen == 0+@$FATES;
 		for my $fate (@{$lexer->{FATES}}) {
 		    push @$FATES, "$prefix$fate";
@@ -1339,7 +1375,7 @@ sub fail { my $self = shift;
                 return $result;
             }
             else {
-                my $lexer = $C->$name(['?'], $re);
+                my $lexer = $C->$name(['?', 'peek'], $re);
 		my $pat = $lexer->{PAT};
 		return '' unless $pat =~ /\S/;
 		return $pat unless $q;
@@ -1364,7 +1400,7 @@ sub fail { my $self = shift;
                 return '';
             }
             else {
-                my $lexer = $C->$name(['?'], $str);
+                my $lexer = $C->$name(['?', 'peek'], $str);
 		my $pat = $lexer->{PAT};
 		return '' unless $pat =~ /\S/;
 		return $pat unless $q;

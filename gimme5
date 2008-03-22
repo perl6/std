@@ -399,7 +399,11 @@ END
             my $body = <<'END';
 <<DECL>>
     local $CTX = $C->callm("@fate");
-    $binding eq '?' and return <<PEEK>>;
+    if ($binding eq '?') {
+        if ($fate[0] eq 'peek') { return <<PEEK>> }
+        <<PROPS>>
+        return $C-><<PROTONAME>>(['?',@fate]);
+    }
 
     if (@fate and $fate[0] =~ /^<<NAME>>/) {
       warn "Fate passed to <<NAME>>: @fate\n";
@@ -423,6 +427,8 @@ END
     );
 END
 
+            my $PROTONAME = $NAME;
+            $PROTONAME =~ s/__.*// or $PROTONAME = "panic";
             if ($impure{$NAME}) {
                 $body =~ s/<<PEEK>>/''/;
             }
@@ -431,6 +437,8 @@ END
             }
             $body =~ s/<<PKG>>/$PKG/g;
             $body =~ s/<<NAME>>/$NAME/g;
+            $body =~ s/<<PROPS>>//g;
+            $body =~ s/<<PROTONAME>>/$PROTONAME/g;
             $body =~ s/<<DECL>>/$sym@DECL/;
             $body =~ s/<<MEAT>>/$meat/;
             $body =~ s/\$\+(\w+)/\$$1/g;
@@ -1222,7 +1230,7 @@ sub unbalanced {
         }
         $text = ::un6($text);
         my $ctx = $$self{context};
-        $text = 'my $M = $C->matchify->{M}; ' . $text . '; $C; ' if $NEEDMATCH;
+        $text = 'my $M = $C->matchify->{M}; ' . $text . ';' if $NEEDMATCH;
         if ($text =~ s/\bmake\b/scalar/g) {  # XXX hack, avoid using $<make>
             "do {$text}";
         }
@@ -1300,7 +1308,7 @@ sub unbalanced {
         my $self = shift;
         local $NEEDMATCH = 0;
         my $text = ::un6($$self{text} . ';');
-        $text = 'my $M = $C->matchify->{M}; ' . $text . '; $C; ' if $NEEDMATCH;
+        $text = 'my $M = $C->matchify->{M}; ' . $text . '; ' if $NEEDMATCH;
         $text;
     }
 }
@@ -1442,7 +1450,7 @@ END
         $PURE = 0 if $impure{$name};
 
         my $re = '$C->' . $name . "($args)";
-        $re = 'do {my $M = $C->matchify->{M}; ' . $re . '; $C; }' if $NEEDMATCH;
+        $re = 'do {my $M = $C->matchify->{M}; ' . $re . '; }' if $NEEDMATCH;
         $re;
     }
 }
@@ -1500,7 +1508,7 @@ END
         $rest =~ s/\(,? *//;
         push @TOKEN, "\$C->$name$rest'?')" if $PURE;
         my $re = "\$C->$name($binding, $rest)";
-        $re = 'do { my $M = $C->matchify->{M}; ' . $re . '; $C; }' if $NEEDMATCH;
+        $re = 'do { my $M = $C->matchify->{M}; ' . $re . '; }' if $NEEDMATCH;
     }
 }
 

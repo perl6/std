@@ -234,13 +234,13 @@ token category:quote { <sym> }
 proto token quote (:$endsym is context = 'nofat') { }
 
 token category:prefix { <sym> }
-proto token prefix is defequiv(%symbolic_unary) { }
+proto token prefix is unary is defequiv(%symbolic_unary) { }
 
 token category:infix { <sym> }
-proto token infix is defequiv(%additive) { }
+proto token infix is binary is defequiv(%additive) { }
 
 token category:postfix { <sym> }
-proto token postfix is defequiv(%autoincrement) { }
+proto token postfix is unary is defequiv(%autoincrement) { }
 
 token category:dotty { <sym> }
 proto token dotty (:$endsym is context = 'unspacey') { }
@@ -249,7 +249,7 @@ token category:circumfix { <sym> }
 proto token circumfix { }
 
 token category:postcircumfix { <sym> }
-proto token postcircumfix { }
+proto token postcircumfix is unary { }  # unary as far as EXPR knows...
 
 token category:regex_metachar { <sym> }
 proto token regex_metachar { }
@@ -306,22 +306,22 @@ token category:statement_mod_loop { <sym> }
 proto rule  statement_mod_loop (:$endsym is context = 'nofat') { }
 
 token category:infix_prefix_meta_operator { <sym> }
-proto token infix_prefix_meta_operator { }
+proto token infix_prefix_meta_operator is binary { }
 
 token category:infix_postfix_meta_operator { <sym> }
-proto token infix_postfix_meta_operator { }
+proto token infix_postfix_meta_operator is binary { }
 
 token category:infix_circumfixfix_meta_operator { <sym> }
-proto token infix_circumfixfix_meta_operator { }
+proto token infix_circumfixfix_meta_operator is binary { }
 
 token category:postfix_prefix_meta_operator { <sym> }
-proto token postfix_prefix_meta_operator { }
+proto token postfix_prefix_meta_operator is unary { }
 
 token category:prefix_postfix_meta_operator { <sym> }
-proto token prefix_postfix_meta_operator { }
+proto token prefix_postfix_meta_operator is unary { }
 
 token category:prefix_circumfix_meta_operator { <sym> }
-proto token prefix_circumfix_meta_operator { }
+proto token prefix_circumfix_meta_operator is unary { }
 
 token unspacey { <.unsp>? }
 token nofat_space { <nofat> <?before \s | '#'> }
@@ -542,7 +542,7 @@ token statement {
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
-    | <expect_term> <expr=EXPR(:seen($<expect_term>))>  {*}         #= expr
+    | <expr=EXPR()>  {*}                                        #= expr
         [
         || <?before <stdstopper>>
         || <statement_mod_loop> <loopx=EXPR> {*}            #= mod loop
@@ -601,7 +601,8 @@ ex:     {
 
 rule statement_control:use {\
     <sym>
-    <module_name> <EXPR>? <eat_terminator>           {*}        #= use
+    <module_name> <EXPR>?
+    {*}
 }
 
 =begin perlhints
@@ -617,7 +618,8 @@ ex:     no Test;
 
 rule statement_control:no {\
     <sym>
-    <module_name> <EXPR>? <eat_terminator>           {*}        #= no
+    <module_name> <EXPR>?
+    {*}
 }
 
 =begin perlhints
@@ -923,35 +925,6 @@ token expect_term {
     <post>*
     <.ws>
     <adverbs>?
-
-    # now push ops over the noun according to precedence.
-    { make $¢.nounphrase(:noun($<noun>), :pre(@<pre>), :post(@<post>)) }
-}
-
-# XXX no @fate, so may not be called as a rule
-method nounphrase (:$noun, :@pre is rw, :@post is rw) {
-    my $nounphrase = $noun;
-    my $pre = pop @pre;
-    my $post = shift @post;
-    while $pre or $post {
-        my $oldterm = $nounphrase;
-        if $pre {
-            if $post and $post<prec> gt $pre<prec> {
-                $nounphrase = $post;
-                $post = shift @post;
-            }
-            else {
-                $nounphrase = $pre;
-                $pre = pop @pre;
-            }
-        }
-        else {
-            $nounphrase = $post;
-            $post = shift @post;
-        }
-        $nounphrase<term> = $oldterm;
-    }
-    return $nounphrase;
 }
 
 token adverbs {
@@ -2587,10 +2560,10 @@ token circumfix:sym<[ ]> ( --> Term)
 
 ## methodcall
 
-token infix:sym<.> ( --> Methodcall)
+token infix:sym<.> ()
     { '.' <obs('. to concatenate strings', '~')> }
 
-token postfix:sym['->'] ( --> Methodcall)
+token postfix:sym['->'] ()
     { '->' <obs('-> to call a method', '.')> }
 
 ## autoincrement
@@ -3010,7 +2983,7 @@ regex stdstopper {
     | <statement_mod_cond>
     | <statement_mod_loop>
     | <?before '{' | <lambda> ><?after \s>
-    | <?{ $¢.pos === $+endstmt }>
+    | <?{ $¢.ws_from === $+endstmt }>
     | <?{ $¢.pos === $+endargs }>
 #    | <$+unitstopper>
 }
@@ -3019,10 +2992,13 @@ regex stdstopper {
 
 method EXPR (@fate,
                 %preclim = %LOOSEST,
-                :$stop = self.can('stdstopper'),
-                :$seen,
+                :$stop = self.can('stdstopper')
             )
 {
+    if @fate[0] eq '?' {
+        return self.expect_term(@fate);
+    }
+    my @f = @fate;
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
 #    my @terminator = self.before(-> $s { $stop($s:) } );
@@ -3034,15 +3010,7 @@ method EXPR (@fate,
 
     push @opstack, item %terminator;         # (just a sentinel value)
 
-    my $here;
-    if $seen {
-        $here = $seen;
-    }
-    else {
-        my @t = self.expect_term(['',@fate]);
-        $here = @t[0];
-    }
-    push @termstack, $here;
+    my $here = self;
     warn "In EXPR, at ", $here.pos, "\n";
 
     my &reduce := -> {
@@ -3081,11 +3049,14 @@ method EXPR (@fate,
                 my @list;
                 warn "Termstack size: ", +@termstack, "\n";
 
-                #$op<top><right> = pop @termstack;
-                #$op<top><left> = pop @termstack;
-
-                $op<top><right> = pop @termstack;
-                $op<top><left> = pop @termstack;
+                warn Dump($op);
+                if $op<top><R> ~~ /^infix/ {
+                    $op<top><right> = pop @termstack;
+                    $op<top><left> = pop @termstack;
+                }
+                else {
+                    $op<top><arg> = pop @termstack;
+                }
 
                 push @termstack, $op<top>;
             }
@@ -3094,6 +3065,36 @@ method EXPR (@fate,
 
     loop {
         warn "In loop, at ", $here.pos, "\n";
+        %thisop = ();
+        my @t = $here.expect_term([], @f);
+        die "EXPR failed to match expect_term" unless @t;
+        @f = ('');
+        $here = @t[0];
+
+        # interleave prefix and postfix, pretend they're infixish
+        my @pre;
+        @pre = @($here<pre>) if $here<pre>;
+        my @post;
+        @post = @($here<post>) if $here<post>;
+        loop {
+            if @pre {
+                if @post and @post[0]<prec> gt @pre[0]<prec> {
+                    push @opstack, shift @post;
+                }
+                else {
+                    push @opstack, pop @pre;
+                }
+            }
+            elsif @post {
+                push @opstack, shift @post;
+            }
+            else {
+                last;
+            }
+        }
+
+        push @termstack, $here<noun>;
+        warn "after push: " ~ (0+@termstack), "\n";
         my @terminator = $here.before([], -> $s { $stop($s, []) } );
         my $t = @terminator[0];
     last if defined $t and @terminator[0].bool;
@@ -3140,11 +3141,6 @@ method EXPR (@fate,
         if @terminator and @terminator[0].bool {
             $here.panic([], "$infix.perl() is missing right term");
         }
-        %thisop = ();
-        my @t = $here.expect_term([]);
-        $here = @t[0];
-        push @termstack, $here;
-        warn "after push: " ~ +@termstack, "\n";
     }
     reduce() while +@termstack > 1;
     @termstack == 1 or $here.panic([], "Internal operator parser error, termstack == {+@termstack}");
@@ -3169,33 +3165,34 @@ grammar Regex is Perl {
         :my $ratchet     is context<rw> = $+ratchet     // 0;
         :my $insensitive is context<rw> = $+insensitive // 0;
         :my $basechar    is context<rw> = $+basechar    // 0;
-        <regex_ordered_disjunction>
+        <regex_first>
         {*}
     }
 
-    rule regex_ordered_disjunction {
+    rule regex_first {
         '||'?
-        <regex_ordered_conjunction> ** '||'
+        <regex_every> ** '||'
         {*}
     }
 
-    rule regex_ordered_conjunction {
+    rule regex_every {
         <regex_submatch> ** '&&'
         {*}
     }
 
     rule regex_submatch {
-        <regex_unordered_disjunction> ** [ \!?'~~' ]
+        <regex_any> ** [ \!?'~~' ]
         {*}
     }
 
-    rule regex_unordered_disjunction {
+    # XXX shouldn't need lookahead if LTM works transitively...
+    rule regex_any {
         [ '|' <!before '|'> ]?
-        <regex_unordered_conjunction> ** [ '|' <!before '|'> ]
+        <regex_all> ** [ '|' <!before '|'> ]
         {*}
     }
 
-    rule regex_unordered_conjunction {
+    rule regex_all {
         <regex_sequence> ** [ '&' <!before '&'> ]
         {*}
     }

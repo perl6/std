@@ -6,12 +6,16 @@ use warnings;
 
 sub print_usage_and_exit {
     print STDERR <<"END"; exit(2);
-$0 GRAMMAR_RULE [ INPUT_FILE | -e INPUT ]
+$0 [-fo] GRAMMAR_RULE [ INPUT_FILE | -e INPUT ]
 
 Examples:
   $0 noun -e 42
 END
 }
+
+my $fo = '';
+$fo = shift if $ARGV[0] eq '-fo';
+
 sub main {
     print_usage_and_exit if @ARGV < 2 || $ARGV[0] eq '--help';
     my $rule = shift(@ARGV);
@@ -34,7 +38,7 @@ sub main {
 		-M 'STD5.pm' > -M 'STD.pm' or
 		-M 'STD5.pm' > -M 'cheat' or
 		-M 'STD5.pm' > -M 'gimme5') {
-	    system("./cheat STD.pm | ./gimme5 -fo >STD5.pm");
+	    system("./cheat STD.pm | ./gimme5 $fo >STD5.pm");
 	    system("rm -f lex/*");
 	}
     }
