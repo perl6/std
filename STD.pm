@@ -324,7 +324,7 @@ token category:prefix_circumfix_meta_operator { <sym> }
 proto token prefix_circumfix_meta_operator is unary { }
 
 token unspacey { <.unsp>? }
-token nofat_space { <nofat> <?before \s | '#'> }
+token nofat_space { <?before \s | '#'> <?nofat> }
 
 # Lexical routines
 
@@ -539,11 +539,10 @@ token label {
 
 token statement {
     :my StrPos $endstmt is context<rw> = -1;
-    <.ws>
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
-    | <expr=EXPR()>  {*}                                        #= expr
+    | <EXPR> {*}                                        #= expr
         [
         || <?before <stdstopper>>
         || <statement_mod_loop> <loopx=EXPR> {*}            #= mod loop
@@ -919,7 +918,7 @@ token pre {
 token expect_term {
     [
     | <noun>
-    | <pre>+ <noun>
+    | <pre>+ :: <noun>
     ]
 
     # also queue up any postfixes, since adverbs could change things
@@ -1111,14 +1110,8 @@ token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
     <lex1: hyper>
     [
-    | '«' <infix> '»'
-    | '«' <infix> '«'
-    | '»' <infix> '»'
-    | '»' <infix> '«'
-    | '<<' <infix> '>>'
-    | '<<' <infix> '<<'
-    | '>>' <infix> '>>'
-    | '>>' <infix> '<<'
+    | [ '«' | '»' ] <infix> [ '«' | '»' ]
+    | [ '<<' | '>>' ] <infix> [ '<<' | '>>' ]
     ]
     {*}                                                         #= « »
 }
@@ -1216,7 +1209,7 @@ rule scoped {
     [
     | <regex_declarator>
     | <package_declarator>
-    | <typename>*
+    | <fulltypename>*
         [ <variable_decl>
         | '(' <signature> ')' <trait>*
         | <plurality_declarator>
@@ -1612,6 +1605,7 @@ token desigilname {
 }
 
 token variable {
+    <?before <sigil> > ::
     [
     | <special_variable> {*}                                    #= special
     | <sigil> <twigil>?
@@ -1628,10 +1622,6 @@ token variable {
     | <sigil> \d+ {*}                                           #= $0
     # Note: $() can also parse as contextualizer in an expression; should have same effect
     | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
-    # Note: any ::() are handled within <name>, and subscript must be final part.
-    # A bare ::($foo) is not considered a variable, but ::($foo)::<$bar> is.
-    # (The point being that we want a sigil either first or last but not both.)
-    | <name> '::' <?before '<' | '«' | '{' > <postcircumfix> {*} #= FOO::<$x>
     ]
     {*}
 }
@@ -1657,7 +1647,7 @@ token twigil:sym<=> { <sym> }
 
 token name {
     [
-    | <ident> <nofat> <morename>*
+    | <ident> <morename>*
     | <morename>+
     ]
     {*}
@@ -1690,11 +1680,20 @@ token subcall {
     {*}
 }
 
+token packagevar {
+    # Note: any ::() are handled within <name>, and subscript must be final part.
+    # A bare ::($foo) is not considered a variable, but ::($foo)::<$bar> is.
+    # (The point being that we want a sigil either first or last but not both.)
+    <?before [\w+] ** '::' [ '<' | '«' | '{' ]> ::
+    <name> '::' <postcircumfix> {*} #= FOO::<$x>
+}
+
 token value {
     [
     | <quote>
     | <number>
     | <version>
+    | <packagevar>
     | <fulltypename>
     ]
     {*}
@@ -2127,7 +2126,7 @@ class TR_tweaker does QLang {
 
 token quotesnabber (*@q) {
     :my $delim is context<rw> = '' ;
-    <!before \w> <nofat> ::
+    <!before \w> <?nofat> ::
     <.ws>
 
     [ (<quotepair>) { push @q, $0 } <.ws> ]*
@@ -2531,7 +2530,7 @@ token statement_prefix:lazy    { <sym> <statement> {*} }        #= lazy
 
 ## term
 token term:sym<undef> ( --> Term) {
-    <sym> \h* <nofat>
+    <sym> <?nofat> \h*
     [ <?before '$/' >
         <obs('$/ variable as input record separator',
              "the filehandle's .slurp method")>
@@ -2916,8 +2915,9 @@ token infix:sym<X> ( --> List_infix)
 token infix:sym<Z> ( --> List_infix)
     { <sym> {*} }                                               #= Z
 
-token infix:sym<minmax> ( --> List_infix)
-    { <sym> {*} }                                               #= minmax
+# XXX tre workaround
+# token infix:sym<minmax> ( --> List_infix)
+#     { <sym> {*} }                                               #= minmax
 
 token term:sigil ( --> List_prefix)
     { <sym=sigil> <?before \s> <arglist> {*} }                                #= $
@@ -2929,10 +2929,13 @@ token term:typecast ( --> List_prefix)
 # (XXX for cheating purposes this rule must be the last term: rule)
 token term:listop ( --> List_prefix)
 {
-        <sym=ident>
+        <name> ::
         [
-        || <nofat_space> <arglist> {*}                          #= listop args
-        || <nofat> {*}                                          #= listop noarg
+        || '.(' <semilist> ')' {*}                               #= func args
+        || '(' <semilist> ')' {*}                                #= func args
+        || <?before \\ > <unsp> '.'? '(' <semilist> ')' {*}      #= func args
+        || <nofat_space> <arglist> {*}                           #= listop args
+        || <?nofat> {*}                                           #= listop noarg
         ]
         {*}                                                     #= listop
 }
@@ -2941,8 +2944,9 @@ token term:listop ( --> List_prefix)
 token infix:sym<and> ( --> Loose_and)
     { <sym> {*} }                                               #= and
 
-token infix:sym<andthen> ( --> Loose_and)
-    { <sym> {*} }                                               #= andthen
+# XXX tre workaround
+# token infix:sym<andthen> ( --> Loose_and)
+#     { <sym> {*} }                                               #= andthen
 
 ## loose or
 token infix:sym<or> ( --> Loose_or)
@@ -2951,8 +2955,9 @@ token infix:sym<or> ( --> Loose_or)
 token infix:sym<xor> ( --> Loose_or)
     { <sym> {*} }                                               #= xor
 
-token infix:sym<orelse> ( --> Loose_or)
-    { <sym> {*} }                                               #= orelse
+# XXX tre workaround
+# token infix:sym<orelse> ( --> Loose_or)
+#     { <sym> {*} }                                               #= orelse
 
 ## expression terminator
 
@@ -2993,15 +2998,18 @@ regex stdstopper {
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR (@fate,
+method EXPR ($fate,
                 %preclim = %LOOSEST,
                 :$stop = self.can('stdstopper')
             )
 {
-    if @fate[0] eq '?' {
-        return self.expect_term(@fate);
+    if $fate.[0] eq '?' {
+        if ($fate.[1] eq 'peek') {
+            $._AUTOLEXpeek('Perl::expect_term');
+            return $._AUTOLEXpeek('Perl::EXPR');
+        }
     }
-    my @f = @fate;
+    my $f = $fate;
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
 #    my @terminator = self.before(-> $s { $stop($s:) } );
@@ -3031,7 +3039,8 @@ method EXPR (@fate,
                     push @chain, pop(@opstack)<top>;
                 }
                 push @chain, pop(@termstack);
-                $op<top><chain> = reverse @chain;
+                @chain = reverse @chain if @chain > 1;
+                $op<top><chain> = @chain;
                 push @termstack, $op<top>;
             }
             when 'list' {
@@ -3044,7 +3053,8 @@ method EXPR (@fate,
                     pop(@opstack);
                 }
                 push @list, pop(@termstack);
-                $op<top><list> = reverse @list;
+                @list = reverse @list if @list > 1;
+                $op<top><list> = @list;
                 push @termstack, $op<top>;
             }
             default {
@@ -3069,9 +3079,9 @@ method EXPR (@fate,
     loop {
         warn "In loop, at ", $here.pos, "\n";
         %thisop = ();
-        my @t = $here.expect_term([], @f);       # eats ws too
+        my @t = $here.expect_term($f);       # eats ws too
         die "EXPR failed to match expect_term" unless @t;
-        @f = ('');
+        $f = [''];
         $here = @t[0];
 
         # interleave prefix and postfix, pretend they're infixish

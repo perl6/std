@@ -16,7 +16,7 @@ if (@ARGV) {
     }
 }
 
-use YAML::Syck;
+use YAML::XS;
 
 our %OUR = ( '$CTX' => 1 );
 our %RE = ();                   # turns into __DATA__ yaml
@@ -98,6 +98,7 @@ sub un6 {
         $f =~ s/^<\s*([^>]+)>//             	and $t .= do {my $x=$1; $x =~ s! !','!g; "{'$x'}"}, next;
         $f =~ s/^(\w+)((<[^>]*>)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
         $f =~ s/^(\w+)((«[^»]*»)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
+        $f =~ s/^self\.//                    	and $t .= qq/\$self->/, next;
         $f =~ s/^(\$\w+)\.//            	and $t .= qq/$1->/, next;
         $f =~ s/^(\$\w+)\(/(/            	and $t .= qq/$1->/, next;
         $f =~ s/^\(\$s:\)//            	        and $t .= qq/(\$s)/, next;
@@ -422,7 +423,7 @@ END
 END
 
             $body .= <<"END";
-    \$C->_MATCHIFY(\$binding,$coercion
+    \$self->_MATCHIFY(\$binding,$coercion
 <<MEAT>>
     );
 END
@@ -515,7 +516,7 @@ sub BUILD {
     $self->{ws_to} = 0;
 }
 
-use YAML::Syck;
+use YAML::XS;
 {
     local $/;
     my $yaml = <DATA>;
@@ -645,11 +646,11 @@ sub regex {
         push @decl, bless { text => $code, min => 0, max => 0 }, "RE_decl";
     }
 
-    my $od = ordered_disjunction();
+    my $od = first();
     return bless { decl => [@decl], re => $od, min => $od->{min} }, "RE";
 }
 
-sub ordered_disjunction {
+sub first {
     here();
     my @kids;
     my $min = 1_000_000_000;
@@ -658,7 +659,7 @@ sub ordered_disjunction {
 
     do {
         ws();
-        my $k = ordered_conjunction();
+        my $k = every();
         push @kids, $k;
         my $kidmin = $k->{min};
         $min = $kidmin if $kidmin < $min;
@@ -666,10 +667,10 @@ sub ordered_disjunction {
     } while s/^\|\|//;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => $min}, "RE_ordered_disjunction";
+    return bless { zyg => [@kids], min => $min}, "RE_first";
 }
 
-sub ordered_conjunction {
+sub every {
     here();
     my @kids;
     my $min = 0;
@@ -684,7 +685,7 @@ sub ordered_conjunction {
     } while s/^\&\&//;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => $min }, "RE_ordered_conjunction";
+    return bless { zyg => [@kids], min => $min }, "RE_every";
 }
 
 sub submatch {
@@ -693,7 +694,7 @@ sub submatch {
 
     do {
         ws();
-        push @kids, unordered_disjunction();
+        push @kids, any();
         ws();
     } while s/^\!?\~\~//;
 
@@ -701,7 +702,7 @@ sub submatch {
     return bless { zyg => [@kids], min => 0 }, "RE_submatch";
 }
 
-sub unordered_disjunction {
+sub any {
     here();
     my @kids;
     my $min = 1_000_000_000;
@@ -711,7 +712,7 @@ sub unordered_disjunction {
 
     do {
         ws();
-        my $k = unordered_conjunction();
+        my $k = all();
         push @kids, $k;
         my $kidmin = $k->{min};
         $min = $kidmin if $kidmin < $min;
@@ -722,10 +723,10 @@ sub unordered_disjunction {
 
     return $RE{$PKG . '::' . $ALTNAME} =
         bless { zyg => [@kids], min => $min, altname => $ALTNAME },
-              "RE_unordered_disjunction";
+              "RE_any";
 }
 
-sub unordered_conjunction {
+sub all {
     here();
     my @kids;
     my $min = 0;
@@ -741,7 +742,7 @@ sub unordered_conjunction {
     } while s/^ \& (?!\&) //x;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => $min }, "RE_unordered_conjunction";
+    return bless { zyg => [@kids], min => $min }, "RE_all";
 }
 
 sub sequence {
@@ -1519,7 +1520,7 @@ END
     }
 }
 
-{ package RE_ordered_conjunction; use base "REbase";
+{ package RE_every; use base "REbase";
     sub walk {
         my $self = shift;
         my @result;
@@ -1533,14 +1534,14 @@ END
             $result[0];
         }
         else {
-            ::panic("Can't reverse ordered conjunction") if $REV;
+            ::panic("Can't reverse serial conjunction") if $REV;
             my $result = ::indent(join("\nSAME\n", @result));
             $result;
         }
     };
 }
 
-{ package RE_ordered_disjunction; use base "REbase";
+{ package RE_first; use base "REbase";
     sub walk {
         my $self = shift;
         my @result;
@@ -1554,10 +1555,10 @@ END
             $result[0];
         }
         else {
-            ::panic("Can't reverse ordered disjunction") if $REV;
+            ::panic("Can't reverse serial disjunction") if $REV;
             for (@result) { s/^/push \@gather, / }
             my $result = "do { my \@gather;\n" .
-                            ::indent(join("or\n", @result)) .
+                            ::indent(join("\nor\n", @result)) .
                           ";\n  \@gather;\n}";
             $result;
         }
@@ -1614,7 +1615,7 @@ END
                         $PURE = 0 if $rest =~ /^0/;
                         $rest = "'$rest'";
                     }
-                    $quant = "$rep$h($rest, ";
+                    $quant = "\$C->$rep$h($rest, ";
                 }
                 $result = $quant . " sub { my \$C=shift;\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
             }
@@ -1699,7 +1700,7 @@ END
     }
 }
 
-{ package RE_unordered_conjunction; use base "REbase";
+{ package RE_all; use base "REbase";
     sub walk {
         my $self = shift;
         my @result;
@@ -1719,7 +1720,7 @@ END
     }
 }
 
-{ package RE_unordered_disjunction; use base "REbase";
+{ package RE_any; use base "REbase";
     sub walk {
         my $self = shift;
         my @result;

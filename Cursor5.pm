@@ -2,7 +2,7 @@ our $CTX;
 $CTX->{lvl} = 0;
 package Cursor5;
 
-my $lexverbose = 0;
+my $lexverbose = 1;
 
 use strict;
 use warnings;
@@ -38,10 +38,11 @@ sub new {
     my $buf = $self->{orig};
     warn " orig ", $$buf,"\n";
     $self->BUILD;
+    $self->_AUTOLEXpeek('Perl::expect_term');
     $self;
 }
 
-use YAML::Syck;
+use YAML::XS;
 
 my $VERBOSE = 1;
 my $RE_verbose = 1;
@@ -106,13 +107,12 @@ sub _AUTOLEXgen { my $self = shift;
     warn "AUTOLEXgen $key\n";
     my $lexer = {};
     (my $file = $key) =~ s/::/--/g;
-    if (-s "lex/$file.yml") {
-	warn "using cached lex/$file.yml\n";
+    if (-s "lex/$file") {
+	$lexer = loadlexer($key);
     }
     else {
 	{ package RE_base; 1; }
 	my $ast = $::RE{$key};	# should be per package
-#	my $ast = LoadFile("yamlg5/$file.yml");
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
 	local $FATES;
 	$FATES = [];
@@ -120,19 +120,45 @@ sub _AUTOLEXgen { my $self = shift;
 	$AUTOLEXED{$key} = $fakepos;
 	my $pat = $ast->longest($self,0);
 	warn "(null pattern)\n" unless $pat;
-#	if (Encode::is_utf8($pat)) { warn "UTF8 ON\n" } else { warn "UTF8 OFF\n" }
-	if ($pat =~ /Â/) { warn "bad Â\n" }
+	#$pat = Encode::encode('utf8', $pat);
+	#if (Encode::is_utf8($pat)) { warn "UTF8 ON\n" } else { warn "UTF8 OFF\n" }
+	#if ($pat =~ /Â/) { warn "bad Â\n" }
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
 	$lexer = { PAT => $pat, FATES => $FATES };
 	mkdir("lex") unless -d "lex";
-	open(my $cache, '>', "lex/$file.yml") // warn "Can't print: $!";
-	print $cache Dump($lexer) or warn "Can't print: $!";
+	open(my $cache, '>', "lex/$file") // warn "Can't print: $!";
+	binmode($cache, ":utf8");
+	print $cache join("\n", @$FATES, "PAT:\n$pat\n") or warn "Can't print: $!";
 	close($cache) or warn "Can't close: $!";
-	warn "regenerated lex/$file.yml\n";
+	warn "regenerated lex/$file\n";
+	if ($file eq 'Perl--expect_term') {
+	    system 'cp lex/Perl--expect_term lex/Perl--EXPR';
+	}
     }
     $lexer;
+}
+
+sub loadlexer {
+    my $key = shift;
+    (my $file = $key) =~ s/::/--/g;
+    warn "using cached lex/$file\n";
+
+    my @fates;
+    open(LEX, "lex/$file") or die "No lexer!";
+    binmode(LEX, ":utf8");
+    while (<LEX>) {
+	last if /^PAT:/;
+	push(@fates, $_);
+    }
+    chomp(@fates);
+
+    local($/);
+    my $pat = <LEX>;
+    close LEX;
+
+    return {"PAT" => $pat, "FATES" => \@fates};
 }
 
 sub _AUTOLEXnow { my $self = shift;
@@ -160,24 +186,19 @@ sub _AUTOLEXnow { my $self = shift;
 	    die "orig disappeared!!!" unless length($$buf);
 
 	    my $stuff;
-	    (my $file = $key) =~ s/::/--/g;
 	    if (exists $lexer->{PAT}) {
 		$stuff = {"PAT" => $lexer->{PAT}, "FATES" => $lexer->{FATES}};
 	    }
-	    elsif ((-e "lex/$file.yml")) {
-		$stuff = LoadFile("lex/$file.yml");
-	    }
 	    else {
-		die "No lexer!"
+		$stuff = loadlexer($key);
 	    }
 
 	    if ($stuff->{PAT} eq '') {
 		return '';
 	    }
 
-	    my $pat = '^' . decode('utf8', $stuff->{PAT});
-	    Encode::_utf8_off($pat);
-	    $pat = decode('utf8', $pat);
+	    my $pat = '^' . $stuff->{PAT};
+#	    print $pat,"\n", if $pat =~ /[^\0-\x7f]/;
 #	    if (Encode::is_utf8($pat)) { warn "UTF8 ON\n" } else { warn "UTF8 OFF\n" }
 	    
 	    {
@@ -192,6 +213,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    $pat =~ s/\s+//g;
 	    $pat =~ s/:://g;
 
+	    1 while $pat =~ s/\(\?:\)\??//;
 	    1 while $pat =~ s/\(((\?:)?)\)/($1 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
 	    my $tmp = $pat;
@@ -1313,7 +1335,7 @@ sub fail { my $self = shift;
                 $PURE = 0;
                 return '';
             }
-            elsif ($_ eq 'EXPR') {
+            elsif ($_ eq 'unsp') {
                 $PURE = 0;
                 return '';
             }
@@ -1327,23 +1349,27 @@ sub fail { my $self = shift;
                 $fakepos++;
                 return '[a-z_A-Z]';	# XXX not unicodey
             }
-            else {
-		# XXX should be ."$name"
-		my $prefix = '';
-		if (@$FATES) {
-		    $prefix = @$FATES[-1] . " ";
+	    elsif ($_ eq 'EXPR') {
+		if (not -e 'lex/Perl--EXPR') {
+		    $PURE = 0;
+		    return '';
 		}
-		my $flen = 0+@$FATES;
-                my $lexer = $C->$name(['?', 'peek']);
-		warn "FATES CHANGED" unless $flen == 0+@$FATES;
-		for my $fate (@{$lexer->{FATES}}) {
-		    push @$FATES, "$prefix$fate";
-		}
-		my $pat = $lexer->{PAT} // '';
-		return '' unless $pat =~ /\S/;
-		return $pat unless $q;
-                return '(?: ' . $pat . ')';
-            }
+	    }
+	    # XXX should be ."$name"
+	    my $prefix = '';
+	    if (@$FATES) {
+		$prefix = @$FATES[-1] . " ";
+	    }
+	    my $flen = 0+@$FATES;
+	    my $lexer = $C->$name(['?', 'peek']);
+	    warn "FATES CHANGED" unless $flen == 0+@$FATES;
+	    for my $fate (@{$lexer->{FATES}}) {
+		push @$FATES, "$prefix$fate";
+	    }
+	    my $pat = $lexer->{PAT} // '';
+	    return '' unless $pat =~ /\S/;
+	    return $pat unless $q;
+	    return '(?: ' . $pat . ')';
         }
     }
 }
@@ -1423,14 +1449,14 @@ sub fail { my $self = shift;
     }
 }
 
-{ package RE_ordered_conjunction; our @ISA = 'RE_base';
+{ package RE_every; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }
 }
 
-{ package RE_ordered_disjunction; our @ISA = 'RE_base';
+{ package RE_first; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
@@ -1542,14 +1568,14 @@ sub fail { my $self = shift;
     #method longest ($C) { ... }
 }
 
-{ package RE_unordered_conjunction; our @ISA = 'RE_base';
+{ package RE_all; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         $PURE = 0;
         '';
     }
 }
 
-{ package RE_unordered_disjunction; our @ISA = 'RE_base';
+{ package RE_any; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C,$q) = @_; 
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
