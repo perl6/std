@@ -398,7 +398,7 @@ token pod_comment {
 
 method UNIT ($unitstopper is context = "_EOS") {
     UNIT: do {
-        self.comp_unit([]);
+        self.comp_unit(['']);
     }
 }
 
@@ -871,19 +871,6 @@ token module_name:deprecated { 'v6-alpha' }
 
 =begin perlhints
 
-id:     whatever
-token:  *
-syn:    @list[*]
-name:   whatever star
-desc:   * in context of list index means "all the indices"
-ex:     @list.pick(*)  # pick all elements of @list in random order
-
-=end perlhints
-
-token whatever { '*' {*} }
-
-=begin perlhints
-
 id:     version
 token:  v .
 name:   version
@@ -895,7 +882,7 @@ ex:     v0.*.3
 =end perlhints
 
 token version:sym<v> {
-    v \d+ [ '.' (\d+ | <whatever>) ]* '+'?            {*}       #= vstyle
+    'v' [\d+ | '*'] ** '.' '+'?
 }
 
 ###################################################
@@ -1018,13 +1005,9 @@ token expect_infix {
     {*}
 }
 
-token dotty:sym<.+> { <sym> <methodop> {*} }                    #= plus
-token dotty:sym<.*> { <sym> <methodop> {*} }                    #= star
-token dotty:sym<.?> { <sym> <methodop> {*} }                    #= query
-token dotty:sym<.=> { <sym> <methodop> {*} }                    #= equals
-token dotty:sym<.^> { <sym> <methodop> {*} }                    #= caret
-token dotty:sym<.:> { <sym> <methodop> {*} }                    #= colon
-token dotty:sym<.>  { <sym> <dottyop>  {*} }                    #= plain
+# doing fancy as one rule simplifies LTM
+token dotty:sym<.*> { '.' <[+*?=^:]> <methodop> {*} }           #= fancy
+token dotty:sym<.>  { '.' <dottyop>  {*} }                      #= plain
 
 token dottyop {
     [
@@ -1844,7 +1827,7 @@ method heredoc (@fate) {
             $herestub.orignode<doc> = $here;
         }
         else {
-            self.panic([],"Ending delimiter $delim not found");
+            self.panic([''],"Ending delimiter $delim not found");
         }
     }
     return $here;
@@ -2209,7 +2192,7 @@ constant %open2close = (
 # assumes whitespace is eaten already
 
 method peek_delimiters (@fate) {
-    return self.peek_brackets([]) || do {
+    return self.peek_brackets(['']) || do {
         my $buf = self.<orig>;
         substr($$buf,self.<pos>,1) xx 2;
     }
@@ -3005,8 +2988,7 @@ method EXPR ($fate,
 {
     if $fate.[0] eq '?' {
         if ($fate.[1] eq 'peek') {
-            $._AUTOLEXpeek('Perl::expect_term');
-            return $._AUTOLEXpeek('Perl::EXPR');
+            return self._AUTOLEXpeek('Perl::EXPR');
         }
     }
     my $f = $fate;
@@ -3108,19 +3090,19 @@ method EXPR ($fate,
 
         push @termstack, $here<noun>;
         warn "after push: " ~ (0+@termstack), "\n";
-        my @terminator = $here.before([], -> $s { $stop($s, []) } );
+        my @terminator = $here.before([''], -> $s { $stop($s, ['']) } );
         my $t = @terminator[0];
     last if defined $t and @terminator[0].bool;
         %thisop = ();
-#        my @infix = $here.expect_tight_infix([], $preclim);
-        my @infix = $here.expect_infix([]);
+#        my @infix = $here.expect_tight_infix([''], $preclim);
+        my @infix = $here.expect_infix(['']);
         last unless @infix;
         my $infix = @infix[0];
         
         # XXX might want to allow this in a declaration though
-        if not $infix { $here.panic([],"Can't have two terms in a row") }
+        if not $infix { $here.panic([''],"Can't have two terms in a row") }
 
-        $here = $infix.ws([]);
+        $here = $infix.ws(['']);
 
         if not defined %thisop<prec> {
             warn "No prec given in thisop!\n";
@@ -3141,23 +3123,23 @@ method EXPR ($fate,
         # Equal precedence, so use associativity to decide.
         if @opstack[*-1]<prec> eq $thisprec {
             given %thisop<assoc> {
-                when 'non'   { $here.panic([],qq["$infix" is not associative]) }
+                when 'non'   { $here.panic([''],qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if %thisop<top><sym> !eqv @opstack[*-1]<top><sym>;
                 }
-                default { $here.panic([],qq[Unknown associativity "$_" for "$infix"]) }
+                default { $here.panic([''],qq[Unknown associativity "$_" for "$infix"]) }
             }
         }
         push @opstack, item %thisop;
-        @terminator = $here.before([], -> $s { $stop($s, []) } );
+        @terminator = $here.before([''], -> $s { $stop($s, ['']) } );
         if @terminator and @terminator[0].bool {
-            $here.panic([], "$infix.perl() is missing right term");
+            $here.panic([''], "$infix.perl() is missing right term");
         }
     }
     reduce() while +@termstack > 1;
-    @termstack == 1 or $here.panic([], "Internal operator parser error, termstack == {+@termstack}");
+    @termstack == 1 or $here.panic([''], "Internal operator parser error, termstack == {+@termstack}");
     return @termstack[0];
 }
 

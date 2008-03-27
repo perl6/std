@@ -2,7 +2,7 @@ our $CTX;
 $CTX->{lvl} = 0;
 package Cursor5;
 
-my $lexverbose = 1;
+my $lexverbose = 0;
 
 use strict;
 use warnings;
@@ -1336,6 +1336,10 @@ sub fail { my $self = shift;
                 return '';
             }
             elsif ($_ eq 'unsp') {
+                $PURE = 0;
+                return '';
+            }
+            elsif ($_ eq 'nofat_space') {
                 $PURE = 0;
                 return '';
             }

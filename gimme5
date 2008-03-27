@@ -98,7 +98,6 @@ sub un6 {
         $f =~ s/^<\s*([^>]+)>//             	and $t .= do {my $x=$1; $x =~ s! !','!g; "{'$x'}"}, next;
         $f =~ s/^(\w+)((<[^>]*>)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
         $f =~ s/^(\w+)((«[^»]*»)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
-        $f =~ s/^self\.//                    	and $t .= qq/\$self->/, next;
         $f =~ s/^(\$\w+)\.//            	and $t .= qq/$1->/, next;
         $f =~ s/^(\$\w+)\(/(/            	and $t .= qq/$1->/, next;
         $f =~ s/^\(\$s:\)//            	        and $t .= qq/(\$s)/, next;
@@ -128,6 +127,7 @@ sub un6 {
         $f =~ s/^\blet\b //             	and $t .= qq//, next;
         $f =~ s/^\bTrue\b//             	and $t .= qq/1/, next;
         $f =~ s/^\bFalse\b//             	and $t .= qq/0/, next;
+        $f =~ s/^([^\$])self\.//             	and $t .= qq/$1\$self->/, next;
         $f =~ s/^([^\$])self\b//             	and $t .= qq/$1\$self/, next;
         $f =~ s/^\.panic//              	and $t .= qq/->panic/, next;
         $f =~ s/^(\s)~(\s)/$2/            	and $t .= qq/$1./, next;
