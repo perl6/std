@@ -2,7 +2,7 @@ our $CTX;
 $CTX->{lvl} = 0;
 package Cursor5;
 
-my $lexverbose = 0;
+my $lexverbose = 1;
 
 use strict;
 use warnings;
@@ -12,6 +12,7 @@ our %AUTOLEXED;
 our $FATES;
 our $PURE;
 our $ALT;
+our $PREFIX;
 
 binmode(STDIN, ":utf8");
 binmode(STDERR, ":utf8");
@@ -145,7 +146,7 @@ sub loadlexer {
     (my $file = $key) =~ s/::/--/g;
     warn "using cached lex/$file\n";
 
-    my @fates;
+    my @fates = ('');
     open(LEX, "lex/$file") or die "No lexer!";
     binmode(LEX, ":utf8");
     while (<LEX>) {
@@ -201,10 +202,13 @@ sub _AUTOLEXnow { my $self = shift;
 #	    print $pat,"\n", if $pat =~ /[^\0-\x7f]/;
 #	    if (Encode::is_utf8($pat)) { warn "UTF8 ON\n" } else { warn "UTF8 OFF\n" }
 	    
-	    {
-		my $i = 1;
-		$pat =~ s/\((?!\?[#:])/( (?#@{[$i++]})/g;
-	    }
+#	    {
+#		my $i = 1;
+#		$pat =~ s/([^\\])\((?!\?[#:])/$1( (?#@{[$i++]})/g;
+#	    }
+	    my $fate = [];
+	    my $i = 1;
+	    $pat =~ s/([^\\])\(\s+\(\?#(FATE|START) (.*?)\)/$1( (?#@{ $fate->[$i] = $3; [$i++]} $2 $3)/g;
 	    warn "PAT: ", $pat,"\n" if $lexverbose;
 	    $pat =~ s/\(\?#.*?\)//g;
 	    $pat =~ s/^[ \t]*\n//gm;
@@ -221,10 +225,8 @@ sub _AUTOLEXnow { my $self = shift;
 
 #	    warn "PAT: ", $pat,"\n";
 
-	    my $fate = $stuff->{FATES};
 	    warn "#FATES: ", @$fate + 0, "\n" if $lexverbose;
 
-	    unshift @$fate, "";	# start at $1
 	    for my $i (1..@$fate-1) {
 		warn $i, ': ', $fate->[$i], "\n" if $lexverbose;
 	    }
@@ -1365,13 +1367,18 @@ sub fail { my $self = shift;
 		$prefix = @$FATES[-1] . " ";
 	    }
 	    my $flen = 0+@$FATES;
-	    my $lexer = $C->$name(['?', 'peek']);
+	    my $lexer;
+	    {
+		local $PREFIX;
+		$lexer = $C->$name(['?', 'peek']);
+	    }
 	    warn "FATES CHANGED" unless $flen == 0+@$FATES;
+	    my $pat = $lexer->{PAT} // '';
+	    return '' unless $pat =~ /\S/;
+	    $pat =~ s/(\(?#(?:FATE|START)) /$1$PREFIX /g if $PREFIX;
 	    for my $fate (@{$lexer->{FATES}}) {
 		push @$FATES, "$prefix$fate";
 	    }
-	    my $pat = $lexer->{PAT} // '';
-	    return '' unless $pat =~ /\S/;
 	    return $pat unless $q;
 	    return '(?: ' . $pat . ')';
         }
@@ -1508,6 +1515,10 @@ sub fail { my $self = shift;
 		$fakepos = $oldfakepos if $x =~ m/^0/;
 		return $atom . "{$x}";
 	    }
+	    else {
+		$PURE = 0;
+		return $atom;
+	    }
         }
 	$PURE = 0;
 	return '';
@@ -1592,15 +1603,18 @@ sub fail { my $self = shift;
             $fakepos = $oldfakepos;
 	    local $ALT = $base . $alt->{alt};
 	    push @$FATES, $ALT;
-            my $pat = ::indent($alt->longest($C,0));
-	    $pat = "OOPS" if $pat =~ m/^\s*$/;
-	    if ($pat =~ /\n/) {
-		$pat = "(\t\t(?#START $ALT)\n$pat\n)\t\t(?#END $ALT)";
+	    {
+		local $PREFIX = $PREFIX . ' ' . $ALT;
+		my $pat = ::indent($alt->longest($C,0));
+		$pat = "OOPS" if $pat =~ m/^\s*$/;
+		if ($pat =~ /\n/) {
+		    $pat = "(\t\t(?#START $PREFIX)\n$pat\n)\t\t(?#END $ALT)";
+		}
+		else {
+		    $pat = "( (?#FATE $PREFIX)\t$pat )";
+		}
+		push @result, $pat;
 	    }
-	    else {
-		$pat = "( (?# $ALT)\t$pat )";
-	    }
-            push @result, $pat;
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
         my $result = "\n(?:\n  " . ::indent(join "\n| ", @result) . "\n)";

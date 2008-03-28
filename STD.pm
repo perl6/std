@@ -904,6 +904,7 @@ token pre {
 
 token expect_term {
     [
+    | <stdstopper>
     | <noun>
     | <pre>+ :: <noun>
     ]
@@ -998,6 +999,7 @@ token expect_tight_infix ($loosest) {
 
 token expect_infix {
     [
+    | <stdstopper>
     | <infix><infix_postfix_meta_operator>*
     | <infix_prefix_meta_operator>
     | <infix_circumfix_meta_operator>
@@ -2982,8 +2984,7 @@ regex stdstopper {
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
 method EXPR ($fate,
-                %preclim = %LOOSEST,
-                :$stop = self.can('stdstopper')
+                %preclim = %LOOSEST
             )
 {
     if $fate.[0] eq '?' {
@@ -2994,8 +2995,6 @@ method EXPR ($fate,
     my $f = $fate;
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
-#    my @terminator = self.before(-> $s { $stop($s:) } );
-#    return () if @terminator and @terminator[0].bool;
     my $prevop is context<rw>;
     my %thisop is context<rw>;
     my @termstack;
@@ -3065,6 +3064,7 @@ method EXPR ($fate,
         die "EXPR failed to match expect_term" unless @t;
         $f = [''];
         $here = @t[0];
+        last unless $here<noun>;
 
         # interleave prefix and postfix, pretend they're infixish
         my @pre;
@@ -3090,14 +3090,12 @@ method EXPR ($fate,
 
         push @termstack, $here<noun>;
         warn "after push: " ~ (0+@termstack), "\n";
-        my @terminator = $here.before([''], -> $s { $stop($s, ['']) } );
-        my $t = @terminator[0];
-    last if defined $t and @terminator[0].bool;
         %thisop = ();
 #        my @infix = $here.expect_tight_infix([''], $preclim);
         my @infix = $here.expect_infix(['']);
         last unless @infix;
         my $infix = @infix[0];
+        last unless %thisop;  # probably a terminator
         
         # XXX might want to allow this in a declaration though
         if not $infix { $here.panic([''],"Can't have two terms in a row") }
@@ -3133,10 +3131,6 @@ method EXPR ($fate,
             }
         }
         push @opstack, item %thisop;
-        @terminator = $here.before([''], -> $s { $stop($s, ['']) } );
-        if @terminator and @terminator[0].bool {
-            $here.panic([''], "$infix.perl() is missing right term");
-        }
     }
     reduce() while +@termstack > 1;
     @termstack == 1 or $here.panic([''], "Internal operator parser error, termstack == {+@termstack}");
