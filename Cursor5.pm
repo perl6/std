@@ -2,8 +2,8 @@ our $CTX;
 $CTX->{lvl} = 0;
 package Cursor5;
 
-my $lexverbose = 1;
-my $DEBUG = 1;
+my $lexverbose = 0;
+my $DEBUG = 0;
 
 use strict;
 use warnings;
@@ -196,6 +196,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    1 while $pat =~ s/\(\?:\)\??//;
 	    1 while $pat =~ s/\(((\?:)?)\)/($1 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
+	    $pat =~ s/\\x20/ /g;
 	    my $tmp = $pat;
 	    "42" =~ /$tmp/;	# XXX see if p5 parses it
 
@@ -286,7 +287,12 @@ sub setname { my $self = shift;
 sub matchify { my $self = shift;
     my $bindings;
     warn "matchify ", ref $self, "\n" if $DEBUG;
-    $self->{M} = $bindings = 'Match'->new(_f => $self->{from}, _t => $self->{to} );
+    if ($self->{M}) {
+	@{$self->{M}}{'_f','_t'} = ($self->{from}, $self->{to});
+    }
+    else {
+	$self->{M} = $bindings = 'Match'->new(_f => $self->{from}, _t => $self->{to} );
+    }
     for (my $c = $self->{prior}; $c; $c = $c->{prior}) {
         my $n = $c->{name};
         warn "matchify prior $n\n" if $DEBUG;
@@ -326,6 +332,7 @@ sub cursor_all { my $self = shift;
     $r{orig} = $$self{orig};
     $r{ws_to} = $$self{ws_to};
     $r{ws_from} = $$self{ws_from};
+    $r{M} = $$self{M} if exists $$self{M};
     $r{from} = $fpos;
     $r{to} = $tpos;
     $r{pos} = $tpos;
@@ -342,6 +349,7 @@ sub cursor { my $self = shift;
     $r{orig} = $$self{orig};
     $r{ws_to} = $$self{ws_to};
     $r{ws_from} = $$self{ws_from};
+    $r{M} = $$self{M} if exists $$self{M};
     $r{from} = $self->{pos} // 0;
     $r{to} = $tpos;
     $r{pos} = $tpos;
@@ -358,6 +366,7 @@ sub cursor_rev { my $self = shift;
     $r{orig} = $$self{orig};
     $r{ws_to} = $$self{ws_to};
     $r{ws_from} = $$self{ws_from};
+    $r{M} = $$self{M} if exists $$self{M};
     $r{pos} = $fpos;
     $r{from} = $fpos;
     $r{to} = $self->{from};
@@ -594,8 +603,8 @@ sub before { my $self = shift;
 
     local $CTX = $self->callm;
     my @all = $block->($self);
-    if ((@all and $all[0]->{bool})) {
-        return $self->cursor($self->{pos})->retm($bind);
+    if (@all and $all[0]) {
+        return $all[0]->cursor_all(($self->{pos}) x 2)->retm($bind);
     }
     return ();
 }
@@ -609,8 +618,8 @@ sub after { my $self = shift;
     local $CTX = $self->callm;
     my $end = $self->cursor($self->{pos});
     my @all = $block->($end);          # Make sure $_->{from} == $_->{to}
-    if ((@all and $all[0]->{bool})) {
-        return $end->retm($bind);
+    if (@all and $all[0]) {
+        return $all[0]->cursor_all(($self->{pos}) x 2)->retm($bind);
     }
     return ();
 }

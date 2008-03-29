@@ -544,18 +544,18 @@ token statement {
     | <statement_control>                        {*}            #= control
     | <EXPR> {*}                                        #= expr
         [
-        || <?before <stdstopper>>
+        || <?stdstopper>
         || <statement_mod_loop> <loopx=EXPR> {*}            #= mod loop
         || <statement_mod_cond> <condx=EXPR>
             [
-            || <?before <stdstopper>> {*}                       #= mod cond
+            || <?stdstopper> {*}                       #= mod cond
             || <statement_mod_loop> <loopx=EXPR> {*}        #= mod condloop
             ]
         ]
         {*}                                                     #= modexpr
     | <?before ';'> {*}                                         #= null
     ]
-    <eat_terminator>
+    <.eat_terminator>
     {*}
 }
 
@@ -937,7 +937,7 @@ token noun {
     | <type_declarator>
     | <circumfix>
     | <dotty>
-    | <subcall>
+#    | <subcall>
     | <variable> { $<sigil> = $<variable><sigil> }
     | <value>
     | <capterm>
@@ -1165,7 +1165,8 @@ token methodop {
 token arglist {
     :my StrPos $endargs is context<rw> = 0;
     <.ws>
-    <EXPR(%list_prefix)>
+#    <EXPR(%list_prefix)>
+    <EXPR>
 }
 
 token circumfix:sym<{ }> ( --> Term) {
@@ -1659,27 +1660,27 @@ token sublongname {
     {*}
 }
 
-token subcall {
-    # XXX should this be sublongname?
-    <subshortname> <.unsp>? '.'? '(' <semilist> ')'
-    {*}
-}
+#token subcall {
+#    # XXX should this be sublongname?
+#    <subshortname> <.unsp>? '.'? '(' <semilist> ')'
+#    {*}
+#}
 
-token packagevar {
-    # Note: any ::() are handled within <name>, and subscript must be final part.
-    # A bare ::($foo) is not considered a variable, but ::($foo)::<$bar> is.
-    # (The point being that we want a sigil either first or last but not both.)
-    <?before [\w+] ** '::' [ '<' | '«' | '{' ]> ::
-    <name> '::' <postcircumfix> {*} #= FOO::<$x>
-}
+#token packagevar {
+#    # Note: any ::() are handled within <name>, and subscript must be final part.
+#    # A bare ::($foo) is not considered a variable, but ::($foo)::<$bar> is.
+#    # (The point being that we want a sigil either first or last but not both.)
+#    <?before [\w+] ** '::' [ '<' | '«' | '{' ]> ::
+#    <name> '::' <postcircumfix> {*} #= FOO::<$x>
+#}
 
 token value {
     [
     | <quote>
     | <number>
     | <version>
-    | <packagevar>
-    | <fulltypename>
+#    | <packagevar>
+#    | <fulltypename>
     ]
     {*}
 }
@@ -2535,8 +2536,8 @@ token term:sym<*> ( --> Term)
 token circumfix:sigil ( --> Term)
     { <sigil> '(' <semilist> ')' {*} }                          #= $( ) 
 
-token circumfix:typecast ( --> Term)
-    { <typename> '(' <semilist> ')' {*} }                       #= Type( ) 
+#token circumfix:typecast ( --> Term)
+#    { <typename> '(' <semilist> ')' {*} }                       #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
     { '(' <statementlist> ')'  {*} }                            #= ( )
@@ -2907,8 +2908,8 @@ token infix:sym<Z> ( --> List_infix)
 token term:sigil ( --> List_prefix)
     { <sym=sigil> <?before \s> <arglist> {*} }                                #= $
 
-token term:typecast ( --> List_prefix)
-    { <sym=typename> <nofat_space> <arglist> {*} }                             #= Type
+# token term:typecast ( --> List_prefix)
+#     { <sym=typename> <?nofat_space> <arglist> {*} }                             #= Type
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last term: rule)
@@ -2916,11 +2917,12 @@ token term:listop ( --> List_prefix)
 {
         <name> ::
         [
-        || '.(' <semilist> ')' {*}                               #= func args
-        || '(' <semilist> ')' {*}                                #= func args
-        || <?before \\ > <unsp> '.'? '(' <semilist> ')' {*}      #= func args
-        || <nofat_space> <arglist> {*}                           #= listop args
-        || <?nofat> {*}                                           #= listop noarg
+        | '.(' <semilist> ')' {*}                               #= func args
+        | '(' <semilist> ')' {*}                                #= func args
+#       | <?nofat_space> <arglist> {*}                           #= listop args
+        | <?before \s> <arglist> {*}                           #= listop args
+        | <?before \\ > <unsp> '.'? '(' <semilist> ')' {*}      #= func args
+        | <?nofat> {*}                                           #= listop noarg
         ]
         {*}                                                     #= listop
 }
@@ -2993,6 +2995,7 @@ method EXPR ($fate,
         }
     }
     my $f = $fate;
+    $f.[0] = 'expect_term' if $f.[0] eq 'EXPR';
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
     my $prevop is context<rw>;
@@ -3060,17 +3063,19 @@ method EXPR ($fate,
     loop {
         warn "In loop, at ", $here.pos, "\n";
         %thisop = ();
+        my $oldpos = $here.pos;
         my @t = $here.expect_term($f);       # eats ws too
         die "EXPR failed to match expect_term" unless @t;
         $f = [''];
         $here = @t[0];
-        last unless $here<noun>;
+        last unless $here.pos > $oldpos;
 
         # interleave prefix and postfix, pretend they're infixish
+        my $M = $here<M>;
         my @pre;
-        @pre = @($here<pre>) if $here<pre>;
+        @pre = @($M<pre>) if $M<pre>;
         my @post;
-        @post = @($here<post>) if $here<post>;
+        @post = @($M<post>) if $M<post>;
         loop {
             if @pre {
                 if @post and @post[0]<prec> gt @pre[0]<prec> {
@@ -3088,13 +3093,15 @@ method EXPR ($fate,
             }
         }
 
-        push @termstack, $here<noun>;
+        push @termstack, $here;
         warn "after push: " ~ (0+@termstack), "\n";
         %thisop = ();
 #        my @infix = $here.expect_tight_infix([''], $preclim);
+        $oldpos = $here.pos;
         my @infix = $here.expect_infix(['']);
         last unless @infix;
         my $infix = @infix[0];
+        last unless $infix.pos > $oldpos;
         last unless %thisop;  # probably a terminator
         
         # XXX might want to allow this in a declaration though
@@ -3133,13 +3140,13 @@ method EXPR ($fate,
         push @opstack, item %thisop;
     }
     reduce() while +@termstack > 1;
-    @termstack == 1 or $here.panic([''], "Internal operator parser error, termstack == {+@termstack}");
+    @termstack == 1 or $here.panic([''], "Internal operator parser error, termstack == " ~ (+@termstack));
     return @termstack[0];
 }
 
-#############################################3333
+#################################################
 ## Regex
-#############################################3333
+#################################################
 
 grammar Regex is Perl {
 
