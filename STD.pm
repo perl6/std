@@ -1679,8 +1679,8 @@ token value {
     | <quote>
     | <number>
     | <version>
-#    | <packagevar>
-#    | <fulltypename>
+#    | <packagevar>     # XXX see term:name for now
+#    | <fulltypename>   # XXX see term:name for now
     ]
     {*}
 }
@@ -2913,16 +2913,30 @@ token term:sigil ( --> List_prefix)
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last term: rule)
-token term:listop ( --> List_prefix)
+token term:name ( --> List_prefix)
 {
         <name> ::
         [
-        | '.(' <semilist> ')' {*}                               #= func args
-        | '(' <semilist> ')' {*}                                #= func args
-#       | <?nofat_space> <arglist> {*}                           #= listop args
-        | <?before \s> <arglist> {*}                           #= listop args
-        | <?before \\ > <unsp> '.'? '(' <semilist> ')' {*}      #= func args
-        | <?nofat> {*}                                           #= listop noarg
+        ||  <?{
+                $¢.is_type($<name>)
+            }> ::
+            # parametric type?
+            <.unsp>? [ <?before '['> <postcircumfix> ]?
+            [
+                '::'
+                <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
+                {*}                                              #= packagevar 
+            ]?
+            {*}                                                     #= typename
+        ||
+            [
+            | '.(' <semilist> ')' {*}                               #= func args
+            | '(' <semilist> ')' {*}                                #= func args
+    #       | <?nofat_space> <arglist> {*}                           #= listop args
+            | <?before \s> <arglist> {*}                           #= listop args
+            | <?before \\ > <unsp> '.'? '(' <semilist> ')' {*}      #= func args
+            | <?nofat> {*}                                           #= listop noarg
+            ]
         ]
         {*}                                                     #= listop
 }
