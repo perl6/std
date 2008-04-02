@@ -2540,10 +2540,10 @@ token circumfix:sigil ( --> Term)
 #    { <typename> '(' <semilist> ')' {*} }                       #= Type( ) 
 
 token circumfix:sym<( )> ( --> Term)
-    { '(' <statementlist> ')'  {*} }                            #= ( )
+    { '(' <semilist> ')'  {*} }                            #= ( )
 
 token circumfix:sym<[ ]> ( --> Term)
-    { '[' <statementlist> ']' {*} }                             #= [ ]
+    { '[' <semilist> ']' {*} }                             #= [ ]
 
 ## methodcall
 
