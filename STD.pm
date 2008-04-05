@@ -1010,6 +1010,7 @@ token expect_infix {
 # doing fancy as one rule simplifies LTM
 token dotty:sym<.*> { '.' <[+*?=^:]> <methodop> {*} }           #= fancy
 token dotty:sym<.>  { '.' <dottyop>  {*} }                      #= plain
+token dotty:sym<!>  { '!' <methodop>  {*} }                     #= private
 
 token dottyop {
     [
@@ -1148,7 +1149,7 @@ token postop {
 
 token methodop {
     [
-    | <ident>
+    | <name>
     | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]> > <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
