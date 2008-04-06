@@ -273,7 +273,12 @@ sub setname { my $self = shift;
 	foreach my $k (sort keys %$self) {
 	    next if $k =~ /^_/;
 	    my $v = $$self{$k};
-	    if (ref $v) {
+	    if (not defined $v) {
+		warn "$k undefined in $text";
+		print YAML::XS::Dump($self);
+		exit;
+	    }
+	    elsif (ref $v) {
 		$text .= ::indent($v->dump($k));
 	    }
 	    else {
@@ -382,7 +387,9 @@ sub callm { my $self = shift;
     my $arg = shift;
 
     my $lvl = 0;
-    while (caller($lvl)) { $lvl++ }
+    my @subs;
+    while (my @c = caller($lvl)) { $lvl++; (my $s = $c[3]) =~ s/^.*:://; $s =~ s/^__ANON//; push @subs, $s; }
+    splice(@subs, 0, 2);
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
     my $name = $subname;
     if (defined $arg) { 
@@ -390,7 +397,7 @@ sub callm { my $self = shift;
     }
     my $pos = '?';
     $pos = $self->{pos} if defined $self->{pos};
-    print STDERR $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n" if $DEBUG;
+    print STDERR $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "] @subs\n" if $DEBUG;
     {lvl => $lvl};
 }
 

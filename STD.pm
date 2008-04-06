@@ -1028,10 +1028,7 @@ token post {
     # last whitespace didn't end here (or was zero width)
     <?{ $¢.pos !=== $!ws_to or $!ws_to === $!ws_from  }>
 
-    [
-    | \\ <?before '.'>
-    | <.unsp>?
-    ]
+    <?unspacey>
 
     [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
 
@@ -1158,8 +1155,7 @@ token methodop {
     [
     | '.'? <.unsp>? '(' <semilist> ')'
     | ':' <?before \s> <!{ $+inquote }> <arglist>
-    | <null>
-    ]
+    ]?
     {*}
 }
 
@@ -1601,11 +1597,9 @@ token variable {
             <sublongname> {*}                                   #= subnoun
         || <desigilname> {*}                                    #= desigilname
         ]
-        [
-        | <?{ $<twigil> eq '.' }>
+        [ <?{ $<twigil> eq '.' }>
             <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
-        | <null> {*}                                            #= $?foo
-        ]
+        ]?
     | <sigil> \d+ {*}                                           #= $0
     # Note: $() can also parse as contextualizer in an expression; should have same effect
     | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
@@ -2438,8 +2432,7 @@ token param_var {
     || <ident>
 
         # bare sigil?
-    || <null>
-    ]
+    ]?
 }
 
 token parameter {
@@ -3410,7 +3403,7 @@ grammar Regex is Perl {
     token regex_assertion:bogus { <panic: unrecognized regex assertion> }
 
     token cclass_elem {
-        [ '+' | '-' | <null> ]
+        [ '+' | '-' ]?
         [
         | <name>
         | <before '['> <bracketed(QLang('cclass'))>
