@@ -480,6 +480,9 @@ syn:    regex { <regex> }
 name:   regex block
 desc:   delimits a regex, rule or token
 ex:     regex word { <alpha>+ }
+seealso: regex_declarator:regex
+seealso: regex_declarator:token
+seealso: regex_declarator:rule
 
 =end perlhints
 
@@ -611,8 +614,9 @@ id:     statement_control:no
 token:  no
 syn:    no MODULE EXPRESSION;
 name:   no
-desc:   Unload a module or class
+desc:   Unloads a module or class, or disables a pragma
 ex:     no Test;
+seealso: statement_control:use
 
 =end perlhints
 
@@ -667,6 +671,7 @@ desc:   executes a code block only if an expression yields False.
 ex:     unless $allowed {
             die "Insufficent permissions, aborting"
         }
+seealso: statement_control:if
 
 =end perlhints
 
@@ -811,10 +816,37 @@ id:     statement_control:given
 token:  given
 syn:    given EXPR BLOCK
 name:   given
-desc:   Sets the topic ($_) in BLOCK to EXPR
+desc:   Sets the topic ($_) in BLOCK to EXPR. Sets item context to EXPR.
 ex:     given @list {
             .sort.join('|').say
         }
+seealso: statement_control:when
+seealso: statement_control:default
+
+id:     statement_control:when
+token:  when
+syn:    when EXPRESSION BLOCK
+name:   when
+desc:   does a smartmatch of the current topic ($_) against EXPRESSION
+        and executes BLOCK if the match returned True.
+ex:     given $greeting {
+            when rx:i{dear}  { say "friendly" }
+            when rx:i{hi}    { say "informal" }
+            when rx:i{hello} { say "neutral"  }
+            default          { say "unclassified greeting" }
+        }
+seealso: statement_control:given
+seealso: statement_control:default
+
+id:     statement_control:default
+token:  default
+syn:    default BLOCK
+name:   default
+desc:   executes BLOCK if no 'when'-block mached in the current scope
+seealso: statement_control:when
+seealso: statement_control:given
+
+# TODO: BEGIN, CHECK, INIT, ...
 
 =end perlhints
 
@@ -1247,6 +1279,69 @@ name:   constant
 desc:   declares a lexically scoped constant. Assignment happens at compile 
         time.
 ex:     constant $pi = 3.14159;
+
+id:     scope_declarator:has
+token:  has
+syn:    has VARIABLE;
+syn:    has VARIABLE = VALUE;
+name:   has
+desc:   declares an object attribute, i.e. a variable that is stored
+        in every object of a class.
+        Only makes sense in classes, roles and grammars.
+ex:     class Perlhacker {
+            has $!brain;
+            has @.modules_on_cpan;
+        }
+seealso: package_declarator:class
+
+id:     package_declarator:class
+token:  class
+syn:    class CLASSNAME TRAITS; CLASSDEF
+syn:    class CLASSNAME TRAITS { CLASSDEF }
+name:   class
+desc:   declares a class. The TRAITS are optional. If the class declaration
+        ends with a semicolon ';' it expands over the rest of the file.
+        If it is followed by a curly brace, everything up to the closing brace
+        is considered to be the class definition.
+        A class comes with its own namespaces (with the same name as the class)
+ex:     class Array is also {
+            method length {
+                die "'Length' is a forbidden word in Perl 6";
+            }
+        }
+ex:     class Dog {
+            has $.name;
+            has @.legs;
+            method bark {
+                say "bark";
+            }
+        }
+seealso: scope_declarator:has
+seealso: routine_declarator:method
+
+id:     package_declarator:grammar
+token:  grammar
+syn:    grammar CLASSNAME TRAITS; CLASSDEFF
+syn:    grammar CLASSNAME TRAITS { CLASSDEF }
+name:   grammar
+desc:   declares a grammar, i.e a class that is designed to hold regexes,
+        rules and tokens. 
+ex:     grammar URL {
+            regex TOP {
+                <schema>
+                <host>?
+                <path>
+            }
+            token schema {
+                \w+ ':'
+            }
+            token host { ... }
+            ...
+        }
+seealso: regex_declarator:token
+seealso: regex_declarator:rule
+seealso: regex_declarator:regex
+seealso: package_declarator:class
 
 =end perlhints
 
