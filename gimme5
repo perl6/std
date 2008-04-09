@@ -1510,6 +1510,7 @@ END
         push @TOKEN, "\$C->$name$rest'?')" if $PURE;
         my $re = "\$C->$name($binding, $rest)";
         $re = 'do { my $M = $C->matchify->{M}; ' . $re . '; }' if $NEEDMATCH;
+        $re;
     }
 }
 

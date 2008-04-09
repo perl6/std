@@ -47,7 +47,7 @@ understand Perl 6 code.
 =end comment overview
 
 token TOP {
-    <UNIT( $+unitstopper or "_EOS" )>
+    <UNIT( $+unitstopper || "_EOS" )>
     {*}
 }
 
@@ -581,6 +581,7 @@ token eat_terminator {
     || ';'
     || <?{ $+endstmt === $!ws_from }>
     || <?before <terminator>>
+    || $
     || {{ if $¢.pos === $!ws_to { $¢.pos = $!ws_from } }}   # undo any line transition
         <panic: Statement not terminated properly>  # "can't happen" anyway :)
     ]
@@ -936,7 +937,7 @@ token pre {
 
 token expect_term {
     [
-    | <stdstopper>
+    | <?stdstopper>
     | <noun>
     | <pre>+ :: <noun>
     ]
@@ -948,6 +949,7 @@ token expect_term {
 }
 
 token adverbs {
+    <!stdstopper>
     [ <colonpair> <.ws> ]+
     {
         my $prop = $+prevop orelse
@@ -1030,8 +1032,8 @@ token expect_tight_infix ($loosest) {
 }
 
 token expect_infix {
+    <!stdstopper>
     [
-    | <stdstopper>
     | <infix><infix_postfix_meta_operator>*
     | <infix_prefix_meta_operator>
     | <infix_circumfix_meta_operator>
@@ -1056,7 +1058,7 @@ token dottyop {
 # as a lookahead by the quote interpolator.
 
 token post {
-
+    <!stdstopper>
     # last whitespace didn't end here (or was zero width)
     <?{ $¢.pos !=== $!ws_to or $!ws_to === $!ws_from  }>
 
@@ -1604,7 +1606,7 @@ method obscaret ($fate, Str $var, Str $sigil, Str $name) {
 
 token special_variable:sym<${ }> {
     ( <sigil> '{' (.*?) '}' )
-    <obs("$0 variable", "{$sigil}($1)")>
+    <obs("$0 variable", "{$<sigil>}($1)")>
 }
 
 token special_variable:sym<$[> {
@@ -2035,21 +2037,22 @@ role QLang {
         if @pedigree == 1 {
 #           my %start = try { self."root_of_@pedigree[0]" } //
             my %start = try { self.root_of_Q } //
-                panic("Quote construct " ~ @pedigree.[0] ~ "not recognized");
+                Perl::panic("Quote construct " ~ @pedigree.[0] ~ "not recognized");
             return self.bless(|%start);
         }
         else {
             my $tail = pop @pedigree;
-            my $self = qlang(@pedigree).clone
-                orelse fail "Can't clone {@pedigree}: $!";
+            my $self = Perl::qlang(@pedigree);
+#            my $self = Perl::qlang(@pedigree).clone
+#                orelse fail "Can't clone {@pedigree}: $!";
             return $self.tweak($tail);
         }
     }
 } # end role
 
 sub qlang (*@pedigree) {
-    my $pedigree = ~@pedigree;
-    (state %qlang){$pedigree} //= QLang.new(@pedigree);
+    my $pedigree = "@pedigree";
+    (state %qlang){$pedigree} //= Perl::QLang.new(@pedigree);
 }
 
 class Q_tweaker does QLang {
@@ -2068,14 +2071,14 @@ class Q_tweaker does QLang {
 
     # begin tweaks (DO NOT ERASE)
     multi method tweak (:single(:$q)) {
-        $q or panic("Can't turn :q back off");
-        %.option and panic("Too late for :q");
+        $q or Perl::panic("Can't turn :q back off");
+        %.option and Perl::panic("Too late for :q");
         %.option = (:b, :!s, :!a, :!h, :!f, :!c);
     }
 
     multi method tweak (:double(:$qq)) {
-        $qq or panic("Can't turn :qq back off");
-        %.option and panic("Too late for :qq");
+        $qq or Perl::panic("Can't turn :qq back off");
+        %.option and Perl::panic("Too late for :qq");
         %.option = (:b, :s, :a, :h, :f, :c);
     }
 
@@ -2118,7 +2121,7 @@ class Q_tweaker does QLang {
 
     multi method tweak (*%x) {
         my @k = keys(%x);
-        panic("Unrecognized quote modifier: " ~ @k);
+        Perl::panic("Unrecognized quote modifier: " ~ @k);
     }
     # end tweaks (DO NOT ERASE)
 
@@ -2162,7 +2165,7 @@ class RX_tweaker does QLang {
     multi method tweak (*%x) {
         my ($na) = keys(%x);
         my ($n,$a) = $na ~~ /^(\d+)(<[a-z]>+)$/
-            or panic("Unrecognized regex modifier: $na");
+            or Perl::panic("Unrecognized regex modifier: $na");
         if $a eq 'x' {
             %.option<x> = $n;
         }
@@ -2182,7 +2185,7 @@ class P5RX_tweaker does QLang {
 
     multi method tweak (*%x) {
         my @k = keys(%x);
-        panic("Unrecognized Perl 5 regex modifier: " ~ @k);
+        Perl::panic("Unrecognized Perl 5 regex modifier: " ~ @k);
     }
     # end tweaks (DO NOT ERASE)
 } # end class
@@ -2195,7 +2198,7 @@ class TR_tweaker does QLang {
 
     multi method tweak (*%x) {
         my @k = keys(%x);
-        panic("Unrecognized transliteration modifier: " ~ @k);
+        Perl::panic("Unrecognized transliteration modifier: " ~ @k);
     }
     # end tweaks (DO NOT ERASE)
 } # end class
@@ -2210,7 +2213,8 @@ token quotesnabber (*@q) {
     # Dispatch to current lang's subparser.
     {{
         my $lang = qlang('Q', @q);
-        $<delimited> := $lang.parser.($lang);  # XXX probably wrong
+        my $parser = $lang.parser;
+        $<delimited> := $lang.$parser($lang);  # XXX probably wrong
         $<delim> = $delim;
     }}
     {*}

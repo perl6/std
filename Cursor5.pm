@@ -2,7 +2,7 @@ our $CTX;
 $CTX->{lvl} = 0;
 package Cursor5;
 
-my $lexverbose = 0;
+my $lexverbose = 1;
 my $DEBUG = 1;
 
 use strict;
@@ -12,7 +12,7 @@ use Encode;
 our %AUTOLEXED;
 our $PURE;
 our $ALT;
-our $PREFIX;
+our $PREFIX = "";
 
 binmode(STDIN, ":utf8");
 binmode(STDERR, ":utf8");
@@ -177,7 +177,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    die "orig disappeared!!!" unless length($$buf);
 
 	    my $stuff;
-	    die "OOPS" unless $lexer;
+	    return '' unless $lexer;
 
 	    my $pat = '^' . $lexer->{PAT};
 
@@ -194,7 +194,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    $pat =~ s/:://g;
 
 	    1 while $pat =~ s/\(\?:\)\??//;
-	    1 while $pat =~ s/\(((\?:)?)\)/($1 !!!OOPS!!! )/;
+	    1 while $pat =~ s/([^\\])\(((\?:)?)\)/$1($2 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
 	    $pat =~ s/\\x20/ /g;
 	    my $tmp = $pat;
@@ -222,7 +222,7 @@ sub _AUTOLEXnow { my $self = shift;
 		    my $max = @+ - 1;
 		    my $last = @- - 1;	# ignore '$0'
 #		    print STDERR "LAST: $last\n";
-		    $result = $fate->[$last] // "OOPS";
+		    $result = $fate->[$last] // return '';
 		    for my $x (1 .. $max) {
 			my $beg = $-[$x];
 			next unless defined $beg;
@@ -275,8 +275,10 @@ sub setname { my $self = shift;
 	    my $v = $$self{$k};
 	    if (not defined $v) {
 		warn "$k undefined in $text";
-		print YAML::XS::Dump($self);
-		exit;
+		$text .= "$k: " . YAML::XS::Dump($self);
+	    }
+	    elsif (ref $v eq 'HASH') {
+		$text .= "$k: " . YAML::XS::Dump($v);
 	    }
 	    elsif (ref $v) {
 		$text .= ::indent($v->dump($k));
@@ -467,10 +469,12 @@ sub _STARr { my $self = shift;
     local $CTX = $self->callm;
     my $to = $self;
     my @all;
+    my $eos = length(${$self->{orig}});
     for (;;) {
+      last if $to->{pos} == $eos;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
 #            say @matches.perl;
-    last unless @matches;
+      last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
 	push @all, $first;
 	$to = $first;
@@ -488,6 +492,8 @@ sub _PLUSf { my $self = shift;
     my $x = $self;
 
     my @result;
+    # don't go beyond end of string
+    return () if $self->{pos} == length(${$self->{orig}});
     do {
 	for my $x ($block->($self)) {
 	    push @result, map { $self->cursor($_->{to}) } $x, $x->_PLUSf($block);
@@ -512,9 +518,11 @@ sub _PLUSr { my $self = shift;
     local $CTX = $self->callm;
     my $to = $self;
     my @all;
+    my $eos = length(${$self->{orig}});
     for (;;) {
+      last if $to->{pos} == $eos;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
-    last unless @matches;
+      last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
 	#print STDERR $matches->perl, "\n" if $DEBUG;
 	push @all, $first;
@@ -1360,7 +1368,7 @@ sub fail { my $self = shift;
 	    }
 	    my $lexer;
 	    {
-		local $PREFIX;
+		local $PREFIX = "";
 		$lexer = $C->$name(['?', 'peek']);
 	    }
 	    my $pat = $lexer->{PAT} // '';
