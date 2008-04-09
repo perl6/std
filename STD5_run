@@ -25,7 +25,7 @@ sub main {
 	shift(@ARGV);
 	print_usage_and_exit if not @ARGV;
 	$input = shift(@ARGV);
-	$input = 'qq{'.quotemeta($input).'}';
+	#$input = 'qq{'.quotemeta($input).'}';
     }
     else {
 	my $fn = shift(@ARGV);
@@ -42,9 +42,21 @@ sub main {
 	    system("rm -f lex/*");
 	}
     }
-    my $cmd = qq/perl -w -I . -MSTD5 -e 'print Perl::Dump(Perl->new(orig=>$input)->${rule}(["$rule"]));'/;
-    warn "# ",$cmd,"\n";
-    system "$cmd 2>std5.err";
+    #my $cmd = qq/perl -w -I . -MSTD5 -e 'print Perl::Dump(Perl->new(orig=>$input)->${rule}(["$rule"]));'/;
+    #warn "# ",$cmd,"\n";
+    #system "$cmd 2>std5.err";
+    unshift(@INC,'.');
+    require "STD5.pm";
+    my $err = "std5.err";
+    open(STDERR,">$err") or die;
+    my $perl = Perl->new(orig=>$input);
+    if(!$perl->can($rule)) { die "\nERROR: Unknown rule: $rule\n"; }
+    my $result = eval { $perl->${rule}([$rule]); };
+    if($result) { 
+      print Perl::Dump($result);
+    } else {
+      print "Parse failed.  See $err.\n";
+    }
 }
 main;
 
