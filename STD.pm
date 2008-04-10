@@ -1955,7 +1955,7 @@ token quote:qq {
     <quotesnabber(':qq', $<quote_mod>)>
 }
 token quote:q {
-    <sym>  <quote_mod>
+    <sym> <quote_mod>
     <quotesnabber(':q', $<quote_mod>)>
 }
 
@@ -1976,7 +1976,7 @@ token quote:m { <sym>  <quotesnabber(':regex')> }
 token quote:mm { <sym> <quotesnabber(':regex', ':s')> }
 
 token quote:s {
-    <sym>  <pat=quotesnabber(':regex')>
+    <sym> <pat=quotesnabber(':regex')>
     <finish_subst($<pat>)>
 }
 token quote:ss {
@@ -2214,7 +2214,7 @@ token quotesnabber (*@q) {
     {{
         my $lang = qlang('Q', @q);
         my $parser = $lang.parser;
-        $<delimited> := $lang.$parser($lang);  # XXX probably wrong
+        $<delimited> := $¢.$parser([''], $lang);
         $<delim> = $delim;
     }}
     {*}
@@ -2458,7 +2458,7 @@ rule macro_def {
 
 rule trait { <trait_verb> | <trait_auxiliary> }
 
-rule trait_auxiliary:is   { <sym> <ident><postcircumfix>? }
+rule trait_auxiliary:is   { <sym> <name><postcircumfix>? }
 rule trait_auxiliary:will { <sym> <ident> <block> }
 
 rule trait_verb:of      { <sym> <fulltypename> }
