@@ -119,6 +119,10 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$AUTOLEXED{$key} = $fakepos;
 	my @pat = $ast->longest($self);
+	for (@pat) {
+	    s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
+	    s/^\t/.\t/;		# empty pattern, match anything
+	}
 	warn "(null pattern)" unless @pat;
 	my $pat = join("\n", @pat);
 
@@ -156,6 +160,53 @@ sub loadlexer {
     return {"PATS" => \@pat};
 }
 
+# Can the current pattern match the current position?
+
+sub canmatch {
+    my ($p,$c) = @_;
+    my $f = substr($p,0,1,'');
+    if ($f eq '\\') {
+	if ($p =~ s/^(\W)//) {
+	    return 1 if $c eq $1;
+	}
+	elsif ($p =~ s/^(\w)//) {
+	    $f .= $1;
+	    if ($1 eq 'x') {
+		if ($p =~ s/^(\w\w)//) {
+		    $f .= $1;
+		}
+		elsif ($p =~ s/^(\[\w+\])//) {
+		    $f .= $1;
+		}
+	    }
+	    return 1 if $c =~ /^$f/;
+	}
+    }
+    elsif ($f eq '[') {
+	if ($p =~ s/^(\^?.[^]]*\])//) {
+	    $f .= $1;
+	    return 1 if $c =~ /^$f/;
+	}
+    }
+    elsif ($f eq '(') {
+	if ($p =~ s/^(\?:[^)]*\))//) {
+	    $f .= $1;
+	    return 1 if $c =~ /^$f/;
+	}
+    }
+    elsif ($f eq '.') {
+	return 1;
+    }
+    elsif ($f eq $c) {
+	return 1;
+    }
+    # nullable first char?
+    if ($p =~ s/^[*?]//) {
+	return canmatch($p,$c);
+    }
+    return 0;
+}
+
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
 
@@ -165,24 +216,23 @@ sub _AUTOLEXnow { my $self = shift;
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
     };
+    my $buf = $self->{orig};
+    my $P = $self->{pos};
+    if ($P == length($$buf)) {
+	return sub { '' };
+    }
+    my $chr = substr($$buf,$self->{pos},1);
 
-    $lexer->{M} //= do {
-	print STDERR "generating lexer closure for $key:\n" if $DEBUG;
+    $lexer->{$chr} //= do {
+	print STDERR '=' x 72, "\n" if $DEBUG;
+	print STDERR "GENERATING $key patterns starting with '$chr'\n" if $DEBUG;
 
-	my $buf = $self->{orig};
-
-	# generate match closure at the last moment
-	sub {
-	    my $C = shift;
-
-	    print STDERR '=' x 72, "\n" if $DEBUG;
-	    print STDERR "lexing $key\n" if $DEBUG;
-	    die "orig disappeared!!!" unless length($$buf);
-
-	    my $stuff;
-	    return '' unless $lexer;
-
-	    my @pats = @{$lexer->{PATS}};
+	my @pats = grep { canmatch($_, $chr) } @{$lexer->{PATS}};
+	if (!@pats) {
+	    print STDERR "No $key patterns start with '$chr'\n" if $DEBUG;
+	    sub { '' };
+	}
+	else {
 	    my $i = 1;
 	    my $fate = [];
 	    for (@pats) {
@@ -214,40 +264,51 @@ sub _AUTOLEXnow { my $self = shift;
 	    for my $i (1..@$fate-1) {
 		print STDERR $i, ': ', $fate->[$i], "\n" if $lexverbose;
 	    }
-	    my $result = "";
-	    pos($$buf) = $C->{pos};
 
-	    ##########################################
-	    # No normal p5 match/subst below here!!! #
-	    ##########################################
-	    {
-		use re::engine::TRE;
+	    # generate match closure at the last moment
+	    sub {
+		my $C = shift;
 
-		print STDERR "/ running tre match at @{[ pos($$buf) ]} /\n" if $DEBUG;
+		print STDERR "lexing $key\n" if $DEBUG;
+		die "orig disappeared!!!" unless length($$buf);
 
-		if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
-		    my $max = @+ - 1;
-		    my $last = @- - 1;	# ignore '$0'
-#		    print STDERR "LAST: $last\n";
-		    $result = $fate->[$last] // return '';
-		    for my $x (1 .. $max) {
-			my $beg = $-[$x];
-			next unless defined $beg;
-			my $end = $+[$x];
-			my $f = $fate->[$x];
-			no strict 'refs';
-			if ($lexverbose or ($DEBUG and $x == $last)) {
-			    print STDERR "\$$x: $beg..$end\t$$x\t ",
-				$x == $last ? "====>" : "---->",
-				" $f\n";
+		return '' unless $lexer;
+
+		my $result = "";
+		pos($$buf) = $C->{pos};
+
+		##########################################
+		# No normal p5 match/subst below here!!! #
+		##########################################
+		{
+		    use re::engine::TRE;
+
+		    print STDERR "/ running tre match at @{[ pos($$buf) ]} /\n" if $DEBUG;
+
+		    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
+			my $max = @+ - 1;
+			my $last = @- - 1;	# ignore '$0'
+#		        print STDERR "LAST: $last\n";
+			$result = $fate->[$last] // return '';
+			for my $x (1 .. $max) {
+			    my $beg = $-[$x];
+			    next unless defined $beg;
+			    my $end = $+[$x];
+			    my $f = $fate->[$x];
+			    no strict 'refs';
+			    if ($lexverbose or ($DEBUG and $x == $last)) {
+				print STDERR "\$$x: $beg..$end\t$$x\t ",
+				    $x == $last ? "====>" : "---->",
+				    " $f\n";
+			    }
 			}
+			print STDERR "success at '", substr($$buf,$C->{pos},10), "'\n" if $DEBUG;
 		    }
-		    print STDERR "success at '", substr($$buf,$C->{pos},10), "'\n" if $DEBUG;
+		    else {
+			print STDERR "NO LEXER MATCH at '", substr($$buf,$C->{pos},10), "'\n" if $DEBUG;
+		    }
+		    $result;
 		}
-		else {
-		    print STDERR "NO LEXER MATCH at '", substr($$buf,$C->{pos},10), "'\n" if $DEBUG;
-		}
-		$result;
 	    }
 	}
     };
