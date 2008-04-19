@@ -290,8 +290,14 @@ proto token scope_declarator (:$endsym is context = 'nofat') { }
 token category:package_declarator { <sym> }
 proto token package_declarator (:$endsym is context = 'nofat') { }
 
+token category:plurality_declarator { <sym> }
+proto token plurality_declarator (:$endsym is context = 'nofat') { }
+
 token category:routine_declarator { <sym> }
 proto token routine_declarator (:$endsym is context = 'nofat') { }
+
+token category:regex_declarator { <sym> }
+proto token regex_declarator (:$endsym is context = 'nofat') { }
 
 token category:statement_prefix { <sym> }
 proto rule  statement_prefix (:$endsym is context = 'nofat') { }
@@ -930,6 +936,7 @@ token pre {
                                                     {*}     #= precircum
     ]
     # XXX assuming no precedence change
+    ::
     <prefix_postfix_meta_operator>*                 {*}     #= prepost
     <.ws>
     {*}
@@ -941,6 +948,7 @@ token expect_term {
     | <noun>
     | <pre>+ :: <noun>
     ]
+    ::
 
     # also queue up any postfixes, since adverbs could change things
     <post>*
@@ -1010,7 +1018,7 @@ token colonpair {
     | '!' <ident>                                        {*}    #= false
     | <ident> [ <.unsp>? <postcircumfix> ]?              {*}    #= value
     | <postcircumfix>                                    {*}    #= structural
-    | <sigil> <twigil>? <desigilname>                    {*}    #= varname
+    | <sigil> :: <twigil>? <desigilname>                    {*}    #= varname
     ]
     {*}
 }
@@ -1078,9 +1086,10 @@ token post {
 # (Also backtracks if on \op when no \op infix exists.)
 regex prefix_circumfix_meta_operator:reduce {
     :my %thisop is context<rw>;
-    @<sym> = [ '[' \\?? ]   # prefer no meta \ if op has \
+    '[' <?before \S* ']' > ::
+    \\??   # prefer no meta \ if op has \
     <expect_infix>
-    @<sym> = [ ']' ]
+    ']'
 
     [ <!{ %+thisop<assoc> eq 'non' }>
         || <panic: Can't reduce a non-associative operator> ]
@@ -1125,7 +1134,7 @@ token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
-    <lex1: hyper>
+    <?lex1: hyper>
     [
     | [ '«' | '»' ] <infix> [ '«' | '»' ]
     | [ '<<' | '>>' ] <infix> [ '<<' | '>>' ]
@@ -1360,13 +1369,13 @@ token package_declarator:role    { <sym> <package_def> {*} }    #= role
 token package_declarator:package { <sym> <package_def> {*} }    #= package
 
 token package_declarator:require {   # here because of declarational aspects
-    <sym>
+    <sym> <.ws>
     <module_name> <EXPR>?
     {*}
 }
 
 token package_declarator:trusts {
-    <sym>
+    <sym> <.ws>
     <module_name>
     {*}
 }
@@ -1733,6 +1742,7 @@ token name {
 
 token morename {
     '::'
+    <?before <alpha> | '(' > ::
     [
     | <ident>
     | '(' <EXPR> ')'
@@ -2489,7 +2499,7 @@ rule signature {
     {*}
 }
 
-rule type_declarator:subset {
+rule type_declarator:subset {\
     <sym>
     <name>
     [ of <fulltypename> ]?
@@ -2600,16 +2610,16 @@ rule default_value {
     '=' <EXPR(%item_assignment)>
 }
 
-token statement_prefix:do      { <sym> <statement> {*} }        #= do
-token statement_prefix:try     { <sym> <statement> {*} }        #= try
-token statement_prefix:gather  { <sym> <statement> {*} }        #= gather
-token statement_prefix:contend { <sym> <statement> {*} }        #= contend
-token statement_prefix:async   { <sym> <statement> {*} }        #= async
-token statement_prefix:lazy    { <sym> <statement> {*} }        #= lazy
+token statement_prefix:do      { <sym> <.ws> <statement> {*} }        #= do
+token statement_prefix:try     { <sym> <.ws> <statement> {*} }        #= try
+token statement_prefix:gather  { <sym> <.ws> <statement> {*} }        #= gather
+token statement_prefix:contend { <sym> <.ws> <statement> {*} }        #= contend
+token statement_prefix:async   { <sym> <.ws> <statement> {*} }        #= async
+token statement_prefix:lazy    { <sym> <.ws> <statement> {*} }        #= lazy
 
 ## term
 token term:sym<undef> ( --> Term) {
-    <sym> <?nofat> \h*
+    <sym> » <?nofat> \h*
     [ <?before '$/' >
         <obs('$/ variable as input record separator',
              "the filehandle's .slurp method")>
@@ -2621,7 +2631,10 @@ token term:sym<undef> ( --> Term) {
 }
 
 token term:sym<self> ( --> Term)
-    { <sym> {*} }                                               #= self
+    { <sym> » <?nofat> {*} }                                               #= self
+
+token term:rand ( --> Named_unary)
+    { <sym> » <?nofat> {*} }                                               #= rand
 
 token term:sym<*> ( --> Term)
     { <sym> {*} }                                               #= *
@@ -2769,10 +2782,10 @@ token infix:sym<?^> ( --> Additive)
 ## replication
 # Note: no word boundary check after x, relies on longest token for x2 xx2 etc
 token infix:sym<x> ( --> Replication)
-    { <sym> {*} }                                               #= x
+    { <sym> » {*} }                                               #= x
 
 token infix:sym<xx> ( --> Replication)
-    { <sym> {*} }                                               #= xx
+    { <sym> » {*} }                                               #= xx
 
 ## concatenation
 token infix:sym<~> ( --> Concatenation)
@@ -2793,30 +2806,27 @@ token infix:sym<^> ( --> Junctive_or)
 
 
 ## named unary examples
-token prefix:rand ( --> Named_unary)
-    { <sym> {*} }                                               #= rand
-
 token prefix:sleep ( --> Named_unary)
-    { <sym> {*} }                                               #= sleep
+    { <sym> » <?nofat> {*} }                                               #= sleep
 
 token prefix:abs ( --> Named_unary)
-    { <sym> {*} }                                               #= abs
+    { <sym> » <?nofat> {*} }                                               #= abs
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
     { <sym> {*} }                                               #= <=>
 
 token infix:cmp ( --> Nonchaining)
-    { <sym> {*} }                                               #= cmp
+    { <sym> » {*} }                                               #= cmp
 
 token infix:is ( --> Nonchaining)
-    { <sym> {*} }                                               #= is
+    { <sym> » {*} }                                               #= is
 
 token infix:but ( --> Nonchaining)
-    { <sym> {*} }                                               #= but
+    { <sym> » {*} }                                               #= but
 
 token infix:does ( --> Nonchaining)
-    { <sym> {*} }                                               #= does
+    { <sym> » {*} }                                               #= does
 
 token infix:sym<..> ( --> Nonchaining)
     { <sym> {*} }                                               #= ..
@@ -2831,10 +2841,10 @@ token infix:sym<^..^> ( --> Nonchaining)
     { <sym> {*} }                                               #= ^..^
 
 token infix:sym<ff> ( --> Nonchaining)
-    { <sym> {*} }                                               #= ff
+    { <sym> » {*} }                                               #= ff
 
 token infix:sym<^ff> ( --> Nonchaining)
-    { <sym> {*} }                                               #= ^ff
+    { <sym> » {*} }                                               #= ^ff
 
 token infix:sym<ff^> ( --> Nonchaining)
     { <sym> {*} }                                               #= ff^
@@ -2843,10 +2853,10 @@ token infix:sym<^ff^> ( --> Nonchaining)
     { <sym> {*} }                                               #= ^ff^
 
 token infix:sym<fff> ( --> Nonchaining)
-    { <sym> {*} }                                               #= fff
+    { <sym> » {*} }                                               #= fff
 
 token infix:sym<^fff> ( --> Nonchaining)
-    { <sym> {*} }                                               #= ^fff
+    { <sym> » {*} }                                               #= ^fff
 
 token infix:sym<fff^> ( --> Nonchaining)
     { <sym> {*} }                                               #= fff^
@@ -2884,22 +2894,22 @@ token infix:sym<=~> ( --> Chaining)
     { <sym> <obs('=~ to do pattern matching', '~~')> }
 
 token infix:sym<eq> ( --> Chaining)
-    { <sym> {*} }                                               #= eq
+    { <sym> » {*} }                                               #= eq
 
 token infix:sym<ne> ( --> Chaining)
-    { <sym> {*} }                                               #= ne
+    { <sym> » {*} }                                               #= ne
 
 token infix:sym<lt> ( --> Chaining)
-    { <sym> {*} }                                               #= lt
+    { <sym> » {*} }                                               #= lt
 
 token infix:sym<le> ( --> Chaining)
-    { <sym> {*} }                                               #= le
+    { <sym> » {*} }                                               #= le
 
 token infix:sym<gt> ( --> Chaining)
-    { <sym> {*} }                                               #= gt
+    { <sym> » {*} }                                               #= gt
 
 token infix:sym<ge> ( --> Chaining)
-    { <sym> {*} }                                               #= ge
+    { <sym> » {*} }                                               #= ge
 
 token infix:sym<=:=> ( --> Chaining)
     { <sym> {*} }                                               #= =:=
@@ -2975,10 +2985,10 @@ token infix:sym<.=> ( --> Item_assignment)
 
 ## loose unary
 token prefix:sym<true> ( --> Loose_unary)
-    { <sym> {*} }                                               #= true
+    { <sym> » <?nofat> {*} }                                               #= true
 
 token prefix:sym<not> ( --> Loose_unary)
-    { <sym> {*} }                                               #= not
+    { <sym> » <?nofat> {*} }                                               #= not
 
 ## list item separator
 token infix:sym<,> ( --> Comma)
@@ -2989,14 +2999,14 @@ token infix:sym« p5=> » ( --> Comma)
 
 ## list infix
 token infix:sym<X> ( --> List_infix)
-    { <sym> {*} }                                               #= X
+    { <sym> » {*} }                                               #= X
 
 token infix:sym<Z> ( --> List_infix)
-    { <sym> {*} }                                               #= Z
+    { <sym> » {*} }                                               #= Z
 
 # XXX tre workaround
 # token infix:sym<minmax> ( --> List_infix)
-#     { <sym> {*} }                                               #= minmax
+#     { <sym> » {*} }                                               #= minmax
 
 token term:sigil ( --> List_prefix)
     { <sym=sigil> <?before \s> <arglist> {*} }                                #= $
@@ -3036,22 +3046,22 @@ token term:name ( --> List_prefix)
 
 ## loose and
 token infix:sym<and> ( --> Loose_and)
-    { <sym> {*} }                                               #= and
+    { <sym> » {*} }                                               #= and
 
 # XXX tre workaround
 # token infix:sym<andthen> ( --> Loose_and)
-#     { <sym> {*} }                                               #= andthen
+#     { <sym> » {*} }                                               #= andthen
 
 ## loose or
 token infix:sym<or> ( --> Loose_or)
-    { <sym> {*} }                                               #= or
+    { <sym> » {*} }                                               #= or
 
 token infix:sym<xor> ( --> Loose_or)
-    { <sym> {*} }                                               #= xor
+    { <sym> » {*} }                                               #= xor
 
 # XXX tre workaround
 # token infix:sym<orelse> ( --> Loose_or)
-#     { <sym> {*} }                                               #= orelse
+#     { <sym> » {*} }                                               #= orelse
 
 ## expression terminator
 

@@ -108,6 +108,7 @@ sub _AUTOLEXgen { my $self = shift;
     print STDERR "AUTOLEXgen $key\n" if $DEBUG;
     my $lexer = {};
     (my $file = $key) =~ s/::/--/g;
+    $file =~ s/^Perl--//;
     if (-s "lex/$file") {
 	$lexer = loadlexer($key);
     }
@@ -141,6 +142,7 @@ sub _AUTOLEXgen { my $self = shift;
 sub loadlexer {
     my $key = shift;
     (my $file = $key) =~ s/::/--/g;
+    $file =~ s/^Perl--//;
     print STDERR "using cached lex/$file\n" if $DEBUG;
 
     my @fates = ('');
@@ -1204,7 +1206,7 @@ sub fail { my $self = shift;
             elsif ($_ eq '?') {
                 my $re = $self->{'re'};
 		print STDERR ::Dump($self) unless $re;
-                if ($re->{'name'} eq 'before') {
+                if (ref($re) eq 'RE_method_re' and $re->{'name'} eq 'before') {
                     my @result = $re->longest($C);
                     $PURE = 0;
                     return @result;
@@ -1369,7 +1371,7 @@ sub fail { my $self = shift;
                 return '[a-z_A-Z]';	# XXX not unicodey
             }
 	    elsif ($_ eq 'EXPR') {
-		if (not -e 'lex/Perl--EXPR') {
+		if (not -e 'lex/EXPR') {
 		    $PURE = 0;
 		    return;
 		}
@@ -1499,6 +1501,7 @@ sub fail { my $self = shift;
         my @atom = $a->longest($C);
 	return unless @atom;
 	my $atom = join('|',@atom);
+	return if $atom eq '';
 	$atom = "(?:" . $atom . ')' unless $a->{min} == 1 and ref($a) =~ /^RE_(?:meta|cclass|string)/;
         if ($self->{'quant'}[0] eq '+') {
 	    if (@atom > 1) {
@@ -1563,11 +1566,20 @@ sub fail { my $self = shift;
 	local $PREFIX = $PREFIX;
 
         for my $chunk (@chunks) {
-            my @next = $chunk->longest($C);
-            last unless @next;
+	    # ignore negative lookahead
+	    next if ref($chunk) eq 'RE_assertion' and $chunk->{assert} eq '!';
+	    warn "NULLABLE ".ref($chunk)."\n" unless $chunk->{min};
+            my @newalts = $chunk->longest($C);
+            if (not @newalts) {
+		next if $PURE;
+		last;
+	    }
+#	    if (not $chunk->{min} and $next[-1] ne '') {
+#		push(@next, '');	# install bypass around nullable atom
+#	    }
 	    my $newresult = [];
 	    for my $oldalt (@$result) {
-		for my $newalt (@next) {
+		for my $newalt (@newalts) {
 		    $PREFIX = '' if $newalt =~ /FATE/;;
 		    if ($oldalt =~ /FATE/ and $newalt =~ /FATE/) {
 			my $newold = $oldalt;
@@ -1583,7 +1595,8 @@ sub fail { my $self = shift;
 		}
 	    }
 	    $result = $newresult;
-	    last unless $chunk->{min};	# assertion?
+	    # ignore everything after positive lookahead
+	    last if ref($chunk) eq 'RE_assertion';
 	    next if $PURE;
         }
 	@$result;

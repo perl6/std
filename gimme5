@@ -1390,6 +1390,12 @@ sub unbalanced {
         elsif ($text eq '«') {
             $code = "\$C->_LEFTWB()";
         }
+        elsif ($text eq '>>') {
+            $code = "\$C->_RIGHTWB()";
+        }
+        elsif ($text eq '<<') {
+            $code = "\$C->_LEFTWB()";
+        }
         if ($not) { # XXX or maybe just .NOT on the end...
             $PURE = 0;
             $code = "\$C->_NOTCHAR( sub { my \$C=shift; $code })";
