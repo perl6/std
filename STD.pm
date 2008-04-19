@@ -1951,11 +1951,11 @@ token quote:sym</ />   {
 
 # handle composite forms like qww
 token quote:qq {
-    <sym> <quote_mod>
+    'qq' <quote_mod> »
     <quotesnabber(':qq', $<quote_mod>)>
 }
 token quote:q {
-    <sym> <quote_mod>
+    'q' <quote_mod> »
     <quotesnabber(':q', $<quote_mod>)>
 }
 

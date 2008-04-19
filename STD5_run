@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/local/bin/perl
 # A script to make running STD5.pm easier,
 # by providing it input, and isolating it's Match yaml output.
 use strict;
