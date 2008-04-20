@@ -2368,7 +2368,6 @@ regex transliterator($stop) {
     # XXX your ad here
 }
 
-# XXX $lang.<tweaker>.escset ???
 regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     $start
     $<text> = [.*?] ** [
@@ -2387,19 +2386,14 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
 }
 
 regex q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {
-    $<text> = [.*?] ** [
-        <!before <$stop>>
-        <?before @esc> <escape=q_escape($lang)>
-    ]
+    $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!$stop>. ] ]*? ]
     <stop=$stop>
     {*}
 }
 
 regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
-    $<text> = [.*?] ** [
-        <!before $stop>
-        <?before @esc> <escape=q_escape($lang)>
-    ]
+    $stop
+    $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!before $stop >. ] ]*? ]
     $stop
     {*}
 }

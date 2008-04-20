@@ -600,6 +600,64 @@ sub _PLUSr { my $self = shift;
     $r->retm($bind);
 }
 
+sub _REPSEPf { my $self = shift;
+    my $sep = shift;
+    my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
+
+    local $CTX = $self->callm;
+    my $x = $self;
+
+    my @result;
+    # don't go beyond end of string
+    return () if $self->{pos} == length(${$self->{orig}});
+    do {
+	for my $x ($block->($self)) {
+	    for my $s ($sep->($x)) {
+		push @result, map { $self->cursor($_->{to}) } $x, $s->_REPSEPf($sep,$block);
+	    }
+	}
+    };
+    map { $_->retm($bind) } @result;
+}
+
+sub _REPSEPg { my $self = shift;
+    my $sep = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm;
+
+    reverse $self->_REPSEPf($sep, $block, @_);
+}
+
+sub _REPSEPr { my $self = shift;
+    my $sep = shift;
+    my $block = shift;
+    my %args = @_;
+    my $bind = $args{bind} // '';
+
+    local $CTX = $self->callm;
+    my $to = $self;
+    my @all;
+    my $eos = length(${$self->{orig}});
+    for (;;) {
+      last if $to->{pos} == $eos;
+	my @matches = $block->($to);  # XXX shouldn't read whole list
+      last unless @matches;
+	my $first = $matches[0];  # no backtracking into block on ratchet
+	#print STDERR $matches->perl, "\n" if $DEBUG;
+	push @all, $first;
+	my @seps = $sep->($first);
+      last unless @seps;
+	my $sep = $seps[0];
+	$to = $sep;
+    }
+    return () unless @all;
+    my $r = $self->cursor($to->{pos});
+    $r->retm($bind);
+}
+
 sub _OPTr { my $self = shift;
     my $block = shift;
     my %args = @_;
@@ -793,6 +851,40 @@ sub _EXACT_rev { my $self = shift;
 #        say "EXACT_rev $s didn't match @{[substr($!orig,$from,$len)]} at $from $len";
         return ();
     }
+}
+
+sub _ARRAY { my $self = shift;
+    local $CTX = $self->callm(0+@_);
+    my $P = $self->{pos} // 0;
+    my $buf = $self->{orig};
+    my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
+    my @result = ();
+    for my $s (@array) {
+	my $len = length($s);
+	if (substr($$buf, $P, $len) eq $s) {
+	    print STDERR "ARRAY elem $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
+	    my $r = $self->cursor($P+$len);
+	    push @result, $r->retm('');
+	}
+    }
+    return @result;
+}
+
+sub _ARRAY_rev { my $self = shift;
+    local $CTX = $self->callm(0+@_);
+    my $buf = $self->{orig};
+    my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
+    my @result = ();
+    for my $s (@array) {
+	my $len = length($s);
+	my $from = $self->{from} = $len;
+	if (substr($$buf, $from, $len) eq $s) {
+	    print STDERR "ARRAY_rev elem $s matched @{[substr($$buf,$from,$len)]} at $from $len\n" if $DEBUG;
+	    my $r = $self->cursor_rev($from);
+	    push @result, $r->retm('');
+	}
+    }
+    return @result;
 }
 
 sub _DIGIT { my $self = shift;

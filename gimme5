@@ -228,7 +228,7 @@ sub MAIN {
 	else {
 	    my $tail = pop @pedigree;
 	    my %stuff = %{Perl::qlang(@pedigree)};
-	    my $self = bless(\%stuff, $self->{tweaker});
+	    my $self = bless(\%stuff, $stuff{tweaker});
 	    my @kv;
 	    if ($tail =~ m/^:(\w+)$/) {
 		@kv = ($1,1);
