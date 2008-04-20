@@ -69,6 +69,7 @@ sub un6 {
         $f =~ s!^(".*?")!!              	and $t .= $1, next;
         $f =~ s!^q/(.*?)/!!              	and $t .= "q/$1/", next;
         $f =~ s!^/(.+?)/!!              	and $t .= "qr/$1/", next;
+        $f =~ s/^\$¢\.\$parser//                and $t .= qq/\$C->\$parser/, next;
         $f =~ s/^\$¢//                  	and $t .= qq/\$C/, next;
         $f =~ s/^\$\/</.</                  	and $t .= qq/\$M/, $NEEDMATCH++, next;
         $f =~ s/^ ::([A-Z]\w+)//        	and $t .= qq/ '$1'/, next;
@@ -108,6 +109,7 @@ sub un6 {
         $f =~ s/^\%[!.](\w+)([\[{<])/.$2/       and $t .= qq/\$self->{$1}/, next;
         $f =~ s/^\@[!.](\w+)//          	and $t .= qq/\@{\$self->{$1}}/, next;
         $f =~ s/^\%[!.](\w+)//          	and $t .= qq/\%{\$self->{$1}}/, next;
+        $f =~ s/^\&Perl:://          		and $t .= qq/*Perl::/, next;
         $f =~ s/^\@(\w+)([\[{])/$2/             and $t .= qq/\$$1/, next;
         $f =~ s/^\%(\w+)([\[{])/$2/             and $t .= qq/\$$1/, next;
         $f =~ s/^\|%/%/                         and next;
@@ -204,6 +206,47 @@ sub MAIN {
         if ( s/^(#.*\n)// ) { $out .= $1; next }
 
         my $remaining = length($_);
+        if (s/^    method new \(\*\@pedigree\).*?\n    }\n//s) {
+            $out .= <<'END';
+
+    # emulate 'handles'
+    sub tweak { my $self = shift;
+	my $tweaker = $self->{tweaker} . '::tweak';
+	$self->$tweaker(@_);
+    }
+    sub parser { return shift()->{parser} }
+    sub escrule { return shift()->{escrule} }
+    sub option { return shift()->{option} }
+
+    sub new { my $self = shift;
+	my @pedigree = @_;
+	if (@pedigree == 1) {
+	    my %start = eval { $self->root_of_Q } or
+		Perl::panic("Quote construct " . $pedigree[0] . "not recognized");
+	    return bless(\%start, $self);
+	}
+	else {
+	    my $tail = pop @pedigree;
+	    my %stuff = %{Perl::qlang(@pedigree)};
+	    my $self = bless(\%stuff, $self->{tweaker});
+	    my @kv;
+	    if ($tail =~ m/^:(\w+)$/) {
+		@kv = ($1,1);
+	    }
+	    elsif ($tail =~ m/^:!(\w+)$/) {
+		@kv = ($1,0);
+	    }
+	    elsif ($tail =~ m/^:(\w+)\((.*)\)$/) {
+		@kv = ($1,$2);
+	    }
+	    $self->tweak(@kv);
+	    return $self;
+	}
+    }
+END
+	    next;
+	}
+
         if (s/^(method heredoc[^\n{]*).*?\n}\n//s) {
             $out .= "# $1\n";
             $out .= <<'END';
@@ -466,6 +509,11 @@ END
             }
             next;
         }
+
+	if (s/^#begin p5\n(.*?\n)#end p5\n//s) {
+	    $out .= $1;
+	    next;
+	}
 
 
         # from here on we assume all nibbles are line-sized or less.

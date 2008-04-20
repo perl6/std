@@ -1961,11 +1961,11 @@ token quote:sym</ />   {
 
 # handle composite forms like qww
 token quote:qq {
-    'qq' <quote_mod> »
+    'qq' <quote_mod>? »
     <quotesnabber(':qq', $<quote_mod>)>
 }
 token quote:q {
-    'q' <quote_mod> »
+    'q' <quote_mod>? »
     <quotesnabber(':q', $<quote_mod>)>
 }
 
@@ -2037,25 +2037,24 @@ role QLang {
     # a method, so that everything is overridable in derived grammars
     method root_of_Q () {
         return
-            tweaker => ::Q_tweaker,      # class name should be virtual here!
+            tweaker => 'Perl::Q_tweaker',      # class name should be virtual here!
             parser => &Perl::q_pickdelim,
-            option => < >,
+            option => {},
             escrule => &Perl::quote_escapes;
     }
 
     method new (*@pedigree) {
         if @pedigree == 1 {
 #           my %start = try { self."root_of_@pedigree[0]" } //
-            my %start = try { self.root_of_Q } //
+            my %start = try { self.root_of_Q } or
                 Perl::panic("Quote construct " ~ @pedigree.[0] ~ "not recognized");
             return self.bless(|%start);
         }
         else {
             my $tail = pop @pedigree;
-            my $self = Perl::qlang(@pedigree);
-#            my $self = Perl::qlang(@pedigree).clone
-#                orelse fail "Can't clone {@pedigree}: $!";
-            return $self.tweak($tail);
+            my $self = Perl::qlang(@pedigree).clone
+                orelse fail "Can't clone {@pedigree}: $!";
+            return $self.tweak(|$tail);
         }
     }
 } # end role
@@ -2334,10 +2333,10 @@ regex q_pickdelim ($lang) {
     {{
        ($start,$stop) = $¢.peek_delimiters();
        if $start eq $stop {
-           $<q> := $¢.q_unbalanced($lang, $stop);
+           $<q> := $¢.q_unbalanced([''], $lang, $stop);
        }
        else {
-           $<q> := $¢.q_balanced($lang, $start, $stop);
+           $<q> := $¢.q_balanced([''], $lang, $start, $stop);
        }
     }}
     {*}
@@ -2369,6 +2368,7 @@ regex transliterator($stop) {
     # XXX your ad here
 }
 
+# XXX $lang.<tweaker>.escset ???
 regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     $start
     $<text> = [.*?] ** [

@@ -121,7 +121,6 @@ sub _AUTOLEXgen { my $self = shift;
 	my @pat = $ast->longest($self);
 	for (@pat) {
 	    s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
-	    s/^\t/.\t/;		# empty pattern, match anything
 	}
 	warn "(null pattern)" unless @pat;
 	my $pat = join("\n", @pat);
@@ -227,7 +226,7 @@ sub _AUTOLEXnow { my $self = shift;
 	print STDERR '=' x 72, "\n" if $DEBUG;
 	print STDERR "GENERATING $key patterns starting with '$chr'\n" if $DEBUG;
 
-	my @pats = grep { canmatch($_, $chr) } @{$lexer->{PATS}};
+	my @pats = grep { canmatch($_, $chr) } map { s/\t/.?\t/; $_; } @{$lexer->{PATS}};
 	if (!@pats) {
 	    print STDERR "No $key patterns start with '$chr'\n" if $DEBUG;
 	    sub { '' };
