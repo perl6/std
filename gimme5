@@ -211,37 +211,37 @@ sub MAIN {
 
     # emulate 'handles'
     sub tweak { my $self = shift;
-	my $tweaker = $self->{tweaker} . '::tweak';
-	$self->$tweaker(@_);
+        my $tweaker = $self->{tweaker} . '::tweak';
+        $self->$tweaker(@_);
     }
     sub parser { return shift()->{parser} }
     sub escrule { return shift()->{escrule} }
     sub option { return shift()->{option} }
 
     sub new { my $self = shift;
-	my @pedigree = @_;
-	if (@pedigree == 1) {
-	    my %start = eval { $self->root_of_Q } or
-		Perl::panic("Quote construct " . $pedigree[0] . "not recognized");
-	    return bless(\%start, $self);
-	}
-	else {
-	    my $tail = pop @pedigree;
-	    my %stuff = %{Perl::qlang(@pedigree)};
-	    my $self = bless(\%stuff, $stuff{tweaker});
-	    my @kv;
-	    if ($tail =~ m/^:(\w+)$/) {
-		@kv = ($1,1);
-	    }
-	    elsif ($tail =~ m/^:!(\w+)$/) {
-		@kv = ($1,0);
-	    }
-	    elsif ($tail =~ m/^:(\w+)\((.*)\)$/) {
-		@kv = ($1,$2);
-	    }
-	    $self->tweak(@kv);
-	    return $self;
-	}
+        my @pedigree = @_;
+        if (@pedigree == 1) {
+            my %start = eval { $self->root_of_Q } or
+                Perl::panic("Quote construct " . $pedigree[0] . "not recognized");
+            return bless(\%start, $self);
+        }
+        else {
+            my $tail = pop @pedigree;
+            my %stuff = %{Perl::qlang(@pedigree)};
+            my $self = bless(\%stuff, $stuff{tweaker});
+            my @kv;
+            if ($tail =~ m/^:(\w+)$/) {
+                @kv = ($1,1);
+            }
+            elsif ($tail =~ m/^:!(\w+)$/) {
+                @kv = ($1,0);
+            }
+            elsif ($tail =~ m/^:(\w+)\((.*)\)$/) {
+                @kv = ($1,$2);
+            }
+            $self->tweak(@kv);
+            return $self;
+        }
     }
 END
 	    next;
@@ -328,7 +328,11 @@ END
             }
             $args .= ', ';
             my $sym = "";
-            $sym .= "    my (\$binding,\@fate) = \@{shift()};\n" unless $KIND eq 'method';
+            $sym .= <<'END' unless $KIND eq 'method';
+    my $depth = shift;
+    my $binding = shift;
+    my $fate = shift;
+END
 
             $args =~ s/is rw//g;
             while ($args =~ s/^([A-Z]\w+)?\s*([\$\@%&]\w+)\s*(is\s+context(?:<rw>)?)?\s*([^=?,]*?),\s*//) {
@@ -442,31 +446,33 @@ END
             }
             my $body = <<'END';
 <<DECL>>
-    local $CTX = $C->callm("@fate");
-    if ($binding eq '?') {
-        if ($fate[0] eq 'peek') { return <<PEEK>> }
-        <<PROPS>>
-        return $C-><<PROTONAME>>(['?',@fate]);
+    local $CTX = $C->callm($fate ? $$fate[3] : '');
+    if ($depth < 0) {
+        return <<PEEK>>
     }
 
-    if (@fate and $fate[0] =~ /^<<NAME>>/) {
-      warn "Fate passed to <<NAME>>: @fate\n";
+    my $tag = '';
+    my $try;
+    if ($fate) {
+        print STDERR "Fate passed to <<NAME>>: $$fate[3]\n";
+        ($tag, $try, $fate) = @$fate if $$fate[0] eq "<<NAME>>";
     }
     else {
-      @fate = split(' ', $C->_AUTOLEXnow('<<PKG>>::<<NAME>>')->($C));
-      if (@fate) {
-        warn "FATE OF <<PKG>>::<<NAME>>: @fate\n";
-      }
-      else {
-        warn "NO FATE FOR <<PKG>>::<<NAME>> (may backtrack)\n";
-      }
+        $fate = $C->_AUTOLEXnow('<<PKG>>::<<NAME>>')->($C);
+        if ($fate) {
+            print STDERR "FATE OF <<PKG>>::<<NAME>>: $$fate[3]\n";
+            ($tag, $try, $fate) = @$fate;
+        }
+        else {
+            print STDERR "NO FATE FOR <<PKG>>::<<NAME>> (may backtrack)\n";
+        }
     }
-    my ($tag,$try);
+    my $mydepth = $depth+1;
 
 END
 
             $body .= <<"END";
-    \$self->_MATCHIFY(\$binding,$coercion
+    \$self->_MATCHIFY(\$depth,\$binding,$coercion
 <<MEAT>>
     );
 END
@@ -643,6 +649,7 @@ END
         print "our $_;\n";
     }
     print "our \$moreinput;\n";
+    print "our \$MATCHID;\n";
     print "\n";
     print $out;
     print "__DATA__\n";
@@ -650,7 +657,7 @@ END
 }
 
 sub here {
-    warn +(caller(0))[3],": ",/^(.{0,20})/,"\n" if $TRACE;
+    print STDERR +(caller(0))[3],": ",/^(.{0,20})/,"\n" if $TRACE;
 }
 
 #############################################3333
@@ -1206,15 +1213,15 @@ sub unbalanced {
         my $binding;
         my $self = shift;
         if ($$self{nobind}) {
-            $binding = "['', \@fate]",
+            $binding = "\$mydepth, '', \$fate",
         }
         elsif (defined $BINDING) {
-            $binding = "['$BINDING', \@fate]";
+            $binding = "\$mydepth, '$BINDING', \$fate";
             undef $BINDING;
         }
         else {
             my $name = $$self{name};
-            $binding = "['$name', \@fate]";
+            $binding = "\$mydepth, '$name', \$fate";
         }
         $binding;
     }
@@ -1245,12 +1252,12 @@ sub unbalanced {
         local(@ALTS);
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk(@_);
-            "\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+            "\$C->_NOTBEFORE( \$mydepth,'',undef, sub { my \$C=shift;\n" . ::indent($re) . "\n})";
         }
         else {
             my $re = $$self{re}->walk(@_);
             return $re if $re =~ /^\$C->before/;
-            "\$C->before( ['', \@fate], sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+            "\$C->before( \$mydepth, '', \$fate, sub { my \$C=shift;\n" . ::indent($re) . "\n})";
         }
     }
 }
@@ -1279,7 +1286,7 @@ sub unbalanced {
         }
         $text = ::un6($text);
         my $ctx = $$self{context};
-        $text = 'my $M = $C->matchify->{M}; ' . $text . ';' if $NEEDMATCH;
+        $text = 'my $M = $C->matchify($mydepth)->{M}; ' . $text . ';' if $NEEDMATCH;
         if ($text =~ s/\bmake\b/scalar/g) {  # XXX hack, avoid using $<make>
             "do {$text}";
         }
@@ -1303,7 +1310,7 @@ sub unbalanced {
         my $var = $$self{var};
         my $re = $$self{atom}->walk(@_);
 #        $var = "my $var" unless $var =~ /::/;
-        "bindvar($var,$re)" . '->matchify';
+        "bindvar($var,$re)" . '->matchify($mydepth)';
     }
 }
 
@@ -1314,7 +1321,7 @@ sub unbalanced {
         local $BINDING = $var;
         my $re = ::indent($$self{atom}->walk(@_));
         if (defined $BINDING) {
-            $re = "\$C->_BINDNAMED$REV('$var', sub { my \$C=shift;\n" . $re . "\n})";
+            $re = "\$C->_BINDNAMED$REV(\$mydepth, '$var', undef, sub { my \$C=shift;\n" . $re . "\n})";
         }
         $re;
     }
@@ -1327,7 +1334,7 @@ sub unbalanced {
         local $BINDING = $var;
         my $re = ::indent($$self{atom}->walk(@_));
         if (defined $BINDING) {
-            $re = "\$C->_BINDPOS$REV('$var', sub { my \$C=shift;\n" . $re . "\n})";
+            $re = "\$C->_BINDPOS$REV(\$mydepth, '$var', undef, sub { my \$C=shift;\n" . $re . "\n})";
         }
         $re;
     }
@@ -1337,7 +1344,7 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "\$C->_BRACKET$REV( sub { my \$C=shift;\n" . $re . "\n})";
+        "\$C->_BRACKET$REV( \$mydepth,'',undef, sub { my \$C=shift;\n" . $re . "\n})";
     }
 }
 
@@ -1348,7 +1355,7 @@ sub unbalanced {
         $text =~ s!(\/|\\\/)!\\$1!g;
         $text =~ s/\s//g;
         $text =~ s/\.\./-/g;
-        "\$C->_CCLASS$REV(qr/^$text\$/)";
+        "\$C->_CCLASS$REV(\$mydepth,'',undef, qr/^$text\$/)";
     }
 }
 
@@ -1357,7 +1364,7 @@ sub unbalanced {
         my $self = shift;
         local $NEEDMATCH = 0;
         my $text = ::un6($$self{text} . ';');
-        $text = 'my $M = $C->matchify->{M}; ' . $text . '; ' if $NEEDMATCH;
+        $text = 'my $M = $C->matchify($mydepth)->{M}; ' . $text . '; ' if $NEEDMATCH;
         $text;
     }
 }
@@ -1367,7 +1374,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         push @TOKEN, '"' . $text . '"' if $PURE;
-        '$C->_EXACT' . $REV . '("' . $text . '")';
+        '$C->_EXACT' . $REV . '($mydepth,"",undef, "' . $text . '")';
     }
 }
 
@@ -1377,7 +1384,7 @@ sub unbalanced {
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
         push @TOKEN, "'" . $text . "'" if $PURE;
-        "\$C->_EXACT$REV('" . $text . "')";
+        "\$C->_EXACT$REV(\$mydepth,'',undef, '" . $text . "')";
     }
 }
 
@@ -1392,61 +1399,61 @@ sub unbalanced {
             $not = 1;
         }
         if ($text eq '.') {
-            $code = "\$C->_ANY$REV()";
+            $code = "\$C->_ANY$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '^') {
-            $code = "\$C->_BOS$REV()";
+            $code = "\$C->_BOS$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '^^') {
-            $code = "\$C->_BOL$REV()";
+            $code = "\$C->_BOL$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '$') {
-            $code = "\$C->_EOS$REV()";
+            $code = "\$C->_EOS$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '$$') {
-            $code = "\$C->_EOL$REV()";
+            $code = "\$C->_EOL$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq ':') {
-            $code = "\$C->_COMMITATOM$REV()";
+            $code = "\$C->_COMMITATOM$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '::') {
             $PURE = 0;
-            $code = "\$C->_COMMITBRANCH$REV()";
+            $code = "\$C->_COMMITBRANCH$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq ':::') {
             $PURE = 0;
-            $code = "\$C->_COMMITRULE$REV()";
+            $code = "\$C->_COMMITRULE$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '\\d') {
-            $code = "\$C->_DIGIT$REV()";
+            $code = "\$C->_DIGIT$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '\\w') {
-            $code = "\$C->_ALNUM$REV()";
+            $code = "\$C->_ALNUM$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '\\s') {
-            $code = "\$C->_SPACE$REV()";
+            $code = "\$C->_SPACE$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '\\h') {
-            $code = "\$C->_HSPACE$REV()";
+            $code = "\$C->_HSPACE$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '\\v') {
-            $code = "\$C->_VSPACE$REV()";
+            $code = "\$C->_VSPACE$REV(\$mydepth,'',undef, )";
         }
         elsif ($text eq '»') {
-            $code = "\$C->_RIGHTWB()";
+            $code = "\$C->_RIGHTWB(\$mydepth,'',undef, )";
         }
         elsif ($text eq '«') {
-            $code = "\$C->_LEFTWB()";
+            $code = "\$C->_LEFTWB(\$mydepth,'',undef, )";
         }
         elsif ($text eq '>>') {
-            $code = "\$C->_RIGHTWB()";
+            $code = "\$C->_RIGHTWB(\$mydepth,'',undef, )";
         }
         elsif ($text eq '<<') {
-            $code = "\$C->_LEFTWB()";
+            $code = "\$C->_LEFTWB(\$mydepth,'',undef, )";
         }
         if ($not) { # XXX or maybe just .NOT on the end...
             $PURE = 0;
-            $code = "\$C->_NOTCHAR( sub { my \$C=shift; $code })";
+            $code = "\$C->_NOTCHAR( \$mydepth,'',undef, sub { my \$C=shift; $code })";
         }
         $code;
     }
@@ -1504,8 +1511,8 @@ END
         ::panic("Can't reverse $name") if $REV;
         $PURE = 0 if $impure{$name};
 
-        my $re = '$C->' . $name . "($args)";
-        $re = 'do {my $M = $C->matchify->{M}; ' . $re . '; }' if $NEEDMATCH;
+        my $re = '$C->' . $name . "(\$mydepth,'',undef, $args)";
+        $re = 'do {my $M = $C->matchify($mydepth)->{M}; ' . $re . '; }' if $NEEDMATCH;
         $re;
     }
 }
@@ -1527,7 +1534,7 @@ END
                 push @TOKEN, $re;
             }
             else {
-                push @TOKEN, "\$C->$name( [''], sub { my \$C=shift;\n$re\n} )";
+                push @TOKEN, "\$C->$name( \$mydepth,'',undef, sub { my \$C=shift;\n$re\n} )";
             }
         }
         '$C->' . $name . "($binding, sub { my \$C=shift;\n$re\n})";
@@ -1563,7 +1570,7 @@ END
         $rest =~ s/\(,? *//;
         push @TOKEN, "\$C->$name$rest'?')" if $PURE;
         my $re = "\$C->$name($binding, $rest)";
-        $re = 'do { my $M = $C->matchify->{M}; ' . $re . '; }' if $NEEDMATCH;
+        $re = 'do { my $M = $C->matchify($mydepth)->{M}; ' . $re . '; }' if $NEEDMATCH;
         $re;
     }
 }
@@ -1613,7 +1620,7 @@ END
             ::panic("Can't reverse serial disjunction") if $REV;
             for (@result) { s/^/push \@gather, / }
             my $result = "do { my \@gather;\n" .
-                            ::indent(join("\nor\n", @result)) .
+                            ::indent(join("\nor\n", @result),2) .
                           ";\n  \@gather;\n}";
             $result;
         }
@@ -1624,7 +1631,7 @@ END
     sub walk {
         my $self = shift;
         my $re = ::indent($$self{re}->walk(@_));
-        "\$C->_${REV}PAREN( sub { my \$C=shift;\n" . $re . "\n})";
+        "do { local \$MATCHID = \$C; \$C->_${REV}PAREN( \$mydepth, '', undef, sub { my \$C=shift;\n" . $re . "\n})}";
     }
 }
 
@@ -1670,9 +1677,9 @@ END
                         $PURE = 0 if $rest =~ /^0/;
                         $rest = "'$rest'";
                     }
-                    $quant = "\$C->$rep$h($rest, ";
+                    $quant = "\$C->$rep$h(\$mydepth, '', undef, $rest, ";
                 }
-                $result = $quant . " sub { my \$C=shift;\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
+                $result = $quant . "\$mydepth,'',undef, sub { my \$C=shift;\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
             }
             else {
                 $result = $$self{atom}->walk(@_);
@@ -1688,7 +1695,7 @@ END
 { package RE_qw; use base "REbase";
     sub walk {
         my $self = shift;
-        "\$C->_ARRAY$REV(qw$$self{text} )";
+        "\$C->_ARRAY$REV(\$mydepth, '', undef, qw$$self{text} )";
     }
 }
 
@@ -1749,7 +1756,7 @@ END
             my $pattern = ::indent(shift @result);
             $against =~ s/BACK//;
             $against .= "";
-            my $result = "\$C->SUBMATCH($against, sub {\n$pattern\n})";
+            my $result = "\$C->SUBMATCH(\$mydepth, '', undef, $against, sub {\n$pattern\n})";
             $result;
         }
     }
@@ -1788,12 +1795,12 @@ END
                 local @TOKEN;
                 local $PURE = 1;
                 my $r = $kid->walk(@_);
-                if ($r and $r =~ /^\$C->(\w+)/) {
-                    my $name = $1;
+#                if ($r and $r =~ /^\$C->(\w+)/) {
+#                    my $name = $1;
 #                    if (my $p = $fixedprefix{$name}) {
 #                        $r = "\$C->_EQ(\$C->{pos}, $p) && " . $r;
 #                    }
-                }
+#                }
                 push @result, $r;
                 my $token;
                 if (@TOKEN) {
@@ -1810,46 +1817,47 @@ END
             $result[0];
         }
         else {
-            for (@result) { $_ = " sub { my \$C=shift; $_ }," }
+            for (@result) { $_ = "sub { my \$C=shift; $_ }," }
             my $policy;
             if ($failover) {
                 $policy = <<"END"
-  my \@try = @{[ '0..' . (@ALTS-1) ]};
-  unshift \@try, splice(\@try,\$try,1) if \$tag eq '$altname';
+    my \@try = @{[ '0..' . (@ALTS-1) ]};
+    unshift \@try, splice(\@try,\$try,1) if \$tag eq '$altname';
 END
             }
             else {
                 $policy = <<"END"
-  my \@try = \$tag eq '$altname' ? (\$try) : ();
+    my \@try = \$tag eq '$altname' ? (\$try) : ();
 END
             }
             my $result = <<"END";
 do {
-  if (\@fate and \$fate[0] eq '$altname') {
-    warn "Fate passed to $altname: \@fate\\n";
-  }
-  else {
-    \@fate = split(' ', \$C->_AUTOLEXnow('${PKG}::$altname')->(\$C));
-    if (\@fate) {
-      warn "FATE OF ${PKG}::$altname: \@fate\\n";
+    if (\$fate and \$fate->[0] eq '$altname') {
+        print STDERR "Fate passed to $altname: \$\$fate[3]\\n";
+        (\$tag, \$try, \$fate) = \@\$fate;
     }
     else {
-      warn "NO FATE FOR ${PKG}::$altname (will probe)\\n";
+        \$fate = \$C->_AUTOLEXnow('${PKG}::$altname')->(\$C);
+        if (\$fate) {
+            print STDERR "FATE OF ${PKG}::$altname: \$\$fate[3]\\n";
+            (\$tag, \$try, \$fate) = \@\$fate;
+        }
+        else {
+            print STDERR "NO FATE FOR ${PKG}::$altname (will probe)\\n";
+            \$tag = '';
+        }
     }
-  }
-  (\$tag, \$try, \@fate) = \@fate;
-  \$tag //= '';
 $policy
-  warn "$altname will try: \@try\\n" if \@try > 1;
-  my \@gather = ();
-  while (\@try and not \@gather) {
-    my \$try = shift(\@try);
-    warn "Trying \$tag \$try\\n";
-    push \@gather, ((
-@{[ ::indent(join("\n", @result)) ]}
-    )[\$try])->(\$C);
-  }
-  \@gather;
+    print STDERR "$altname will try: \@try\\n" if \@try > 1;
+    my \@gather = ();
+    while (\@try and not \@gather) {
+        my \$try = shift(\@try);
+        print STDERR "Trying \$tag \$try\\n";
+        push \@gather, ((
+@{[ ::indent(join("\n", @result),3) ]}
+        )[\$try])->(\$C);
+    }
+    \@gather;
 }
 END
             $result;
@@ -1864,20 +1872,20 @@ END
         $PURE = 0;
         if ($var =~ /^\$/) {
             if ($var =~ /^\$(\d+)$/) {
-                "\$C->_BACKREFp$REV($1)";
+                "\$C->_BACKREFp$REV(\$mydepth,'',undef,$1)";
             }
             elsif ($var =~ /^\$<(.*)>$/) {
-                "\$C->_BACKREFn$REV('$1')";
+                "\$C->_BACKREFn$REV(\$mydepth,'',undef,'$1')";
             }
             else {
-                "\$C->_EXACT$REV($var)";
+                "\$C->_EXACT$REV(\$mydepth,'',undef,$var)";
             }
         }
         elsif ($var =~ /^\@/) {
-            "\$C->_ARRAY$REV($var)";
+            "\$C->_ARRAY$REV(\$mydepth,'',undef,$var)";
         }
         elsif ($var =~ /^\%/) {
-            "\$C->_HASH$REV($var)";
+            "\$C->_HASH$REV(\$mydepth,'',undef,$var)";
         }
     }
 }

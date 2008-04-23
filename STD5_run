@@ -51,7 +51,7 @@ sub main {
     open(STDERR,">$err") or die;
     my $perl = Perl->new(orig=>$input);
     if(!$perl->can($rule)) { die "\nERROR: Unknown rule: $rule\n"; }
-    my $result = eval { $perl->${rule}([$rule]); };
+    my $result = eval { $perl->${rule}(0,$rule); };
     if($result) { 
       print Perl::Dump($result);
     } else {

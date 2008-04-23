@@ -364,7 +364,7 @@ token vws {
 # We provide two mechanisms here:
 # 1) define $+moreinput, or
 # 2) override moreinput method
-method moreinput (@fate) {
+method moreinput ($depth, $binding, $fate) {
     $+moreinput.() if $+moreinput;
 }
 
@@ -1122,8 +1122,8 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     {*}                                                         #= !
 }
 
-method lex1 (@fate, Str $s) {
-    if %+thisop{$s}++ { self.panic(@fate, "Nested $s metaoperators not allowed"); }
+method lex1 ($depth, $binding, $fate, Str $s) {
+    if %+thisop{$s}++ { self.panic($depth, $binding, $fate, "Nested $s metaoperators not allowed"); }
     self;
 }
 
@@ -1898,14 +1898,14 @@ token theredoc {
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
-method heredoc (@fate) {
+method heredoc ($depth, $binding, $fate) {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $delim is context = $herestub.delim;
         my $lang = $herestub.lang;
         my $doc;
         my $ws = "";
-        $here = $here.q_unbalanced_rule(@fate,$lang, :stop(&theredoc)).MATCHIFY;
+        $here = $here.q_unbalanced_rule($depth, $binding, $fate,$lang, :stop(&theredoc)).MATCHIFY;
         if $here {
             if $ws {
                 my $wsequiv = $ws;
@@ -2297,7 +2297,7 @@ constant %open2close = (
 
 # assumes whitespace is eaten already
 
-method peek_delimiters (@fate) {
+method peek_delimiters ($depth, $binding, $fate) {
     return self.peek_brackets(['']) || do {
         my $buf = self.<orig>;
         substr($$buf,self.<pos>,1) xx 2;
@@ -2399,7 +2399,7 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
 }
 
 # We get here only for escapes in escape set, even though more are defined.
-method q_escape (@fate, $lang) {
+method q_escape ($depth, $binding, $fate, $lang) {
     $lang<escrule>(self);
 }
 
@@ -3564,13 +3564,13 @@ grammar Regex is Perl {
 
 # token panic (Str $s) { <commit> <fail($s)> }
 
-method panic (@fate, Str $s) {
+method panic ($depth, $binding, $fate, Str $s) {
     warn "############# PARSE FAILED #############\n";die "$s"
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
-method obs (@fate, Str $old, Str $new, Str $when = ' in Perl 6') {
-    self.panic(@fate,"Obsolete use of $old;$when please use $new instead");
+method obs ($depth, $binding, $fate, Str $old, Str $new, Str $when = ' in Perl 6') {
+    self.panic($depth, $binding, $fate,"Obsolete use of $old;$when please use $new instead");
 }
 
 #XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
