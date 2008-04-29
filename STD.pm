@@ -3506,8 +3506,8 @@ grammar Regex is Perl {
     }
 
     token regex_assertion:method {
-        <?before '.' <!before '>'> >
-        <dotty>
+        '.' <?before <alpha> >
+        <regex_assertion>
         {*}                                                        #= method
     }
 
