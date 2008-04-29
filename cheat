@@ -113,7 +113,7 @@ continue {
 }
 
 foreach my $name (sort keys %multis) {
-    print "token $name {\n";
+    print "proto token $name {\n";
     for (@{$multis{$name}}) {
 	print "    | <.$_>\n";
     }

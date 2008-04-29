@@ -3,6 +3,12 @@ grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 has StrPos $.ws_from;
 has StrPos $.ws_to;
 
+# random rule for debugging, please ignore
+token foo {
+    <prefix> ::
+    <integer>
+}
+
 =begin things todo
 
     add more suppositions and figure out exact error continuation semantics
@@ -208,126 +214,126 @@ token sym (Str $pat = $+sym) {
     $pat
 }
 
-proto token category { }
+proto token category {...}
 
 token category:category { <sym> }
 
 token category:sigil { <sym> }
-proto token sigil { }
+proto token sigil {...}
 
 token category:twigil { <sym> }
-proto token twigil { }
+proto token twigil {...}
 
 token category:special_variable { <sym> }
-proto token special_variable { }
+proto token special_variable {...}
 
 token category:version { <sym> }
-proto token version { }
+proto token version {...}
 
 token category:module_name { <sym> }
-proto token module_name { }
+proto token module_name {...}
 
 token category:term { <sym> }
-proto token term { }
+proto token term {...}
 
 token category:quote { <sym> }
-proto token quote (:$endsym is context = 'nofat') { }
+proto token quote (:$endsym is context = 'nofat') {...}
 
 token category:prefix { <sym> }
-proto token prefix is unary is defequiv(%symbolic_unary) { }
+proto token prefix is unary is defequiv(%symbolic_unary) {...}
 
 token category:infix { <sym> }
-proto token infix is binary is defequiv(%additive) { }
+proto token infix is binary is defequiv(%additive) {...}
 
 token category:postfix { <sym> }
-proto token postfix is unary is defequiv(%autoincrement) { }
+proto token postfix is unary is defequiv(%autoincrement) {...}
 
 token category:dotty { <sym> }
-proto token dotty (:$endsym is context = 'unspacey') { }
+proto token dotty (:$endsym is context = 'unspacey') {...}
 
 token category:circumfix { <sym> }
-proto token circumfix { }
+proto token circumfix {...}
 
 token category:postcircumfix { <sym> }
-proto token postcircumfix is unary { }  # unary as far as EXPR knows...
+proto token postcircumfix is unary {...}  # unary as far as EXPR knows...
 
 token category:regex_metachar { <sym> }
-proto token regex_metachar { }
+proto token regex_metachar {...}
 
 token category:regex_backslash { <sym> }
-proto token regex_backslash { }
+proto token regex_backslash {...}
 
 token category:regex_assertion { <sym> }
-proto token regex_assertion { }
+proto token regex_assertion {...}
 
 token category:regex_quantifier { <sym> }
-proto token regex_quantifier { }
+proto token regex_quantifier {...}
 
 token category:regex_mod_internal { <sym> }
-proto token regex_mod_internal { }
+proto token regex_mod_internal {...}
 
 token category:quote_mod { <sym> }
-proto token quote_mod { }
+proto token quote_mod {...}
 
 token category:q_backslash { <sym> }
-proto token q_backslash { }
+proto token q_backslash {...}
 
 token category:qq_backslash { <sym> }
-proto token qq_backslash { }
+proto token qq_backslash {...}
 
 token category:trait_verb { <sym> }
-proto token trait_verb (:$endsym is context = 'nofat_space') { }
+proto token trait_verb (:$endsym is context = 'nofat_space') {...}
 
 token category:trait_auxiliary { <sym> }
-proto token trait_auxiliary (:$endsym is context = 'nofat_space') { }
+proto token trait_auxiliary (:$endsym is context = 'nofat_space') {...}
 
 token category:type_declarator { <sym> }
-proto token type_declarator (:$endsym is context = 'nofat') { }
+proto token type_declarator (:$endsym is context = 'nofat') {...}
 
 token category:scope_declarator { <sym> }
-proto token scope_declarator (:$endsym is context = 'nofat') { }
+proto token scope_declarator (:$endsym is context = 'nofat') {...}
 
 token category:package_declarator { <sym> }
-proto token package_declarator (:$endsym is context = 'nofat') { }
+proto token package_declarator (:$endsym is context = 'nofat') {...}
 
 token category:plurality_declarator { <sym> }
-proto token plurality_declarator (:$endsym is context = 'nofat') { }
+proto token plurality_declarator (:$endsym is context = 'nofat') {...}
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator (:$endsym is context = 'nofat') { }
+proto token routine_declarator (:$endsym is context = 'nofat') {...}
 
 token category:regex_declarator { <sym> }
-proto token regex_declarator (:$endsym is context = 'nofat') { }
+proto token regex_declarator (:$endsym is context = 'nofat') {...}
 
 token category:statement_prefix { <sym> }
-proto rule  statement_prefix (:$endsym is context = 'nofat') { }
+proto rule  statement_prefix (:$endsym is context = 'nofat') {...}
 
 token category:statement_control { <sym> }
-proto rule  statement_control (:$endsym is context = 'nofat_space') { }
+proto rule  statement_control (:$endsym is context = 'nofat_space') {...}
 
 token category:statement_mod_cond { <sym> }
-proto rule  statement_mod_cond (:$endsym is context = 'nofat') { }
+proto rule  statement_mod_cond (:$endsym is context = 'nofat') {...}
 
 token category:statement_mod_loop { <sym> }
-proto rule  statement_mod_loop (:$endsym is context = 'nofat') { }
+proto rule  statement_mod_loop (:$endsym is context = 'nofat') {...}
 
 token category:infix_prefix_meta_operator { <sym> }
-proto token infix_prefix_meta_operator is binary { }
+proto token infix_prefix_meta_operator is binary {...}
 
 token category:infix_postfix_meta_operator { <sym> }
-proto token infix_postfix_meta_operator is binary { }
+proto token infix_postfix_meta_operator is binary {...}
 
 token category:infix_circumfixfix_meta_operator { <sym> }
-proto token infix_circumfixfix_meta_operator is binary { }
+proto token infix_circumfixfix_meta_operator is binary {...}
 
 token category:postfix_prefix_meta_operator { <sym> }
-proto token postfix_prefix_meta_operator is unary { }
+proto token postfix_prefix_meta_operator is unary {...}
 
 token category:prefix_postfix_meta_operator { <sym> }
-proto token prefix_postfix_meta_operator is unary { }
+proto token prefix_postfix_meta_operator is unary {...}
 
 token category:prefix_circumfix_meta_operator { <sym> }
-proto token prefix_circumfix_meta_operator is unary { }
+proto token prefix_circumfix_meta_operator is unary {...}
 
 token unspacey { <.unsp>? }
 token nofat_space { <?before \s | '#'> <?nofat> }
@@ -3096,15 +3102,14 @@ regex stdstopper {
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR ($fate,
+method EXPR ($depth, $binding, $fate,
                 %preclim = %LOOSEST
             )
 {
-    if $fate.[0] eq '?' {
-        if ($fate.[1] eq 'peek') {
-            return self._AUTOLEXpeek('Perl::EXPR');
-        }
+    if $depth < 0 {
+	return self._AUTOLEXpeek('Perl::EXPR');
     }
+    my $mydepth = $depth+1;
     my $f = $fate;
     $f.[0] = 'expect_term' if $f.[0] eq 'EXPR';
     my $preclim = %preclim<prec>;
@@ -3175,14 +3180,14 @@ method EXPR ($fate,
         warn "In loop, at ", $here.pos, "\n";
         %thisop = ();
         my $oldpos = $here.pos;
-        my @t = $here.expect_term($f);       # eats ws too
+        my @t = $here.expect_term($mydepth,'',$f);       # eats ws too
         die "EXPR failed to match expect_term" unless @t;
-        $f = [''];
+        $f = undef;
         $here = @t[0];
         last unless $here.pos > $oldpos;
 
         # interleave prefix and postfix, pretend they're infixish
-        my $M = $here<M>;
+        my $M = $here<M>[$mydepth];
         my @pre;
         @pre = @($M<pre>) if $M<pre>;
         my @post;
@@ -3207,9 +3212,9 @@ method EXPR ($fate,
         push @termstack, $here;
         warn "after push: " ~ (0+@termstack), "\n";
         %thisop = ();
-#        my @infix = $here.expect_tight_infix([''], $preclim);
+#        my @infix = $here.expect_tight_infix($mydepth,'',undef, $preclim);
         $oldpos = $here.pos;
-        my @infix = $here.expect_infix(['']);
+        my @infix = $here.expect_infix($mydepth,'',undef);
         last unless @infix;
         my $infix = @infix[0];
         last unless $infix.pos > $oldpos;
@@ -3218,7 +3223,7 @@ method EXPR ($fate,
         # XXX might want to allow this in a declaration though
         if not $infix { $here.panic([''],"Can't have two terms in a row") }
 
-        $here = $infix.ws(['']);
+        $here = $infix.ws($mydepth,'',undef);
 
         if not defined %thisop<prec> {
             warn "No prec given in thisop!\n";
@@ -3360,6 +3365,21 @@ grammar Regex is Perl {
         {*}                                                         #= :mod
     }
 
+    token regex_metachar:<:> {
+        <sym>
+        {*}                                                         #= :
+    }
+
+    token regex_metachar:<::> {
+        <sym>
+        {*}                                                         #= ::
+    }
+
+    token regex_metachar:<:::> {
+        <sym>
+        {*}                                                         #= :::
+    }
+
     token regex_metachar:sym<[ ]> {
         '[' <regex ']'> ']'
         { $/<sym> := <[ ]> }
@@ -3404,6 +3424,7 @@ grammar Regex is Perl {
         <before
         | \s
         | '|'
+        | '&'
         | ')'
         | ']'
         | '>'
@@ -3417,7 +3438,7 @@ grammar Regex is Perl {
     token regex_metachar:var {
         <!before '$$'>
         <sym=variable> <.ws>
-        $<binding> = ( ':=' <.ws> <regex_quantified_atom> )?
+        $<binding> = ( '=' <.ws> <regex_quantified_atom> )?
         {*}                                                         #= var
     }
 
@@ -3464,10 +3485,12 @@ grammar Regex is Perl {
     token regex_backslash:n { :i <sym> }
     token regex_backslash:o { :i <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
     token regex_backslash:r { :i <sym> }
+    token regex_backslash:s { :i <sym> }
     token regex_backslash:t { :i <sym> }
     token regex_backslash:v { :i <sym> }
     token regex_backslash:w { :i <sym> }
     token regex_backslash:x { :i <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+    token regex_backslash:misc { $<litchar>=(\W) }
     token regex_backslash:oops { :: <panic: unrecognized regex backslash sequence> }
 
     token regex_assertion:sym<?> { <sym> <regex_assertion> }
@@ -3492,7 +3515,7 @@ grammar Regex is Perl {
                                     | ':' <.ws>
                                         <q_unbalanced(qlang('Q',':qq'), :stop«>»)>
                                     | '(' <semilist> ')'
-                                    | <.ws> <EXPR(%LOOSEST)>
+                                    | <.ws> <regex>
                                     ]?
     }
 
@@ -3519,22 +3542,22 @@ grammar Regex is Perl {
         <quotepair> { $/<sym> := «: $<quotepair><key>» }
     }
 
-    token regex_mod_internal:sym<:i> { <sym> { $+insensitive = 1 } }
-    token regex_mod_internal:sym<:!i> { <sym> { $+insensitive = 0 } }
+    token regex_mod_internal:sym<:i>    { <sym> 'nsensitive' { $+insensitive = 1 } }
+    token regex_mod_internal:sym<:!i>   { <sym> 'nsensitive' { $+insensitive = 0 } }
     # XXX will this please work somehow ???
-    token regex_mod_internal:sym<:i( )> { <sym> <regex_mod_arg> { $+insensitive = $<regex_mod_arg>.eval } }
+    token regex_mod_internal:sym<:i( )> { <sym 'nsensitive'> <regex_mod_arg> { $+insensitive = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:sym<:b> { <sym> { $+basechar = 1 } }
-    token regex_mod_internal:sym<:!b> { <sym> { $+basechar = 0 } }
-    token regex_mod_internal:sym<:b( )> { <sym> <regex_mod_arg> { $+basechar = $<regex_mod_arg>.eval } }
+    token regex_mod_internal:sym<:b>    { <sym> 'asechar'? { $+basechar = 1 } }
+    token regex_mod_internal:sym<:!b>   { <sym> 'asechar'? { $+basechar = 0 } }
+    token regex_mod_internal:sym<:b( )> { <sym> 'asechar'? <regex_mod_arg> { $+basechar = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:sym<:r> { <sym> { $+sigspace = 1 } }
-    token regex_mod_internal:sym<:!r> { <sym> { $+sigspace = 0 } }
-    token regex_mod_internal:sym<:r( )> { <sym> <regex_mod_arg> { $+sigspace = $<regex_mod_arg>.eval } }
+    token regex_mod_internal:sym<:s>    { <sym> 'igspace'? { $+sigspace = 1 } }
+    token regex_mod_internal:sym<:!s>   { <sym> 'igspace'? { $+sigspace = 0 } }
+    token regex_mod_internal:sym<:s( )> { <sym> 'igspace'? <regex_mod_arg> { $+sigspace = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:sym<:ratchet> { <sym> { $+ratchet = 1 } }
-    token regex_mod_internal:sym<:!ratchet> { <sym> { $+ratchet = 0 } }
-    token regex_mod_internal:sym<:ratchet( )> { <sym> <regex_mod_arg> { $+ratchet = $<regex_mod_arg>.eval } }
+    token regex_mod_internal:sym<:r>    { <sym> 'atchet'? { $+ratchet = 1 } }
+    token regex_mod_internal:sym<:!r>   { <sym> 'atchet'? { $+ratchet = 0 } }
+    token regex_mod_internal:sym<:r( )> { <sym> 'atchet'? <regex_mod_arg> { $+ratchet = $<regex_mod_arg>.eval } }
 
     token regex_mod_internal:oops { <panic: unrecognized regex modifier> }
 

@@ -344,6 +344,7 @@ sub setname { my $self = shift;
     }
 
     sub dump { my $self = shift;
+	my $depth = shift;
 	local $DEPTH = $DEPTH;
 	my $name = shift // 'Match';
 	my $text = "$name: $$self{_f}..$$self{_t}\n";
@@ -352,14 +353,16 @@ sub setname { my $self = shift;
 	    my $v = $$self{$k};
 	#    warn "$DEPTH $k $v\n";
 	    if (not defined $v) {
-		warn "$k undefined in $text";
-		$text .= "$k: " . YAML::XS::Dump($self);
+		$text .= "$k: <undef>\n";
 	    }
 	    elsif (ref $v eq 'HASH') {
-		$text .= "$k: " . YAML::XS::Dump($v);
+		$text .= "$k: BARE HASH keys " . join(' ',keys(%$v)) . "\n";
+	    }
+	    elsif (ref $v eq 'ARRAY') {
+		$text .= "$k: BARE ARRAY @$v" . "\n";
 	    }
 	    elsif (ref $v) {
-		$text .= ::indent($v->dump($k));
+		$text .= ::indent($v->dump($depth+1, $k));
 	    }
 	    else {
 		$text .= "$k: $v\n";
@@ -371,48 +374,79 @@ sub setname { my $self = shift;
 
 sub matchify { my $self = shift;
     my $depth = shift;
-    my $bindings;
+    my $binding = shift // '_anon_';
     print STDERR "matchify $depth\n" if $DEBUG;
-#    if ($self->{M}) {
-#	@{$self->{M}}{'_f','_t'} = ($self->{from}, $self->{to});
-#    }
-#    else {
-	$bindings = 'Match'->new(_f => $self->{from}, _t => $self->{to} );
-#	if ($self->{M}) {
-#	    %$bindings = %{$self->{M}};
-#	    $bindings->{_t} = $self->{to};
+
+    my $mymatch = $self->{M}[$depth];
+    if (!$mymatch) {
+	$self->{M}[$depth] = $mymatch = { _f => $self->{from}, _t => $self->{to}, $binding => [] };
+    }
+    my $pushme = $mymatch->{$binding};
+    my $newprior = $self->{prior};
+    for (my $c = $self->{prior}; $c and $c != $self; $newprior = $c = $c->{prior}) {
+	if ($c->{depth} <= $depth) {
+	    last;	# let shallower matchify harvest this
+	}
+	elsif ($c->{depth} == $depth+1) {
+	    my $n = $c->{name};
+	    print STDERR "matchify prior $n\n" if $DEBUG;
+	    my $submatch = $c->{M}[$depth+1];
+	    if ($submatch) {
+		push @$pushme, $submatch;
+	    }
+	}
+	else {
+	    warn "oops, skipped match level from $c->{name}\n";
+	}
+    }
+    $self->{prior} = $newprior;
+#    for my $k (keys(%$bindings)) {
+#	my $v = $bindings->{$k};
+#	if (ref $v eq 'ARRAY' and @$v == 1) {
+#	    $bindings->{$k} = $v->[0];	# "unbox" singleton
 #	}
-	$self->{M} = $bindings;
 #    }
-    for (my $c = $self->{prior}; $c and $c != $self; $c = $c->{prior}) {
-        my $n = $c->{name};
-        print STDERR "matchify prior $n\n" if $DEBUG;
-        if (not $bindings->{$n}) {
-            $bindings->{$n} = [];
-        }
-	if ($c->{M}) {
-	    unshift @{$bindings->{$n}}, $c->{M};
-	    last;
-	}
-    }
-    for my $k (keys(%$bindings)) { my $v = $bindings->{$k};
-	if (ref $v eq 'ARRAY' and @$v == 1) {
-	    $bindings->{$k} = $v->[0];
-	}
-    }
-    print STDERR $self->dump() if $DEBUG;
+# print YAML::XS::Dump($self->{M});
+    print STDERR "after matchify:\n";
+    print "-" x 10, "\n";
+    print STDERR $self->dump($depth) if $DEBUG;
+    print "-" x 10, "\n";
     $self;
 }
 
 sub dump { my $self = shift;
+    my $depth = shift;
     my $name = shift // 'Cursor';
     my $text = "$name: $$self{from}..$$self{to}\n";
     local $DEPTH = $DEPTH+1;
     die YAML::XS::Dump($self) if $DEPTH++ > 100;
-    if ($self->{M}) {
-	$text .= ::indent($self->{M}->dump($$self{name}));
+    warn YAML::XS::Dump($self);
+    if (exists $self->{M}) {
+	my @m = @{$self->{M}};
+	for my $mx (0..@m-1) {
+	    my $m = $m[$mx];
+	    if ($m) {
+		$text .= "$mx:\n";
+		my $submatch = "";
+		for my $k (sort keys %$m) {
+		    $submatch .= "$k: ";
+		    my $a = $$m{$k};
+		    if (ref $a eq 'ARRAY') {
+			for my $i (0..@$a-1) {
+			    $submatch .= ::indent($$a[$i]->dump($depth+1, $i));
+			}
+		    }
+		    else {
+			$submatch .= $a . "\n";
+		    }
+		}
+		$text .= ::indent($submatch);
+	    }
+	    else {
+		$text .= "$mx: <undef>\n";
+	    }
+	}
     }
-    $text =~ s/ +$//;
     $text;
 }
 
@@ -430,6 +464,9 @@ sub cursor_all { my $self = shift;
     $r{prior} = defined $self->{name} ? $self : $self->{prior};
 #    print STDERR "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}})) if $DEBUG;
 
+    if ($$self{M}) {
+	@{$r{M}} = @{$$self{M}};
+    }
     bless \%r, ref $self;
 }
 
@@ -446,6 +483,9 @@ sub cursor { my $self = shift;
     $r{prior} = defined $self->{name} ? $self : $self->{prior};
 #    print STDERR "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}})) if $DEBUG;
 
+    if ($$self{M}) {
+	@{$r{M}} = @{$$self{M}};
+    }
     bless \%r, ref $self;
 }
 
@@ -462,6 +502,9 @@ sub cursor_rev { my $self = shift;
     $r{prior} = defined $self->{name} ? $self : $self->{prior};
 #    print STDERR "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}})) if $DEBUG;
 
+    if ($$self{M}) {
+	@{$r{M}} = @{$$self{M}};
+    }
     bless \%r, ref $self;
 }
 
@@ -1391,8 +1434,8 @@ sub fail { my $self = shift;
 
 { package main;
     sub indent { my $s = shift;
-	$s =~ s/\n/\n  /g;
-	"  " . $s;
+	$s =~ s/^/\n  /mg;
+	$s;
     }
 
     sub qm { my $s = shift;

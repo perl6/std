@@ -44,6 +44,7 @@ our $PKG = "main";
 our @PKG = ();
 our $ALTNAME;
 our $ALTNAMES;
+our $PROTO;
 
 my $TRACE = 0;
 my $METHOD = "method";
@@ -293,14 +294,17 @@ END
             next;
         }
 
-        if ( s/^([ \t]*)(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
-            my $indent = $1;
-            local $KIND = $2;
-            my $ws = $3;
-            local $NAME = $4;
-            my $argstuff = $5;
+        s/^proto(.*?\{\.\.\.\})/#proto$1/; # original proto from STD.pm
 
-            my $comment = "$1$2$3$4$5\n";
+        if ( s/^(proto)?([ \t]*)(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
+            my $proto = $1;
+            my $indent = $2;
+            local $KIND = $3;
+            my $ws = $4;
+            local $NAME = $5;
+            my $argstuff = $6;
+
+            my $comment = "$2$3$4$5$6\n";
             $comment =~ s/^/## /mg;
             $out .= $comment;
 
@@ -424,6 +428,7 @@ END
 
             local @ALTS;
             local $PURE = 1;
+            local $PROTO = $proto;
             my $meat = ::indent($re->walk(), 2);
 
             $RE{$PKG . '::' . $NAME} = $re;
@@ -467,15 +472,24 @@ END
             print STDERR "NO FATE FOR <<PKG>>::<<NAME>> (may backtrack)\n";
         }
     }
-    my $mydepth = $depth+1;
-
 END
 
-            $body .= <<"END";
+            if ($proto) {
+                $body .= <<'END';
+    my $mydepth = $depth;  # (child method does MATCHIFY for us)
+
+<<MEAT>>
+END
+            }
+            else {
+                $body .= <<"END";
+    my \$mydepth = \$depth+1;
+
     \$self->_MATCHIFY(\$depth,\$binding,$coercion
 <<MEAT>>
     );
 END
+            }
 
             my $PROTONAME = $NAME;
             $PROTONAME =~ s/__.*// or $PROTONAME = "panic";
@@ -580,7 +594,6 @@ use YAML::XS;
 END
             }
             $line =~ s/^(\s*has) /#$1 /;
-            $line =~ s/^proto /#proto /;
             $line =~ s/\bsay /print / and ($line =~ s/";$/\\n";/ or $line =~ s/;$/,"\\n";/);
             $line =~ s/&reduce = ->/\$reduce = sub/;
             $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
@@ -1212,7 +1225,10 @@ sub unbalanced {
     sub binding {
         my $binding;
         my $self = shift;
-        if ($$self{nobind}) {
+        if ($PROTO) {   # just pass on incoming args
+            $binding = "\$mydepth, \$binding, \$fate",
+        }
+        elsif ($$self{nobind}) {
             $binding = "\$mydepth, '', \$fate",
         }
         elsif (defined $BINDING) {
@@ -1286,7 +1302,7 @@ sub unbalanced {
         }
         $text = ::un6($text);
         my $ctx = $$self{context};
-        $text = 'my $M = $C->matchify($mydepth)->{M}; ' . $text . ';' if $NEEDMATCH;
+        $text = 'my $M = $C->matchify($mydepth,$binding)->{M}[$mydepth]; ' . $text . ';' if $NEEDMATCH;
         if ($text =~ s/\bmake\b/scalar/g) {  # XXX hack, avoid using $<make>
             "do {$text}";
         }
@@ -1310,7 +1326,7 @@ sub unbalanced {
         my $var = $$self{var};
         my $re = $$self{atom}->walk(@_);
 #        $var = "my $var" unless $var =~ /::/;
-        "bindvar($var,$re)" . '->matchify($mydepth)';
+        "bindvar($var,$re)" . '->matchify($mydepth,$binding)';
     }
 }
 
@@ -1364,7 +1380,7 @@ sub unbalanced {
         my $self = shift;
         local $NEEDMATCH = 0;
         my $text = ::un6($$self{text} . ';');
-        $text = 'my $M = $C->matchify($mydepth)->{M}; ' . $text . '; ' if $NEEDMATCH;
+        $text = 'my $M = $C->matchify($mydepth,$binding)->{M}[$mydepth]; ' . $text . '; ' if $NEEDMATCH;
         $text;
     }
 }
@@ -1512,7 +1528,7 @@ END
         $PURE = 0 if $impure{$name};
 
         my $re = '$C->' . $name . "(\$mydepth,'',undef, $args)";
-        $re = 'do {my $M = $C->matchify($mydepth)->{M}; ' . $re . '; }' if $NEEDMATCH;
+        $re = 'do {my $M = $C->matchify($mydepth,$binding)->{M}[$mydepth]; ' . $re . '; }' if $NEEDMATCH;
         $re;
     }
 }
@@ -1570,7 +1586,7 @@ END
         $rest =~ s/\(,? *//;
         push @TOKEN, "\$C->$name$rest'?')" if $PURE;
         my $re = "\$C->$name($binding, $rest)";
-        $re = 'do { my $M = $C->matchify($mydepth)->{M}; ' . $re . '; }' if $NEEDMATCH;
+        $re = 'do { my $M = $C->matchify($mydepth,$binding)->{M}[$mydepth]; ' . $re . '; }' if $NEEDMATCH;
         $re;
     }
 }
