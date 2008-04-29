@@ -3428,6 +3428,7 @@ grammar Regex is Perl {
         | ')'
         | ']'
         | '>'
+        | $
         >
         {*}                                                         #= $
     }
@@ -3506,7 +3507,7 @@ grammar Regex is Perl {
 
     token regex_assertion:method {
         <?before '.' <!before '>'> >
-        <EXPR(%LOOSEST)>
+        <dotty>
         {*}                                                        #= method
     }
 
