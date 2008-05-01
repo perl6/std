@@ -402,8 +402,10 @@ token ident {
 token pod_comment {
     ^^ '=' <.unsp>?
     [
-    | begin <.ws> <ident> .*? \n
-      '=' <.unsp>? 'end' <.ws> $<ident> \N*         {*}         #= block
+    | 'begin' \h+ <ident> .*? \n
+      '=' <.unsp>? 'end' \h+ $<ident> » \N*         {*}         #= tagged
+    | 'begin' » \h* \n .*? \n
+      '=' <.unsp>? 'end' » \N*                      {*}         #= anon
     | \N*                                           {*}         #= misc
     ]
     {*}
