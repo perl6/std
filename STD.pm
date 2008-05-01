@@ -5,7 +5,7 @@ has StrPos $.ws_to;
 
 # random rule for debugging, please ignore
 token foo {
-    <pre> ::
+    <pre>+ ::
     <integer>
 }
 
@@ -1125,7 +1125,7 @@ token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' {*} }    #= hyper
 token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' {*} }    #= hyper
 
 token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
-    <?lex1: negation>
+    <?lex1: 'negation'>
 
     <sym> <!before '!'> <infix> ::
 
@@ -1146,13 +1146,13 @@ method lex1 (Str $s) {
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
-    <?lex1: cross>
+    <?lex1: 'cross'>
     X <infix> X
     {*}                                                         #= X X
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
-    <?lex1: hyper>
+    <?lex1: 'hyper'>
     [
     | [ '«' | '»' ] <infix> [ '«' | '»' ]
     | [ '<<' | '>>' ] <infix> [ '<<' | '>>' ]
@@ -1161,7 +1161,7 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
 }
 
 token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
-    <?lex1: assignment>
+    <?lex1: 'assignment'>
     '=' ::
 
     [
@@ -3357,7 +3357,7 @@ grammar Regex is Perl {
     # "normal" metachars
 
     token regex_metachar:sigwhite {
-        <?before \s|'#'> <SUPER::ws>   # significant whitespace
+        <?before \s|'#'> <.SUPER::ws>   # significant whitespace
     }
 
     token regex_metachar:sym<{ }> {
@@ -3476,7 +3476,7 @@ grammar Regex is Perl {
     token qq_backslash:sym<0> { <sym> }
     token qq_backslash:misc { :: \W || <panic: "unrecognized backslash sequence"> }
 
-    token regex_backslash:unspace { <?before \s> <SUPER::ws> }
+    token regex_backslash:unspace { <?before \s> <.SUPER::ws> }
 
     token regex_backslash:a { :i <sym> }
     token regex_backslash:b { :i <sym> }

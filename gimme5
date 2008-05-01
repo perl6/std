@@ -24,7 +24,9 @@ our %RE = ();                   # turns into __DATA__ yaml
 our $STOP = "";
 our $REV = "";
 our $NAME = "";
-our $BINDING = "";
+our @BINDINGS;	# list of names to bind to
+our %BINDINGS;	# count of how many times name used in this rule
+our $BINDNUM = 1;	# is this a singular or plural binding?
 our $KIND = "";
 our $PARSEBIND = 0;
 our $PAREN = 0;
@@ -410,8 +412,8 @@ END
                 next;
             }
 
-            local $BINDING;
-            undef $BINDING;
+            local @BINDINGS;
+	    local %BINDINGS;
             local @DECL;
 
             local $ALTNAME = $NAME;
@@ -453,8 +455,14 @@ END
     }
 
     my $C = $self;
-#    my ($C, $tag, $try) = $self->cursor_fate('<<PKG>>', '<<NAME>>');
 END
+
+	    for my $binding ( keys %BINDINGS ) {
+		next unless $BINDINGS{$binding} > 1;
+		$body .= <<"END";
+    \$C->{'$binding'} = [];
+END
+	    }
 
             if ($proto) {
                 $body .= <<'END';
@@ -1105,7 +1113,7 @@ sub assertion {
         return $rest;
     }
 
-    if (s/^([a-zA-Z]\w*)//) {
+    if (s/^([a-zA-Z]\w*(?:\:\:\w+)*)//) {
         my $word = $1;
         my $ch = substr($_,0,1);
         if ($ch eq '>') {
@@ -1117,17 +1125,11 @@ sub assertion {
             return bless { name => $word, min => 12345 }, "RE_method_noarg";
         }
         if ($ch eq ':') {
-            s/^:\s*//;
-            my $str = unbalanced('>');
+            my $code = code('>');
             s/^>// or panic "Missing >";
-            if ($word eq 'after') {
-                my $x = bless { name => '_EXACT_rev', str => $str, min => 0 },
-                    "RE_method_str";
-                return bless { name => $word, rest => $x, min => 0 },
-                    "RE_method";
-            }
-            return bless { name => $word, str => $str, min => 0 },
-                "RE_method_str";
+	    $code =~ s/:\s+(.*)$/($1)/s;
+            return bless { name => $word, rest => $code, min => 0 },
+                "RE_method";
         }
         if ($ch eq '(') {
             my $code = code('\\)>');
@@ -1202,6 +1204,16 @@ sub unbalanced {
         return $result;
     }
 
+    sub bind { my $self = shift;
+	my $re = shift;
+	return $re unless @BINDINGS;
+	$re = "\$C->_SUBSUME([" .
+	    join(',', map {"'$_'"} @BINDINGS) .
+	    "], sub { my \$C = shift()->cursor_fresh; $re })";
+	@BINDINGS = ();
+	$re;
+    }
+
 }
 
 { package RE; use base "REbase";
@@ -1229,12 +1241,12 @@ sub unbalanced {
         local(@ALTS);
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk(@_);
-            "\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+            $self->bind("\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re) . "\n})");
         }
         else {
             my $re = $$self{re}->walk(@_);
             return $re if $re =~ /^\$C->before/;
-            "\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+            $self->bind("\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})");
         }
     }
 }
@@ -1286,8 +1298,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = $$self{atom}->walk(@_);
-#        $var = "my $var" unless $var =~ /::/;
-        "bindvar($var,$re)";
+        "bindvar($var,$re)";	# doesn't do "let" semantics yet
     }
 }
 
@@ -1295,11 +1306,9 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $var = $$self{var};
-        local $BINDING = $var;
+	push @BINDINGS, $var;
+	$BINDINGS{$var} += $BINDNUM;
         my $re = ::indent($$self{atom}->walk(@_));
-        if (defined $BINDING) {
-            $re = "\$C->_BINDNAMED$REV('$var', sub { my \$C=shift;\n" . $re . "\n})";
-        }
         $re;
     }
 }
@@ -1308,11 +1317,9 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $var = $$self{var};
-        local $BINDING = $var;
+	push @BINDINGS, $var;
+	$BINDINGS{$var} += $BINDNUM;
         my $re = ::indent($$self{atom}->walk(@_));
-        if (defined $BINDING) {
-            $re = "\$C->_BINDPOS$REV('$var', sub { my \$C=shift;\n" . $re . "\n})";
-        }
         $re;
     }
 }
@@ -1320,8 +1327,13 @@ sub unbalanced {
 { package RE_bracket; use base "REbase";
     sub walk {
         my $self = shift;
-        my $re = ::indent($$self{re}->walk(@_));
-        "\$C->_BRACKET$REV( sub { my \$C=shift;\n" . $re . "\n})";
+	my $re;
+	{
+	    local @BINDINGS;
+	    $re = ::indent($$self{re}->walk(@_));
+	}
+        $re = "\$C->_BRACKET$REV( sub { my \$C=shift;\n" . $re . "\n})";
+	$self->bind($re);
     }
 }
 
@@ -1332,7 +1344,7 @@ sub unbalanced {
         $text =~ s!(\/|\\\/)!\\$1!g;
         $text =~ s/\s//g;
         $text =~ s/\.\./-/g;
-        "\$C->_CCLASS$REV(qr/^$text\$/)";
+        $self->bind("\$C->_CCLASS$REV(qr/^$text\$/)");
     }
 }
 
@@ -1351,7 +1363,7 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         push @TOKEN, '"' . $text . '"' if $PURE;
-        '$C->_EXACT' . $REV . '("' . $text . '")';
+        $self->bind('$C->_EXACT' . $REV . '("' . $text . '")');
     }
 }
 
@@ -1442,21 +1454,23 @@ sub unbalanced {
         my $name = $$self{name};
         ::panic("Can't reverse $name") if $REV;
         $PURE = 0 if $impure{$name};
+	my $re;
 
         if ($name eq "sym") {
             $$self{sym} = $SYM;
             $$self{endsym} = $ENDSYM if $ENDSYM;
+            $re = '$C->' . $name . "()";
         }
         elsif ($name eq "nextsame") {
             $NEEDORIGARGS++;
-            return '$self->SUPER::' . $NAME . '(@origargs)';
+            $re = '$self->SUPER::' . $NAME . '(@origargs)';
         }
-        if ($name =~ /^\w/) {
+        elsif ($name =~ /^\w/) {
             push @TOKEN, "\$C->$name('?')" if $PURE;
-            '$C->' . $name . "()";
+            $re = '$C->' . $name . "()";
         }
         else {
-            <<"END";
+            $re = <<"END";
 do {
     if (not $name) {
         \$C;
@@ -1475,6 +1489,11 @@ do {
 }
 END
         }
+	if ($name =~ /^\w/ and not $self->{nobind}) {
+	    push @BINDINGS, $name;
+	    $BINDINGS{$name} += $BINDNUM;
+	}
+	$self->bind($re);
     }
 }
 
@@ -1501,7 +1520,10 @@ END
         ::panic("Can't reverse $name") if $REV;
         $PURE = 0 if $impure{$name};
         local $REV = '_rev' if $name eq 'after';
-        $re = ::indent($re->walk(@_));
+	{
+	    local @BINDINGS;
+	    $re = ::indent($re->walk(@_));
+	}
         $REV = '';
 
         if ($PURE) {
@@ -1512,21 +1534,12 @@ END
                 push @TOKEN, "\$C->$name( sub { my \$C=shift;\n$re\n} )";
             }
         }
-        '$C->' . $name . "(sub { my \$C=shift;\n$re\n})";
-    }
-}
-
-{ package RE_method_str; use base "REbase";
-    sub walk {
-        my $self = shift;
-        my $str = $$self{str};
-        my $name = $$self{name};
-        ::panic("Can't reverse $name") if $REV;
-        $PURE = 0 if $impure{$name};
-        $str =~ s/(['\\])/\\$1/g;
-
-        push @TOKEN, "\$C->$name('$str','?')" if $PURE;
-        '$C->' . $name . "('$str')";
+        $re = '$C->' . $name . "(sub { my \$C=shift;\n$re\n})";
+	if ($name =~ /^\w/ and not $self->{nobind}) {
+	    push @BINDINGS, $name;
+	    $BINDINGS{$name} += $BINDNUM;
+	}
+	$self->bind($re);
     }
 }
 
@@ -1544,7 +1557,11 @@ END
         push @TOKEN, "\$C->$name$rest'?')" if $PURE;
         my $re = "\$C->$name($rest)";
         $re = 'do { my $M = $C; ' . $re . '; }' if $NEEDMATCH;
-        $re;
+	if ($name =~ /^\w/ and not $self->{nobind}) {
+	    push @BINDINGS, $name;
+	    $BINDINGS{$name} += $BINDNUM;
+	}
+        $self->bind($re);
     }
 }
 
@@ -1603,8 +1620,22 @@ END
 { package RE_paren; use base "REbase";
     sub walk {
         my $self = shift;
-        my $re = ::indent($$self{re}->walk(@_));
-        "do { local \$MATCHID = \$C; \$C->_${REV}PAREN( sub { my \$C=shift;\n" . $re . "\n})}";
+	my $re;
+	{
+	    local @BINDINGS;
+	    local %BINDINGS;
+	    $re = ::indent($$self{re}->walk(@_));
+	    if (%BINDINGS) {
+		for my $binding ( keys %BINDINGS ) {
+		    next unless $BINDINGS{$binding} > 1;
+		    my $re = <<"END" . $re;
+	\$C->{'$binding'} = [];
+END
+		}
+	    }
+	}
+        $re = "do { \$C->_${REV}PAREN( sub { my \$C=shift;\n" . $re . "\n})}";
+	$self->bind($re);
     }
 }
 
@@ -1612,6 +1643,7 @@ END
     sub walk {
         my $self = shift;
         my $result;
+	local $BINDNUM = 2;
         #warn ::Dump($self);
         #warn $$self{quant},"\n";
         if (ref $$self{atom}) {
@@ -1668,7 +1700,7 @@ END
 { package RE_qw; use base "REbase";
     sub walk {
         my $self = shift;
-        "\$C->_ARRAY$REV( qw$$self{text} )";
+        $self->bind("\$C->_ARRAY$REV( qw$$self{text} )");
     }
 }
 
@@ -1831,20 +1863,20 @@ END
         $PURE = 0;
         if ($var =~ /^\$/) {
             if ($var =~ /^\$(\d+)$/) {
-                "\$C->_BACKREFp$REV($1)";
+                $self->bind("\$C->_BACKREFp$REV($1)");
             }
             elsif ($var =~ /^\$<(.*)>$/) {
-                "\$C->_BACKREFn$REV('$1')";
+                $self->bind("\$C->_BACKREFn$REV('$1')");
             }
             else {
-                "\$C->_EXACT$REV($var)";
+                $self->bind("\$C->_EXACT$REV($var)");
             }
         }
         elsif ($var =~ /^\@/) {
-            "\$C->_ARRAY$REV($var)";
+            $self->bind("\$C->_ARRAY$REV($var)");
         }
         elsif ($var =~ /^\%/) {
-            "\$C->_HASH$REV($var)";
+            $self->bind("\$C->_HASH$REV($var)");
         }
     }
 }

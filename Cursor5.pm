@@ -330,10 +330,36 @@ sub _AUTOLEXnow { my $self = shift;
 }
 
 sub cursor_peek { my $self = shift;
-
     my %r = %$self;
     $r{_peek} = 1;
     bless \%r, ref $self;
+}
+
+sub cursor_fresh { my $self = shift;
+    my %r;
+    $r{_orig} = $self->{_orig};
+    $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
+    $r{_fate} = $self->{_fate};
+    bless \%r, ref $self;
+}
+
+sub cursor_bind { my $self = shift;	# this is parent's match cursor
+    my $bindings = shift;
+    my $submatch = shift;		# this is the submatch's cursor
+
+    my %r = %$self;
+    if ($bindings) {
+	for my $binding (@$bindings) {
+	    if (ref $r{$binding} eq 'ARRAY') {
+		push(@{$r{$binding}}, $submatch);
+	    }
+	    else {
+		$r{$binding} = $submatch;
+	    }
+	}
+    }
+    $r{_pos} = $r{_to} = $submatch->{_to};
+    bless \%r, ref $self;		# return new match cursor for parent
 }
 
 sub cursor_fate { my $self = shift;
@@ -427,7 +453,7 @@ sub retm { my $self = shift;
 }
 
 sub _MATCHIFY { my $self = shift;
-    my @result = map { $_->cursor_all($self->{_pos}, $_->{_to})->retm() } @_;
+    my @result = map { $_->retm() } @_;
     if (wantarray) {
 	@result;
     }
@@ -686,21 +712,12 @@ sub _BINDVAR { my $self = shift;
         $block->($self);
 }
 
-sub _BINDPOS { my $self = shift;
-    my $pos = shift;
+sub _SUBSUME { my $self = shift;
+    my $names = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
-    map { $_->retm() }
-        $block->($self);
-}
-
-sub _BINDNAMED { my $self = shift;
-    my $name = shift;
-    my $block = shift;
-
-    local $CTX = $self->callm;
-    map { $_->retm() }
+    local $CTX = $self->callm($names ? "@$names" : "");
+    map { $self->cursor_bind($names, $_)->retm() }
         $block->($self);
 }
 
