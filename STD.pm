@@ -1816,9 +1816,9 @@ token typename {
     {*}
 }
 
-regex fulltypename {
+rule fulltypename {
     <typename>
-    [ <.ws> of <.ws> <fulltypename> ]?
+    [ of <fulltypename> ]?
     {*}
 }
 
