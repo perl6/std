@@ -894,6 +894,13 @@ rule statement_control:POST    {<sym> <block> {*} }            #= POST
 rule statement_control:CATCH   {<sym> <block> {*} }            #= CATCH
 rule statement_control:CONTROL {<sym> <block> {*} }            #= CONTROL
 
+rule term:BEGIN   {<sym> <block> {*} }                         #= BEGIN
+rule term:CHECK   {<sym> <block> {*} }                         #= CHECK
+rule term:INIT    {<sym> <block> {*} }                         #= INIT
+rule term:START   {<sym> <block> {*} }                         #= START
+rule term:ENTER   {<sym> <block> {*} }                         #= ENTER
+rule term:FIRST   {<sym> <block> {*} }                         #= FIRST
+
 rule modifier_expr { <EXPR> {*} }
 
 rule statement_mod_cond:if     {<sym> <modifier_expr> {*} }    #= mod if
