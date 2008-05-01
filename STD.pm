@@ -672,9 +672,9 @@ rule statement_control:if {\
     <sym>
     <EXPR>                           {*}                        #= if expr
     <pblock>                         {*}                        #= if block
-    @<elsif> = ( elsif <EXPR>       {*}                        #= elsif expr
+    @<elsif> = ( elsif<?nofat_space> <EXPR>       {*}                        #= elsif expr
                         <pblock>     {*} )*                     #= elsif block
-    @<else> = ( else <pblock>       {*} )?                     #= else
+    @<else> = ( else<?nofat_space> <pblock>       {*} )?                     #= else
     {*}
 }
 
