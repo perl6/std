@@ -26,18 +26,14 @@ $SIG{__DIE__} = sub { confess(@_) };
 
 sub new {
     my $class = shift;
-    my %args = ('pos' => 0, 'from' => 0);
+    my $orig = shift;
+    my %args = ('_pos' => 0, '_from' => 0, '_orig' => \$orig);
     while (@_) {
 	my $name = shift;
-	if ($name eq 'orig') {
-	    $args{$name} = \shift;
-	}
-	else {
-	    $args{$name} = shift;
-	}
+	$args{'_' . $name} = shift;
     }
     my $self = bless \%args, ref $class || $class;
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     print STDERR " orig ", $$buf,"\n" if $DEBUG;
     $self->BUILD;
     $self->_AUTOLEXpeek('Perl::expect_term');
@@ -51,28 +47,24 @@ my $RE_verbose = 1;
 
 # XXX still full of ASCII assumptions
 
-# most cursors just copy forward the previous value of the following two items:
-#has $self->{orig};        # per match, the original string we are matching against
 our %lexers;       # per language, the cache of lexers, keyed by rule name
 
-#has Bool $.bool = 1;
-#has StrPos $.from = 0;
-#has StrPos $.to = 0;
-#has StrPos $.pos = 0;
-#has Cursor $.prior;
-#has %.mykeys};
-#has Str $.name;
-#has $.item;
+# most cursors just copy forward the previous value of the following two items:
+#has $._orig; 	       # per match, the original string we are matching against
+#has StrPos $._from = 0;
+#has StrPos $._to = 0;
+#has StrPos $._pos = 0;
+#has Cursor $._prior;
 
-sub bool { $_[0]->{bool} }
-sub from { $_[0]->{from} }
-sub to { $_[0]->{to} }
-sub pos { $_[0]->{pos} }
-sub name { $_[0]->{name} }
+sub from { $_[0]->{_from} }
+sub to { $_[0]->{_to} }
+sub pos { $_[0]->{_pos} }
+sub peek { $_[0]->{_peek} }
+sub orig { $_[0]->{_orig} }
 
 # unwarranted chumminess with Perl grammar
-sub ws_from { $_[0]->{name} }
-sub ws_to { $_[0]->{name} }
+sub ws_from { $_[0]->{_ws_from} }
+sub ws_to { $_[0]->{_ws_to} }
 
 sub lexers { my $self = shift;
     \%lexers;    # XXX should be different per language, sigh
@@ -119,7 +111,7 @@ sub _AUTOLEXgen { my $self = shift;
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
 
 	$AUTOLEXED{$key} = $fakepos;
-	my @pat = $ast->longest($self);
+	my @pat = $ast->longest($self->cursor_peek());
 	for (@pat) {
 	    s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
 	}
@@ -215,12 +207,12 @@ sub _AUTOLEXnow { my $self = shift;
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
     };
-    my $buf = $self->{orig};
-    my $P = $self->{pos};
+    my $buf = $self->{_orig};
+    my $P = $self->{_pos};
     if ($P == length($$buf)) {
 	return sub { undef };
     }
-    my $chr = substr($$buf,$self->{pos},1);
+    my $chr = substr($$buf,$self->{_pos},1);
 
     $lexer->{$chr} //= do {
 	print STDERR '=' x 72, "\n" if $DEBUG;
@@ -282,7 +274,7 @@ sub _AUTOLEXnow { my $self = shift;
 
 		return '' unless $lexer;
 
-		pos($$buf) = $C->{pos};
+		pos($$buf) = $C->{_pos};
 
 		##########################################
 		# No normal p5 match/subst below here!!! #
@@ -309,24 +301,17 @@ sub _AUTOLEXnow { my $self = shift;
 				    " $f\n";
 			    }
 			}
-			print STDERR "success at '", substr($$buf,$C->{pos},10), "'\n" if $DEBUG;
+			print STDERR "success at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG;
 			$result;
 		    }
 		    else {
-			print STDERR "NO LEXER MATCH at '", substr($$buf,$C->{pos},10), "'\n" if $DEBUG;
+			print STDERR "NO LEXER MATCH at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG;
 			return;
 		    }
 		}
 	    }
 	}
     };
-}
-
-sub setname { my $self = shift;
-    my $k = shift;
-
-    $self->{name} = "$k";
-    $self;
 }
 
 { package Match;
@@ -342,169 +327,46 @@ sub setname { my $self = shift;
     sub to { my $self = shift;
 	$self->{_t};
     }
-
-    sub dump { my $self = shift;
-	my $depth = shift;
-	local $DEPTH = $DEPTH;
-	my $name = shift // 'Match';
-	my $text = "$name: $$self{_f}..$$self{_t}\n";
-	foreach my $k (sort keys %$self) {
-	    next if $k =~ /^_/;
-	    my $v = $$self{$k};
-	#    warn "$DEPTH $k $v\n";
-	    if (not defined $v) {
-		$text .= "$k: <undef>\n";
-	    }
-	    elsif (ref $v eq 'HASH') {
-		$text .= "$k: BARE HASH keys " . join(' ',keys(%$v)) . "\n";
-	    }
-	    elsif (ref $v eq 'ARRAY') {
-		$text .= "$k: BARE ARRAY @$v" . "\n";
-	    }
-	    elsif (ref $v) {
-		$text .= ::indent($v->dump($depth+1, $k));
-	    }
-	    else {
-		$text .= "$k: $v\n";
-	    }
-	}
-	$text;
-    }
 }
 
-sub matchify { my $self = shift;
-    my $depth = shift;
-    my $binding = shift // '_anon_';
-    print STDERR "matchify $depth\n" if $DEBUG;
+sub cursor_peek { my $self = shift;
 
-    my $mymatch = $self->{M}[$depth];
-    if (!$mymatch) {
-	$self->{M}[$depth] = $mymatch = { _f => $self->{from}, _t => $self->{to}, $binding => [] };
-    }
-    my $pushme = $mymatch->{$binding};
-    my $newprior = $self->{prior};
-    for (my $c = $self->{prior}; $c and $c != $self; $newprior = $c = $c->{prior}) {
-	if ($c->{depth} <= $depth) {
-	    last;	# let shallower matchify harvest this
-	}
-	elsif ($c->{depth} == $depth+1) {
-	    my $n = $c->{name};
-	    print STDERR "matchify prior $n\n" if $DEBUG;
-	    my $submatch = $c->{M}[$depth+1];
-	    if ($submatch) {
-		push @$pushme, $submatch;
-	    }
-	}
-	else {
-	    warn "oops, skipped match level from $c->{name}\n";
-	}
-    }
-    $self->{prior} = $newprior;
-#    for my $k (keys(%$bindings)) {
-#	my $v = $bindings->{$k};
-#	if (ref $v eq 'ARRAY' and @$v == 1) {
-#	    $bindings->{$k} = $v->[0];	# "unbox" singleton
-#	}
-#    }
-# print YAML::XS::Dump($self->{M});
-    print STDERR "after matchify:\n";
-    print "-" x 10, "\n";
-    print STDERR $self->dump($depth) if $DEBUG;
-    print "-" x 10, "\n";
-    $self;
-}
-
-sub dump { my $self = shift;
-    my $depth = shift;
-    my $name = shift // 'Cursor';
-    my $text = "$name: $$self{from}..$$self{to}\n";
-    local $DEPTH = $DEPTH+1;
-    die YAML::XS::Dump($self) if $DEPTH++ > 100;
-    warn YAML::XS::Dump($self);
-    if (exists $self->{M}) {
-	my @m = @{$self->{M}};
-	for my $mx (0..@m-1) {
-	    my $m = $m[$mx];
-	    if ($m) {
-		$text .= "$mx:\n";
-		my $submatch = "";
-		for my $k (sort keys %$m) {
-		    $submatch .= "$k: ";
-		    my $a = $$m{$k};
-		    if (ref $a eq 'ARRAY') {
-			for my $i (0..@$a-1) {
-			    $submatch .= ::indent($$a[$i]->dump($depth+1, $i));
-			}
-		    }
-		    else {
-			$submatch .= $a . "\n";
-		    }
-		}
-		$text .= ::indent($submatch);
-	    }
-	    else {
-		$text .= "$mx: <undef>\n";
-	    }
-	}
-    }
-    $text;
+    my %r = %$self;
+    $r{_peek} = 1;
+    bless \%r, ref $self;
 }
 
 sub cursor_all { my $self = shift;
     my $fpos = shift;
     my $tpos = shift;
 
-    my %r;
-    $r{orig} = $$self{orig};
-    $r{ws_to} = $$self{ws_to};
-    $r{ws_from} = $$self{ws_from};
-    $r{from} = $fpos;
-    $r{to} = $tpos;
-    $r{pos} = $tpos;
-    $r{prior} = defined $self->{name} ? $self : $self->{prior};
-#    print STDERR "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}})) if $DEBUG;
+    my %r = %$self;
+    $r{_from} = $fpos;
+    $r{_to} = $tpos;
+    $r{_pos} = $tpos;
 
-    if ($$self{M}) {
-	@{$r{M}} = @{$$self{M}};
-    }
     bless \%r, ref $self;
 }
 
 sub cursor { my $self = shift;
     my $tpos = shift;
 
-    my %r;
-    $r{orig} = $$self{orig};
-    $r{ws_to} = $$self{ws_to};
-    $r{ws_from} = $$self{ws_from};
-    $r{from} = $self->{pos} // 0;
-    $r{to} = $tpos;
-    $r{pos} = $tpos;
-    $r{prior} = defined $self->{name} ? $self : $self->{prior};
-#    print STDERR "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}})) if $DEBUG;
+    my %r = %$self;
+    $r{_from} = $self->{_pos} // 0;
+    $r{_to} = $tpos;
+    $r{_pos} = $tpos;
 
-    if ($$self{M}) {
-	@{$r{M}} = @{$$self{M}};
-    }
     bless \%r, ref $self;
 }
 
 sub cursor_rev { my $self = shift;
     my $fpos = shift;
 
-    my %r;
-    $r{orig} = $$self{orig};
-    $r{ws_to} = $$self{ws_to};
-    $r{ws_from} = $$self{ws_from};
-    $r{pos} = $fpos;
-    $r{from} = $fpos;
-    $r{to} = $self->{from};
-    $r{prior} = defined $self->{name} ? $self : $self->{prior};
-#    print STDERR "orig at ", sprintf("%08x\n", unpack 'L', pack('p', ${$self->{orig}})) if $DEBUG;
+    my %r = %$self;
+    $r{_pos} = $fpos;
+    $r{_from} = $fpos;
+    $r{_to} = $self->{_from};
 
-    if ($$self{M}) {
-	@{$r{M}} = @{$$self{M}};
-    }
     bless \%r, ref $self;
 }
 
@@ -523,42 +385,20 @@ sub callm { my $self = shift;
         $name .= " " . $arg;
     }
     my $pos = '?';
-    $pos = $self->{pos} if defined $self->{pos};
+    $pos = $self->{_pos} if defined $self->{_pos};
     print STDERR $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "] @subs\n" if $DEBUG;
     {lvl => $lvl};
 }
 
-sub whats { my $self = shift;
-
-    my @k = keys(%{$self->{mykeys}});
-    print STDERR "  $self ===> @{[$self->{from}.' '. $self->{to}.' '. $self->{item}]} (@k)\n" if $DEBUG;
-    for my $k (@k) {
-        print STDERR "   $k => @{[$self->{mykeys}->{$k}]}\n" if $DEBUG;
-    }
-}
-
 sub retm { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
-
-    warn "Returning non-Cursor: $self\n" unless exists $self->{pos};
-    my $bindmess = "";
-    if (defined $binding and $binding ne '') {
-        $self->{name} = $binding;
-	$self->{depth} = $depth;
-        $bindmess = "      :bind<$binding>";
-    }
+    warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
-    print STDERR $self->{pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{from}]}..@{[$self->{to}]}$bindmess\n" if $DEBUG;
-#    $self->whats();
+    print STDERR $self->{_pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}\n" if $DEBUG;
     $self;
 }
 
 sub _MATCHIFY { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
-
-    my @result = map { $_->cursor_all($self->{pos}, $_->{to})->retm($depth,$binding)->matchify($depth) } @_;
+    my @result = map { $_->cursor_all($self->{_pos}, $_->{_to})->retm() } @_;
     if (wantarray) {
 	@result;
     }
@@ -568,43 +408,37 @@ sub _MATCHIFY { my $self = shift;
 }
 
 sub _STARf { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
-    map { $_->retm($depth,$binding) }
-        $self->cursor($self->{pos}),
-        $self->_PLUSf($block);
+    map { $_->retm() }
+        $self->cursor($self->{_pos}),
+        $self->_PLUSf($fate, $block);
 }
 
 sub _STARg { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
-    map { $_->retm($depth,$binding) } reverse
-            $self->cursor($self->{pos}),
-            $self->_PLUSf($block);
+    map { $_->retm() } reverse
+            $self->cursor($self->{_pos}),
+            $self->_PLUSf($fate, $block);
 }
 
 sub _STARr { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
     my $to = $self;
     my @all;
-    my $eos = length(${$self->{orig}});
+    my $eos = length(${$self->{_orig}});
     for (;;) {
-      last if $to->{pos} == $eos;
+      last if $to->{_pos} == $eos;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
 #            say @matches.perl;
       last unless @matches;
@@ -612,12 +446,10 @@ sub _STARr { my $self = shift;
 	push @all, $first;
 	$to = $first;
     }
-    $self->cursor($to->{to})->retm($depth,$binding);
+    $self->cursor($to->{_to})->retm();
 }
 
 sub _PLUSf { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
@@ -626,38 +458,34 @@ sub _PLUSf { my $self = shift;
 
     my @result;
     # don't go beyond end of string
-    return () if $self->{pos} == length(${$self->{orig}});
+    return () if $self->{_pos} == length(${$self->{_orig}});
     do {
 	for my $x ($block->($self)) {
-	    push @result, map { $self->cursor($_->{to}) } $x, $x->_PLUSf($block);
+	    push @result, map { $self->cursor($_->{_to}) } $x, $x->_PLUSf($fate, $block);
 	}
     };
-    map { $_->retm($depth,$binding) } @result;
+    map { $_->retm() } @result;
 }
 
 sub _PLUSg { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
-    reverse $self->_PLUSf($block, @_);
+    reverse $self->_PLUSf($fate, $block, @_);
 }
 
 sub _PLUSr { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
     my $to = $self;
     my @all;
-    my $eos = length(${$self->{orig}});
+    my $eos = length(${$self->{_orig}});
     for (;;) {
-      last if $to->{pos} == $eos;
+      last if $to->{_pos} == $eos;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
       last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
@@ -666,13 +494,11 @@ sub _PLUSr { my $self = shift;
 	$to = $first;
     }
     return () unless @all;
-    my $r = $self->cursor($to->{pos});
-    $r->retm($depth,$binding);
+    my $r = $self->cursor($to->{_pos});
+    $r->retm();
 }
 
 sub _REPSEPf { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $sep = shift;
     my $block = shift;
@@ -682,32 +508,28 @@ sub _REPSEPf { my $self = shift;
 
     my @result;
     # don't go beyond end of string
-    return () if $self->{pos} == length(${$self->{orig}});
+    return () if $self->{_pos} == length(${$self->{_orig}});
     do {
 	for my $x ($block->($self)) {
 	    for my $s ($sep->($x)) {
-		push @result, map { $self->cursor($_->{to}) } $x, $s->_REPSEPf($sep,$block);
+		push @result, map { $self->cursor($_->{_to}) } $x, $s->_REPSEPf($fate, $sep,$block);
 	    }
 	}
     };
-    map { $_->retm($depth,$binding) } @result;
+    map { $_->retm() } @result;
 }
 
 sub _REPSEPg { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $sep = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
-    reverse $self->_REPSEPf($sep, $block, @_);
+    reverse $self->_REPSEPf($fate, $sep, $block, @_);
 }
 
 sub _REPSEPr { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $sep = shift;
     my $block = shift;
@@ -715,9 +537,9 @@ sub _REPSEPr { my $self = shift;
     local $CTX = $self->callm;
     my $to = $self;
     my @all;
-    my $eos = length(${$self->{orig}});
+    my $eos = length(${$self->{_orig}});
     for (;;) {
-      last if $to->{pos} == $eos;
+      last if $to->{_pos} == $eos;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
       last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
@@ -729,194 +551,166 @@ sub _REPSEPr { my $self = shift;
 	$to = $sep;
     }
     return () unless @all;
-    my $r = $self->cursor($to->{pos});
-    $r->retm($depth,$binding);
+    my $r = $self->cursor($to->{_pos});
+    $r->retm();
 }
 
 sub _OPTr { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
     my $x = ($block->($self))[0];
-    my $r = $x // $self->cursor($self->{pos});
-    $r->retm($depth,$binding);
+    my $r = $x // $self->cursor($self->{_pos});
+    $r->retm();
 }
 
 sub _OPTg { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
     my @x = $block->($self);
-    map { $_->retm($depth,$binding) }
+    map { $_->retm() }
         $block->($self),
-        $self->cursor($self->{pos});
+        $self->cursor($self->{_pos});
 }
 
 sub _OPTf { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    map { $_->retm($depth,$binding) }
-        $self->cursor($self->{pos}),
+    map { $_->retm() }
+        $self->cursor($self->{_pos}),
         $block->($self);
 }
 
 sub _BRACKET { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    map { $_->retm($depth, $binding) }
+    map { $_->retm() }
         $block->($self);
 }
 
 sub _PAREN { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    map { $_->matchify($depth)->retm($depth,$binding) }
+    map { $_->retm() }
         $block->($self);
 }
 
 sub _NOTBEFORE { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
     my @all = $block->($self);
     return () if @all;  # XXX loses continuation
-    return $self->cursor($self->{pos})->retm($depth,$binding);
+    return $self->cursor($self->{_pos})->retm();
 }
 
 sub _NOTCHAR { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
     my @all = $block->($self);
     return () if @all;  # XXX loses continuation
-    return $self->cursor($self->{pos}+1)->retm($depth,$binding);
+    return $self->cursor($self->{_pos}+1)->retm();
 }
 
 sub before { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
     my @all = $block->($self);
     if (@all and $all[0]) {
-        return $all[0]->cursor_all(($self->{pos}) x 2)->retm($depth,$binding);
+        return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
     }
     return ();
 }
 
 sub after { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    my $end = $self->cursor($self->{pos});
-    my @all = $block->($end);          # Make sure $_->{from} == $_->{to}
+    my $end = $self->cursor($self->{_pos});
+    my @all = $block->($end);          # Make sure $_->{_from} == $_->{_to}
     if (@all and $all[0]) {
-        return $all[0]->cursor_all(($self->{pos}) x 2)->retm($depth,$binding);
+        return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
     }
     return ();
 }
 
 sub null { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    return $self->cursor($self->{pos})->retm($depth,$binding);
+    return $self->cursor($self->{_pos})->retm();
 }
 
 sub _ASSERT { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
     my @all = $block->($self);
-    if ((@all and $all[0]->{bool})) {
-        return $self->cursor($self->{pos})->retm($depth,$binding);
+    if ((@all and $all[0]->{_bool})) {
+        return $self->cursor($self->{_pos})->retm();
     }
     return ();
 }
 
 sub _BINDVAR { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $var = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    map { $$var = $_; $_->retm($depth,$binding) }  # XXX doesn't "let"
+    map { $$var = $_; $_->retm() }  # XXX doesn't "let"
         $block->($self);
 }
 
 sub _BINDPOS { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
+    my $pos = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    map { $_->retm($depth,$binding) }
+    map { $_->retm() }
         $block->($self);
 }
 
 sub _BINDNAMED { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
+    my $name = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
-    map { $_->retm($depth,$binding) }
+    map { $_->retm() }
         $block->($self);
 }
 
 sub _EXACT { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $s = shift;
 
     local $CTX = $self->callm($s);
-    my $P = $self->{pos} // 0;
+    my $P = $self->{_pos} // 0;
     my $len = length($s);
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     if (substr($$buf, $P, $len) eq $s) {
         print STDERR "EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
         my $r = $self->cursor($P+$len);
-        $r->retm($depth,$binding);
+        $r->retm();
     }
     else {
         print STDERR "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
@@ -925,18 +719,16 @@ sub _EXACT { my $self = shift;
 }
 
 sub _EXACT_rev { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $s = shift;
 
     local $CTX = $self->callm;
     my $len = length($s);
-    my $from = $self->{from} - $len;
-    my $buf = $self->{orig};
+    my $from = $self->{_from} - $len;
+    my $buf = $self->{_orig};
     if ($from >= 0 and substr($$buf, $from, $len) eq $s) {
         my $r = $self->cursor_rev($from);
-        $r->retm($depth,$binding);
+        $r->retm();
     }
     else {
 #        say "EXACT_rev $s didn't match @{[substr($!orig,$from,$len)]} at $from $len";
@@ -945,12 +737,10 @@ sub _EXACT_rev { my $self = shift;
 }
 
 sub _ARRAY { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     local $CTX = $self->callm(0+@_);
-    my $P = $self->{pos} // 0;
-    my $buf = $self->{orig};
+    my $P = $self->{_pos} // 0;
+    my $buf = $self->{_orig};
     my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
     my @result = ();
     for my $s (@array) {
@@ -965,16 +755,14 @@ sub _ARRAY { my $self = shift;
 }
 
 sub _ARRAY_rev { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     local $CTX = $self->callm(0+@_);
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
     my @result = ();
     for my $s (@array) {
 	my $len = length($s);
-	my $from = $self->{from} = $len;
+	my $from = $self->{_from} = $len;
 	if (substr($$buf, $from, $len) eq $s) {
 	    print STDERR "ARRAY_rev elem $s matched @{[substr($$buf,$from,$len)]} at $from $len\n" if $DEBUG;
 	    my $r = $self->cursor_rev($from);
@@ -985,17 +773,15 @@ sub _ARRAY_rev { my $self = shift;
 }
 
 sub _DIGIT { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
     if ($char =~ /^\d$/) {
         my $r = $self->cursor($P+1);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "DIGIT didn't match $char at $P";
@@ -1004,21 +790,19 @@ sub _DIGIT { my $self = shift;
 }
 
 sub _DIGIT_rev { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->{from} - 1;
+    my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "DIGIT_rev didn't match $char at $from";
         return ();
     }
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $from, 1);
     if ($char =~ /^\d$/) {
         my $r = $self->cursor_rev($from);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "DIGIT_rev didn't match $char at $from";
@@ -1027,17 +811,15 @@ sub _DIGIT_rev { my $self = shift;
 }
 
 sub _ALNUM { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
     if ($char =~ /^\w$/) {
         my $r = $self->cursor($P+1);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "ALNUM didn't match $char at $P";
@@ -1046,21 +828,19 @@ sub _ALNUM { my $self = shift;
 }
 
 sub _ALNUM_rev { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->{from} - 1;
+    my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "ALNUM_rev didn't match $char at $from";
         return ();
     }
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $from, 1);
     if ($char =~ /^\w$/) {
         my $r = $self->cursor_rev($from);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "ALNUM_rev didn't match $char at $from";
@@ -1069,17 +849,15 @@ sub _ALNUM_rev { my $self = shift;
 }
 
 sub alpha { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
     if ($char =~ /^[a-z_A-Z]$/) {
         my $r = $self->cursor($P+1);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "alpha didn't match $char at $P";
@@ -1088,17 +866,15 @@ sub alpha { my $self = shift;
 }
 
 sub _SPACE { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
     if ($char =~ /^\s$/) {
         my $r = $self->cursor($P+1);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "SPACE didn't match $char at $P";
@@ -1107,21 +883,19 @@ sub _SPACE { my $self = shift;
 }
 
 sub _SPACE_rev { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->{from} - 1;
+    my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "SPACE_rev didn't match $char at $from";
         return ();
     }
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $from, 1);
     if ($char =~ /^\s$/) {
         my $r = $self->cursor_rev($from);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "SPACE_rev didn't match $char at $from";
@@ -1130,17 +904,15 @@ sub _SPACE_rev { my $self = shift;
 }
 
 sub _HSPACE { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
     if ($char =~ /^[ \t\r]$/ or ($char =~ /^\s$/ and $char !~ /^[\n\f\0x0b\x{2028}\x{2029}]$/)) {
         my $r = $self->cursor($P+1);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "HSPACE didn't match $char at $P";
@@ -1149,21 +921,19 @@ sub _HSPACE { my $self = shift;
 }
 
 sub _HSPACE_rev { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->{from} - 1;
+    my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "HSPACE_rev didn't match $char at $from";
         return ();
     }
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $from, 1);
     if ($char =~ /^[ \t\r]$/ or ($char =~ /^\s$/ and $char !~ /^[\n\f\0x0b\x{2028}\x{2029}]$/)) {
         my $r = $self->cursor_rev($from);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "HSPACE_rev didn't match $char at $from";
@@ -1172,17 +942,15 @@ sub _HSPACE_rev { my $self = shift;
 }
 
 sub _VSPACE { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
     if ($char =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
         my $r = $self->cursor($P+1);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "VSPACE didn't match $char at $P";
@@ -1191,21 +959,19 @@ sub _VSPACE { my $self = shift;
 }
 
 sub _VSPACE_rev { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->{from} - 1;
+    my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "VSPACE_rev didn't match $char at $from";
         return ();
     }
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $from, 1);
     if ($char =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
         my $r = $self->cursor_rev($from);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "VSPACE_rev didn't match $char at $from";
@@ -1214,18 +980,16 @@ sub _VSPACE_rev { my $self = shift;
 }
 
 sub _CCLASS { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $cc = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
     if ($char =~ /$cc/) {
         my $r = $self->cursor($P+1);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "CCLASS didn't match $char at $P";
@@ -1234,22 +998,20 @@ sub _CCLASS { my $self = shift;
 }
 
 sub _CCLASS_rev { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $cc = shift;
 
     local $CTX = $self->callm;
-    my $from = $self->{from} - 1;
+    my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "CCLASS didn't match $char at $from";
         return ();
     }
-    my $buf = $self->{orig};
+    my $buf = $self->{_orig};
     my $char = substr($$buf, $from, 1);
     if ($char =~ /$cc/) {
         my $r = $self->cursor_rev($from);
-        return $r->retm($depth,$binding);
+        return $r->retm();
     }
     else {
 #        say "CCLASS didn't match $char at $from";
@@ -1258,15 +1020,13 @@ sub _CCLASS_rev { my $self = shift;
 }
 
 sub _ANY { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     if ($P < length($$buf)) {
-        $self->cursor($P+1)->retm($depth,$binding);
+        $self->cursor($P+1)->retm();
     }
     else {
 #        say "ANY didn't match anything at $P";
@@ -1275,14 +1035,12 @@ sub _ANY { my $self = shift;
 }
 
 sub _BOS { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
+    my $P = $self->{_pos};
     if ($P == 0) {
-        $self->cursor($P)->retm($depth,$binding);
+        $self->cursor($P)->retm();
     }
     else {
         return ();
@@ -1290,15 +1048,13 @@ sub _BOS { my $self = shift;
 }
 
 sub _BOL { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     if ($P == 0 or substr($$buf, $P-1, 1) =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
-        $self->cursor($P)->retm($depth,$binding);
+        $self->cursor($P)->retm();
     }
     else {
         return ();
@@ -1306,15 +1062,13 @@ sub _BOL { my $self = shift;
 }
 
 sub _EOS { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     if ($P == length($$buf)) {
-        $self->cursor($P)->retm($depth,$binding);
+        $self->cursor($P)->retm();
     }
     else {
         return ();
@@ -1322,15 +1076,13 @@ sub _EOS { my $self = shift;
 }
 
 sub _EOL { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     if ($P == length($$buf) or substr($$buf, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
-        $self->cursor($P)->retm($depth,$binding);
+        $self->cursor($P)->retm();
     }
     else {
         return ();
@@ -1338,16 +1090,14 @@ sub _EOL { my $self = shift;
 }
 
 sub _RIGHTWB { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     pos($$buf) = $P - 1;
     if ($$buf =~ /\w\b/) {
-        $self->cursor($P)->retm($depth,$binding);
+        $self->cursor($P)->retm();
     }
     else {
         return ();
@@ -1355,16 +1105,14 @@ sub _RIGHTWB { my $self = shift;
 }
 
 sub _LEFTWB { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
-    my $buf = $self->{orig};
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
     pos($$buf) = $P;
     if ($$buf =~ /\b(?=\w)/) {
-        $self->cursor($P)->retm($depth,$binding);
+        $self->cursor($P)->retm();
     }
     else {
         return ();
@@ -1372,15 +1120,13 @@ sub _LEFTWB { my $self = shift;
 }
 
 sub _REDUCE { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $tag = shift;
 
     local $CTX = $self->callm($tag);
-    my $P = $self->{pos};
-    my $F = $self->{from};
-    $self->{Rtag} = $tag;
+    my $P = $self->{_pos};
+    my $F = $self->{_from};
+    $self->{_Rtag} = $tag;
     print STDERR "Success $tag from $F to $P\n" if $DEBUG;
 #    $self->whats;
     $self;
@@ -1388,43 +1134,35 @@ sub _REDUCE { my $self = shift;
 }
 
 sub _COMMITBRANCH { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     local $CTX = $self->callm;
-    my $P = $self->{pos};
+    my $P = $self->{_pos};
     print STDERR "Commit branch to $P\n" if $DEBUG;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
 
 sub _COMMITRULE { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
+    my $P = $self->{_pos};
     print STDERR "Commit rule to $P\n" if $DEBUG;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
 
 sub commit { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
 
     local $CTX = $self->callm;
-    my $P = $self->{pos};
+    my $P = $self->{_pos};
     print STDERR "Commit match to $P\n" if $DEBUG;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
 
 sub fail { my $self = shift;
-    my $depth = shift;
-    my $binding = shift;
     my $fate = shift;
     my $m = shift;
     die $m;
@@ -1662,7 +1400,7 @@ sub fail { my $self = shift;
 	    my $lexer;
 	    {
 		local $PREFIX = "";
-		$lexer = $C->$name(-1, '', undef);
+		$lexer = $C->$name(undef);
 	    }
 	    my @pat = @{$lexer->{PATS}};
 	    return unless @pat;
@@ -1703,7 +1441,7 @@ sub fail { my $self = shift;
                 return @result;
             }
             else {
-                my $lexer = $C->$name(-1, '', undef, $re);
+                my $lexer = $C->$name(undef, $re);
 		my @pat = @{$lexer->{PATS}};
 		return unless @pat;
 		return @pat;
@@ -1727,7 +1465,7 @@ sub fail { my $self = shift;
                 return;
             }
             else {
-                my $lexer = $C->$name(-1, '', undef, $str);
+                my $lexer = $C->$name(undef, $str);
 		my @pat = @{$lexer->{PATS}};
 		return '' unless @pat;
 		return @pat;

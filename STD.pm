@@ -373,7 +373,7 @@ token vws {
 # We provide two mechanisms here:
 # 1) define $+moreinput, or
 # 2) override moreinput method
-method moreinput ($depth, $binding, $fate) {
+method moreinput ($fate) {
     $+moreinput.() if $+moreinput;
 }
 
@@ -1140,8 +1140,8 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     {*}                                                         #= !
 }
 
-method lex1 ($depth, $binding, $fate, Str $s) {
-    if %+thisop{$s}++ { self.panic($depth, $binding, $fate, "Nested $s metaoperators not allowed"); }
+method lex1 ($fate, Str $s) {
+    if %+thisop{$s}++ { self.panic($fate, "Nested $s metaoperators not allowed"); }
     self;
 }
 
@@ -1429,6 +1429,7 @@ rule pluralized {
 token plurality_declarator:multi { <sym> <pluralized> {*} }     #= multi
 token plurality_declarator:proto { <sym> <pluralized> {*} }     #= proto
 token plurality_declarator:only  { <sym> <pluralized> {*} }     #= only
+token plurality_declarator:bare  {       <pluralized> {*} }     #= bare
 
 token routine_declarator:sub       { <sym> <routine_def> {*} }  #= sub
 token routine_declarator:method    { <sym> <method_def> {*} }   #= method
@@ -1916,14 +1917,14 @@ token theredoc {
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
-method heredoc ($depth, $binding, $fate) {
+method heredoc ($fate) {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $delim is context = $herestub.delim;
         my $lang = $herestub.lang;
         my $doc;
         my $ws = "";
-        $here = $here.q_unbalanced_rule($depth, $binding, $fate, $lang, :stop(&theredoc)).MATCHIFY;
+        $here = $here.q_unbalanced_rule($fate, $lang, :stop(&theredoc)).MATCHIFY;
         if $here {
             if $ws {
                 my $wsequiv = $ws;
@@ -2315,10 +2316,10 @@ constant %open2close = (
 
 # assumes whitespace is eaten already
 
-method peek_delimiters ($depth, $binding, $fate) {
+method peek_delimiters ($fate) {
     return self.peek_brackets(['']) || do {
-        my $buf = self.<orig>;
-        substr($$buf,self.<pos>,1) xx 2;
+        my $buf = self.orig;
+        substr($$buf,self.pos,1) xx 2;
     }
 }
 
@@ -2417,7 +2418,7 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
 }
 
 # We get here only for escapes in escape set, even though more are defined.
-method q_escape ($depth, $binding, $fate, $lang) {
+method q_escape ($fate, $lang) {
     $lang<escrule>(self);
 }
 
@@ -3114,14 +3115,13 @@ regex stdstopper {
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR ($depth, $binding, $fate,
+method EXPR ($fate,
                 %preclim = %LOOSEST
             )
 {
-    if $depth < 0 {
+    if self->peek {
 	return self._AUTOLEXpeek('Perl::EXPR');
     }
-    my $mydepth = $depth+1;
     my $f = $fate;
     $f.[0] = 'expect_term' if $f.[0] eq 'EXPR';
     my $preclim = %preclim<prec>;
@@ -3192,14 +3192,14 @@ method EXPR ($depth, $binding, $fate,
         warn "In loop, at ", $here.pos, "\n";
         %thisop = ();
         my $oldpos = $here.pos;
-        my @t = $here.expect_term($mydepth,'',$f);       # eats ws too
+        my @t = $here.expect_term($f);       # eats ws too
         die "EXPR failed to match expect_term" unless @t;
         $f = undef;
         $here = @t[0];
         last unless $here.pos > $oldpos;
 
         # interleave prefix and postfix, pretend they're infixish
-        my $M = $here<M>[$mydepth];
+        my $M = $here;
         my @pre;
         @pre = @($M<pre>) if $M<pre>;
         my @post;
@@ -3224,9 +3224,9 @@ method EXPR ($depth, $binding, $fate,
         push @termstack, $here;
         warn "after push: " ~ (0+@termstack), "\n";
         %thisop = ();
-#        my @infix = $here.expect_tight_infix($mydepth,'',undef, $preclim);
+#        my @infix = $here.expect_tight_infix(undef, $preclim);
         $oldpos = $here.pos;
-        my @infix = $here.expect_infix($mydepth,'',undef);
+        my @infix = $here.expect_infix(undef);
         last unless @infix;
         my $infix = @infix[0];
         last unless $infix.pos > $oldpos;
@@ -3235,7 +3235,7 @@ method EXPR ($depth, $binding, $fate,
         # XXX might want to allow this in a declaration though
         if not $infix { $here.panic([''],"Can't have two terms in a row") }
 
-        $here = $infix.ws($mydepth,'',undef);
+        $here = $infix.ws(undef);
 
         if not defined %thisop<prec> {
             warn "No prec given in thisop!\n";
@@ -3377,17 +3377,17 @@ grammar Regex is Perl {
         {*}                                                         #= :mod
     }
 
-    token regex_metachar:<:> {
+    token regex_metachar:sym<:> {
         <sym>
         {*}                                                         #= :
     }
 
-    token regex_metachar:<::> {
+    token regex_metachar:sym<::> {
         <sym>
         {*}                                                         #= ::
     }
 
-    token regex_metachar:<:::> {
+    token regex_metachar:sym<:::> {
         <sym>
         {*}                                                         #= :::
     }
@@ -3602,13 +3602,13 @@ grammar Regex is Perl {
 
 # token panic (Str $s) { <commit> <fail($s)> }
 
-method panic ($depth, $binding, $fate, Str $s) {
+method panic ($fate, Str $s) {
     warn "############# PARSE FAILED #############\n";die "$s"
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
-method obs ($depth, $binding, $fate, Str $old, Str $new, Str $when = ' in Perl 6') {
-    self.panic($depth, $binding, $fate, "Obsolete use of $old;$when please use $new instead");
+method obs ($fate, Str $old, Str $new, Str $when = ' in Perl 6') {
+    self.panic($fate, "Obsolete use of $old;$when please use $new instead");
 }
 
 #XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
