@@ -1068,9 +1068,9 @@ token expect_infix {
 }
 
 # doing fancy as one rule simplifies LTM
-token dotty:sym<.*> { '.' <[+*?=^:]> <methodop> {*} }           #= fancy
-token dotty:sym<.>  { '.' <dottyop>  {*} }                      #= plain
-token dotty:sym<!>  { '!' <methodop>  {*} }                     #= private
+token dotty:sym<.*> { '.' <[+*?=^:]> <?unspacey> <methodop> {*} }           #= fancy
+token dotty:sym<.>  { '.' <?unspacey> <dottyop>  {*} }                      #= plain
+token dotty:sym<!>  { '!' <?unspacey> <methodop>  {*} }                     #= private
 
 token dottyop {
     [
