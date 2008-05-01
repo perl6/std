@@ -336,6 +336,35 @@ sub cursor_peek { my $self = shift;
     bless \%r, ref $self;
 }
 
+sub cursor_fate { my $self = shift;
+    my $pkg = shift;
+    my $name = shift;
+
+    my %r = %$self;
+    my $tag;
+    my $try;
+    
+    my $fate = $self->{_fate};
+    if ($fate and $fate->[0] eq $name) {
+        print STDERR "Fate passed to $name: $$fate[3]\n";
+        ($tag, $try, $fate) = @$fate;
+	$r{_fate} = $fate;
+    }
+    else {
+        $fate = $self->_AUTOLEXnow("${pkg}::$name")->($self);
+        if ($fate) {
+            print STDERR "FATE OF ${pkg}::$name: $$fate[3]\n";
+            ($tag, $try, $fate) = @$fate;
+	    $r{_fate} = $fate;
+        }
+        else {
+            print STDERR "NO FATE FOR ${pkg}::$name (will probe)\n";
+            $tag = '';
+        }
+    }
+    return (bless \%r, ref $self), $tag, $try;
+}
+
 sub cursor_all { my $self = shift;
     my $fpos = shift;
     my $tpos = shift;
@@ -408,29 +437,26 @@ sub _MATCHIFY { my $self = shift;
 }
 
 sub _STARf { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
     map { $_->retm() }
         $self->cursor($self->{_pos}),
-        $self->_PLUSf($fate, $block);
+        $self->_PLUSf($block);
 }
 
 sub _STARg { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
     map { $_->retm() } reverse
             $self->cursor($self->{_pos}),
-            $self->_PLUSf($fate, $block);
+            $self->_PLUSf($block);
 }
 
 sub _STARr { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -450,7 +476,6 @@ sub _STARr { my $self = shift;
 }
 
 sub _PLUSf { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -461,23 +486,21 @@ sub _PLUSf { my $self = shift;
     return () if $self->{_pos} == length(${$self->{_orig}});
     do {
 	for my $x ($block->($self)) {
-	    push @result, map { $self->cursor($_->{_to}) } $x, $x->_PLUSf($fate, $block);
+	    push @result, map { $self->cursor($_->{_to}) } $x, $x->_PLUSf($block);
 	}
     };
     map { $_->retm() } @result;
 }
 
 sub _PLUSg { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
-    reverse $self->_PLUSf($fate, $block, @_);
+    reverse $self->_PLUSf($block, @_);
 }
 
 sub _PLUSr { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -499,7 +522,6 @@ sub _PLUSr { my $self = shift;
 }
 
 sub _REPSEPf { my $self = shift;
-    my $fate = shift;
     my $sep = shift;
     my $block = shift;
 
@@ -512,7 +534,7 @@ sub _REPSEPf { my $self = shift;
     do {
 	for my $x ($block->($self)) {
 	    for my $s ($sep->($x)) {
-		push @result, map { $self->cursor($_->{_to}) } $x, $s->_REPSEPf($fate, $sep,$block);
+		push @result, map { $self->cursor($_->{_to}) } $x, $s->_REPSEPf($sep,$block);
 	    }
 	}
     };
@@ -520,17 +542,15 @@ sub _REPSEPf { my $self = shift;
 }
 
 sub _REPSEPg { my $self = shift;
-    my $fate = shift;
     my $sep = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
 
-    reverse $self->_REPSEPf($fate, $sep, $block, @_);
+    reverse $self->_REPSEPf($sep, $block, @_);
 }
 
 sub _REPSEPr { my $self = shift;
-    my $fate = shift;
     my $sep = shift;
     my $block = shift;
 
@@ -556,7 +576,6 @@ sub _REPSEPr { my $self = shift;
 }
 
 sub _OPTr { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -567,7 +586,6 @@ sub _OPTr { my $self = shift;
 }
 
 sub _OPTg { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -578,7 +596,6 @@ sub _OPTg { my $self = shift;
 }
 
 sub _OPTf { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -588,7 +605,6 @@ sub _OPTf { my $self = shift;
 }
 
 sub _BRACKET { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -597,7 +613,6 @@ sub _BRACKET { my $self = shift;
 }
 
 sub _PAREN { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -606,7 +621,6 @@ sub _PAREN { my $self = shift;
 }
 
 sub _NOTBEFORE { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -616,7 +630,6 @@ sub _NOTBEFORE { my $self = shift;
 }
 
 sub _NOTCHAR { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -626,7 +639,6 @@ sub _NOTCHAR { my $self = shift;
 }
 
 sub before { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -638,7 +650,6 @@ sub before { my $self = shift;
 }
 
 sub after { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -651,14 +662,11 @@ sub after { my $self = shift;
 }
 
 sub null { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     return $self->cursor($self->{_pos})->retm();
 }
 
 sub _ASSERT { my $self = shift;
-    my $fate = shift;
     my $block = shift;
 
     local $CTX = $self->callm;
@@ -670,7 +678,6 @@ sub _ASSERT { my $self = shift;
 }
 
 sub _BINDVAR { my $self = shift;
-    my $fate = shift;
     my $var = shift;
     my $block = shift;
 
@@ -680,7 +687,6 @@ sub _BINDVAR { my $self = shift;
 }
 
 sub _BINDPOS { my $self = shift;
-    my $fate = shift;
     my $pos = shift;
     my $block = shift;
 
@@ -690,7 +696,6 @@ sub _BINDPOS { my $self = shift;
 }
 
 sub _BINDNAMED { my $self = shift;
-    my $fate = shift;
     my $name = shift;
     my $block = shift;
 
@@ -700,7 +705,6 @@ sub _BINDNAMED { my $self = shift;
 }
 
 sub _EXACT { my $self = shift;
-    my $fate = shift;
     my $s = shift;
 
     local $CTX = $self->callm($s);
@@ -719,7 +723,6 @@ sub _EXACT { my $self = shift;
 }
 
 sub _EXACT_rev { my $self = shift;
-    my $fate = shift;
     my $s = shift;
 
     local $CTX = $self->callm;
@@ -737,7 +740,6 @@ sub _EXACT_rev { my $self = shift;
 }
 
 sub _ARRAY { my $self = shift;
-    my $fate = shift;
     local $CTX = $self->callm(0+@_);
     my $P = $self->{_pos} // 0;
     my $buf = $self->{_orig};
@@ -755,7 +757,6 @@ sub _ARRAY { my $self = shift;
 }
 
 sub _ARRAY_rev { my $self = shift;
-    my $fate = shift;
     local $CTX = $self->callm(0+@_);
     my $buf = $self->{_orig};
     my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
@@ -773,8 +774,6 @@ sub _ARRAY_rev { my $self = shift;
 }
 
 sub _DIGIT { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -790,8 +789,6 @@ sub _DIGIT { my $self = shift;
 }
 
 sub _DIGIT_rev { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
@@ -811,8 +808,6 @@ sub _DIGIT_rev { my $self = shift;
 }
 
 sub _ALNUM { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -828,8 +823,6 @@ sub _ALNUM { my $self = shift;
 }
 
 sub _ALNUM_rev { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
@@ -849,8 +842,6 @@ sub _ALNUM_rev { my $self = shift;
 }
 
 sub alpha { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -866,8 +857,6 @@ sub alpha { my $self = shift;
 }
 
 sub _SPACE { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -883,8 +872,6 @@ sub _SPACE { my $self = shift;
 }
 
 sub _SPACE_rev { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
@@ -904,8 +891,6 @@ sub _SPACE_rev { my $self = shift;
 }
 
 sub _HSPACE { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -921,8 +906,6 @@ sub _HSPACE { my $self = shift;
 }
 
 sub _HSPACE_rev { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
@@ -942,8 +925,6 @@ sub _HSPACE_rev { my $self = shift;
 }
 
 sub _VSPACE { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -959,8 +940,6 @@ sub _VSPACE { my $self = shift;
 }
 
 sub _VSPACE_rev { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
@@ -980,7 +959,6 @@ sub _VSPACE_rev { my $self = shift;
 }
 
 sub _CCLASS { my $self = shift;
-    my $fate = shift;
     my $cc = shift;
 
     local $CTX = $self->callm;
@@ -998,7 +976,6 @@ sub _CCLASS { my $self = shift;
 }
 
 sub _CCLASS_rev { my $self = shift;
-    my $fate = shift;
     my $cc = shift;
 
     local $CTX = $self->callm;
@@ -1020,8 +997,6 @@ sub _CCLASS_rev { my $self = shift;
 }
 
 sub _ANY { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -1035,8 +1010,6 @@ sub _ANY { my $self = shift;
 }
 
 sub _BOS { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     if ($P == 0) {
@@ -1048,8 +1021,6 @@ sub _BOS { my $self = shift;
 }
 
 sub _BOL { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -1062,8 +1033,6 @@ sub _BOL { my $self = shift;
 }
 
 sub _EOS { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -1076,8 +1045,6 @@ sub _EOS { my $self = shift;
 }
 
 sub _EOL { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -1090,8 +1057,6 @@ sub _EOL { my $self = shift;
 }
 
 sub _RIGHTWB { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -1105,8 +1070,6 @@ sub _RIGHTWB { my $self = shift;
 }
 
 sub _LEFTWB { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
@@ -1120,7 +1083,6 @@ sub _LEFTWB { my $self = shift;
 }
 
 sub _REDUCE { my $self = shift;
-    my $fate = shift;
     my $tag = shift;
 
     local $CTX = $self->callm($tag);
@@ -1134,7 +1096,6 @@ sub _REDUCE { my $self = shift;
 }
 
 sub _COMMITBRANCH { my $self = shift;
-    my $fate = shift;
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     print STDERR "Commit branch to $P\n" if $DEBUG;
@@ -1143,8 +1104,6 @@ sub _COMMITBRANCH { my $self = shift;
 }
 
 sub _COMMITRULE { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     print STDERR "Commit rule to $P\n" if $DEBUG;
@@ -1153,8 +1112,6 @@ sub _COMMITRULE { my $self = shift;
 }
 
 sub commit { my $self = shift;
-    my $fate = shift;
-
     local $CTX = $self->callm;
     my $P = $self->{_pos};
     print STDERR "Commit match to $P\n" if $DEBUG;
@@ -1163,7 +1120,6 @@ sub commit { my $self = shift;
 }
 
 sub fail { my $self = shift;
-    my $fate = shift;
     my $m = shift;
     die $m;
 }

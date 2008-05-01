@@ -5,7 +5,7 @@ has StrPos $.ws_to;
 
 # random rule for debugging, please ignore
 token foo {
-    <prefix> ::
+    <pre> ::
     <integer>
 }
 
@@ -373,7 +373,7 @@ token vws {
 # We provide two mechanisms here:
 # 1) define $+moreinput, or
 # 2) override moreinput method
-method moreinput ($fate) {
+method moreinput () {
     $+moreinput.() if $+moreinput;
 }
 
@@ -415,7 +415,7 @@ token pod_comment {
 
 method UNIT ($unitstopper is context = "_EOS") {
     UNIT: do {
-        self.comp_unit(['']);
+        self.comp_unit();
     }
 }
 
@@ -1140,8 +1140,8 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     {*}                                                         #= !
 }
 
-method lex1 ($fate, Str $s) {
-    if %+thisop{$s}++ { self.panic($fate, "Nested $s metaoperators not allowed"); }
+method lex1 (Str $s) {
+    if %+thisop{$s}++ { self.panic("Nested $s metaoperators not allowed"); }
     self;
 }
 
@@ -1590,7 +1590,7 @@ token special_variable:sym<${^ }> {
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
-method obscaret ($fate, Str $var, Str $sigil, Str $name) {
+method obscaret (Str $var, Str $sigil, Str $name) {
     my $repl = do given $sigil {
         when '$' {
             given $name {
@@ -1629,7 +1629,7 @@ method obscaret ($fate, Str $var, Str $sigil, Str $name) {
         }
         when * { "a global form such as $sigil*$0" }
     }; # XXX pugs needs semi here for some reason
-    return self.obs($fate, "$var variable", $repl);
+    return self.obs("$var variable", $repl);
 }
 
 token special_variable:sym<${ }> {
@@ -1917,14 +1917,14 @@ token theredoc {
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
-method heredoc ($fate) {
+method heredoc () {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $delim is context = $herestub.delim;
         my $lang = $herestub.lang;
         my $doc;
         my $ws = "";
-        $here = $here.q_unbalanced_rule($fate, $lang, :stop(&theredoc)).MATCHIFY;
+        $here = $here.q_unbalanced_rule($lang, :stop(&theredoc)).MATCHIFY;
         if $here {
             if $ws {
                 my $wsequiv = $ws;
@@ -1951,7 +1951,7 @@ method heredoc ($fate) {
             $herestub.orignode<doc> = $here;
         }
         else {
-            self.panic([''],"Ending delimiter $delim not found");
+            self.panic("Ending delimiter $delim not found");
         }
     }
     return $here;
@@ -2242,7 +2242,7 @@ token quotesnabber (*@q) {
     {{
         my $lang = qlang('Q', @q);
         my $parser = $lang.parser;
-        $<delimited> := $¢.$parser([''], $lang);
+        $<delimited> := $¢.$parser($lang);
         $<delim> = $delim;
     }}
     {*}
@@ -2316,8 +2316,8 @@ constant %open2close = (
 
 # assumes whitespace is eaten already
 
-method peek_delimiters ($fate) {
-    return self.peek_brackets(['']) || do {
+method peek_delimiters () {
+    return self.peek_brackets() || do {
         my $buf = self.orig;
         substr($$buf,self.pos,1) xx 2;
     }
@@ -2352,10 +2352,10 @@ regex q_pickdelim ($lang) {
     {{
        ($start,$stop) = $¢.peek_delimiters();
        if $start eq $stop {
-           $<q> := $¢.q_unbalanced([''], $lang, $stop);
+           $<q> := $¢.q_unbalanced($lang, $stop);
        }
        else {
-           $<q> := $¢.q_balanced([''], $lang, $start, $stop);
+           $<q> := $¢.q_balanced($lang, $start, $stop);
        }
     }}
     {*}
@@ -2418,7 +2418,7 @@ regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
 }
 
 # We get here only for escapes in escape set, even though more are defined.
-method q_escape ($fate, $lang) {
+method q_escape ($lang) {
     $lang<escrule>(self);
 }
 
@@ -3115,15 +3115,11 @@ regex stdstopper {
 
 # A fairly complete (but almost certainly buggy) operator precedence parser
 
-method EXPR ($fate,
-                %preclim = %LOOSEST
-            )
+method EXPR (%preclim = %LOOSEST)
 {
-    if self->peek {
+    if self.peek {
 	return self._AUTOLEXpeek('Perl::EXPR');
     }
-    my $f = $fate;
-    $f.[0] = 'expect_term' if $f.[0] eq 'EXPR';
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
     my $prevop is context<rw>;
@@ -3192,9 +3188,8 @@ method EXPR ($fate,
         warn "In loop, at ", $here.pos, "\n";
         %thisop = ();
         my $oldpos = $here.pos;
-        my @t = $here.expect_term($f);       # eats ws too
+        my @t = $here.expect_term();       # eats ws too
         die "EXPR failed to match expect_term" unless @t;
-        $f = undef;
         $here = @t[0];
         last unless $here.pos > $oldpos;
 
@@ -3224,18 +3219,18 @@ method EXPR ($fate,
         push @termstack, $here;
         warn "after push: " ~ (0+@termstack), "\n";
         %thisop = ();
-#        my @infix = $here.expect_tight_infix(undef, $preclim);
+#        my @infix = $here.expect_tight_infix($preclim);
         $oldpos = $here.pos;
-        my @infix = $here.expect_infix(undef);
+        my @infix = $here.expect_infix();
         last unless @infix;
         my $infix = @infix[0];
         last unless $infix.pos > $oldpos;
         last unless %thisop;  # probably a terminator
         
         # XXX might want to allow this in a declaration though
-        if not $infix { $here.panic([''],"Can't have two terms in a row") }
+        if not $infix { $here.panic("Can't have two terms in a row") }
 
-        $here = $infix.ws(undef);
+        $here = $infix.ws();
 
         if not defined %thisop<prec> {
             warn "No prec given in thisop!\n";
@@ -3256,19 +3251,19 @@ method EXPR ($fate,
         # Equal precedence, so use associativity to decide.
         if @opstack[*-1]<prec> eq $thisprec {
             given %thisop<assoc> {
-                when 'non'   { $here.panic([''],qq["$infix" is not associative]) }
+                when 'non'   { $here.panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if %thisop<top><sym> !eqv @opstack[*-1]<top><sym>;
                 }
-                default { $here.panic([''],qq[Unknown associativity "$_" for "$infix"]) }
+                default { $here.panic(qq[Unknown associativity "$_" for "$infix"]) }
             }
         }
         push @opstack, item %thisop;
     }
     reduce() while +@termstack > 1;
-    @termstack == 1 or $here.panic([''], "Internal operator parser error, termstack == " ~ (+@termstack));
+    @termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
     return @termstack[0];
 }
 
@@ -3602,13 +3597,13 @@ grammar Regex is Perl {
 
 # token panic (Str $s) { <commit> <fail($s)> }
 
-method panic ($fate, Str $s) {
+method panic (Str $s) {
     warn "############# PARSE FAILED #############\n";die "$s"
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
-method obs ($fate, Str $old, Str $new, Str $when = ' in Perl 6') {
-    self.panic($fate, "Obsolete use of $old;$when please use $new instead");
+method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
+    self.panic("Obsolete use of $old;$when please use $new instead");
 }
 
 #XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
