@@ -323,8 +323,8 @@ proto token infix_prefix_meta_operator is binary {...}
 token category:infix_postfix_meta_operator { <sym> }
 proto token infix_postfix_meta_operator is binary {...}
 
-token category:infix_circumfixfix_meta_operator { <sym> }
-proto token infix_circumfixfix_meta_operator is binary {...}
+token category:infix_circumfix_meta_operator { <sym> }
+proto token infix_circumfix_meta_operator is binary {...}
 
 token category:postfix_prefix_meta_operator { <sym> }
 proto token postfix_prefix_meta_operator is unary {...}
@@ -334,6 +334,9 @@ proto token prefix_postfix_meta_operator is unary {...}
 
 token category:prefix_circumfix_meta_operator { <sym> }
 proto token prefix_circumfix_meta_operator is unary {...}
+
+token category:terminator { <sym> }
+proto token terminator {...}
 
 token unspacey { <.unsp>? }
 token nofat_space { <?before \s | '#'> <?nofat> }
