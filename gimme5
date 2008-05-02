@@ -1028,8 +1028,8 @@ sub atom {
                 my $atom = quantified_atom(@_);
                 $atom->{nobind} = 1;
                 ws();
-                if ($code =~ s/([\$\@%]<.*?>)/$1/) {
-                    return bless { var => $code,
+                if ($code =~ /[\$\@%]<(.*?)>/) {
+                    return bless { var => $1,
                                    atom => $atom,
                                    min => $atom->{min}
                                  }, "RE_bindnamed";
@@ -1147,7 +1147,7 @@ sub assertion {
     if (/^[\$\@\%]/) {
         my $code = code('>');
         s/^>// or panic "Missing >";
-        if ($code =~ s/\(.*\)//) {
+        if ($code =~ s/(\(.*\))//) {
             return bless { name => $code, rest => $1, min => 0 }, "RE_method";
         }
         else {
@@ -1552,10 +1552,8 @@ END
         ::panic("Can't reverse $name") if $REV;
         $PURE = 0 if $impure{$name};
 
-        $rest =~ s/\)$/, /;
-        $rest =~ s/\(,? *//;
         push @TOKEN, "\$C->$name$rest'?')" if $PURE;
-        my $re = "\$C->$name($rest)";
+        my $re = "\$C->$name$rest";
         $re = 'do { my $M = $C; ' . $re . '; }' if $NEEDMATCH;
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    push @BINDINGS, $name;
@@ -1598,10 +1596,16 @@ END
         my $self = shift;
         my @result;
         if ($$self{zyg}) {
+	    my %B = %BINDINGS;
             $PURE = 0 if @{$$self{zyg}} > 1;
             foreach my $kid (@{$$self{zyg}}) {
+		local %BINDINGS;
                 push @result, $kid->walk(@_);
+		for my $b (keys %BINDINGS) {
+		    $B{$b} = 2 if $BINDINGS{$b} > 1 or $B{$b};
+		}
             }
+	    %BINDINGS = %B;
         }
         if (@result == 1) {
             $result[0];
@@ -1796,10 +1800,15 @@ END
         my $altname = $self->{altname};
         if ($$self{zyg}) {
             $PURE = 0 if @{$$self{zyg}} > 1;
+	    my %B = %BINDINGS;
             foreach my $kid (@{$$self{zyg}}) {
                 local @TOKEN;
                 local $PURE = 1;
+		local %BINDINGS;
                 my $r = $kid->walk(@_);
+		for my $b (keys %BINDINGS) {
+		    $B{$b} = 2 if $BINDINGS{$b} > 1 or $B{$b};
+		}
 #                if ($r and $r =~ /^\$C->(\w+)/) {
 #                    my $name = $1;
 #                    if (my $p = $fixedprefix{$name}) {
@@ -1817,6 +1826,7 @@ END
                 $kid->{alt} = $altname . ' ' . $alt++;
                 push @ALTS, $token;
             }
+	    %BINDINGS = %B;
         }
         if (@result == 1) {
             $result[0];

@@ -154,11 +154,8 @@ role PrecOp[*%defaults] {
     method &.(Match $m) {
 #        $m but= ::?CLASS;
         my %d = (%defaults); 
-        for keys(%d) { $m.{$_} //= %d{$_} };
-        %+thisop<top> = $m;
-        if not $m<transparent> {
-            %+thisop<prec> = $m<prec>;
-            %+thisop<assoc> = $m<assoc> // 'left';
+        if not %d<transparent> {
+            for keys(%d) { $m<O>{$_} = %d{$_} };
             warn "coercing to " ~ self ~ "\n";
         }
         return $m;
@@ -947,10 +944,10 @@ token version:sym<v> {
 token pre {
     [
     | <prefix>
-        { $<prec> = $<prefix><prec> }
+        { $<O> = $<prefix><O> }
                                                     {*}     #= prefix
     | <prefix_circumfix_meta_operator>
-        { $<prec> = $<prefix_circumfix_meta_operator><prec> }
+        { $<O> = $<prefix_circumfix_meta_operator><O> }
                                                     {*}     #= precircum
     ]
     # XXX assuming no precedence change
@@ -1054,15 +1051,21 @@ token quotepair {
 token expect_tight_infix ($loosest) {
     <!before '{' | <lambda> >     #'  # presumably a statement control block
     <expect_infix>
-    ::: <?{ %+thisop<prec> ge $loosest }>
+    { $<O> := $<expect_infix><O> }
+    ::: <?{ $<O><prec> ge $loosest }>
 }
 
 token expect_infix {
+    :my $op is context;
     <!stdstopper>
     [
-    | <infix><infix_postfix_meta_operator>*
+    | <infix> { $op = $<infix>; }
+       <infix_postfix_meta_operator>*
+       { $<O> = $op<O>; }
     | <infix_prefix_meta_operator>
+        { $<O> = $<infix_prefix_meta_operator><O>; }
     | <infix_circumfix_meta_operator>
+        { $<O> = $<infix_circumfix_meta_operator><O>; }
     ]
     {*}
 }
@@ -1074,8 +1077,8 @@ token dotty:sym<!>  { '!' <?unspacey> <methodop>  {*} }                     #= p
 
 token dottyop {
     [
-    | <methodop>
-    | <postop>
+    | <methodop> { $<O> = $<methodop><O>; }
+    | <postop>   { $<O> = $<postop><O>; }
     ]
     {*}
 }
@@ -1093,10 +1096,9 @@ token post {
     [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
 
     [
-    | <dotty>
-    | <postop>
+    | <dotty>  { $<O> = $<dotty><O> }
+    | <postop> { $<O> = $<postop><O> }
     ]
-    { $<prec> = $<postop><prec> }
     {*}
 }
 
@@ -1108,14 +1110,13 @@ regex prefix_circumfix_meta_operator:reduce {
     \\??   # prefer no meta \ if op has \
     <expect_infix>
     ']'
+    { $<O> = $<expect_infix><O>; }
 
-    [ <!{ %+thisop<assoc> eq 'non' }>
+    [ <!{ $<O><assoc> eq 'non' }>
         || <.panic: "Can't reduce a non-associative operator"> ]
 
-    [ <!{ %+thisop<prec> eq %conditional<prec> }>
+    [ <!{ $<O><prec> eq %conditional<prec> }>
         || <.panic: "Can't reduce a conditional operator"> ]
-
-    { $<prec> := %+thisop<prec> }
 
     {*}                                                         #= [ ]
 }
@@ -1129,25 +1130,26 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
 
     <sym> <!before '!'> <infix> ::
 
+    { $<O> = $<infix><O>; }
     [
-    || <?{ %+thisop<assoc> eq 'chain'}>
-    || <?{ %+thisop<assoc> and %+thisop<bool> }>
+    || <?{ $<O><assoc> eq 'chain'}>
+    || <?{ $<O><assoc> and $<O><bool> }>
     || <.panic: "Only boolean infix operators may be negated">
     ]
 
-    { %+thisop<hyper> and $¢.panic("Negation of hyper operator not allowed") }
+    { $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }
 
     {*}                                                         #= !
 }
 
-method lex1 (Str $s) {
-    if %+thisop{$s}++ { self.panic("Nested $s metaoperators not allowed"); }
-    self;
+token lex1 (Str $s) {
+    {{ $<O>{$s}++ or self.panic("Nested $s metaoperators not allowed"); }}
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
     <?lex1: 'cross'>
     X <infix> X
+    { $<O> = $<infix><O>; }
     {*}                                                         #= X X
 }
 
@@ -1157,25 +1159,27 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
     | [ '«' | '»' ] <infix> [ '«' | '»' ]
     | [ '<<' | '>>' ] <infix> [ '<<' | '>>' ]
     ]
+    { $<O> := $<infix><O>; }
     {*}                                                         #= « »
 }
 
 token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
-    <?lex1: 'assignment'>
     '=' ::
+    { $<O> = $+op<O>; }
+    <?lex1: 'assignment'>
 
     [
-    || <?{ %+thisop<prec> gt %item_assignment<prec> }>
+    || <?{ $<O><prec> gt %item_assignment<prec> }>
     || <.panic: "Can't make assignment op of operator looser than assignment">
     ]
 
     [
-    || <!{ %+thisop<assoc> eq 'chain' }>
+    || <!{ $<O><assoc> eq 'chain' }>
     || <.panic: "Can't make assignment op of boolean operator">
     ]
     
     [
-    || <!{ %+thisop<assoc> eq 'non' }>
+    || <!{ $<O><assoc> eq 'non' }>
     || <.panic: "Can't make assignment op of non-associative operator">
     ]
     
@@ -1201,8 +1205,8 @@ token postcircumfix:sym<« »> ( --> Methodcall)
     { <?before '«' > <quotesnabber(":qq","ww")> {*} }           #= « »
 
 token postop {
-    | <postfix>         { $<prec> := $<postfix><prec> }
-    | <postcircumfix>   { $<prec> := $<postcircumfix><prec> }
+    | <postfix>         { $<O> := $<postfix><O> }
+    | <postcircumfix>   { $<O> := $<postcircumfix><O> }
 }
 
 token methodop {
@@ -2018,13 +2022,12 @@ token quote:tr {
 }
 
 token finish_subst ($pat) {
-    :my %thisop is context<rw>;
     [
     # bracketed form
     | <?{ $pat<delim> == 2 }> ::
           <.ws>
           <infix>            # looking for pseudoassign here
-          { %+thisop<prec> == %item_assignment<prec> or
+          { $<infix><O><prec> == %item_assignment<prec> or
               $¢.panic("Bracketed subst must use some form of assignment") }
           <repl=EXPR(%item_assignment)>
     # unbracketed form
@@ -2233,6 +2236,8 @@ class TR_tweaker does QLang {
 
 token quotesnabber (*@q) {
     :my $delim is context<rw> = '' ;
+    :my $lang;
+    :my $parser;
     <!before \w> <?nofat> ::
     <.ws>
 
@@ -2240,9 +2245,11 @@ token quotesnabber (*@q) {
 
     # Dispatch to current lang's subparser.
     {{
-        my $lang = qlang('Q', @q);
-        my $parser = $lang.parser;
-        $<delimited> := $¢.$parser($lang);
+        $lang = qlang('Q', @q);
+        $parser = $lang.parser;
+    }}
+        <delimited=.$parser($lang)>
+    {{
         $<delim> = $delim;
     }}
     {*}
@@ -2348,16 +2355,11 @@ regex bracketed ($lang = qlang("Q")) {
 }
 
 regex q_pickdelim ($lang) {
-    :my ($start,$stop);
-    {{
-       ($start,$stop) = $¢.peek_delimiters();
-       if $start eq $stop {
-           $<q> := $¢.q_unbalanced($lang, $stop);
-       }
-       else {
-           $<q> := $¢.q_balanced($lang, $start, $stop);
-       }
-    }}
+    :my ($start,$stop) = self.peek_delimiters();
+    [
+    || <?{ $start eq $stop }> :: <q=q_unbalanced($lang, $stop)>
+    ||                           <q=q_balanced($lang, $start, $stop)>
+    ]
     {*}
 }
 
@@ -3123,7 +3125,6 @@ method EXPR (%preclim = %LOOSEST)
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;
     my $prevop is context<rw>;
-    my %thisop is context<rw>;
     my @termstack;
     my @opstack;
 
@@ -3135,35 +3136,35 @@ method EXPR (%preclim = %LOOSEST)
     my &reduce := -> {
         warn "entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack, "\n";
         my $op = pop @opstack;
-        given $op<assoc> {
+        given $op<O><assoc> {
             when 'chain' {
                 warn "reducing chain\n";
                 my @chain;
                 push @chain, pop(@termstack);
                 push @chain, $op;
                 while @opstack {
-                    last if $op<prec> ne @opstack[*-1]<prec>;
+                    last if $op<O><prec> ne @opstack[*-1]<O><prec>;
                     push @chain, pop(@termstack);
-                    push @chain, pop(@opstack)<top>;
+                    push @chain, pop(@opstack);
                 }
                 push @chain, pop(@termstack);
                 @chain = reverse @chain if @chain > 1;
-                $op<top><chain> = @chain;
-                push @termstack, $op<top>;
+                $op<O><chain> = @chain;
+                push @termstack, $op;
             }
             when 'list' {
                 warn "reducing list\n";
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
-                    last if $op<top><sym> ne @opstack[*-1]<top><sym>;
+                    last if $op<sym> ne @opstack[*-1]<sym>;
                     push @list, pop(@termstack);
                     pop(@opstack);
                 }
                 push @list, pop(@termstack);
                 @list = reverse @list if @list > 1;
-                $op<top><list> = @list;
-                push @termstack, $op<top>;
+                $op<list> = @list;
+                push @termstack, $op;
             }
             default {
                 warn "reducing\n";
@@ -3171,22 +3172,27 @@ method EXPR (%preclim = %LOOSEST)
                 warn "Termstack size: ", +@termstack, "\n";
 
                 warn Dump($op);
-                if $op<top><R> ~~ /^infix/ {
-                    $op<top><right> = pop @termstack;
-                    $op<top><left> = pop @termstack;
+                if $op<O><assoc> {
+                    $op<right> = pop @termstack;
+                    $op<left> = pop @termstack;
+                    $op<_from> = $op<left><_from>;
+                    $op<_to> = $op<right><_to>;
                 }
                 else {
-                    $op<top><arg> = pop @termstack;
+                    $op<arg> = pop @termstack;
+                    $op<_from> = $op<arg><_from>
+                        if $op<_from> > $op<arg><_from>;
+                    $op<_to> = $op<arg><_to>
+                        if $op<_to> < $op<arg><_to>;
                 }
 
-                push @termstack, $op<top>;
+                push @termstack, $op;
             }
         }
     };
 
     loop {
         warn "In loop, at ", $here.pos, "\n";
-        %thisop = ();
         my $oldpos = $here.pos;
         my @t = $here.expect_term();       # eats ws too
         last unless @t;
@@ -3201,7 +3207,7 @@ method EXPR (%preclim = %LOOSEST)
         @post = @($M<post>) if $M<post>;
         loop {
             if @pre {
-                if @post and @post[0]<prec> gt @pre[0]<prec> {
+                if @post and @post[0]<O><prec> gt @pre[0]<O><prec> {
                     push @opstack, shift @post;
                 }
                 else {
@@ -3218,30 +3224,29 @@ method EXPR (%preclim = %LOOSEST)
 
         push @termstack, $here;
         warn "after push: " ~ (0+@termstack), "\n";
-        %thisop = ();
 #        my @infix = $here.expect_tight_infix($preclim);
         $oldpos = $here.pos;
-        my @infix = $here.expect_infix();
+        my @infix = $here.cursor_fresh.expect_infix();
         last unless @infix;
         my $infix = @infix[0];
         last unless $infix.pos > $oldpos;
-        last unless %thisop;  # probably a terminator
         
         # XXX might want to allow this in a declaration though
         if not $infix { $here.panic("Can't have two terms in a row") }
 
-        $here = $infix.ws();
+        $here = $infix.cursor_fresh.ws();
 
-        if not defined %thisop<prec> {
-            warn "No prec given in thisop!\n";
-            %thisop = %terminator;
+        my $thisop = $infix<O>;
+        my Str $thisprec = $thisop<prec>;
+        if not defined $thisprec {
+            warn "No prec given in infix!\n";
+            $thisprec = %terminator<prec>;
         }
-        my Str $thisprec = %thisop<prec>;
         # substitute precedence for listops
-        %thisop<prec> = %thisop<sub> if %thisop<sub>;
+        $thisop<prec> = $thisop<sub> if $thisop<sub>;
 
         # Does new infix (or terminator) force any reductions?
-        while @opstack[*-1]<prec> gt $thisprec {
+        while @opstack[*-1]<O><prec> gt $thisprec {
             reduce();
         }
 
@@ -3249,21 +3254,22 @@ method EXPR (%preclim = %LOOSEST)
         last if $thisprec lt $LOOSEST;
 
         # Equal precedence, so use associativity to decide.
-        if @opstack[*-1]<prec> eq $thisprec {
-            given %thisop<assoc> {
+        if @opstack[*-1]<O><prec> eq $thisprec {
+            given $thisop<assoc> {
                 when 'non'   { $here.panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift
                 when 'list'  {              # if op differs reduce else shift
-                    reduce() if %thisop<top><sym> !eqv @opstack[*-1]<top><sym>;
+                    reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
                 }
                 default { $here.panic(qq[Unknown associativity "$_" for "$infix"]) }
             }
         }
-        push @opstack, item %thisop;
+        push @opstack, $infix;
     }
     reduce() while +@termstack > 1;
     +@termstack <= 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
+    @termstack[0]<_from> = self.pos if @termstack;
     @termstack;
 }
 

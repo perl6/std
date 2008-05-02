@@ -218,7 +218,8 @@ sub _AUTOLEXnow { my $self = shift;
 	print STDERR '=' x 72, "\n" if $DEBUG;
 	print STDERR "GENERATING $key patterns starting with '$chr'\n" if $DEBUG;
 
-	my @pats = grep { canmatch($_, $chr) } map { s/\t/.?\t/; $_; } @{$lexer->{PATS}};
+	my @tmp =  @{$lexer->{PATS}};
+	my @pats = grep { canmatch($_, $chr) } map { s/\t/.?\t/; $_; } @tmp;
 	if (!@pats) {
 	    print STDERR "No $key patterns start with '$chr'\n" if $DEBUG;
 	    sub { undef };
@@ -359,6 +360,7 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
 	}
     }
     $r{_pos} = $r{_to} = $submatch->{_to};
+    delete $r{_fate};
     bless \%r, ref $self;		# return new match cursor for parent
 }
 
@@ -453,7 +455,7 @@ sub retm { my $self = shift;
 }
 
 sub _MATCHIFY { my $self = shift;
-    my @result = map { $_->retm() } @_;
+    my @result = map { $_->{_from} = $self->{_from}; $_->retm() } @_;
     if (wantarray) {
 	@result;
     }
@@ -498,7 +500,7 @@ sub _STARr { my $self = shift;
 	push @all, $first;
 	$to = $first;
     }
-    $self->cursor($to->{_to})->retm();
+    $self->cursor($to->{_pos})->retm();
 }
 
 sub _PLUSf { my $self = shift;
