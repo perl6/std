@@ -13,8 +13,8 @@ Examples:
 END
 }
 
-my $fo = '';
-$fo = shift if $ARGV[0] eq '-fo';
+my $fo = '-fo';
+$fo = '', shift if $ARGV[0] eq '-fh';
 
 sub main {
     print_usage_and_exit if @ARGV < 2 || $ARGV[0] eq '--help';

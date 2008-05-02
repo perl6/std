@@ -463,6 +463,11 @@ END
     \$C->{'$binding'} = [];
 END
 	    }
+	    if ($SYM and $meat !~ /->_SYM\(\$sym\)/) {
+		$body .= <<"END";
+    \$C->{'sym'} = \$sym;
+END
+	    }
 
             if ($proto) {
                 $body .= <<'END';
@@ -1459,7 +1464,7 @@ sub unbalanced {
         if ($name eq "sym") {
             $$self{sym} = $SYM;
             $$self{endsym} = $ENDSYM if $ENDSYM;
-            $re = '$C->' . $name . "()";
+            return $re = '$C->_SYM($sym)';	# could pass endsym too here...
         }
         elsif ($name eq "nextsame") {
             $NEEDORIGARGS++;

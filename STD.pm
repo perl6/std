@@ -207,10 +207,6 @@ my $unitstopper is context = "_EOS";
 my $endstmt is context = -1;
 my $endargs is context = -1;
 
-token sym (Str $pat = $+sym) {
-    $pat
-}
-
 proto token category {...}
 
 token category:category { <sym> }
@@ -478,7 +474,7 @@ token block {
     <statementlist>
     [ '}' || <.panic: "Missing right brace"> ]
     [
-    | \h* <.unsp>? <?before < ,: >> {*}                         #= normal 
+    | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? <?before \n > <.ws>
         { let $+endstmt = $!ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = $¢.pos; }                               #= endargs
@@ -3024,10 +3020,14 @@ token infix:sym<Z> ( --> List_infix)
 #     { <sym> » {*} }                                               #= minmax
 
 token term:sigil ( --> List_prefix)
-    { <sym=sigil> <?before \s> <arglist> {*} }                                #= $
+{
+    <sigil> <?before \s> <arglist>
+    { $<sym> = $<sigil>.item; }
+    {*}                                                                    #= $
+}
 
 # token term:typecast ( --> List_prefix)
-#     { <sym=typename> <?nofat_space> <arglist> {*} }                             #= Type
+#     { <typename> <?nofat_space> <arglist> { $<sym> = $<typename>.item; } {*} }                             #= Type
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last term: rule)
@@ -3451,8 +3451,9 @@ grammar Regex is Perl {
 
     token regex_metachar:var {
         <!before '$$'>
-        <sym=variable> <.ws>
+        <variable> <.ws>
         $<binding> = ( '=' <.ws> <regex_quantified_atom> )?
+        { $<sym> = $<variable>.item; }
         {*}                                                         #= var
     }
 

@@ -2,8 +2,8 @@ our $CTX;
 $CTX->{lvl} = 0;
 package Cursor5;
 
-my $lexverbose = 1;
-my $DEBUG = 1;
+my $lexverbose = 0;
+my $DEBUG = 0;
 
 use strict;
 use warnings;
@@ -61,6 +61,26 @@ sub to { $_[0]->{_to} }
 sub pos { $_[0]->{_pos} }
 sub peek { $_[0]->{_peek} }
 sub orig { $_[0]->{_orig} }
+
+sub item { substr(${$_[0]->{_orig}}, $_[0]->{_from}, $_[0]->{_to} - $_[0]->{_from}) }
+sub list { my $self = shift;
+    my @result;
+    # can't just do this in numerical order because some might be missing
+    # and we don't know the max
+    for my $k (keys %$self) {
+	$result[$k] = $self->{$k} if $k =~ /^\d/;
+    }
+    \@result;
+}
+sub hash { my $self = shift;
+    my %result;
+    # can't just do this in numerical order because some might be missing
+    # and we don't know the max
+    for my $k (keys %$self) {
+	$result{$k} = $self->{$k} if $k !~ /^[_\d]/;
+    }
+    \%result;
+}
 
 # unwarranted chumminess with Perl grammar
 sub ws_from { $_[0]->{_ws_from} }
@@ -737,6 +757,25 @@ sub _EXACT { my $self = shift;
     }
     else {
         print STDERR "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
+        return ();
+    }
+}
+
+sub _SYM { my $self = shift;
+    my $s = shift;
+
+    local $CTX = $self->callm($s);
+    my $P = $self->{_pos} // 0;
+    my $len = length($s);
+    my $buf = $self->{_orig};
+    if (substr($$buf, $P, $len) eq $s) {
+        print STDERR "SYM $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
+        my $r = $self->cursor($P+$len);
+	$r->{sym} = $s;
+        $r->retm();
+    }
+    else {
+        print STDERR "SYM $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
         return ();
     }
 }
@@ -1564,7 +1603,7 @@ sub fail { my $self = shift;
         for my $chunk (@chunks) {
 	    # ignore negative lookahead
 	    next if ref($chunk) eq 'RE_assertion' and $chunk->{assert} eq '!';
-	    print STDERR "NULLABLE ".ref($chunk)."\n" unless $chunk->{min};
+	    print STDERR "NULLABLE ".ref($chunk)."\n" if $RE_verbose and not $chunk->{min};
             my @newalts = $chunk->longest($C);
             if (not @newalts) {
 		next if $PURE;
