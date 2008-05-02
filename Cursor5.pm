@@ -1138,7 +1138,7 @@ sub commit { my $self = shift;
 
 sub fail { my $self = shift;
     my $m = shift;
-    die $m;
+    return ();
 }
 
 #############################################################3

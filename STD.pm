@@ -382,7 +382,7 @@ token unv {
    || ^^ [
        | <.pod_comment>  {*}                                    #= multiline
        | '#' [
-            | <.bracketed> <panic: "Can't use embedded comments in column 1">
+            | <.bracketed> <.panic: "Can't use embedded comments in column 1">
             | \N*            {*}                                #= end
        ]
    ]
@@ -427,7 +427,7 @@ rule comp_unit {
     :my $endargs        is context<rw> = -1;
 
     <statementlist>
-    [ <$+unitstopper> || <panic: "Can't understand next input--giving up"> ]
+    [ <$+unitstopper> || <.panic: "Can't understand next input--giving up"> ]
     {*}
 }
 
@@ -479,7 +479,7 @@ ex:     for @list -> $a { say $a }
 token block {
     '{'
     <statementlist>
-    [ '}' || <panic: "Missing right brace"> ]
+    [ '}' || <.panic: "Missing right brace"> ]
     [
     | \h* <.unsp>? <?before < ,: >> {*}                         #= normal 
     | <.unv>? <?before \n > <.ws>
@@ -506,7 +506,7 @@ seealso: regex_declarator:rule
 token regex_block {  # perhaps parameterize and combine with block someday
     '{'
     <regex '}'>
-    [ '}' || <panic: "Missing right brace"> ]
+    [ '}' || <.panic: "Missing right brace"> ]
     [
     | <.unsp>? <?before <[,:]> > {*}                             #= normal
     | <.unv>? <?before \n > <.ws>
@@ -600,7 +600,7 @@ token eat_terminator {
     || <?before <terminator>>
     || $
     || {{ if $¢.pos === $!ws_to { $¢.pos = $!ws_from } }}   # undo any line transition
-        <panic: "Statement not terminated properly">  # "can't happen" anyway :)
+        <.panic: "Statement not terminated properly">  # "can't happen" anyway :)
     ]
 }
 
@@ -717,7 +717,7 @@ ex:     while $a < $b {
 rule statement_control:while {\
     <sym>
     [ <?before '(' [[my]? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
-        <panic: "This appears to be Perl 5 code"> ]?
+        <.panic: "This appears to be Perl 5 code"> ]?
     <EXPR>                             {*}                      #= while expr
     <pblock>                           {*}                      #= while block
     {*}
@@ -822,7 +822,7 @@ ex:     for @list {
 rule statement_control:for {\
     <sym>
     [ <?before [my]? '$'\w+ '(' >
-        <panic: "This appears to be Perl 5 code"> ]?
+        <.panic: "This appears to be Perl 5 code"> ]?
     <EXPR>                             {*}                      #= for expr
     <pblock>                           {*}                      #= for block
     {*}
@@ -962,7 +962,7 @@ token pre {
 
 token expect_term {
     [
-    | <?stdstopper>
+    | <?stdstopper> :: <?fail>
     | <noun>
     | <pre>+ :: <noun>
     ]
@@ -1110,10 +1110,10 @@ regex prefix_circumfix_meta_operator:reduce {
     ']'
 
     [ <!{ %+thisop<assoc> eq 'non' }>
-        || <panic: "Can't reduce a non-associative operator"> ]
+        || <.panic: "Can't reduce a non-associative operator"> ]
 
     [ <!{ %+thisop<prec> eq %conditional<prec> }>
-        || <panic: "Can't reduce a conditional operator"> ]
+        || <.panic: "Can't reduce a conditional operator"> ]
 
     { $<prec> := %+thisop<prec> }
 
@@ -1132,7 +1132,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     [
     || <?{ %+thisop<assoc> eq 'chain'}>
     || <?{ %+thisop<assoc> and %+thisop<bool> }>
-    || <panic: "Only boolean infix operators may be negated">
+    || <.panic: "Only boolean infix operators may be negated">
     ]
 
     { %+thisop<hyper> and $¢.panic("Negation of hyper operator not allowed") }
@@ -1166,17 +1166,17 @@ token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
 
     [
     || <?{ %+thisop<prec> gt %item_assignment<prec> }>
-    || <panic: "Can't make assignment op of operator looser than assignment">
+    || <.panic: "Can't make assignment op of operator looser than assignment">
     ]
 
     [
     || <!{ %+thisop<assoc> eq 'chain' }>
-    || <panic: "Can't make assignment op of boolean operator">
+    || <.panic: "Can't make assignment op of boolean operator">
     ]
     
     [
     || <!{ %+thisop<assoc> eq 'non' }>
-    || <panic: "Can't make assignment op of non-associative operator">
+    || <.panic: "Can't make assignment op of non-associative operator">
     ]
     
     {*}                                                         #= =
@@ -2366,7 +2366,7 @@ regex rx_pickdelim ($lang) {
     || { ($<start>,$<stop>) = $¢.peek_delimiters() }
       $<start>
       <rx=regex($<stop>)>        # counts its own brackets, we hope
-    || $<stop> = [ [\S] || <panic: "Regex delimiter must not be whitespace"> ]
+    || $<stop> = [ [\S] || <.panic: "Regex delimiter must not be whitespace"> ]
       <rx=regex($<stop>)>
     ]
     {*}
@@ -2377,7 +2377,7 @@ regex tr_pickdelim ($lang) {
     || { ($<start>,$<stop>) = $¢.peek_delimiters() }
       $<start>
       <tr=transliterator($<stop>)>
-    || $<stop> = [ [\S] || <panic: "tr delimiter must not be whitespace"> ]
+    || $<stop> = [ [\S] || <.panic: "tr delimiter must not be whitespace"> ]
       <tr=transliterator($<stop>)>
     ]
     {*}
@@ -2957,11 +2957,11 @@ token infix:sym<?? !!> ( --> Conditional) {
     <EXPR(%conditional)>
     [ '!!' ||
         [
-        || <?before '='> <panic: "Assignment not allowed within ??!!">
-        || <?before '::'> <panic: "Please use !! rather than ::">
+        || <?before '='> <.panic: "Assignment not allowed within ??!!">
+        || <?before '::'> <.panic: "Please use !! rather than ::">
         || <?before <infix>>    # Note: a tight infix would have parsed right
-            <panic: "Precedence too loose within ??!!; use ??()!! instead ">
-        || <panic: "Found ?? but no !!; possible precedence problem">
+            <.panic: "Precedence too loose within ??!!; use ??()!! instead ">
+        || <.panic: "Found ?? but no !!; possible precedence problem">
         ]
     ]
     {*}                                                         #= ?? !!
@@ -3189,7 +3189,7 @@ method EXPR (%preclim = %LOOSEST)
         %thisop = ();
         my $oldpos = $here.pos;
         my @t = $here.expect_term();       # eats ws too
-        die "EXPR failed to match expect_term" unless @t;
+        last unless @t;
         $here = @t[0];
         last unless $here.pos > $oldpos;
 
@@ -3263,8 +3263,8 @@ method EXPR (%preclim = %LOOSEST)
         push @opstack, item %thisop;
     }
     reduce() while +@termstack > 1;
-    @termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
-    return @termstack[0];
+    +@termstack <= 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
+    @termstack;
 }
 
 #################################################
@@ -3327,7 +3327,7 @@ grammar Regex is Perl {
         <regex_atom>
         [ <regex_quantifier>
             <?{ $<regex_atom>.max_width }>
-                || <panic: "Can't quantify zero-width atom">
+                || <.panic: "Can't quantify zero-width atom">
         ]?
         {*}
     }
@@ -3337,7 +3337,7 @@ grammar Regex is Perl {
         || <$+stop> :: <fail>
         || <regex_metachar>
         || (\w)
-        || <panic: "unrecognized metacharacter">
+        || <.panic: "unrecognized metacharacter">
         ]
         {*}
     }
@@ -3352,7 +3352,7 @@ grammar Regex is Perl {
     token regex_metachar:sym<)>   { ')'  :: <fail> }
     token regex_metachar:sym<\\\\> { \\\\ :: <fail> }
 
-    token regex_metachar:quant { <regex_quantifier> <panic: "quantifier quantifies nothing"> }
+    token regex_metachar:quant { <regex_quantifier> <.panic: "quantifier quantifies nothing"> }
 
     # "normal" metachars
 
@@ -3474,7 +3474,7 @@ grammar Regex is Perl {
     token qq_backslash:t { <sym> }
     token qq_backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
     token qq_backslash:sym<0> { <sym> }
-    token qq_backslash:misc { :: \W || <panic: "unrecognized backslash sequence"> }
+    token qq_backslash:misc { :: \W || <.panic: "unrecognized backslash sequence"> }
 
     token regex_backslash:unspace { <?before \s> <.SUPER::ws> }
 
@@ -3499,7 +3499,7 @@ grammar Regex is Perl {
     token regex_backslash:w { :i <sym> }
     token regex_backslash:x { :i <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
     token regex_backslash:misc { $<litchar>=(\W) }
-    token regex_backslash:oops { :: <panic: "unrecognized regex backslash sequence"> }
+    token regex_backslash:oops { :: <.panic: "unrecognized regex backslash sequence"> }
 
     token regex_assertion:sym<?> { <sym> <regex_assertion> }
     token regex_assertion:sym<!> { <sym> <regex_assertion> }
@@ -3536,7 +3536,7 @@ grammar Regex is Perl {
     token regex_assertion:sym<,> { <sym> }
     token regex_assertion:sym<~~> { <sym> <desigilname>? }
 
-    token regex_assertion:bogus { <panic: "unrecognized regex assertion"> }
+    token regex_assertion:bogus { <.panic: "unrecognized regex assertion"> }
 
     token cclass_elem {
         [ '+' | '-' ]?
@@ -3569,7 +3569,7 @@ grammar Regex is Perl {
     token regex_mod_internal:sym<:!r>   { <sym> 'atchet'? { $+ratchet = 0 } }
     token regex_mod_internal:sym<:r( )> { <sym> 'atchet'? <regex_mod_arg> { $+ratchet = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:oops { <panic: "unrecognized regex modifier"> }
+    token regex_mod_internal:oops { <.panic: "unrecognized regex modifier"> }
 
     token regex_quantifier:sym<*>  { <sym> <quantmod> }
     token regex_quantifier:sym<+>  { <sym> <quantmod> }
