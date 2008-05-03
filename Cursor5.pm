@@ -2,8 +2,8 @@ our $CTX;
 $CTX->{lvl} = 0;
 package Cursor5;
 
-my $lexverbose = 0;
-my $DEBUG = 0;
+my $lexverbose = 1;
+my $DEBUG = 1;
 
 use strict;
 use warnings;
@@ -218,6 +218,26 @@ sub canmatch {
     return 0;
 }
 
+sub rxlen {
+    my $p = shift;
+    my $len = 0;
+    while ($p ne '' and $p ne '.?') {
+	return -1 if $p =~ /^[*+?(|]/;
+	return -1 if $p =~ /^\{[\d,]+\}/;
+	$len++, next if $p =~ s/^\[\^?.[^\]]*?\]//;
+	if ($p =~ s/^\\//) {
+	    next if $p =~ s/^>//;
+	    $len++, next if $p =~ s/^\W//;
+	    $len++, next if $p =~ s/^[ntfrdswDSW]//;
+	    $len++, next if $p =~ s/^\d+//;
+	    $len++, next if $p =~ s/^x[\da-fA-F]{1,2}//;
+	    return -1;
+	}
+	$len++, next if $p =~ s/^.//s;
+    }
+    return $len;
+}
+
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
 
@@ -230,7 +250,7 @@ sub _AUTOLEXnow { my $self = shift;
     my $buf = $self->{_orig};
     my $P = $self->{_pos};
     if ($P == length($$buf)) {
-	return sub { undef };
+	return sub { return };
     }
     my $chr = substr($$buf,$self->{_pos},1);
 
@@ -240,16 +260,17 @@ sub _AUTOLEXnow { my $self = shift;
 
 	my @tmp =  @{$lexer->{PATS}};
 	my @pats = grep { canmatch($_, $chr) } map { s/\t/.?\t/; $_; } @tmp;
+	my @rxlenmemo;
 	if (!@pats) {
 	    print STDERR "No $key patterns start with '$chr'\n" if $DEBUG;
-	    sub { undef };
+	    sub { return };
 	}
 	else {
 	    # extract fate comments before they are deleted
 	    my $i = 1;
 	    my $fates = [];
 	    for (@pats) {
-		s/\(\?#FATE (.*?)\)/(?#$i FATE $1)/ or return sub { undef };
+		s/\(\?#FATE (.*?)\)/(?#$i FATE $1)/ or return sub { return };
 		my $fstr = $1;
 		$fates->[$i] = [0,0,0,$fstr];
 		my $fate = $fates->[$i];
@@ -261,22 +282,24 @@ sub _AUTOLEXnow { my $self = shift;
 		$i++;
 	    }
 
-	    my $pat = "^(?:\n(" . join(")\n|(",@pats) . '))';
-
-	    print STDERR "LEXER: ", $pat,"\n" if $lexverbose;
+	    if ($lexverbose) {
+		my $tmp = "^(?:\n(" . join(")\n|(",@pats) . '))';
+		print STDERR "LEXER: ", $tmp,"\n";
+	    }
 
 	    # remove stuff that will confuse TRE greatly
-	    $pat =~ s/\(\?#.*?\)//g;
-	    $pat =~ s/^[ \t]*\n//gm;
-	    $pat =~ s/\s+//g;
-	    $pat =~ s/:://g;
+	    for my $pat (@pats) {
+		$pat =~ s/\(\?#.*?\)//g;
+		$pat =~ s/\s+//g;
+		$pat =~ s/:://g;
 
+		$pat =~ s/\\x20/ /g;
+	    }
+
+	    my $pat = "^(?:(" . join(")|(",@pats) . '))';
 	    1 while $pat =~ s/\(\?:\)\??//;
 	    1 while $pat =~ s/([^\\])\(((\?:)?)\)/$1($2 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
-	    $pat =~ s/\\x20/ /g;
-	    my $tmp = $pat;
-	    "42" =~ /$tmp/;	# XXX see if p5 parses it
 
 	    print STDERR "TRE: ", $pat,"\n" if $DEBUG;
 
@@ -284,6 +307,9 @@ sub _AUTOLEXnow { my $self = shift;
 
 	    for my $i (1..@$fates-1) {
 		print STDERR $i, ': ', $fates->[$i][3], "\n" if $lexverbose;
+	    }
+	    for my $pat (@pats) {
+		$pat =~ s/\.\?$//;	# ltm backoff doesn't need tre workaround
 	    }
 
 	    # generate match closure at the last moment
@@ -293,15 +319,56 @@ sub _AUTOLEXnow { my $self = shift;
 		print STDERR "lexing $key\n" if $DEBUG;
 		die "orig disappeared!!!" unless length($$buf);
 
-		return '' unless $lexer;
+		return unless $lexer;
 
 		pos($$buf) = $C->{_pos};
+
 
 		##########################################
 		# No normal p5 match/subst below here!!! #
 		##########################################
 		{
 		    use re::engine::TRE;
+
+		    # if trystate is defined, the "obvious" LTM failed, so must back off
+		    # a parallel nfa matcher might or might not do better here...
+		    # this has the advantage of being fairly compact
+		    if (defined $_[0]) {
+			my $tried = \${$_[0]}[0];   # vec of tried pats
+			my $trylen = \${$_[0]}[1];  # next len to try
+			my $rxlens = ${$_[0]}[2];   # our states idea of rx lengths
+			return if $$trylen < 0;
+			if (not @$rxlens) {
+			    if (@rxlenmemo) {
+				@$rxlens = @rxlenmemo;
+			    }
+			    else {
+				for my $px (0..@pats-1) {
+				    $$rxlens[$px] = rxlen($pats[$px]);
+				    print STDERR "Fixed len $$rxlens[$px] for $pats[$px]\n";
+				}
+				@rxlenmemo = @$rxlens;
+			    }
+			}
+			my @result;
+			for my $px (0..@pats-1) {
+			    next if vec($$tried,$px,1);	# already tried this one
+			    my $l = $$rxlens[$px];
+			    if ($l == -1) {
+				my $pat = '^' . $pats[$px];
+				if (($$buf =~ m/$pat/xgc)) {
+				    $$rxlens[$px] = $l = $+[0] - $-[0];
+				}
+			    }
+			    if ($l == $$trylen) {
+				push @result, $fates->[$px];
+				vec($$tried,$px,1) = 1;	# mark this one tried
+			    }
+			}
+			$$trylen = $$trylen - 1;
+
+			return @result;
+		    }
 
 		    print STDERR "/ running tre match at @{[ pos($$buf) ]} /\n" if $DEBUG;
 
@@ -323,6 +390,9 @@ sub _AUTOLEXnow { my $self = shift;
 			    }
 			}
 			print STDERR "success at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG;
+			my $tried = "";
+			vec($tried,$last,1) = 1;
+			$_[0] = [$tried, $+[0] - $-[0], []];
 			$result;
 		    }
 		    else {
@@ -361,6 +431,8 @@ sub cursor_fresh { my $self = shift;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
+    $r{ws_to} = $self->{ws_to};
+    $r{ws_from} = $self->{ws_from};
     bless \%r, ref $self;
 }
 
@@ -387,10 +459,12 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
 sub cursor_fate { my $self = shift;
     my $pkg = shift;
     my $name = shift;
+    # $_[0] is now ref to a $trystate;
 
     my %r = %$self;
     my $tag;
     my $try;
+    my $relex;
     
     my $fate = $self->{_fate};
     if ($fate and $fate->[0] eq $name) {
@@ -399,7 +473,8 @@ sub cursor_fate { my $self = shift;
 	$r{_fate} = $fate;
     }
     else {
-        $fate = $self->_AUTOLEXnow("${pkg}::$name")->($self);
+        $relex = $self->_AUTOLEXnow("${pkg}::$name");
+	$fate = $relex->($self,$_[0]);
         if ($fate) {
             print STDERR "FATE OF ${pkg}::$name: $$fate[3]\n";
             ($tag, $try, $fate) = @$fate;
@@ -410,7 +485,7 @@ sub cursor_fate { my $self = shift;
             $tag = '';
         }
     }
-    return (bless \%r, ref $self), $tag, $try;
+    return (bless \%r, ref $self), $tag, $try, $relex;
 }
 
 sub cursor_all { my $self = shift;
@@ -1414,7 +1489,7 @@ sub fail { my $self = shift;
 	    my $lexer;
 	    {
 		local $PREFIX = "";
-		$lexer = $C->$name(undef);
+		$lexer = $C->cursor_peek->$name();
 	    }
 	    my @pat = @{$lexer->{PATS}};
 	    return unless @pat;
@@ -1455,7 +1530,7 @@ sub fail { my $self = shift;
                 return @result;
             }
             else {
-                my $lexer = $C->$name(undef, $re);
+                my $lexer = $C->cursor_peek->$name($re);
 		my @pat = @{$lexer->{PATS}};
 		return unless @pat;
 		return @pat;
@@ -1479,7 +1554,7 @@ sub fail { my $self = shift;
                 return;
             }
             else {
-                my $lexer = $C->$name(undef, $str);
+                my $lexer = $C->cursor_peek->$name($str);
 		my @pat = @{$lexer->{PATS}};
 		return '' unless @pat;
 		return @pat;

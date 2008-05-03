@@ -33,8 +33,6 @@ our $PAREN = 0;
 our %adverbs = ();
 our %fixedprefix;
 our $PURE;
-our @ALTS;
-our @TOKEN;
 our $MAYBACKTRACK;
 our @DECL;
 our $SYM;
@@ -424,7 +422,6 @@ END
             $old =~ s/^/##      /mg;
             $out .= "$old\n\n";
 
-            local @ALTS;
             local $PURE = 1;
             local $PROTO = $proto;
             my $meat = ::indent($re->walk(), 2);
@@ -1242,8 +1239,6 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         local($PURE);
-        local(@TOKEN);
-        local(@ALTS);
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk(@_);
             $self->bind("\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re) . "\n})");
@@ -1367,7 +1362,6 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $text = $$self{text};
-        push @TOKEN, '"' . $text . '"' if $PURE;
         $self->bind('$C->_EXACT' . $REV . '("' . $text . '")');
     }
 }
@@ -1377,7 +1371,6 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        push @TOKEN, "'" . $text . "'" if $PURE;
         "\$C->_EXACT$REV('" . $text . "')";
     }
 }
@@ -1471,7 +1464,6 @@ sub unbalanced {
             $re = '$self->SUPER::' . $NAME . '(@origargs)';
         }
         elsif ($name =~ /^\w/) {
-            push @TOKEN, "\$C->$name('?')" if $PURE;
             $re = '$C->' . $name . "()";
         }
         else {
@@ -1531,14 +1523,6 @@ END
 	}
         $REV = '';
 
-        if ($PURE) {
-            if ($name eq 'before') {
-                push @TOKEN, $re;
-            }
-            else {
-                push @TOKEN, "\$C->$name( sub { my \$C=shift;\n$re\n} )";
-            }
-        }
         $re = '$C->' . $name . "(sub { my \$C=shift;\n$re\n})";
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    push @BINDINGS, $name;
@@ -1557,7 +1541,6 @@ END
         ::panic("Can't reverse $name") if $REV;
         $PURE = 0 if $impure{$name};
 
-        push @TOKEN, "\$C->$name$rest'?')" if $PURE;
         my $re = "\$C->$name$rest";
         $re = 'do { my $M = $C; ' . $re . '; }' if $NEEDMATCH;
 	if ($name =~ /^\w/ and not $self->{nobind}) {
@@ -1801,13 +1784,11 @@ END
         my $self = shift;
         my @result;
         my $alt = 0;
-        local @ALTS;
         my $altname = $self->{altname};
         if ($$self{zyg}) {
             $PURE = 0 if @{$$self{zyg}} > 1;
 	    my %B = %BINDINGS;
             foreach my $kid (@{$$self{zyg}}) {
-                local @TOKEN;
                 local $PURE = 1;
 		local %BINDINGS;
                 my $r = $kid->walk(@_);
@@ -1821,15 +1802,7 @@ END
 #                    }
 #                }
                 push @result, $r;
-                my $token;
-                if (@TOKEN) {
-                    $token = '(' . join(' X ',@TOKEN) . ')';
-                }
-                else {
-                    $token = "''";
-                }
                 $kid->{alt} = $altname . ' ' . $alt++;
-                push @ALTS, $token;
             }
 	    %BINDINGS = %B;
         }
@@ -1841,29 +1814,56 @@ END
             my $policy;
             if ($failover) {
                 $policy = <<"END"
-    my \@try = @{[ '0..' . (@ALTS-1) ]};
+    my \@try = @{[ '0..' . ($alt-1) ]};
     unshift \@try, splice(\@try,\$try,1) if \$tag eq '$altname';
+    splice(\@try,1,0,\$relex) if \$relex;
 END
             }
             else {
                 $policy = <<"END"
-    my \@try = \$tag eq '$altname' ? (\$try) : ();
+    my \@try = \$tag eq '$altname' ? (\$try,\$relex) : ();
 END
             }
             my $result = <<"END";
 do {
-    my (\$C, \$tag, \$try) = \$C->cursor_fate('${PKG}', '$altname');
+    my \$trystate;
+    my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$trystate);
 $policy
-    print STDERR "$altname will try: \@try\\n" if \@try > 1;
-    my \@gather = ();
-    while (\@try and not \@gather) {
-        my \$try = shift(\@try);
-        print STDERR "Trying \$tag \$try\\n";
+END
+
+            $result .= <<'END';
+    my @gather = ();
+    while (@try and not @gather) {
+        my $try = shift(@try);
+
+        # if first try failed, interrogate lexer for shorter answers
+        if (ref $try) {
+            if (ref $try eq 'ARRAY') {
+                ($tag, $try, $C->{_fate}) = @$try;	# next candidate fate
+                print STDERR "Retrying with $tag $try\n";
+            }
+            elsif (ref $try eq 'CODE') {
+                my @more = $relex->($C, $trystate);
+                if (@more) {
+                    print STDERR 0+@more,"\n";
+                    unshift @try, @more;   # ask relex for more
+                }
+                next;
+            }
+        }
+
+END
+
+            $result .= <<"END";
+        print STDERR "$altname trying \$tag \$try\\n";
         push \@gather, ((
 @{[ ::indent(join("\n", @result),3) ]}
-        )[\$try])->(\$C);
+END
+
+            $result .= <<'END';
+        )[$try])->($C);
     }
-    \@gather;
+    @gather;
 }
 END
             $result;
