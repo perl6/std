@@ -12,7 +12,6 @@ token foo {
 =begin things todo
 
     add more suppositions and figure out exact error continuation semantics
-    finish out all the {*} #= hookage
     think about longest-token-defeating {*} that maybe should be <?{ {*}; 1}>
     add parsing this file to sanity tests :)
     evaluate "is context<rw>" for reentrancy brokenness
@@ -1052,11 +1051,11 @@ token expect_tight_infix ($loosest) {
 }
 
 token expect_infix {
-    :my $op is context;
+    :my $op is context;         # (used in infix_postfix_meta_operator)
     <!stdstopper>
     [
     | <infix> { $op = $<infix>; }
-       <infix_postfix_meta_operator>*
+       <infix_postfix_meta_operator>*  # may modify $op
        { $<O> = $op<O>; }
     | <infix_prefix_meta_operator>
         { $<O> = $<infix_prefix_meta_operator><O>; }
@@ -1067,9 +1066,23 @@ token expect_infix {
 }
 
 # doing fancy as one rule simplifies LTM
-token dotty:sym<.*> { '.' <[+*?=^:]> <?unspacey> <methodop> {*} }
-token dotty:sym<.>  { '.' <?unspacey> <dottyop>  {*} }
-token dotty:sym<!>  { '!' <?unspacey> <methodop>  {*} }
+token dotty:sym<.*> {
+    ('.' <[+*?=^:]>) <?unspacey> <methodop>
+    { $<O> = $<methodop><O>; $<sym> = $0.item; }
+    {*}
+}
+
+token dotty:sym<.> {
+    <sym> <dottyop>
+    { $<O> = $<dottyop><O>; }
+    {*}
+}
+
+token dotty:sym<!> {
+    <sym> <methodop>
+    { $<O> = $<methodop><O>; }
+    {*}
+}
 
 token dottyop {
     [
