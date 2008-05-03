@@ -1845,8 +1845,7 @@ END
             elsif (ref $try eq 'CODE') {
                 my @more = $relex->($C, $trystate);
                 if (@more) {
-                    print STDERR 0+@more,"\n";
-                    unshift @try, @more;   # ask relex for more
+                    unshift @try, @more, $relex;   # ask relex for more
                 }
                 next;
             }

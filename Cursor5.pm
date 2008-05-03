@@ -351,21 +351,35 @@ sub _AUTOLEXnow { my $self = shift;
 			    }
 			}
 			my @result;
-			for my $px (0..@pats-1) {
-			    next if vec($$tried,$px,1);	# already tried this one
-			    my $l = $$rxlens[$px];
-			    if ($l == -1) {
+			while (not @result and $$trylen >= 0) {
+			    for my $px (0..@pats-1) {
+				next if vec($$tried,$px,1);	# already tried this one
+				my $l = $$rxlens[$px];
 				my $pat = '^' . $pats[$px];
-				if (($$buf =~ m/$pat/xgc)) {
-				    $$rxlens[$px] = $l = $+[0] - $-[0];
+				if ($l == -1) {
+				    if (($$buf =~ m/$pat/xgc)) {
+					$$rxlens[$px] = $l = $+[0] - $-[0];
+					if ($l == $$trylen) {
+					    push @result, $fates->[$px];
+					    vec($$tried,$px,1) = 1;
+					}
+					next;
+				    }
+				    else {	# pattern doesn't match at all, invalidate
+					vec($$tried,$px,1) = 1;
+					next;
+				    }
+				}
+				if ($l == $$trylen) {
+				    # already known to match if memo is < 0
+				    if ($rxlenmemo[$px] < 0 or $$buf =~ m/$pat/xgc) {
+					push @result, $fates->[$px];
+				    }
+				    vec($$tried,$px,1) = 1;	# mark this one tried
 				}
 			    }
-			    if ($l == $$trylen) {
-				push @result, $fates->[$px];
-				vec($$tried,$px,1) = 1;	# mark this one tried
-			    }
+			    $$trylen = $$trylen - 1;
 			}
-			$$trylen = $$trylen - 1;
 
 			return @result;
 		    }
