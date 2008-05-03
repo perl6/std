@@ -267,13 +267,12 @@ sub _AUTOLEXnow { my $self = shift;
 	}
 	else {
 	    # extract fate comments before they are deleted
-	    my $i = 1;
+	    my $i = 0;
 	    my $fates = [];
 	    for (@pats) {
 		s/\(\?#FATE (.*?)\)/(?#$i FATE $1)/ or return sub { return };
 		my $fstr = $1;
-		$fates->[$i] = [0,0,0,$fstr];
-		my $fate = $fates->[$i];
+		my $fate = $fates->[$i] = [0,0,0,$fstr];
 		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
 		    $fate->[0] = $1;
 		    $fate->[1] = $2;
@@ -303,9 +302,9 @@ sub _AUTOLEXnow { my $self = shift;
 
 	    print STDERR "TRE: ", $pat,"\n" if $DEBUG;
 
-	    print STDERR "#FATES: ", @$fates - 1, "\n" if $lexverbose;
+	    print STDERR "#FATES: ", 0+@$fates, "\n" if $lexverbose;
 
-	    for my $i (1..@$fates-1) {
+	    for my $i (0..@$fates-1) {
 		print STDERR $i, ': ', $fates->[$i][3], "\n" if $lexverbose;
 	    }
 	    for my $pat (@pats) {
@@ -355,9 +354,9 @@ sub _AUTOLEXnow { my $self = shift;
 			    for my $px (0..@pats-1) {
 				next if vec($$tried,$px,1);	# already tried this one
 				my $l = $$rxlens[$px];
-				my $pat = '^' . $pats[$px];
 				if ($l == -1) {
-				    if (($$buf =~ m/$pat/xgc)) {
+				    my $p = '^' . $pats[$px];
+				    if (($$buf =~ m/$p/xgc)) {
 					$$rxlens[$px] = $l = $+[0] - $-[0];
 					if ($l == $$trylen) {
 					    push @result, $fates->[$px];
@@ -371,14 +370,20 @@ sub _AUTOLEXnow { my $self = shift;
 				    }
 				}
 				if ($l == $$trylen) {
-				    # already known to match if memo is < 0
-				    if ($rxlenmemo[$px] < 0 or $$buf =~ m/$pat/xgc) {
+				    # already known to match if null or variable length
+				    if (not $l or $rxlenmemo[$px] < 0) {
 					push @result, $fates->[$px];
+				    }
+				    else {
+					my $p = '^' . $pats[$px];
+					if ($$buf =~ m/$p/xgc) {
+					    push @result, $fates->[$px];
+					}
 				    }
 				    vec($$tried,$px,1) = 1;	# mark this one tried
 				}
 			    }
-			    $$trylen = $$trylen - 1;
+			    --$$trylen;
 			}
 
 			return @result;
@@ -390,12 +395,12 @@ sub _AUTOLEXnow { my $self = shift;
 			my $max = @+ - 1;
 			my $last = @- - 1;	# ignore '$0'
 #		        print STDERR "LAST: $last\n";
-			my $result = $fates->[$last] // return;
+			my $result = $fates->[$last-1] // return;
 			for my $x (1 .. $max) {
 			    my $beg = $-[$x];
 			    next unless defined $beg;
 			    my $end = $+[$x];
-			    my $f = $fates->[$x][3];
+			    my $f = $fates->[$x-1][3];
 			    no strict 'refs';
 			    if ($lexverbose or ($DEBUG and $x == $last)) {
 				print STDERR "\$$x: $beg..$end\t$$x\t ",
@@ -405,7 +410,7 @@ sub _AUTOLEXnow { my $self = shift;
 			}
 			print STDERR "success at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG;
 			my $tried = "";
-			vec($tried,$last,1) = 1;
+			vec($tried,$last-1,1) = 1;
 			$_[0] = [$tried, $+[0] - $-[0], []];
 			$result;
 		    }
@@ -1436,7 +1441,7 @@ sub fail { my $self = shift;
             elsif ($_ eq '\\h') {
                 return '[\\x20\\t\\r]';
 	    }
-            elsif ($_ eq '\\h') {
+            elsif ($_ eq '\\v') {
                 return '[\\n\\f]';
             }
             elsif ($_ eq ':' or $_ eq '^^') {

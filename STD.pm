@@ -339,7 +339,8 @@ token nofat_space { <?before \s | '#'> <?nofat> }
 regex nofat { <!before » \h* <.unsp>? '=>' > <!before \w> }
 
 token ws {
-    || <?{ $¢.pos === $!ws_to }>
+    :my @stub = return self if self.pos === $!ws_to; # really fast memoizing
+    [
     || <?after \w> <?before \w> ::: <!>        # must \s+ between words
     || { $!ws_from = $¢.pos }
        [
@@ -348,6 +349,7 @@ token ws {
        | <unv>               {*}                                #= unv
        ]*  {*}                                                  #= all
        { $!ws_to = $¢.pos }
+    ]
 }
 
 token unsp {

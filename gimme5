@@ -427,6 +427,7 @@ END
             my $meat = ::indent($re->walk(), 2);
 
             $RE{$PKG . '::' . $NAME} = $re;
+            $re->remember_alts();
     #        my $lex = Dump($re);
     #        $lex =~ s[!!perl/hash:][!pugs/Object:]g;
     #        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
@@ -779,8 +780,7 @@ sub any {
 
     return $kids[0] if @kids == 1;
 
-    return $RE{$PKG . '::' . $ALTNAME} =
-        bless { zyg => [@kids], min => $min, altname => $ALTNAME },
+    return bless { zyg => [@kids], min => $min, altname => $ALTNAME },
               "RE_any";
 }
 
@@ -808,9 +808,15 @@ sub sequence {
     my @kids;
     my $k;
     my $min = 0;
+    my $lastws = 0;
 
     while ($k = quantified_atom()) {
+        if ($lastws) {
+            # optimize away any redundant ws
+            $k->remove_leading_ws();
+        }
         push(@kids, $k);
+        $lastws = ref $k eq 'RE_method_noarg' && $k->{name} eq 'ws';
         my $kidmin = $k->{min};
         $min += $kidmin;
     }
@@ -1216,6 +1222,8 @@ sub unbalanced {
 	$re;
     }
 
+    sub remove_leading_ws { }   # this tree node not interested
+    sub remember_alts { }
 }
 
 { package RE; use base "REbase";
@@ -1228,6 +1236,12 @@ sub unbalanced {
         }
         if ($$self{re}) {
             return $$self{re}->walk(@_);
+        }
+    }
+    sub remember_alts {
+        my $self = shift;
+        if ($$self{re}) {
+            $$self{re}->remember_alts(@_);
         }
     }
 }
@@ -1248,6 +1262,11 @@ sub unbalanced {
             return $re if $re =~ /^\$C->before/;
             $self->bind("\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})");
         }
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        $$self{re}->remember_alts(@_);
     }
 }
 
@@ -1311,6 +1330,11 @@ sub unbalanced {
         my $re = ::indent($$self{atom}->walk(@_));
         $re;
     }
+
+    sub remember_alts {
+        my $self = shift;
+        $$self{atom}->remember_alts(@_);
+    }
 }
 
 { package RE_bindpos; use base "REbase";
@@ -1321,6 +1345,11 @@ sub unbalanced {
 	$BINDINGS{$var} += $BINDNUM;
         my $re = ::indent($$self{atom}->walk(@_));
         $re;
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        $$self{atom}->remember_alts(@_);
     }
 }
 
@@ -1335,6 +1364,19 @@ sub unbalanced {
         $re = "\$C->_BRACKET$REV( sub { my \$C=shift;\n" . $re . "\n})";
 	$self->bind($re);
     }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
+        my $re = $$self{re};
+        $re->remove_leading_ws();
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        $$self{re}->remember_alts(@_);
+    }
+
 }
 
 { package RE_cclass; use base "REbase";
@@ -1530,6 +1572,12 @@ END
 	}
 	$self->bind($re);
     }
+
+    sub remember_alts {
+        my $self = shift;
+        my $re = $$self{re};
+        $re->remember_alts(@_);
+    }
 }
 
 { package RE_method; use base "REbase";
@@ -1576,7 +1624,25 @@ END
             my $result = ::indent(join("\nSAME\n", @result));
             $result;
         }
-    };
+    }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
+        for my $kid (@{$$self{zyg}}) {
+            $kid->remove_leading_ws();
+        }
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
+                $kid->remember_alts(@_);
+            }
+        }
+    }
+
 }
 
 { package RE_first; use base "REbase";
@@ -1607,6 +1673,23 @@ END
             $result;
         }
     }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
+        for my $kid (@{$$self{zyg}}) {
+            $kid->remove_leading_ws();
+        }
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
+                $kid->remember_alts(@_);
+            }
+        }
+    }
 }
 
 { package RE_paren; use base "REbase";
@@ -1628,6 +1711,20 @@ END
 	}
         $re = "do { \$C->_${REV}PAREN( sub { my \$C=shift;\n" . $re . "\n})}";
 	$self->bind($re);
+    }
+
+    # yes, () would capture the ws, but we're guaranteed to be past it already
+    sub remove_leading_ws {
+        my $self = shift;
+        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
+        my $re = $$self{re};
+        $re->remove_leading_ws();
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        my $re = $$self{re};
+        $re->remember_alts();
     }
 }
 
@@ -1687,6 +1784,19 @@ END
         }
         $result;
     }
+
+    sub remember_alts {
+        my $self = shift;
+        if (ref $$self{atom}) {
+            $$self{atom}->remember_alts(@_);
+            if ($$self{quant}) {
+                my ($qfer,$how,$rest) = @{$$self{quant}};
+                if ($qfer eq '**' and ref $rest) {
+                    $rest->remember_alts();
+                }
+            }
+        }
+    }
 }
 
 { package RE_qw; use base "REbase";
@@ -1732,6 +1842,31 @@ END
         }
         join('', @decl, $result || '');
     }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
+        if ($$self{zyg}) {
+            my @kids = @{$$self{zyg}};
+
+            shift(@kids) while
+                @kids and
+                ref $kids[0] eq 'RE_method_noarg' and
+                $kids[0]->{name} eq 'ws';
+
+            $kids[0]->remove_leading_ws() if @kids;
+            @{$$self{zyg}} = @kids;
+        }
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
+                $kid->remember_alts(@_);
+            }
+        }
+    }
 }
 
 { package RE_submatch; use base "REbase";
@@ -1757,6 +1892,15 @@ END
             $result;
         }
     }
+
+    sub remember_alts {
+        my $self = shift;
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
+                $kid->remember_alts(@_);
+            }
+        }
+    }
 }
 
 { package RE_all; use base "REbase";
@@ -1777,6 +1921,23 @@ END
             $result;
         }
     }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
+        for my $kid (@{$$self{zyg}}) {
+            $kid->remove_leading_ws();
+        }
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
+                $kid->remember_alts(@_);
+            }
+        }
+    }
 }
 
 { package RE_any; use base "REbase";
@@ -1788,7 +1949,7 @@ END
         if ($$self{zyg}) {
             $PURE = 0 if @{$$self{zyg}} > 1;
 	    my %B = %BINDINGS;
-            foreach my $kid (@{$$self{zyg}}) {
+            for my $kid (@{$$self{zyg}}) {
                 local $PURE = 1;
 		local %BINDINGS;
                 my $r = $kid->walk(@_);
@@ -1866,6 +2027,24 @@ END
 }
 END
             $result;
+        }
+    }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
+        for my $kid (@{$$self{zyg}}) {
+            $kid->remove_leading_ws();
+        }
+    }
+
+    sub remember_alts {
+        my $self = shift;
+        $RE{$PKG . '::' . $self->{altname}} = $self;
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
+                $kid->remember_alts(@_);
+            }
         }
     }
 }
