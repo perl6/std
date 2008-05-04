@@ -5,8 +5,8 @@ has StrPos $.ws_to;
 
 # random rule for debugging, please ignore
 token foo {
-    <pre>+ ::
-    <integer>
+    <opener>
+    | <integer>
 }
 
 =begin things todo
@@ -336,7 +336,8 @@ token nofat_space { <?before \s | '#'> <?nofat> }
 # Lexical routines
 
 # make sure we're at end of a non-autoquoted identifier
-regex nofat { <!before » \h* <.unsp>? '=>' > <!before \w> }
+#regex nofat { <!before » \h* <.unsp>? '=>' > <!before \w> }
+regex nofat { '' }
 
 token ws {
     :my @stub = return self if self.pos === $!ws_to; # really fast memoizing
@@ -347,6 +348,7 @@ token ws {
        | <unsp>              {*}                                #= unsp
        | <vws>               {*} <heredoc>
        | <unv>               {*}                                #= unv
+       | $ { $¢.moreinput }
        ]*  {*}                                                  #= all
        { $!ws_to = $¢.pos }
     ]
@@ -357,11 +359,13 @@ token unsp {
     [
     | <vws>                     {*}                             #= vwhite
     | <unv>                  {*}                                #= unv
-    ]*  {*}                                                     #= all
+    | $ { $¢.moreinput }
+    ]*
+    {*}
 }
 
 token vws {
-    \v [ $ { $¢.moreinput } ]?
+    \v
 }
 
 # We provide two mechanisms here:
@@ -372,19 +376,17 @@ method moreinput () {
 }
 
 token unv {
-   || \h+                 {*}                                   #= hwhite
-   || ^^ [
-       | <.pod_comment>  {*}                                    #= multiline
-       | '#' [
-            | <.bracketed> <.panic: "Can't use embedded comments in column 1">
-            | \N*            {*}                                #= end
-       ]
-   ]
-   || '#' [
-        # assuming <bracketed> defaults to standard set
-        | <.bracketed>   {*}                                    #= embedded
-        | \N*            {*}                                    #= end
-   ]
+   | \h+                 {*}                                    #= hwhite
+   | <?before '='> ^^ :: <.pod_comment>  {*}                    #= pod
+   | '#' [
+         # assuming <bracketed> defaults to standard set
+         || <?opener>
+            [
+            || <?after ^^ . > <.panic: "Can't use embedded comments in column 1">
+            || <.bracketed>   {*}                               #= embedded
+            ]
+         || \N*            {*}                                 #= end
+         ]
 }
 
 token ident {
@@ -1021,7 +1023,7 @@ ex:     say @list.grep(matcher => &my_function);
 =end perlhints
 
 token fatarrow {
-    <key=ident> \h* '=>' <.ws> <val=EXPR(%item_assignment)>
+    <key=ident> \h* '=>' :: <.ws> <val=EXPR(%item_assignment)>
 }
 
 token colonpair {
@@ -1068,28 +1070,26 @@ token expect_infix {
 }
 
 # doing fancy as one rule simplifies LTM
-token dotty:sym<.*> {
+token dotty:sym<.*> ( --> Methodcall) {
     ('.' <[+*?=^:]>) <?unspacey> <methodop>
-    { $<O> = $<methodop><O>; $<sym> = $0.item; }
+    { $<sym> = $0.item; }
     {*}
 }
 
-token dotty:sym<.> {
+token dotty:sym<.> ( --> Methodcall) {
     <sym> <dottyop>
-    { $<O> = $<dottyop><O>; }
     {*}
 }
 
-token dotty:sym<!> {
+token dotty:sym<!> ( --> Methodcall) {
     <sym> <methodop>
-    { $<O> = $<methodop><O>; }
     {*}
 }
 
 token dottyop {
     [
-    | <methodop> { $<O> = $<methodop><O>; }
-    | <postop>   { $<O> = $<postop><O>; }
+    | <methodop>
+    | <postop>     # forcing postop's precedence to methodcall here
     ]
     {*}
 }
@@ -1116,7 +1116,6 @@ token post {
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
 # (Also backtracks if on \op when no \op infix exists.)
 regex prefix_circumfix_meta_operator:reduce {
-    :my %thisop is context<rw>;
     '[' <?before \S* ']' > ::
     \\??   # prefer no meta \ if op has \
     <expect_infix>
@@ -1863,7 +1862,7 @@ token integer {
 token radint {
     [
     | <integer>
-    | <rad_number> <?{
+    | <?before :> <rad_number> <?{
                         defined $<rad_number><intpart>
                         and
                         not defined $<rad_number><fracpart>
@@ -2331,6 +2330,71 @@ constant %open2close = (
     "\xFF1C" => "\xFF1E", "\xFF3B" => "\xFF3D", "\xFF5B" => "\xFF5D",
     "\xFF5F" => "\xFF60", "\xFF62" => "\xFF63",
 );
+
+token opener {
+  <[\x0028 \x003C \x005B
+    \x007B \x00AB \x0F3A
+    \x0F3C \x169B \x2039
+    \x2045 \x207D \x208D
+    \x2208 \x2209 \x220A
+    \x2215 \x223C \x2243
+    \x2252 \x2254 \x2264
+    \x2266 \x2268 \x226A
+    \x226E \x2270 \x2272
+    \x2274 \x2276 \x2278
+    \x227A \x227C \x227E
+    \x2280 \x2282 \x2284
+    \x2286 \x2288 \x228A
+    \x228F \x2291 \x2298
+    \x22A2 \x22A6 \x22A8
+    \x22A9 \x22AB \x22B0
+    \x22B2 \x22B4 \x22B6
+    \x22C9 \x22CB \x22D0
+    \x22D6 \x22D8 \x22DA
+    \x22DC \x22DE \x22E0
+    \x22E2 \x22E4 \x22E6
+    \x22E8 \x22EA \x22EC
+    \x22F0 \x22F2 \x22F3
+    \x22F4 \x22F6 \x22F7
+    \x2308 \x230A \x2329
+    \x23B4 \x2768 \x276A
+    \x276C \x276E \x2770
+    \x2772 \x2774 \x27C3
+    \x27C5 \x27D5 \x27DD
+    \x27E2 \x27E4 \x27E6
+    \x27E8 \x27EA \x2983
+    \x2985 \x2987 \x2989
+    \x298B \x298D \x298F
+    \x2991 \x2993 \x2995
+    \x2997 \x29C0 \x29C4
+    \x29CF \x29D1 \x29D4
+    \x29D8 \x29DA \x29F8
+    \x29FC \x2A2B \x2A2D
+    \x2A34 \x2A3C \x2A64
+    \x2A79 \x2A7D \x2A7F
+    \x2A81 \x2A83 \x2A8B
+    \x2A91 \x2A93 \x2A95
+    \x2A97 \x2A99 \x2A9B
+    \x2AA1 \x2AA6 \x2AA8
+    \x2AAA \x2AAC \x2AAF
+    \x2AB3 \x2ABB \x2ABD
+    \x2ABF \x2AC1 \x2AC3
+    \x2AC5 \x2ACD \x2ACF
+    \x2AD1 \x2AD3 \x2AD5
+    \x2AEC \x2AF7 \x2AF9
+    \x2E02 \x2E04 \x2E09
+    \x2E0C \x2E1C \x3008
+    \x300A \x300C \x300E
+    \x3010 \x3014 \x3016
+    \x3018 \x301A \x301D
+    \xFD3E \xFE17 \xFE35
+    \xFE37 \xFE39 \xFE3B
+    \xFE3D \xFE3F \xFE41
+    \xFE43 \xFE47 \xFE59
+    \xFE5B \xFE5D \xFF08
+    \xFF1C \xFF3B \xFF5B
+    \xFF5F \xFF62]>
+}
 
 # assumes whitespace is eaten already
 
@@ -3058,17 +3122,16 @@ token term:name ( --> List_prefix)
         [
             '::'
             <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
-            {*}                                             #= packagevar 
+            {*}                                                 #= packagevar 
         ]?
-        {*}                                                 #= typename
+        {*}                                                     #= typename
     ||
         [
-        | '.(' <semilist> ')' {*}                           #= func args
-        | '(' <semilist> ')' {*}                            #= func args
-#       | <?nofat_space> <arglist> {*}                      #= listop args
-        | <?before \s> <arglist> {*}                        #= listop args
-        | <?before \\ > <unsp> '.'? '(' <semilist> ')' {*}  #= func args
-        | <?nofat> {*}                                      #= listop noarg
+        | '.(' <semilist> ')' {*}                               #= func args
+        | '(' <semilist> ')' {*}                                #= func args
+        | <?before \s> <arglist> {*}                            #= listop args
+        | <.unsp> '.'? '(' <semilist> ')' {*}                   #= func args
+        | :: {*}                                                #= listop noarg
         ]
     ]
     {*}
@@ -3251,26 +3314,26 @@ method EXPR (%preclim = %LOOSEST)
 
         $here = $infix.cursor_fresh.ws();
 
-        my $thisop = $infix<O>;
-        my Str $thisprec = $thisop<prec>;
-        if not defined $thisprec {
+        my $inO = $infix<O>;
+        my Str $inprec = $inO<prec>;
+        if not defined $inprec {
             warn "No prec given in infix!\n";
-            $thisprec = %terminator<prec>;
+            $inprec = %terminator<prec>;
         }
         # substitute precedence for listops
-        $thisop<prec> = $thisop<sub> if $thisop<sub>;
+        $inO<prec> = $inO<sub> if $inO<sub>;
 
         # Does new infix (or terminator) force any reductions?
-        while @opstack[*-1]<O><prec> gt $thisprec {
+        while @opstack[*-1]<O><prec> gt $inprec {
             reduce();
         }
 
         # Not much point in reducing the sentinels...
-        last if $thisprec lt $LOOSEST;
+        last if $inprec lt $LOOSEST;
 
         # Equal precedence, so use associativity to decide.
-        if @opstack[*-1]<O><prec> eq $thisprec {
-            given $thisop<assoc> {
+        if @opstack[*-1]<O><prec> eq $inprec {
+            given $inO<assoc> {
                 when 'non'   { $here.panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' | 'chain' { }  # just shift

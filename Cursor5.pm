@@ -10,10 +10,10 @@ use warnings;
 use Encode;
 
 our %AUTOLEXED;
-our $PURE;
 our $ALT;
 our $PREFIX = "";
 our $DEPTH = 0;
+my $IMP = '(?#::)';
 
 binmode(STDIN, ":utf8");
 binmode(STDERR, ":utf8");
@@ -37,6 +37,7 @@ sub new {
     print STDERR " orig ", $$buf,"\n" if $DEBUG;
     $self->BUILD;
     $self->_AUTOLEXpeek('Perl::expect_term');
+    system('cp lex/expect_term lex/EXPR');
     $self;
 }
 
@@ -183,7 +184,7 @@ sub canmatch {
 	elsif ($p =~ s/^(\w)//) {
 	    $f .= $1;
 	    if ($1 eq 'x') {
-		if ($p =~ s/^(\w\w)//) {
+		if ($p =~ s/^([0-9a-zA-Z]{2,4})//) {
 		    $f .= $1;
 		}
 		elsif ($p =~ s/^(\[\w+\])//) {
@@ -230,7 +231,7 @@ sub rxlen {
 	    $len++, next if $p =~ s/^\W//;
 	    $len++, next if $p =~ s/^[ntfrdswDSW]//;
 	    $len++, next if $p =~ s/^\d+//;
-	    $len++, next if $p =~ s/^x[\da-fA-F]{1,2}//;
+	    $len++, next if $p =~ s/^x[\da-fA-F]{1,4}//;
 	    return -1;
 	}
 	$len++, next if $p =~ s/^.//s;
@@ -292,7 +293,8 @@ sub _AUTOLEXnow { my $self = shift;
 		$pat =~ s/\s+//g;
 		$pat =~ s/:://g;
 
-		$pat =~ s/\\x20/ /g;
+		$pat =~ s/\\x(\w\w)/chr(hex($1))/eg;
+		$pat =~ s/\\x\{(\w+)\}/chr(hex($1))/eg;
 	    }
 
 	    my $pat = "^(?:(" . join(")|(",@pats) . '))';
@@ -315,13 +317,12 @@ sub _AUTOLEXnow { my $self = shift;
 	    sub {
 		my $C = shift;
 
-		print STDERR "lexing $key\n" if $DEBUG;
 		die "orig disappeared!!!" unless length($$buf);
 
 		return unless $lexer;
 
 		pos($$buf) = $C->{_pos};
-
+		print STDERR "lexing $key at >>>>>>>>> '" . substr($$buf,$C->{_pos},20) . "\n" if $DEBUG;
 
 		##########################################
 		# No normal p5 match/subst below here!!! #
@@ -335,7 +336,7 @@ sub _AUTOLEXnow { my $self = shift;
 		    if (defined $_[0]) {
 			my $tried = \${$_[0]}[0];   # vec of tried pats
 			my $trylen = \${$_[0]}[1];  # next len to try
-			my $rxlens = ${$_[0]}[2];   # our states idea of rx lengths
+			my $rxlens = ${$_[0]}[2];   # our state's idea of rx lengths
 			return if $$trylen < 0;
 			if (not @$rxlens) {
 			    if (@rxlenmemo) {
@@ -1008,6 +1009,23 @@ sub alpha { my $self = shift;
     }
 }
 
+sub alpha_rev { my $self = shift;
+    local $CTX = $self->callm;
+    my $from = $self->{_from} - 1;
+    if ($from < 0) {
+        return ();
+    }
+    my $buf = $self->{_orig};
+    my $char = substr($$buf, $from, 1);
+    if ($char =~ /^[a-z_A-Z]$/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+        return ();
+    }
+}
+
 sub _SPACE { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{_pos};
@@ -1161,6 +1179,15 @@ sub _ANY { my $self = shift;
     }
 }
 
+sub _ANY_rev { my $self = shift;
+    local $CTX = $self->callm;
+    my $from = $self->{_from} - 1;
+    if ($from < 0) {
+        return ();
+    }
+    return $self->cursor_rev($from)->retm();
+}
+
 sub _BOS { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{_pos};
@@ -1171,6 +1198,7 @@ sub _BOS { my $self = shift;
         return ();
     }
 }
+sub _BOS_rev { $_[0]->_BOS }
 
 sub _BOL { my $self = shift;
     local $CTX = $self->callm;
@@ -1183,6 +1211,7 @@ sub _BOL { my $self = shift;
         return ();
     }
 }
+sub _BOL_rev { $_[0]->_BOL }
 
 sub _EOS { my $self = shift;
     local $CTX = $self->callm;
@@ -1195,6 +1224,7 @@ sub _EOS { my $self = shift;
         return ();
     }
 }
+sub _EOS_rev { $_[0]->_EOS }
 
 sub _EOL { my $self = shift;
     local $CTX = $self->callm;
@@ -1207,6 +1237,7 @@ sub _EOL { my $self = shift;
         return ();
     }
 }
+sub _EOL_rev { $_[0]->_EOL }
 
 sub _RIGHTWB { my $self = shift;
     local $CTX = $self->callm;
@@ -1220,6 +1251,7 @@ sub _RIGHTWB { my $self = shift;
         return ();
     }
 }
+sub _RIGHTWB_rev { $_[0]->_RIGHTWB }
 
 sub _LEFTWB { my $self = shift;
     local $CTX = $self->callm;
@@ -1233,6 +1265,7 @@ sub _LEFTWB { my $self = shift;
         return ();
     }
 }
+sub _LEFTWB_rev { $_[0]->_LEFTWB }
 
 sub _REDUCE { my $self = shift;
     my $tag = shift;
@@ -1319,7 +1352,6 @@ sub fail { my $self = shift;
 { package RE; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
         ::here();
-        local $PURE = 1;
 	local $ALT = '';
         $self->{'re'}->longest($C);
     }
@@ -1337,8 +1369,7 @@ sub fail { my $self = shift;
 		print STDERR ::Dump($self) unless $re;
                 if (ref($re) eq 'RE_method_re' and $re->{'name'} eq 'before') {
                     my @result = $re->longest($C);
-                    $PURE = 0;
-                    return @result;
+                    return map { $_ . $IMP } @result;
                 }
             }
         }
@@ -1348,15 +1379,13 @@ sub fail { my $self = shift;
 
 { package RE_assertvar; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
-        $PURE = 0;
-        return;
+        return $IMP;
     }
 }
 
 { package RE_block; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
-        $PURE = 0;
-        return;
+        return $IMP;
     }
 }
 
@@ -1409,8 +1438,7 @@ sub fail { my $self = shift;
         ::here($text);
 	my $fixed = '';
 	if ( $text =~ /^(.*?)[\$\@\%\&\{]/ ) {
-	    $PURE = 0;
-	    $fixed = $1;
+	    $fixed = $1 . $IMP;
 	}
 	else {
 	    $fixed = $text;
@@ -1439,10 +1467,13 @@ sub fail { my $self = shift;
                 return $text;
             }
             elsif ($_ eq '\\h') {
-                return '[\\x20\\t\\r]';
+                return '[\\x20\\x09\\x0d]';
 	    }
             elsif ($_ eq '\\v') {
-                return '[\\n\\f]';
+                return '[\\x0a\\x0c]';
+            }
+            elsif ($_ eq '\\N') {
+                return '[^\\x0a]';
             }
             elsif ($_ eq ':' or $_ eq '^^') {
 		return;
@@ -1454,8 +1485,7 @@ sub fail { my $self = shift;
 		return '\<';
 	    }
             elsif ($_ eq '::' or $_ eq ':::') {
-                $PURE = 0;
-                return;
+                return $IMP;
             }
             else {
                 return $text;
@@ -1474,20 +1504,10 @@ sub fail { my $self = shift;
                 return;
             }
             elsif ($_ eq '') {
-                $PURE = 0;
-                return;
+                return $IMP;
             }
             elsif ($_ eq 'ws') {
-                $PURE = 0;
-                return;
-            }
-            elsif ($_ eq 'unsp') {
-                $PURE = 0;
-                return;
-            }
-            elsif ($_ eq 'nofat_space') {
-                $PURE = 0;
-                return;
+                return $IMP;
             }
             elsif ($_ eq 'sym') {
                 $fakepos++;
@@ -1501,8 +1521,7 @@ sub fail { my $self = shift;
             }
 	    elsif ($_ eq 'EXPR') {
 		if (not -e 'lex/EXPR') {
-		    $PURE = 0;
-		    return;
+		    return $IMP;
 		}
 	    }
 	    my $lexer;
@@ -1524,8 +1543,7 @@ sub fail { my $self = shift;
 
 { package RE_method_internal; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
-        $PURE = 0;
-        return;
+        return $IMP;
     }
 }
 
@@ -1537,16 +1555,14 @@ sub fail { my $self = shift;
         my $re = $self->{'re'};
         for (scalar($name)) { if ((0)) {}
             elsif ($_ eq '') {
-                $PURE = 0;
-                return;
+                return $IMP;
             }
             elsif ($_ eq 'after') {
                 return;
             }
             elsif ($_ eq 'before') {
                 my @result = $re->longest($C);
-                $PURE = 0;
-                return @result;
+                return map { $_ . $IMP } @result;
             }
             else {
                 my $lexer = $C->cursor_peek->$name($re);
@@ -1569,8 +1585,7 @@ sub fail { my $self = shift;
                 return;
             }
             elsif ($_ eq 'panic' | 'obs') {
-                $PURE = 0;
-                return;
+                return $IMP;
             }
             else {
                 my $lexer = $C->cursor_peek->$name($str);
@@ -1584,8 +1599,7 @@ sub fail { my $self = shift;
 
 { package RE_method; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
-        $PURE = 0;
-        return;
+        return $IMP;
     }
 }
 
@@ -1597,8 +1611,7 @@ sub fail { my $self = shift;
 
 { package RE_every; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
-        $PURE = 0;
-        return;
+        return $IMP;
     }
 }
 
@@ -1634,16 +1647,14 @@ sub fail { my $self = shift;
 	$atom = "(?:" . $atom . ')' unless $a->{min} == 1 and ref($a) =~ /^RE_(?:meta|cclass|string)/;
         if ($self->{'quant'}[0] eq '+') {
 	    if (@atom > 1) {
-		$PURE = 0;
-		return @atom;
+		return map { $_ . $IMP } @atom;
 	    }
             return "$atom+";
         }
         elsif ($self->{'quant'}[0] eq '*') {
             $fakepos = $oldfakepos;
 	    if (@atom > 1) {
-		$PURE = 0;
-		return @atom,'';
+		return map { $_ . $IMP } @atom,'';
 	    }
             return "$atom*";
         }
@@ -1663,12 +1674,10 @@ sub fail { my $self = shift;
 		return $atom . "{$x}";
 	    }
 	    else {
-		$PURE = 0;
-		return $atom;
+		return $atom . $IMP;
 	    }
         }
-	$PURE = 0;
-	return;
+	return $IMP;
     }
 }
 
@@ -1687,28 +1696,31 @@ sub fail { my $self = shift;
 
 { package RE_sequence; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
-        local $PURE = 1;
-        my $c = $self->{'zyg'};
-        my @chunks = @$c;
-        ::here(0+@chunks);
-        my $result = [''];
+	my $result = [''];
+	my $c = $self->{'zyg'};
+	my @chunks = @$c;
+	::here(0+@chunks);
 	local $PREFIX = $PREFIX;
 
-        for my $chunk (@chunks) {
+	for my $chunk (@chunks) {
 	    # ignore negative lookahead
 	    next if ref($chunk) eq 'RE_assertion' and $chunk->{assert} eq '!';
 	    print STDERR "NULLABLE ".ref($chunk)."\n" if $RE_verbose and not $chunk->{min};
-            my @newalts = $chunk->longest($C);
-            if (not @newalts) {
-		next if $PURE;
-		last;
-	    }
+	    my @newalts = $chunk->longest($C);
+	    last unless @newalts;
 #	    if (not $chunk->{min} and $next[-1] ne '') {
 #		push(@next, '');	# install bypass around nullable atom
 #	    }
 	    my $newresult = [];
+	    my $pure = 0;
 	    for my $oldalt (@$result) {
+		if ($oldalt =~ /\(\?#::\)/) {
+		    push(@$newresult, $oldalt);
+		    next;
+		}
+
 		for my $newalt (@newalts) {
+		    $pure = 1 unless $newalt =~ /\(\?#::\)/;
 		    $PREFIX = '' if $newalt =~ /FATE/;;
 		    if ($oldalt =~ /FATE/ and $newalt =~ /FATE/) {
 			my $newold = $oldalt;
@@ -1724,10 +1736,10 @@ sub fail { my $self = shift;
 		}
 	    }
 	    $result = $newresult;
+	    last unless $pure;	# at least one alternative was pure
 	    # ignore everything after positive lookahead
 	    last if ref($chunk) eq 'RE_assertion';
-	    next if $PURE;
-        }
+	}
 	@$result;
     }
 }
@@ -1749,8 +1761,7 @@ sub fail { my $self = shift;
 
 { package RE_all; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
-        $PURE = 0;
-        return;
+        return $IMP;
     }
 }
 
@@ -1782,8 +1793,7 @@ sub fail { my $self = shift;
 { package RE_var; our @ISA = 'RE_base';
     #method longest ($C) { ... }
     sub longest { my $self = shift; my ($C) = @_; 
-        $PURE = 0;
-        return;
+        return $IMP;
     }
 }
 

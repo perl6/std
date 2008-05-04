@@ -379,6 +379,7 @@ END
                     warn $args unless $dflt;
                     $ENDSYM = $dflt;
                     $ENDSYM =~ s/^\s+//;
+                    $ENDSYM =~ s/\s+$//;
                     $ENDSYM =~ s/^'(.*)'$/$1/ or
                     $ENDSYM =~ s/^"(.*)"$/$1/;
                 }
@@ -426,6 +427,7 @@ END
             local $PROTO = $proto;
             my $meat = ::indent($re->walk(), 2);
 
+            $re->{kind} = $KIND;
             $RE{$PKG . '::' . $NAME} = $re;
             $re->remember_alts();
     #        my $lex = Dump($re);
@@ -1112,6 +1114,7 @@ sub assertion {
     if (/^[+-]?\[/) {
         my $cclass = unbalanced(']>');
         s/^]>// or panic "Missing ]>";
+        $cclass =~ s/\\x([0-9a-fA-F]{3,4})/\\x\{$1\}/g;
         return bless { text => $cclass . ']', min => 1 }, "RE_cclass";
     }
 
@@ -1367,7 +1370,6 @@ sub unbalanced {
 
     sub remove_leading_ws {
         my $self = shift;
-        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
         my $re = $$self{re};
         $re->remove_leading_ws();
     }
@@ -1469,16 +1471,19 @@ sub unbalanced {
             $code = "\$C->_VSPACE$REV()";
         }
         elsif ($text eq '»') {
-            $code = "\$C->_RIGHTWB()";
+            $code = "\$C->_RIGHTWB$REV()";
         }
         elsif ($text eq '«') {
-            $code = "\$C->_LEFTWB()";
+            $code = "\$C->_LEFTWB$REV()";
         }
         elsif ($text eq '>>') {
-            $code = "\$C->_RIGHTWB()";
+            $code = "\$C->_RIGHTWB$REV()";
         }
         elsif ($text eq '<<') {
-            $code = "\$C->_LEFTWB()";
+            $code = "\$C->_LEFTWB$REV()";
+        }
+        else {
+            $code = "\$C->_EXACT$REV(\"$text\")";
         }
         if ($not) { # XXX or maybe just .NOT on the end...
             $PURE = 0;
@@ -1628,7 +1633,6 @@ END
 
     sub remove_leading_ws {
         my $self = shift;
-        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
         for my $kid (@{$$self{zyg}}) {
             $kid->remove_leading_ws();
         }
@@ -1676,7 +1680,6 @@ END
 
     sub remove_leading_ws {
         my $self = shift;
-        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
         for my $kid (@{$$self{zyg}}) {
             $kid->remove_leading_ws();
         }
@@ -1716,7 +1719,6 @@ END
     # yes, () would capture the ws, but we're guaranteed to be past it already
     sub remove_leading_ws {
         my $self = shift;
-        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
         my $re = $$self{re};
         $re->remove_leading_ws();
     }
@@ -1845,7 +1847,6 @@ END
 
     sub remove_leading_ws {
         my $self = shift;
-        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
         if ($$self{zyg}) {
             my @kids = @{$$self{zyg}};
 
@@ -1924,7 +1925,6 @@ END
 
     sub remove_leading_ws {
         my $self = shift;
-        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
         for my $kid (@{$$self{zyg}}) {
             $kid->remove_leading_ws();
         }
@@ -2032,7 +2032,6 @@ END
 
     sub remove_leading_ws {
         my $self = shift;
-        print STDERR "$NAME remove_leading_ws from ", ref $self, "\n";
         for my $kid (@{$$self{zyg}}) {
             $kid->remove_leading_ws();
         }
