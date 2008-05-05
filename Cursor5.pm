@@ -62,6 +62,7 @@ sub to { $_[0]->{_to} }
 sub pos { $_[0]->{_pos} }
 sub peek { $_[0]->{_peek} }
 sub orig { $_[0]->{_orig} }
+sub WHAT { ref $_[0] }
 
 sub item { substr(${$_[0]->{_orig}}, $_[0]->{_from}, $_[0]->{_to} - $_[0]->{_from}) }
 sub list { my $self = shift;
@@ -205,6 +206,12 @@ sub canmatch {
 	    $f .= $1;
 	    return 1 if $c =~ /^$f/;
 	}
+	elsif ($p =~ s/^(\?#[^)]*\))//) {
+	    return canmatch($p,$c);
+	}
+	else {
+	    return 0;
+	}
     }
     elsif ($f eq '.') {
 	return 1;
@@ -322,7 +329,13 @@ sub _AUTOLEXnow { my $self = shift;
 		return unless $lexer;
 
 		pos($$buf) = $C->{_pos};
-		print STDERR "lexing $key at >>>>>>>>> '" . substr($$buf,$C->{_pos},20) . "\n" if $DEBUG;
+
+		if ($DEBUG) {
+		    my $peek = substr($$buf,$C->{_pos},20);
+		    $peek =~ s/\n/\\n/g;
+		    $peek =~ s/\t/\\t/g;
+		    print STDERR ">>>>>>>>>$peek<<<<<<<< looking for $key\n";
+		}
 
 		##########################################
 		# No normal p5 match/subst below here!!! #
@@ -448,12 +461,13 @@ sub cursor_peek { my $self = shift;
 
 sub cursor_fresh { my $self = shift;
     my %r;
+    my $lang = @_ ? shift() : ref $self;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
     $r{ws_to} = $self->{ws_to};
     $r{ws_from} = $self->{ws_from};
-    bless \%r, ref $self;
+    bless \%r, $lang;
 }
 
 sub cursor_bind { my $self = shift;	# this is parent's match cursor
@@ -549,8 +563,13 @@ sub callm { my $self = shift;
 
     my $lvl = 0;
     my @subs;
-    while (my @c = caller($lvl)) { $lvl++; (my $s = $c[3]) =~ s/^.*:://; $s =~ s/^__ANON//; push @subs, $s; }
-    splice(@subs, 0, 2);
+    if ($DEBUG >= 2) {
+	while (my @c = caller($lvl)) { $lvl++; (my $s = $c[3]) =~ s/^.*:://; $s =~ s/^__ANON//; push @subs, $s; }
+	splice(@subs, 0, 2);
+    }
+    else {
+	while (my @c = caller($lvl)) { $lvl++; }
+    }
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
     my $name = $subname;
     if (defined $arg) { 

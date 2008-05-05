@@ -3,6 +3,8 @@ grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 has StrPos $.ws_from;
 has StrPos $.ws_to;
 
+my $LANG is context;
+
 # random rule for debugging, please ignore
 token foo {
     <opener>
@@ -1889,7 +1891,7 @@ token rad_number {
             $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ ]?
             [ '*' <base=radint> '**' <exp=radint> ]?
        '>'
-      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
+#      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
     || <?before '['> <postcircumfix>
     || <?before '('> <postcircumfix>
     ]
@@ -1971,7 +1973,15 @@ method heredoc () {
     return $here;
 }
 
-token quote:sym<' '>   { <?before "'"  > <quotesnabber(":q")>        }
+method nibble ($lang) {
+    my $outerlang = self.WHAT;
+    my $LANG is context = $outerlang;
+    self.cursor_fresh($lang).nibbler();
+}
+
+#token quote:sym<' '>   { <?before "'"  > <quotesnabber(":q")>        }
+token quote:sym<' '>   { "'" <nibble('Perl::Q_single')> "'" }
+
 token quote:sym<" ">   { <?before '"'  > <quotesnabber(":qq")>       }
 token quote:sym<« »>   { <?before '«'  > <quotesnabber(":qq",":ww")> }
 token quote:sym«<< >>» { <?before '<<' > <quotesnabber(":qq",":ww")> }
@@ -2464,7 +2474,7 @@ regex transliterator($stop) {
     # XXX your ad here
 }
 
-regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
+token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     $start
     $<text> = [.*?] ** [
         <!before $stop>
@@ -2481,13 +2491,57 @@ regex q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     {*}
 }
 
-regex q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {
+grammar Q is Perl {
+    # note: polymorphic over many quote languages, we hope
+    token nibbler {
+        :my $text = '';
+        :my @nibbles = ();
+        [
+            <!stopper>
+            [
+            | <0=starter> :: <nibbler> <1=stopper>
+                            {
+                                my @n = $<nibbler><nibbles>.list;
+                                $text ~= $0 ~ shift(@n);
+                                $text = (@n ?? pop(@n) !! '') ~ $1;
+                                push @nibbles, @n;
+                            }
+            | <escape>   :: {
+                                push @nibbles, $text, $<escape>;
+                                $text = '';
+                            }
+            |            :: (.)
+                            {
+                                $text ~= $0;
+                            }
+            ]
+        ]*
+        { push @nibbles, $text; @<nibbles> = @nibbles; }
+        {*}
+    }
+} # end grammar
+
+grammar Q_single is Q {
+    token stopper { \' }
+    token starter { <!> }
+
+    token escape:sym<\\> { <sym> <item=backslash> }
+
+    token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
+    token backslash:sym<\\> { <text=sym> }
+    token backslash:stopper { <text=stopper> }
+
+    # in single quotes, keep random backslash in by default
+    token backslash:misc { :: (.) { $<text> = "\\$0"; } }
+} # end grammar
+
+token q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {
     $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!$stop>. ] ]*? ]
     <stop=$stop>
     {*}
 }
 
-regex q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
+token q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
     $stop
     $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!before $stop >. ] ]*? ]
     $stop
@@ -3336,7 +3390,8 @@ method EXPR (%preclim = %LOOSEST)
             given $inO<assoc> {
                 when 'non'   { $here.panic(qq["$infix" is not associative]) }
                 when 'left'  { reduce() }   # reduce immediately
-                when 'right' | 'chain' { }  # just shift
+                when 'right' { }            # just shift
+                when 'chain' { }            # just shift
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
                 }
@@ -3346,8 +3401,11 @@ method EXPR (%preclim = %LOOSEST)
         push @opstack, $infix;
     }
     reduce() while +@termstack > 1;
-    +@termstack <= 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
-    @termstack[0]<_from> = self.pos if @termstack;
+    if @termstack {
+        +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
+        @termstack[0]<_from> = self.pos;
+        @termstack[0]<_to> = $here.pos;
+    }
     @termstack;
 }
 

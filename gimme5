@@ -134,6 +134,7 @@ sub un6 {
         $f =~ s/^([^\$])self\.//             	and $t .= qq/$1\$self->/, next;
         $f =~ s/^([^\$])self\b//             	and $t .= qq/$1\$self/, next;
         $f =~ s/^\.panic//              	and $t .= qq/->panic/, next;
+        $f =~ s/^(\s)~=(\s)/$2/            	and $t .= qq/$1.=/, next;
         $f =~ s/^(\s)~(\s)/$2/            	and $t .= qq/$1./, next;
         $f =~ s/^(\s):=(\s)/$2/           	and $t .= qq/$1=/, next;
         $f =~ s/^(\s)\?\?(\s)/$2/         	and $t .= qq/$1?/, next;
@@ -605,7 +606,9 @@ END
             $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package ${PKG}::$1; our \@ISA = 'Perl::$2';/
                     and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
 
-            $line =~ s/^grammar (\w+)\s+is\s+(\w+)\s*\{/{ package ${PKG}::$1; our \@ISA = '$2';/
+            $line =~ s/^grammar (\w+)\s+is\s+(\w+)\s*\{/{ package ${PKG}::$1; our \@ISA = '${PKG}::$2';/
+                    and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; $line =~ s/Perl::Perl/Perl/; };
+            $line =~ s/^grammar (\w+)\s*\{/{ package ${PKG}::$1;/
                     and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
 
             $PKG = pop(@PKG) if @PKG and $line =~ /} # end (role|class|grammar)/;
