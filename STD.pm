@@ -231,7 +231,7 @@ token category:term { <sym> }
 proto token term {...}
 
 token category:quote { <sym> }
-proto token quote (:$endsym is context = 'nofat') {...}
+proto token quote () {...}
 
 token category:prefix { <sym> }
 proto token prefix is unary is defequiv(%symbolic_unary) {...}
@@ -276,40 +276,40 @@ token category:qq_backslash { <sym> }
 proto token qq_backslash {...}
 
 token category:trait_verb { <sym> }
-proto token trait_verb (:$endsym is context = 'nofat_space') {...}
+proto token trait_verb (:$endsym is context = 'spacey') {...}
 
 token category:trait_auxiliary { <sym> }
-proto token trait_auxiliary (:$endsym is context = 'nofat_space') {...}
+proto token trait_auxiliary (:$endsym is context = 'spacey') {...}
 
 token category:type_declarator { <sym> }
-proto token type_declarator (:$endsym is context = 'nofat') {...}
+proto token type_declarator () {...}
 
 token category:scope_declarator { <sym> }
-proto token scope_declarator (:$endsym is context = 'nofat') {...}
+proto token scope_declarator () {...}
 
 token category:package_declarator { <sym> }
-proto token package_declarator (:$endsym is context = 'nofat') {...}
+proto token package_declarator () {...}
 
 token category:plurality_declarator { <sym> }
-proto token plurality_declarator (:$endsym is context = 'nofat') {...}
+proto token plurality_declarator () {...}
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator (:$endsym is context = 'nofat') {...}
+proto token routine_declarator () {...}
 
 token category:regex_declarator { <sym> }
-proto token regex_declarator (:$endsym is context = 'nofat') {...}
+proto token regex_declarator () {...}
 
 token category:statement_prefix { <sym> }
-proto rule  statement_prefix (:$endsym is context = 'nofat') {...}
+proto rule  statement_prefix () {...}
 
 token category:statement_control { <sym> }
-proto rule  statement_control (:$endsym is context = 'nofat_space') {...}
+proto rule  statement_control (:$endsym is context = 'spacey') {...}
 
 token category:statement_mod_cond { <sym> }
-proto rule  statement_mod_cond (:$endsym is context = 'nofat') {...}
+proto rule  statement_mod_cond () {...}
 
 token category:statement_mod_loop { <sym> }
-proto rule  statement_mod_loop (:$endsym is context = 'nofat') {...}
+proto rule  statement_mod_loop () {...}
 
 token category:infix_prefix_meta_operator { <sym> }
 proto token infix_prefix_meta_operator is binary {...}
@@ -333,13 +333,12 @@ token category:terminator { <sym> }
 proto token terminator {...}
 
 token unspacey { <.unsp>? }
-token nofat_space { <?before \s | '#'> <?nofat> }
+token spacey { <?before \s | '#'> }
 
 # Lexical routines
 
 # make sure we're at end of a non-autoquoted identifier
 #regex nofat { <!before » \h* <.unsp>? '=>' > <!before \w> }
-regex nofat { '' }
 
 token ws {
     :my @stub = return self if self.pos === $!ws_to; # really fast memoizing
@@ -670,9 +669,9 @@ rule statement_control:if {\
     <sym>
     <EXPR>                           {*}                        #= if expr
     <pblock>                         {*}                        #= if block
-    @<elsif> = ( elsif<?nofat_space> <EXPR>       {*}           #= elsif expr
+    @<elsif> = ( elsif<?spacey> <EXPR>       {*}                #= elsif expr
                         <pblock>     {*} )*                     #= elsif block
-    @<else> = ( else<?nofat_space> <pblock>       {*} )?        #= else
+    @<else> = ( else<?spacey> <pblock>       {*} )?             #= else
     {*}
 }
 
@@ -2258,7 +2257,7 @@ token quotesnabber (*@q) {
     :my $delim is context<rw> = '' ;
     :my $lang;
     :my $parser;
-    <!before \w> <?nofat> ::
+    <!before \w> ::
     <.ws>
 
     [ (<quotepair>) { push @q, $0 } <.ws> ]*
@@ -2763,7 +2762,7 @@ token statement_prefix:lazy    { <sym> <.ws> <statement> {*} }
 
 ## term
 token term:sym<undef> ( --> Term) {
-    <sym> » <?nofat> \h*
+    <sym> » \h*
     [ <?before '$/' >
         <obs('$/ variable as input record separator',
              "the filehandle's .slurp method")>
@@ -2775,10 +2774,10 @@ token term:sym<undef> ( --> Term) {
 }
 
 token term:sym<self> ( --> Term)
-    { <sym> » <?nofat> {*} }
+    { <sym> » {*} }
 
 token term:rand ( --> Named_unary)
-    { <sym> » <?nofat> {*} }
+    { <sym> » {*} }
 
 token term:sym<*> ( --> Term)
     { <sym> {*} }
@@ -2816,7 +2815,8 @@ token prefix:sym<++> ( --> Autoincrement)
 token prefix:sym<--> ( --> Autoincrement)
     { <sym> {*} }
 
-token postfix:i       ( --> Autoincrement) { <sym> {*} }
+token postfix:sym<i> ( --> Autoincrement)
+    { <sym> » {*} }
 
 ## exponentiation
 token infix:sym<**> ( --> Exponentiate)
@@ -2951,10 +2951,10 @@ token infix:sym<^> ( --> Junctive_or)
 
 ## named unary examples
 token prefix:sleep ( --> Named_unary)
-    { <sym> » <?nofat> {*} }
+    { <sym> » {*} }
 
 token prefix:abs ( --> Named_unary)
-    { <sym> » <?nofat> {*} }
+    { <sym> » {*} }
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
@@ -3129,10 +3129,10 @@ token infix:sym<.=> ( --> Item_assignment)
 
 ## loose unary
 token prefix:sym<true> ( --> Loose_unary)
-    { <sym> » <?nofat> {*} }
+    { <sym> » {*} }
 
 token prefix:sym<not> ( --> Loose_unary)
-    { <sym> » <?nofat> {*} }
+    { <sym> » {*} }
 
 ## list item separator
 token infix:sym<,> ( --> Comma)
@@ -3160,7 +3160,7 @@ token term:sigil ( --> List_prefix)
 }
 
 # token term:typecast ( --> List_prefix)
-#     { <typename> <?nofat_space> <arglist> { $<sym> = $<typename>.item; } {*} }
+#     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.item; } {*} }
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last term: rule)
