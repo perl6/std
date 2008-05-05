@@ -157,7 +157,7 @@ role PrecOp[*%defaults] {
         my %d = (%defaults); 
         if not %d<transparent> {
             for keys(%d) { $m<O>{$_} = %d{$_} };
-            warn "coercing to " ~ self ~ "\n";
+            warn "coercing to " ~ self ~ "\n" if $DEBUG +& 32;
         }
         return $m;
     }
@@ -1853,7 +1853,7 @@ token integer {
         | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
         | d \d+               [ _ \d+]*
         | \d+[_\d+]*
-            {{ START { warn("Leading 0 does not indicate octal in Perl 6") } }}
+            {{ START { worry("Leading 0 does not indicate octal in Perl 6") } }}
         ]
     | \d+[_\d+]*
     ]
@@ -3263,14 +3263,14 @@ method EXPR (%preclim = %LOOSEST)
     push @opstack, item %terminator;         # (just a sentinel value)
 
     my $here = self;
-    warn "In EXPR, at ", $here.pos, "\n";
+    warn "In EXPR, at ", $here.pos, "\n" if $DEBUG +& 32;
 
     my &reduce := -> {
-        warn "entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack, "\n";
+        warn "entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack, "\n" if $DEBUG +& 32;
         my $op = pop @opstack;
         given $op<O><assoc> {
             when 'chain' {
-                warn "reducing chain\n";
+                warn "reducing chain\n" if $DEBUG +& 32;
                 my @chain;
                 push @chain, pop(@termstack);
                 push @chain, $op;
@@ -3285,7 +3285,7 @@ method EXPR (%preclim = %LOOSEST)
                 push @termstack, $op;
             }
             when 'list' {
-                warn "reducing list\n";
+                warn "reducing list\n" if $DEBUG +& 32;
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
@@ -3299,11 +3299,11 @@ method EXPR (%preclim = %LOOSEST)
                 push @termstack, $op;
             }
             default {
-                warn "reducing\n";
+                warn "reducing\n" if $DEBUG +& 32;
                 my @list;
-                warn "Termstack size: ", +@termstack, "\n";
+                warn "Termstack size: ", +@termstack, "\n" if $DEBUG +& 32;
 
-                warn Dump($op);
+                warn Dump($op) if $DEBUG +& 32;
                 if $op<O><assoc> {
                     $op<right> = pop @termstack;
                     $op<left> = pop @termstack;
@@ -3324,7 +3324,7 @@ method EXPR (%preclim = %LOOSEST)
     };
 
     loop {
-        warn "In loop, at ", $here.pos, "\n";
+        warn "In loop, at ", $here.pos, "\n" if $DEBUG +& 32;
         my $oldpos = $here.pos;
         my @t = $here.expect_term();       # eats ws too
         last unless @t;
@@ -3355,7 +3355,7 @@ method EXPR (%preclim = %LOOSEST)
         }
 
         push @termstack, $here;
-        warn "after push: " ~ (0+@termstack), "\n";
+        warn "after push: " ~ (0+@termstack), "\n" if $DEBUG +& 32;
 #        my @infix = $here.expect_tight_infix($preclim);
         $oldpos = $here.pos;
         my @infix = $here.cursor_fresh.expect_infix();
@@ -3371,7 +3371,7 @@ method EXPR (%preclim = %LOOSEST)
         my $inO = $infix<O>;
         my Str $inprec = $inO<prec>;
         if not defined $inprec {
-            warn "No prec given in infix!\n";
+            warn "No prec given in infix!\n" if $DEBUG +& 32;
             $inprec = %terminator<prec>;
         }
         # substitute precedence for listops
@@ -3740,8 +3740,26 @@ grammar Regex is Perl {
 
 # token panic (Str $s) { <commit> <fail($s)> }
 
+method mess (Str $s) {
+    my $orig = self.orig;
+    my $text = $$orig;
+    my $pre = substr($text, 0, self.pos);
+    my $line = 1 + $pre ~~ tr!\n!\n!;
+    $pre = substr($pre, -40, 40);
+    1 while $pre =~ s!.*\n!!;
+    my $post = substr($text, self.pos, 40);
+    1 while $post ~~ s!(\n.*)!!;
+    "############# PARSE FAILED #############\n----> $pre" ~
+        '<<<HERE>>>' ~
+        "$post\n$s at line $line\n";
+}
+
 method panic (Str $s) {
-    warn "############# PARSE FAILED #############\n";die "$s"
+    die self.mess($s);
+}
+
+method worry (Str $s) {
+    warn self.mess($s);
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...

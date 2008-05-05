@@ -68,6 +68,8 @@ sub un6 {
         $f =~ s/^\)</.</                  	and $t .= ')', next;
         $f =~ s!^('.*?')!!              	and $t .= $1, next;
         $f =~ s!^(".*?")!!              	and $t .= $1, next;
+	$f =~ s!^m:p5(\W)(.+?)\1/!!		and $t .= "m$1$2$1", next;
+	$f =~ s!^s:p5(\W)(.+?)\1(.*?)\1/!!	and $t .= "s$1$2$1$3$1", next;
         $f =~ s!^q/(.*?)/!!              	and $t .= "q/$1/", next;
         $f =~ s!^/(.+?)/!!              	and $t .= "qr/$1/", next;
         $f =~ s/^\$¢\.\$parser//                and $t .= qq/\$C->\$parser/, next;
@@ -134,6 +136,9 @@ sub un6 {
         $f =~ s/^([^\$])self\.//             	and $t .= qq/$1\$self->/, next;
         $f =~ s/^([^\$])self\b//             	and $t .= qq/$1\$self/, next;
         $f =~ s/^\.panic//              	and $t .= qq/->panic/, next;
+        $f =~ s/^(\s)\+&(\s)/$2/            	and $t .= qq/$1&/, next;
+        $f =~ s/^(\s)!~~(\s)/$2/            	and $t .= qq/$1!~/, next;
+        $f =~ s/^(\s)~~(\s)/$2/            	and $t .= qq/$1=~/, next;
         $f =~ s/^(\s)~=(\s)/$2/            	and $t .= qq/$1.=/, next;
         $f =~ s/^(\s)~(\s)/$2/            	and $t .= qq/$1./, next;
         $f =~ s/^(\s):=(\s)/$2/           	and $t .= qq/$1=/, next;
@@ -282,7 +287,7 @@ sub heredoc { my $self = shift;
                         }
                     }!eg;
                 }
-                $here->{text}[0] ~~ s/^\n//;
+                $here->{text}[0] =~ s/^\n//;
             }
             $herestub->orignode->{doc} = $here;
         }
@@ -657,8 +662,8 @@ END
     for (sort keys(%OUR)) {
         print "our $_;\n";
     }
-    print "our \$moreinput;\n";
-    print "our \$MATCHID;\n";
+    print "\nour \$moreinput;\n";
+    print "our \$DEBUG;\n";
     print "\n";
     print $out;
     print "__DATA__\n";
@@ -1132,9 +1137,13 @@ sub assertion {
         my $ch = substr($_,0,1);
         if ($ch eq '>') {
             s/^>// or panic "Missing >";
-            if ($word eq 'sym' and $ENDSYM) {
-                s/^/<.$ENDSYM>/;
-                s/^/»/ if $SYM =~ /\w$/;
+            if ($word eq 'sym') {
+		if ($ENDSYM) {
+		    s/^/<.$ENDSYM>/;	# hopefully checks word boundary
+		}
+		else {
+		    s/^/»/ if $SYM =~ /\w$/;
+		}
             }
             return bless { name => $word, min => 12345 }, "RE_method_noarg";
         }
@@ -2004,7 +2013,7 @@ END
         if (ref $try) {
             if (ref $try eq 'ARRAY') {
                 ($tag, $try, $C->{_fate}) = @$try;	# next candidate fate
-                print STDERR "Retrying with $tag $try\n";
+                print STDERR "Retrying with $tag $try\n" if $DEBUG & 1024;
             }
             elsif (ref $try eq 'CODE') {
                 my @more = $relex->($C, $trystate);
@@ -2018,7 +2027,7 @@ END
 END
 
             $result .= <<"END";
-        print STDERR "$altname trying \$tag \$try\\n";
+        print STDERR "$altname trying \$tag \$try\\n" if \$DEBUG & 1024;
         push \@gather, ((
 @{[ ::indent(join("\n", @result),3) ]}
 END

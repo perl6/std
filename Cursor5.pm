@@ -1,9 +1,20 @@
 our $CTX;
 $CTX->{lvl} = 0;
-package Cursor5;
+our $DEBUG = 0;
+    # 1 autolexer
+    # 2 lexer
+    # 4 fixed length
+    # 8 fates
+    # 16 longest token pattern generation
+    # 32 EXPR
+    # 64 matchers
+    # 128 trace call/return
+    # 256 cursors
+    # 512 callm show subnames
+    # 1024 try processing in STD5.pm
 
-my $lexverbose = 1;
-my $DEBUG = 1;
+package Cursor5;
+$::DEBUG //= 0;
 
 use strict;
 use warnings;
@@ -34,7 +45,7 @@ sub new {
     }
     my $self = bless \%args, ref $class || $class;
     my $buf = $self->{_orig};
-    print STDERR " orig ", $$buf,"\n" if $DEBUG;
+    print STDERR " orig ", $$buf,"\n" if $DEBUG & 256;
     $self->BUILD;
     $self->_AUTOLEXpeek('Perl::expect_term');
     system('cp lex/expect_term lex/EXPR');
@@ -42,9 +53,6 @@ sub new {
 }
 
 use YAML::XS;
-
-my $VERBOSE = 1;
-my $RE_verbose = 1;
 
 # XXX still full of ASCII assumptions
 
@@ -97,20 +105,21 @@ my $fakepos = 1;
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
 
-    print STDERR "?" x 72, "\n" if $DEBUG;
-    print STDERR "AUTOLEXpeek $key\n" if $DEBUG;
+    print STDERR "?" x 72, "\n" if $DEBUG & 1;
+    print STDERR "AUTOLEXpeek $key\n" if $DEBUG & 1;
     die "Null key" if $key eq '';
     if ($self->lexers->{$key}) {
         if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
             die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
-            print STDERR "Suppressing lexer recursion on $key\n" if $DEBUG;
+            print STDERR "Suppressing lexer recursion on $key\n" if $DEBUG & 1;
             return hash();  # (but if we advanced just assume a :: here)
         }
         elsif (ref($self->lexers->{$key}) eq 'Hash') {
             return $self->lexers->{$key} // hash();
         }
         else {
-            print STDERR "oops ", ref($key), "\n";
+            print STDERR "_AUTOLEXpeek oops ", ref($key), "\n";
+	    return;
         }
     }
     return $self->lexers->{$key} = $self->_AUTOLEXgen($key);
@@ -119,8 +128,8 @@ sub _AUTOLEXpeek { my $self = shift;
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
 
-    print STDERR "=" x 72, "\n" if $DEBUG;
-    print STDERR "AUTOLEXgen $key\n" if $DEBUG;
+    print STDERR "=" x 72, "\n" if $DEBUG & 1;
+    print STDERR "AUTOLEXgen $key\n" if $DEBUG & 1;
     my $lexer = {};
     (my $file = $key) =~ s/::/--/g;
     $file =~ s/^Perl--//;
@@ -148,7 +157,7 @@ sub _AUTOLEXgen { my $self = shift;
 	binmode($cache, ":utf8");
 	print $cache join("\n",@pat),"\n" or die "Can't print: $!";
 	close($cache) or die "Can't close: $!";
-	print STDERR "regenerated lex/$file\n" if $DEBUG;
+	print STDERR "regenerated lex/$file\n" if $DEBUG & 1;
 	# force operator precedence method to look like a term
 	if ($file eq 'Perl--expect_term') {
 	    system 'cp lex/Perl--expect_term lex/Perl--EXPR';
@@ -161,7 +170,7 @@ sub loadlexer {
     my $key = shift;
     (my $file = $key) =~ s/::/--/g;
     $file =~ s/^Perl--//;
-    print STDERR "using cached lex/$file\n" if $DEBUG;
+    print STDERR "using cached lex/$file\n" if $DEBUG & 1;
 
     open(LEX, "lex/$file") or die "No lexer!";
     binmode(LEX, ":utf8");
@@ -173,10 +182,11 @@ sub loadlexer {
     return {"PATS" => \@pat};
 }
 
-# Can the current pattern match the current position?
+# Can the current pattern match the current position according to 1st char?
 
 sub canmatch {
     my ($p,$c) = @_;
+    $p =~ s/\(\?#[^)]*\)//g;
     my $f = substr($p,0,1,'');
     if ($f eq '\\') {
 	if ($p =~ s/^(\W)//) {
@@ -205,9 +215,6 @@ sub canmatch {
 	if ($p =~ s/^(\?:[^)]*\))//) {
 	    $f .= $1;
 	    return 1 if $c =~ /^$f/;
-	}
-	elsif ($p =~ s/^(\?#[^)]*\))//) {
-	    return canmatch($p,$c);
 	}
 	else {
 	    return 0;
@@ -249,8 +256,8 @@ sub rxlen {
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
 
-    print STDERR "!" x 72, "\n" if $DEBUG;
-    print STDERR "AUTOLEXnow $key\n" if $DEBUG;
+    print STDERR "!" x 72, "\n" if $DEBUG & 1;
+    print STDERR "AUTOLEXnow $key\n" if $DEBUG & 1;
     my $lexer = $self->lexers->{$key} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
@@ -263,14 +270,14 @@ sub _AUTOLEXnow { my $self = shift;
     my $chr = substr($$buf,$self->{_pos},1);
 
     $lexer->{$chr} //= do {
-	print STDERR '=' x 72, "\n" if $DEBUG;
-	print STDERR "GENERATING $key patterns starting with '$chr'\n" if $DEBUG;
+	print STDERR '=' x 72, "\n" if $DEBUG & 1;
+	print STDERR "GENERATING $key patterns starting with '$chr'\n" if $DEBUG & 1;
 
 	my @tmp =  @{$lexer->{PATS}};
 	my @pats = grep { canmatch($_, $chr) } map { s/\t/.?\t/; $_; } @tmp;
 	my @rxlenmemo;
 	if (!@pats) {
-	    print STDERR "No $key patterns start with '$chr'\n" if $DEBUG;
+	    print STDERR "No $key patterns start with '$chr'\n" if $DEBUG & 1;
 	    sub { return };
 	}
 	else {
@@ -289,7 +296,7 @@ sub _AUTOLEXnow { my $self = shift;
 		$i++;
 	    }
 
-	    if ($lexverbose) {
+	    if ($DEBUG & 1) {
 		my $tmp = "^(?:\n(" . join(")\n|(",@pats) . '))';
 		print STDERR "LEXER: ", $tmp,"\n";
 	    }
@@ -309,12 +316,12 @@ sub _AUTOLEXnow { my $self = shift;
 	    1 while $pat =~ s/([^\\])\(((\?:)?)\)/$1($2 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
 
-	    print STDERR "TRE: ", $pat,"\n" if $DEBUG;
+	    print STDERR "TRE: ", $pat,"\n" if $DEBUG & 1;
 
-	    print STDERR "#FATES: ", 0+@$fates, "\n" if $lexverbose;
+	    print STDERR "#FATES: ", 0+@$fates, "\n" if $DEBUG & 1;
 
 	    for my $i (0..@$fates-1) {
-		print STDERR $i, ': ', $fates->[$i][3], "\n" if $lexverbose;
+		print STDERR $i, ': ', $fates->[$i][3], "\n" if $DEBUG & 1;
 	    }
 	    for my $pat (@pats) {
 		$pat =~ s/\.\?$//;	# ltm backoff doesn't need tre workaround
@@ -330,7 +337,7 @@ sub _AUTOLEXnow { my $self = shift;
 
 		pos($$buf) = $C->{_pos};
 
-		if ($DEBUG) {
+		if ($DEBUG & 2) {
 		    my $peek = substr($$buf,$C->{_pos},20);
 		    $peek =~ s/\n/\\n/g;
 		    $peek =~ s/\t/\\t/g;
@@ -358,7 +365,7 @@ sub _AUTOLEXnow { my $self = shift;
 			    else {
 				for my $px (0..@pats-1) {
 				    $$rxlens[$px] = rxlen($pats[$px]);
-				    print STDERR "Fixed len $$rxlens[$px] for $pats[$px]\n";
+				    print STDERR "Fixed len $$rxlens[$px] for $pats[$px]\n" if $DEBUG & 4;
 				}
 				@rxlenmemo = @$rxlens;
 			    }
@@ -403,7 +410,7 @@ sub _AUTOLEXnow { my $self = shift;
 			return @result;
 		    }
 
-		    print STDERR "/ running tre match at @{[ pos($$buf) ]} /\n" if $DEBUG;
+		    print STDERR "/ running tre match at @{[ pos($$buf) ]} /\n" if $DEBUG & 2;
 
 		    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 			my $max = @+ - 1;
@@ -416,20 +423,20 @@ sub _AUTOLEXnow { my $self = shift;
 			    my $end = $+[$x];
 			    my $f = $fates->[$x-1][3];
 			    no strict 'refs';
-			    if ($lexverbose or ($DEBUG and $x == $last)) {
+			    if ($DEBUG & 8 or ($DEBUG & 2 and $x == $last)) {
 				print STDERR "\$$x: $beg..$end\t$$x\t ",
 				    $x == $last ? "====>" : "---->",
-				    " $f\n";
+				    " $f\t[$pats[$x]]\n";
 			    }
 			}
-			print STDERR "success at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG;
+#			print STDERR "success at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG & 2;
 			my $tried = "";
 			vec($tried,$last-1,1) = 1;
 			$_[0] = [$tried, $+[0] - $-[0], []];
 			$result;
 		    }
 		    else {
-			print STDERR "NO LEXER MATCH at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG;
+			print STDERR "NO LEXER MATCH\n" if $DEBUG & 2;
 			return;
 		    }
 		}
@@ -454,6 +461,7 @@ sub _AUTOLEXnow { my $self = shift;
 }
 
 sub cursor_peek { my $self = shift;
+    print STDERR "cursor_peek\n" if $DEBUG & 256;
     my %r = %$self;
     $r{_peek} = 1;
     bless \%r, ref $self;
@@ -462,6 +470,7 @@ sub cursor_peek { my $self = shift;
 sub cursor_fresh { my $self = shift;
     my %r;
     my $lang = @_ ? shift() : ref $self;
+    print STDERR "cursor_fresh lang $lang\n" if $DEBUG & 256;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
@@ -474,6 +483,7 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
     my $bindings = shift;
     my $submatch = shift;		# this is the submatch's cursor
 
+    print STDERR "cursor_bind @$bindings\n" if $DEBUG & 256;
     my %r = %$self;
     if ($bindings) {
 	for my $binding (@$bindings) {
@@ -495,6 +505,7 @@ sub cursor_fate { my $self = shift;
     my $name = shift;
     # $_[0] is now ref to a $trystate;
 
+    print STDERR "cursor_fate $pkg $name\n" if $DEBUG & 256;
     my %r = %$self;
     my $tag;
     my $try;
@@ -502,7 +513,7 @@ sub cursor_fate { my $self = shift;
     
     my $fate = $self->{_fate};
     if ($fate and $fate->[0] eq $name) {
-        print STDERR "Fate passed to $name: $$fate[3]\n";
+        print STDERR "Fate passed to $name: $$fate[3]\n" if $DEBUG & 8;
         ($tag, $try, $fate) = @$fate;
 	$r{_fate} = $fate;
     }
@@ -510,12 +521,12 @@ sub cursor_fate { my $self = shift;
         $relex = $self->_AUTOLEXnow("${pkg}::$name");
 	$fate = $relex->($self,$_[0]);
         if ($fate) {
-            print STDERR "FATE OF ${pkg}::$name: $$fate[3]\n";
+            print STDERR "FATE OF ${pkg}::$name: $$fate[3]\n" if $DEBUG & 8;
             ($tag, $try, $fate) = @$fate;
 	    $r{_fate} = $fate;
         }
         else {
-            print STDERR "NO FATE FOR ${pkg}::$name (will probe)\n";
+            print STDERR "NO FATE FOR ${pkg}::$name (will probe)\n" if $DEBUG & 8;
             $tag = '';
         }
     }
@@ -526,6 +537,7 @@ sub cursor_all { my $self = shift;
     my $fpos = shift;
     my $tpos = shift;
 
+    print STDERR "cursor_all from $fpos to $tpos\n" if $DEBUG & 256;
     my %r = %$self;
     $r{_from} = $fpos;
     $r{_to} = $tpos;
@@ -537,6 +549,7 @@ sub cursor_all { my $self = shift;
 sub cursor { my $self = shift;
     my $tpos = shift;
 
+    print STDERR "cursor to $tpos\n" if $DEBUG & 256;
     my %r = %$self;
     $r{_from} = $self->{_pos} // 0;
     $r{_to} = $tpos;
@@ -548,6 +561,7 @@ sub cursor { my $self = shift;
 sub cursor_rev { my $self = shift;
     my $fpos = shift;
 
+    print STDERR "cursor_rev back to $fpos\n" if $DEBUG & 256;
     my %r = %$self;
     $r{_pos} = $fpos;
     $r{_from} = $fpos;
@@ -563,7 +577,7 @@ sub callm { my $self = shift;
 
     my $lvl = 0;
     my @subs;
-    if ($DEBUG >= 2) {
+    if ($DEBUG & 512) {
 	while (my @c = caller($lvl)) { $lvl++; (my $s = $c[3]) =~ s/^.*:://; $s =~ s/^__ANON//; push @subs, $s; }
 	splice(@subs, 0, 2);
     }
@@ -577,14 +591,14 @@ sub callm { my $self = shift;
     }
     my $pos = '?';
     $pos = $self->{_pos} if defined $self->{_pos};
-    print STDERR $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "] @subs\n" if $DEBUG;
+    print STDERR $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "] @subs\n" if $DEBUG & 128;
     {lvl => $lvl};
 }
 
 sub retm { my $self = shift;
     warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
-    print STDERR $self->{_pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}\n" if $DEBUG;
+    print STDERR $self->{_pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}\n" if $DEBUG & 128;
     $self;
 }
 
@@ -865,12 +879,12 @@ sub _EXACT { my $self = shift;
     my $len = length($s);
     my $buf = $self->{_orig};
     if (substr($$buf, $P, $len) eq $s) {
-        print STDERR "EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
+        print STDERR "EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
         my $r = $self->cursor($P+$len);
         $r->retm();
     }
     else {
-        print STDERR "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
+        print STDERR "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
         return ();
     }
 }
@@ -883,13 +897,13 @@ sub _SYM { my $self = shift;
     my $len = length($s);
     my $buf = $self->{_orig};
     if (substr($$buf, $P, $len) eq $s) {
-        print STDERR "SYM $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
+        print STDERR "SYM $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
         my $r = $self->cursor($P+$len);
 	$r->{sym} = $s;
         $r->retm();
     }
     else {
-        print STDERR "SYM $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
+        print STDERR "SYM $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
         return ();
     }
 }
@@ -920,7 +934,7 @@ sub _ARRAY { my $self = shift;
     for my $s (@array) {
 	my $len = length($s);
 	if (substr($$buf, $P, $len) eq $s) {
-	    print STDERR "ARRAY elem $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG;
+	    print STDERR "ARRAY elem $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
 	    my $r = $self->cursor($P+$len);
 	    push @result, $r->retm('');
 	}
@@ -937,7 +951,7 @@ sub _ARRAY_rev { my $self = shift;
 	my $len = length($s);
 	my $from = $self->{_from} = $len;
 	if (substr($$buf, $from, $len) eq $s) {
-	    print STDERR "ARRAY_rev elem $s matched @{[substr($$buf,$from,$len)]} at $from $len\n" if $DEBUG;
+	    print STDERR "ARRAY_rev elem $s matched @{[substr($$buf,$from,$len)]} at $from $len\n" if $DEBUG & 64;
 	    my $r = $self->cursor_rev($from);
 	    push @result, $r->retm('');
 	}
@@ -1293,7 +1307,7 @@ sub _REDUCE { my $self = shift;
     my $P = $self->{_pos};
     my $F = $self->{_from};
     $self->{_Rtag} = $tag;
-    print STDERR "Success $tag from $F to $P\n" if $DEBUG;
+    print STDERR "Success $tag from $F to $P\n" if $DEBUG & 64;
 #    $self->whats;
     $self;
 #    $self->cursor($P);
@@ -1302,7 +1316,7 @@ sub _REDUCE { my $self = shift;
 sub _COMMITBRANCH { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{_pos};
-    print STDERR "Commit branch to $P\n" if $DEBUG;
+    print STDERR "Commit branch to $P\n" if $DEBUG & 64;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1310,7 +1324,7 @@ sub _COMMITBRANCH { my $self = shift;
 sub _COMMITRULE { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{_pos};
-    print STDERR "Commit rule to $P\n" if $DEBUG;
+    print STDERR "Commit rule to $P\n" if $DEBUG & 64;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1318,7 +1332,7 @@ sub _COMMITRULE { my $self = shift;
 sub commit { my $self = shift;
     local $CTX = $self->callm;
     my $P = $self->{_pos};
-    print STDERR "Commit match to $P\n" if $DEBUG;
+    print STDERR "Commit match to $P\n" if $DEBUG & 64;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1350,7 +1364,7 @@ sub fail { my $self = shift;
     }
 
     sub here {
-	return unless $RE_verbose;
+	return unless $DEBUG & 16;
 	my $arg = shift;
 	my $lvl = 0;
 	while (caller($lvl)) { $lvl++ }
@@ -1548,6 +1562,7 @@ sub fail { my $self = shift;
 		local $PREFIX = "";
 		$lexer = $C->cursor_peek->$name();
 	    }
+	    return $IMP unless $lexer;
 	    my @pat = @{$lexer->{PATS}};
 	    return unless @pat;
 	    if ($PREFIX) {
@@ -1644,7 +1659,7 @@ sub fail { my $self = shift;
             push @result, @pat;
             last;
         }
-        print STDERR join("\n",@result), "\n" if $RE_verbose;
+        print STDERR join("\n",@result), "\n" if $DEBUG & 16;
         @result;
     }
 }
@@ -1724,7 +1739,7 @@ sub fail { my $self = shift;
 	for my $chunk (@chunks) {
 	    # ignore negative lookahead
 	    next if ref($chunk) eq 'RE_assertion' and $chunk->{assert} eq '!';
-	    print STDERR "NULLABLE ".ref($chunk)."\n" if $RE_verbose and not $chunk->{min};
+	    print STDERR "NULLABLE ".ref($chunk)."\n" if $DEBUG & 16 and not $chunk->{min};
 	    my @newalts = $chunk->longest($C);
 	    last unless @newalts;
 #	    if (not $chunk->{min} and $next[-1] ne '') {
@@ -1803,7 +1818,7 @@ sub fail { my $self = shift;
 	    }
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
-        print STDERR join("\n", @result), "\n" if $RE_verbose;
+        print STDERR join("\n", @result), "\n" if $DEBUG & 16;
         $fakepos = $minfakepos;  # Did all branches advance?
         @result;
     }
