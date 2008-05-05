@@ -1061,11 +1061,13 @@ token expect_infix {
     [
     | <infix> { $op = $<infix>; }
        <infix_postfix_meta_operator>*  # may modify $op
-       { $<O> = $op<O>; }
+       { $<O> = $op<O>; $<sym> = $op<sym>; }
     | <infix_prefix_meta_operator>
-        { $<O> = $<infix_prefix_meta_operator><O>; }
+        { $<O> = $<infix_prefix_meta_operator><O>;
+        $<sym> = $<infix_prefix_meta_operator><sym>; }
     | <infix_circumfix_meta_operator>
-        { $<O> = $<infix_circumfix_meta_operator><O>; }
+        { $<O> = $<infix_circumfix_meta_operator><O>;
+        $<sym> = $<infix_circumfix_meta_operator><sym>; }
     ]
     {*}
 }
@@ -1137,11 +1139,11 @@ token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' {*} }
 token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' {*} }
 
 token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
-    <?lex1: 'negation'>
-
     <sym> <!before '!'> <infix> ::
 
     { $<O> = $<infix><O>; }
+    <?lex1: 'negation'>
+
     [
     || <?{ $<O><assoc> eq 'chain'}>
     || <?{ $<O><assoc> and $<O><bool> }>
@@ -1158,19 +1160,19 @@ token lex1 (Str $s) {
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
-    <?lex1: 'cross'>
     X <infix> X
     { $<O> = $<infix><O>; }
+    <?lex1: 'cross'>
     {*}
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
-    <?lex1: 'hyper'>
     [
     | [ '«' | '»' ] <infix> [ '«' | '»' ]
     | [ '<<' | '>>' ] <infix> [ '<<' | '>>' ]
     ]
     { $<O> := $<infix><O>; }
+    <?lex1: 'hyper'>
     {*}
 }
 
@@ -3260,7 +3262,7 @@ method EXPR (%preclim = %LOOSEST)
     my @termstack;
     my @opstack;
 
-    push @opstack, item %terminator;         # (just a sentinel value)
+    push @opstack, { 'O' => item %terminator, 'sym' => '' };         # (just a sentinel value)
 
     my $here = self;
     warn "In EXPR, at ", $here.pos, "\n" if $DEBUG +& 32;
@@ -3365,6 +3367,10 @@ method EXPR (%preclim = %LOOSEST)
         
         # XXX might want to allow this in a declaration though
         if not $infix { $here.panic("Can't have two terms in a row") }
+
+        if not $infix<sym> {
+            die Dump($infix) if $DEBUG +& 32;
+        }
 
         $here = $infix.cursor_fresh.ws();
 

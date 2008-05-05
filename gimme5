@@ -2007,13 +2007,13 @@ END
             $result .= <<'END';
     my @gather = ();
     while (@try and not @gather) {
-        my $try = shift(@try);
+        my $try = shift(@try) // next;
 
         # if first try failed, interrogate lexer for shorter answers
         if (ref $try) {
             if (ref $try eq 'ARRAY') {
                 ($tag, $try, $C->{_fate}) = @$try;	# next candidate fate
-                print STDERR "Retrying with $tag $try\n" if $DEBUG & 1024;
+                print ::LOG "Retrying with $tag $try\n" if $DEBUG & 1024;
             }
             elsif (ref $try eq 'CODE') {
                 my @more = $relex->($C, $trystate);
@@ -2027,7 +2027,7 @@ END
 END
 
             $result .= <<"END";
-        print STDERR "$altname trying \$tag \$try\\n" if \$DEBUG & 1024;
+        print ::LOG "$altname trying \$tag \$try\\n" if \$DEBUG & 1024;
         push \@gather, ((
 @{[ ::indent(join("\n", @result),3) ]}
 END
