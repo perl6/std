@@ -1980,12 +1980,12 @@ method nibble ($lang) {
 }
 
 #token quote:sym<' '>   { <?before "'"  > <quotesnabber(":q")>        }
-token quote:sym<' '>   { "'" <nibble('Perl::Q_single')> "'" }
-token quote:sym<" ">   { '"' <nibble('Perl::Q_double')> '"' }
+token quote:sym<' '>   { "'" <nibble(Perl::Q.mixin('Perl::Q_q'))> "'" }
+token quote:sym<" ">   { '"' <nibble(Perl::Q.mixin('Perl::Q_qq'))> '"' }
 
 token quote:sym<« »>   { <?before '«'  > <quotesnabber(":qq",":ww")> }
 token quote:sym«<< >>» { <?before '<<' > <quotesnabber(":qq",":ww")> }
-token quote:sym«< >»   { <?before '<'  > <quotesnabber(":q", ":w")>  }
+token quote:sym«< >»   { <?before '<'  > <nibble(Perl::Q.tweak(:q).tweak(:w))>  }
 
 token quote:sym</ />   {
     <?before '/'  > <quotesnabber(":regex")>
@@ -2491,6 +2491,81 @@ token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     {*}
 }
 
+role Q_b {
+    token escape:sym<\\> { <sym> <item=backslash> }
+    token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
+    token backslash:sym<\\> { <text=sym> }
+    token backslash:stopper { <text=stopper> }
+    token backslash:a { <sym> }
+    token backslash:b { <sym> }
+    token backslash:c { <sym>
+        [
+        || '[' <-[ \] \v ]>* ']'
+        || <codepoint>
+        ]
+    }
+    token backslash:e { <sym> }
+    token backslash:f { <sym> }
+    token backslash:n { <sym> }
+    token backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
+    token backslash:r { <sym> }
+    token backslash:t { <sym> }
+    token backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+    token backslash:sym<0> { <sym> }
+} # end role
+
+role Q_NOTb {
+    token escape:sym<\\> { <!> }
+} # end role
+
+role Q_c {
+    token escape:sym<{ }> { <?before '{'> <block> }
+} # end role
+
+role Q_NOTc {
+    token escape:sym<{ }> { <!> }
+} # end role
+
+role Q_s {
+    token escape:sym<$> { <?before '$'> <variable> <extrapost>? }
+} # end role
+
+role Q_NOTs {
+    token escape:sym<$> { <!> }
+} # end role
+
+role Q_a {
+    token escape:sym<@> { <?before '@'> <variable> <extrapost> }
+} # end role
+
+role Q_NOTa {
+    token escape:sym<@> { <!> }
+} # end role
+
+role Q_h {
+    token escape:sym<%> { <?before '%'> <variable> <extrapost> }
+} # end role
+
+role Q_NOTh {
+    token escape:sym<%> { <!> }
+} # end role
+
+role Q_f {
+    token escape:sym<&> { <?before '&'> <variable> <extrapost> }
+} # end role
+
+role Q_NOTf {
+    token escape:sym<&> { <!> }
+} # end role
+
+role Q_w {
+    method postprocess ($s) { $s.comb }
+} # end role
+
+role Q_NOTw {
+    method postprocess ($s) { $s }
+} # end role
+
 grammar Q is Perl {
     # note: polymorphic over many quote languages, we hope
     token nibbler {
@@ -2519,9 +2594,50 @@ grammar Q is Perl {
         { push @nibbles, $text; @<nibbles> = @nibbles; }
         {*}
     }
+
+    # begin tweaks (DO NOT ERASE)
+    multi method tweak (:single(:$q)) { ::Q_q; }
+
+    multi method tweak (:double(:$qq)) { ::Q_qq; }
+
+    multi method tweak (:backslash(:$b))   { self.mixin($b ?? ::Q_b !! ::Q_NOTb) }
+    multi method tweak (:scalar(:$s))      { self.mixin($s ?? ::Q_s !! ::Q_NOTs) }
+    multi method tweak (:array(:$a))       { self.mixin($a ?? ::Q_a !! ::Q_NOTa) }
+    multi method tweak (:hash(:$h))        { self.mixin($h ?? ::Q_h !! ::Q_NOTh) }
+    multi method tweak (:function(:$f))    { self.mixin($f ?? ::Q_f !! ::Q_NOTf) }
+    multi method tweak (:closure(:$c))     { self.mixin($c ?? ::Q_c !! ::Q_NOTc) }
+
+    multi method tweak (:exec(:$x))        { self.mixin($x ?? ::Q_x !! ::Q_NOTx) }
+    multi method tweak (:words(:$w))       { self.mixin($w ?? ::Q_w !! ::Q_NOTw) }
+    multi method tweak (:quotewords(:$ww)) { self.mixin($ww ?? ::Q_ww !! ::Q_NOTww) }
+
+    multi method tweak (:heredoc(:$to)) {
+        # $.parser = &Perl::q_heredoc;
+        # %.option<to> = $to;
+    }
+
+    multi method tweak (:$regex) {
+        return ::Regex;
+    }
+
+    multi method tweak (:$trans) {
+        return ::Trans;
+    }
+
+    multi method tweak (:$code) {
+        return ::RegexCode;
+    }
+
+    multi method tweak (*%x) {
+        my @k = keys(%x);
+        Perl::panic("Unrecognized quote modifier: " ~ @k);
+    }
+    # end tweaks (DO NOT ERASE)
+
+
 } # end grammar
 
-grammar Q_single is Q {
+grammar Q_q is Q {
     token stopper { \' }
     token starter { <!> }
 
@@ -2533,41 +2649,25 @@ grammar Q_single is Q {
 
     # in single quotes, keep backslash on random character by default
     token backslash:misc { :: (.) { $<text> = "\\$0"; } }
+
+    # begin tweaks (DO NOT ERASE)
+    multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
+    multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
+    # end tweaks (DO NOT ERASE)
+
 } # end grammar
 
-grammar Q_double is Q {
+grammar Q_qq is Q does Q_b does Q_c does Q_s does Q_a does Q_h does Q_f {
     token stopper { \" }
     token starter { <!> }
-
-    token escape:sym<\\> { <sym> <item=backslash> }
-    token escape:sym<{ }> { <?before '{'> <block> }
-    token escape:sym<$> { <?before '$'> <variable> <extrapost>? }
-    token escape:sym<@> { <?before '@'> <variable> <extrapost> }
-    token escape:sym<%> { <?before '%'> <variable> <extrapost> }
-    token escape:sym<&> { <?before '&'> <variable> <extrapost> }
-
-    token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
-    token backslash:sym<\\> { <text=sym> }
-    token backslash:stopper { <text=stopper> }
-    token backslash:a { <sym> }
-    token backslash:b { <sym> }
-    token backslash:c { <sym>
-        [
-        || '[' <-[ \] \v ]>* ']'
-        || <codepoint>
-        ]
-    }
-    token backslash:e { <sym> }
-    token backslash:f { <sym> }
-    token backslash:n { <sym> }
-    token backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
-    token backslash:r { <sym> }
-    token backslash:t { <sym> }
-    token backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
-    token backslash:sym<0> { <sym> }
-
     # in double quotes, omit backslash on random \W backslash by default
     token backslash:misc { :: [ (\W) { $<text> = "$0"; } | (\w) <.panic: "unrecognized backslash sequence: '\\$0'"> ] }
+
+    # begin tweaks (DO NOT ERASE)
+    multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
+    multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
+    # end tweaks (DO NOT ERASE)
+
 } # end grammar
 
 token q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {

@@ -56,9 +56,21 @@ sub new {
     $self;
 }
 
-use YAML::XS;
+sub mixin {
+    my $self = shift;
+    my $mixin = shift;
 
-# XXX still full of ASCII assumptions
+    my $WHAT = $self;
+    (my $ext = $mixin) =~ s/Perl::Q//;
+    $WHAT .= $ext;
+    no strict 'refs';
+    if (not @{$WHAT.'::ISA'}) {
+	push @{$WHAT . '::ISA'}, $self, $mixin;
+    }
+    return $WHAT;
+}
+
+use YAML::XS;
 
 our %lexers;       # per language, the cache of lexers, keyed by rule name
 
@@ -101,7 +113,8 @@ sub ws_from { $_[0]->{_ws_from} }
 sub ws_to { $_[0]->{_ws_to} }
 
 sub lexers { my $self = shift;
-    \%lexers;    # XXX should be different per language, sigh
+    my $lang = ref $self;
+    $lexers{$lang} //= {};
 }
 
 my $fakepos = 1;

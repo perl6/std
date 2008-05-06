@@ -75,7 +75,8 @@ sub un6 {
         $f =~ s/^\$¢\.\$parser//                and $t .= qq/\$C->\$parser/, next;
         $f =~ s/^\$¢//                  	and $t .= qq/\$C/, next;
         $f =~ s/^\$\/</.</                  	and $t .= qq/\$M/, $NEEDMATCH++, next;
-        $f =~ s/^ ::([A-Z]\w+)//        	and $t .= qq/ '$1'/, next;
+        $f =~ s/^ ::(Perl(?:::\w+)*)// 		and $t .= qq/ '$1'/, next;
+        $f =~ s/^ ::([A-Z]\w+(?:::\w+)*)// 	and $t .= qq/ 'Perl::$1'/, next;
         $f =~ s/^([^:]):(\w+)\((.*?)\)/ ($3)/ 	and $t .= qq/$1$2 =>/, next;
         $f =~ s/^([^:]):([\$\@%])(\w+)//        and $t .= qq/$1$3 => $2$3/, next;
         $f =~ s/^([^:]):(\w+)<(.*?)>//  	and $t .= qq/$1$2 => '$3'/, next;
@@ -611,10 +612,22 @@ END
             $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package ${PKG}::$1; our \@ISA = 'Perl::$2';/
                     and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
 
-            $line =~ s/^grammar (\w+)\s+is\s+(\w+)\s*\{/{ package ${PKG}::$1; our \@ISA = '${PKG}::$2';/
-                    and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; $line =~ s/Perl::Perl/Perl/; };
             $line =~ s/^grammar (\w+)\s*\{/{ package ${PKG}::$1;/
                     and do { push(@PKG, $PKG); $PKG = "${PKG}::$1"; };
+            $line =~ s/^grammar (\w+)\s+(.*?)\{/{ package ${PKG}::$1; our \@ISA = ();/
+                    and do {
+			my $name = $1;
+			my $is = $2;
+			my @parents;
+			for (split ' ', $is) {
+			    push @parents, "${PKG}::$_" unless /^(is|does)/;
+			}
+			push(@PKG, $PKG);
+			$PKG = "${PKG}::$name";
+			$is = "qw(@parents)";
+			$line =~ s/\(\)/$is/;
+			$line =~ s/Perl::Perl/Perl/g;
+		    };
 
             $PKG = pop(@PKG) if @PKG and $line =~ /} # end (role|class|grammar)/;
 
