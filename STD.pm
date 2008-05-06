@@ -514,13 +514,13 @@ token regex_block {  # perhaps parameterize and combine with block someday
 
 # statement semantics
 rule statementlist {
-    [<statement> ]*
+    [<statement><.eat_terminator> ]*
     {*}
 }
 
 # embedded semis, context-dependent semantics
 rule semilist {
-    [<statement> ]*
+    [<statement><.eat_terminator> ]*
     {*}
 }
 
@@ -571,7 +571,6 @@ token statement {
         {*}                                                     #= modexpr
     | <?before ';'> {*}                                         #= null
     ]
-    <.eat_terminator>
     {*}
 }
 
