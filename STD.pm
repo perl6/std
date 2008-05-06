@@ -7,8 +7,7 @@ my $LANG is context;
 
 # random rule for debugging, please ignore
 token foo {
-    <opener>
-    | <integer>
+    <expect_term>
 }
 
 =begin things todo
@@ -1982,8 +1981,8 @@ method nibble ($lang) {
 
 #token quote:sym<' '>   { <?before "'"  > <quotesnabber(":q")>        }
 token quote:sym<' '>   { "'" <nibble('Perl::Q_single')> "'" }
+token quote:sym<" ">   { '"' <nibble('Perl::Q_double')> '"' }
 
-token quote:sym<" ">   { <?before '"'  > <quotesnabber(":qq")>       }
 token quote:sym<« »>   { <?before '«'  > <quotesnabber(":qq",":ww")> }
 token quote:sym«<< >>» { <?before '<<' > <quotesnabber(":qq",":ww")> }
 token quote:sym«< >»   { <?before '<'  > <quotesnabber(":q", ":w")>  }
@@ -2532,8 +2531,43 @@ grammar Q_single is Q {
     token backslash:sym<\\> { <text=sym> }
     token backslash:stopper { <text=stopper> }
 
-    # in single quotes, keep random backslash in by default
+    # in single quotes, keep backslash on random character by default
     token backslash:misc { :: (.) { $<text> = "\\$0"; } }
+} # end grammar
+
+grammar Q_double is Q {
+    token stopper { \" }
+    token starter { <!> }
+
+    token escape:sym<\\> { <sym> <item=backslash> }
+    token escape:sym<{ }> { <?before '{'> <block> }
+    token escape:sym<$> { <?before '$'> <variable> <extrapost>? }
+    token escape:sym<@> { <?before '@'> <variable> <extrapost> }
+    token escape:sym<%> { <?before '%'> <variable> <extrapost> }
+    token escape:sym<&> { <?before '&'> <variable> <extrapost> }
+
+    token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
+    token backslash:sym<\\> { <text=sym> }
+    token backslash:stopper { <text=stopper> }
+    token backslash:a { <sym> }
+    token backslash:b { <sym> }
+    token backslash:c { <sym>
+        [
+        || '[' <-[ \] \v ]>* ']'
+        || <codepoint>
+        ]
+    }
+    token backslash:e { <sym> }
+    token backslash:f { <sym> }
+    token backslash:n { <sym> }
+    token backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
+    token backslash:r { <sym> }
+    token backslash:t { <sym> }
+    token backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+    token backslash:sym<0> { <sym> }
+
+    # in double quotes, omit backslash on random \W backslash by default
+    token backslash:misc { :: [ (\W) { $<text> = "$0"; } | (\w) <.panic: "unrecognized backslash sequence: '\\$0'"> ] }
 } # end grammar
 
 token q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {
@@ -3606,24 +3640,6 @@ grammar Regex is Perl {
     token q_backslash:qq { <?before qq> <quote> }
     token q_backslash:sym<\\> { <sym> }
     token q_backslash:misc { :: (.) }
-
-    token qq_backslash:a { <sym> }
-    token qq_backslash:b { <sym> }
-    token qq_backslash:c { <sym>
-        [
-        || '[' <-[ \] \v ]>* ']'
-        || <codepoint>
-        ]
-    }
-    token qq_backslash:e { <sym> }
-    token qq_backslash:f { <sym> }
-    token qq_backslash:n { <sym> }
-    token qq_backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
-    token qq_backslash:r { <sym> }
-    token qq_backslash:t { <sym> }
-    token qq_backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
-    token qq_backslash:sym<0> { <sym> }
-    token qq_backslash:misc { :: \W || <.panic: "unrecognized backslash sequence"> }
 
     token regex_backslash:unspace { <?before \s> <.SUPER::ws> }
 

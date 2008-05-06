@@ -455,7 +455,7 @@ END
             }
             my $body = <<'END';
 <<DECL>>
-    local $CTX = $self->callm();
+    local $CTX = $self->callm() if $DEBUG & 128;
     if ($self->{_peek}) {
         return <<PEEK>>
     }

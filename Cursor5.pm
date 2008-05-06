@@ -602,6 +602,7 @@ sub callm { my $self = shift;
 }
 
 sub retm { my $self = shift;
+    return $self unless $DEBUG & 128;
     warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
     print ::LOG $self->{_pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}\n" if $DEBUG & 128;
@@ -621,7 +622,7 @@ sub _MATCHIFY { my $self = shift;
 sub _STARf { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
 
     map { $_->retm() }
         $self->cursor($self->{_pos}),
@@ -631,7 +632,7 @@ sub _STARf { my $self = shift;
 sub _STARg { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
 
     map { $_->retm() } reverse
             $self->cursor($self->{_pos}),
@@ -641,7 +642,7 @@ sub _STARg { my $self = shift;
 sub _STARr { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $to = $self;
     my @all;
     my $eos = length(${$self->{_orig}});
@@ -660,7 +661,7 @@ sub _STARr { my $self = shift;
 sub _PLUSf { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $x = $self;
 
     my @result;
@@ -677,7 +678,7 @@ sub _PLUSf { my $self = shift;
 sub _PLUSg { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
 
     reverse $self->_PLUSf($block, @_);
 }
@@ -685,7 +686,7 @@ sub _PLUSg { my $self = shift;
 sub _PLUSr { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $to = $self;
     my @all;
     my $eos = length(${$self->{_orig}});
@@ -707,7 +708,7 @@ sub _REPSEPf { my $self = shift;
     my $sep = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $x = $self;
 
     my @result;
@@ -727,7 +728,7 @@ sub _REPSEPg { my $self = shift;
     my $sep = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
 
     reverse $self->_REPSEPf($sep, $block, @_);
 }
@@ -736,7 +737,7 @@ sub _REPSEPr { my $self = shift;
     my $sep = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $to = $self;
     my @all;
     my $eos = length(${$self->{_orig}});
@@ -760,7 +761,7 @@ sub _REPSEPr { my $self = shift;
 sub _OPTr { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
 
     my $x = ($block->($self))[0];
     my $r = $x // $self->cursor($self->{_pos});
@@ -770,7 +771,7 @@ sub _OPTr { my $self = shift;
 sub _OPTg { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my @x = $block->($self);
     map { $_->retm() }
         $block->($self),
@@ -780,7 +781,7 @@ sub _OPTg { my $self = shift;
 sub _OPTf { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     map { $_->retm() }
         $self->cursor($self->{_pos}),
         $block->($self);
@@ -789,7 +790,7 @@ sub _OPTf { my $self = shift;
 sub _BRACKET { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     map { $_->retm() }
         $block->($self);
 }
@@ -797,7 +798,7 @@ sub _BRACKET { my $self = shift;
 sub _PAREN { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     map { $_->retm() }
         $block->($self);
 }
@@ -805,7 +806,7 @@ sub _PAREN { my $self = shift;
 sub _NOTBEFORE { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my @all = $block->($self);
     return () if @all;  # XXX loses continuation
     return $self->cursor($self->{_pos})->retm();
@@ -814,7 +815,7 @@ sub _NOTBEFORE { my $self = shift;
 sub _NOTCHAR { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my @all = $block->($self);
     return () if @all;  # XXX loses continuation
     return $self->cursor($self->{_pos}+1)->retm();
@@ -823,7 +824,7 @@ sub _NOTCHAR { my $self = shift;
 sub before { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my @all = $block->($self);
     if (@all and $all[0]) {
         return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
@@ -834,7 +835,7 @@ sub before { my $self = shift;
 sub after { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $end = $self->cursor($self->{_pos});
     my @all = $block->($end);          # Make sure $_->{_from} == $_->{_to}
     if (@all and $all[0]) {
@@ -844,14 +845,14 @@ sub after { my $self = shift;
 }
 
 sub null { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     return $self->cursor($self->{_pos})->retm();
 }
 
 sub _ASSERT { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my @all = $block->($self);
     if ((@all and $all[0]->{_bool})) {
         return $self->cursor($self->{_pos})->retm();
@@ -863,7 +864,7 @@ sub _BINDVAR { my $self = shift;
     my $var = shift;
     my $block = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     map { $$var = $_; $_->retm() }  # XXX doesn't "let"
         $block->($self);
 }
@@ -872,7 +873,7 @@ sub _SUBSUME { my $self = shift;
     my $names = shift;
     my $block = shift;
 
-    local $CTX = $self->callm($names ? "@$names" : "");
+    local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & 128;
     map { $self->cursor_bind($names, $_)->retm() }
         $block->($self);
 }
@@ -880,7 +881,7 @@ sub _SUBSUME { my $self = shift;
 sub _EXACT { my $self = shift;
     my $s = shift;
 
-    local $CTX = $self->callm($s);
+    local $CTX = $self->callm($s) if $DEBUG & 128;
     my $P = $self->{_pos} // 0;
     my $len = length($s);
     my $buf = $self->{_orig};
@@ -898,7 +899,7 @@ sub _EXACT { my $self = shift;
 sub _SYM { my $self = shift;
     my $s = shift;
 
-    local $CTX = $self->callm($s);
+    local $CTX = $self->callm($s) if $DEBUG & 128;
     my $P = $self->{_pos} // 0;
     my $len = length($s);
     my $buf = $self->{_orig};
@@ -917,7 +918,7 @@ sub _SYM { my $self = shift;
 sub _EXACT_rev { my $self = shift;
     my $s = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $len = length($s);
     my $from = $self->{_from} - $len;
     my $buf = $self->{_orig};
@@ -932,7 +933,7 @@ sub _EXACT_rev { my $self = shift;
 }
 
 sub _ARRAY { my $self = shift;
-    local $CTX = $self->callm(0+@_);
+    local $CTX = $self->callm(0+@_) if $DEBUG & 128;
     my $P = $self->{_pos} // 0;
     my $buf = $self->{_orig};
     my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
@@ -949,7 +950,7 @@ sub _ARRAY { my $self = shift;
 }
 
 sub _ARRAY_rev { my $self = shift;
-    local $CTX = $self->callm(0+@_);
+    local $CTX = $self->callm(0+@_) if $DEBUG & 128;
     my $buf = $self->{_orig};
     my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
     my @result = ();
@@ -966,7 +967,7 @@ sub _ARRAY_rev { my $self = shift;
 }
 
 sub _DIGIT { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -981,7 +982,7 @@ sub _DIGIT { my $self = shift;
 }
 
 sub _DIGIT_rev { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "DIGIT_rev didn't match $char at $from";
@@ -1000,7 +1001,7 @@ sub _DIGIT_rev { my $self = shift;
 }
 
 sub _ALNUM { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1015,7 +1016,7 @@ sub _ALNUM { my $self = shift;
 }
 
 sub _ALNUM_rev { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "ALNUM_rev didn't match $char at $from";
@@ -1034,7 +1035,7 @@ sub _ALNUM_rev { my $self = shift;
 }
 
 sub alpha { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1049,7 +1050,7 @@ sub alpha { my $self = shift;
 }
 
 sub alpha_rev { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
         return ();
@@ -1066,7 +1067,7 @@ sub alpha_rev { my $self = shift;
 }
 
 sub _SPACE { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1081,7 +1082,7 @@ sub _SPACE { my $self = shift;
 }
 
 sub _SPACE_rev { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "SPACE_rev didn't match $char at $from";
@@ -1100,7 +1101,7 @@ sub _SPACE_rev { my $self = shift;
 }
 
 sub _HSPACE { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1115,7 +1116,7 @@ sub _HSPACE { my $self = shift;
 }
 
 sub _HSPACE_rev { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "HSPACE_rev didn't match $char at $from";
@@ -1134,7 +1135,7 @@ sub _HSPACE_rev { my $self = shift;
 }
 
 sub _VSPACE { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1149,7 +1150,7 @@ sub _VSPACE { my $self = shift;
 }
 
 sub _VSPACE_rev { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "VSPACE_rev didn't match $char at $from";
@@ -1170,7 +1171,7 @@ sub _VSPACE_rev { my $self = shift;
 sub _CCLASS { my $self = shift;
     my $cc = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1187,7 +1188,7 @@ sub _CCLASS { my $self = shift;
 sub _CCLASS_rev { my $self = shift;
     my $cc = shift;
 
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "CCLASS didn't match $char at $from";
@@ -1206,7 +1207,7 @@ sub _CCLASS_rev { my $self = shift;
 }
 
 sub _ANY { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     if ($P < length($$buf)) {
@@ -1219,7 +1220,7 @@ sub _ANY { my $self = shift;
 }
 
 sub _ANY_rev { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
         return ();
@@ -1228,7 +1229,7 @@ sub _ANY_rev { my $self = shift;
 }
 
 sub _BOS { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     if ($P == 0) {
         $self->cursor($P)->retm();
@@ -1240,7 +1241,7 @@ sub _BOS { my $self = shift;
 sub _BOS_rev { $_[0]->_BOS }
 
 sub _BOL { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     if ($P == 0 or substr($$buf, $P-1, 1) =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
@@ -1253,7 +1254,7 @@ sub _BOL { my $self = shift;
 sub _BOL_rev { $_[0]->_BOL }
 
 sub _EOS { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     if ($P == length($$buf)) {
@@ -1266,7 +1267,7 @@ sub _EOS { my $self = shift;
 sub _EOS_rev { $_[0]->_EOS }
 
 sub _EOL { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     if ($P == length($$buf) or substr($$buf, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
@@ -1279,7 +1280,7 @@ sub _EOL { my $self = shift;
 sub _EOL_rev { $_[0]->_EOL }
 
 sub _RIGHTWB { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     pos($$buf) = $P - 1;
@@ -1293,7 +1294,7 @@ sub _RIGHTWB { my $self = shift;
 sub _RIGHTWB_rev { $_[0]->_RIGHTWB }
 
 sub _LEFTWB { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     pos($$buf) = $P;
@@ -1309,18 +1310,18 @@ sub _LEFTWB_rev { $_[0]->_LEFTWB }
 sub _REDUCE { my $self = shift;
     my $tag = shift;
 
-    local $CTX = $self->callm($tag);
+    local $CTX = $self->callm($tag) if $DEBUG & 128;
     my $P = $self->{_pos};
     my $F = $self->{_from};
-    $self->{_Rtag} = $tag;
-    print ::LOG "Success $tag from $F to $P\n" if $DEBUG & 64;
+    $self->{_reduced} = $tag;
+    print ::LOG "REDUCE $tag from $F to $P\n" if $DEBUG & 64;
 #    $self->whats;
     $self;
 #    $self->cursor($P);
 }
 
 sub _COMMITBRANCH { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     print ::LOG "Commit branch to $P\n" if $DEBUG & 64;
 #    $self->cursor($P);  # XXX currently noop
@@ -1328,7 +1329,7 @@ sub _COMMITBRANCH { my $self = shift;
 }
 
 sub _COMMITRULE { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     print ::LOG "Commit rule to $P\n" if $DEBUG & 64;
 #    $self->cursor($P);  # XXX currently noop
@@ -1336,7 +1337,7 @@ sub _COMMITRULE { my $self = shift;
 }
 
 sub commit { my $self = shift;
-    local $CTX = $self->callm;
+    local $CTX = $self->callm if $DEBUG & 128;
     my $P = $self->{_pos};
     print ::LOG "Commit match to $P\n" if $DEBUG & 64;
 #    $self->cursor($P);  # XXX currently noop
