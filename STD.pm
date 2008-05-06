@@ -1055,7 +1055,7 @@ token expect_tight_infix ($loosest) {
 
 token expect_infix {
     :my $op is context;         # (used in infix_postfix_meta_operator)
-    <!stdstopper>
+    <!infixstopper>
     [
     | <infix> { $op = $<infix>; }
        <infix_postfix_meta_operator>*  # may modify $op
@@ -3371,12 +3371,15 @@ token terminator:sym<}> ( --> Terminator)
 token terminator:sym<!!> ( --> Terminator)
     { <?before '!!' > {*} }
 
+regex infixstopper {
+    | <?before '{' | <lambda> ><?after \s>
+}
+
 regex stdstopper {
     | $
     | <terminator>
     | <statement_mod_cond>
     | <statement_mod_loop>
-    | <?before '{' | <lambda> ><?after \s>
     | <?{ $¢.ws_from === $+endstmt }>
     | <?{ $¢.pos === $+endargs }>
 #    | <$+unitstopper>
