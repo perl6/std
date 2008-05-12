@@ -12,6 +12,7 @@ our $DEBUG = $ENV{STD5DEBUG} // 0;
     # 256 cursors
     # 512 callm show subnames
     # 1024 try processing in STD5.pm
+    # 2048 mixins
 
 package Cursor5;
 $::DEBUG //= 0;
@@ -58,16 +59,52 @@ sub new {
 
 sub mixin {
     my $self = shift;
-    my $mixin = shift;
+    my @mixins = @_;
 
-    my $WHAT = $self;
-    (my $ext = $mixin) =~ s/Perl::Q//;
-    $WHAT .= $ext;
+    my $WHAT = $self . '::';
+    for my $mixin (@mixins) {
+	(my $ext = $mixin) =~ s/^.*:://;	# just looking for a "cache" key, really
+	$WHAT .= '_' . $ext;
+    }
+    print ::LOG "mixin $WHAT $self\n" if $DEBUG & 2048;
     no strict 'refs';
-    if (not @{$WHAT.'::ISA'}) {
-	push @{$WHAT . '::ISA'}, $self, $mixin;
+    if (not @{$WHAT.'::ISA'}) {		# never composed this one yet?
+	# fake up mixin with MI, being sure to put "roles" in front
+	my $eval = "package $WHAT; our \@ISA = (" . join(',', map {"'$_'"} @mixins) . ",'$self');\n";
+	print ::LOG $eval if $DEBUG & 2048;
+	eval $eval;
     }
     return $WHAT;
+}
+
+# alas, p5's SUPER is not correct for this
+sub super {
+    my $self = shift;
+    my $meth = shift;
+    my $type = ref $self || $self;
+    my ($caller) = caller;
+    no strict 'refs';
+    my @supers = @{$type . '::ISA'};
+    if (wantarray) {
+	my @result;
+	for my $super (@supers) {
+	    next if $super eq $caller;
+	    my $supmeth = $super . '::' . $meth;
+	    print ::LOG "super attempting $supmeth\n" if $DEBUG & 2048;
+	    last if defined eval { @result = $self->$supmeth(@_); };
+	}
+	@result;
+    }
+    else {
+	my $result;
+	for my $super (@supers) {
+	    next if $super eq $caller;
+	    my $supmeth = $super . '::' . $meth;
+	    print ::LOG "super attempting $supmeth\n" if $DEBUG & 2048;
+	    last if defined eval { $result = $self->$supmeth(@_); };
+	}
+	$result;
+    }
 }
 
 use YAML::XS;
@@ -83,12 +120,15 @@ our %lexers;       # per language, the cache of lexers, keyed by rule name
 
 sub from { $_[0]->{_from} }
 sub to { $_[0]->{_to} }
+sub chars { $_[0]->{_to} - $_[0]->{_from} }
+sub text { substr(${$_[0]->{_orig}}, $_[0]->{_from}, $_[0]->{_to} - $_[0]->{_from}) }
 sub pos { $_[0]->{_pos} }
 sub peek { $_[0]->{_peek} }
 sub orig { $_[0]->{_orig} }
 sub WHAT { ref $_[0] }
 
-sub item { substr(${$_[0]->{_orig}}, $_[0]->{_from}, $_[0]->{_to} - $_[0]->{_from}) }
+sub item { exists $_[0]->{''} ? $_[0]->{''} : $_[0]->text }
+
 sub list { my $self = shift;
     my @result;
     # can't just do this in numerical order because some might be missing
@@ -488,7 +528,7 @@ sub cursor_peek { my $self = shift;
 
 sub cursor_fresh { my $self = shift;
     my %r;
-    my $lang = @_ ? shift() : ref $self;
+    my $lang = @_ && $_[0] ? shift() : ref $self;
     print ::LOG "cursor_fresh lang $lang\n" if $DEBUG & 256;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
@@ -1580,7 +1620,7 @@ sub fail { my $self = shift;
 	    my $lexer;
 	    {
 		local $PREFIX = "";
-		$lexer = $C->cursor_peek->$name();
+		$lexer = eval { $C->cursor_peek->$name() };
 	    }
 	    return $IMP unless $lexer;
 	    my @pat = @{$lexer->{PATS}};

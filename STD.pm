@@ -116,33 +116,33 @@ token TOP {
 # The current values are mere implementation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
 
-constant %term              = { :prec<z=>                           };
-constant %methodcall        = { :prec<y=>                           };
-constant %autoincrement     = { :prec<x=>,                          };
-constant %exponentiation    = { :prec<w=>, :assoc<right>, :assign   };
-constant %symbolic_unary    = { :prec<v=>                           };
-constant %multiplicative    = { :prec<u=>, :assoc<left>,  :assign   };
-constant %additive          = { :prec<t=>, :assoc<left>,  :assign   };
-constant %replication       = { :prec<s=>, :assoc<left>,  :assign   };
-constant %concatenation     = { :prec<r=>, :assoc<left>,  :assign   };
-constant %junctive_and      = { :prec<q=>, :assoc<list>,  :assign   };
-constant %junctive_or       = { :prec<p=>, :assoc<list>,  :assign   };
-constant %named_unary       = { :prec<o=>,                          };
-constant %nonchaining       = { :prec<n=>, :assoc<non>              };
-constant %chaining          = { :prec<m=>, :assoc<chain>, :bool     };
-constant %tight_and         = { :prec<l=>, :assoc<left>,  :assign   };
-constant %tight_or          = { :prec<k=>, :assoc<left>,  :assign   };
-constant %conditional       = { :prec<j=>, :assoc<right>,           };
-constant %item_assignment   = { :prec<i=>, :assoc<right>,           };
-constant %loose_unary       = { :prec<h=>,                          };
-constant %comma             = { :prec<g=>, :assoc<list>,            };
-constant %list_infix        = { :prec<f=>, :assoc<list>,  :assign   };
-constant %list_assignment   = { :prec<i=>, :sub<e=>, :assoc<right>  };
-constant %list_prefix       = { :prec<e=>,                          };
-constant %loose_and         = { :prec<d=>, :assoc<left>,  :assign   };
-constant %loose_or          = { :prec<c=>, :assoc<left>,  :assign   };
-constant %LOOSEST           = { :prec<a=!>,                         };
-constant %terminator        = { :prec<a=>, :assoc<list>             };
+constant %term            = (:prec<z=>);
+constant %methodcall      = (:prec<y=>);
+constant %autoincrement   = (:prec<x=>);
+constant %exponentiation  = (:prec<w=>, :assoc<right>, :assign);
+constant %symbolic_unary  = (:prec<v=>);
+constant %multiplicative  = (:prec<u=>, :assoc<left>,  :assign);
+constant %additive        = (:prec<t=>, :assoc<left>,  :assign);
+constant %replication     = (:prec<s=>, :assoc<left>,  :assign);
+constant %concatenation   = (:prec<r=>, :assoc<left>,  :assign);
+constant %junctive_and    = (:prec<q=>, :assoc<list>,  :assign);
+constant %junctive_or     = (:prec<p=>, :assoc<list>,  :assign);
+constant %named_unary     = (:prec<o=>);
+constant %nonchaining     = (:prec<n=>, :assoc<non>);
+constant %chaining        = (:prec<m=>, :assoc<chain>, :bool);
+constant %tight_and       = (:prec<l=>, :assoc<left>,  :assign);
+constant %tight_or        = (:prec<k=>, :assoc<left>,  :assign);
+constant %conditional     = (:prec<j=>, :assoc<right>);
+constant %item_assignment = (:prec<i=>, :assoc<right>);
+constant %loose_unary     = (:prec<h=>);
+constant %comma           = (:prec<g=>, :assoc<list>);
+constant %list_infix      = (:prec<f=>, :assoc<list>,  :assign);
+constant %list_assignment = (:prec<i=>, :sub<e=>, :assoc<right>);
+constant %list_prefix     = (:prec<e=>);
+constant %loose_and       = (:prec<d=>, :assoc<left>,  :assign);
+constant %loose_or        = (:prec<c=>, :assoc<left>,  :assign);
+constant %LOOSEST         = (:prec<a=!>);
+constant %terminator      = (:prec<a=>, :assoc<list>);
 
 # "epsilon" tighter than terminator
 #constant $LOOSEST = %LOOSEST<prec>;
@@ -198,8 +198,7 @@ class Terminator      does PrecOp[|%terminator]             {} # end class
 
 # The endsym context, if specified, says what to implicitly check for in each
 # rule right after the initial <sym>.  Normally this is used to make sure
-# there's appropriate whitespace, though Perl 6 also uses it to rule out
-# the => (fatarrow) construct.  Note that endsym isn't called if <sym>
+# there's appropriate whitespace.  # Note that endsym isn't called if <sym>
 # isn't called.
 
 my $endsym is context = "null";
@@ -1153,8 +1152,8 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     {*}
 }
 
-token lex1 (Str $s) {
-    {{ $<O>{$s}++ or self.panic("Nested $s metaoperators not allowed"); }}
+method lex1 (Str $s) {
+    self.<O>{$s}++ or self.panic("Nested $s metaoperators not allowed");
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
@@ -1979,17 +1978,17 @@ method nibble ($lang) {
 }
 
 #token quote:sym<' '>   { <?before "'"  > <quotesnabber(":q")>        }
-token quote:sym<' '>   { "'" <nibble(Perl::Q.mixin('Perl::Q_q'))> "'" }
-token quote:sym<" ">   { '"' <nibble(Perl::Q.mixin('Perl::Q_qq'))> '"' }
+token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q))> "'" }
+token quote:sym<" ">   { '"' <nibble(Perl::Q.tweak(:qq))> '"' }
 
 token quote:sym<« »>   { <?before '«'  > <quotesnabber(":qq",":ww")> }
 token quote:sym«<< >>» { <?before '<<' > <quotesnabber(":qq",":ww")> }
-token quote:sym«< >»   { <?before '<'  > <nibble(Perl::Q.tweak(:q).tweak(:w))>  }
+token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w))> '>'  }
 
 token quote:sym</ />   {
     <?before '/'  > <quotesnabber(":regex")>
     [ (< i g s m x c e ] >+) 
-        # note: only the submatch fails here on the obs call
+        # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
         [ $0 ~~ 'g' <obs('/g',':g')> ]?
         [ $0 ~~ 's' <obs('/s','^^ and $$ anchors')> ]?
@@ -2490,82 +2489,118 @@ token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     {*}
 }
 
-role Q_b {
-    token escape:sym<\\> { <sym> <item=backslash> }
-    token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
-    token backslash:sym<\\> { <text=sym> }
-    token backslash:stopper { <text=stopper> }
-    token backslash:a { <sym> }
-    token backslash:b { <sym> }
-    token backslash:c { <sym>
-        [
-        || '[' <-[ \] \v ]>* ']'
-        || <codepoint>
-        ]
-    }
-    token backslash:e { <sym> }
-    token backslash:f { <sym> }
-    token backslash:n { <sym> }
-    token backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
-    token backslash:r { <sym> }
-    token backslash:t { <sym> }
-    token backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
-    token backslash:sym<0> { <sym> }
-} # end role
-
-role Q_NOTb {
-    token escape:sym<\\> { <!> }
-} # end role
-
-role Q_c {
-    token escape:sym<{ }> { <?before '{'> <block> }
-} # end role
-
-role Q_NOTc {
-    token escape:sym<{ }> { <!> }
-} # end role
-
-role Q_s {
-    token escape:sym<$> { <?before '$'> <variable> <extrapost>? }
-} # end role
-
-role Q_NOTs {
-    token escape:sym<$> { <!> }
-} # end role
-
-role Q_a {
-    token escape:sym<@> { <?before '@'> <variable> <extrapost> }
-} # end role
-
-role Q_NOTa {
-    token escape:sym<@> { <!> }
-} # end role
-
-role Q_h {
-    token escape:sym<%> { <?before '%'> <variable> <extrapost> }
-} # end role
-
-role Q_NOTh {
-    token escape:sym<%> { <!> }
-} # end role
-
-role Q_f {
-    token escape:sym<&> { <?before '&'> <variable> <extrapost> }
-} # end role
-
-role Q_NOTf {
-    token escape:sym<&> { <!> }
-} # end role
-
-role Q_w {
-    method postprocess ($s) { $s.comb }
-} # end role
-
-role Q_NOTw {
-    method postprocess ($s) { $s }
-} # end role
-
 grammar Q is Perl {
+    role b {
+        token escape:sym<\\> { <sym> <item=backslash> }
+        token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
+        token backslash:sym<\\> { <text=sym> }
+        token backslash:stopper { <text=stopper> }
+        token backslash:a { <sym> }
+        token backslash:b { <sym> }
+        token backslash:c { <sym>
+            [
+            || '[' <-[ \] \v ]>* ']'
+            || <codepoint>
+            ]
+        }
+        token backslash:e { <sym> }
+        token backslash:f { <sym> }
+        token backslash:n { <sym> }
+        token backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
+        token backslash:r { <sym> }
+        token backslash:t { <sym> }
+        token backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+        token backslash:sym<0> { <sym> }
+    } # end role
+
+    role _b {
+        token escape:sym<\\> { <!> }
+    } # end role
+
+    role c {
+        token escape:sym<{ }> { <?before '{'> <block> }
+    } # end role
+
+    role _c {
+        token escape:sym<{ }> { <!> }
+    } # end role
+
+    role s {
+        token escape:sym<$> { <?before '$'> <variable> <extrapost>? }
+    } # end role
+
+    role _s {
+        token escape:sym<$> { <!> }
+    } # end role
+
+    role a {
+        token escape:sym<@> { <?before '@'> <variable> <extrapost> }
+    } # end role
+
+    role _a {
+        token escape:sym<@> { <!> }
+    } # end role
+
+    role h {
+        token escape:sym<%> { <?before '%'> <variable> <extrapost> }
+    } # end role
+
+    role _h {
+        token escape:sym<%> { <!> }
+    } # end role
+
+    role f {
+        token escape:sym<&> { <?before '&'> <variable> <extrapost> }
+    } # end role
+
+    role _f {
+        token escape:sym<&> { <!> }
+    } # end role
+
+    role w {
+        token stopper { '>' } # wrong
+        method postprocess ($s) { $s.comb }
+    } # end role
+
+    role _w {
+        method postprocess ($s) { $s }
+    } # end role
+
+    role q {
+        token stopper { \' }
+        token starter { <!> }
+
+        token escape:sym<\\> { <sym> <item=backslash> }
+
+        token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
+        token backslash:sym<\\> { <text=sym> }
+        token backslash:stopper { <text=stopper> }
+
+        # in single quotes, keep backslash on random character by default
+        token backslash:misc { :: (.) { $<text> = "\\$0"; } }
+
+        # begin tweaks (DO NOT ERASE)
+        multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
+        multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
+        multi method tweak (*%x) { self.super('tweak', %x) }
+        # end tweaks (DO NOT ERASE)
+
+    } # end grammar
+
+    role qq does b does c does s does a does h does f {
+        token stopper { \" }
+        token starter { <!> }
+        # in double quotes, omit backslash on random \W backslash by default
+        token backslash:misc { :: [ (\W) { $<text> = "$0"; } | (\w) <.panic: "unrecognized backslash sequence: '\\$0'"> ] }
+
+        # begin tweaks (DO NOT ERASE)
+        multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
+        multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
+        multi method tweak (*%x) { self.super('tweak', %x) }
+        # end tweaks (DO NOT ERASE)
+
+    } # end grammar
+
     # note: polymorphic over many quote languages, we hope
     token nibbler {
         :my $text = '';
@@ -2595,20 +2630,20 @@ grammar Q is Perl {
     }
 
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:single(:$q)) { ::Q_q; }
+    multi method tweak (:single(:$q)) { self.mixin( ::q ); }
 
-    multi method tweak (:double(:$qq)) { ::Q_qq; }
+    multi method tweak (:double(:$qq)) { self.mixin( ::qq ); }
 
-    multi method tweak (:backslash(:$b))   { self.mixin($b ?? ::Q_b !! ::Q_NOTb) }
-    multi method tweak (:scalar(:$s))      { self.mixin($s ?? ::Q_s !! ::Q_NOTs) }
-    multi method tweak (:array(:$a))       { self.mixin($a ?? ::Q_a !! ::Q_NOTa) }
-    multi method tweak (:hash(:$h))        { self.mixin($h ?? ::Q_h !! ::Q_NOTh) }
-    multi method tweak (:function(:$f))    { self.mixin($f ?? ::Q_f !! ::Q_NOTf) }
-    multi method tweak (:closure(:$c))     { self.mixin($c ?? ::Q_c !! ::Q_NOTc) }
+    multi method tweak (:backslash(:$b))   { self.mixin($b ?? ::b !! ::_b) }
+    multi method tweak (:scalar(:$s))      { self.mixin($s ?? ::s !! ::_s) }
+    multi method tweak (:array(:$a))       { self.mixin($a ?? ::a !! ::_a) }
+    multi method tweak (:hash(:$h))        { self.mixin($h ?? ::h !! ::_h) }
+    multi method tweak (:function(:$f))    { self.mixin($f ?? ::f !! ::_f) }
+    multi method tweak (:closure(:$c))     { self.mixin($c ?? ::c !! ::_c) }
 
-    multi method tweak (:exec(:$x))        { self.mixin($x ?? ::Q_x !! ::Q_NOTx) }
-    multi method tweak (:words(:$w))       { self.mixin($w ?? ::Q_w !! ::Q_NOTw) }
-    multi method tweak (:quotewords(:$ww)) { self.mixin($ww ?? ::Q_ww !! ::Q_NOTww) }
+    multi method tweak (:exec(:$x))        { self.mixin($x ?? ::x !! ::_x) }
+    multi method tweak (:words(:$w))       { self.mixin($w ?? ::w !! ::_w) }
+    multi method tweak (:quotewords(:$ww)) { self.mixin($ww ?? ::ww !! ::_ww) }
 
     multi method tweak (:heredoc(:$to)) {
         # $.parser = &Perl::q_heredoc;
@@ -2636,67 +2671,34 @@ grammar Q is Perl {
 
 } # end grammar
 
-grammar Q_q is Q {
-    token stopper { \' }
-    token starter { <!> }
-
-    token escape:sym<\\> { <sym> <item=backslash> }
-
-    token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
-    token backslash:sym<\\> { <text=sym> }
-    token backslash:stopper { <text=stopper> }
-
-    # in single quotes, keep backslash on random character by default
-    token backslash:misc { :: (.) { $<text> = "\\$0"; } }
-
-    # begin tweaks (DO NOT ERASE)
-    multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
-    multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
-    # end tweaks (DO NOT ERASE)
-
-} # end grammar
-
-grammar Q_qq is Q does Q_b does Q_c does Q_s does Q_a does Q_h does Q_f {
-    token stopper { \" }
-    token starter { <!> }
-    # in double quotes, omit backslash on random \W backslash by default
-    token backslash:misc { :: [ (\W) { $<text> = "$0"; } | (\w) <.panic: "unrecognized backslash sequence: '\\$0'"> ] }
-
-    # begin tweaks (DO NOT ERASE)
-    multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
-    multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
-    # end tweaks (DO NOT ERASE)
-
-} # end grammar
-
-token q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {
-    $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!$stop>. ] ]*? ]
-    <stop=$stop>
-    {*}
-}
-
-token q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
-    $stop
-    $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!before $stop >. ] ]*? ]
-    $stop
-    {*}
-}
-
-# We get here only for escapes in escape set, even though more are defined.
-method q_escape ($lang) {
-    $lang<escrule>(self);
-}
-
-token quote_escapes {
-    [
-    || \\ <qq_backslash>
-    || <?before '{'> <block>
-    || <?before '$'> <variable> <extrapost>?
-    || <variable> <extrapost>
-    || .
-    ]
-    {*}
-}
+#token q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {
+#    $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!$stop>. ] ]*? ]
+#    <stop=$stop>
+#    {*}
+#}
+#
+#token q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
+#    $stop
+#    $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!before $stop >. ] ]*? ]
+#    $stop
+#    {*}
+#}
+#
+## We get here only for escapes in escape set, even though more are defined.
+#method q_escape ($lang) {
+#    $lang<escrule>(self);
+#}
+#
+#token quote_escapes {
+#    [
+#    || \\ <qq_backslash>
+#    || <?before '{'> <block>
+#    || <?before '$'> <variable> <extrapost>?
+#    || <variable> <extrapost>
+#    || .
+#    ]
+#    {*}
+#}
 
 # Note, backtracks!  So post mustn't commit to anything permanent.
 regex extrapost {
@@ -3258,6 +3260,9 @@ token infix:sym<::=> ( --> Item_assignment)
 
 # XXX need to do something to turn subcall into method call here...
 token infix:sym<.=> ( --> Item_assignment)
+    { <sym> {*} }
+
+token infix:sym« => » ( --> Item_assignment)
     { <sym> {*} }
 
 # Note, other assignment ops generated by infix_postfix_meta_operator rule
