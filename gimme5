@@ -486,7 +486,6 @@ END
 		s/\./Dot/g;
 		s/\?/Question/g;
 		s/\//Slash/g;
-		s/\!/Bang/g;
 		s/(\W)/sprintf("_%02x_",ord($1))/eg;
 	    }
 	    $mangle = join '_', @list;
