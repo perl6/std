@@ -18,6 +18,8 @@ if (@ARGV) {
 
 use YAML::XS;
 
+our $SEQ = 0;
+
 our %OUR = ( '$CTX' => 1 );
 our %RE = ();                   # turns into __DATA__ yaml
 
@@ -47,6 +49,9 @@ our $ALTNAMES;
 our $PROTO;
 
 my %pkg_really;
+my @MULTIS;
+my %proto;
+my %protosig;
 
 my $TRACE = 0;
 my $METHOD = "method";
@@ -68,8 +73,10 @@ sub un6 {
     my $t;
     while ($f ne "") {
         $f =~ s/^\)</.</                  	and $t .= ')', next;
+	$f =~ s/^\[\*-1\]//			and $t .= '[-1]';
         $f =~ s!^('.*?')!!              	and $t .= $1, next;
         $f =~ s!^(".*?")!!              	and $t .= $1, next;
+	$f =~ s!^ self\.WHAT!!			and $t .= ' ref($self)', next;
 	$f =~ s!^m:p5(\W)(.+?)\1/!!		and $t .= "m$1$2$1", next;
 	$f =~ s!^s:p5(\W)(.+?)\1(.*?)\1/!!	and $t .= "s$1$2$1$3$1", next;
         $f =~ s!^q/(.*?)/!!              	and $t .= "q/$1/", next;
@@ -85,19 +92,20 @@ sub un6 {
         $f =~ s/^([^:]):(\w+)«(.*?)»//  	and $t .= qq/$1$2 => '$3'/, next;
         $f =~ s/^([^:]):(\w+)//         	and $t .= qq/$1$2 => 1/, next;
         $f =~ s/^([^:]):!(\w+)//        	and $t .= qq/$1$2 => 0/, next;
+        $f =~ s/^\%::\((.*?)\)// 		and $t .= ('do { no strict "refs"; \%{' . $1 . '}}'), next;
         $f =~ s/^\%\+?(\w+)((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
         $f =~ s/^\%\+?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
         $f =~ s/^\%\+?(\w+)\{//         	and $t .= qq/\$$1\{/, next;
         $f =~ s/^\$(\w+)((<[^>]*>)+)//  	and $t .= ('$' . $1 . '->' . unangle($2)), next;
         $f =~ s/^[\$\@%]((<[^>]*>)+)//       	and $t .= ('$M->' . unangle($1)), $NEEDMATCH++, next;
         $f =~ s/^ \.((<[^>]*>)+)//      	and $t .= (' $_->' . unangle($1)), next;
-        $f =~ s/^(\s)<([^>) ,]*)>//       	and $t .= qq/$1qw($2)/, next;
+        $f =~ s/^(\s)<([^>) ,]*)>//       	and $t .= qq/$1q($2)/, next;
         $f =~ s/^(\s)<([^>),]*)>//       	and $t .= qq/$1\[qw($2)\]/, next;
-        $f =~ s/^(\s)<([^> ]*)>//        	and $t .= qq/$1qw[$2]/, next;
+        $f =~ s/^(\s)<([^> ]*)>//        	and $t .= qq/$1q[$2]/, next;
         $f =~ s/^(\s)<([^>]*)>//        	and $t .= qq/$1\[qw[$2]\]/, next;
-        $f =~ s/^«([^») ]*)»//      	        and $t .= qq/qw($1)/, next;
+        $f =~ s/^«([^») ]*)»//      	        and $t .= qq/q($1)/, next;
         $f =~ s/^«([^»)]*)»//      	        and $t .= qq/\[qw($1)\]/, next;
-        $f =~ s/^«([^» ]*)»//      	        and $t .= qq/qw[$1]/, next;
+        $f =~ s/^«([^» ]*)»//      	        and $t .= qq/q[$1]/, next;
         $f =~ s/^«([^»]*)»//      	        and $t .= qq/\[qw[$1]\]/, next;
         $f =~ s/^ «\s*([^»]+)»//        	and $t .= do {my $x=$1; $x =~ s! !','!g; "['$x']"}, next;
         $f =~ s/^ <\s*([^>]+)>//        	and $t .= do {my $x=$1; $x =~ s! !','!g; "['$x']"}, next;
@@ -210,9 +218,42 @@ sub panic {
 sub MAIN {
     my $out = "";
 
-    s/^(\s+)// and $out .= $1;
+    if (s/^\s*grammar Perl:ver.*;\n//) {
+	$PKG = 'Perl';
+	$out .= "package $PKG;\n";
+	$out .= <<'END';
+use Moose ':all' => { -prefix => "moose_" };
+moose_extends('Cursor5');
+no warnings 'qw';
+use feature 'state';
+use utf8;
+sub BUILD {
+    my $self = shift;
+    $self->{ws_from} = 0;
+    $self->{ws_to} = 0;
+}
+
+use YAML::XS;
+{
+    local $/;
+    my $yaml = <DATA>;
+    *::RE = Load($yaml);
+}
+
+END
+    }
+
     while ($_ ne "") {
+
         if ( s/^(#line.*\n)// ) { next }
+	if ( s/^([ \t]*\n)// ) { $out .= $1; next; };
+
+	if (s/^ (=begin \s+ (\w+) .*? \n =end \s+ \2 .*? \n) //sx) {
+	    my $c = $1;
+	    $c =~ s/^/# /mg;
+	    $out .= $c;
+	    next;
+	}
 
         if ( s/^(#.*\n)// ) { $out .= $1; next }
 
@@ -304,17 +345,182 @@ END
             next;
         }
 
-        s/^proto(.*?\{\.\.\.\})/#proto$1/; # original proto from STD.pm
+	if (s/^(proto \s+ (regex|rule|token) \s+
+	    (\w+) \s*
+	    (?:\(([^)]*)\))?.*?\{\.\.\.\}.*?\n)//x) {
+	    $out .= '#' . $1;
+	    my $name = $3;
+	    my $pkgname = $PKG . '::' . $name;
+	    $proto{$name}++;
+	    $protosig{$name} = $4;
+	    $out .= <<"END";
+sub $name {
+    my \$self = shift;
+    my \$subs;
 
-        if ( s/^(proto)?([ \t]*)(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
-            my $proto = $1;
-            my $indent = $2;
+    local \$CTX = \$self->callm() if \$DEBUG & 128;
+    if (\$self->{_peek}) {
+        return \$self->_AUTOLEXpeek('${PKG}::$name:*');
+    }
+
+    my \$C = \$self;
+
+    do {
+	my \$trystate;
+	my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$trystate);
+	my \@try = \$tag eq '$name' ? (\$try,\$relex) : ();
+    
+	my \@gather = ();
+	while (\@try and not \@gather) {
+	    my \$try = shift(\@try) // next;
+    
+	    # if first try failed, interrogate lexer for shorter answers
+	    if (ref \$try) {
+		if (ref \$try eq 'ARRAY') {
+		    (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
+		    print ::LOG "Retrying with \$tag \$try\\n" if \$DEBUG & 1024;
+		}
+		elsif (ref \$try eq 'CODE') {
+		    my \@more = \$relex->(\$C, \$trystate);
+		    if (\@more) {
+			unshift \@try, \@more, \$relex;   # ask relex for more
+		    }
+		    next;
+		}
+	    }
+    
+	    print ::LOG "$name trying \$tag \$try\\n" if \$DEBUG & 1024;
+	    push \@gather, \$C->\$try(\@_);
+	}
+	\@gather;
+    }
+}
+
+END
+	    next;
+	}
+
+	if (s/^([ \t]*)(?:multi\s+)?
+	    (regex|rule|token) \s+
+	    (\w+) ( :\w+ ( <.*?>
+			| «.*?»
+			| \{.*?\}
+			| \[.*?\]
+			)?
+		  ) \s*
+	    (?:\(([^)]*)\))?//x) {
+	    my $indent = $1;
+	    my $kind = $2;
+	    my $name = $3;
+	    my $adv = $4;
+	    my $sig = $6;
+
+	    my $newdflt = $adv;
+	    $newdflt =~ s/:(\w+)$/'$1'/ or
+	    $newdflt =~ s/:sym(<.*?>)/$1/ or
+	    $newdflt =~ s/:sym(«.*?»)/$1/ or
+	    $newdflt =~ s/:sym(\(.*?\))/$1/ or
+	    $newdflt =~ s/:sym(\[.*?\])/$1/;
+
+	    my $newparm = ":\$sym is context<rw> = $newdflt";
+
+	    my $newsig = $protosig{$name} || "";
+	    if ($sig and $sig =~ s/( --> \w*$)//) { $newsig .= ' ' . $1 }
+	    if ($newsig =~ /^\s*-->/) {
+		$newsig =~ s/-->/$newparm -->/;
+	    }
+	    elsif ($newsig =~ /-->/) {
+		$newsig =~ s/-->/, $newparm -->/;
+	    }
+	    elsif ($newsig) {
+		$newsig .= ', ' . $newparm;
+	    }
+	    else {
+		$newsig = $newparm;
+	    }
+	    my $mangle = $adv;
+	    $mangle =~ s/^:(sym)?//;
+	    my @list;
+	    if ($mangle =~ s/^<(.*)>$/$1/ or
+		$mangle =~ s/^«(.*)»$/$1/) {
+		@list = $mangle =~ /(\S+)/g;
+	    }
+	    elsif ($mangle =~ s/^\[(.*)\]$/$1/ or
+		$mangle =~ s/^\{(.*)\}$/$1/) {
+		@list = eval $mangle;
+	    }
+	    else {
+		@list = $mangle;
+	    }
+	    for (@list) {
+		s/\`/Grave/g;
+		s/\~/Tilde/g;
+		s/\!/Bang/g;
+		s/\@/At/g;
+		s/\#/Sharp/g;
+		s/\$/Dollar/g;
+		s/\%/Percent/g;
+		s/\^/Caret/g;
+		s/\&/Amp/g;
+		s/\*/Star/g;
+		s/\(/Par/g;
+		s/\)/En/g;
+		s/\-/Minus/g;
+		s/\+/Plus/g;
+		s/\=/Equal/g;
+		s/\{/Cur/g;
+		s/\}/Ly/g;
+		s/\[/Bra/g;
+		s/\]/Ket/g;
+		s/\|/Vert/g;
+		s/\\/Back/g;
+		s/\:/Colon/g;
+		s/\;/Semi/g;
+		s/\'/Single/g;
+		s/\"/Double/g;
+		s/\</Lt/g;
+		s/\>/Gt/g;
+		s/\«/Fre/g;
+		s/\»/Nch/g;
+		s/\,/Comma/g;
+		s/\./Dot/g;
+		s/\?/Question/g;
+		s/\//Slash/g;
+		s/\!/Bang/g;
+		s/(\W)/sprintf("_%02x_",ord($1))/eg;
+	    }
+	    $mangle = join '_', @list;
+	    $mangle = $name . '__S_' . sprintf("%03d",$SEQ++) . $mangle;
+	    my $multis = $MULTIS[-1];
+	    push(@{$$multis{$name}}, $mangle);
+	    substr($_,0,0,"$indent$kind $mangle ($newsig) ")
+	}
+
+	if (s/^(\s*}) # end (role|class|grammar).*\n/$1 ## end $2\n/) {
+	    my $multis = pop @MULTIS;
+	    my $proto = "";
+	    foreach my $name (sort keys %$multis) {
+		$proto .= "    proto token $name {\n";
+		for (@{$$multis{$name}}) {
+		    $proto .= "        | <.$_>\n";
+		}
+		$proto .= "    }\n\n";
+	    }
+
+	    $PKG = pop(@PKG) if @PKG;
+
+	    $_ = $proto . $_;
+	}
+
+        if ( s/^([ \t]*)(proto)?\s*(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
+            my $indent = $1;
+            my $proto = $2;
             local $KIND = $3;
             my $ws = $4;
             local $NAME = $5;
             my $argstuff = $6;
 
-            my $comment = "$2$3$4$5$6\n";
+            my $comment = "$1$3$4$5$6\n";
             $comment =~ s/^/## /mg;
             $out .= $comment;
 
@@ -570,31 +776,8 @@ END
                 next;
             }
             $line = un6($line);
-            if ($line =~ s/^grammar (\w+);//) {
-                $PKG = $1;
-                $out .= "package $PKG;\n";
-                $out .= <<'END';
-use Cursor5;
-use base 'Cursor5';
-use strict;
-use warnings; no warnings 'qw';
-use feature 'state';
-use utf8;
-sub BUILD {
-    my $self = shift;
-    $self->{ws_from} = 0;
-    $self->{ws_to} = 0;
-}
 
-use YAML::XS;
-{
-    local $/;
-    my $yaml = <DATA>;
-    *::RE = Load($yaml);
-}
-
-END
-            }
+	    $line =~ s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
             $line =~ s/^(\s*has) /#$1 /;
             $line =~ s/\bsay /print / and ($line =~ s/";$/\\n";/ or $line =~ s/;$/,"\\n";/);
             $line =~ s/&reduce = ->/\$reduce = sub/;
@@ -609,31 +792,93 @@ END
             $line =~ s/^constant /my /;
             $line =~ s/\bmy ([A-Z]\w+) /my /;
 
-            $line =~ s/class (\w+)\s+\{/{ package ${PKG}::$1;/
-                    and do { push(@PKG, $PKG); $pkg_really{$1} = $PKG = "${PKG}::$1"; };    # "our" semantics
-            $line =~ s/class (\w+)\s+does\s+(\w+)\s+\{/{ package ${PKG}::$1; our \@ISA = 'Perl::$2';/
-                    and do { push(@PKG, $PKG); $pkg_really{$1} = $PKG = "${PKG}::$1"; };
-
-            $line =~ s/^(\s*)grammar (\w+)\s*\{/${1}{ package ${PKG}::$2;/
+            $line =~ s/(\s*)class (\w+)\s*(.*?)\s+\{/${1}{ package ${PKG}::$2;\n$1    use Moose ':all' => { -prefix => "moose_" };/
                     and do {
-			push(@PKG, $PKG); $pkg_really{$2} = $PKG = "${PKG}::$2";
-		    };
-            $line =~ s/^(\s*)(?:grammar|role) (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2; our \@ISA = ();/
-                    and do {
+			my $ws = $1;
 			my $name = $2;
 			my $is = $3;
-			my @parents;
-			for (split ' ', $is) {
-			    push @parents, $pkg_really{$_} || "${PKG}::$_" unless /^(is|does)/;
+			my @is;
+			my @does;
+			my @list = split ' ', $is;
+			my $which;
+			while (@list) {
+			    my $next = shift @list;
+			    if ($next eq 'is') {
+				$which = \@is;
+			    }
+			    elsif ($next eq 'does') {
+				$which = \@does;
+			    }
+			    else {
+				push @$which, $pkg_really{$next} || "${PKG}::$next";
+			    }
 			}
 			push(@PKG, $PKG);
 			$pkg_really{$name} = $PKG = "${PKG}::$name";
-			$is = "qw(@parents)";
-			$line =~ s/\(\)/$is/;
-			$line =~ s/Perl::Perl/Perl/g;
+			$line .= "$ws    moose_extends(qw(@is)); " if @is;
+			$line .= "$ws    moose_with(qw(@does));" if @does;
+			$pkg_really{$1} = $PKG = "${PKG}::$1";
+			push(@MULTIS, {});
 		    };
 
-            $PKG = pop(@PKG) if @PKG and $line =~ /} # end (role|class|grammar)/;
+            $line =~ s/^(\s*)grammar (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2;\n$1    use Moose ':all' => { -prefix => "moose_" };/
+                    and do {
+			my $ws = $1;
+			my $name = $2;
+			my $is = $3;
+
+			my @is;
+			my @does;
+			my @list = split ' ', $is;
+			my $which;
+			while (@list) {
+			    my $next = shift @list;
+			    if ($next eq 'is') {
+				$which = \@is;
+			    }
+			    elsif ($next eq 'does') {
+				$which = \@does;
+			    }
+			    else {
+				push @$which, $pkg_really{$next} || "${PKG}::$next";
+			    }
+			}
+			push(@PKG, $PKG);
+			$pkg_really{$name} = $PKG = "${PKG}::$name";
+			$line .= "$ws    moose_extends(qw(@is));" if @is;
+			$line .= "$ws    moose_with(qw(@does));" if @does;
+			$line =~ s/Perl::Perl/Perl/g;
+			push(@MULTIS, {});
+		    };
+
+            $line =~ s/^(\s*)role (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2;\n$1    use Moose::Role ':all' => { -prefix => "moose_" };/
+                    and do {
+			my $ws = $1;
+			my $name = $2;
+			my $is = $3;
+			my @is;
+			my @does;
+			my @list = split ' ', $is;
+			my $which;
+			while (@list) {
+			    my $next = shift @list;
+			    if ($next eq 'is') {
+				$which = \@is;
+			    }
+			    elsif ($next eq 'does') {
+				$which = \@does;
+			    }
+			    else {
+				push @$which, $pkg_really{$next} || "${PKG}::$next";
+			    }
+			}
+			push(@PKG, $PKG);
+			$pkg_really{$name} = $PKG = "${PKG}::$name";
+			$line .= "$ws    moose_extends(qw(@is));" if @is;
+			$line .= "$ws    moose_with(qw(@does));" if @does;
+			$line =~ s/Perl::Perl/Perl/g;
+			push(@MULTIS, {});
+		    };
 
             $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
             $line =~ s/(\S+) xx /($1) x /;
@@ -843,7 +1088,7 @@ sub sequence {
             $k->remove_leading_ws();
         }
         push(@kids, $k);
-        $lastws = ref $k eq 'RE_method_noarg' && $k->{name} eq 'ws';
+        $lastws = ref $k eq 'RE_method' && $k->{name} eq 'ws';
         my $kidmin = $k->{min};
         $min += $kidmin;
     }
@@ -915,8 +1160,8 @@ sub atom {
     }
     if (/^[\s\#]/ and $KIND eq 'rule') {
         wsany();
-        return bless { name => 'ws', nobind => 1, noquant => 1, min => 0 },
-            "RE_method_noarg";
+        return bless { name => 'ws', nobind => 1, noquant => 1, min => 0, rest => '' },
+            "RE_method";
     }
     return if /^ [\]&|)] /x;   # XXX an approximation
     return if /^ (?:
@@ -1162,7 +1407,7 @@ sub assertion {
 		    s/^/»/ if $SYM =~ /\w$/;
 		}
             }
-            return bless { name => $word, min => 12345 }, "RE_method_noarg";
+            return bless { name => $word, min => 12345, rest => '' }, "RE_method";
         }
         if ($ch eq ':') {
             my $code = code('>');
@@ -1191,7 +1436,7 @@ sub assertion {
             return bless { name => $code, rest => $1, min => 0 }, "RE_method";
         }
         else {
-            return bless { name => $code, min => 0 }, "RE_method_noarg";
+            return bless { name => $code, min => 0, rest => '' }, "RE_method";
         }
     }
 
@@ -1522,9 +1767,10 @@ sub unbalanced {
     }
 }
 
-{ package RE_method_noarg; use base "REbase";
+{ package RE_method; use base "REbase";
     sub walk {
         my $self = shift;
+        my $rest = ::un6($$self{rest}) // '';
         my $name = $$self{name};
         ::panic("Can't reverse $name") if $REV;
         $PURE = 0 if $impure{$name};
@@ -1540,7 +1786,7 @@ sub unbalanced {
             $re = '$self->SUPER::' . $NAME . '(@origargs)';
         }
         elsif ($name =~ /^\w/) {
-            $re = '$C->' . $name . "()";
+            $re = '$C->' . $name . $rest;
         }
         else {
             $re = <<"END";
@@ -1557,7 +1803,7 @@ do {
         }
     }
     else {
-        \$C->$name();
+        \$C->$name$rest;
     }
 }
 END
@@ -1566,6 +1812,7 @@ END
 	    push @BINDINGS, $name;
 	    $BINDINGS{$name} += $BINDNUM;
 	}
+        $re = 'do { my $M = $C; ' . $re . '; }' if $NEEDMATCH;
 	$self->bind($re);
     }
 }
@@ -1611,25 +1858,6 @@ END
         my $self = shift;
         my $re = $$self{re};
         $re->remember_alts(@_);
-    }
-}
-
-{ package RE_method; use base "REbase";
-    sub walk {
-        my $self = shift;
-        local $NEEDMATCH = 0;
-        my $rest = ::un6($$self{rest});
-        my $name = $$self{name};
-        ::panic("Can't reverse $name") if $REV;
-        $PURE = 0 if $impure{$name};
-
-        my $re = "\$C->$name$rest";
-        $re = 'do { my $M = $C; ' . $re . '; }' if $NEEDMATCH;
-	if ($name =~ /^\w/ and not $self->{nobind}) {
-	    push @BINDINGS, $name;
-	    $BINDINGS{$name} += $BINDNUM;
-	}
-        $self->bind($re);
     }
 }
 
@@ -1881,7 +2109,7 @@ END
 
             shift(@kids) while
                 @kids and
-                ref $kids[0] eq 'RE_method_noarg' and
+                ref $kids[0] eq 'RE_method' and
                 $kids[0]->{name} eq 'ws';
 
             $kids[0]->remove_leading_ws() if @kids;

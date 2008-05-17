@@ -148,48 +148,103 @@ constant %terminator      = (:prec<a=>, :assoc<list>);
 #constant $LOOSEST = %LOOSEST<prec>;
 constant $LOOSEST = "a=!"; # XXX preceding line is busted
 
-role PrecOp[*%defaults] {
+role PrecOp {
 
     # This is hopefully called on a match to mix in operator info by type.
-    method &.(Match $m) {
+    method coerce(Match $m) {
 #        $m but= ::?CLASS;
-        my %d = (%defaults); 
-        if not %d<transparent> {
-            for keys(%d) { $m<O>{$_} = %d{$_} };
+        my $var = self.WHAT ~ '::o';
+        my $d = %::($var); 
+        if not $d<transparent> {
+            for keys(%$d) { $m<O>{$_} = $d.{$_} };
             warn "coercing to " ~ self ~ "\n" if $DEBUG +& 32;
         }
         return $m;
     }
 } # end role
 
-class Hyper           does PrecOp[:transparent]             {} # end class
+class Hyper does PrecOp {
+ our %o = (:transparent);
+} # end class
 
-class Term            does PrecOp[|%term]                   {} # end class
-class Methodcall      does PrecOp[|%methodcall]             {} # end class
-class Autoincrement   does PrecOp[|%autoincrement]          {} # end class
-class Exponentiation  does PrecOp[|%exponentiation]         {} # end class
-class Symbolic_unary  does PrecOp[|%symbolic_unary]         {} # end class
-class Multiplicative  does PrecOp[|%multiplicative]         {} # end class
-class Additive        does PrecOp[|%additive]               {} # end class
-class Replication     does PrecOp[|%replication]            {} # end class
-class Concatenation   does PrecOp[|%concatenation]          {} # end class
-class Junctive_and    does PrecOp[|%junctive_and]           {} # end class
-class Junctive_or     does PrecOp[|%junctive_or]            {} # end class
-class Named_unary     does PrecOp[|%named_unary]            {} # end class
-class Nonchaining     does PrecOp[|%nonchaining]            {} # end class
-class Chaining        does PrecOp[|%chaining]               {} # end class
-class Tight_and       does PrecOp[|%tight_and]              {} # end class
-class Tight_or        does PrecOp[|%tight_or]               {} # end class
-class Conditional     does PrecOp[|%conditional]            {} # end class
-class Item_assignment does PrecOp[|%item_assignment]        {} # end class
-class Loose_unary     does PrecOp[|%loose_unary]            {} # end class
-class Comma           does PrecOp[|%comma]                  {} # end class
-class List_infix      does PrecOp[|%list_infix]             {} # end class
-class List_assignment does PrecOp[|%list_assignment]        {} # end class
-class List_prefix     does PrecOp[|%list_prefix]            {} # end class
-class Loose_and       does PrecOp[|%loose_and]              {} # end class
-class Loose_or        does PrecOp[|%loose_or]               {} # end class
-class Terminator      does PrecOp[|%terminator]             {} # end class
+class Term does PrecOp {
+    our %o = %term;
+} # end class
+class Methodcall does PrecOp {
+    our %o = %methodcall;
+} # end class
+class Autoincrement does PrecOp {
+    our %o = %autoincrement;
+} # end class
+class Exponentiation does PrecOp {
+    our %o = %exponentiation;
+} # end class
+class Symbolic_unary does PrecOp {
+    our %o = %symbolic_unary;
+} # end class
+class Multiplicative does PrecOp {
+    our %o = %multiplicative;
+} # end class
+class Additive does PrecOp {
+    our %o = %additive;
+} # end class
+class Replication does PrecOp {
+    our %o = %replication;
+} # end class
+class Concatenation does PrecOp {
+    our %o = %concatenation;
+} # end class
+class Junctive_and does PrecOp {
+    our %o = %junctive_and;
+} # end class
+class Junctive_or does PrecOp {
+    our %o = %junctive_or;
+} # end class
+class Named_unary does PrecOp {
+    our %o = %named_unary;
+} # end class
+class Nonchaining does PrecOp {
+    our %o = %nonchaining;
+} # end class
+class Chaining does PrecOp {
+    our %o = %chaining;
+} # end class
+class Tight_and does PrecOp {
+    our %o = %tight_and;
+} # end class
+class Tight_or does PrecOp {
+    our %o = %tight_or;
+} # end class
+class Conditional does PrecOp {
+    our %o = %conditional;
+} # end class
+class Item_assignment does PrecOp {
+    our %o = %item_assignment;
+} # end class
+class Loose_unary does PrecOp {
+    our %o = %loose_unary;
+} # end class
+class Comma does PrecOp {
+    our %o = %comma;
+} # end class
+class List_infix does PrecOp {
+    our %o = %list_infix;
+} # end class
+class List_assignment does PrecOp {
+    our %o = %list_assignment;
+} # end class
+class List_prefix does PrecOp {
+    our %o = %list_prefix;
+} # end class
+class Loose_and does PrecOp {
+    our %o = %loose_and;
+} # end class
+class Loose_or does PrecOp {
+    our %o = %loose_or;
+} # end class
+class Terminator does PrecOp {
+    our %o = %terminator;
+} # end class
 
 # Categories are designed to be easily extensible in derived grammars
 # by merely adding more rules in the same category.  The rules within
@@ -242,6 +297,9 @@ proto token postfix is unary is defequiv(%autoincrement) {...}
 
 token category:dotty { <sym> }
 proto token dotty (:$endsym is context = 'unspacey') {...}
+
+token category:escape { <sym> }
+proto token escape () {...}
 
 token category:circumfix { <sym> }
 proto token circumfix {...}

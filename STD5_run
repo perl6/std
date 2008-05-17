@@ -32,13 +32,12 @@ sub main {
 	print_usage_and_exit if !-f $fn;
 	$input = "`cat $fn`";
     }
-    if(-e 'STD.pm' and -e 'cheat') { # We're in the right place.
+    if(-e 'STD.pm' and -e 'gimme5') { # We're in the right place.
 	# pretend we're 'make'
 	if(!-e 'STD5.pm' or
 		-M 'STD5.pm' > -M 'STD.pm' or
-		-M 'STD5.pm' > -M 'cheat' or
 		-M 'STD5.pm' > -M 'gimme5') {
-	    system("./cheat STD.pm | ./gimme5 $fo >STD5.pm");
+	    system("./gimme5 $fo STD.pm >STD5.pm");
 	    system("rm -f lex/*");
 	}
     }

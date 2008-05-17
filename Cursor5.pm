@@ -10,12 +10,14 @@ our $DEBUG = $ENV{STD5DEBUG} // 0;
     # 64 matchers
     # 128 trace call/return
     # 256 cursors
-    # 512 callm show subnames
     # 1024 try processing in STD5.pm
     # 2048 mixins
+    # 16384 callm show subnames
 
 package Cursor5;
 $::DEBUG //= 0;
+
+use Moose ':all' => { -prefix => 'moose_' };
 
 use strict;
 use warnings;
@@ -70,41 +72,12 @@ sub mixin {
     no strict 'refs';
     if (not @{$WHAT.'::ISA'}) {		# never composed this one yet?
 	# fake up mixin with MI, being sure to put "roles" in front
-	my $eval = "package $WHAT; our \@ISA = (" . join(',', map {"'$_'"} @mixins) . ",'$self');\n";
+	my $eval = "package $WHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$self'); moose_with(" . join(',', map {"'$_'"} @mixins) . ");\n";
 	print ::LOG $eval if $DEBUG & 2048;
 	eval $eval;
+	warn $@ if $@;
     }
     return $WHAT;
-}
-
-# alas, p5's SUPER is not correct for this
-sub super {
-    my $self = shift;
-    my $meth = shift;
-    my $type = ref $self || $self;
-    my ($caller) = caller;
-    no strict 'refs';
-    my @supers = @{$type . '::ISA'};
-    if (wantarray) {
-	my @result;
-	for my $super (@supers) {
-	    next if $super eq $caller;
-	    my $supmeth = $super . '::' . $meth;
-	    print ::LOG "super attempting $supmeth\n" if $DEBUG & 2048;
-	    last if defined eval { @result = $self->$supmeth(@_); };
-	}
-	@result;
-    }
-    else {
-	my $result;
-	for my $super (@supers) {
-	    next if $super eq $caller;
-	    my $supmeth = $super . '::' . $meth;
-	    print ::LOG "super attempting $supmeth\n" if $DEBUG & 2048;
-	    last if defined eval { $result = $self->$supmeth(@_); };
-	}
-	$result;
-    }
 }
 
 use YAML::XS;
@@ -191,18 +164,46 @@ sub _AUTOLEXgen { my $self = shift;
     my $lexer = {};
     (my $file = $key) =~ s/::/--/g;
     $file =~ s/^Perl--//;
+    $file =~ s/:\*$//;
     if (-s "lex/$file") {
 	$lexer = loadlexer($key);
     }
     else {
 	{ package RE_base; 1; }
-	my $ast = $::RE{$key};	# should be per package
+	my @pat;
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
-
 	$AUTOLEXED{$key} = $fakepos;
-	my @pat = $ast->longest($self->cursor_peek());
+	my $ast = $::RE{$key};	# should be per package
+	if ($ast) {
+	    @pat = $ast->longest($self->cursor_peek());
+	}
+	else {	# a protomethod, look up all methods it can call
+	    my $proto = $key;
+	    if ($proto =~ s/.*::(\w+):\*$/${1}/) {
+		my $protopat = $proto . '__S_';
+		my $protolen = length($protopat);
+		my $altnum = 0;
+		for my $class ($self->meta->linearized_isa) {
+		    for my $method (sort $class->meta->get_method_list) {
+			if (substr($method,0,$protolen) eq $protopat) {
+			    my $peeklex = $self->_AUTOLEXpeek($class . '::' . $method);
+			    if ($peeklex and $peeklex->{PATS}) {
+				my @alts = @{$peeklex->{PATS}};
+				for my $alt (@alts) {
+				    $alt .= "\t(?#FATE)" unless $alt =~ /FATE/;
+				    $alt =~ s/\(\?#FATE/(?#FATE $proto ${class}::$method/;
+				    $altnum++;
+				}
+				push @pat, @alts;
+			    }
+			}
+		    }
+		}
+	    }
+	}
 	for (@pat) {
 	    s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
+	    s/(\(\?#::\))+/(?#::)/;
 	}
 	warn "(null pattern)" unless @pat;
 	my $pat = join("\n", @pat);
@@ -217,8 +218,8 @@ sub _AUTOLEXgen { my $self = shift;
 	close($cache) or die "Can't close: $!";
 	print ::LOG "regenerated lex/$file\n" if $DEBUG & 1;
 	# force operator precedence method to look like a term
-	if ($file eq 'Perl--expect_term') {
-	    system 'cp lex/Perl--expect_term lex/Perl--EXPR';
+	if ($file eq 'expect_term') {
+	    system 'cp lex/expect_term lex/EXPR';
 	}
     }
     $lexer;
@@ -228,9 +229,10 @@ sub loadlexer {
     my $key = shift;
     (my $file = $key) =~ s/::/--/g;
     $file =~ s/^Perl--//;
+    $file =~ s/:\*$//;
     print ::LOG "using cached lex/$file\n" if $DEBUG & 1;
 
-    open(LEX, "lex/$file") or die "No lexer!";
+    open(LEX, "lex/$file") or die "No lexer for $key!";
     binmode(LEX, ":utf8");
 
     my @pat = <LEX>;
@@ -379,7 +381,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    print ::LOG "#FATES: ", 0+@$fates, "\n" if $DEBUG & 1;
 
 	    for my $i (0..@$fates-1) {
-		print ::LOG $i, ': ', $fates->[$i][3], "\n" if $DEBUG & 1;
+		print ::LOG "\t", $i, ': ', $fates->[$i][3], "\n" if $DEBUG & 1;
 	    }
 	    for my $pat (@pats) {
 		$pat =~ s/\.\?$//;	# ltm backoff doesn't need tre workaround
@@ -636,7 +638,7 @@ sub callm { my $self = shift;
 
     my $lvl = 0;
     my @subs;
-    if ($DEBUG & 512) {
+    if ($DEBUG & 16384) {
 	while (my @c = caller($lvl)) { $lvl++; (my $s = $c[3]) =~ s/^.*:://; $s =~ s/^__ANON//; push @subs, $s; }
 	splice(@subs, 0, 2);
     }
@@ -1587,9 +1589,10 @@ sub fail { my $self = shift;
     }
 }
 
-{ package RE_method_noarg; our @ISA = 'RE_base';
+{ package RE_method; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
         my $name = $self->{'name'};
+	return $IMP if $self->{'rest'};
 	Encode::_utf8_on($name);
         ::here($name);
         for (scalar($name)) { if ((0)) {}
@@ -1688,12 +1691,6 @@ sub fail { my $self = shift;
 		return @pat;
             }
         }
-    }
-}
-
-{ package RE_method; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
-        return $IMP;
     }
 }
 
