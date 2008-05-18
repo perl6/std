@@ -305,7 +305,7 @@ END
 sub heredoc { my $self = shift;  
     my $here = $self;
     while (my $herestub = shift @herestub_queue) {
-        local $delim = $herestub->delim;
+        local $DELIM = $herestub->delim;
         my $lang = $herestub->lang;
         my $doc;
         my $ws = "";
@@ -336,7 +336,7 @@ sub heredoc { my $self = shift;
             $herestub->orignode->{doc} = $here;
         }
         else {
-            self->panic("Ending delimiter $delim not found");
+            self->panic("Ending delimiter $DELIM not found");
         }
     }
     return $here;
@@ -392,7 +392,7 @@ sub $name {
 	    print ::LOG "$name trying \$tag \$try\\n" if \$DEBUG & 1024;
 	    push \@gather, \$C->\$try(\@_);
 	}
-	\@gather;
+	\$self->_MATCHIFY(\@gather);
     }
 }
 
@@ -644,15 +644,6 @@ END
             $re->{kind} = $KIND;
             $RE{$PKG . '::' . $NAME} = $re;
             $re->remember_alts();
-    #        my $lex = Dump($re);
-    #        $lex =~ s[!!perl/hash:][!pugs/Object:]g;
-    #        $lex =~ s/\\x([89A-Fa-f][0-9A-Fa-f])/chr(hex($1))/eg;
-    #        mkdir("yamlg5");
-    #        (my $file = "${PKG}::$NAME") =~ s/::/--/g;
-    #        open YAML, ">yamlg5/$file.yml" or die "Can't create yamlg5/$file.yml: $!";
-    #        binmode(YAML, ":utf8");
-    #        print YAML $lex;
-    #        close YAML;
 
             $out .= <<"END";
 sub$ws$NAME {
@@ -925,6 +916,7 @@ END
     }
     print "\nour \$moreinput;\n";
     print "our \$DEBUG;\n";
+    print "our \$DELIM;\n";
     print "\n";
     print $out;
     print "__DATA__\n";

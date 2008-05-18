@@ -1264,13 +1264,13 @@ token postcircumfix:sym<{ }> ( --> Methodcall)
     { '{' <semilist> '}' {*} }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { <?before '<' > <quotesnabber(":q",":w")> {*} }
+    { '<' <nibble(Perl::Q.tweak(:q).tweak(:w))> '>' {*} }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { <?before '<<' > <quotesnabber(":qq","ww")> {*}}
+    { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww))> '>>' {*}}
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { <?before '«' > <quotesnabber(":qq","ww")> {*} }
+    { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww))> {*} }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O> }
@@ -1965,7 +1965,7 @@ token hexint {
 our @herestub_queue;
 
 token q_herestub ($lang) {
-    $<delimstr> = <quotesnabber()>  # force raw semantics on /END/ marker
+    $<delimstr> = <quotenibble('Perl::Q')>  # force raw semantics on /END/ marker
     {
         push @herestub_queue,
             Herestub.new(
@@ -1984,7 +1984,7 @@ class Herestub {
 } # end class
 
 token theredoc {
-    ^^ $<ws>=(\h*?) $+delim \h* $$ \n?
+    ^^ $<ws>=(\h*?) $+DELIM \h* $$ \n?
 }
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
@@ -1992,7 +1992,7 @@ token theredoc {
 method heredoc () {
     my $here = self;
     while my $herestub = shift @herestub_queue {
-        my $delim is context = $herestub.delim;
+        my $DELIM is context = $herestub.delim;
         my $lang = $herestub.lang;
         my $doc;
         my $ws = "";
@@ -2023,10 +2023,15 @@ method heredoc () {
             $herestub.orignode<doc> = $here;
         }
         else {
-            self.panic("Ending delimiter $delim not found");
+            self.panic("Ending delimiter $DELIM not found");
         }
     }
     return $here;
+}
+
+token quotenibble ($lang) {
+    :my ($start,$stop) = self.peek_delimiters();
+    $start <nibble($lang.tweak(:stop($stop)))> $stop
 }
 
 method nibble ($lang) {
@@ -2035,16 +2040,15 @@ method nibble ($lang) {
     self.cursor_fresh($lang).nibbler();
 }
 
-#token quote:sym<' '>   { <?before "'"  > <quotesnabber(":q")>        }
 token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q))> "'" }
 token quote:sym<" ">   { '"' <nibble(Perl::Q.tweak(:qq))> '"' }
 
-token quote:sym<« »>   { <?before '«'  > <quotesnabber(":qq",":ww")> }
-token quote:sym«<< >>» { <?before '<<' > <quotesnabber(":qq",":ww")> }
+token quote:sym<« »>   { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww))> '»' }
+token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww))> '>>' }
 token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w))> '>'  }
 
 token quote:sym</ />   {
-    <?before '/'  > <quotesnabber(":regex")>
+    '/' <nibble(Perl::Q.tweak(:regex))> '/'
     [ (< i g s m x c e ] >+) 
         # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
@@ -2061,11 +2065,11 @@ token quote:sym</ />   {
 # handle composite forms like qww
 token quote:qq {
     'qq' <quote_mod>? »
-    <quotesnabber(':qq', $<quote_mod>)>
+    <quotenibble(Perl::Q.tweak(:qq).tweak($<quote_mod>))>
 }
 token quote:q {
     'q' <quote_mod>? »
-    <quotesnabber(':q', $<quote_mod>)>
+    <quotenibble(Perl::Q.tweak(:q).tweak($<quote_mod>))>
 }
 
 token quote_mod:w  { <sym> }
@@ -2079,21 +2083,21 @@ token quote_mod:f  { <sym> }
 token quote_mod:c  { <sym> }
 token quote_mod:b  { <sym> }
 
-token quote:rx { <sym> <quotesnabber(':regex')> }
+token quote:rx { <sym> <quotenibble(Perl::Q.tweak(:regex))> }
 
-token quote:m { <sym>  <quotesnabber(':regex')> }
-token quote:mm { <sym> <quotesnabber(':regex', ':s')> }
+token quote:m  { <sym> <quotenibble(Perl::Q.tweak(:regex))> }
+token quote:mm { <sym> <quotenibble(Perl::Q.tweak(:regex).tweak(:s))> }
 
 token quote:s {
-    <sym> <pat=quotesnabber(':regex')>
+    <sym> <pat=quotenibble(Perl::Q.tweak(:regex))>
     <finish_subst($<pat>)>
 }
 token quote:ss {
-    <sym> <pat=quotesnabber(':regex', ':s')>
+    <sym> <pat=quotenibble(Perl::Q.tweak(:regex).tweak(:s))>
     <finish_subst($<pat>)>
 }
 token quote:tr {
-    <sym> <pat=quotesnabber(':trans')>
+    <sym> <pat=quotenibble(Perl::Q.tweak(:trans))>
     <finish_trans($<pat>)>
 }
 
@@ -2120,215 +2124,6 @@ token finish_trans ($pat) {
     # unbracketed form
     | <repl=q_unbalanced(qlang('Q',':tr'), $pat<delim>[0])>
     ]
-}
-
-# The key observation here is that the inside of quoted constructs may
-# be any of a lot of different sublanguages, and we have to parameterize
-# which parse rule to use as well as what options to feed that parse rule.
-
-role QLang {
-    has %.option;
-    has $.tweaker handles 'tweak';
-    has $.parser;
-    has $.escrule;
-
-    # a method, so that everything is overridable in derived grammars
-    method root_of_Q () {
-        return
-            tweaker => 'Perl::Q_tweaker',      # class name should be virtual here!
-            parser => &Perl::q_pickdelim,
-            option => {},
-            escrule => &Perl::quote_escapes;
-    }
-
-    method new (*@pedigree) {
-        if @pedigree == 1 {
-#           my %start = try { self."root_of_@pedigree[0]" } //
-            my %start = try { self.root_of_Q } or
-                Perl::panic("Quote construct " ~ @pedigree.[0] ~ "not recognized");
-            return self.bless(|%start);
-        }
-        else {
-            my $tail = pop @pedigree;
-            my $self = Perl::qlang(@pedigree).clone
-                orelse fail "Can't clone {@pedigree}: $!";
-            return $self.tweak(|$tail);
-        }
-    }
-} # end role
-
-sub qlang (*@pedigree) {
-    my $pedigree = "@pedigree";
-    (state %qlang){$pedigree} //= Perl::QLang.new(@pedigree);
-}
-
-class Q_tweaker does QLang {
-    has $.escapes;
-
-    method escset {
-        $.escapes ||= [              # presumably resolves after adverbs
-           '\\' xx ?%.option<b>,
-            '$' xx ?%.option<s>,
-            '@' xx ?%.option<a>,
-            '%' xx ?%.option<h>,
-            '&' xx ?%.option<f>,
-            '{' xx ?%.option<c>,
-        ];
-    } #'
-
-    # begin tweaks (DO NOT ERASE)
-    multi method tweak (:single(:$q)) {
-        $q or Perl::panic("Can't turn :q back off");
-        %.option and Perl::panic("Too late for :q");
-        %.option = (:b, :!s, :!a, :!h, :!f, :!c);
-    }
-
-    multi method tweak (:double(:$qq)) {
-        $qq or Perl::panic("Can't turn :qq back off");
-        %.option and Perl::panic("Too late for :qq");
-        %.option = (:b, :s, :a, :h, :f, :c);
-    }
-
-    multi method tweak (:backslash(:$b))   { %.option<b>  = $b }
-    multi method tweak (:scalar(:$s))      { %.option<s>  = $s }
-    multi method tweak (:array(:$a))       { %.option<a>  = $a }
-    multi method tweak (:hash(:$h))        { %.option<h>  = $h }
-    multi method tweak (:function(:$f))    { %.option<f>  = $f }
-    multi method tweak (:closure(:$c))     { %.option<c>  = $c }
-
-    multi method tweak (:exec(:$x))        { %.option<x>  = $x }
-    multi method tweak (:words(:$w))       { %.option<w>  = $w }
-    multi method tweak (:quotewords(:$ww)) { %.option<ww> = $ww }
-
-    multi method tweak (:heredoc(:$to)) {
-        $.parser = &Perl::q_heredoc;
-        %.option<to> = $to;
-    }
-
-    multi method tweak (:$regex) {
-        $.tweaker = ::RX_tweaker,
-        $.parser = &Perl::rx_pickdelim;
-        %.option = < >;
-        $.escrule = &Perl::regex_metachar;
-    }
-
-    multi method tweak (:$trans) {
-        $.tweaker = ::TR_tweaker,
-        $.parser = &Perl::tr_pickdelim;
-        %.option = < >;
-        $.escrule = &Perl::trans_metachar;
-    }
-
-    multi method tweak (:$code) {
-        $.tweaker = ::RX_tweaker,
-        $.parser = &Perl::rx_pickdelim;
-        %.option = < >;
-        $.escrule = &Perl::regex_metachar;
-    }
-
-    multi method tweak (*%x) {
-        my @k = keys(%x);
-        Perl::panic("Unrecognized quote modifier: " ~ @k);
-    }
-    # end tweaks (DO NOT ERASE)
-
-} # end class
-
-class RX_tweaker does QLang {
-    # begin tweaks (DO NOT ERASE)
-    multi method tweak (:global(:$g))      { %.option<g>  = $g }
-    multi method tweak (:ignorecase(:$i))  { %.option<i>  = $i }
-    multi method tweak (:samecase(:$ii))   { %.option<ii> = $ii }
-    multi method tweak (:basechar(:$b))    { %.option<b>  = $b }
-    multi method tweak (:samebase(:$bb))   { %.option<bb> = $bb }
-    multi method tweak (:continue(:$c))    { %.option<c>  = $c }
-    multi method tweak (:pos(:$p))         { %.option<p>  = $p }
-    multi method tweak (:overlap(:$ov))    { %.option<ov> = $ov }
-    multi method tweak (:exhaustive(:$ex)) { %.option<ex> = $ex }
-    multi method tweak (:sigspace(:$s))    { %.option<s>  = $s }
-
-    multi method tweak (:$bytes)  { %.option<UNILEVEL> = 'bytes' }
-    multi method tweak (:$codes)  { %.option<UNILEVEL> = 'codes' }
-    multi method tweak (:$graphs) { %.option<UNILEVEL> = 'graphs' }
-    multi method tweak (:$langs)  { %.option<UNILEVEL> = 'langs' }
-
-    multi method tweak (:$rw)      { %.option<rw>      = $rw }
-    multi method tweak (:$ratchet) { %.option<ratchet> = $ratchet }
-    multi method tweak (:$keepall) { %.option<keepall> = $keepall }
-    multi method tweak (:$panic)   { %.option<panic>   = $panic }
-
-    # XXX probably wrong
-    multi method tweak (:Perl5(:$P5)) {
-        %.option<P5> = $P5;
-        $.tweaker = ::P5RX_tweaker,
-        $.parser = &Perl::p5rx_pickdelim;
-        $.escrule = &Perl::p5regex_metachar;
-    }
-
-    multi method tweak (:$nth)       { %.option<nth> = $nth }
-    multi method tweak (:times(:$x)) { %.option<x> = $x }
-
-    # Ain't we special!
-    multi method tweak (*%x) {
-        my ($na) = keys(%x);
-        my ($n,$a) = $na ~~ /^(\d+)(<[a-z]>+)$/
-            or Perl::panic("Unrecognized regex modifier: $na");
-        if $a eq 'x' {
-            %.option<x> = $n;
-        }
-        elsif $a eq 'st' | 'nd' | 'rd' | 'th' {
-            %.option<nth> = $n;
-        }
-    }
-    # end tweaks (DO NOT ERASE)
-} # end class
-
-class P5RX_tweaker does QLang {
-    # begin tweaks (DO NOT ERASE)
-    multi method tweak (:global(:$g))     { %.option<g>  = $g }
-    multi method tweak (:ignorecase(:$i)) { %.option<i>  = $i }
-    multi method tweak (:sanedot(:$s))    { %.option<s>  = $s }
-    multi method tweak (:multiline(:$m))  { %.option<m>  = $m }
-
-    multi method tweak (*%x) {
-        my @k = keys(%x);
-        Perl::panic("Unrecognized Perl 5 regex modifier: " ~ @k);
-    }
-    # end tweaks (DO NOT ERASE)
-} # end class
-
-class TR_tweaker does QLang {
-    # begin tweaks (DO NOT ERASE)
-    multi method tweak (:complement(:$c)) { %.option<c>  = $c }
-    multi method tweak (:delete(:$d))     { %.option<d>  = $d }
-    multi method tweak (:squeeze(:$s))    { %.option<s>  = $s }
-
-    multi method tweak (*%x) {
-        my @k = keys(%x);
-        Perl::panic("Unrecognized transliteration modifier: " ~ @k);
-    }
-    # end tweaks (DO NOT ERASE)
-} # end class
-
-token quotesnabber (*@q) {
-    :my $delim is context<rw> = '' ;
-    :my $lang;
-    :my $parser;
-    <!before \w> ::
-    <.ws>
-
-    [ (<quotepair>) { push @q, $0 } <.ws> ]*
-
-    # Dispatch to current lang's subparser.
-    {{
-        $lang = qlang('Q', @q);
-        $parser = $lang.parser;
-    }}
-        <delimited=.$parser($lang)>
-    {{
-        $<delim> = $delim;
-    }}
-    {*}
 }
 
 # XXX should eventually be derived from current Unicode tables.
@@ -2488,7 +2283,7 @@ token peek_brackets {
     }}
 }
 
-regex bracketed ($lang = qlang("Q")) {
+regex bracketed ($lang = 'Perl::Q') {
     :my ($start,$stop);
     <?{ ($start,$stop) = $¢.peek_brackets() }>
     <q=q_balanced($lang, $start, $stop)>
@@ -3787,8 +3582,8 @@ grammar Regex is Perl {
         {*}
     }
 
-    token regex_metachar:sym<' '> { <?before "'"  > <quotesnabber(":q")>  }
-    token regex_metachar:sym<" "> { <?before '"'  > <quotesnabber(":qq")> }
+    token regex_metachar:sym<' '> { "'" <nibble(Perl::Q.tweak(:q))>  "'" }
+    token regex_metachar:sym<" "> { '"' <nibble(Perl::Q.tweak(:qq))> '"' }
 
     token regex_metachar:var {
         <!before '$$'>
