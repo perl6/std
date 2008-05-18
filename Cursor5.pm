@@ -183,10 +183,12 @@ sub _AUTOLEXgen { my $self = shift;
 		my $protopat = $proto . '__S_';
 		my $protolen = length($protopat);
 		my $altnum = 0;
+		my $peek = $self->cursor_peek();
 		for my $class ($self->meta->linearized_isa) {
 		    for my $method (sort $class->meta->get_method_list) {
 			if (substr($method,0,$protolen) eq $protopat) {
-			    my $peeklex = $self->_AUTOLEXpeek($class . '::' . $method);
+			    my $callname = $class . '::' . $method;
+			    my $peeklex = $peek->$callname();
 			    if ($peeklex and $peeklex->{PATS}) {
 				my @alts = @{$peeklex->{PATS}};
 				for my $alt (@alts) {

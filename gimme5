@@ -49,7 +49,6 @@ our $ALTNAMES;
 our $PROTO;
 
 my %pkg_really;
-my @MULTIS;
 my %proto;
 my %protosig;
 
@@ -130,6 +129,7 @@ sub un6 {
         $f =~ s/^\@(\w+)([\[{])/$2/             and $t .= qq/\$$1/, next;
         $f =~ s/^\%(\w+)([\[{])/$2/             and $t .= qq/\$$1/, next;
         $f =~ s/^\|%/%/                         and next;
+        $f =~ s/^\.HOW//         		and $t .= qq/->meta/, next;
         $f =~ s/^\.([a-z]\w+)//         	and $t .= qq/->$1/, next;
         $f =~ s/^!===?//                	and $t .= qq/!=/, next;
         $f =~ s/^===//                  	and $t .= qq/==/, next;
@@ -346,14 +346,14 @@ END
             next;
         }
 
-	if (s/^(proto \s+ (regex|rule|token) \s+
+	if (s/^(\s*)(proto \s+ (regex|rule|token|method) \s+
 	    (\w+) \s*
-	    (?:\(([^)]*)\))?.*?\{\.\.\.\}.*?\n)//x) {
-	    $out .= '#' . $1;
-	    my $name = $3;
+	    (?:\(([^)]*)\))?.*?\{[.\s]*}.*?\n)//x) {
+	    $out .= '#' . $2;
+	    my $name = $4;
 	    my $pkgname = $PKG . '::' . $name;
 	    $proto{$name}++;
-	    $protosig{$name} = $4;
+	    $protosig{$name} = $5;
 	    $out .= <<"END";
 sub $name {
     my \$self = shift;
@@ -444,6 +444,7 @@ END
 	    my @list;
 	    if ($mangle =~ s/^<(.*)>$/$1/ or
 		$mangle =~ s/^«(.*)»$/$1/) {
+		$mangle =~ s/\\(.)/$1/g;
 		@list = $mangle =~ /(\S+)/g;
 	    }
 	    elsif ($mangle =~ s/^\[(.*)\]$/$1/ or
@@ -491,25 +492,11 @@ END
 	    }
 	    $mangle = join '_', @list;
 	    $mangle = $name . '__S_' . sprintf("%03d",$SEQ++) . $mangle;
-	    my $multis = $MULTIS[-1];
-	    push(@{$$multis{$name}}, $mangle);
 	    substr($_,0,0,"$indent$kind $mangle ($newsig) ")
 	}
 
 	if (s/^(\s*}) # end (role|class|grammar).*\n/$1 ## end $2\n/) {
-	    my $multis = pop @MULTIS;
-	    my $proto = "";
-	    foreach my $name (sort keys %$multis) {
-		$proto .= "    proto token $name {\n";
-		for (@{$$multis{$name}}) {
-		    $proto .= "        | <.$_>\n";
-		}
-		$proto .= "    }\n\n";
-	    }
-
 	    $PKG = pop(@PKG) if @PKG;
-
-	    $_ = $proto . $_;
 	}
 
         if ( s/^([ \t]*)(proto)?\s*(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
@@ -589,6 +576,7 @@ END
                     $SYM =~ s/^\{'(.*)'\}$/$1/;
                     $SYM =~ s/^\s+//;
                     $SYM =~ s/\s+$//;
+		    $SYM =~ s/\\(.)/$1/g;
                 }
                 if ($name eq 'endsym') {
                     warn $args unless $dflt;
@@ -809,7 +797,6 @@ END
 			$line .= "$ws    moose_extends(qw(@is)); " if @is;
 			$line .= "$ws    moose_with(qw(@does));" if @does;
 			$pkg_really{$1} = $PKG = "${PKG}::$1";
-			push(@MULTIS, {});
 		    };
 
             $line =~ s/^(\s*)grammar (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2;\n$1    use Moose ':all' => { -prefix => "moose_" };/
@@ -839,7 +826,6 @@ END
 			$line .= "$ws    moose_extends(qw(@is));" if @is;
 			$line .= "$ws    moose_with(qw(@does));" if @does;
 			$line =~ s/Perl::Perl/Perl/g;
-			push(@MULTIS, {});
 		    };
 
             $line =~ s/^(\s*)role (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2;\n$1    use Moose::Role ':all' => { -prefix => "moose_" };/
@@ -868,7 +854,6 @@ END
 			$line .= "$ws    moose_extends(qw(@is));" if @is;
 			$line .= "$ws    moose_with(qw(@does));" if @does;
 			$line =~ s/Perl::Perl/Perl/g;
-			push(@MULTIS, {});
 		    };
 
             $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
@@ -1394,9 +1379,6 @@ sub assertion {
             if ($word eq 'sym') {
 		if ($ENDSYM) {
 		    s/^/<.$ENDSYM>/;	# hopefully checks word boundary
-		}
-		else {
-		    s/^/»/ if $SYM =~ /\w$/;
 		}
             }
             return bless { name => $word, min => 12345, rest => '' }, "RE_method";

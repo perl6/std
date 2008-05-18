@@ -2340,8 +2340,8 @@ token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
 }
 
 grammar Q is Perl {
-    proto token backslash {...}
-    proto token escape {...}
+    proto token backslash {}
+    proto token escape {}
     token starter { <!> }
 
     role b {
@@ -2435,7 +2435,7 @@ grammar Q is Perl {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
-        multi method tweak (*%x) { self.meta.find_next_method_by_name('tweak').(self,%x) }
+        multi method tweak (*%x) { self.HOW.find_next_method_by_name('tweak').(self,%x) }
         # end tweaks (DO NOT ERASE)
 
     } # end grammar
@@ -2448,7 +2448,7 @@ grammar Q is Perl {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
-        multi method tweak (*%x) { self.meta.find_next_method_by_name('tweak').(self,%x) }
+        multi method tweak (*%x) { self.HOW.find_next_method_by_name('tweak').(self,%x) }
         # end tweaks (DO NOT ERASE)
 
     } # end grammar
@@ -2457,6 +2457,7 @@ grammar Q is Perl {
     token nibbler {
         :my $text = '';
         :my @nibbles = ();
+        :my $buf = self.orig;
         [
             <!stopper>
             [
@@ -2471,13 +2472,13 @@ grammar Q is Perl {
                                 push @nibbles, $text, $<escape>;
                                 $text = '';
                             }
-            |            :: (.)
+            |            :: .
                             {
-                                $text ~= $0;
+                                $text ~= substr($$buf, $¢.pos-1, 1);
                             }
             ]
         ]*
-        { push @nibbles, $text; @<nibbles> = @nibbles; }
+        { push @nibbles, $text; $<nibbles> = [@nibbles]; }
         {*}
     }
 
