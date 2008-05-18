@@ -298,9 +298,6 @@ proto token postfix is unary is defequiv(%autoincrement) {...}
 token category:dotty { <sym> }
 proto token dotty (:$endsym is context = 'unspacey') {...}
 
-token category:escape { <sym> }
-proto token escape () {...}
-
 token category:circumfix { <sym> }
 proto token circumfix {...}
 
@@ -2343,6 +2340,10 @@ token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
 }
 
 grammar Q is Perl {
+    proto token backslash {...}
+    proto token escape {...}
+    token starter { <!> }
+
     role b {
         token escape:sym<\\> { <sym> <item=backslash> }
         token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
@@ -2421,7 +2422,6 @@ grammar Q is Perl {
 
     role q {
         token stopper { \' }
-        token starter { <!> }
 
         token escape:sym<\\> { <sym> <item=backslash> }
 
@@ -2435,21 +2435,20 @@ grammar Q is Perl {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
-        multi method tweak (*%x) { self.super('tweak', %x) }
+        multi method tweak (*%x) { self.meta.find_next_method_by_name('tweak').(self,%x) }
         # end tweaks (DO NOT ERASE)
 
     } # end grammar
 
     role qq does b does c does s does a does h does f {
         token stopper { \" }
-        token starter { <!> }
         # in double quotes, omit backslash on random \W backslash by default
         token backslash:misc { :: [ (\W) { $<text> = "$0"; } | (\w) <.panic: "unrecognized backslash sequence: '\\$0'"> ] }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
-        multi method tweak (*%x) { self.super('tweak', %x) }
+        multi method tweak (*%x) { self.meta.find_next_method_by_name('tweak').(self,%x) }
         # end tweaks (DO NOT ERASE)
 
     } # end grammar
@@ -2517,7 +2516,7 @@ grammar Q is Perl {
 
     multi method tweak (*%x) {
         my @k = keys(%x);
-        Perl::panic("Unrecognized quote modifier: " ~ @k);
+        Perl.panic("Unrecognized quote modifier: " ~ @k);
     }
     # end tweaks (DO NOT ERASE)
 

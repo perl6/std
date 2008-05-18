@@ -122,8 +122,8 @@ sub hash { my $self = shift;
 }
 
 # unwarranted chumminess with Perl grammar
-sub ws_from { $_[0]->{_ws_from} }
-sub ws_to { $_[0]->{_ws_to} }
+sub ws_from { $_[0]->{ws_from} }
+sub ws_to { $_[0]->{ws_to} }
 
 sub lexers { my $self = shift;
     my $lang = ref $self;
@@ -205,7 +205,7 @@ sub _AUTOLEXgen { my $self = shift;
 	    s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
 	    s/(\(\?#::\))+/(?#::)/;
 	}
-	warn "(null pattern)" unless @pat;
+	warn "(null pattern for $key)" unless @pat;
 	my $pat = join("\n", @pat);
 
 	$AUTOLEXED{$key} = $oldfakepos;
@@ -1468,7 +1468,7 @@ sub fail { my $self = shift;
                 }
             }
         }
-        return;
+        return '';
     }
 }
 

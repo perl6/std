@@ -73,6 +73,7 @@ sub un6 {
     my $t;
     while ($f ne "") {
         $f =~ s/^\)</.</                  	and $t .= ')', next;
+        $f =~ s/^\.\(/(/                  	and $t .= '->', next;
 	$f =~ s/^\[\*-1\]//			and $t .= '[-1]';
         $f =~ s!^('.*?')!!              	and $t .= $1, next;
         $f =~ s!^(".*?")!!              	and $t .= $1, next;
