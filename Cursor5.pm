@@ -33,7 +33,12 @@ binmode(STDIN, ":utf8");
 binmode(STDERR, ":utf8");
 binmode(STDOUT, ":utf8");
 BEGIN {
-    open(::LOG, ">$0.log") or die "Can't create $0.log: $!";
+    if ($^P) {
+	open(::LOG, ">&1") or die "Can't create $0.log: $!";
+    }
+    else {
+	open(::LOG, ">$0.log") or die "Can't create $0.log: $!";
+    }
     binmode(::LOG, ":utf8");
 }
 
@@ -398,6 +403,12 @@ sub _AUTOLEXnow { my $self = shift;
 		return unless $lexer;
 
 		pos($$buf) = $C->{_pos};
+		my $stoplen = -1;
+		if ($::STOP and $$buf =~ m/\G(??{$::STOP})/gc) {
+		    $stoplen = pos($$buf) - $C->{_pos};
+		    pos($$buf) = $C->{_pos};
+		    print STDERR "STOPLEN = $stoplen for $::STOP\n";
+		}
 
 		if ($DEBUG & 2) {
 		    my $peek = substr($$buf,$C->{_pos},20);
@@ -483,6 +494,7 @@ sub _AUTOLEXnow { my $self = shift;
 			    my $beg = $-[$x];
 			    next unless defined $beg;
 			    my $end = $+[$x];
+			    return if $stoplen >= $end - $beg;
 			    my $f = $fates->[$x-1][3];
 			    no strict 'refs';
 			    if ($DEBUG & 8 or ($DEBUG & 2 and $x == $last)) {

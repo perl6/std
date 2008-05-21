@@ -53,7 +53,7 @@ understand Perl 6 code.
 =end comment overview
 
 token TOP {
-    <UNIT( $+unitstopper || "_EOS" )>
+    <UNIT( $+STOP || rx/$/ )>
     {*}
 }
 
@@ -256,8 +256,8 @@ class Terminator does PrecOp {
 # there's appropriate whitespace.  # Note that endsym isn't called if <sym>
 # isn't called.
 
+my $STOP is context = rx/$/;
 my $endsym is context = "null";
-my $unitstopper is context = "_EOS";
 my $endstmt is context = -1;
 my $endargs is context = -1;
 
@@ -463,13 +463,13 @@ token pod_comment {
 
 # Top-level rules
 
-method UNIT ($unitstopper is context = "_EOS") {
+method UNIT ($STOP is context = rx/$/) {
     UNIT: do {
         self.comp_unit();
     }
 }
 
-# Note: we only check for the unitstopper.  We don't check for ^ because
+# Note: we only check for the stopper.  We don't check for ^ because
 # we might be embedded in something else.
 rule comp_unit {
     :my $begin_compunit is context = 1;
@@ -477,7 +477,7 @@ rule comp_unit {
     :my $endargs        is context<rw> = -1;
 
     <statementlist>
-    [ <$+unitstopper> || <.panic: "Can't understand next input--giving up"> ]
+    [ <$+STOP> || <.panic: "Can't understand next input--giving up"> ]
     {*}
 }
 
@@ -1136,8 +1136,8 @@ token dotty:sym<.> ( --> Methodcall) {
     {*}
 }
 
-token dotty:sym<!> ( --> Methodcall) {
-    <sym> <methodop>
+token privop ( --> Methodcall) {
+    '!' <methodop>
     {*}
 }
 
@@ -1163,6 +1163,7 @@ token post {
 
     [
     | <dotty>  { $<O> = $<dotty><O> }
+    | <privop> { $<O> = $<privop><O> }
     | <postop> { $<O> = $<postop><O> }
     ]
     {*}
@@ -1261,13 +1262,13 @@ token postcircumfix:sym<{ }> ( --> Methodcall)
     { '{' <semilist> '}' {*} }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble(Perl::Q.tweak(:q).tweak(:w))> '>' {*} }
+    { '<' <nibble(Perl::Q.tweak(:q).tweak(:w), rx/\>/)> '>' {*} }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww))> '>>' {*}}
+    { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww), rx/\>\>/)> '>>' {*}}
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww))> {*} }
+    { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww), rx/\»/)> {*} }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O> }
@@ -2028,21 +2029,22 @@ method heredoc () {
 
 token quotenibble ($lang) {
     :my ($start,$stop) = self.peek_delimiters();
-    $start <nibble($lang.tweak(:stop($stop)))> $stop
+    :my $STOP is context = rx/$stop/;
+    $start <nibble($lang)> $stop
 }
 
-method nibble ($lang) {
+method nibble ($lang, $stop) {
     my $outerlang = self.WHAT;
     my $LANG is context = $outerlang;
-    self.cursor_fresh($lang).nibbler();
+    self.cursor_fresh($lang).nibbler($stop);
 }
 
-token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q))> "'" }
-token quote:sym<" ">   { '"' <nibble(Perl::Q.tweak(:qq))> '"' }
+token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q), rx/\'/)> "'" }
+token quote:sym<" ">   { '"' <nibble(Perl::Q.tweak(:qq), rx/\"/)> '"' }
 
-token quote:sym<« »>   { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww))> '»' }
-token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww))> '>>' }
-token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w))> '>'  }
+token quote:sym<« »>   { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww), rx/»/)> '»' }
+token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww), rx/\>\>/)> '>>' }
+token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w), rx/\>/)> '>'  }
 
 token quote:sym</ />   {
     '/' <nibble(Perl::Q.tweak(:regex))> '/'
@@ -2325,7 +2327,7 @@ regex transliterator($stop) {
 token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
     $start
     $<text> = [.*?] ** [
-        <!before $stop>
+#        <!before $stop>
         [ # XXX triple rule should just be in escapes to be customizable
         | <?before $start ** 3>
             $<dequote> = <EXPR(%LOOSEST,/<$stop> ** 3/)>
@@ -2454,14 +2456,14 @@ grammar Q is Perl {
     } # end grammar
 
     # note: polymorphic over many quote languages, we hope
-    token nibbler {
+    token nibbler ($STOP is context) {
         :my $text = '';
         :my @nibbles = ();
         :my $buf = self.orig;
         [
-            <!stopper>
+#            <!stopper>
             [
-            | <0=starter> :: <nibbler> <1=stopper>
+            | <0=starter> :: <nibbler $STOP> <1=stopper>
                             {
                                 my @n = $<nibbler><nibbles>.list;
                                 $text ~= $0 ~ shift(@n);
@@ -3231,6 +3233,7 @@ token terminator:sym<!!> ( --> Terminator)
 
 regex infixstopper {
     | <?before '{' | <lambda> ><?after \s>
+    | <stdstopper>
 }
 
 regex stdstopper {
@@ -3243,7 +3246,7 @@ regex stdstopper {
 #    | <$+unitstopper>
 }
 
-# A fairly complete (but almost certainly buggy) operator precedence parser
+# A fairly complete operator precedence parser
 
 method EXPR (%preclim = %LOOSEST)
 {
@@ -3415,55 +3418,42 @@ method EXPR (%preclim = %LOOSEST)
 
 grammar Regex is Perl {
 
+    method start ($lang) {
+        my $outerlang = self.WHAT;
+        my $LANG is context = $outerlang;
+        self.cursor_fresh($lang).regex();
+    }
+
     token ws {
         <!{ $+sigspace }>
         <nextsame>      # still get all the pod goodness, hopefully
     }
 
     token stdstopper { '>' | <nextsame> }
+    token infixstopper { '>' | <nextsame> }
 
-    rule regex ($stop is context) {
+    rule regex ($STOP is context) {
         :my $sigspace    is context<rw> = $+sigspace    // 0;
         :my $ratchet     is context<rw> = $+ratchet     // 0;
         :my $insensitive is context<rw> = $+insensitive // 0;
         :my $basechar    is context<rw> = $+basechar    // 0;
-        <regex_first>
+        < || | && & >?
+        <EXPR>
         {*}
     }
 
-    rule regex_first {
-        '||'?
-        <regex_every> ** '||'
-        {*}
-    }
-
-    rule regex_every {
-        <regex_submatch> ** '&&'
-        {*}
-    }
-
-    rule regex_submatch {
-        <regex_any> ** [ \!?'~~' ]
-        {*}
-    }
-
-    # XXX shouldn't need lookahead if LTM works transitively...
-    rule regex_any {
-        [ '|' <!before '|'> ]?
-        <regex_all> ** [ '|' <!before '|'> ]
-        {*}
-    }
-
-    rule regex_all {
-        <regex_sequence> ** [ '&' <!before '&'> ]
-        {*}
-    }
-
-    rule regex_sequence {
+    token expect_term {
         <regex_quantified_atom>+
-        # Could combine unquantified atoms into one here...
-        {*}
     }
+    token expect_infix {
+        <!infixstopper>
+        <rxinfix>
+    }
+
+    token rxinfix:sym<||> ( --> Tight_or ) { <sym> }
+    token rxinfix:sym<&&> ( --> Tight_and ) { <sym> }
+    token rxinfix:sym<|> ( --> Junctive_or ) { <sym> }
+    token rxinfix:sym<&> ( --> Junctive_and ) { <sym> }
 
     rule regex_quantified_atom {
         <regex_atom>
@@ -3476,10 +3466,9 @@ grammar Regex is Perl {
 
     rule regex_atom {
         [
-        || <$+stop> :: <fail>
-        || <regex_metachar>
-        || (\w)
-        || <.panic: "unrecognized metacharacter">
+        | <regex_metachar>
+        | (\w)
+        | :: <.panic: "unrecognized metacharacter">
         ]
         {*}
     }
@@ -3582,12 +3571,14 @@ grammar Regex is Perl {
         {*}
     }
 
-    token regex_metachar:sym<' '> { "'" <nibble(Perl::Q.tweak(:q))>  "'" }
-    token regex_metachar:sym<" "> { '"' <nibble(Perl::Q.tweak(:qq))> '"' }
+    # should be based on $+LANG...
+    token regex_metachar:sym<' '> { "'" <nibble(Perl::Q.tweak(:q), rx/\'/)>  "'" }
+    token regex_metachar:sym<" "> { '"' <nibble(Perl::Q.tweak(:qq), rx/\"/)> '"' }
 
     token regex_metachar:var {
         <!before '$$'>
-        <variable> <.ws>
+        <variable=$¢.cursor_fresh($+LANG).variable>
+        <.ws>
         $<binding> = ( '=' <.ws> <regex_quantified_atom> )?
         { $<sym> = $<variable>.item; }
         {*}
@@ -3633,7 +3624,7 @@ grammar Regex is Perl {
 
     token regex_assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        <EXPR(%LOOSEST)>
+        <variable=$¢.cursor_fresh($+LANG).EXPR(%LOOSEST)>
         {*}
     }
 
@@ -3706,6 +3697,8 @@ grammar Regex is Perl {
         | <regex_quantified_atom>
         ]
     }
+
+    token regex_quantifier:sym<~~> { '!'? <sym> <sigspace> <regex_quantified_atom> }
 
     token quantmod { [ '?' | '!' | ':' | '+' ]? }
 

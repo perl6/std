@@ -80,7 +80,7 @@ sub un6 {
 	$f =~ s!^m:p5(\W)(.+?)\1/!!		and $t .= "m$1$2$1", next;
 	$f =~ s!^s:p5(\W)(.+?)\1(.*?)\1/!!	and $t .= "s$1$2$1$3$1", next;
         $f =~ s!^q/(.*?)/!!              	and $t .= "q/$1/", next;
-        $f =~ s!^/(.+?)/!!              	and $t .= "qr/$1/", next;
+        $f =~ s!^(?:rx)?/(.+?)/!!              	and $t .= "qr/$1/", next;
         $f =~ s/^\$¢\.\$parser//                and $t .= qq/\$C->\$parser/, next;
         $f =~ s/^\$¢//                  	and $t .= qq/\$C/, next;
         $f =~ s/^\$\/</.</                  	and $t .= qq/\$M/, $NEEDMATCH++, next;
@@ -1763,6 +1763,7 @@ sub unbalanced {
             $re = '$C->' . $name . $rest;
         }
         else {
+	    $name = ::un6($name);
             $re = <<"END";
 do {
     if (not $name) {
