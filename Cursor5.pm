@@ -674,7 +674,7 @@ sub retm { my $self = shift;
     return $self unless $DEBUG & 128;
     warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
-    print ::LOG $self->{_pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}\n" if $DEBUG & 128;
+    print ::LOG $self->{_pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}\n";
     $self;
 }
 
