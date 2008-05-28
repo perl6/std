@@ -1,18 +1,22 @@
 our $CTX;
 $CTX->{lvl} = 0;
 our $DEBUG = $ENV{STD5DEBUG} // 0;
-    # 1 autolexer
-    # 2 lexer
-    # 4 fixed length
-    # 8 fates
-    # 16 longest token pattern generation
-    # 32 EXPR
-    # 64 matchers
-    # 128 trace call/return
-    # 256 cursors
-    # 1024 try processing in STD5.pm
-    # 2048 mixins
-    # 16384 callm show subnames
+
+use constant {
+    DEBUG_autolexer => 1,
+    DEBUG_lexer => 2,
+    DEBUG_fixed_length => 4,
+    DEBUG_fates => 8,
+    DEBUG_longest_token_pattern_generation => 16,
+    DEBUG_EXPR => 32,
+    DEBUG_matchers => 64,
+    DEBUG_trace_call=> 128,
+    DEBUG_cursors => 256,
+    DEBUG_try_processing_in_STD5_dot_pm => 1024,
+    DEBUG_mixins => 2048,
+    DEBUG_callm_show_subnames => 16384
+};
+
 
 package Cursor5;
 $::DEBUG //= 0;
