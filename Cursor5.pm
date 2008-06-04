@@ -2,20 +2,22 @@ our $CTX;
 $CTX->{lvl} = 0;
 our $DEBUG = $ENV{STD5DEBUG} // 0;
 
-use constant {
-    DEBUG_autolexer => 1,
-    DEBUG_lexer => 2,
-    DEBUG_fixed_length => 4,
-    DEBUG_fates => 8,
-    DEBUG_longest_token_pattern_generation => 16,
-    DEBUG_EXPR => 32,
-    DEBUG_matchers => 64,
-    DEBUG_trace_call=> 128,
-    DEBUG_cursors => 256,
-    DEBUG_try_processing_in_STD5_dot_pm => 1024,
-    DEBUG_mixins => 2048,
-    DEBUG_callm_show_subnames => 16384
-};
+{ package DEBUG;
+    use constant {
+        autolexer => 1,
+        lexer => 2,
+        fixed_length => 4,
+        fates => 8,
+        longest_token_pattern_generation => 16,
+        EXPR => 32,
+        matchers => 64,
+        trace_call=> 128,
+        cursors => 256,
+        try_processing_in_STD5_dot_pm => 1024,
+        mixins => 2048,
+        callm_show_subnames => 16384
+    };
+}
 
 
 package Cursor5;
@@ -61,7 +63,7 @@ sub new {
     }
     my $self = bless \%args, ref $class || $class;
     my $buf = $self->{_orig};
-#    print ::LOG " orig ", $$buf,"\n" if $DEBUG & 256;
+#    print ::LOG " orig ", $$buf,"\n" if $DEBUG & DEBUG::cursors;
     $self->BUILD;
     $self->_AUTOLEXpeek('Perl::expect_term');
     system('cp lex/expect_term lex/EXPR');
@@ -77,12 +79,12 @@ sub mixin {
 	(my $ext = $mixin) =~ s/^.*:://;	# just looking for a "cache" key, really
 	$WHAT .= '_' . $ext;
     }
-    print ::LOG "mixin $WHAT $self\n" if $DEBUG & 2048;
+    print ::LOG "mixin $WHAT $self\n" if $DEBUG & DEBUG::mixins;
     no strict 'refs';
     if (not @{$WHAT.'::ISA'}) {		# never composed this one yet?
 	# fake up mixin with MI, being sure to put "roles" in front
 	my $eval = "package $WHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$self'); moose_with(" . join(',', map {"'$_'"} @mixins) . ");\n";
-	print ::LOG $eval if $DEBUG & 2048;
+	print ::LOG $eval if $DEBUG & DEBUG::mixins;
 	eval $eval;
 	warn $@ if $@;
     }
@@ -144,13 +146,13 @@ my $fakepos = 1;
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
 
-    print ::LOG "?" x 72, "\n" if $DEBUG & 1;
-    print ::LOG "AUTOLEXpeek $key\n" if $DEBUG & 1;
+    print ::LOG "?" x 72, "\n" if $DEBUG & DEBUG::autolexer;
+    print ::LOG "AUTOLEXpeek $key\n" if $DEBUG & DEBUG::autolexer;
     die "Null key" if $key eq '';
 #    if (my $lexer = $self->lexers->{$key}) {
 #        if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
 #            die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
-#            print ::LOG "Suppressing lexer recursion on $key\n" if $DEBUG & 1;
+#            print ::LOG "Suppressing lexer recursion on $key\n" if $DEBUG & DEBUG::autolexer;
 #            return hash();  # (but if we advanced just assume a :: here)
 #        }
 #        elsif (ref($lexer) eq 'HASH') {
@@ -168,8 +170,8 @@ sub _AUTOLEXpeek { my $self = shift;
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
 
-    print ::LOG "=" x 72, "\n" if $DEBUG & 1;
-    print ::LOG "AUTOLEXgen $key\n" if $DEBUG & 1;
+    print ::LOG "=" x 72, "\n" if $DEBUG & DEBUG::autolexer;
+    print ::LOG "AUTOLEXgen $key\n" if $DEBUG & DEBUG::autolexer;
     my $lexer = {};
     (my $file = $key) =~ s/::/--/g;
     $file =~ s/^Perl--//;
@@ -227,7 +229,7 @@ sub _AUTOLEXgen { my $self = shift;
 	binmode($cache, ":utf8");
 	print $cache join("\n",@pat),"\n" or die "Can't print: $!";
 	close($cache) or die "Can't close: $!";
-	print ::LOG "regenerated lex/$file\n" if $DEBUG & 1;
+	print ::LOG "regenerated lex/$file\n" if $DEBUG & DEBUG::autolexer;
 	# force operator precedence method to look like a term
 	if ($file eq 'expect_term') {
 	    system 'cp lex/expect_term lex/EXPR';
@@ -241,7 +243,7 @@ sub loadlexer {
     (my $file = $key) =~ s/::/--/g;
     $file =~ s/^Perl--//;
     $file =~ s/:\*$//;
-    print ::LOG "using cached lex/$file\n" if $DEBUG & 1;
+    print ::LOG "using cached lex/$file\n" if $DEBUG & DEBUG::autolexer;
 
     open(LEX, "lex/$file") or die "No lexer for $key!";
     binmode(LEX, ":utf8");
@@ -327,8 +329,8 @@ sub rxlen {
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
 
-    print ::LOG "!" x 72, "\n" if $DEBUG & 1;
-    print ::LOG "AUTOLEXnow $key\n" if $DEBUG & 1;
+    print ::LOG "!" x 72, "\n" if $DEBUG & DEBUG::autolexer;
+    print ::LOG "AUTOLEXnow $key\n" if $DEBUG & DEBUG::autolexer;
     my $lexer = $self->lexers->{$key} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key);
@@ -341,14 +343,14 @@ sub _AUTOLEXnow { my $self = shift;
     my $chr = substr($$buf,$self->{_pos},1);
 
     $lexer->{$chr} //= do {
-	print ::LOG '=' x 72, "\n" if $DEBUG & 1;
-	print ::LOG "GENERATING $key patterns starting with '$chr'\n" if $DEBUG & 1;
+	print ::LOG '=' x 72, "\n" if $DEBUG & DEBUG::autolexer;
+	print ::LOG "GENERATING $key patterns starting with '$chr'\n" if $DEBUG & DEBUG::autolexer;
 
 	my @tmp =  @{$lexer->{PATS}};
 	my @pats = grep { canmatch($_, $chr) } map { s/\t/.?\t/; $_; } @tmp;
 	my @rxlenmemo;
 	if (!@pats) {
-	    print ::LOG "No $key patterns start with '$chr'\n" if $DEBUG & 1;
+	    print ::LOG "No $key patterns start with '$chr'\n" if $DEBUG & DEBUG::autolexer;
 	    sub { return };
 	}
 	else {
@@ -367,7 +369,7 @@ sub _AUTOLEXnow { my $self = shift;
 		$i++;
 	    }
 
-	    if ($DEBUG & 1) {
+	    if ($DEBUG & DEBUG::autolexer) {
 		my $tmp = "^(?:\n(" . join(")\n|(",@pats) . '))';
 		print ::LOG "LEXER: ", $tmp,"\n";
 	    }
@@ -387,12 +389,12 @@ sub _AUTOLEXnow { my $self = shift;
 	    1 while $pat =~ s/([^\\])\(((\?:)?)\)/$1($2 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
 
-	    print ::LOG "TRE: ", $pat,"\n" if $DEBUG & 1;
+	    print ::LOG "TRE: ", $pat,"\n" if $DEBUG & DEBUG::autolexer;
 
-	    print ::LOG "#FATES: ", 0+@$fates, "\n" if $DEBUG & 1;
+	    print ::LOG "#FATES: ", 0+@$fates, "\n" if $DEBUG & DEBUG::autolexer;
 
 	    for my $i (0..@$fates-1) {
-		print ::LOG "\t", $i, ': ', $fates->[$i][3], "\n" if $DEBUG & 1;
+		print ::LOG "\t", $i, ': ', $fates->[$i][3], "\n" if $DEBUG & DEBUG::autolexer;
 	    }
 	    for my $pat (@pats) {
 		$pat =~ s/\.\?$//;	# ltm backoff doesn't need tre workaround
@@ -414,7 +416,7 @@ sub _AUTOLEXnow { my $self = shift;
 		    print STDERR "STOPLEN = $stoplen for $::STOP\n";
 		}
 
-		if ($DEBUG & 2) {
+		if ($DEBUG & DEBUG::lexer) {
 		    my $peek = substr($$buf,$C->{_pos},20);
 		    $peek =~ s/\n/\\n/g;
 		    $peek =~ s/\t/\\t/g;
@@ -442,7 +444,7 @@ sub _AUTOLEXnow { my $self = shift;
 			    else {
 				for my $px (0..@pats-1) {
 				    $$rxlens[$px] = rxlen($pats[$px]);
-				    print ::LOG "Fixed len $$rxlens[$px] for $pats[$px]\n" if $DEBUG & 4;
+				    print ::LOG "Fixed len $$rxlens[$px] for $pats[$px]\n" if $DEBUG & DEBUG::fixed_length;
 				}
 				@rxlenmemo = @$rxlens;
 			    }
@@ -487,7 +489,7 @@ sub _AUTOLEXnow { my $self = shift;
 			return @result;
 		    }
 
-		    print ::LOG "/ running tre match at @{[ pos($$buf) ]} /\n" if $DEBUG & 2;
+		    print ::LOG "/ running tre match at @{[ pos($$buf) ]} /\n" if $DEBUG & DEBUG::lexer;
 
 		    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 			my $max = @+ - 1;
@@ -501,21 +503,21 @@ sub _AUTOLEXnow { my $self = shift;
 			    return if $stoplen >= $end - $beg;
 			    my $f = $fates->[$x-1][3];
 			    no strict 'refs';
-			    if ($DEBUG & 8 or ($DEBUG & 2 and $x == $last)) {
+			    if ($DEBUG & DEBUG::fates or ($DEBUG & 2 and $x == $last)) {
 				my $p = $pats[$x] // '<nopat>';
 				print ::LOG "\$$x: $beg..$end\t$$x\t ",
 				    $x == $last ? "====>" : "---->",
 				    " $f\t/$p/\n";
 			    }
 			}
-#			print ::LOG "success at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG & 2;
+#			print ::LOG "success at '", substr($$buf,$C->{_pos},10), "'\n" if $DEBUG & DEBUG::lexer;
 			my $tried = "";
 			vec($tried,$last-1,1) = 1;
 			$_[0] = [$tried, $+[0] - $-[0], []];
 			$result;
 		    }
 		    else {
-			print ::LOG "NO LEXER MATCH\n" if $DEBUG & 2;
+			print ::LOG "NO LEXER MATCH\n" if $DEBUG & DEBUG::lexer;
 			return;
 		    }
 		}
@@ -540,7 +542,7 @@ sub _AUTOLEXnow { my $self = shift;
 }
 
 sub cursor_peek { my $self = shift;
-    print ::LOG "cursor_peek\n" if $DEBUG & 256;
+    print ::LOG "cursor_peek\n" if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_peek} = 1;
     bless \%r, ref $self;
@@ -549,7 +551,7 @@ sub cursor_peek { my $self = shift;
 sub cursor_fresh { my $self = shift;
     my %r;
     my $lang = @_ && $_[0] ? shift() : ref $self;
-    print ::LOG "cursor_fresh lang $lang\n" if $DEBUG & 256;
+    print ::LOG "cursor_fresh lang $lang\n" if $DEBUG & DEBUG::cursors;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
@@ -562,7 +564,7 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
     my $bindings = shift;
     my $submatch = shift;		# this is the submatch's cursor
 
-    print ::LOG "cursor_bind @$bindings\n" if $DEBUG & 256;
+    print ::LOG "cursor_bind @$bindings\n" if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     if ($bindings) {
 	for my $binding (@$bindings) {
@@ -584,7 +586,7 @@ sub cursor_fate { my $self = shift;
     my $name = shift;
     # $_[0] is now ref to a $trystate;
 
-    print ::LOG "cursor_fate $pkg $name\n" if $DEBUG & 256;
+    print ::LOG "cursor_fate $pkg $name\n" if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     my $tag;
     my $try;
@@ -592,7 +594,7 @@ sub cursor_fate { my $self = shift;
     
     my $fate = $self->{_fate};
     if ($fate and $fate->[0] eq $name) {
-        print ::LOG "Fate passed to $name: $$fate[3]\n" if $DEBUG & 8;
+        print ::LOG "Fate passed to $name: $$fate[3]\n" if $DEBUG & DEBUG::fates;
         ($tag, $try, $fate) = @$fate;
 	$r{_fate} = $fate;
     }
@@ -600,12 +602,12 @@ sub cursor_fate { my $self = shift;
         $relex = $self->_AUTOLEXnow("${pkg}::$name");
 	$fate = $relex->($self,$_[0]);
         if ($fate) {
-            print ::LOG "FATE OF ${pkg}::$name: $$fate[3]\n" if $DEBUG & 8;
+            print ::LOG "FATE OF ${pkg}::$name: $$fate[3]\n" if $DEBUG & DEBUG::fates;
             ($tag, $try, $fate) = @$fate;
 	    $r{_fate} = $fate;
         }
         else {
-            print ::LOG "NO FATE FOR ${pkg}::$name (will probe)\n" if $DEBUG & 8;
+            print ::LOG "NO FATE FOR ${pkg}::$name (will probe)\n" if $DEBUG & DEBUG::fates;
             $tag = '';
         }
     }
@@ -616,7 +618,7 @@ sub cursor_all { my $self = shift;
     my $fpos = shift;
     my $tpos = shift;
 
-    print ::LOG "cursor_all from $fpos to $tpos\n" if $DEBUG & 256;
+    print ::LOG "cursor_all from $fpos to $tpos\n" if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_from} = $fpos;
     $r{_to} = $tpos;
@@ -628,7 +630,7 @@ sub cursor_all { my $self = shift;
 sub cursor { my $self = shift;
     my $tpos = shift;
 
-    print ::LOG "cursor to $tpos\n" if $DEBUG & 256;
+    print ::LOG "cursor to $tpos\n" if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_from} = $self->{_pos} // 0;
     $r{_to} = $tpos;
@@ -640,7 +642,7 @@ sub cursor { my $self = shift;
 sub cursor_rev { my $self = shift;
     my $fpos = shift;
 
-    print ::LOG "cursor_rev back to $fpos\n" if $DEBUG & 256;
+    print ::LOG "cursor_rev back to $fpos\n" if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_pos} = $fpos;
     $r{_from} = $fpos;
@@ -656,7 +658,7 @@ sub callm { my $self = shift;
 
     my $lvl = 0;
     my @subs;
-    if ($DEBUG & 16384) {
+    if ($DEBUG & DEBUG::callm_show_subnames) {
 	while (my @c = caller($lvl)) { $lvl++; (my $s = $c[3]) =~ s/^.*:://; $s =~ s/^__ANON//; push @subs, $s; }
 	splice(@subs, 0, 2);
     }
@@ -670,12 +672,12 @@ sub callm { my $self = shift;
     }
     my $pos = '?';
     $pos = $self->{_pos} if defined $self->{_pos};
-    print ::LOG $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "] @subs\n" if $DEBUG & 128;
+    print ::LOG $pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "] @subs\n" if $DEBUG & DEBUG::trace_call;
     {lvl => $lvl};
 }
 
 sub retm { my $self = shift;
-    return $self unless $DEBUG & 128;
+    return $self unless $DEBUG & DEBUG::trace_call;
     warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
     print ::LOG $self->{_pos}, "\t", ':' x $CTX->{lvl}, ' ', $subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}\n";
@@ -695,7 +697,7 @@ sub _MATCHIFY { my $self = shift;
 sub _STARf { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
     map { $_->retm() }
         $self->cursor($self->{_pos}),
@@ -705,7 +707,7 @@ sub _STARf { my $self = shift;
 sub _STARg { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
     map { $_->retm() } reverse
             $self->cursor($self->{_pos}),
@@ -715,7 +717,7 @@ sub _STARg { my $self = shift;
 sub _STARr { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
     my @all;
     my $eos = length(${$self->{_orig}});
@@ -734,7 +736,7 @@ sub _STARr { my $self = shift;
 sub _PLUSf { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $x = $self;
 
     my @result;
@@ -751,7 +753,7 @@ sub _PLUSf { my $self = shift;
 sub _PLUSg { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
     reverse $self->_PLUSf($block, @_);
 }
@@ -759,7 +761,7 @@ sub _PLUSg { my $self = shift;
 sub _PLUSr { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
     my @all;
     my $eos = length(${$self->{_orig}});
@@ -781,7 +783,7 @@ sub _REPSEPf { my $self = shift;
     my $sep = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $x = $self;
 
     my @result;
@@ -801,7 +803,7 @@ sub _REPSEPg { my $self = shift;
     my $sep = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
     reverse $self->_REPSEPf($sep, $block, @_);
 }
@@ -810,7 +812,7 @@ sub _REPSEPr { my $self = shift;
     my $sep = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
     my @all;
     my $eos = length(${$self->{_orig}});
@@ -834,7 +836,7 @@ sub _REPSEPr { my $self = shift;
 sub _OPTr { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
     my $x = ($block->($self))[0];
     my $r = $x // $self->cursor($self->{_pos});
@@ -844,7 +846,7 @@ sub _OPTr { my $self = shift;
 sub _OPTg { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @x = $block->($self);
     map { $_->retm() }
         $block->($self),
@@ -854,7 +856,7 @@ sub _OPTg { my $self = shift;
 sub _OPTf { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     map { $_->retm() }
         $self->cursor($self->{_pos}),
         $block->($self);
@@ -863,7 +865,7 @@ sub _OPTf { my $self = shift;
 sub _BRACKET { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     map { $_->retm() }
         $block->($self);
 }
@@ -871,7 +873,7 @@ sub _BRACKET { my $self = shift;
 sub _PAREN { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     map { $_->retm() }
         $block->($self);
 }
@@ -879,7 +881,7 @@ sub _PAREN { my $self = shift;
 sub _NOTBEFORE { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @all = $block->($self);
     return () if @all;  # XXX loses continuation
     return $self->cursor($self->{_pos})->retm();
@@ -888,7 +890,7 @@ sub _NOTBEFORE { my $self = shift;
 sub _NOTCHAR { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @all = $block->($self);
     return () if @all;  # XXX loses continuation
     return $self->cursor($self->{_pos}+1)->retm();
@@ -897,7 +899,7 @@ sub _NOTCHAR { my $self = shift;
 sub before { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @all = $block->($self);
     if (@all and $all[0]) {
         return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
@@ -908,7 +910,7 @@ sub before { my $self = shift;
 sub after { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $end = $self->cursor($self->{_pos});
     my @all = $block->($end);          # Make sure $_->{_from} == $_->{_to}
     if (@all and $all[0]) {
@@ -918,14 +920,14 @@ sub after { my $self = shift;
 }
 
 sub null { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     return $self->cursor($self->{_pos})->retm();
 }
 
 sub _ASSERT { my $self = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @all = $block->($self);
     if ((@all and $all[0]->{_bool})) {
         return $self->cursor($self->{_pos})->retm();
@@ -937,7 +939,7 @@ sub _BINDVAR { my $self = shift;
     my $var = shift;
     my $block = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     map { $$var = $_; $_->retm() }  # XXX doesn't "let"
         $block->($self);
 }
@@ -946,7 +948,7 @@ sub _SUBSUME { my $self = shift;
     my $names = shift;
     my $block = shift;
 
-    local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & 128;
+    local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
     map { $self->cursor_bind($names, $_)->retm() }
         $block->($self);
 }
@@ -954,17 +956,17 @@ sub _SUBSUME { my $self = shift;
 sub _EXACT { my $self = shift;
     my $s = shift;
 
-    local $CTX = $self->callm($s) if $DEBUG & 128;
+    local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
     my $len = length($s);
     my $buf = $self->{_orig};
     if (substr($$buf, $P, $len) eq $s) {
-        print ::LOG "EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
+        print ::LOG "EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & DEBUG::matchers;
         my $r = $self->cursor($P+$len);
         $r->retm();
     }
     else {
-        print ::LOG "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
+        print ::LOG "EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & DEBUG::matchers;
         return ();
     }
 }
@@ -972,18 +974,18 @@ sub _EXACT { my $self = shift;
 sub _SYM { my $self = shift;
     my $s = shift;
 
-    local $CTX = $self->callm($s) if $DEBUG & 128;
+    local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
     my $len = length($s);
     my $buf = $self->{_orig};
     if (substr($$buf, $P, $len) eq $s) {
-        print ::LOG "SYM $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
+        print ::LOG "SYM $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & DEBUG::matchers;
         my $r = $self->cursor($P+$len);
 	$r->{sym} = $s;
         $r->retm();
     }
     else {
-        print ::LOG "SYM $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
+        print ::LOG "SYM $s didn't match @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & DEBUG::matchers;
         return ();
     }
 }
@@ -991,7 +993,7 @@ sub _SYM { my $self = shift;
 sub _EXACT_rev { my $self = shift;
     my $s = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $len = length($s);
     my $from = $self->{_from} - $len;
     my $buf = $self->{_orig};
@@ -1006,7 +1008,7 @@ sub _EXACT_rev { my $self = shift;
 }
 
 sub _ARRAY { my $self = shift;
-    local $CTX = $self->callm(0+@_) if $DEBUG & 128;
+    local $CTX = $self->callm(0+@_) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
     my $buf = $self->{_orig};
     my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
@@ -1014,7 +1016,7 @@ sub _ARRAY { my $self = shift;
     for my $s (@array) {
 	my $len = length($s);
 	if (substr($$buf, $P, $len) eq $s) {
-	    print ::LOG "ARRAY elem $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & 64;
+	    print ::LOG "ARRAY elem $s matched @{[substr($$buf,$P,$len)]} at $P $len\n" if $DEBUG & DEBUG::matchers;
 	    my $r = $self->cursor($P+$len);
 	    push @result, $r->retm('');
 	}
@@ -1023,7 +1025,7 @@ sub _ARRAY { my $self = shift;
 }
 
 sub _ARRAY_rev { my $self = shift;
-    local $CTX = $self->callm(0+@_) if $DEBUG & 128;
+    local $CTX = $self->callm(0+@_) if $DEBUG & DEBUG::trace_call;
     my $buf = $self->{_orig};
     my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
     my @result = ();
@@ -1031,7 +1033,7 @@ sub _ARRAY_rev { my $self = shift;
 	my $len = length($s);
 	my $from = $self->{_from} = $len;
 	if (substr($$buf, $from, $len) eq $s) {
-	    print ::LOG "ARRAY_rev elem $s matched @{[substr($$buf,$from,$len)]} at $from $len\n" if $DEBUG & 64;
+	    print ::LOG "ARRAY_rev elem $s matched @{[substr($$buf,$from,$len)]} at $from $len\n" if $DEBUG & DEBUG::matchers;
 	    my $r = $self->cursor_rev($from);
 	    push @result, $r->retm('');
 	}
@@ -1040,7 +1042,7 @@ sub _ARRAY_rev { my $self = shift;
 }
 
 sub _DIGIT { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1055,7 +1057,7 @@ sub _DIGIT { my $self = shift;
 }
 
 sub _DIGIT_rev { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "DIGIT_rev didn't match $char at $from";
@@ -1074,7 +1076,7 @@ sub _DIGIT_rev { my $self = shift;
 }
 
 sub _ALNUM { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1089,7 +1091,7 @@ sub _ALNUM { my $self = shift;
 }
 
 sub _ALNUM_rev { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "ALNUM_rev didn't match $char at $from";
@@ -1108,7 +1110,7 @@ sub _ALNUM_rev { my $self = shift;
 }
 
 sub alpha { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1123,7 +1125,7 @@ sub alpha { my $self = shift;
 }
 
 sub alpha_rev { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
         return ();
@@ -1140,7 +1142,7 @@ sub alpha_rev { my $self = shift;
 }
 
 sub _SPACE { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1155,7 +1157,7 @@ sub _SPACE { my $self = shift;
 }
 
 sub _SPACE_rev { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "SPACE_rev didn't match $char at $from";
@@ -1174,7 +1176,7 @@ sub _SPACE_rev { my $self = shift;
 }
 
 sub _HSPACE { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1189,7 +1191,7 @@ sub _HSPACE { my $self = shift;
 }
 
 sub _HSPACE_rev { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "HSPACE_rev didn't match $char at $from";
@@ -1208,7 +1210,7 @@ sub _HSPACE_rev { my $self = shift;
 }
 
 sub _VSPACE { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1223,7 +1225,7 @@ sub _VSPACE { my $self = shift;
 }
 
 sub _VSPACE_rev { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "VSPACE_rev didn't match $char at $from";
@@ -1244,7 +1246,7 @@ sub _VSPACE_rev { my $self = shift;
 sub _CCLASS { my $self = shift;
     my $cc = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
@@ -1261,7 +1263,7 @@ sub _CCLASS { my $self = shift;
 sub _CCLASS_rev { my $self = shift;
     my $cc = shift;
 
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
 #        say "CCLASS didn't match $char at $from";
@@ -1280,7 +1282,7 @@ sub _CCLASS_rev { my $self = shift;
 }
 
 sub _ANY { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     if ($P < length($$buf)) {
@@ -1293,7 +1295,7 @@ sub _ANY { my $self = shift;
 }
 
 sub _ANY_rev { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $from = $self->{_from} - 1;
     if ($from < 0) {
         return ();
@@ -1302,7 +1304,7 @@ sub _ANY_rev { my $self = shift;
 }
 
 sub _BOS { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     if ($P == 0) {
         $self->cursor($P)->retm();
@@ -1314,7 +1316,7 @@ sub _BOS { my $self = shift;
 sub _BOS_rev { $_[0]->_BOS }
 
 sub _BOL { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     if ($P == 0 or substr($$buf, $P-1, 1) =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
@@ -1327,7 +1329,7 @@ sub _BOL { my $self = shift;
 sub _BOL_rev { $_[0]->_BOL }
 
 sub _EOS { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     if ($P == length($$buf)) {
@@ -1340,7 +1342,7 @@ sub _EOS { my $self = shift;
 sub _EOS_rev { $_[0]->_EOS }
 
 sub _EOL { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     if ($P == length($$buf) or substr($$buf, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
@@ -1353,7 +1355,7 @@ sub _EOL { my $self = shift;
 sub _EOL_rev { $_[0]->_EOL }
 
 sub _RIGHTWB { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     pos($$buf) = $P - 1;
@@ -1367,7 +1369,7 @@ sub _RIGHTWB { my $self = shift;
 sub _RIGHTWB_rev { $_[0]->_RIGHTWB }
 
 sub _LEFTWB { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     pos($$buf) = $P;
@@ -1383,36 +1385,36 @@ sub _LEFTWB_rev { $_[0]->_LEFTWB }
 sub _REDUCE { my $self = shift;
     my $tag = shift;
 
-    local $CTX = $self->callm($tag) if $DEBUG & 128;
+    local $CTX = $self->callm($tag) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $F = $self->{_from};
     $self->{_reduced} = $tag;
-    print ::LOG "REDUCE $tag from $F to $P\n" if $DEBUG & 64;
+    print ::LOG "REDUCE $tag from $F to $P\n" if $DEBUG & DEBUG::matchers;
 #    $self->whats;
     $self;
 #    $self->cursor($P);
 }
 
 sub _COMMITBRANCH { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    print ::LOG "Commit branch to $P\n" if $DEBUG & 64;
+    print ::LOG "Commit branch to $P\n" if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
 
 sub _COMMITRULE { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    print ::LOG "Commit rule to $P\n" if $DEBUG & 64;
+    print ::LOG "Commit rule to $P\n" if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
 
 sub commit { my $self = shift;
-    local $CTX = $self->callm if $DEBUG & 128;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    print ::LOG "Commit match to $P\n" if $DEBUG & 64;
+    print ::LOG "Commit match to $P\n" if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1444,7 +1446,7 @@ sub fail { my $self = shift;
     }
 
     sub here {
-	return unless $DEBUG & 16;
+	return unless $DEBUG & DEBUG::longest_token_pattern_generation;
 	my $arg = shift;
 	my $lvl = 0;
 	while (caller($lvl)) { $lvl++ }
@@ -1454,7 +1456,7 @@ sub fail { my $self = shift;
 	if (defined $arg) { 
 	    $name .= " " . $arg;
 	}
-	print ::LOG ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n" if $DEBUG & 16;
+	print ::LOG ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]\n" if $DEBUG & DEBUG::longest_token_pattern_generation;
     }
 }
 
@@ -1734,7 +1736,7 @@ sub fail { my $self = shift;
             push @result, @pat;
             last;
         }
-        print ::LOG join("\n",@result), "\n" if $DEBUG & 16;
+        print ::LOG join("\n",@result), "\n" if $DEBUG & DEBUG::longest_token_pattern_generation;
         @result;
     }
 }
@@ -1814,7 +1816,7 @@ sub fail { my $self = shift;
 	for my $chunk (@chunks) {
 	    # ignore negative lookahead
 	    next if ref($chunk) eq 'RE_assertion' and $chunk->{assert} eq '!';
-	    print ::LOG "NULLABLE ".ref($chunk)."\n" if $DEBUG & 16 and not $chunk->{min};
+	    print ::LOG "NULLABLE ".ref($chunk)."\n" if $DEBUG & DEBUG::longest_token_pattern_generation and not $chunk->{min};
 	    my @newalts = $chunk->longest($C);
 	    last unless @newalts;
 #	    if (not $chunk->{min} and $next[-1] ne '') {
@@ -1893,7 +1895,7 @@ sub fail { my $self = shift;
 	    }
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
-        print ::LOG join("\n", @result), "\n" if $DEBUG & 16;
+        print ::LOG join("\n", @result), "\n" if $DEBUG & DEBUG::longest_token_pattern_generation;
         $fakepos = $minfakepos;  # Did all branches advance?
         @result;
     }

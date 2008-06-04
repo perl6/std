@@ -223,6 +223,7 @@ sub MAIN {
 	$PKG = 'Perl';
 	$out .= "package $PKG;\n";
 	$out .= <<'END';
+use Cursor5; # for DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
 moose_extends('Cursor5');
 no warnings 'qw';
@@ -359,7 +360,7 @@ sub $name {
     my \$self = shift;
     my \$subs;
 
-    local \$CTX = \$self->callm() if \$DEBUG & 128;
+    local \$CTX = \$self->callm() if \$DEBUG & DEBUG::trace_call;
     if (\$self->{_peek}) {
         return \$self->_AUTOLEXpeek('${PKG}::$name:*');
     }
@@ -379,7 +380,7 @@ sub $name {
 	    if (ref \$try) {
 		if (ref \$try eq 'ARRAY') {
 		    (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
-		    print ::LOG "Retrying with \$tag \$try\\n" if \$DEBUG & 1024;
+		    print ::LOG "Retrying with \$tag \$try\\n" if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
 		}
 		elsif (ref \$try eq 'CODE') {
 		    my \@more = \$relex->(\$C, \$trystate);
@@ -390,7 +391,7 @@ sub $name {
 		}
 	    }
     
-	    print ::LOG "$name trying \$tag \$try\\n" if \$DEBUG & 1024;
+	    print ::LOG "$name trying \$tag \$try\\n" if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
 	    push \@gather, \$C->\$try(\@_);
 	}
 	\$self->_MATCHIFY(\@gather);
@@ -643,7 +644,7 @@ END
             }
             my $body = <<'END';
 <<DECL>>
-    local $CTX = $self->callm() if $DEBUG & 128;
+    local $CTX = $self->callm() if $DEBUG & DEBUG::trace_call;
     if ($self->{_peek}) {
         return <<PEEK>>
     }
@@ -2233,7 +2234,7 @@ END
         if (ref $try) {
             if (ref $try eq 'ARRAY') {
                 ($tag, $try, $C->{_fate}) = @$try;	# next candidate fate
-                print ::LOG "Retrying with $tag $try\n" if $DEBUG & 1024;
+                print ::LOG "Retrying with $tag $try\n" if $DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
             }
             elsif (ref $try eq 'CODE') {
                 my @more = $relex->($C, $trystate);
@@ -2247,7 +2248,7 @@ END
 END
 
             $result .= <<"END";
-        print ::LOG "$altname trying \$tag \$try\\n" if \$DEBUG & 1024;
+        print ::LOG "$altname trying \$tag \$try\\n" if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
         push \@gather, ((
 @{[ ::indent(join("\n", @result),3) ]}
 END
