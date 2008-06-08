@@ -21,7 +21,8 @@ use YAML::XS;
 our $SEQ = 0;
 
 our %OUR = ( '$CTX' => 1 );
-our %RE = ();                   # turns into __DATA__ yaml
+our $RETREE = {};
+our @RETREE = {};
 
 our $STOP = "";
 our $REV = "";
@@ -47,6 +48,7 @@ our @PKG = ();
 our $ALTNAME;
 our $ALTNAMES;
 our $PROTO;
+our $ENDMATTER;
 
 my %pkg_really;
 my %proto;
@@ -57,6 +59,8 @@ my $METHOD = "method";
 
 my @impure = qw/ ws fail commit before after panic /;
 my %impure;
+
+require "mangle.pl";
 
 sub unangle {
     my $s = shift;
@@ -84,6 +88,7 @@ sub un6 {
         $f =~ s/^\$¢\.\$parser//                and $t .= qq/\$C->\$parser/, next;
         $f =~ s/^\$¢//                  	and $t .= qq/\$C/, next;
         $f =~ s/^\$\/</.</                  	and $t .= qq/\$M/, $NEEDMATCH++, next;
+        $f =~ s/^ ::(\w+(?:::\w+)*)\[(.*?)\]/$2)/ and $t .= qq/ '@{[ $pkg_really{$1} || "${PKG}::$1" ]}'->__instantiate__(/, next;
         $f =~ s/^ ::(Perl(?:::\w+)*)// 		and $t .= qq/ '$1'/, next;
         $f =~ s/^ ::(\w+(?:::\w+)*)// 		and $t .= qq/ '@{[ $pkg_really{$1} || "${PKG}::$1" ]}'/, next;
         $f =~ s/^([^:]):(\w+)\((.*?)\)/ ($3)/ 	and $t .= qq/$1$2 =>/, next;
@@ -216,8 +221,9 @@ sub panic {
         "'\n";
 }
 
+my $out = "";
+
 sub MAIN {
-    my $out = "";
 
     if (s/^\s*grammar Perl:ver.*;\n//) {
 	$PKG = 'Perl';
@@ -226,6 +232,7 @@ sub MAIN {
 use Cursor5; # for DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
 moose_extends('Cursor5');
+my $retree;
 no warnings 'qw';
 use feature 'state';
 use utf8;
@@ -233,14 +240,16 @@ sub BUILD {
     my $self = shift;
     $self->{ws_from} = 0;
     $self->{ws_to} = 0;
+    $self->_AUTOLEXpeek('expect_term',$retree);
+    system('cp lex/Perl/expect_term lex/Perl/EXPR');
 }
 
 use YAML::XS;
-{
-    local $/;
-    my $yaml = <DATA>;
-    *::RE = Load($yaml);
-}
+#{
+#    local $/;
+#    my $yaml = <DATA>;
+#    *::RE = Load($yaml);
+#}
 
 END
     }
@@ -260,46 +269,6 @@ END
         if ( s/^(#.*\n)// ) { $out .= $1; next }
 
         my $remaining = length($_);
-        if (s/^    method new \(\*\@pedigree\).*?\n    }\n//s) {
-            $out .= <<'END';
-
-    # emulate 'handles'
-    sub tweak { my $self = shift;
-        my $tweaker = $self->{tweaker} . '::tweak';
-        $self->$tweaker(@_);
-    }
-    sub parser { return shift()->{parser} }
-    sub escrule { return shift()->{escrule} }
-    sub option { return shift()->{option} }
-
-    sub new { my $self = shift;
-        my @pedigree = @_;
-        if (@pedigree == 1) {
-            my %start = eval { $self->root_of_Q } or
-                Perl::panic("Quote construct " . $pedigree[0] . "not recognized");
-            return bless(\%start, $self);
-        }
-        else {
-            my $tail = pop @pedigree;
-            my %stuff = %{Perl::qlang(@pedigree)};
-            my $self = bless(\%stuff, $stuff{tweaker});
-            my @kv;
-            if ($tail =~ m/^:(\w+)$/) {
-                @kv = ($1,1);
-            }
-            elsif ($tail =~ m/^:!(\w+)$/) {
-                @kv = ($1,0);
-            }
-            elsif ($tail =~ m/^:(\w+)\((.*)\)$/) {
-                @kv = ($1,$2);
-            }
-            $self->tweak(@kv);
-            return $self;
-        }
-    }
-END
-	    next;
-	}
 
         if (s/^(method heredoc[^\n{]*).*?\n}\n//s) {
             $out .= "# $1\n";
@@ -349,7 +318,8 @@ END
 
 	if (s/^(\s*)(proto \s+ (regex|rule|token|method) \s+
 	    (\w+) \s*
-	    (?:\(([^)]*)\))?.*?\{[.\s]*}.*?\n)//x) {
+	    (?:\(([^)]*)\))?.*?\{[.\s]*}.*?\n)//x)
+	{
 	    $out .= '#' . $2;
 	    my $name = $4;
 	    my $pkgname = $PKG . '::' . $name;
@@ -362,14 +332,14 @@ sub $name {
 
     local \$CTX = \$self->callm() if \$DEBUG & DEBUG::trace_call;
     if (\$self->{_peek}) {
-        return \$self->_AUTOLEXpeek('${PKG}::$name:*');
+        return \$self->_AUTOLEXpeek('$name:*',\$retree);
     }
 
     my \$C = \$self;
 
     do {
 	my \$trystate;
-	my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$trystate);
+	my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$retree, \$trystate);
 	my \@try = \$tag eq '$name' ? (\$try,\$relex) : ();
     
 	my \@gather = ();
@@ -410,7 +380,8 @@ END
 			| \[.*?\]
 			)?
 		  ) \s*
-	    (?:\(([^)]*)\))?//x) {
+	    (?:\(([^)]*)\))?//x)
+	{
 	    my $indent = $1;
 	    my $kind = $2;
 	    my $name = $3;
@@ -455,49 +426,18 @@ END
 	    else {
 		@list = $mangle;
 	    }
-	    for (@list) {
-		s/\`/Grave/g;
-		s/\~/Tilde/g;
-		s/\!/Bang/g;
-		s/\@/At/g;
-		s/\#/Sharp/g;
-		s/\$/Dollar/g;
-		s/\%/Percent/g;
-		s/\^/Caret/g;
-		s/\&/Amp/g;
-		s/\*/Star/g;
-		s/\(/Par/g;
-		s/\)/En/g;
-		s/\-/Minus/g;
-		s/\+/Plus/g;
-		s/\=/Equal/g;
-		s/\{/Cur/g;
-		s/\}/Ly/g;
-		s/\[/Bra/g;
-		s/\]/Ket/g;
-		s/\|/Vert/g;
-		s/\\/Back/g;
-		s/\:/Colon/g;
-		s/\;/Semi/g;
-		s/\'/Single/g;
-		s/\"/Double/g;
-		s/\</Lt/g;
-		s/\>/Gt/g;
-		s/\«/Fre/g;
-		s/\»/Nch/g;
-		s/\,/Comma/g;
-		s/\./Dot/g;
-		s/\?/Question/g;
-		s/\//Slash/g;
-		s/(\W)/sprintf("_%02x_",ord($1))/eg;
-	    }
-	    $mangle = join '_', @list;
+	    $mangle = ::mangle(@list);
 	    $mangle = $name . '__S_' . sprintf("%03d",$SEQ++) . $mangle;
 	    substr($_,0,0,"$indent$kind $mangle ($newsig) ")
 	}
 
-	if (s/^(\s*}) # end (role|class|grammar).*\n/$1 ## end $2\n/) {
+	if (s/^(\s*)} # end (class|grammar|role).*\n//) {
+	    my $ws = $1;
+	    dumpretree();
+	    $out .= "$ws$ENDMATTER ## end $2\n";
+	    $RETREE = pop(@RETREE);
 	    $PKG = pop(@PKG) if @PKG;
+	    $ENDMATTER = '}';
 	}
 
         if ( s/^([ \t]*)(proto)?\s*(method|rule|token|regex)(\s+)(\w+)(.*?)\s+{//s ) {
@@ -523,7 +463,7 @@ END
                 $args =~ s/^\s+//;
                 $args =~ s/\s+$//;
             }
-            warn $argstuff if $argstuff =~ /\S/;
+            warn "ARGSTUFF: ", $argstuff if $argstuff =~ /\S/;
             my $p = "";
 
             local $MAYBACKTRACK = 1;  # XXX ratchet current broken
@@ -531,7 +471,7 @@ END
                 $MAYBACKTRACK = 1;
             }
 
-            if ($args =~ s/ --> (\w*)$//) {
+            if ($args =~ s/ *--> (\w*)$//) {
                 $coercion = " map { ${PKG}::$1->coerce(\$_) }";
             }
             $args .= ', ';
@@ -542,7 +482,7 @@ END
                 my $type = $1;
                 my $var = $2;
                 my $decl = $3 ? ($OUR{$var}++, "local") : "my";
-                warn $4 if $4;
+                warn "EXTRA: ", $4 if $4;
                 $sym .= "    $decl $var = shift;\n";
                 $args =~ s/^,\s*//;
             }
@@ -566,7 +506,7 @@ END
                 my $dflt = $6;
                 $sym .= "    my %args = \@_;\n" unless $didargs++;   # simulate named args from variadics
                 if ($name eq 'sym') {
-                    warn $args unless $dflt;
+                    warn "NO DFLT: ", $args unless $dflt;
                     $SYM = $dflt;
                     $SYM =~ s/^\s+//;
                     $SYM =~ s/^'(.*)'$/$1/ or
@@ -580,7 +520,7 @@ END
 		    $SYM =~ s/\\(.)/$1/g;
                 }
                 if ($name eq 'endsym') {
-                    warn $args unless $dflt;
+                    warn "NO DFLT: ", $args unless $dflt;
                     $ENDSYM = $dflt;
                     $ENDSYM =~ s/^\s+//;
                     $ENDSYM =~ s/\s+$//;
@@ -601,11 +541,11 @@ END
                 my $type = $1;
                 my $var = $2;
                 my $decl = $3 ? ($OUR{$var}++, "local") : "my";
-                warn $4 if $4;
+                warn "EXTRA: ", $4 if $4;
                 $sym .= "    $decl $var = \@_;\n";
                 $args =~ s/^,\s*//;
             }
-            warn $comment if $args =~ /[^, ]/;
+            warn "EXTRA: ", $args if $args =~ /[^, ]/;
 
             if ($KIND eq 'method') {
                 $out .= <<"END";
@@ -632,7 +572,7 @@ END
             my $meat = ::indent($re->walk(), 2);
 
             $re->{kind} = $KIND;
-            $RE{$PKG . '::' . $NAME} = $re;
+            $RETREE->{$NAME} = $re;
             $re->remember_alts();
 
             $out .= <<"END";
@@ -685,7 +625,7 @@ END
                 $body =~ s/<<PEEK>>/''/;
             }
             else {
-                $body =~ s/<<PEEK>>/\$self->_AUTOLEXpeek('<<PKG>>::<<NAME>>')/;
+                $body =~ s/<<PEEK>>/\$self->_AUTOLEXpeek('<<NAME>>',\$retree)/;
             }
             $body =~ s/<<PKG>>/$PKG/g;
             $body =~ s/<<NAME>>/$NAME/g;
@@ -722,7 +662,6 @@ END
 	    $out .= $1;
 	    next;
 	}
-
 
         # from here on we assume all nibbles are line-sized or less.
         if (s/^(.*\n)//) {
@@ -772,7 +711,7 @@ END
             $line =~ s/^constant /my /;
             $line =~ s/\bmy ([A-Z]\w+) /my /;
 
-            $line =~ s/(\s*)class (\w+)\s*(.*?)\s+\{/${1}{ package ${PKG}::$2;\n$1    use Moose ':all' => { -prefix => "moose_" };/
+            $line =~ s/(\s*)class (\w+)\s*(.*?)\s+\{/${1}{ package ${PKG}::$2;\n$1    use Moose ':all' => { -prefix => "moose_" };\n$1     my \$retree;/
                     and do {
 			my $ws = $1;
 			my $name = $2;
@@ -794,13 +733,15 @@ END
 			    }
 			}
 			push(@PKG, $PKG);
+			push(@RETREE, $RETREE);
+			$RETREE = {};
 			$pkg_really{$name} = $PKG = "${PKG}::$name";
 			$line .= "$ws    moose_extends(qw(@is)); " if @is;
 			$line .= "$ws    moose_with(qw(@does));" if @does;
 			$pkg_really{$1} = $PKG = "${PKG}::$1";
 		    };
 
-            $line =~ s/^(\s*)grammar (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2;\n$1    use Moose ':all' => { -prefix => "moose_" };/
+            $line =~ s/^(\s*)grammar (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2;\n$1    use Moose ':all' => { -prefix => "moose_" };\n$1     my \$retree;/
                     and do {
 			my $ws = $1;
 			my $name = $2;
@@ -823,14 +764,86 @@ END
 			    }
 			}
 			push(@PKG, $PKG);
+			push(@RETREE, $RETREE);
+			$RETREE = {};
 			$pkg_really{$name} = $PKG = "${PKG}::$name";
 			$line .= "$ws    moose_extends(qw(@is));" if @is;
 			$line .= "$ws    moose_with(qw(@does));" if @does;
 			$line =~ s/Perl::Perl/Perl/g;
+			$ENDMATTER = '}';
 		    };
 
-            $line =~ s/^(\s*)role (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2;\n$1    use Moose::Role ':all' => { -prefix => "moose_" };/
+	    if ($line =~ s/^(\s*)role (\w+)(?:\[(.*?)\])?\s+(.*?)\{//) {
+		my $ws = $1;
+		my $name = $2;
+		my $params = $3;
+		my $is = $4;
+		my @is;
+		my @does;
+		my @list = split ' ', $is;
+		my $which;
+
+		if ($params) {	# parametric type? resort to eval...
+		    my $qp = '{ ' . $params . ' }';
+		    $qp =~ s/(\$\w+)/'$1' => $1/g;
+		    $line = <<"END";
+${ws}{ package ${PKG}::$name;
+$ws    sub __instantiate__ { my \$self = shift;
+$ws        my ($params) = \@_;
+$ws        my \$mangle = ::mangle($params);
+$ws        my \$mixin = "${PKG}::${name}::" . \$mangle;
+$ws        return \$mixin if \$INSTANTIATED{\$mixin}++;
+$ws        print ::LOG "instantiating \$mixin\\n" if \$DEBUG & DEBUG::mixins;
+$ws        my \$eval = "package \$mixin" . q{;
+$ws            use Moose::Role ':all' => { -prefix => "moose_" };
+$ws            my \$retree;
+$ws            sub _PARAMS { $qp }
+END
+		    $ENDMATTER = <<"END";
+$ws        };
+$ws        eval \$eval;
+$ws        return \$mixin;
+$ws    }
+$ws}
+END
+		}
+		else {
+		    $line = <<"END";
+${ws}{ package ${PKG}::$name;
+$ws    use Moose::Role ':all' => { -prefix => "moose_" };
+$ws    my \$retree;
+END
+		    $ENDMATTER = '}';
+		}
+
+		while (@list) {
+		    my $next = shift @list;
+		    if ($next eq 'is') {
+			$which = \@is;
+		    }
+		    elsif ($next eq 'does') {
+			$which = \@does;
+		    }
+		    else {
+			push @$which, $pkg_really{$next} || "${PKG}::$next";
+		    }
+		}
+
+		push(@PKG, $PKG);
+		push(@RETREE, $RETREE);
+		$RETREE = {};
+		$pkg_really{$name} = $PKG = "${PKG}::$name";
+		$line .= "$ws        moose_extends(qw(@is));\n" if @is;
+		$line .= "$ws        moose_with(qw(@does));\n" if @does;
+		$line =~ s/Perl::Perl/Perl/g;
+		warn $line;
+		$out .= $line;
+		next;
+	    }
+
+            $line =~ s/^(\s*)role (\w+)\s+(.*?)\{//
                     and do {
+			die "OBS";
 			my $ws = $1;
 			my $name = $2;
 			my $is = $3;
@@ -850,11 +863,6 @@ END
 				push @$which, $pkg_really{$next} || "${PKG}::$next";
 			    }
 			}
-			push(@PKG, $PKG);
-			$pkg_really{$name} = $PKG = "${PKG}::$name";
-			$line .= "$ws    moose_extends(qw(@is));" if @is;
-			$line .= "$ws    moose_with(qw(@does));" if @does;
-			$line =~ s/Perl::Perl/Perl/g;
 		    };
 
             $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
@@ -896,18 +904,32 @@ END
             $out .= $line;
         }
     }
+    dumpretree();
 
     print "# Emulate context vars by localizing 'our' vars living in main\n";
     for (sort keys(%OUR)) {
         print "our $_;\n";
     }
-    print "\nour \$moreinput;\n";
-    print "our \$DEBUG;\n";
-    print "our \$DELIM;\n";
-    print "\n";
+    print <<'END';
+
+our $moreinput;
+our $DEBUG;
+our $DELIM;
+
+our %INSTANTIATED;
+require 'mangle.pl';
+
+END
+
     print $out;
-    print "__DATA__\n";
-    print Dump(\%RE);
+}
+
+sub dumpretree {
+    if (%$RETREE) {
+	$out .= "BEGIN {\n    \$retree = YAML::XS::Load(<<'RETREE_END');\n";
+	$out .= Dump($RETREE);
+	$out .= "RETREE_END\n}\n";
+    }
 }
 
 sub here {
@@ -1044,7 +1066,7 @@ sub all {
         my $k = sequence();
         push @kids, $k;
         my $kidmin = $k->{min};
-        warn "$k\n" unless defined $kidmin;
+        warn "no kidmin $k\n" unless defined $kidmin;
         $min = $kidmin if $kidmin > $min;
         ws();
     } while s/^ \& (?!\&) //x;
@@ -2221,7 +2243,7 @@ END
             my $result = <<"END";
 do {
     my \$trystate;
-    my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$trystate);
+    my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$retree, \$trystate);
 $policy
 END
 
@@ -2272,7 +2294,7 @@ END
 
     sub remember_alts {
         my $self = shift;
-        $RE{$PKG . '::' . $self->{altname}} = $self;
+        $RETREE->{$self->{altname}} = $self;
         if ($$self{zyg}) {
             foreach my $kid (@{$$self{zyg}}) {
                 $kid->remember_alts(@_);

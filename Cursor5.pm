@@ -65,8 +65,6 @@ sub new {
     my $buf = $self->{_orig};
 #    print ::LOG " orig ", $$buf,"\n" if $DEBUG & DEBUG::cursors;
     $self->BUILD;
-    $self->_AUTOLEXpeek('Perl::expect_term');
-    system('cp lex/expect_term lex/EXPR');
     $self;
 }
 
@@ -90,6 +88,8 @@ sub mixin {
     }
     return $WHAT;
 }
+
+sub _PARAMS {}	# overridden in parametric role packages
 
 use YAML::XS;
 
@@ -138,6 +138,7 @@ sub ws_to { $_[0]->{ws_to} }
 
 sub lexers { my $self = shift;
     my $lang = ref $self;
+    print ::LOG "LANG = $lang\n" if $DEBUG & DEBUG::autolexer;
     $lexers{$lang} //= {};
 }
 
@@ -145,6 +146,7 @@ my $fakepos = 1;
 
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
+    my $retree = shift;
 
     print ::LOG "?" x 72, "\n" if $DEBUG & DEBUG::autolexer;
     print ::LOG "AUTOLEXpeek $key\n" if $DEBUG & DEBUG::autolexer;
@@ -164,33 +166,43 @@ sub _AUTOLEXpeek { my $self = shift;
 #	    return;
 #        }
 #    }
-    return $self->lexers->{$key} = $self->_AUTOLEXgen($key);
+    return $self->lexers->{$key} = $self->_AUTOLEXgen($key, $retree);
 }
 
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
+    my $retree = shift;
 
     print ::LOG "=" x 72, "\n" if $DEBUG & DEBUG::autolexer;
-    print ::LOG "AUTOLEXgen $key\n" if $DEBUG & DEBUG::autolexer;
+    my $lang = ref $self;
+    print ::LOG "AUTOLEXgen $key in $lang\n" if $DEBUG & DEBUG::autolexer;
     my $lexer = {};
-    (my $file = $key) =~ s/::/--/g;
-    $file =~ s/^Perl--//;
+    (my $dir = 'lex::' . $lang) =~ s/::/\//g;
+    (my $file = $key) =~ s/::/-/g;
     $file =~ s/:\*$//;
-    if (-s "lex/$file") {
-	$lexer = loadlexer($key);
+
+    if (open(LEX, "$dir/$file")) {
+	binmode(LEX, ":utf8");
+	print ::LOG "using cached $dir/$file\n" if $DEBUG & DEBUG::autolexer;
+
+	my @pat = <LEX>;
+	chomp(@pat);
+	close LEX;
+
+	return {"PATS" => \@pat};
     }
     else {
 	{ package RE_base; 1; }
 	my @pat;
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
 	$AUTOLEXED{$key} = $fakepos;
-	my $ast = $::RE{$key};	# should be per package
+	my $ast = $retree->{$key};
 	if ($ast) {
 	    @pat = $ast->longest($self->cursor_peek());
 	}
 	else {	# a protomethod, look up all methods it can call
 	    my $proto = $key;
-	    if ($proto =~ s/.*::(\w+):\*$/${1}/) {
+	    if ($proto =~ s/:\*$//) {
 		my $protopat = $proto . '__S_';
 		my $protolen = length($protopat);
 		my $altnum = 0;
@@ -213,6 +225,9 @@ sub _AUTOLEXgen { my $self = shift;
 		    }
 		}
 	    }
+	    else {
+		die "BAD KEY $key";
+	    }
 	}
 	for (@pat) {
 	    s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
@@ -224,36 +239,25 @@ sub _AUTOLEXgen { my $self = shift;
 	$AUTOLEXED{$key} = $oldfakepos;
 
 	$lexer = { PATS => [@pat] };
-	mkdir("lex") unless -d "lex";
-	open(my $cache, '>', "lex/$file") // die "Can't print: $!";
+
+	if (not -d $dir) {
+	    use File::Path 'mkpath';
+	    mkpath($dir);
+	}
+
+	open(my $cache, '>', "$dir/$file") // die "Can't print: $!";
 	binmode($cache, ":utf8");
 	print $cache join("\n",@pat),"\n" or die "Can't print: $!";
 	close($cache) or die "Can't close: $!";
-	print ::LOG "regenerated lex/$file\n" if $DEBUG & DEBUG::autolexer;
+	print ::LOG "regenerated $dir/$file\n" if $DEBUG & DEBUG::autolexer;
 	# force operator precedence method to look like a term
 	if ($file eq 'expect_term') {
-	    system 'cp lex/expect_term lex/EXPR';
+	    system "cp $dir/expect_term $dir/EXPR";
 	}
     }
     $lexer;
 }
 
-sub loadlexer {
-    my $key = shift;
-    (my $file = $key) =~ s/::/--/g;
-    $file =~ s/^Perl--//;
-    $file =~ s/:\*$//;
-    print ::LOG "using cached lex/$file\n" if $DEBUG & DEBUG::autolexer;
-
-    open(LEX, "lex/$file") or die "No lexer for $key!";
-    binmode(LEX, ":utf8");
-
-    my @pat = <LEX>;
-    chomp(@pat);
-    close LEX;
-
-    return {"PATS" => \@pat};
-}
 
 # Can the current pattern match the current position according to 1st char?
 
@@ -328,12 +332,13 @@ sub rxlen {
 
 sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
+    my $retree = shift;
 
     print ::LOG "!" x 72, "\n" if $DEBUG & DEBUG::autolexer;
     print ::LOG "AUTOLEXnow $key\n" if $DEBUG & DEBUG::autolexer;
     my $lexer = $self->lexers->{$key} // do {
 	local %AUTOLEXED;
-	$self->_AUTOLEXpeek($key);
+	$self->_AUTOLEXpeek($key,$retree);
     };
     my $buf = $self->{_orig};
     my $P = $self->{_pos};
@@ -409,12 +414,12 @@ sub _AUTOLEXnow { my $self = shift;
 		return unless $lexer;
 
 		pos($$buf) = $C->{_pos};
-		my $stoplen = -1;
-		if ($::STOP and $$buf =~ m/\G(??{$::STOP})/gc) {
-		    $stoplen = pos($$buf) - $C->{_pos};
-		    pos($$buf) = $C->{_pos};
-		    print STDERR "STOPLEN = $stoplen for $::STOP\n";
-		}
+#		my $stoplen = -1;
+#		if ($::STOP and $$buf =~ m/\G(??{$::STOP})/gc) {
+#		    $stoplen = pos($$buf) - $C->{_pos};
+#		    pos($$buf) = $C->{_pos};
+#		    print STDERR "STOPLEN = $stoplen for $::STOP\n";
+#		}
 
 		if ($DEBUG & DEBUG::lexer) {
 		    my $peek = substr($$buf,$C->{_pos},20);
@@ -500,7 +505,7 @@ sub _AUTOLEXnow { my $self = shift;
 			    my $beg = $-[$x];
 			    next unless defined $beg;
 			    my $end = $+[$x];
-			    return if $stoplen >= $end - $beg;
+#			    return if $stoplen >= $end - $beg;
 			    my $f = $fates->[$x-1][3];
 			    no strict 'refs';
 			    if ($DEBUG & DEBUG::fates or ($DEBUG & 2 and $x == $last)) {
@@ -584,6 +589,7 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
 sub cursor_fate { my $self = shift;
     my $pkg = shift;
     my $name = shift;
+    my $retree = shift;
     # $_[0] is now ref to a $trystate;
 
     print ::LOG "cursor_fate $pkg $name\n" if $DEBUG & DEBUG::cursors;
@@ -599,7 +605,7 @@ sub cursor_fate { my $self = shift;
 	$r{_fate} = $fate;
     }
     else {
-        $relex = $self->_AUTOLEXnow("${pkg}::$name");
+        $relex = $self->_AUTOLEXnow($name,$retree);
 	$fate = $relex->($self,$_[0]);
         if ($fate) {
             print ::LOG "FATE OF ${pkg}::$name: $$fate[3]\n" if $DEBUG & DEBUG::fates;
@@ -1904,6 +1910,13 @@ sub fail { my $self = shift;
 { package RE_var; our @ISA = 'RE_base';
     #method longest ($C) { ... }
     sub longest { my $self = shift; my ($C) = @_; 
+	my $var = $self->{var};
+	if (my $p = $C->_PARAMS) {
+	    my $text = $p->{$var} || return $IMP;
+	    $fakepos++ if length($text);
+	    $text = ::qm($text);
+	    return $text;
+	}
         return $IMP;
     }
 }

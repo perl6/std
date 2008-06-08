@@ -967,6 +967,8 @@ rule statement_mod_loop:until {<sym> <modifier_expr> {*} }      #= until
 rule statement_mod_loop:for   {<sym> <modifier_expr> {*} }      #= for
 rule statement_mod_loop:given {<sym> <modifier_expr> {*} }      #= given
 
+token role_name { <module_name> [ <?before '['> <postcircumfix> ]? }
+
 token module_name:normal {
     <name>                                          {*}         #= name
     <colonpair>*
@@ -1453,8 +1455,8 @@ token scope_declarator:has      { <sym> <scoped> {*} }
 token package_declarator:class   { <sym> <package_def> {*} }
 token package_declarator:grammar { <sym> <package_def> {*} }
 token package_declarator:module  { <sym> <package_def> {*} }
-token package_declarator:role    { <sym> <package_def> {*} }
 token package_declarator:package { <sym> <package_def> {*} }
+token package_declarator:role    { <sym> <role_def> {*} }
 
 token package_declarator:require {   # here because of declarational aspects
     <sym> <.ws>
@@ -1469,10 +1471,18 @@ token package_declarator:trusts {
 }
 
 rule package_def {
-    <module_name>?
-    <trait>* {*}                                                #= traits
+    <module_name>? <trait>*
+    <package_block>
+}
+
+rule role_def {
+    <role_name>? <trait>*
+    <package_block>
+}
+
+rule package_block {
     [
-    || <?{ $+begin_compunit }> :: ';'
+    || <?{ $+begin_compunit }> :: <?before ';'>
         {
             $<module_name> orelse $¢.panic("Compilation unit cannot be anonymous");
             $+begin_compunit = 0;
@@ -1480,6 +1490,7 @@ rule package_def {
         {*}                                                     #= semi
     || <block>
         {*}                                                     #= block
+    || <panic: 'No block found for module definition'>
     ]
     {*}
 }
@@ -1963,7 +1974,7 @@ token hexint {
 our @herestub_queue;
 
 token q_herestub ($lang) {
-    $<delimstr> = <quotenibble('Perl::Q')>  # force raw semantics on /END/ marker
+    $<delimstr> = <quibble('Perl::Q')>  # force raw semantics on /END/ marker
     {
         push @herestub_queue,
             Herestub.new(
@@ -2027,10 +2038,12 @@ method heredoc () {
     return $here;
 }
 
-token quotenibble ($lang) {
+token quibble ($lang) {
     :my ($start,$stop) = self.peek_delimiters();
+    :my $sublang = $start eq $stop ?? $lang.balanced($start,$stop)
+                                   !! $lang.unbalanced($stop);
     :my $STOP is context = rx/$stop/;
-    $start <nibble($lang)> $stop
+    $start <nibble($sublang)> $stop
 }
 
 method nibble ($lang, $stop) {
@@ -2039,15 +2052,15 @@ method nibble ($lang, $stop) {
     self.cursor_fresh($lang).nibbler($stop);
 }
 
-token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q), rx/\'/)> "'" }
-token quote:sym<" ">   { '"' <nibble(Perl::Q.tweak(:qq), rx/\"/)> '"' }
+token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q).unbalanced("'"))> "'" }
+token quote:sym<" ">   { '"' <nibble(Perl::Q.tweak(:qq).unbalanced('"'))> '"' }
 
-token quote:sym<« »>   { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww), rx/»/)> '»' }
-token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww), rx/\>\>/)> '>>' }
-token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w), rx/\>/)> '>'  }
+token quote:sym<« »>   { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
+token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
+token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
-    '/' <nibble(Perl::Q.tweak(:regex))> '/'
+    '/' <nibble(Perl::Q.tweak(:regex).unbalanced('/'))> '/'
     [ (< i g s m x c e ] >+) 
         # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
@@ -2064,11 +2077,11 @@ token quote:sym</ />   {
 # handle composite forms like qww
 token quote:qq {
     'qq' <quote_mod>? »
-    <quotenibble(Perl::Q.tweak(:qq).tweak($<quote_mod>))>
+    <quibble(Perl::Q.tweak(:qq).tweak($<quote_mod>))>
 }
 token quote:q {
     'q' <quote_mod>? »
-    <quotenibble(Perl::Q.tweak(:q).tweak($<quote_mod>))>
+    <quibble(Perl::Q.tweak(:q).tweak($<quote_mod>))>
 }
 
 token quote_mod:w  { <sym> }
@@ -2082,21 +2095,21 @@ token quote_mod:f  { <sym> }
 token quote_mod:c  { <sym> }
 token quote_mod:b  { <sym> }
 
-token quote:rx { <sym> <quotenibble(Perl::Q.tweak(:regex))> }
+token quote:rx { <sym> <quibble(Perl::Q.tweak(:regex))> }
 
-token quote:m  { <sym> <quotenibble(Perl::Q.tweak(:regex))> }
-token quote:mm { <sym> <quotenibble(Perl::Q.tweak(:regex).tweak(:s))> }
+token quote:m  { <sym> <quibble(Perl::Q.tweak(:regex))> }
+token quote:mm { <sym> <quibble(Perl::Q.tweak(:regex).tweak(:s))> }
 
 token quote:s {
-    <sym> <pat=quotenibble(Perl::Q.tweak(:regex))>
+    <sym> <pat=quibble(Perl::Q.tweak(:regex))>
     <finish_subst($<pat>)>
 }
 token quote:ss {
-    <sym> <pat=quotenibble(Perl::Q.tweak(:regex).tweak(:s))>
+    <sym> <pat=quibble(Perl::Q.tweak(:regex).tweak(:s))>
     <finish_subst($<pat>)>
 }
 token quote:tr {
-    <sym> <pat=quotenibble(Perl::Q.tweak(:trans))>
+    <sym> <pat=quibble(Perl::Q.tweak(:trans))>
     <finish_trans($<pat>)>
 }
 
@@ -2440,7 +2453,7 @@ grammar Q is Perl {
         multi method tweak (*%x) { self.HOW.find_next_method_by_name('tweak').(self,%x) }
         # end tweaks (DO NOT ERASE)
 
-    } # end grammar
+    } # end role
 
     role qq does b does c does s does a does h does f {
         token stopper { \" }
@@ -2453,7 +2466,7 @@ grammar Q is Perl {
         multi method tweak (*%x) { self.HOW.find_next_method_by_name('tweak').(self,%x) }
         # end tweaks (DO NOT ERASE)
 
-    } # end grammar
+    } # end role
 
     # note: polymorphic over many quote languages, we hope
     token nibbler ($STOP is context) {
@@ -2461,8 +2474,8 @@ grammar Q is Perl {
         :my @nibbles = ();
         :my $buf = self.orig;
         [
-#            <!stopper>
             [
+            | <?before <stopper> > :: <fail>
             | <0=starter> :: <nibbler $STOP> <1=stopper>
                             {
                                 my @n = $<nibbler><nibbles>.list;
@@ -2474,7 +2487,7 @@ grammar Q is Perl {
                                 push @nibbles, $text, $<escape>;
                                 $text = '';
                             }
-            |            :: .
+            |            :: <!stopper> .
                             {
                                 $text ~= substr($$buf, $¢.pos-1, 1);
                             }
@@ -2484,7 +2497,21 @@ grammar Q is Perl {
         {*}
     }
 
+    role startstop[$start,$stop] {
+        token starter { $start }
+        token stopper { $stop }
+    } # end role
+
+    role stop[$stop] {
+        token starter { <!> }
+        token stopper { $stop }
+    } # end role
+
+    method balanced ($start,$stop) { self.mixin( ::startstop[$start,$stop] ); }
+    method unbalanced ($stop) { self.mixin( ::stop[$stop] ); }
+
     # begin tweaks (DO NOT ERASE)
+
     multi method tweak (:single(:$q)) { self.mixin( ::q ); }
 
     multi method tweak (:double(:$qq)) { self.mixin( ::qq ); }
@@ -2604,6 +2631,7 @@ rule macro_def {
 rule trait { <trait_verb> | <trait_auxiliary> }
 
 rule trait_auxiliary:is   { <sym> <name><postcircumfix>? }
+rule trait_auxiliary:does { <sym> <role_name> }
 rule trait_auxiliary:will { <sym> <ident> <block> }
 
 rule trait_verb:of      { <sym> <fulltypename> }

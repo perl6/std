@@ -38,7 +38,7 @@ sub main {
 		-M 'STD5.pm' > -M 'STD.pm' or
 		-M 'STD5.pm' > -M 'gimme5') {
 	    system("$^X gimme5 $fo STD.pm >STD5.pm");
-	    system("rm -f lex/*");
+	    system("rm -rf lex");
 	}
     }
     #my $cmd = qq/perl -w -I . -MSTD5 -e 'print Perl::Dump(Perl->new(orig=>$input)->${rule}(["$rule"]));'/;
