@@ -508,7 +508,7 @@ sub _AUTOLEXnow { my $self = shift;
 #			    return if $stoplen >= $end - $beg;
 			    my $f = $fates->[$x-1][3];
 			    no strict 'refs';
-			    if ($DEBUG & DEBUG::fates or ($DEBUG & 2 and $x == $last)) {
+			    if ($DEBUG & DEBUG::fates or ($DEBUG & DEBUG::lexer and $x == $last)) {
 				my $p = $pats[$x] // '<nopat>';
 				print ::LOG "\$$x: $beg..$end\t$$x\t ",
 				    $x == $last ? "====>" : "---->",
