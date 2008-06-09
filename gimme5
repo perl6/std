@@ -836,7 +836,6 @@ END
 		$line .= "$ws        moose_extends(qw(@is));\n" if @is;
 		$line .= "$ws        moose_with(qw(@does));\n" if @does;
 		$line =~ s/Perl::Perl/Perl/g;
-		warn $line;
 		$out .= $line;
 		next;
 	    }

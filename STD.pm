@@ -6,8 +6,8 @@ has StrPos $.ws_to;
 my $LANG is context;
 
 # random rule for debugging, please ignore
-token foo {
-    <expect_term>
+regex foo {
+    ( aa | a ) a
 }
 
 =begin things todo
