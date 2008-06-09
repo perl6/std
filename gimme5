@@ -350,7 +350,7 @@ sub $name {
 	    if (ref \$try) {
 		if (ref \$try eq 'ARRAY') {
 		    (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
-		    print ::LOG "Retrying with \$tag \$try\\n" if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+		    ::deb("Retrying with \$tag \$try") if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
 		}
 		elsif (ref \$try eq 'CODE') {
 		    my \@more = \$relex->(\$C, \$trystate);
@@ -361,7 +361,7 @@ sub $name {
 		}
 	    }
     
-	    print ::LOG "$name trying \$tag \$try\\n" if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+	    ::deb("$name trying \$tag \$try") if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
 	    push \@gather, \$C->\$try(\@_);
 	}
 	\$self->_MATCHIFY(\@gather);
@@ -793,7 +793,7 @@ $ws        my ($params) = \@_;
 $ws        my \$mangle = ::mangle($params);
 $ws        my \$mixin = "${PKG}::${name}::" . \$mangle;
 $ws        return \$mixin if \$INSTANTIATED{\$mixin}++;
-$ws        print ::LOG "instantiating \$mixin\\n" if \$DEBUG & DEBUG::mixins;
+$ws        ::deb("instantiating \$mixin") if \$DEBUG & DEBUG::mixins;
 $ws        my \$eval = "package \$mixin" . q{;
 $ws            use Moose::Role ':all' => { -prefix => "moose_" };
 $ws            my \$retree;
@@ -839,30 +839,6 @@ END
 		$out .= $line;
 		next;
 	    }
-
-            $line =~ s/^(\s*)role (\w+)\s+(.*?)\{//
-                    and do {
-			die "OBS";
-			my $ws = $1;
-			my $name = $2;
-			my $is = $3;
-			my @is;
-			my @does;
-			my @list = split ' ', $is;
-			my $which;
-			while (@list) {
-			    my $next = shift @list;
-			    if ($next eq 'is') {
-				$which = \@is;
-			    }
-			    elsif ($next eq 'does') {
-				$which = \@does;
-			    }
-			    else {
-				push @$which, $pkg_really{$next} || "${PKG}::$next";
-			    }
-			}
-		    };
 
             $line =~ s/\(state %(\w+)\)/(state \$$1)->/;
             $line =~ s/(\S+) xx /($1) x /;
@@ -2255,7 +2231,7 @@ END
         if (ref $try) {
             if (ref $try eq 'ARRAY') {
                 ($tag, $try, $C->{_fate}) = @$try;	# next candidate fate
-                print ::LOG "Retrying with $tag $try\n" if $DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+                ::deb("Retrying with $tag $try") if $DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
             }
             elsif (ref $try eq 'CODE') {
                 my @more = $relex->($C, $trystate);
@@ -2269,7 +2245,7 @@ END
 END
 
             $result .= <<"END";
-        print ::LOG "$altname trying \$tag \$try\\n" if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+        ::deb("$altname trying \$tag \$try") if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
         push \@gather, ((
 @{[ ::indent(join("\n", @result),3) ]}
 END
