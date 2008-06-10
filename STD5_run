@@ -47,9 +47,9 @@ sub main {
     unshift(@INC,'.');
     require "STD5.pm";
     my $err = "std5.err";
-    open(STDERR,">$err") or die;
     my $perl = Perl->new($input);
     if(!$perl->can($rule)) { die "\nERROR: Unknown rule: $rule\n"; }
+    open(STDERR,">$err") or die;
     my $result = eval { $perl->${rule}(); };
     if($result) { 
       print Perl::Dump($result);
