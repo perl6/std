@@ -1952,8 +1952,8 @@ token rad_number {
     ::           # don't recurse in lexer
     [
     || '<'
-            $<intpart> = <[ 0..9 a..z A..Z ]>+
-            $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ ]?
+            $<intpart> = <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]*
+            $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]?
             [ '*' <base=radint> '**' <exp=radint> ]?
        '>'
 #      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
@@ -1964,11 +1964,11 @@ token rad_number {
 }
 
 token octint {
-    <[ 0..7 ]>+
+    <[ 0..7 ]>+ [ _ <[ 0..7 ]>+ ]*
 }
 
 token hexint {
-    <[ 0..9 a..f A..F ]>+
+    <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
 }
 
 our @herestub_queue;
