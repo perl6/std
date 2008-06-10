@@ -568,12 +568,14 @@ token regex_block {  # perhaps parameterize and combine with block someday
 
 # statement semantics
 rule statementlist {
+    :my StrPos $endstmt is context<rw> = -1;
     [<statement><.eat_terminator> ]*
     {*}
 }
 
 # embedded semis, context-dependent semantics
 rule semilist {
+    :my StrPos $endstmt is context<rw> = -1;
     [<statement><.eat_terminator> ]*
     {*}
 }
@@ -608,7 +610,6 @@ token label {
 }
 
 token statement {
-    :my StrPos $endstmt is context<rw> = -1;
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
@@ -2839,7 +2840,7 @@ token postfix:sym<i> ( --> Autoincrement)
     { <sym> » {*} }
 
 ## exponentiation
-token infix:sym<**> ( --> Exponentiate)
+token infix:sym<**> ( --> Exponentiation)
     { <sym> {*} }
 
 ## symbolic unary
