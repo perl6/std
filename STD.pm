@@ -157,7 +157,7 @@ role PrecOp {
         my $d = %::($var); 
         if not $d<transparent> {
             for keys(%$d) { $m<O>{$_} = $d.{$_} };
-            warn "coercing to " ~ self ~ "\n" if $DEBUG +& 32;
+            $m.deb("coercing to " ~ self) if $DEBUG +& DEBUG::EXPR;
         }
         return $m;
     }
@@ -3278,6 +3278,7 @@ regex stdstopper {
 
 method EXPR (%preclim = %LOOSEST)
 {
+    temp $CTX = self.callm if $DEBUG +& DEBUG::trace_call;
     if self.peek {
         return self._AUTOLEXpeek('Perl::EXPR');
     }
@@ -3290,14 +3291,14 @@ method EXPR (%preclim = %LOOSEST)
     push @opstack, { 'O' => item %terminator, 'sym' => '' };         # (just a sentinel value)
 
     my $here = self;
-    warn "In EXPR, at ", $here.pos, "\n" if $DEBUG +& 32;
+    self.deb("In EXPR, at ", $here.pos) if $DEBUG +& DEBUG::EXPR;
 
     my &reduce := -> {
-        warn "entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack, "\n" if $DEBUG +& 32;
+        self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $DEBUG +& DEBUG::EXPR;
         my $op = pop @opstack;
         given $op<O><assoc> {
             when 'chain' {
-                warn "reducing chain\n" if $DEBUG +& 32;
+                self.deb("reducing chain") if $DEBUG +& DEBUG::EXPR;
                 my @chain;
                 push @chain, pop(@termstack);
                 push @chain, $op;
@@ -3312,7 +3313,7 @@ method EXPR (%preclim = %LOOSEST)
                 push @termstack, $op;
             }
             when 'list' {
-                warn "reducing list\n" if $DEBUG +& 32;
+                self.deb("reducing list") if $DEBUG +& DEBUG::EXPR;
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
@@ -3326,11 +3327,11 @@ method EXPR (%preclim = %LOOSEST)
                 push @termstack, $op;
             }
             default {
-                warn "reducing\n" if $DEBUG +& 32;
+                self.deb("reducing") if $DEBUG +& DEBUG::EXPR;
                 my @list;
-                warn "Termstack size: ", +@termstack, "\n" if $DEBUG +& 32;
+                self.deb("Termstack size: ", +@termstack) if $DEBUG +& DEBUG::EXPR;
 
-                warn Dump($op) if $DEBUG +& 32;
+                self.deb(Dump($op)) if $DEBUG +& DEBUG::EXPR;
                 if $op<O><assoc> {
                     $op<right> = pop @termstack;
                     $op<left> = pop @termstack;
@@ -3351,7 +3352,7 @@ method EXPR (%preclim = %LOOSEST)
     };
 
     loop {
-        warn "In loop, at ", $here.pos, "\n" if $DEBUG +& 32;
+        self.deb("In loop, at ", $here.pos) if $DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
         my @t = $here.expect_term();       # eats ws too
         last unless @t;
@@ -3382,7 +3383,7 @@ method EXPR (%preclim = %LOOSEST)
         }
 
         push @termstack, $here;
-        warn "after push: " ~ (0+@termstack), "\n" if $DEBUG +& 32;
+        self.deb("after push: " ~ (0+@termstack)) if $DEBUG +& DEBUG::EXPR;
 #        my @infix = $here.expect_tight_infix($preclim);
         $oldpos = $here.pos;
         my @infix = $here.cursor_fresh.expect_infix();
@@ -3394,7 +3395,7 @@ method EXPR (%preclim = %LOOSEST)
         if not $infix { $here.panic("Can't have two terms in a row") }
 
         if not $infix<sym> {
-            die Dump($infix) if $DEBUG +& 32;
+            die Dump($infix) if $DEBUG +& DEBUG::EXPR;
         }
 
         $here = $infix.cursor_fresh.ws();
@@ -3402,7 +3403,8 @@ method EXPR (%preclim = %LOOSEST)
         my $inO = $infix<O>;
         my Str $inprec = $inO<prec>;
         if not defined $inprec {
-            warn "No prec given in infix!\n" if $DEBUG +& 32;
+            self.deb("No prec given in infix!") if $DEBUG +& DEBUG::EXPR;
+            die Dump($infix) if $DEBUG +& DEBUG::EXPR;
             $inprec = %terminator<prec>;
         }
         # substitute precedence for listops

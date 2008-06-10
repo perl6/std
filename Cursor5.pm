@@ -1,5 +1,9 @@
+use strict;
+use warnings;
+
 our $CTX = 0;
 our $DEBUG = $ENV{STD5DEBUG} // 0;
+$::DEBUG = $DEBUG;
 
 { package DEBUG;
     use constant {
@@ -18,18 +22,23 @@ our $DEBUG = $ENV{STD5DEBUG} // 0;
     };
 }
 
+our $DEPTH = 0;
+
 sub ::deb {
     print ::LOG @_, "\n";
 }
-our $DEPTH = 0;
 
 package Cursor5;
+
+sub deb { my $self = shift;
+    my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
+    print ::LOG $pos, "\t", ':' x $CTX, ' ', @_, "\n";
+}
+
 $::DEBUG //= 0;
 
 use Moose ':all' => { -prefix => 'moose_' };
 
-use strict;
-use warnings;
 use Encode;
 
 our %AUTOLEXED;
@@ -65,7 +74,7 @@ sub new {
     }
     my $self = bless \%args, ref $class || $class;
     my $buf = $self->{_orig};
-#    ::deb(" orig ", $$buf) if $DEBUG & DEBUG::cursors;
+#    $self->deb(" orig ", $$buf) if $DEBUG & DEBUG::cursors;
     $self->BUILD;
     $self;
 }
@@ -79,12 +88,12 @@ sub mixin {
 	(my $ext = $mixin) =~ s/^.*:://;	# just looking for a "cache" key, really
 	$WHAT .= '_' . $ext;
     }
-    ::deb("mixin $WHAT $self") if $DEBUG & DEBUG::mixins;
+    $self->deb("mixin $WHAT $self") if $DEBUG & DEBUG::mixins;
     no strict 'refs';
     if (not @{$WHAT.'::ISA'}) {		# never composed this one yet?
 	# fake up mixin with MI, being sure to put "roles" in front
 	my $eval = "package $WHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$self'); moose_with(" . join(',', map {"'$_'"} @mixins) . ");\n";
-	::deb($eval) if $DEBUG & DEBUG::mixins;
+	$self->deb($eval) if $DEBUG & DEBUG::mixins;
 	eval $eval;
 	warn $@ if $@;
     }
@@ -140,7 +149,7 @@ sub ws_to { $_[0]->{ws_to} }
 
 sub lexers { my $self = shift;
     my $lang = ref $self;
-    ::deb("LANG = $lang") if $DEBUG & DEBUG::autolexer;
+    $self->deb("LANG = $lang") if $DEBUG & DEBUG::autolexer;
     $lexers{$lang} //= {};
 }
 
@@ -150,20 +159,20 @@ sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
     my $retree = shift;
 
-    ::deb("AUTOLEXpeek $key") if $DEBUG & DEBUG::autolexer;
+    $self->deb("AUTOLEXpeek $key") if $DEBUG & DEBUG::autolexer;
     die "Null key" if $key eq '';
 #    if (my $lexer = $self->lexers->{$key}) {
 #        if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
 #            die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
-#            ::deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
+#            $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
 #            return hash();  # (but if we advanced just assume a :: here)
 #        }
 #        elsif (ref($lexer) eq 'HASH') {
 #            return $lexer // hash();
 #        }
 #        else {
-#	    ::deb(::Dump($lexer));
-#            ::deb("_AUTOLEXpeek oops\n");
+#	    $self->deb(::Dump($lexer));
+#            $self->deb("_AUTOLEXpeek oops\n");
 #	    return;
 #        }
 #    }
@@ -175,7 +184,7 @@ sub _AUTOLEXgen { my $self = shift;
     my $retree = shift;
 
     my $lang = ref $self;
-    ::deb("AUTOLEXgen $key in $lang") if $DEBUG & DEBUG::autolexer;
+    $self->deb("AUTOLEXgen $key in $lang") if $DEBUG & DEBUG::autolexer;
     my $lexer = {};
     (my $dir = 'lex::' . $lang) =~ s/::/\//g;
     (my $file = $key) =~ s/::/-/g;
@@ -183,7 +192,7 @@ sub _AUTOLEXgen { my $self = shift;
 
     if (open(LEX, "$dir/$file")) {
 	binmode(LEX, ":utf8");
-	::deb("using cached $dir/$file") if $DEBUG & DEBUG::autolexer;
+	$self->deb("using cached $dir/$file") if $DEBUG & DEBUG::autolexer;
 
 	my @pat = <LEX>;
 	chomp(@pat);
@@ -249,7 +258,7 @@ sub _AUTOLEXgen { my $self = shift;
 	binmode($cache, ":utf8");
 	print $cache join("\n",@pat),"\n" or die "Can't print: $!";
 	close($cache) or die "Can't close: $!";
-	::deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
+	$self->deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
 	# force operator precedence method to look like a term
 	if ($file eq 'expect_term') {
 	    system "cp $dir/expect_term $dir/EXPR";
@@ -334,7 +343,7 @@ sub _AUTOLEXnow { my $self = shift;
     my $key = shift;
     my $retree = shift;
 
-    ::deb("AUTOLEXnow $key") if $DEBUG & DEBUG::autolexer;
+    $self->deb("AUTOLEXnow $key") if $DEBUG & DEBUG::autolexer;
     my $lexer = $self->lexers->{$key} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key,$retree);
@@ -347,13 +356,13 @@ sub _AUTOLEXnow { my $self = shift;
     my $chr = substr($$buf,$self->{_pos},1);
 
     $lexer->{$chr} //= do {
-	::deb("GENERATING $key patterns starting with '$chr'") if $DEBUG & DEBUG::autolexer;
+	$self->deb("GENERATING $key patterns starting with '$chr'") if $DEBUG & DEBUG::autolexer;
 
 	my @tmp =  @{$lexer->{PATS}};
 	my @pats = grep { canmatch($_, $chr) } map { s/\t/.?\t/; $_; } @tmp;
 	my @rxlenmemo;
 	if (!@pats) {
-	    ::deb("No $key patterns start with '$chr'") if $DEBUG & DEBUG::autolexer;
+	    $self->deb("No $key patterns start with '$chr'") if $DEBUG & DEBUG::autolexer;
 	    sub { return };
 	}
 	else {
@@ -374,7 +383,7 @@ sub _AUTOLEXnow { my $self = shift;
 
 	    if ($DEBUG & DEBUG::autolexer) {
 		my $tmp = "^(?:\n(" . join(")\n|(",@pats) . '))';
-		::deb("LEXER: ", $tmp);
+		$self->deb("LEXER: ", $tmp);
 	    }
 
 	    # remove stuff that will confuse TRE greatly
@@ -392,12 +401,12 @@ sub _AUTOLEXnow { my $self = shift;
 	    1 while $pat =~ s/([^\\])\(((\?:)?)\)/$1($2 !!!OOPS!!! )/;
 	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
 
-	    ::deb("TRE: ", $pat) if $DEBUG & DEBUG::autolexer;
+	    $self->deb("TRE: ", $pat) if $DEBUG & DEBUG::autolexer;
 
-	    ::deb("#FATES: ", 0+@$fates) if $DEBUG & DEBUG::autolexer;
+	    $self->deb("#FATES: ", 0+@$fates) if $DEBUG & DEBUG::autolexer;
 
 	    for my $i (0..@$fates-1) {
-		::deb("\t", $i, ': ', $fates->[$i][3]) if $DEBUG & DEBUG::autolexer;
+		$self->deb("\t", $i, ': ', $fates->[$i][3]) if $DEBUG & DEBUG::autolexer;
 	    }
 	    for my $pat (@pats) {
 		$pat =~ s/\.\?$//;	# ltm backoff doesn't need tre workaround
@@ -423,7 +432,7 @@ sub _AUTOLEXnow { my $self = shift;
 		    my $peek = substr($$buf,$C->{_pos},20);
 		    $peek =~ s/\n/\\n/g;
 		    $peek =~ s/\t/\\t/g;
-		    ::deb("looking for $key at --------->$peek");
+		    $self->deb("looking for $key at --------->$peek");
 		}
 
 		##########################################
@@ -447,7 +456,7 @@ sub _AUTOLEXnow { my $self = shift;
 			    else {
 				for my $px (0..@pats-1) {
 				    $$rxlens[$px] = rxlen($pats[$px]);
-				    ::deb("Fixed len $$rxlens[$px] for $pats[$px]") if $DEBUG & DEBUG::fixed_length;
+				    $self->deb("Fixed len $$rxlens[$px] for $pats[$px]") if $DEBUG & DEBUG::fixed_length;
 				}
 				@rxlenmemo = @$rxlens;
 			    }
@@ -492,12 +501,12 @@ sub _AUTOLEXnow { my $self = shift;
 			return @result;
 		    }
 
-		    ::deb("/ running tre match at @{[ pos($$buf) ]} /") if $DEBUG & DEBUG::lexer;
+		    $self->deb("/ running tre match at @{[ pos($$buf) ]} /") if $DEBUG & DEBUG::lexer;
 
 		    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 			my $max = @+ - 1;
 			my $last = @- - 1;	# ignore '$0'
-#		        ::deb("LAST: $last\n");
+#		        $self->deb("LAST: $last\n");
 			my $result = $fates->[$last-1] // return;
 			for my $x (1 .. $max) {
 			    my $beg = $-[$x];
@@ -508,19 +517,19 @@ sub _AUTOLEXnow { my $self = shift;
 			    no strict 'refs';
 			    if ($DEBUG & DEBUG::fates or ($DEBUG & DEBUG::lexer and $x == $last)) {
 				my $p = $pats[$x] // '<nopat>';
-				::deb("\$$x: $beg..$end\t$$x\t ",
+				$self->deb("\$$x: $beg..$end\t$$x\t ",
 				    $x == $last ? "====>" : "---->",
 				    " $f\t/$p/");
 			    }
 			}
-#			::deb("success at '", substr($$buf,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
+#			$self->deb("success at '", substr($$buf,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
 			my $tried = "";
 			vec($tried,$last-1,1) = 1;
 			$_[0] = [$tried, $+[0] - $-[0], []];
 			$result;
 		    }
 		    else {
-			::deb("NO LEXER MATCH") if $DEBUG & DEBUG::lexer;
+			$self->deb("NO LEXER MATCH") if $DEBUG & DEBUG::lexer;
 			return;
 		    }
 		}
@@ -545,7 +554,7 @@ sub _AUTOLEXnow { my $self = shift;
 }
 
 sub cursor_peek { my $self = shift;
-    ::deb("cursor_peek") if $DEBUG & DEBUG::cursors;
+    $self->deb("cursor_peek") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_peek} = 1;
     bless \%r, ref $self;
@@ -554,7 +563,7 @@ sub cursor_peek { my $self = shift;
 sub cursor_fresh { my $self = shift;
     my %r;
     my $lang = @_ && $_[0] ? shift() : ref $self;
-    ::deb("cursor_fresh lang $lang") if $DEBUG & DEBUG::cursors;
+    $self->deb("cursor_fresh lang $lang") if $DEBUG & DEBUG::cursors;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
@@ -567,7 +576,7 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
     my $bindings = shift;
     my $submatch = shift;		# this is the submatch's cursor
 
-    ::deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
+    $self->deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     if ($bindings) {
 	for my $binding (@$bindings) {
@@ -590,7 +599,7 @@ sub cursor_fate { my $self = shift;
     my $retree = shift;
     # $_[0] is now ref to a $trystate;
 
-    ::deb("cursor_fate $pkg $name") if $DEBUG & DEBUG::cursors;
+    $self->deb("cursor_fate $pkg $name") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     my $tag;
     my $try;
@@ -598,7 +607,7 @@ sub cursor_fate { my $self = shift;
     
     my $fate = $self->{_fate};
     if ($fate and $fate->[0] eq $name) {
-        ::deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
+        $self->deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
         ($tag, $try, $fate) = @$fate;
 	$r{_fate} = $fate;
     }
@@ -606,12 +615,12 @@ sub cursor_fate { my $self = shift;
         $relex = $self->_AUTOLEXnow($name,$retree);
 	$fate = $relex->($self,$_[0]);
         if ($fate) {
-            ::deb("FATE OF ${pkg}::$name: $$fate[3]") if $DEBUG & DEBUG::fates;
+            $self->deb("FATE OF ${pkg}::$name: $$fate[3]") if $DEBUG & DEBUG::fates;
             ($tag, $try, $fate) = @$fate;
 	    $r{_fate} = $fate;
         }
         else {
-            ::deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
+            $self->deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
             $tag = '';
         }
     }
@@ -622,7 +631,7 @@ sub cursor_all { my $self = shift;
     my $fpos = shift;
     my $tpos = shift;
 
-    ::deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
+    $self->deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_from} = $fpos;
     $r{_to} = $tpos;
@@ -634,7 +643,7 @@ sub cursor_all { my $self = shift;
 sub cursor { my $self = shift;
     my $tpos = shift;
 
-    ::deb("cursor to $tpos") if $DEBUG & DEBUG::cursors;
+    $self->deb("cursor to $tpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_from} = $self->{_pos} // 0;
     $r{_to} = $tpos;
@@ -646,7 +655,7 @@ sub cursor { my $self = shift;
 sub cursor_rev { my $self = shift;
     my $fpos = shift;
 
-    ::deb("cursor_rev back to $fpos") if $DEBUG & DEBUG::cursors;
+    $self->deb("cursor_rev back to $fpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_pos} = $fpos;
     $r{_from} = $fpos;
@@ -673,8 +682,7 @@ sub callm { my $self = shift;
         $name .= " " . $arg;
     }
     my $pos = '?';
-    $pos = $self->{_pos} if defined $self->{_pos};
-    ::deb($pos,"\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "] @subs") if $DEBUG & DEBUG::trace_call;
+    $self->deb($name, " [", $file, ":", $line, "] @subs") if $DEBUG & DEBUG::trace_call;
     $lvl;
 }
 
@@ -682,7 +690,7 @@ sub retm { my $self = shift;
     return $self unless $DEBUG & DEBUG::trace_call;
     warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
-    ::deb($self->{_pos}, "\t", ':' x $CTX, ' ', $subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}");
+    $self->deb($subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}");
     $self;
 }
 
@@ -772,7 +780,7 @@ sub _PLUSr { my $self = shift;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
       last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
-	#::deb($matches->perl) if $DEBUG;
+	#$first->deb($matches->perl) if $DEBUG;
 	push @all, $first;
 	$to = $first;
     }
@@ -823,7 +831,7 @@ sub _REPSEPr { my $self = shift;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
       last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
-	#::deb($matches->perl) if $DEBUG;
+	#$first->deb($matches->perl) if $DEBUG;
 	push @all, $first;
 	my @seps = $sep->($first);
       last unless @seps;
@@ -963,12 +971,12 @@ sub _EXACT { my $self = shift;
     my $len = length($s);
     my $buf = $self->{_orig};
     if (substr($$buf, $P, $len) eq $s) {
-        ::deb("EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        $self->deb("EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
         my $r = $self->cursor($P+$len);
         $r->retm();
     }
     else {
-        ::deb("EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        $self->deb("EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
         return ();
     }
 }
@@ -981,13 +989,13 @@ sub _SYM { my $self = shift;
     my $len = length($s);
     my $buf = $self->{_orig};
     if (substr($$buf, $P, $len) eq $s) {
-        ::deb("SYM $s matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        $self->deb("SYM $s matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
         my $r = $self->cursor($P+$len);
 	$r->{sym} = $s;
         $r->retm();
     }
     else {
-        ::deb("SYM $s didn't match @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        $self->deb("SYM $s didn't match @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
         return ();
     }
 }
@@ -1018,7 +1026,7 @@ sub _ARRAY { my $self = shift;
     for my $s (@array) {
 	my $len = length($s);
 	if (substr($$buf, $P, $len) eq $s) {
-	    ::deb("ARRAY elem $s matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+	    $self->deb("ARRAY elem $s matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
 	    my $r = $self->cursor($P+$len);
 	    push @result, $r->retm('');
 	}
@@ -1035,7 +1043,7 @@ sub _ARRAY_rev { my $self = shift;
 	my $len = length($s);
 	my $from = $self->{_from} = $len;
 	if (substr($$buf, $from, $len) eq $s) {
-	    ::deb("ARRAY_rev elem $s matched @{[substr($$buf,$from,$len)]} at $from $len") if $DEBUG & DEBUG::matchers;
+	    $self->deb("ARRAY_rev elem $s matched @{[substr($$buf,$from,$len)]} at $from $len") if $DEBUG & DEBUG::matchers;
 	    my $r = $self->cursor_rev($from);
 	    push @result, $r->retm('');
 	}
@@ -1391,7 +1399,7 @@ sub _REDUCE { my $self = shift;
     my $P = $self->{_pos};
     my $F = $self->{_from};
     $self->{_reduced} = $tag;
-    ::deb("REDUCE $tag from $F to $P") if $DEBUG & DEBUG::matchers;
+    $self->deb("REDUCE $tag from $F to $P") if $DEBUG & DEBUG::matchers;
 #    $self->whats;
     $self;
 #    $self->cursor($P);
@@ -1400,7 +1408,7 @@ sub _REDUCE { my $self = shift;
 sub _COMMITBRANCH { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    ::deb("Commit branch to $P") if $DEBUG & DEBUG::matchers;
+    $self->deb("Commit branch to $P") if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1408,7 +1416,7 @@ sub _COMMITBRANCH { my $self = shift;
 sub _COMMITRULE { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    ::deb("Commit rule to $P") if $DEBUG & DEBUG::matchers;
+    $self->deb("Commit rule to $P") if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1416,7 +1424,7 @@ sub _COMMITRULE { my $self = shift;
 sub commit { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    ::deb("Commit match to $P") if $DEBUG & DEBUG::matchers;
+    $self->deb("Commit match to $P") if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
     $self;
 }
@@ -1458,7 +1466,7 @@ sub fail { my $self = shift;
 	if (defined $arg) { 
 	    $name .= " " . $arg;
 	}
-	::deb(':' x $lvl, ' ', $name, " [", $file, ":", $line, "]") if $DEBUG & DEBUG::longest_token_pattern_generation;
+	::deb("\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]") if $DEBUG & DEBUG::longest_token_pattern_generation;
     }
 }
 
@@ -1483,7 +1491,7 @@ sub fail { my $self = shift;
         for (scalar($self->{'assert'})) { if ((0)) {}
             elsif ($_ eq '?') {
                 my $re = $self->{'re'};
-		::deb(::Dump($self)) unless $re;
+		$C->deb("\n",::Dump($self)) unless $re;
                 if (ref($re) eq 'RE_method_re' and $re->{'name'} eq 'before') {
                     my @result = $re->longest($C);
                     return map { $_ . $IMP } @result;
@@ -1738,7 +1746,7 @@ sub fail { my $self = shift;
             push @result, @pat;
             last;
         }
-        ::deb(join("\n",@result)) if $DEBUG & DEBUG::longest_token_pattern_generation;
+        $C->deb(join("\n",@result)) if $DEBUG & DEBUG::longest_token_pattern_generation;
         @result;
     }
 }
@@ -1818,7 +1826,7 @@ sub fail { my $self = shift;
 	for my $chunk (@chunks) {
 	    # ignore negative lookahead
 	    next if ref($chunk) eq 'RE_assertion' and $chunk->{assert} eq '!';
-	    ::deb("NULLABLE ".ref($chunk)) if $DEBUG & DEBUG::longest_token_pattern_generation and not $chunk->{min};
+	    $C->deb("NULLABLE ".ref($chunk)) if $DEBUG & DEBUG::longest_token_pattern_generation and not $chunk->{min};
 	    my @newalts = $chunk->longest($C);
 	    last unless @newalts;
 #	    if (not $chunk->{min} and $next[-1] ne '') {
@@ -1897,7 +1905,7 @@ sub fail { my $self = shift;
 	    }
             $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
         }
-        ::deb(join("\n", @result)) if $DEBUG & DEBUG::longest_token_pattern_generation;
+        $C->deb(join("\n", @result)) if $DEBUG & DEBUG::longest_token_pattern_generation;
         $fakepos = $minfakepos;  # Did all branches advance?
         @result;
     }
