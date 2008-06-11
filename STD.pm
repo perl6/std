@@ -1,8 +1,5 @@
 grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
-has StrPos $.ws_from;
-has StrPos $.ws_to;
-
 my $LANG is context;
 
 # random rule for debugging, please ignore
@@ -394,17 +391,17 @@ token spacey { <?before \s | '#'> }
 #regex nofat { <!before » \h* <.unsp>? '=>' > <!before \w> }
 
 token ws {
-    :my @stub = return self if self.pos === $!ws_to; # really fast memoizing
+    :my @stub = return self if self.pos === $.ws_to; # really fast memoizing
     [
     || <?after \w> <?before \w> ::: <!>        # must \s+ between words
-    || { $!ws_from = $¢.pos }
+    || { $.ws_from = $¢.pos }
        [
        | <unsp>              {*}                                #= unsp
        | <vws>               {*} <heredoc>
        | <unv>               {*}                                #= unv
        | $ { $¢.moreinput }
        ]*  {*}                                                  #= all
-       { $!ws_to = $¢.pos }
+       { $.ws_to = $¢.pos }
     ]
 }
 
@@ -533,7 +530,7 @@ token block {
     [
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? <?before \n > <.ws>
-        { let $+endstmt = $!ws_from; } {*}                      #= endstmt
+        { let $+endstmt = $.ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = $¢.pos; }                           #= endargs
     ]
     {*}
@@ -560,7 +557,7 @@ token regex_block {  # perhaps parameterize and combine with block someday
     [
     | <.unsp>? <?before <[,:]> > {*}                            #= normal
     | <.unv>? <?before \n > <.ws>
-        { let $+endstmt = $!ws_from; } {*}                      #= endstmt
+        { let $+endstmt = $.ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = $¢.pos; }                           #= endargs
     ]
     {*}
@@ -646,10 +643,10 @@ ex:     say $a;
 token eat_terminator {
     [
     || ';'
-    || <?{ $+endstmt === $!ws_from }>
+    || <?{ $+endstmt === $.ws_from }>
     || <?before <terminator>>
     || $
-    || {{ if $¢.pos === $!ws_to { $¢.pos = $!ws_from } }}   # undo any line transition
+    || {{ if $¢.pos === $.ws_to { $¢.pos = $.ws_from } }}   # undo any line transition
         <.panic: "Statement not terminated properly">  # "can't happen" anyway :)
     ]
 }
@@ -1158,7 +1155,7 @@ token dottyop {
 token post {
     <!stdstopper>
     # last whitespace didn't end here (or was zero width)
-    <?{ $¢.pos !=== $!ws_to or $!ws_to === $!ws_from  }>
+    <?{ $¢.pos !=== $.ws_to or $.ws_to === $.ws_from  }>
 
     <?unspacey>
 

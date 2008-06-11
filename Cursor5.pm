@@ -1893,7 +1893,7 @@ sub fail { my $self = shift;
 
 		for my $newalt (@newalts) {
 		    $pure = 1 unless $newalt =~ /\(\?#::\)/;
-		    $PREFIX = '' if $newalt =~ /FATE/;;
+#		    $PREFIX = '' if $newalt =~ /FATE/;;
 		    if ($oldalt =~ /FATE/ and $newalt =~ /FATE/) {
 			my $newold = $oldalt;
 			my $newnew = $newalt;
