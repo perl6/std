@@ -136,6 +136,7 @@ sub un6 {
         $f =~ s/^\%(\w+)([\[{])/$2/             and $t .= qq/\$$1/, next;
         $f =~ s/^\|%/%/                         and next;
         $f =~ s/^\.HOW//         		and $t .= qq/->meta/, next;
+        $f =~ s/^HOW//	         		and $t .= qq/meta/, next;
         $f =~ s/^\.([a-z]\w+)//         	and $t .= qq/->$1/, next;
         $f =~ s/^!===?//                	and $t .= qq/!=/, next;
         $f =~ s/^===//                  	and $t .= qq/==/, next;
@@ -242,11 +243,11 @@ sub BUILD {
     my $self = shift;
     $self->{ws_from} = 0;
     $self->{ws_to} = 0;
-    $self->_AUTOLEXpeek('expect_term',$retree);
 END
 
-	$out .= <<"END";
-    system('cp lex/$TOP/expect_term lex/$TOP/EXPR');
+	$out .= <<'END' if $TOP eq 'Perl';
+    $self->_AUTOLEXpeek('expect_term',$retree);
+    system('cp lex/Perl/expect_term lex/Perl/EXPR');
 END
 
 	$out .= <<'END';
