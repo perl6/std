@@ -143,10 +143,6 @@ sub hash { my $self = shift;
     \%result;
 }
 
-# unwarranted chumminess with Perl grammar
-sub ws_from { $_[0]->{ws_from} }
-sub ws_to { $_[0]->{ws_to} }
-
 sub lexers { my $self = shift;
     my $lang = ref $self;
     $self->deb("LANG = $lang") if $DEBUG & DEBUG::autolexer;
@@ -932,6 +928,61 @@ sub after { my $self = shift;
 sub null { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     return $self->cursor($self->{_pos})->retm();
+}
+
+## token ws
+##      token ws {
+##          :my @stub = return self if self.pos === $!ws_to; # really fast memoizing
+##          [
+##          || <?after \w> <?before \w> ::: <!>        # must \s+ between words
+##          || { $!ws_from = $¢.pos } \s* { $!ws_to = $¢.pos }
+##          ]
+##      }
+
+sub ws_from { $_[0]->{ws_from} }
+sub ws_to { $_[0]->{ws_to} }
+
+sub ws {
+    my $self = shift;
+    my @stub = return $self if $self->pos == $self->{ws_to};
+
+    local $CTX = $self->callm() if $DEBUG & DEBUG::trace_call;
+    if ($self->{_peek}) {
+        return;
+    }
+
+    my $C = $self;
+
+    $self->_MATCHIFY(
+        $C->_BRACKET( sub { my $C=shift;
+            do { my @gather;
+                    push @gather, (map { my $C=$_;
+                        (map { my $C=$_;
+                            (map { my $C=$_;
+                                $C->_NOTBEFORE( sub { my $C=shift;
+                                    $C
+                                })
+                            } $C->_COMMITRULE())
+                        } $C->before(sub { my $C=shift;
+                            $C->_ALNUM()
+                        }))
+                    } $C->before( sub { my $C=shift;
+                        $C->after(sub { my $C=shift;
+                            $C->_ALNUM_rev()
+                        })
+                    }))
+                    or
+                    push @gather, (map { my $C=$_;
+                        (map { my $C=$_;
+                            scalar(do { $self->{ws_to} = $C->{_pos} }, $C)
+                        } $C->_STARr(sub { my $C=shift;
+                            $C->_SPACE()
+                        }))
+                    } scalar(do { $self->{ws_from} = $C->{_pos} }, $C));
+              @gather;
+            }
+        })
+    );
 }
 
 sub _ASSERT { my $self = shift;
