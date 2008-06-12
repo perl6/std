@@ -3463,8 +3463,8 @@ grammar Regex is Perl {
     rule regex ($STOP is context) {
         :my $sigspace    is context<rw> = $+sigspace    // 0;
         :my $ratchet     is context<rw> = $+ratchet     // 0;
-        :my $insensitive is context<rw> = $+insensitive // 0;
-        :my $basechar    is context<rw> = $+basechar    // 0;
+        :my $ignorecase is context<rw> = $+ignorecase // 0;
+        :my $ignoreaccent    is context<rw> = $+ignoreaccent    // 0;
         < || | && & >?
         <EXPR>
         {*}
@@ -3700,14 +3700,15 @@ grammar Regex is Perl {
         <quotepair> { $/<sym> := «: $<quotepair><key>» }
     }
 
-    token regex_mod_internal:sym<:i>    { <sym> 'nsensitive' { $+insensitive = 1 } }
-    token regex_mod_internal:sym<:!i>   { <sym> 'nsensitive' { $+insensitive = 0 } }
+    token regex_mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] { $+ignorecase = 1 } }
+    token regex_mod_internal:sym<:!i>   { $<sym>=[':i'|':ignorecase'] { $+ignorecase = 0 } }
     # XXX will this please work somehow ???
-    token regex_mod_internal:sym<:i( )> { <sym 'nsensitive'> <regex_mod_arg> { $+insensitive = $<regex_mod_arg>.eval } }
+    token regex_mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <regex_mod_arg> { $+ignorecase = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:sym<:b>    { <sym> 'asechar'? { $+basechar = 1 } }
-    token regex_mod_internal:sym<:!b>   { <sym> 'asechar'? { $+basechar = 0 } }
-    token regex_mod_internal:sym<:b( )> { <sym> 'asechar'? <regex_mod_arg> { $+basechar = $<regex_mod_arg>.eval } }
+    token regex_mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] { $+ignoreaccent = 1 } }
+    token regex_mod_internal:sym<:!a>   { $<sym>=[':a'|':ignoreaccent'] { $+ignoreaccent = 0 } }
+    # XXX will this please work somehow ???
+    token regex_mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <regex_mod_arg> { $+ignoreaccent = $<regex_mod_arg>.eval } }
 
     token regex_mod_internal:sym<:s>    { <sym> 'igspace'? { $+sigspace = 1 } }
     token regex_mod_internal:sym<:!s>   { <sym> 'igspace'? { $+sigspace = 0 } }
