@@ -327,7 +327,7 @@ END
 
 	if (s/^(\s*)(proto \s+ (regex|rule|token|method) \s+
 	    (\w+) \s*
-	    (?:\(([^)]*)\))?.*?\{[.\s]*}.*?\n)//x)
+	    (?:\(([^)]*)\))?.*?\{[<.>\s]*}.*?\n)//x)
 	{
 	    $out .= '#' . $2;
 	    my $name = $4;
@@ -1221,12 +1221,18 @@ sub atom {
         return quantified_atom();
     }
 
-    # check unbalanced angles before assertions
+    # check weird angles before assertions
 
     if (s/^(<<|>>|«|»)//) {
         my $boundary = $1;
         ws();
         return bless { text => $boundary, min => 0 }, "RE_meta";
+    }
+
+    if (s/^(<(\.\.\.|!!!|\?\?\?)>)//) {
+        my $notyet = $1;
+        ws();
+        return bless { text => $notyet, min => 0 }, "RE_meta";
     }
 
     if (s/^(<\(|\)>)//) {
