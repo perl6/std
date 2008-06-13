@@ -81,23 +81,27 @@ sub new {
 
 sub mixin {
     my $self = shift;
+    my $WHAT = ref($self)||$self;
     my @mixins = @_;
 
-    my $WHAT = $self . '::';
+    my $NEWWHAT = $WHAT . '::';
+    my @newmix;
     for my $mixin (@mixins) {
-	(my $ext = $mixin) =~ s/^.*:://;	# just looking for a "cache" key, really
-	$WHAT .= '_' . $ext;
+	my $ext = ref($mixin) || $mixin;
+	push @newmix, $ext;
+	$ext =~ s/^.*:://;	# just looking for a "cache" key, really
+	$NEWWHAT .= '_' . $ext;
     }
-    $self->deb("mixin $WHAT $self") if $DEBUG & DEBUG::mixins;
+    $self->deb("mixin $NEWWHAT from $WHAT @newmix") if $DEBUG & DEBUG::mixins;
     no strict 'refs';
-    if (not @{$WHAT.'::ISA'}) {		# never composed this one yet?
+    if (not @{$NEWWHAT.'::ISA'}) {		# never composed this one yet?
 	# fake up mixin with MI, being sure to put "roles" in front
-	my $eval = "package $WHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$self'); moose_with(" . join(',', map {"'$_'"} @mixins) . ");\n";
+	my $eval = "package $NEWWHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$WHAT'); moose_with(" . join(',', map {"'$_'"} @newmix) . ");\n";
 	$self->deb($eval) if $DEBUG & DEBUG::mixins;
 	eval $eval;
 	warn $@ if $@;
     }
-    return $WHAT;
+    return $NEWWHAT;
 }
 
 sub _PARAMS {}	# overridden in parametric role packages
@@ -407,12 +411,6 @@ sub _AUTOLEXnow { my $self = shift;
 		return unless $lexer;
 
 		pos($$buf) = $C->{_pos};
-#		my $stoplen = -1;
-#		if ($::STOP and $$buf =~ m/\G(??{$::STOP})/gc) {
-#		    $stoplen = pos($$buf) - $C->{_pos};
-#		    pos($$buf) = $C->{_pos};
-#		    print STDERR "STOPLEN = $stoplen for $::STOP\n";
-#		}
 
 		if ($DEBUG & DEBUG::lexer) {
 		    my $peek = substr($$buf,$C->{_pos},20);

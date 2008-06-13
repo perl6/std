@@ -49,9 +49,13 @@ understand Perl 6 code.
 
 =end comment overview
 
-token TOP {
-    <UNIT( $+STOP || rx/$/ )>
-    {*}
+method TOP ($STOP = undef) {
+    if defined $STOP {
+        self.unitstop($STOP).comp_unit;
+    }
+    else {
+        self.comp_unit;
+    }
 }
 
 # This grammar also assumes transitive longest-token semantics, though
@@ -253,7 +257,6 @@ class Terminator does PrecOp {
 # there's appropriate whitespace.  # Note that endsym isn't called if <sym>
 # isn't called.
 
-my $STOP is context = rx/$/;
 my $endsym is context = "null";
 my $endstmt is context = -1;
 my $endargs is context = -1;
@@ -460,12 +463,6 @@ token pod_comment {
 
 # Top-level rules
 
-method UNIT ($STOP is context = rx/$/) {
-    UNIT: do {
-        self.comp_unit();
-    }
-}
-
 # Note: we only check for the stopper.  We don't check for ^ because
 # we might be embedded in something else.
 rule comp_unit {
@@ -474,7 +471,7 @@ rule comp_unit {
     :my $endargs        is context<rw> = -1;
 
     <statementlist>
-    [ <$+STOP> || <.panic: "Can't understand next input--giving up"> ]
+    [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
     {*}
 }
 
@@ -550,14 +547,14 @@ seealso: regex_declarator:rule
 
 =end perlhints
 
-method regexlang ($lang, $stop) {
+method sublang ($lang) {
     my $outerlang = self.WHAT;
     my $LANG is context = $outerlang;
-    self.cursor_fresh($lang).regex($stop);
+    self.cursor_fresh($lang);
 }
 
 token regex_block {  # perhaps parameterize and combine with block someday
-    '{' <regexlang( ::Regex, rx/\}/)>
+    '{' <sublang( ::Regex).regex()>
     [ '}' || <.panic: "Missing right brace"> ]
     [
     | \h* <.unsp>? <?before <[,:]> > {*}                        #= normal
@@ -2041,14 +2038,13 @@ token quibble ($lang) {
     :my ($start,$stop) = self.peek_delimiters();
     :my $sublang = $start eq $stop ?? $lang.balanced($start,$stop)
                                    !! $lang.unbalanced($stop);
-    :my $STOP is context = rx/$stop/;
-    $start <nibble($sublang)> $stop
+    $start <sublang($sublang).nibble()> $stop
 }
 
-method nibble ($lang, $stop) {
+method nibble ($lang) {
     my $outerlang = self.WHAT;
     my $LANG is context = $outerlang;
-    self.cursor_fresh($lang).nibbler($stop);
+    self.cursor_fresh($lang).nibbler;
 }
 
 token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q).unbalanced("'"))> "'" }
@@ -2059,7 +2055,7 @@ token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('
 token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
-    '/' <regexlang( ::Regex, rx/\//)> '/'
+    '/' <sublang( ::Regex.unbalanced("/")).regex()> '/'
     [ (< i g s m x c e ] >+) 
         # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
@@ -2353,6 +2349,26 @@ token peek_brackets {
 #    {*}
 #}
 
+role startstop[$start,$stop] {
+    token starter { $start }
+    token stopper { $stop }
+} # end role
+
+role stop[$stop] {
+    token starter { <!> }
+    token stopper { $stop }
+} # end role
+
+role unitstop[$stop] {
+    token unitstopper { $stop }
+} # end role
+
+token unitstopper { $ }
+
+method balanced ($start,$stop) { self.mixin( ::startstop[$start,$stop] ); }
+method unbalanced ($stop) { self.mixin( ::stop[$stop] ); }
+method unitstop ($stop) { self.mixin( ::unitstop[$stop] ); }
+
 grammar Q is Perl {
     proto token backslash {}
     proto token escape {}
@@ -2468,14 +2484,14 @@ grammar Q is Perl {
     } # end role
 
     # note: polymorphic over many quote languages, we hope
-    token nibbler ($STOP is context) {
+    token nibbler {
         :my $text = '';
         :my @nibbles = ();
         :my $buf = self.orig;
         [
             [
             | <?before <stopper> > :: <fail>
-            | <0=starter> :: <nibbler $STOP> <1=stopper>
+            | <0=starter> :: <nibbler> <1=stopper>
                             {
                                 my @n = $<nibbler><nibbles>.list;
                                 $text ~= $0 ~ shift(@n);
@@ -2495,19 +2511,6 @@ grammar Q is Perl {
         { push @nibbles, $text; $<nibbles> = [@nibbles]; }
         {*}
     }
-
-    role startstop[$start,$stop] {
-        token starter { $start }
-        token stopper { $stop }
-    } # end role
-
-    role stop[$stop] {
-        token starter { <!> }
-        token stopper { $stop }
-    } # end role
-
-    method balanced ($start,$stop) { self.mixin( ::startstop[$start,$stop] ); }
-    method unbalanced ($stop) { self.mixin( ::stop[$stop] ); }
 
     # begin tweaks (DO NOT ERASE)
 
@@ -3274,11 +3277,14 @@ method faststopper {
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    | <?terminator>                    { $+endargs = $¢.pos }
-    | <?statement_mod_cond>            { $+endargs = $¢.pos }
-    | <?statement_mod_loop>            { $+endargs = $¢.pos }
-    | $                                { $+endargs = $¢.pos }
-#    | <$+unitstopper>
+    [
+    | <?terminator>
+    | <?statement_mod_cond>
+    | <?statement_mod_loop>
+    | $
+    | <unitstopper>
+    ]
+    { $+endargs = $¢.pos }
 }
 
 # A fairly complete operator precedence parser
@@ -3469,7 +3475,7 @@ grammar Regex is Perl {
     token stdstopper { '>' | <nextsame> }
     token infixstopper { '>' | <nextsame> }
 
-    rule regex ($STOP is context) {
+    rule regex {
         :my $sigspace    is context<rw> = $+sigspace    // 0;
         :my $ratchet     is context<rw> = $+ratchet     // 0;
         :my $ignorecase is context<rw> = $+ignorecase // 0;
@@ -3495,8 +3501,8 @@ grammar Regex is Perl {
     rule regex_quantified_atom {
         <regex_atom>
         [ <regex_quantifier>
-            <?{ $<regex_atom>.max_width }>
-                || <.panic: "Can't quantify zero-width atom">
+#            <?{ $<regex_atom>.max_width }>
+#                || <.panic: "Can't quantify zero-width atom">
         ]?
         {*}
     }
@@ -3556,13 +3562,15 @@ grammar Regex is Perl {
     }
 
     token regex_metachar:sym<[ ]> {
-        '[' <regex ']'> ']'
+        '[' <sublang( self.unbalanced(']')).regex()>
+        [ ']' || <.panic: "Missing right bracket"> ]
         { $/<sym> := <[ ]> }
         {*}
     }
 
     token regex_metachar:sym<( )> {
-        '(' <regex ')'> ')'
+        '(' <sublang( self.unbalanced(')')).regex()>
+        [ ')' || <.panic: "Missing right parenthesis"> ]
         { $/<sym> := <( )> }
         {*}
     }

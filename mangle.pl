@@ -13,8 +13,8 @@ sub mangle {
 	s/\^/Caret/g;
 	s/\&/Amp/g;
 	s/\*/Star/g;
-	s/\(/Par/g;
-	s/\)/En/g;
+	s/\(/Paren/g;
+	s/\)/Thesis/g;
 	s/\-/Minus/g;
 	s/\+/Plus/g;
 	s/\=/Equal/g;
