@@ -293,7 +293,7 @@ sub canmatch {
 	    return 1 if $c =~ /^$f/;
 	}
 	else {
-	    return 0;
+	    return canmatch($p,$c);
 	}
     }
     elsif ($f eq '.') {
@@ -490,8 +490,8 @@ sub _AUTOLEXnow { my $self = shift;
 		    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 			my $max = @+ - 1;
 			my $last = @- - 1;	# ignore '$0'
-#		        $self->deb("LAST: $last\n");
-			my $result = $fates->[$last-1] // return;
+		        $self->deb("LAST: $last\n");
+			my $result = $fates->[$last-1];
 			for my $x (1 .. $max) {
 			    my $beg = $-[$x];
 			    next unless defined $beg;
@@ -510,6 +510,7 @@ sub _AUTOLEXnow { my $self = shift;
 			my $tried = "";
 			vec($tried,$last-1,1) = 1;
 			$_[0] = [$tried, $+[0] - $-[0], []];
+			return unless $result;
 			$result;
 		    }
 		    else {
@@ -1792,7 +1793,8 @@ sub fail { my $self = shift;
 
 { package RE_paren; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; ::here();
-    ("(" . join('|', $self->{'re'}->longest($C)) . ")") }	# XXX bad if fates
+	$self->{'re'}->longest($C);
+    }
 }
 
 { package RE_quantified_atom; our @ISA = 'RE_base';

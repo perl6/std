@@ -452,11 +452,11 @@ token ident {
 token pod_comment {
     ^^ '=' <.unsp>?
     [
-    | 'begin' \h+ <ident> .*? \n
+    | 'begin' \h+ <ident> :: .*? \n
       '=' <.unsp>? 'end' \h+ $<ident> » \N*         {*}         #= tagged
-    | 'begin' » \h* \n .*? \n
+    | 'begin' » :: \h* \n .*? \n
       '=' <.unsp>? 'end' » \N*                      {*}         #= anon
-    | \N*                                           {*}         #= misc
+    | :: \N*                                           {*}         #= misc
     ]
     {*}
 }
@@ -1526,7 +1526,7 @@ token special_variable:sym<$!> { <sym> <!before \w> {*} }
 
 token special_variable:sym<$!{ }> {
     # XXX the backslashes are necessary here for bootstrapping, not for P6...
-    ( '$!{' (.*?) '}' )
+    ( '$!{' :: (.*?) '}' )
     <obs("$0 variable", 'smart match against $!')>
 }
 
@@ -1711,7 +1711,7 @@ method obscaret (Str $var, Str $sigil, Str $name) {
 }
 
 token special_variable:sym<${ }> {
-    ( <sigil> '{' (.*?) '}' )
+    ( <sigil> '{' :: (.*?) '}' )
     <obs("$0 variable", "{$<sigil>}($1)")>
 }
 
@@ -3509,7 +3509,7 @@ grammar Regex is Perl {
 
     rule regex_atom {
         [
-        | <regex_metachar>
+         <regex_metachar>
         | (\w)
         | :: <.panic: "unrecognized metacharacter">
         ]
@@ -3626,7 +3626,7 @@ grammar Regex is Perl {
 
     token regex_metachar:var {
         <!before '$$'>
-        <variable=$¢.cursor_fresh($+LANG).variable>
+        <variable=$¢.cursor_fresh($+LANG).variable()>
         <.ws>
         $<binding> = ( '=' <.ws> <regex_quantified_atom> )?
         { $<sym> = $<variable>.item; }
@@ -3634,7 +3634,7 @@ grammar Regex is Perl {
     }
 
     token codepoint {
-        '[' (.*?) ']'
+        '[' :: (.*?) ']'
     }
 
     token q_backslash:qq { <?before qq> <quote> }
