@@ -407,7 +407,7 @@ END
 	    my $newparm = ":\$sym is context<rw> = $newdflt";
 
 	    my $newsig = $protosig{$name} || "";
-	    if ($sig and $sig =~ s/( --> \w*$)//) { $newsig .= ' ' . $1 }
+	    if ($sig and $sig =~ s/( *--> *\w* *$)//) { $newsig .= ' ' . $1 }
 	    if ($newsig =~ /^\s*-->/) {
 		$newsig =~ s/-->/$newparm -->/;
 	    }
@@ -480,8 +480,9 @@ END
                 $MAYBACKTRACK = 1;
             }
 
-            if ($args =~ s/ *--> (\w*)$//) {
-                $coercion = " map { ${PKG}::$1->coerce(\$_) }";
+            if ($args =~ s/ *--> *(\w*) *$//) {
+		my $pkg = $pkg_really{$1} || "${PKG}::$1";
+                $coercion = " map { $pkg->coerce(\$_) }";
             }
             $args .= ', ';
             my $sym = "";

@@ -490,7 +490,7 @@ sub _AUTOLEXnow { my $self = shift;
 		    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
 			my $max = @+ - 1;
 			my $last = @- - 1;	# ignore '$0'
-		        $self->deb("LAST: $last\n");
+#		        $self->deb("LAST: $last\n");
 			my $result = $fates->[$last-1];
 			for my $x (1 .. $max) {
 			    my $beg = $-[$x];

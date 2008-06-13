@@ -3464,6 +3464,8 @@ method EXPR (%preclim = %LOOSEST)
 
 grammar Regex is Perl {
 
+    proto token rxinfix { <...> }
+
     method start ($lang) {
         my $outerlang = self.WHAT;
         my $LANG is context = $outerlang;
@@ -3474,9 +3476,6 @@ grammar Regex is Perl {
         <!{ $+sigspace }>
         <nextsame>      # still get all the pod goodness, hopefully
     }
-
-    token stdstopper { '>' | <nextsame> }
-    token infixstopper { '>' | <nextsame> }
 
     rule regex {
         :my $sigspace    is context<rw> = $+sigspace    // 0;
@@ -3493,7 +3492,12 @@ grammar Regex is Perl {
     }
     token expect_infix {
         <!infixstopper>
+        <!stdstopper>
         <rxinfix>
+        {
+            $<O> = $<rxinfix><O>;
+            $<sym> = $<rxinfix><sym>;
+        }
     }
 
     token rxinfix:sym<||> ( --> Tight_or ) { <sym> }
@@ -3502,6 +3506,8 @@ grammar Regex is Perl {
     token rxinfix:sym<&> ( --> Junctive_and ) { <sym> }
 
     rule regex_quantified_atom {
+        <!stopper>
+        <!rxinfix>
         <regex_atom>
         [ <regex_quantifier>
 #            <?{ $<regex_atom>.max_width }>
@@ -3597,7 +3603,8 @@ grammar Regex is Perl {
     }
 
     token regex_metachar:sym«< >» {
-        '<' <unsp>? <regex_assertion> '>'
+        '<' <unsp>? <regex_assertion>
+        [ '>' || <.panic: "regex assertion not terminated by angle bracket"> ]
         {*}
     }
     token regex_metachar:sym<\\> { <sym> <regex_backslash> {*} }
