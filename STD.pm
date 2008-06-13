@@ -653,6 +653,7 @@ token eat_terminator {
     || {{ if $¢.pos === $.ws_to { $¢.pos = $.ws_from } }}   # undo any line transition
         <.panic: "Statement not terminated properly">  # "can't happen" anyway :)
     ]
+    { $+endargs = 0; $+endstmt = 0; }         # or next EXPR won't start right
 }
 
 =begin perlhints
@@ -1047,6 +1048,9 @@ token noun {
     | <package_declarator>
     | <scope_declarator>
     | <multi_declarator>
+    | <routine_declarator>
+    | <regex_declarator>
+    | <type_declarator>
     | <circumfix>
     | <dotty>
 #    | <subcall>
@@ -1504,10 +1508,9 @@ token declarator {
     {*}
 }
 
-token multi_declarator:multi { <sym> <declarator> {*} }
-token multi_declarator:proto { <sym> <declarator> {*} }
-token multi_declarator:only  { <sym> <declarator> {*} }
-token multi_declarator:bare  {       <declarator> {*} }
+token multi_declarator:multi { <sym> <.ws> <declarator> {*} }
+token multi_declarator:proto { <sym> <.ws> <declarator> {*} }
+token multi_declarator:only  { <sym> <.ws> <declarator> {*} }
 
 token routine_declarator:sub       { <sym> <routine_def> {*} }
 token routine_declarator:method    { <sym> <method_def> {*} }
@@ -3293,7 +3296,7 @@ method EXPR (%preclim = %LOOSEST)
 {
     temp $CTX = self.callm if $DEBUG +& DEBUG::trace_call;
     if self.peek {
-        return self._AUTOLEXpeek('Perl::EXPR');
+        return self._AUTOLEXpeek('EXPR');
     }
     my $preclim = %preclim<prec>;
     my $inquote is context = 0;

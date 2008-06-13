@@ -166,7 +166,7 @@ sub _AUTOLEXpeek { my $self = shift;
 	$self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
 	return { PATS => ['(?#::)'] };  # (but if we advanced just assume a :: here)
     }
-    return $self->lexers->{$key} //= $self->_AUTOLEXgen($key, $retree);
+    return $self->lexers->{$key} = $self->_AUTOLEXgen($key, $retree);
 }
 
 sub _AUTOLEXgen { my $self = shift;
@@ -1685,11 +1685,6 @@ sub fail { my $self = shift;
                 $fakepos++;
                 return '[a-z_A-Z]';	# XXX not unicodey
             }
-	    elsif ($_ eq 'EXPR') {
-		if (not -e 'lex/EXPR') {
-		    return $IMP;
-		}
-	    }
 	    my $lexer;
 	    {
 		local $PREFIX = "";
