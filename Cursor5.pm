@@ -157,22 +157,12 @@ sub _AUTOLEXpeek { my $self = shift;
 
     $self->deb("AUTOLEXpeek $key") if $DEBUG & DEBUG::autolexer;
     die "Null key" if $key eq '';
-#    if (my $lexer = $self->lexers->{$key}) {
-#        if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
-#            die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
-#            $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
-#            return hash();  # (but if we advanced just assume a :: here)
-#        }
-#        elsif (ref($lexer) eq 'HASH') {
-#            return $lexer // hash();
-#        }
-#        else {
-#	    $self->deb(::Dump($lexer));
-#            $self->deb("_AUTOLEXpeek oops\n");
-#	    return;
-#        }
-#    }
-    return $self->lexers->{$key} = $self->_AUTOLEXgen($key, $retree);
+    if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
+	die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
+	$self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
+	return { PATS => ['(?#::)'] };  # (but if we advanced just assume a :: here)
+    }
+    return $self->lexers->{$key} //= $self->_AUTOLEXgen($key, $retree);
 }
 
 sub _AUTOLEXgen { my $self = shift;

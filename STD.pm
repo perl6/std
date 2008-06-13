@@ -340,8 +340,8 @@ proto token scope_declarator () { <...> }
 token category:package_declarator { <sym> }
 proto token package_declarator () { <...> }
 
-token category:plurality_declarator { <sym> }
-proto token plurality_declarator () { <...> }
+token category:multi_declarator { <sym> }
+proto token multi_declarator () { <...> }
 
 token category:routine_declarator { <sym> }
 proto token routine_declarator () { <...> }
@@ -550,12 +550,17 @@ seealso: regex_declarator:rule
 
 =end perlhints
 
+method regexlang ($lang, $stop) {
+    my $outerlang = self.WHAT;
+    my $LANG is context = $outerlang;
+    self.cursor_fresh($lang).regex($stop);
+}
+
 token regex_block {  # perhaps parameterize and combine with block someday
-    '{'
-    <regex '}'>
+    '{' <regexlang( ::Regex, rx/\}/)>
     [ '}' || <.panic: "Missing right brace"> ]
     [
-    | <.unsp>? <?before <[,:]> > {*}                            #= normal
+    | \h* <.unsp>? <?before <[,:]> > {*}                        #= normal
     | <.unv>? <?before \n > <.ws>
         { let $+endstmt = $.ws_from; } {*}                      #= endstmt
     | {*} { let $+endargs = $¢.pos; }                           #= endargs
@@ -612,10 +617,12 @@ token statement {
     | <statement_control>                        {*}            #= control
     | <EXPR> {*}                                                #= expr
         [
+        || <?faststopper>
         || <?stdstopper>
         || <statement_mod_loop> <loopx=EXPR> {*}                #= mod loop
         || <statement_mod_cond> <condx=EXPR>
             [
+            || <?faststopper>
             || <?stdstopper> {*}                                #= mod cond
             || <statement_mod_loop> <loopx=EXPR> {*}            #= mod condloop
             ]
@@ -1010,6 +1017,7 @@ token pre {
 }
 
 token expect_term {
+    <!faststopper>
     [
     | <?stdstopper> :: <?fail>
     | <noun>
@@ -1024,6 +1032,7 @@ token expect_term {
 }
 
 token adverbs {
+    <!faststopper>
     <!stdstopper>
     [ <colonpair> <.ws> ]+
     {
@@ -1040,10 +1049,7 @@ token noun {
     | <fatarrow>
     | <package_declarator>
     | <scope_declarator>
-    | <plurality_declarator>
-    | <routine_declarator>
-    | <regex_declarator>
-    | <type_declarator>
+    | <multi_declarator>
     | <circumfix>
     | <dotty>
 #    | <subcall>
@@ -1109,6 +1115,8 @@ token expect_tight_infix ($loosest) {
 
 token expect_infix {
     :my $op is context;         # (used in infix_postfix_meta_operator)
+    <!faststopper>
+    <!stdstopper>
     <!infixstopper>
     [
     | <infix> { $op = $<infix>; }
@@ -1153,6 +1161,7 @@ token dottyop {
 # as a lookahead by the quote interpolator.
 
 token post {
+    <!faststopper>
     <!stdstopper>
     # last whitespace didn't end here (or was zero width)
     <?{ $¢.pos !=== $.ws_to or $.ws_to === $.ws_from  }>
@@ -1302,11 +1311,10 @@ token circumfix:sym<{ }> ( --> Term) {
     {*}
 }
 
-token variable_decl {
+token variable_declarator {
     <variable> { $<sigil> = $<variable><sigil> }
     [   # Is it a shaped array or hash declaration?
-        <?{ $<sigil> eq '@' | '%' }>
-        <.ws>
+      #  <?{ $<sigil> eq '@' | '%' }>
         <?before [ '<' | '(' |  '[' | '{' ] >
         <postcircumfix>
     ]?
@@ -1323,13 +1331,8 @@ rule scoped {
     [
     | <regex_declarator>
     | <package_declarator>
-    | <fulltypename>*
-        [ <variable_decl>
-        | '(' <signature> ')' <trait>*
-        | <plurality_declarator>
-        | <routine_declarator>
-        | <type_declarator>
-        ]
+    | <fulltypename>+ <multi_declarator>
+    | <multi_declarator>
     ]
     
     {*}
@@ -1493,11 +1496,10 @@ rule package_block {
     {*}
 }
 
-rule pluralized {
+token declarator {
     [
-    | <variable_decl>
+    | <variable_declarator>
     | '(' <signature> ')' <trait>*
-    | <package_declarator>
     | <routine_declarator>
     | <regex_declarator>
     | <type_declarator>
@@ -1505,10 +1507,10 @@ rule pluralized {
     {*}
 }
 
-token plurality_declarator:multi { <sym> <pluralized> {*} }
-token plurality_declarator:proto { <sym> <pluralized> {*} }
-token plurality_declarator:only  { <sym> <pluralized> {*} }
-token plurality_declarator:bare  {       <pluralized> {*} }
+token multi_declarator:multi { <sym> <declarator> {*} }
+token multi_declarator:proto { <sym> <declarator> {*} }
+token multi_declarator:only  { <sym> <declarator> {*} }
+token multi_declarator:bare  {       <declarator> {*} }
 
 token routine_declarator:sub       { <sym> <routine_def> {*} }
 token routine_declarator:method    { <sym> <method_def> {*} }
@@ -1895,8 +1897,7 @@ token typename {
     {*}
 }
 
-rule fulltypename {
-    <typename>
+rule fulltypename {<typename>
     [ of <fulltypename> ]?
     {*}
 }
@@ -2058,7 +2059,7 @@ token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('
 token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
-    '/' <nibble(Perl::Q.tweak(:regex).unbalanced('/'))> '/'
+    '/' <regexlang( ::Regex, rx/\//)> '/'
     [ (< i g s m x c e ] >+) 
         # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
@@ -2111,30 +2112,30 @@ token quote:tr {
     <finish_trans($<pat>)>
 }
 
-token finish_subst ($pat) {
-    [
-    # bracketed form
-    | <?{ $pat<delim> == 2 }> ::
-          <.ws>
-          <infix>            # looking for pseudoassign here
-          { $<infix><O><prec> == %item_assignment<prec> or
-              $¢.panic("Bracketed subst must use some form of assignment") }
-          <repl=EXPR(%item_assignment)>
-    # unbracketed form
-    | <repl=q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
-    ]
-}
-
-token finish_trans ($pat) {
-    [
-    # bracketed form
-    | <?{ $pat<delim> == 2 }> ::
-          <.ws>
-          <repl=q_pickdelim(qlang('Q',':tr'))>
-    # unbracketed form
-    | <repl=q_unbalanced(qlang('Q',':tr'), $pat<delim>[0])>
-    ]
-}
+#token finish_subst ($pat) {
+#    [
+#    # bracketed form
+#    | <?{ $pat<delim> == 2 }> ::
+#          <.ws>
+#          <infix>            # looking for pseudoassign here
+#          { $<infix><O><prec> == %item_assignment<prec> or
+#              $¢.panic("Bracketed subst must use some form of assignment") }
+#          <repl=EXPR(%item_assignment)>
+#    # unbracketed form
+#    | <repl=q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
+#    ]
+#}
+#
+#token finish_trans ($pat) {
+#    [
+#    # bracketed form
+#    | <?{ $pat<delim> == 2 }> ::
+#          <.ws>
+#          <repl=q_pickdelim(qlang('Q',':tr'))>
+#    # unbracketed form
+#    | <repl=q_unbalanced(qlang('Q',':tr'), $pat<delim>[0])>
+#    ]
+#}
 
 # XXX should eventually be derived from current Unicode tables.
 constant %open2close = (
@@ -2293,64 +2294,64 @@ token peek_brackets {
     }}
 }
 
-regex bracketed ($lang = 'Perl::Q') {
-    :my ($start,$stop);
-    <?{ ($start,$stop) = $¢.peek_brackets() }>
-    <q=q_balanced($lang, $start, $stop)>
-    {*}
-}
+#regex bracketed ($lang = 'Perl::Q') {
+#    :my ($start,$stop);
+#    <?{ ($start,$stop) = $¢.peek_brackets() }>
+#    <q=q_balanced($lang, $start, $stop)>
+#    {*}
+#}
+#
+#regex q_pickdelim ($lang) {
+#    :my ($start,$stop) = self.peek_delimiters();
+#    [
+#    || <?{ $start eq $stop }> :: <q=q_unbalanced($lang, $stop)>
+#    ||                           <q=q_balanced($lang, $start, $stop)>
+#    ]
+#    {*}
+#}
 
-regex q_pickdelim ($lang) {
-    :my ($start,$stop) = self.peek_delimiters();
-    [
-    || <?{ $start eq $stop }> :: <q=q_unbalanced($lang, $stop)>
-    ||                           <q=q_balanced($lang, $start, $stop)>
-    ]
-    {*}
-}
-
-regex rx_pickdelim ($lang) {
-    [
-    || { ($<start>,$<stop>) = $¢.peek_delimiters() }
-      $<start>
-      <rx=regex($<stop>)>        # counts its own brackets, we hope
-    || $<stop> = [ [\S] || <.panic: "Regex delimiter must not be whitespace"> ]
-      <rx=regex($<stop>)>
-    ]
-    {*}
-}
-
-regex tr_pickdelim ($lang) {
-    [
-    || { ($<start>,$<stop>) = $¢.peek_delimiters() }
-      $<start>
-      <tr=transliterator($<stop>)>
-    || $<stop> = [ [\S] || <.panic: "tr delimiter must not be whitespace"> ]
-      <tr=transliterator($<stop>)>
-    ]
-    {*}
-}
-
-regex transliterator($stop) {
-    # XXX your ad here
-}
-
-token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
-    $start
-    $<text> = [.*?] ** [
-#        <!before $stop>
-        [ # XXX triple rule should just be in escapes to be customizable
-        | <?before $start ** 3>
-            $<dequote> = <EXPR(%LOOSEST,/<$stop> ** 3/)>
-        | <?before <$start>>
-            $<subtext> = <q_balanced($lang, $start, $stop, :@esc)>
-        | <?before @esc>
-            $<escape> = [ <q_escape($lang)> ]
-        ]
-    ]
-    $stop
-    {*}
-}
+#regex rx_pickdelim ($lang) {
+#    [
+#    || { ($<start>,$<stop>) = $¢.peek_delimiters() }
+#      $<start>
+#      <rx=regex($<stop>)>        # counts its own brackets, we hope
+#    || $<stop> = [ [\S] || <.panic: "Regex delimiter must not be whitespace"> ]
+#      <rx=regex($<stop>)>
+#    ]
+#    {*}
+#}
+#
+#regex tr_pickdelim ($lang) {
+#    [
+#    || { ($<start>,$<stop>) = $¢.peek_delimiters() }
+#      $<start>
+#      <tr=transliterator($<stop>)>
+#    || $<stop> = [ [\S] || <.panic: "tr delimiter must not be whitespace"> ]
+#      <tr=transliterator($<stop>)>
+#    ]
+#    {*}
+#}
+#
+#regex transliterator($stop) {
+#    # XXX your ad here
+#}
+#
+#token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
+#    $start
+#    $<text> = [.*?] ** [
+##        <!before $stop>
+#        [ # XXX triple rule should just be in escapes to be customizable
+#        | <?before $start ** 3>
+#            $<dequote> = <EXPR(%LOOSEST,/<$stop> ** 3/)>
+#        | <?before <$start>>
+#            $<subtext> = <q_balanced($lang, $start, $stop, :@esc)>
+#        | <?before @esc>
+#            $<escape> = [ <q_escape($lang)> ]
+#        ]
+#    ]
+#    $stop
+#    {*}
+#}
 
 grammar Q is Perl {
     proto token backslash {}
@@ -3258,17 +3259,25 @@ token terminator:sym<!!> ( --> Terminator)
     { <?before '!!' > {*} }
 
 regex infixstopper {
-    | <?before '{' | <lambda> ><?after \s>
-    | <stdstopper>
+    <?before '{' | <lambda> ><?after \s>
 }
 
+# don't check other stoppers if we already know we stop here
+method faststopper {
+    return self if self.pos === $+endargs;
+    if self.ws_from === $+endstmt {
+        $+endargs = self.pos;  #  cache current stop pos
+        return self;
+    }
+    return ();
+}
+
+# hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    | $
-    | <terminator>
-    | <statement_mod_cond>
-    | <statement_mod_loop>
-    | <?{ $¢.ws_from === $+endstmt }>
-    | <?{ $¢.pos === $+endargs }>
+    | <?terminator>                    { $+endargs = $¢.pos }
+    | <?statement_mod_cond>            { $+endargs = $¢.pos }
+    | <?statement_mod_loop>            { $+endargs = $¢.pos }
+    | $                                { $+endargs = $¢.pos }
 #    | <$+unitstopper>
 }
 
