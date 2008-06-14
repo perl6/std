@@ -232,7 +232,7 @@ sub MAIN {
 	$TOP = $PKG = $1;
 	$out .= "package $PKG;\n";
 	$out .= <<'END';
-use Cursor5; # for DEBUG constants
+use Cursor5; # for base class as well as DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
 moose_extends('Cursor5');
 my $retree;
@@ -482,7 +482,7 @@ END
 
             if ($args =~ s/ *--> *(\w*) *$//) {
 		my $pkg = $pkg_really{$1} || "${PKG}::$1";
-                $coercion = " map { $pkg->coerce(\$_) }";
+                $coercion = " Cursor5::lazymap sub { $pkg->coerce(\$_[0]) }, ";
             }
             $args .= ', ';
             my $sym = "";
@@ -2058,9 +2058,9 @@ END
     sub wrapone {
         my ($outer, $inner) = @_;
         if ($MAYBACKTRACK) {
-            "(map { my \$C=\$_;\n" .
+            "Cursor5::lazymap(sub { my \$C=\$_[0];\n" .
                 ::indent($inner) .
-            "\n} $outer)";
+            "\n}, $outer)";
         }
         else {
             "$outer andthen\n$inner\n}";

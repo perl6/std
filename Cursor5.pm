@@ -30,6 +30,8 @@ sub ::deb {
 
 package Cursor5;
 
+use LazyMap 'lazymap';
+
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
     print ::LOG $pos, "\t", ':' x $CTX, ' ', @_, "\n";
@@ -680,7 +682,7 @@ sub retm { my $self = shift;
 }
 
 sub _MATCHIFY { my $self = shift;
-    my @result = map { $_->{_from} = $self->{_from}; $_->retm() } @_;
+    my @result = lazymap( sub { my $_ = shift; $_->{_from} = $self->{_from}; $_->retm() }, @_);
     if (wantarray) {
 	@result;
     }
@@ -694,9 +696,9 @@ sub _STARf { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
-    map { $_->retm() }
+    lazymap(sub { $_[0]->retm() }, 
         $self->cursor($self->{_pos}),
-        $self->_PLUSf($block);
+        $self->_PLUSf($block));
 }
 
 sub _STARg { my $self = shift;
@@ -704,9 +706,9 @@ sub _STARg { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
-    map { $_->retm() } reverse
+    lazymap(sub { $_[0]->retm() }, reverse
             $self->cursor($self->{_pos}),
-            $self->_PLUSf($block);
+            $self->_PLUSf($block));
 }
 
 sub _STARr { my $self = shift;
@@ -739,10 +741,10 @@ sub _PLUSf { my $self = shift;
     return () if $self->{_pos} == length(${$self->{_orig}});
     do {
 	for my $x ($block->($self)) {
-	    push @result, map { $self->cursor($_->{_to}) } $x, $x->_PLUSf($block);
+	    push @result, lazymap(sub { $self->cursor($_[0]->{_to}) }, $x, $x->_PLUSf($block));
 	}
     };
-    map { $_->retm() } @result;
+    lazymap(sub { $_[0]->retm() }, @result);
 }
 
 sub _PLUSg { my $self = shift;
@@ -787,11 +789,11 @@ sub _REPSEPf { my $self = shift;
     do {
 	for my $x ($block->($self)) {
 	    for my $s ($sep->($x)) {
-		push @result, map { $self->cursor($_->{_to}) } $x, $s->_REPSEPf($sep,$block);
+		push @result, lazymap(sub { $self->cursor($_[0]->{_to}) }, $x, $s->_REPSEPf($sep,$block));
 	    }
 	}
     };
-    map { $_->retm() } @result;
+    lazymap(sub { $_[0]->retm() }, @result);
 }
 
 sub _REPSEPg { my $self = shift;
@@ -843,34 +845,34 @@ sub _OPTg { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @x = $block->($self);
-    map { $_->retm() }
+    lazymap(sub { $_[0]->retm() },
         $block->($self),
-        $self->cursor($self->{_pos});
+        $self->cursor($self->{_pos}));
 }
 
 sub _OPTf { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    map { $_->retm() }
+    lazymap(sub { $_[0]->retm() },
         $self->cursor($self->{_pos}),
-        $block->($self);
+        $block->($self));
 }
 
 sub _BRACKET { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    map { $_->retm() }
-        $block->($self);
+    lazymap(sub { $_[0]->retm() },
+        $block->($self));
 }
 
 sub _PAREN { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    map { $_->retm() }
-        $block->($self);
+    lazymap(sub { $_[0]->retm() },
+        $block->($self));
 }
 
 sub _NOTBEFORE { my $self = shift;
@@ -990,8 +992,8 @@ sub _BINDVAR { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    map { $$var = $_; $_->retm() }  # XXX doesn't "let"
-        $block->($self);
+    lazymap(sub { $$var = $_[0]; $_[0]->retm() },
+        $block->($self));
 }
 
 sub _SUBSUME { my $self = shift;
@@ -999,8 +1001,8 @@ sub _SUBSUME { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
-    map { $self->cursor_bind($names, $_)->retm() }
-        $block->($self);
+    lazymap(sub { $self->cursor_bind($names, $_[0])->retm() },
+        $block->($self));
 }
 
 sub _EXACT { my $self = shift;
