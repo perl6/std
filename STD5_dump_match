@@ -1,0 +1,65 @@
+#!/usr/local/bin/perl
+
+use STD5;
+use utf8;
+use YAML::XS;
+use Encode;
+use strict;
+use warnings;
+use Term::ANSIColor qw(:constants);
+
+if ($#ARGV != 1) {
+    die "USAGE: filename use_color\nuse_color = 0|1\n";
+}
+my ($filename,$use_color) = @ARGV;
+
+my $what = 'comp_unit';
+my $text = Encode::decode('utf8', `cat $ARGV[0]`);
+my $r = Perl->new($text)->$what();
+my @events;
+#print Dump($r);
+sub traverse {
+    my ($r,$label,$depth) = @_;
+    return unless ref $r;
+     if (defined $r->{_from}) {
+         push(@events,[$r->{_from},'from',$label,$r,$depth]);
+         push(@events,[$r->{_to},'to',$label,$r,-$depth]);
+     }
+    for my $name (keys %$r) {
+        my $v = $r->{$name};
+        if (ref $v eq 'ARRAY') {
+            for my $i (0 .. scalar @{$v}) {
+                traverse($v->[$i],$name,$depth+1);
+            }
+        } elsif (ref $v eq 'SCALAR') {
+        } elsif (ref $v) {
+            traverse($v,$name,$depth+1);
+        } else {
+        }
+    }
+}
+my $str = "";
+traverse($r,$what,0);
+my $orig = ${$r->{_orig}};
+my $at = 0;
+# I know, XML sucks, any suggestions? ;)
+for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @events) {
+
+    $str .= substr($orig,$at,$_->[0]-$at);
+    $at = $_->[0];
+
+    if ($_->[1] eq 'from') {
+        if ($use_color) {
+            $str .= RED."<".BLUE.$_->[2].RED.">".RESET;
+        } else {
+            $str .= "<".$_->[2].">";
+        }    
+    } elsif ($_->[1] eq 'to') {
+        if ($use_color) {
+            $str .= RED."</".BLUE.$_->[2].RED.">".RESET;
+        } else {
+            $str .= "</".$_->[2].">";
+        }    
+    }
+}
+print "$str\n";
