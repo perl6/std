@@ -30,7 +30,7 @@ sub ::deb {
 
 package Cursor5;
 
-use LazyMap 'lazymap';
+use LazyMap qw(lazymap lazyconst);
 
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
@@ -689,6 +689,15 @@ sub _MATCHIFY { my $self = shift;
     else {
 	$result[0];
     }
+}
+
+sub _SCAN { my $self = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $pos = $self->{_pos};
+
+    lazymap(sub { $_[0]->retm() }, 
+	lazymap( sub { $self->cursor($pos++) }, lazyconst(1) ));
 }
 
 sub _STARf { my $self = shift;
@@ -1676,7 +1685,7 @@ sub fail { my $self = shift;
             elsif ($_ eq '«' or $_ eq '<<') {
 		return '\<';
 	    }
-            elsif ($_ eq '::' or $_ eq ':::') {
+            elsif ($_ eq '::' or $_ eq ':::' or $_ eq '.*?') {
                 return $IMP;
             }
             else {
@@ -1940,7 +1949,9 @@ sub fail { my $self = shift;
 }
 
 { package RE_submatch; our @ISA = 'RE_base';
-    #method longest ($C) { ... }
+    sub longest { my $self = shift; my ($C) = @_; 
+        return $IMP;
+    }
 }
 
 { package RE_all; our @ISA = 'RE_base';

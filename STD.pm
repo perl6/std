@@ -547,14 +547,8 @@ seealso: regex_declarator:rule
 
 =end perlhints
 
-method sublang ($lang) {
-    my $outerlang = self.WHAT;
-    my $LANG is context = $outerlang;
-    self.cursor_fresh($lang);
-}
-
 token regex_block {  # perhaps parameterize and combine with block someday
-    '{' <sublang( ::Regex.unbalanced('}')).regex()>
+    '{' [ :lang( ::Regex.unbalanced('}') ) <regex> ]
     [ '}' || <.panic: "Missing right brace"> ]
     [
     | \h* <.unsp>? <?before <[,:]> > {*}                        #= normal
@@ -2041,7 +2035,7 @@ token quibble ($lang) {
     :my ($start,$stop) = self.peek_delimiters();
     :my $sublang = $start eq $stop ?? $lang.balanced($start,$stop)
                                    !! $lang.unbalanced($stop);
-    $start <sublang($sublang).nibble()> $stop
+    $start [:lang($sublang) <nibble>] $stop
 }
 
 method nibble ($lang) {
@@ -2058,7 +2052,7 @@ token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('
 token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
-    '/' <sublang( ::Regex.unbalanced("/")).regex()> '/'
+    '/' [:lang( ::Regex.unbalanced("/") ) <regex>] '/'
     [ (< i g s m x c e ] >+) 
         # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
@@ -3571,14 +3565,14 @@ grammar Regex is Perl {
     }
 
     token regex_metachar:sym<[ ]> {
-        '[' <sublang( self.unbalanced(']')).regex()>
+        '[' [:lang(self.unbalanced(']')) <regex>]
         [ ']' || <.panic: "Missing right bracket"> ]
         { $/<sym> := <[ ]> }
         {*}
     }
 
     token regex_metachar:sym<( )> {
-        '(' <sublang( self.unbalanced(')')).regex()>
+        '(' [:lang(self.unbalanced(')')) <regex>]
         [ ')' || <.panic: "Missing right parenthesis"> ]
         { $/<sym> := <( )> }
         {*}
@@ -3631,13 +3625,13 @@ grammar Regex is Perl {
     }
 
     # should be based on $+LANG...
-    token regex_metachar:sym<' '> { "'" <nibble(Perl::Q.tweak(:q), rx/\'/)>  "'" }
-    token regex_metachar:sym<" "> { '"' <nibble(Perl::Q.tweak(:qq), rx/\"/)> '"' }
+    token regex_metachar:sym<' '> { <?before "'"> [:lang($+LANG) <quote>] }
+    token regex_metachar:sym<" "> { <?before '"'> [:lang($+LANG) <quote>] }
 
     token regex_metachar:var {
         <!before '$$'>
         <?before <sigil>>
-        <variable=sublang($+LANG).variable()>
+        [:lang($+LANG) <variable>]
         <.ws>
         $<binding> = ( '=' <.ws> <regex_quantified_atom> )?
         { $<sym> = $<variable>.item; }
@@ -3684,7 +3678,7 @@ grammar Regex is Perl {
 
     token regex_assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        <variable=sublang($+LANG).EXPR(%LOOSEST)>
+        [:lang($+LANG) <variable=EXPR(%LOOSEST)>]
         {*}
     }
 

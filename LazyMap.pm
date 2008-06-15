@@ -3,10 +3,11 @@ use strict;
 use warnings;
 
 use Exporter;
+use Scalar::Util qw(weaken);
 
 our @ISA = 'Exporter';
 
-our @EXPORT = 'lazymap';
+our @EXPORT = qw(lazymap lazyconst);
 
 our $AUTOLOAD;
 
@@ -88,6 +89,17 @@ sub true {
     return 0 unless my ($c) = $self->iter;
     unshift(@$called, $c);
     return 1;
+}
+
+sub lazyconst {
+    my $const = shift;
+    my $lazy = LazyMap->new('B' => undef, 'C' => [], 'L' => [$const]);
+    my $weak = weaken $lazy;
+    my $block = sub {
+	$weak->{'L'} = [$const];
+	$_[0];
+    };
+    $lazy->{'B'} = $block;
 }
 
 1;

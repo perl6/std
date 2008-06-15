@@ -8,6 +8,7 @@
 use 5.010;
 use strict;
 use warnings;
+use Text::Balanced qw(extract_bracketed);
 
 my $failover = 0;
 if (@ARGV) {
@@ -648,7 +649,7 @@ END
             $body =~ s/<<PROTONAME>>/$PROTONAME/g;
             $body =~ s/<<DECL>>/$sym@DECL/;
             $body =~ s/<<MEAT>>/$meat/;
-            $body =~ s/\$\+(\w+)/\$$1/g;
+            $body =~ s/\$\+(\w+)/\$::$1/g;
             $out .= $body;
             next;
         }
@@ -718,7 +719,7 @@ END
             $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
             $line =~ s/ -> {/sub {/;
             $line =~ s/\breduce\(\)/\$reduce->()/;
-            $line =~ s/([\$\@%])\+(\w+)/$1$2/g;       # assume localized
+            $line =~ s/([\$\@%])\+(\w+)/${1}::$2/g;       # assume localized
             if ($line =~ s/^constant %/our %/) {
                 $line =~ tr/{}/()/;
                 $line = ::un6($line);
@@ -1214,9 +1215,15 @@ sub atom {
         my $adverb = $1;
         local %adverbs = %adverbs;
         
-        # XXX chintzy
-        if (s/^(\(.*?\))//) {
-            $adverbs{$adverb} = $1;
+        if (m/^\(/) {
+	    pos($_) = 0;
+	    my $code = extract_bracketed($_,'(q)');
+            $adverbs{$adverb} = $code;
+	    ws();
+	    if ($adverb eq ':lang') {
+		$code = "my \$newlang = $code; local \$LANG = (ref(\$self)||\$self); \$C = \$C->cursor_fresh(\$newlang); ";
+		return bless { text => $code, min => 0, max => 0, noquant => 1 }, "RE_decl";
+	    }
         }
         else {
             my $not = $adverb =~ s/!//;
@@ -1328,6 +1335,10 @@ sub atom {
         my $colons = $1;
         ws();
         return bless { text => $colons, min => 0 }, "RE_meta";
+    }
+    if (s/^\.\*\?//) {
+        ws();
+        return bless { text => '.*?', min => 1 }, "RE_meta";
     }
     if (s/^\.//) {
         ws();
@@ -1698,6 +1709,9 @@ sub unbalanced {
         }
         if ($text eq '.') {
             $code = "\$C->_ANY$REV()";
+        }
+        elsif ($text eq '.*?') {
+            $code = "\$C->_SCAN$REV()";
         }
         elsif ($text eq '^') {
             $code = "\$C->_BOS$REV()";
@@ -2323,6 +2337,8 @@ END
         }
     }
 }
+
+
 MAIN();
 
 ## vim: expandtab sw=4
