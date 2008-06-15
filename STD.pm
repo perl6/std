@@ -444,7 +444,7 @@ token unv {
 }
 
 token ident {
-    <alpha> \w*
+    <.alpha> \w*
 }
 
 # XXX We need to parse the pod eventually to support $= variables.
