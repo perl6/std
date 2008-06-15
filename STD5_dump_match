@@ -7,9 +7,11 @@ use Encode;
 use strict;
 use warnings;
 use Term::ANSIColor qw(:constants);
-
-if ($#ARGV != 1) {
-    die "USAGE: filename use_color\nuse_color = 0|1\n";
+use Getopt::Long;
+my $nocolor = 0;
+GetOptions("nocolor"=>\$nocolor);
+if ($#ARGV != 0) {
+    die "USAGE: [--nocolor] filename\n";
 }
 my ($filename,$use_color) = @ARGV;
 
@@ -49,16 +51,16 @@ for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @events) {
     $at = $_->[0];
 
     if ($_->[1] eq 'from') {
-        if ($use_color) {
-            $str .= RED."<".BLUE.$_->[2].RED.">".RESET;
-        } else {
+        if ($nocolor) {
             $str .= "<".$_->[2].">";
+        } else {
+            $str .= RED."<".BLUE.$_->[2].RED.">".RESET;
         }    
     } elsif ($_->[1] eq 'to') {
-        if ($use_color) {
-            $str .= RED."</".BLUE.$_->[2].RED.">".RESET;
-        } else {
+        if ($nocolor) {
             $str .= "</".$_->[2].">";
+        } else {
+            $str .= RED."</".BLUE.$_->[2].RED.">".RESET;
         }    
     }
 }
