@@ -682,7 +682,7 @@ sub retm { my $self = shift;
 }
 
 sub _MATCHIFY { my $self = shift;
-    my @result = lazymap( sub { my $_ = shift; $_->{_from} = $self->{_from}; $_->retm() }, @_);
+    my @result = lazymap( sub { my $x = shift; $x->{_from} = $self->{_from}; $x->retm() }, @_);
     if (wantarray) {
 	@result;
     }
@@ -698,7 +698,7 @@ sub _STARf { my $self = shift;
 
     lazymap(sub { $_[0]->retm() }, 
         $self->cursor($self->{_pos}),
-        $self->_PLUSf($block));
+        LazyMap->new(sub { $self->_PLUSf($_[0]) }, $block));
 }
 
 sub _STARg { my $self = shift;
@@ -736,15 +736,21 @@ sub _PLUSf { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $x = $self;
 
-    my @result;
     # don't go beyond end of string
     return () if $self->{_pos} == length(${$self->{_orig}});
-    do {
-	for my $x ($block->($self)) {
-	    push @result, lazymap(sub { $self->cursor($_[0]->{_to}) }, $x, $x->_PLUSf($block));
-	}
-    };
-    lazymap(sub { $_[0]->retm() }, @result);
+    lazymap(
+	sub { $_[0]->retm() },
+	lazymap(
+	    sub {
+		my $x = $_[0];
+		lazymap(
+		    sub {
+			$self->cursor($_[0]->{_to})
+		    }, $x, LazyMap->new(sub { $x->_PLUSf($_[0]) }, $block)
+		);
+	    }, $block->($self)
+	)
+    );
 }
 
 sub _PLUSg { my $self = shift;
@@ -1010,6 +1016,25 @@ sub _EXACT { my $self = shift;
 
     local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
+    my $len = length($s);
+    my $buf = $self->{_orig};
+    if (substr($$buf, $P, $len) eq $s) {
+        $self->deb("EXACT $s matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        my $r = $self->cursor($P+$len);
+        $r->retm();
+    }
+    else {
+        $self->deb("EXACT $s didn't match @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        return ();
+    }
+}
+
+sub _BACKREFn { my $self = shift;
+    my $n = shift;
+
+    local $CTX = $self->callm($n) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    my $s = $self->{$n}->text;
     my $len = length($s);
     my $buf = $self->{_orig};
     if (substr($$buf, $P, $len) eq $s) {

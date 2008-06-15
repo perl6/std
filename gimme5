@@ -232,13 +232,18 @@ sub MAIN {
 	$TOP = $PKG = $1;
 	$out .= "package $PKG;\n";
 	$out .= <<'END';
+use strict;
+use warnings;
+no warnings 'qw';
 use Cursor5; # for base class as well as DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
 moose_extends('Cursor5');
 my $retree;
-no warnings 'qw';
 use feature 'state';
 use utf8;
+
+$DB::deep = 1000;
+
 sub BUILD {
     my $self = shift;
     $self->{ws_from} = 0;

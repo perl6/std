@@ -4,7 +4,7 @@ my $LANG is context;
 
 # random rule for debugging, please ignore
 regex foo {
-    ( aa | a ) a
+    <ident> ' ' $<ident>
 }
 
 =begin things todo
@@ -554,7 +554,7 @@ method sublang ($lang) {
 }
 
 token regex_block {  # perhaps parameterize and combine with block someday
-    '{' <sublang( ::Regex).regex()>
+    '{' <sublang( ::Regex.unbalanced('}')).regex()>
     [ '}' || <.panic: "Missing right brace"> ]
     [
     | \h* <.unsp>? <?before <[,:]> > {*}                        #= normal
@@ -3636,7 +3636,8 @@ grammar Regex is Perl {
 
     token regex_metachar:var {
         <!before '$$'>
-        <variable=$¢.cursor_fresh($+LANG).variable()>
+        <?before <sigil>>
+        <variable=sublang($+LANG).variable()>
         <.ws>
         $<binding> = ( '=' <.ws> <regex_quantified_atom> )?
         { $<sym> = $<variable>.item; }
@@ -3683,7 +3684,7 @@ grammar Regex is Perl {
 
     token regex_assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        <variable=$¢.cursor_fresh($+LANG).EXPR(%LOOSEST)>
+        <variable=sublang($+LANG).EXPR(%LOOSEST)>
         {*}
     }
 
@@ -3696,6 +3697,7 @@ grammar Regex is Perl {
     }
 
     token regex_assertion:ident { <ident> [               # is qq right here?
+                                    | <?before '>' >
                                     | '=' <regex_assertion>
                                     | ':' <.ws>
                                         <q_unbalanced(qlang('Q',':qq'), :stop«>»)>
@@ -3745,7 +3747,7 @@ grammar Regex is Perl {
     token regex_mod_internal:sym<:!r>   { <sym> 'atchet'? { $+ratchet = 0 } }
     token regex_mod_internal:sym<:r( )> { <sym> 'atchet'? <regex_mod_arg> { $+ratchet = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:oops { <.panic: "unrecognized regex modifier"> }
+    token regex_mod_internal:oops { ':' <.panic: "unrecognized regex modifier"> }
 
     token regex_quantifier:sym<*>  { <sym> <quantmod> }
     token regex_quantifier:sym<+>  { <sym> <quantmod> }
