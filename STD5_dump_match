@@ -9,11 +9,18 @@ use warnings;
 use Term::ANSIColor qw(:constants);
 use Getopt::Long;
 my $nocolor = 0;
-GetOptions("nocolor"=>\$nocolor);
+my $vertical = 0;
+GetOptions("nocolor"=>\$nocolor,"vertical"=>\$vertical);
 if ($#ARGV != 0) {
     die "USAGE: [--nocolor] filename\n";
 }
-my ($filename,$use_color) = @ARGV;
+my ($filename,) = @ARGV;
+if ($nocolor) {
+    no warnings 'redefine';
+    *RESET = sub {''};
+    *BLUE = sub {''};
+    *RED = sub {''};
+}
 
 my $what = 'comp_unit';
 my $text = Encode::decode('utf8', `cat $ARGV[0]`);
@@ -44,24 +51,34 @@ my $str = "";
 traverse($r,$what,0);
 my $orig = ${$r->{_orig}};
 my $at = 0;
+my $indent=0;
 # I know, XML sucks, any suggestions? ;)
 for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @events) {
-
-    $str .= substr($orig,$at,$_->[0]-$at);
+    my $text = substr($orig,$at,$_->[0]-$at);
+    if ($vertical) {
+        if ($text) {
+            # not sure about that
+            $text =~ s/\n/\\n/;
+            $str .= " " x $indent . $text . "\n";
+        }
+    } else {
+        $str .= $text;
+    }
     $at = $_->[0];
 
     if ($_->[1] eq 'from') {
-        if ($nocolor) {
-            $str .= "<".$_->[2].">";
+        if ($vertical) {
+            $str .= " " x $indent . BLUE.$_->[2].RED.":".RESET."\n";
+            $indent++;
         } else {
             $str .= RED."<".BLUE.$_->[2].RED.">".RESET;
-        }    
+        }
     } elsif ($_->[1] eq 'to') {
-        if ($nocolor) {
-            $str .= "</".$_->[2].">";
+        if ($vertical) {
+            $indent--;
         } else {
-            $str .= RED."</".BLUE.$_->[2].RED.">".RESET;
-        }    
+            $str .=  RED."</".BLUE.$_->[2].RED.">".RESET;
+        }
     }
 }
 print "$str\n";
