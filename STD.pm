@@ -2482,7 +2482,7 @@ grammar Q is Perl {
 
     # note: polymorphic over many quote languages, we hope
     token nibbler {
-        :my $text = '';
+	:my $text = '';
         :my @nibbles = ();
         :my $buf = self.orig;
         [
@@ -3265,9 +3265,9 @@ regex infixstopper {
 # don't check other stoppers if we already know we stop here
 method faststopper {
     no warnings;
-    my $pos = self.pos || -1;
+    my $pos = self.pos || -2;
     return self if $pos === $+endargs;
-    my $ws = self.ws_from || -1;
+    my $ws = self.ws_from || -2;
     if $ws === $+endstmt {
         $+endargs = $pos;  #  cache current stop pos
         return self;
