@@ -229,26 +229,27 @@ my $out = "";
 
 sub MAIN {
 
-    if (s/^\s*grammar (\w+).*;\n//) {
+    if (s/^\s*grammar (\w+)(?::\w+<.*?>)*(?:\s*is\s+(\w+))?;\n//) {
 	$TOP = $PKG = $1;
+	my $extends = $2 // 'Cursor5';
 	$out .= "package $PKG;\n";
-	$out .= <<'END';
+	$out .= <<"END";
 use strict;
 use warnings;
 no warnings 'qw';
-use Cursor5; # for base class as well as DEBUG constants
+use $extends; # for base class as well as DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
-moose_extends('Cursor5');
-my $retree;
+moose_extends('$extends');
+my \$retree;
 use feature 'state';
 use utf8;
 
-$DB::deep = 1000;
+\$DB::deep = 1000;
 
 sub BUILD {
-    my $self = shift;
-    $self->{ws_from} = 0;
-    $self->{ws_to} = 0;
+    my \$self = shift;
+    \$self->{ws_from} = 0;
+    \$self->{ws_to} = 0;
 END
 
 	$out .= <<'END' if $TOP eq 'Perl';
@@ -345,7 +346,7 @@ sub $name {
     my \$self = shift;
     my \$subs;
 
-    local \$CTX = \$self->callm() if \$DEBUG & DEBUG::trace_call;
+    local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
     if (\$self->{_peek}) {
         return \$self->_AUTOLEXpeek('$name:*',\$retree);
     }
@@ -365,7 +366,7 @@ sub $name {
 	    if (ref \$try) {
 		if (ref \$try eq 'ARRAY') {
 		    (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
-		    \$C->deb("Retrying with \$tag \$try") if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+		    \$C->deb("Retrying with \$tag \$try") if \$::DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
 		}
 		elsif (ref \$try eq 'CODE') {
 		    my \@more = \$relex->(\$C, \$trystate);
@@ -376,7 +377,7 @@ sub $name {
 		}
 	    }
     
-	    \$C->deb("$name trying \$tag \$try") if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
 	    push \@gather, \$C->\$try(\@_);
 	}
 	\$self->_MATCHIFY(\@gather);
@@ -600,7 +601,7 @@ END
             }
             my $body = <<'END';
 <<DECL>>
-    local $CTX = $self->callm() if $DEBUG & DEBUG::trace_call;
+    local $CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
     if ($self->{_peek}) {
         return <<PEEK>>
     }
@@ -809,7 +810,7 @@ $ws        my ($params) = \@_;
 $ws        my \$mangle = ::mangle($params);
 $ws        my \$mixin = "${PKG}::${name}::" . \$mangle;
 $ws        return \$mixin if \$INSTANTIATED{\$mixin}++;
-$ws        ::deb("\t\tinstantiating \$mixin") if \$DEBUG & DEBUG::mixins;
+$ws        ::deb("\t\tinstantiating \$mixin") if \$::DEBUG & DEBUG::mixins;
 $ws        my \$eval = "package \$mixin" . q{;
 $ws            use Moose::Role ':all' => { -prefix => "moose_" };
 $ws            my \$retree;
@@ -2266,7 +2267,7 @@ END
         if (ref $try) {
             if (ref $try eq 'ARRAY') {
                 ($tag, $try, $C->{_fate}) = @$try;	# next candidate fate
-                $C->deb("Retrying with $tag $try") if $DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+                $C->deb("Retrying with $tag $try") if $::DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
             }
             elsif (ref $try eq 'CODE') {
                 my @more = $relex->($C, $trystate);
@@ -2280,7 +2281,7 @@ END
 END
 
             $result .= <<"END";
-        \$C->deb("$altname trying \$tag \$try") if \$DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+        \$C->deb("$altname trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
         push \@gather, ((
 @{[ ::indent(join("\n", @result),3) ]}
 END

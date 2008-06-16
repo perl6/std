@@ -598,6 +598,11 @@ sub cursor_fate { my $self = shift;
         ($tag, $try, $fate) = @$fate;
 	$r{_fate} = $fate;
     }
+    elsif ($fate and $fate->[0] . ':*' eq $name) {
+        $self->deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
+        ($tag, $try, $fate) = @$fate;
+	$r{_fate} = $fate;
+    }
     else {
         $relex = $self->_AUTOLEXnow($name,$retree);
 	$fate = $relex->($self,$_[0]);

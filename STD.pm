@@ -3264,9 +3264,12 @@ regex infixstopper {
 
 # don't check other stoppers if we already know we stop here
 method faststopper {
-    return self if self.pos === $+endargs;
-    if self.ws_from === $+endstmt {
-        $+endargs = self.pos;  #  cache current stop pos
+    no warnings;
+    my $pos = self.pos || -1;
+    return self if $pos === $+endargs;
+    my $ws = self.ws_from || -1;
+    if $ws === $+endstmt {
+        $+endargs = $pos;  #  cache current stop pos
         return self;
     }
     return ();
