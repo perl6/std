@@ -1,0 +1,13 @@
+#!/usr/local/bin/perl
+
+BEGIN { $ENV{STD5DEBUG} = 16383; }
+use STD5;
+use utf8;
+use YAML::XS;
+use Encode;
+
+print "Starting...\n";
+my $what = 'foo';
+my $text = 'abc abc';
+my $r = Perl->new($text)->$what();
+print Dump($r);
