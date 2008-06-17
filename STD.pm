@@ -4,7 +4,7 @@ my $LANG is context;
 
 # random rule for debugging, please ignore
 regex foo {
-   <-[<]>*
+   .*? '<' 
 }
 
 =begin things todo

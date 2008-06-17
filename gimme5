@@ -169,6 +169,7 @@ sub un6 {
         $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/else {/, next;
         $f =~ s/^\bdefault\s+\{//               and $t .= qq/else {/, next;
         $f =~ s/^\btemp\b//             	and $t .= qq/local/, next;
+	$f =~ s/\bsay //			and $t .= qq/print /, ($f =~ s/(.*)";/$1\\n";/ or $f =~ s/(.*);/$1,"\\n";/), next;
 
         # the following must do partial rescan of final expression
 
@@ -715,7 +716,6 @@ END
 
 	    $line =~ s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
             $line =~ s/^(\s*has) /#$1 /;
-            $line =~ s/\bsay /print / and ($line =~ s/";$/\\n";/ or $line =~ s/;$/,"\\n";/);
             $line =~ s/&reduce = ->/\$reduce = sub/;
             $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
             $line =~ s/ -> {/sub {/;
