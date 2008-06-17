@@ -27,7 +27,6 @@ my $text;
 {
 local $/;
 $text = Encode::decode('utf8', scalar <>);
-print "{$text}\n";
 }
 
 my $r = Perl->new($text)->$what();
