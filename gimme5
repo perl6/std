@@ -1255,6 +1255,12 @@ sub atom {
         return bless { text => $boundary, min => 0 }, "RE_meta";
     }
 
+    if (s/^(<~~>)//) {
+	my $recurse = $1;
+        ws();
+        return bless { text => $recurse, min => 0 }, "RE_meta";
+    }
+
     if (/^<\s/) {
         my $re = unbalanced(">");
         s/^>// or panic "Missing >";
@@ -1763,6 +1769,9 @@ sub unbalanced {
         }
         elsif ($text eq '<<') {
             $code = "\$C->_LEFTWB$REV()";
+        }
+        elsif ($text eq '<~~>') {
+            $code = "\$C->$NAME()";
         }
         else {
             $code = "\$C->_EXACT$REV(\"$text\")";
