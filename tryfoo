@@ -8,6 +8,6 @@ use Encode;
 
 print "Starting...\n";
 my $what = 'foo';
-my $text = 'abc abc';
+my $text = "@ARGV";
 my $r = Perl->new($text)->$what();
 print Dump($r);

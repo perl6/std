@@ -30,7 +30,7 @@ sub ::deb {
 
 package Cursor5;
 
-use LazyMap qw(lazymap lazyconst);
+use LazyMap qw(lazymap lazyconst eager);
 
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
@@ -721,8 +721,10 @@ sub _STARg { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
     lazymap(sub { $_[0]->retm() }, reverse
+	eager(
             $self->cursor($self->{_pos}),
-            $self->_PLUSf($block));
+            $self->_PLUSf($block))
+	);
 }
 
 sub _STARr { my $self = shift;
@@ -772,7 +774,7 @@ sub _PLUSg { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
-    reverse $self->_PLUSf($block, @_);
+    reverse eager($self->_PLUSf($block, @_));
 }
 
 sub _PLUSr { my $self = shift;
@@ -822,7 +824,7 @@ sub _REPSEPg { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
-    reverse $self->_REPSEPf($sep, $block, @_);
+    reverse eager($self->_REPSEPf($sep, $block, @_));
 }
 
 sub _REPSEPr { my $self = shift;

@@ -7,7 +7,7 @@ use Scalar::Util qw(weaken);
 
 our @ISA = 'Exporter';
 
-our @EXPORT = qw(lazymap lazyconst);
+our @EXPORT = qw(lazymap lazyconst eager);
 
 our $AUTOLOAD;
 
@@ -100,6 +100,22 @@ sub lazyconst {
 	$_[0];
     };
     $lazy->{'B'} = $block;
+}
+
+sub eager {
+    my @out;
+    while (@_) {
+	my $head = shift;
+	if (ref($head) eq 'LazyMap') {
+	    while (my ($next) = $head->iter) {
+		push @out, $next;
+	    }
+	}
+	else {
+	    push @out, $head;
+	}
+    }
+    @out;
 }
 
 1;

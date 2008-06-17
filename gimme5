@@ -1673,6 +1673,7 @@ sub unbalanced {
         $text =~ s!(\/|\\\/)!\\$1!g;
         $text =~ s/\s//g;
         $text =~ s/\.\./-/g;
+	$text =~ s/^-\[/[^/;
         $self->bind("\$C->_CCLASS$REV(qr/^$text\$/)");
     }
 }
