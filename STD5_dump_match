@@ -10,11 +10,11 @@ use Term::ANSIColor qw(:constants);
 use Getopt::Long;
 my $nocolor = 0;
 my $vertical = 0;
-GetOptions("nocolor"=>\$nocolor,"vertical"=>\$vertical);
-if ($#ARGV != 0) {
-    die "USAGE: [--nocolor] filename\n";
+my $yaml = 0;
+GetOptions("nocolor"=>\$nocolor,"vertical"=>\$vertical,"yaml"=>\$yaml);
+unless ($#ARGV <= 0) {
+    die "USAGE: [--nocolor] [filename]\n";
 }
-my ($filename,) = @ARGV;
 if ($nocolor) {
     no warnings 'redefine';
     *RESET = sub {''};
@@ -23,10 +23,19 @@ if ($nocolor) {
 }
 
 my $what = 'comp_unit';
-my $text = Encode::decode('utf8', `cat $ARGV[0]`);
+my $text;
+{
+local $/;
+$text = Encode::decode('utf8', scalar <>);
+print "{$text}\n";
+}
+
 my $r = Perl->new($text)->$what();
 my @events;
-#print Dump($r);
+if ($yaml) {
+    print Dump($r);
+    exit;
+}
 sub traverse {
     my ($r,$label,$depth) = @_;
     return unless ref $r;
