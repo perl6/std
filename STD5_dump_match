@@ -1,12 +1,12 @@
 #!/usr/local/bin/perl
 
 use STD5;
+use DumpMatch;
 use utf8;
 use YAML::XS;
 use Encode;
 use strict;
 use warnings;
-use Term::ANSIColor qw(:constants);
 use Getopt::Long;
 my $nocolor = 0;
 my $vertical = 0;
@@ -16,10 +16,7 @@ unless ($#ARGV <= 0) {
     die "USAGE: [--nocolor] [filename]\n";
 }
 if ($nocolor) {
-    no warnings 'redefine';
-    *RESET = sub {''};
-    *BLUE = sub {''};
-    *RED = sub {''};
+    $DumpMatch::NOCOLOR = 1;
 }
 
 my $what = 'comp_unit';
@@ -30,63 +27,10 @@ $text = Encode::decode('utf8', scalar <>);
 }
 
 my $r = Perl->new($text)->$what();
-my @events;
 if ($yaml) {
     print Dump($r);
     exit;
+} else {
+    print dump_match($what=>$r,{vertical=>$vertical}),"\n";
 }
-sub traverse {
-    my ($r,$label,$depth) = @_;
-    return unless ref $r;
-     if (defined $r->{_from}) {
-         push(@events,[$r->{_from},'from',$label,$r,$depth]);
-         push(@events,[$r->{_to},'to',$label,$r,-$depth]);
-     }
-    for my $name (keys %$r) {
-        my $v = $r->{$name};
-        if (ref $v eq 'ARRAY') {
-            for my $i (0 .. scalar @{$v}) {
-                traverse($v->[$i],$name,$depth+1);
-            }
-        } elsif (ref $v eq 'SCALAR') {
-        } elsif (ref $v) {
-            traverse($v,$name,$depth+1);
-        } else {
-        }
-    }
-}
-my $str = "";
-traverse($r,$what,0);
-my $orig = ${$r->{_orig}};
-my $at = 0;
-my $indent=0;
-# I know, XML sucks, any suggestions? ;)
-for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @events) {
-    my $text = substr($orig,$at,$_->[0]-$at);
-    if ($vertical) {
-        if ($text) {
-            # not sure about that
-            $text =~ s/\n/\\n/;
-            $str .= " " x $indent . $text . "\n";
-        }
-    } else {
-        $str .= $text;
-    }
-    $at = $_->[0];
 
-    if ($_->[1] eq 'from') {
-        if ($vertical) {
-            $str .= " " x $indent . BLUE.$_->[2].RED.":".RESET."\n";
-            $indent++;
-        } else {
-            $str .= RED."<".BLUE.$_->[2].RED.">".RESET;
-        }
-    } elsif ($_->[1] eq 'to') {
-        if ($vertical) {
-            $indent--;
-        } else {
-            $str .=  RED."</".BLUE.$_->[2].RED.">".RESET;
-        }
-    }
-}
-print "$str\n";
