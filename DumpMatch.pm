@@ -13,11 +13,11 @@ our $NOCOLOR;
 sub RESET() {$NOCOLOR ? '' : Term::ANSIColor::RESET()};
 sub RED()   {$NOCOLOR ? '' : Term::ANSIColor::RED()  };
 sub BLUE()  {$NOCOLOR ? '' : Term::ANSIColor::BLUE() };
+sub YELLOW()  {$NOCOLOR ? '' : Term::ANSIColor::BLUE() };
 
 sub process_events {
-    my ($r,$events,$opt) = @_;
+    my ($orig,$events,$opt) = @_;
     my $str = "";
-    my $orig = ${$r->{_orig}};
     my $at = 0;
     my $indent=0;
     # I know, XML sucks, any suggestions? ;)
@@ -37,6 +37,7 @@ sub process_events {
         if ($_->[1] eq 'from') {
             if ($opt->{vertical}) {
                 $str .= " " x $indent . BLUE.$_->[2].RED.":".RESET."\n";
+                $str .= " " x $indent . YELLOW.$_->[3]->{''}.RESET."\n" if $opt->{actions} && $_->[3]->{''};
                 $indent++;
             } else {
                 $str .= RED."<".BLUE.$_->[2].RED.">".RESET;
@@ -55,8 +56,12 @@ sub traverse_match {
     my ($r,$label,$depth,$events) = @_;
     return unless ref $r;
      if (defined $r->{_from}) {
-         push(@{$events},[$r->{_from},'from',$label,$r,$depth]);
-         push(@{$events},[$r->{_to},'to',$label,$r,-$depth]);
+         if ($r->{_from} == $r->{_to}) {
+            push(@{$events},[$r->{_from},'empty',$label,$r,$depth]);
+         }  else {
+            push(@{$events},[$r->{_from},'from',$label,$r,$depth]);
+            push(@{$events},[$r->{_to},'to',$label,$r,-$depth]);
+        }
      }
     for my $name (keys %$r) {
         my $v = $r->{$name};
@@ -77,6 +82,6 @@ sub dump_match {
     my $opt = shift || {};
     my $events = [];
     traverse_match($r,$name,0,$events);
-    process_events($r,$events,$opt);
+    process_events(${$r->{_orig}},$events,$opt);
 }
 1;
