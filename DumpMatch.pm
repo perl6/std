@@ -75,7 +75,6 @@ sub dump_match {
     my $name = shift;
     my $r = shift;
     my $opt = shift || {};
-    print "$name => $r, opt:$opt\n";
     my $events = [];
     traverse_match($r,$name,0,$events);
     process_events($r,$events,$opt);
