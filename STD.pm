@@ -486,39 +486,9 @@ token pblock {
     [ <lambda> <signature> ]? <block>
 }
 
-=begin perlhints
-
-id:     lambda:«->»
-token:  ->
-syn:    -> SIGNATURE { STATEMENTS }
-name:   lambda
-desc:   introduces a (possibly empty) signature to a block
-ex:     for @list -> $a { say $a; }
-        my &function := -> { say 42; };
-
-id:     lambda:«<->»
-token:  <->
-syn:    <-> SIGNATURE { STATEMENTS }
-name:   lambda rw
-desc:   introduces a (possibly empty) signature to a block, applying the
-        'is rw' trait on all arguments
-ex:     for @list <-> $a { $a++ }
-
-=end perlhints
 
 token lambda { '->' | '<->' }
 
-=begin perlhints
-
-id:     block
-token:  { }
-syn:    { <statemts> }
-name:   block
-# XXX what kind of scope?
-desc:   groups statements and introduces a new scope
-ex:     for @list -> $a { say $a }
-
-=end perlhints
 
 token block {
     '{'
@@ -533,19 +503,6 @@ token block {
     {*}
 }
 
-=begin perlhints
-
-id:     regex_block
-token:  { }
-syn:    regex { <regex> }
-name:   regex block
-desc:   delimits a regex, rule or token
-ex:     regex word { <alpha>+ }
-seealso: regex_declarator:regex
-seealso: regex_declarator:token
-seealso: regex_declarator:rule
-
-=end perlhints
 
 token regex_block {  # perhaps parameterize and combine with block someday
     '{' [ :lang( ::Regex.unbalanced('}') ) <regex> ]
@@ -573,21 +530,6 @@ rule semilist {
     {*}
 }
 
-=begin perlhints
-
-id:     label
-token:  :
-syn:    IDENTIFIER:
-name:   label
-desc:   assigns a name to a block or statement
-ex:     INNER: 
-        for @list { 
-            if m/something/ { 
-                last INNER; 
-            } 
-        }
-
-=end perlhints
 
 token label {
     <ident> ':' <?before \s> <.ws>
@@ -624,19 +566,6 @@ token statement {
     {*}
 }
 
-=begin perlhints
-
-# XXX is this the right place for this?
-id:     eat_terminator
-token:  ;
-syn:    STATEMENT;
-name:   statement terminator
-desc:   terminates a statement. Optional for the last statement in a 
-        block or file.
-ex:     say $a;
-        say $b;
-
-=end perlhints
 
 token eat_terminator {
     [
@@ -650,21 +579,6 @@ token eat_terminator {
     { $+endargs = 0; $+endstmt = 0; }         # or next EXPR won't start right
 }
 
-=begin perlhints
-
-id:     statement_control:use
-token:  use
-syn:    use MODULE EXPRESSION;
-name:   use
-desc:   Load a module, class, pragma or language
-ex:     use Test;
-ex:     {
-            use v5;
-            # perl 5 code here
-        }
-        # Perl 6 code here
-
-=end perlhints
 
 rule statement_control:use {\
     <sym>
@@ -672,17 +586,6 @@ rule statement_control:use {\
     {*}
 }
 
-=begin perlhints
-
-id:     statement_control:no
-token:  no
-syn:    no MODULE EXPRESSION;
-name:   no
-desc:   Unloads a module or class, or disables a pragma
-ex:     no Test;
-seealso: statement_control:use
-
-=end perlhints
 
 rule statement_control:no {\
     <sym>
@@ -690,29 +593,6 @@ rule statement_control:no {\
     {*}
 }
 
-=begin perlhints
-
-id:     statement_control:if
-token:  if elsif else
-syn:    if EXPRESSION BLOCK
-syn:    if EXPRESSION BLOCK else BLOCK
-syn:    if EXPRESSION elsif EXPRESSION BLOCK
-name:   if
-desc:   executes a code block only if an yields True.
-        There can be an arbitrary number of elsif blocks, and one or no 
-        else block
-ex:     if $a < $b {
-            say "b is larger than a";
-        }
-ex:     if $a < $b {
-            say "b is smaller than a";
-        } elsif $a == $b {
-            say "b is as large as a";
-        } else {
-            say "b is larger than a"
-        }
-
-=end perlhints
 
 rule statement_control:if {\
     <sym>
@@ -724,20 +604,6 @@ rule statement_control:if {\
     {*}
 }
 
-=begin perlhints
-
-id:     statement_control:unless
-token:  unless
-syn:    unless EXPRESSION BLOCK
-name:   unless
-desc:   executes a code block only if an expression yields False.
-        Unlike the if-statement no else-block is allowed
-ex:     unless $allowed {
-            die "Insufficent permissions, aborting"
-        }
-seealso: statement_control:if
-
-=end perlhints
 
 rule statement_control:unless {\
     <sym> 
@@ -746,19 +612,6 @@ rule statement_control:unless {\
     {*}
 }
 
-=begin perlhints
-
-id:     statement_control:while
-token:  while
-syn:    while EXPRESSION BLOCK
-name:   while
-desc:   executes a code block as long as a controlling expression yields True
-ex:     while $a < $b {
-            $a *= 2;
-        }
-        say $a;
-
-=end perlhints
 
 rule statement_control:while {\
     <sym>
@@ -769,19 +622,6 @@ rule statement_control:while {\
     {*}
 }
 
-=begin perlhints
-
-id:     statement_control:until
-token:  until
-syn:    until EXPRESSION BLOCK
-name:   until
-desc:   executes a code block as long as a controlling expression yields False
-ex:     until $a > $b {
-            $a *= 2;
-        }
-        say $a;
-
-=end perlhints
 
 rule statement_control:until {\
     <sym>
@@ -790,23 +630,6 @@ rule statement_control:until {\
     {*}
 }
 
-=begin perlhints
-
-id:     statement_control:repeat
-token:  repeat
-syn:    repeat BLOCK while EXPR
-syn:    repeat BLOCK until EXPR
-syn:    repeat while EXPR BLOCK
-syn:    repeat until EXPR BLOCK
-name:   repeat
-desc:   Repeatedly executes a block controlled by a condition
-ex:     my $in;
-        repeat {
-            say "greet me"
-            $in = =$*IN;
-        } until $in ~~ m/hi|hello|cheers/ 
-
-=end perlhints
 
 rule statement_control:repeat {\
     <sym>
@@ -819,19 +642,6 @@ rule statement_control:repeat {\
     {*}
 }
 
-=begin perlhints
-
-id:    statement_control:loop
-token: loop
-syn:   loop(EXPR1; EXPR2; EXPR3) BLOCK
-name:  loop
-desc:  C-Style for-Loop. 
-       It is roughly equivalent to EXPR1; while EXPR2 { BLOCK; EXPR3 }
-ex:     loop(my $i = 1; $i < $limit; $i *= 2){
-            say $i;  
-        }
-            
-=end perlhints
 
 rule statement_control:loop {\
     <sym>
@@ -846,24 +656,6 @@ rule statement_control:loop {\
     {*}
 }
 
-=begin perlhints
-
-id:    statement_control:for
-token: for
-syn:   for LIST PBLOCK
-name:  for
-desc:  Iterate over LIST, and execute the block for each item
-ex:     for <a b c d e> -> $a {
-            say $a;  
-        }
-ex:     for @list Z 0 .. * -> $item, $index {
-            say "The item No. $index is '$item'";
-        }
-ex:     for @list {
-            .say    # use $_ as implicit topic
-        }
-
-=end perlhints
 
 rule statement_control:for {\
     <sym>
@@ -874,45 +666,6 @@ rule statement_control:for {\
     {*}
 }
 
-=begin perlhints
-
-id:     statement_control:given
-token:  given
-syn:    given EXPR BLOCK
-name:   given
-desc:   Sets the topic ($_) in BLOCK to EXPR. Sets item context to EXPR.
-ex:     given @list {
-            .sort.join('|').say
-        }
-seealso: statement_control:when
-seealso: statement_control:default
-
-id:     statement_control:when
-token:  when
-syn:    when EXPRESSION BLOCK
-name:   when
-desc:   does a smartmatch of the current topic ($_) against EXPRESSION
-        and executes BLOCK if the match returned True.
-ex:     given $greeting {
-            when rx:i{dear}  { say "friendly" }
-            when rx:i{hi}    { say "informal" }
-            when rx:i{hello} { say "neutral"  }
-            default          { say "unclassified greeting" }
-        }
-seealso: statement_control:given
-seealso: statement_control:default
-
-id:     statement_control:default
-token:  default
-syn:    default BLOCK
-name:   default
-desc:   executes BLOCK if no 'when'-block mached in the current scope
-seealso: statement_control:when
-seealso: statement_control:given
-
-# TODO: BEGIN, CHECK, INIT, ...
-
-=end perlhints
 
 rule statement_control:given {\
     <sym>
@@ -974,17 +727,6 @@ token module_name:normal {
 
 token module_name:deprecated { 'v6-alpha' }
 
-=begin perlhints
-
-id:     version
-token:  v .
-name:   version
-desc:   string
-ex:     v1.2
-ex:     v3.4+
-ex:     v0.*.3
-
-=end perlhints
 
 token version:sym<v> {
     'v' [\d+ | '*'] ** '.' '+'?
@@ -1059,22 +801,6 @@ token noun {
     {*}
 }
 
-=begin perlhints 
-
-token:  =>
-id:     fatarrow
-syn:    KEY => VALUE
-name:   pair
-token:  =>
-desc:   constructs a pair, usually building a hash or named arguments
-ex:     my %continents = (
-            England => 'Europe',
-            Brazil  => 'South America',
-            India   => 'Asia'
-        );
-ex:     say @list.grep(matcher => &my_function);
-
-=end perlhints
 
 token fatarrow {
     <key=ident> \h* '=>' :: <.ws> <val=EXPR(%item_assignment)>
@@ -1333,114 +1059,6 @@ rule scoped {
     {*}
 }
 
-=begin perlhints
-
-id:     scope_declarator:my
-token:  my
-syn:    my VARIABLE
-name:   my
-desc:   declares a lexically scoped variable
-ex:     my $var = 3;
-ex:     {
-            my $x;
-            # 'my' variable $x is visible in this block
-        }
-        # no $x here.
-ex:     my %hash;
-
-id:     scope_declarator:our
-token:  our
-syn:    our VARIABLE
-name:   our
-desc:   declares a package scoped variable
-ex:     our @foo;
-
-id:     scope_declarator:state
-token:  state
-syn:    state VARIABLE
-name:   state
-desc:   declares a lexically scoped variable whos scope is presevered across
-        multiple executions of the block
-ex:     sub iterator {
-            state $c = 0; # assignment only executed at first call
-            return ++$c;
-        }
-        say iterator(); # prints 1
-        say iterator(); # prints 2
-        say iterator(); # prints 3
-
-id:     scope_declarator:constant
-token:  constant
-syn:    constant VARIABLE = VALUE;
-name:   constant
-desc:   declares a lexically scoped constant. Assignment happens at compile 
-        time.
-ex:     constant $pi = 3.14159;
-
-id:     scope_declarator:has
-token:  has
-syn:    has VARIABLE;
-syn:    has VARIABLE = VALUE;
-name:   has
-desc:   declares an object attribute, i.e. a variable that is stored
-        in every object of a class.
-        Only makes sense in classes, roles and grammars.
-ex:     class Perlhacker {
-            has $!brain;
-            has @.modules_on_cpan;
-        }
-seealso: package_declarator:class
-
-id:     package_declarator:class
-token:  class
-syn:    class CLASSNAME TRAITS; CLASSDEF
-syn:    class CLASSNAME TRAITS { CLASSDEF }
-name:   class
-desc:   declares a class. The TRAITS are optional. If the class declaration
-        ends with a semicolon ';' it expands over the rest of the file.
-        If it is followed by a curly brace, everything up to the closing brace
-        is considered to be the class definition.
-        A class comes with its own namespaces (with the same name as the class)
-ex:     class Array is also {
-            method length {
-                die "'Length' is a forbidden word in Perl 6";
-            }
-        }
-ex:     class Dog {
-            has $.name;
-            has @.legs;
-            method bark {
-                say "bark";
-            }
-        }
-seealso: scope_declarator:has
-seealso: routine_declarator:method
-
-id:     package_declarator:grammar
-token:  grammar
-syn:    grammar CLASSNAME TRAITS; CLASSDEFF
-syn:    grammar CLASSNAME TRAITS { CLASSDEF }
-name:   grammar
-desc:   declares a grammar, i.e a class that is designed to hold regexes,
-        rules and tokens. 
-ex:     grammar URL {
-            regex TOP {
-                <schema>
-                <host>?
-                <path>
-            }
-            token schema {
-                \w+ ':'
-            }
-            token host { ... }
-            ...
-        }
-seealso: regex_declarator:token
-seealso: regex_declarator:rule
-seealso: regex_declarator:regex
-seealso: package_declarator:class
-
-=end perlhints
 
 token scope_declarator:my       { <sym> <scoped> {*} }
 token scope_declarator:our      { <sym> <scoped> {*} }
