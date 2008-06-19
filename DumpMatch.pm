@@ -13,7 +13,7 @@ our $NOCOLOR;
 sub RESET() {$NOCOLOR ? '' : Term::ANSIColor::RESET()};
 sub RED()   {$NOCOLOR ? '' : Term::ANSIColor::RED()  };
 sub BLUE()  {$NOCOLOR ? '' : Term::ANSIColor::BLUE() };
-sub YELLOW()  {$NOCOLOR ? '' : Term::ANSIColor::BLUE() };
+sub YELLOW()  {$NOCOLOR ? '' : Term::ANSIColor::YELLOW() };
 
 sub process_events {
     my ($orig,$events,$opt) = @_;
@@ -64,6 +64,7 @@ sub traverse_match {
         }
      }
     for my $name (keys %$r) {
+        next if $name eq '';
         my $v = $r->{$name};
         if (ref $v eq 'ARRAY') {
             for my $i (0 .. scalar @{$v}) {
