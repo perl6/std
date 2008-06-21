@@ -1540,11 +1540,11 @@ token integer {
 token radint {
     [
     | <integer>
-    | <?before :> <rad_number> <?{
+    | <?before ':'> <rad_number> <?{
                         defined $<rad_number><intpart>
                         and
                         not defined $<rad_number><fracpart>
-                   }>
+                    }>
     ]
     {*}
 }
