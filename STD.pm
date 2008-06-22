@@ -803,7 +803,7 @@ token noun {
 
 
 token fatarrow {
-    <key=ident> \h* '=>' :: <.ws> <val=EXPR(%item_assignment)>
+    <key=ident> \h* '=>' :: <.ws> <val=EXPR(%item_assignment<prec>)>
 }
 
 token colonpair {
@@ -2742,14 +2742,16 @@ token infix:sym<?> ( --> Conditional)
 ## assignment
 # There is no "--> type" because assignment may be coerced to either
 # item assignment or list assignment at "make" time.
+
 token infix:sym<=> ()
 {
     <sym>
-    { self.<sigil> eq '$' 
-        ?? make Item_assignment($/)
-        !! make List_assignment($/);
-    }
-    {*}
+# this was broken so i commented it out - pmurias
+#    { self.<sigil> eq '$' 
+#        ?? make Item_assignment($/)
+#        !! make List_assignment($/);
+#    }
+#    {*}
 }
 
 token infix:sym<:=> ( --> Item_assignment)
@@ -2907,13 +2909,12 @@ regex stdstopper {
 
 # A fairly complete operator precedence parser
 
-method EXPR (%preclim = %LOOSEST)
+method EXPR ($preclim = $LOOSEST)
 {
     temp $CTX = self.callm if $DEBUG +& DEBUG::trace_call;
     if self.peek {
         return self._AUTOLEXpeek('EXPR');
     }
-    my $preclim = %preclim<prec>;
     my $inquote is context = 0;
     my $prevop is context<rw>;
     my @termstack;
@@ -2948,13 +2949,14 @@ method EXPR (%preclim = %LOOSEST)
                 my @list;
                 push @list, pop(@termstack);
                 while @opstack {
+                    self.deb($op<sym>." ne ".@opstack[*-1]<sym>) if $DEBUG +& DEBUG::EXPR;
                     last if $op<sym> ne @opstack[*-1]<sym>;
                     push @list, pop(@termstack);
                     pop(@opstack);
                 }
                 push @list, pop(@termstack);
                 @list = reverse @list if @list > 1;
-                $op<list> = @list;
+                $op<list> = [@list];
                 push @termstack, $op;
             }
             default {
@@ -3029,7 +3031,6 @@ method EXPR (%preclim = %LOOSEST)
             die Dump($infix) if $DEBUG +& DEBUG::EXPR;
         }
 
-        $here = $infix.cursor_fresh.ws();
 
         my $inO = $infix<O>;
         my Str $inprec = $inO<prec>;
@@ -3038,6 +3039,12 @@ method EXPR (%preclim = %LOOSEST)
             die Dump($infix) if $DEBUG +& DEBUG::EXPR;
             $inprec = %terminator<prec>;
         }
+
+#        last unless $inprec gt $preclim;
+
+        $here = $infix.cursor_fresh.ws();
+
+
         # substitute precedence for listops
         $inO<prec> = $inO<sub> if $inO<sub>;
 
