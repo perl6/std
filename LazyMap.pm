@@ -3,11 +3,10 @@ use strict;
 use warnings;
 
 use Exporter;
-use Scalar::Util qw(weaken);
 
 our @ISA = 'Exporter';
 
-our @EXPORT = qw(lazymap lazyconst eager);
+our @EXPORT = qw(lazymap eager);
 
 our $AUTOLOAD;
 
@@ -51,9 +50,9 @@ sub iter {
     while (not @$called) {
 	return () unless @$lazies;
 	my $lazy = $$lazies[0];
-	if (ref($lazy) eq 'LazyMap') {
+	if (ref($lazy) =~ /^Lazy/) {
 	    my $todo = $lazy->iter;
-	    if ($todo) {
+	    if (defined $todo) {
 		@$called = $self->{B}->($todo);
 	    }
 	    else {
@@ -67,7 +66,7 @@ sub iter {
 	    shift @$lazies;
 	}
     }
-    while (ref($$called[0]) eq 'LazyMap') {
+    while (ref($$called[0]) =~ /^Lazy/) {
 	my $really = $$called[0]->iter;
 	if ($really) {
 	    return $really;
@@ -91,22 +90,11 @@ sub true {
     return 1;
 }
 
-sub lazyconst {
-    my $const = shift;
-    my $lazy = LazyMap->new('B' => undef, 'C' => [], 'L' => [$const]);
-    my $weak = weaken $lazy;
-    my $block = sub {
-	$weak->{'L'} = [$const];
-	$_[0];
-    };
-    $lazy->{'B'} = $block;
-}
-
 sub eager {
     my @out;
     while (@_) {
 	my $head = shift;
-	if (ref($head) eq 'LazyMap') {
+	if (ref($head) eq 'LazyMap') {	# don't unroll LazyConst
 	    while (my ($next) = $head->iter) {
 		push @out, $next;
 	    }
@@ -115,7 +103,61 @@ sub eager {
 	    push @out, $head;
 	}
     }
+    print STDERR ::Dump(@out);
     @out;
+}
+
+{ package LazyConst;
+    sub new {
+	my $self = shift;
+	bless { 'K' => shift }, 'LazyConst';
+    }
+    sub true {
+	1;
+    }
+    sub iter { $_[0]->{K} }
+}
+
+{ package LazyRange;
+    sub new {
+	my $class = shift;
+	my $start = shift;
+	my $end = shift;
+	bless { 'N' => $start, 'E' => $end }, $class;
+    }
+    sub true {
+	1;
+    }
+    sub iter {
+	my $self = shift;
+	if ((my $n = $self->{N}++) <= $self->{E}) {
+	    $n;
+	}
+	else {
+	    ();
+	}
+    }
+}
+
+{ package LazyRangeRev;
+    sub new {
+	my $class = shift;
+	my $start = shift;
+	my $end = shift;
+	bless { 'N' => $start, 'E' => $end }, $class;
+    }
+    sub true {
+	1;
+    }
+    sub iter {
+	my $self = shift;
+	if ((my $n = $self->{N}--) >= $self->{E}) {
+	    $n;
+	}
+	else {
+	    ();
+	}
+    }
 }
 
 1;

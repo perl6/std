@@ -354,7 +354,7 @@ sub $name {
 
     my \$C = \$self;
 
-    do {
+    my \@result = eval {
 	my \$trystate;
 	my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$retree, \$trystate);
 	my \@try = \$tag eq '$name' ? (\$try,\$relex) : ();
@@ -382,7 +382,12 @@ sub $name {
 	    push \@gather, \$C->\$try(\@_);
 	}
 	\$self->_MATCHIFY(\@gather);
+    };
+    if (\$@) {
+	return () if \$@ =~ /^ABORTRULE/;
+	die \$@;
     }
+    \@result;
 }
 
 END
@@ -1155,7 +1160,8 @@ sub atom {
         return bless { name => 'ws', nobind => 1, noquant => 1, min => 0, rest => '' },
             "RE_method";
     }
-    return if /^ [\]&|)] /x;   # XXX an approximation
+    return if /^ [\]&|] /x;   # XXX an approximation
+    return if /^ \)[^>]/x;
     return if /^ (?:
         >(?!>) |
         !?~~
@@ -1343,9 +1349,10 @@ sub atom {
         ws();
         return bless { text => $colons, min => 0 }, "RE_meta";
     }
-    if (s/^\.\*\?//) {
+    if (s/^(\.\*\??)//) {
+	my $scan = $1;
         ws();
-        return bless { text => '.*?', min => 1 }, "RE_meta";
+        return bless { text => $scan, min => 1 }, "RE_meta";
     }
     if (s/^\.//) {
         ws();
@@ -1718,8 +1725,11 @@ sub unbalanced {
         if ($text eq '.') {
             $code = "\$C->_ANY$REV()";
         }
+        elsif ($text eq '.*') {
+            $code = "\$C->_SCANg$REV()";
+        }
         elsif ($text eq '.*?') {
-            $code = "\$C->_SCAN$REV()";
+            $code = "\$C->_SCANf$REV()";
         }
         elsif ($text eq '^') {
             $code = "\$C->_BOS$REV()";
@@ -1770,6 +1780,12 @@ sub unbalanced {
         }
         elsif ($text eq '<<') {
             $code = "\$C->_LEFTWB$REV()";
+        }
+        elsif ($text eq '<(') {
+            $code = "\$C->_LEFTRESULT$REV()";
+        }
+        elsif ($text eq ')>') {
+            $code = "\$C->_RIGHTRESULT$REV()";
         }
         elsif ($text eq '<~~>') {
             $code = "\$C->$NAME()";
@@ -2262,7 +2278,7 @@ END
 END
             }
             my $result = <<"END";
-do {
+do { my \@result = eval {
     my \$trystate;
     my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$retree, \$trystate);
 $policy
@@ -2300,6 +2316,13 @@ END
         )[$try])->($C);
     }
     @gather;
+};
+return @result if @result;
+if ($@) {
+    $self->deb("CAUGHT $@");
+    die $@ if $@ !~ /^ABORTBRANCH/;
+}
+();
 }
 END
             $result;

@@ -30,7 +30,7 @@ sub ::deb {
 
 package Cursor5;
 
-use LazyMap qw(lazymap lazyconst eager);
+use LazyMap qw(lazymap eager);
 
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
@@ -696,13 +696,22 @@ sub _MATCHIFY { my $self = shift;
     }
 }
 
-sub _SCAN { my $self = shift;
+sub _SCANf { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $pos = $self->{_pos};
+    my $eos = length(${$self->{_orig}});
 
-    lazymap(sub { $_[0]->retm() }, 
-	lazymap( sub { $self->cursor($pos++) }, lazyconst(1) ));
+    lazymap( sub { $self->cursor($_[0])->retm() }, LazyRange->new($pos,$eos) );
+}
+
+sub _SCANg { my $self = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $pos = $self->{_pos};
+    my $eos = length(${$self->{_orig}});
+
+    lazymap( sub { $self->cursor($_[0])->retm() }, LazyRangeRev->new($eos,$pos) );
 }
 
 sub _STARf { my $self = shift;
@@ -755,17 +764,14 @@ sub _PLUSf { my $self = shift;
     # don't go beyond end of string
     return () if $self->{_pos} == length(${$self->{_orig}});
     lazymap(
-	sub { $_[0]->retm() },
-	lazymap(
-	    sub {
-		my $x = $_[0];
-		lazymap(
-		    sub {
-			$self->cursor($_[0]->{_to})
-		    }, $x, LazyMap->new(sub { $x->_PLUSf($_[0]) }, $block)
-		);
-	    }, $block->($self)
-	)
+	sub {
+	    my $x = $_[0];
+	    lazymap(
+		sub {
+		    $self->cursor($_[0]->{_to})->retm()
+		}, $x, LazyMap->new(sub { $x->_PLUSf($_[0]) }, $block)
+	    );
+	}, $block->($self)
     );
 }
 
@@ -1475,6 +1481,20 @@ sub _LEFTWB { my $self = shift;
 }
 sub _LEFTWB_rev { $_[0]->_LEFTWB }
 
+sub _LEFTRESULT { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    my $buf = $self->{_orig};
+    pos($$buf) = $P;
+    if ($$buf =~ /\b(?=\w)/) {
+        $self->cursor($P)->retm();
+    }
+    else {
+        return ();
+    }
+}
+sub _LEFTRESULT_rev { $_[0]->_LEFTWB }
+
 sub _REDUCE { my $self = shift;
     my $tag = shift;
 
@@ -1493,7 +1513,7 @@ sub _COMMITBRANCH { my $self = shift;
     my $P = $self->{_pos};
     $self->deb("Commit branch to $P") if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
-    $self;
+    $self, LazyMap->new(sub { $self->deb("ABORTBRANCH"); die "ABORTBRANCH" }, $self);
 }
 
 sub _COMMITRULE { my $self = shift;
@@ -1501,7 +1521,7 @@ sub _COMMITRULE { my $self = shift;
     my $P = $self->{_pos};
     $self->deb("Commit rule to $P") if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
-    $self;
+    $self, LazyMap->new(sub { $self->deb("ABORTRULE"); die "ABORTRULE" }, $self);
 }
 
 sub commit { my $self = shift;
@@ -1509,7 +1529,7 @@ sub commit { my $self = shift;
     my $P = $self->{_pos};
     $self->deb("Commit match to $P") if $DEBUG & DEBUG::matchers;
 #    $self->cursor($P);  # XXX currently noop
-    $self;
+    $self, LazyMap->new(sub { die "ABORTMATCH" }, 1);
 }
 
 sub fail { my $self = shift;

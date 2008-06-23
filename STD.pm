@@ -4,7 +4,7 @@ my $LANG is context;
 
 # random rule for debugging, please ignore
 regex foo {
-   .*? '<' 
+   .*? X
 }
 
 =begin things todo
@@ -47,6 +47,11 @@ Another nod toward preprocessing is that blocks that contain nested braces
 are delimited by double braces so that the preprocessor does not need to
 understand Perl 6 code.
 
+This grammar also assumes transitive longest-token semantics, though
+we make a feeble attempt to order rules so a procedural interpretation
+of alternation can usually produce a correct parse.  (This will tend
+to become less true over time.)
+
 =end comment overview
 
 method TOP ($STOP = undef) {
@@ -58,60 +63,6 @@ method TOP ($STOP = undef) {
     }
 }
 
-# This grammar also assumes transitive longest-token semantics, though
-# we make a feeble attempt to order rules so a procedural | can usually
-# produce a correct parse.
-
-=begin comment linkage
-
-  XXX random inconsistent ideas
-
-  From the viewpoint of the user:
-    complete replacement of grammar till end of file:
-            use only MyGrammar;
-        turns into something like:
-            use MyGrammar :my<$?PARSER>;    # XXX how to export this?
-        which ends up looking like something below...
-            use MyGrammar;
-            BEGIN {
-                temp COMPILING::<$?PARSER> := MyGrammar;
-                my $more = m:p/ <$?PARSER::UNIT(/$/)>/;
-                # XXX how to we attach $more to the prior tree?
-            }
-
-    complete replacement of grammar till end of scope:
-            use MyGrammar;
-            BEGIN {
-                temp COMPILING::<$?PARSER> := MyGrammar;
-                my $more = m:p/ <$?PARSER::UNIT(/<null>/)>/;
-                # XXX how to we attach $more to the prior tree?
-            }
-
-    mutating existing grammar by derivation:
-        # (Presumably normal subroutine defs don't need to mutate the grammar)
-        BEGIN {
-            temp COMPILING::<$?PARSER> := grammar is OUTER::<$?PARSER> {
-                token infix:plus returns Additive { <sym> }
-            }
-            my $more = m:p/ <$?PARSER::UNIT(/<null>/)>/;   # XXX or some such
-            ...
-        }
-
-    Note that these BEGIN blocks parse the rest of a scope as kind of
-        a "compilation continuation".  The temp restores the old parser
-        at the end of the begin block, which is presumably coincident
-        with the end of the user's current scope if the rule ended up
-        in the right spot.  Note also that, within the BEGIN block,
-        $_ might be the current program being parsed!
-
-    These also assume a cooperative subgrammar that knows how to quit
-        on other stoppers than just /$/.  In the absence of that we
-        might need to snip out a substring to feed the subgrammar.
-        Of course, this means finding a delimiter that can't occur
-        in the substring, or preparsing the subgrammar somehow to
-        find the right closer, neither of which is exactly optimal.
-
-=end comment linkage
 
 # The internal precedence levels are *not* part of the public interface.
 # The current values are mere implementation; they may change at any time.
@@ -149,11 +100,12 @@ constant %terminator      = (:prec<a=>, :assoc<list>);
 #constant $LOOSEST = %LOOSEST<prec>;
 constant $LOOSEST = "a=!"; # XXX preceding line is busted
 
+
 role PrecOp {
 
     # This is hopefully called on a match to mix in operator info by type.
     method coerce(Match $m) {
-#        $m but= ::?CLASS;
+        # $m but= ::?CLASS;
         my $var = self.WHAT ~ '::o';
         my $d = %::($var); 
         if not $d<transparent> {
@@ -162,6 +114,7 @@ role PrecOp {
         }
         return $m;
     }
+
 } # end role
 
 class Hyper does PrecOp {
@@ -545,21 +498,26 @@ token label {
 }
 
 token statement {
+    { $+endargs = 0; $+endstmt = 0; }         # or next EXPR won't start right
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
     | <EXPR> {*}                                                #= expr
         [
-        || <?faststopper>
-        || <?stdstopper>
-        || <statement_mod_loop> <loopx=EXPR> {*}                #= mod loop
-        || <statement_mod_cond> <condx=EXPR>
-            [
-            || <?faststopper>
-            || <?stdstopper> {*}                                #= mod cond
-            || <statement_mod_loop> <loopx=EXPR> {*}            #= mod condloop
-            ]
-        ]
+	|| <!faststopper>
+	||  [
+	    | <?stdstopper>
+	    | <statement_mod_loop> {*}                          #= mod loop
+	    | <statement_mod_cond> {*}                          #= mod cond
+		[
+		|| <!faststopper>
+		||  [
+		    | <?stdstopper>
+		    | <statement_mod_loop> {*}                  #= mod condloop
+		    ]
+		]
+	    ]
+	]
         {*}                                                     #= modexpr
     | <?before ';'> {*}                                         #= null
     ]
@@ -576,7 +534,6 @@ token eat_terminator {
     || {{ if $¢.pos === $.ws_to { $¢.pos = $.ws_from } }}   # undo any line transition
         <.panic: "Statement not terminated properly">  # "can't happen" anyway :)
     ]
-    { $+endargs = 0; $+endstmt = 0; }         # or next EXPR won't start right
 }
 
 
@@ -1705,21 +1662,21 @@ token quote_mod:f  { <sym> }
 token quote_mod:c  { <sym> }
 token quote_mod:b  { <sym> }
 
-token quote:rx { <sym> <quibble(Perl::Q.tweak(:regex))> }
+token quote:rx { <sym> » <quibble( ::Regex )> }
 
-token quote:m  { <sym> <quibble(Perl::Q.tweak(:regex))> }
-token quote:mm { <sym> <quibble(Perl::Q.tweak(:regex).tweak(:s))> }
+token quote:m  { <sym> » <quibble( ::Regex )> }
+token quote:mm { <sym> » <quibble( ::Regex.tweak(:s))> }
 
 token quote:s {
-    <sym> <pat=quibble(Perl::Q.tweak(:regex))>
+    <sym> » <pat=quibble( ::Regex )>
     <finish_subst($<pat>)>
 }
 token quote:ss {
-    <sym> <pat=quibble(Perl::Q.tweak(:regex).tweak(:s))>
+    <sym> » <pat=quibble( ::Regex.tweak(:s))>
     <finish_subst($<pat>)>
 }
 token quote:tr {
-    <sym> <pat=quibble(Perl::Q.tweak(:trans))>
+    <sym> » <pat=quibble( ::Trans )>
     <finish_trans($<pat>)>
 }
 
@@ -2857,6 +2814,27 @@ token infix:sym<xor> ( --> Loose_or)
 token terminator:sym<;> ( --> Terminator)
     { <?before ';' > {*} }
 
+token terminator:sym<if> ( --> Terminator)
+    { <?before 'if' » > {*} }
+
+token terminator:sym<unless> ( --> Terminator)
+    { <?before 'unless' » > {*} }
+
+token terminator:sym<while> ( --> Terminator)
+    { <?before 'while' » > {*} }
+
+token terminator:sym<until> ( --> Terminator)
+    { <?before 'until' » > {*} }
+
+token terminator:sym<for> ( --> Terminator)
+    { <?before 'for' » > {*} }
+
+token terminator:sym<given> ( --> Terminator)
+    { <?before 'given' » > {*} }
+
+token terminator:sym<when> ( --> Terminator)
+    { <?before 'when' » > {*} }
+
 token terminator:sym« <== » ( --> Terminator)
     { <?before '<==' > {*} }
 
@@ -2899,8 +2877,6 @@ method faststopper {
 regex stdstopper {
     [
     | <?terminator>
-    | <?statement_mod_cond>
-    | <?statement_mod_loop>
     | $
     | <unitstopper>
     ]
@@ -2990,7 +2966,7 @@ method EXPR ($preclim = $LOOSEST)
         my @t = $here.expect_term();       # eats ws too
         last unless @t;
         $here = @t[0];
-        last unless $here.pos > $oldpos;
+        $here.panic("Expected term") unless $here.pos > $oldpos;
 
         # interleave prefix and postfix, pretend they're infixish
         my $M = $here;
