@@ -982,6 +982,7 @@ token arglist {
     <.ws>
 #    <EXPR(%list_prefix)>
     <EXPR>
+    {*}
 }
 
 token circumfix:sym<{ }> ( --> Term) {

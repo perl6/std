@@ -37,7 +37,7 @@ sub process_events {
         if ($_->[1] eq 'from') {
             if ($opt->{vertical}) {
                 $str .= " " x $indent . BLUE.$_->[2].RED.":".RESET."\n";
-                $str .= " " x $indent . YELLOW.$_->[3]->{''}.RESET."\n" if $opt->{actions} && $_->[3]->{''};
+                $str .= " " x $indent . YELLOW.$opt->{actions}->($_->[3]->{''}).RESET."\n" if $opt->{actions} && $_->[3]->{''};
                 $indent++;
             } else {
                 $str .= RED."<".BLUE.$_->[2].RED.">".RESET;
