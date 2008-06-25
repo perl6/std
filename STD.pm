@@ -2,8 +2,6 @@ grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 my $LANG is context;
 
-my @endstmt;	# XXX temporary memoization, s/b per parse
-
 # random rule for debugging, please ignore
 regex foo {
    .*? X
@@ -348,18 +346,22 @@ token spacey { <?before \s | '#'> }
 #regex nofat { <!before » \h* <.unsp>? '=>' > <!before \w> }
 
 token ws {
-    :my @stub = return self if self.pos === $.ws_to; # really fast memoizing
+    # XXX exists is a p5ism
+    :my @stub = return self if exists self.<_>[self.pos]<ws>;
+    :my $startpos = self.pos;
+
+    { self.<_>[$startpos]<ws> = undef; }   # assume no ws, but memoize we were here
     [
     || <?after \w> <?before \w> ::: <!>        # must \s+ between words
-    || { $.ws_from = $¢.pos }
-       [
-       | <unsp>              {*}                                #= unsp
-       | <vws>               {*} <heredoc>
-       | <unv>               {*}                                #= unv
+    || [
+       | <.unsp>
+       | <.vws> <.heredoc>
+       | <.unv>
        | $ { $¢.moreinput }
-       ]*  {*}                                                  #= all
-       { $.ws_to = $¢.pos }
+       ]*
+       { $¢.<_>[$¢.pos]<ws> = $startpos unless $¢.pos == $startpos; }
     ]
+    {*}
 }
 
 token unsp {
@@ -447,26 +449,31 @@ token block {
     '{'
     <statementlist>
     [ '}' || <.panic: "Missing right brace"> ]
+
     [
-    | <?before \h* \n> <.ws> { @endstmt[$¢.ws_from] = @endstmt[$¢.pos] = 1; } {*}  #= endstmt simple 
+    | <?before \h* \n> <.ws>	# (usual case without comments)
+	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? <?before \n > <.ws>
-        { @endstmt[$.ws_from] = @endstmt[$¢.pos] = 1; } {*}                        #= endstmt complex
-    | {*} { let $+endargs = $¢.pos; }                           #= endargs
+	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt complex
+    | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
     ]
     {*}
 }
 
 
-token regex_block {  # perhaps parameterize and combine with block someday
-    '{' [ :lang( ::Regex.unbalanced('}') ) <regex> ]
+token regex_block {  # XXX make polymorphic and combine with block someday
+    '{'
+    [ :lang( ::Regex.unbalanced('}') ) <regex> ]
     [ '}' || <.panic: "Missing right brace"> ]
+
     [
-    | <?before \h* \n> <.ws> { @endstmt[$¢.ws_from] = @endstmt[$¢.pos] = 1; } {*}  #= endstmt simple 
-    | \h* <.unsp>? <?before <[,:]> > {*}                        #= normal
+    | <?before \h* \n> <.ws>	# (usual case without comments)
+	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt simple 
+    | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? <?before \n > <.ws>
-        { @endstmt[$.ws_from] = @endstmt[$¢.pos] = 1; } {*}                        #= endstmt complex
-    | {*} { let $+endargs = $¢.pos; }                           #= endargs
+	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt complex
+    | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
     ]
     {*}
 }
@@ -520,10 +527,10 @@ token statement {
 token eat_terminator {
     [
     || ';'
-    || <?{ @endstmt[$¢.pos] }>
+    || <?{ $¢.<_>[$¢.pos]<endstmt> }>
     || <?before <terminator>>
     || $
-    || {{ if $¢.pos === $.ws_to { $¢.pos = $.ws_from } }}   # undo any line transition
+    || {{ if $¢.<_>[$¢.pos]<ws> { $¢.pos = $¢.<_>[$¢.pos]<ws>; } }}   # undo any line transition
         <.panic: "Statement not terminated properly">  # "can't happen" anyway :)
     ]
 }
@@ -547,9 +554,9 @@ rule statement_control:if {\
     <sym>
     <EXPR>                           {*}                        #= if expr
     <pblock>                         {*}                        #= if block
-    @<elsif> = ( elsif<?spacey> <EXPR>       {*}                #= elsif expr
+    @<elsif> = ( 'elsif'<?spacey> <EXPR>       {*}                #= elsif expr
                         <pblock>     {*} )*                     #= elsif block
-    @<else> = ( else<?spacey> <pblock>       {*} )?             #= else
+    @<else> = ( 'else'<?spacey> <pblock>       {*} )?             #= else
     {*}
 }
 
@@ -829,8 +836,9 @@ token dottyop {
 
 token post {
     <!stdstopper>
-    # last whitespace didn't end here (or was zero width)
-    <?{ $¢.pos !=== $.ws_to or $.ws_to === $.ws_from  }>
+
+    # last whitespace didn't end here
+    <!{ $¢.<_>[$¢.pos]<ws> }>
 
     <?unspacey>
 
@@ -1557,6 +1565,7 @@ token theredoc {
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
 method heredoc () {
+    return if self.peek;
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $DELIM is context = $herestub.delim;
@@ -2847,16 +2856,16 @@ token terminator:sym<!!> ( --> Terminator)
     { <?before '!!' > {*} }
 
 regex infixstopper {
-    <?before '{' | <lambda> ><?after \s>
+    <?before '{' | <lambda> > <?{ $¢.<_>[$¢.pos]<ws> }>
 }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    <!{ !@endstmt[$self.pos] }>
+    <!{ $¢.<_>[$¢.pos]<endstmt> }>	# nullary but likely, check first
     [
     | <?terminator>
     | <unitstopper>
-    | $
+    | $					# unlikely, check last (normal LTM behavior)
     ]
 }
 
@@ -2881,7 +2890,7 @@ method EXPR ($preclim = $LOOSEST)
     my &reduce := -> {
         self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $DEBUG +& DEBUG::EXPR;
         my $op = pop @opstack;
-        given $op<O><assoc> {
+        given $op<O><assoc> // 'unary' {
             when 'chain' {
                 self.deb("reducing chain") if $DEBUG +& DEBUG::EXPR;
                 my @chain;
@@ -2912,25 +2921,30 @@ method EXPR ($preclim = $LOOSEST)
                 $op<list> = [@list];
                 push @termstack, $op;
             }
+            when 'unary' {
+                self.deb("reducing") if $DEBUG +& DEBUG::EXPR;
+                my @list;
+                self.deb("Termstack size: ", +@termstack) if $DEBUG +& DEBUG::EXPR;
+
+                self.deb(Dump($op)) if $DEBUG +& DEBUG::EXPR;
+		$op<arg> = (pop @termstack).cleanup;
+		$op<_from> = $op<arg><_from>
+		    if $op<_from> > $op<arg><_from>;
+		$op<_to> = $op<arg><_to>
+		    if $op<_to> < $op<arg><_to>;
+
+                push @termstack, $op;
+            }
             default {
                 self.deb("reducing") if $DEBUG +& DEBUG::EXPR;
                 my @list;
                 self.deb("Termstack size: ", +@termstack) if $DEBUG +& DEBUG::EXPR;
 
                 self.deb(Dump($op)) if $DEBUG +& DEBUG::EXPR;
-                if $op<O><assoc> {
-                    $op<right> = pop @termstack;
-                    $op<left> = pop @termstack;
-                    $op<_from> = $op<left><_from>;
-                    $op<_to> = $op<right><_to>;
-                }
-                else {
-                    $op<arg> = pop @termstack;
-                    $op<_from> = $op<arg><_from>
-                        if $op<_from> > $op<arg><_from>;
-                    $op<_to> = $op<arg><_to>
-                        if $op<_to> < $op<arg><_to>;
-                }
+		$op<right> = (pop @termstack).cleanup;
+		$op<left> = (pop @termstack).cleanup;
+		$op<_from> = $op<left><_from>;
+		$op<_to> = $op<right><_to>;
 
                 push @termstack, $op;
             }

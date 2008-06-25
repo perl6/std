@@ -69,7 +69,9 @@ use utf8;
 sub new {
     my $class = shift;
     my $orig = shift;
-    my %args = ('_pos' => 0, '_from' => 0, '_orig' => \$orig);
+    my @memos;
+    $#memos = length $orig;	# memos kept by position
+    my %args = ('_pos' => 0, '_from' => 0, '_orig' => \$orig, '_' => \@memos);
     while (@_) {
 	my $name = shift;
 	$args{'_' . $name} = shift;
@@ -141,8 +143,6 @@ sub list { my $self = shift;
 }
 sub hash { my $self = shift;
     my %result;
-    # can't just do this in numerical order because some might be missing
-    # and we don't know the max
     for my $k (keys %$self) {
 	$result{$k} = $self->{$k} if $k !~ /^[_\d]/;
     }
@@ -554,14 +554,35 @@ sub cursor_fresh { my $self = shift;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
-    $r{ws_to} = $self->{ws_to};
-    $r{ws_from} = $self->{ws_from};
     bless \%r, $lang;
+}
+
+sub cleanup {
+    my $self = shift;
+    delete $self->{_fate};
+    delete $self->{_};
+#    delete $self->{_orig};	# needs some kind of weakening
+#    delete $self->{_pos};	# EXPR blows up without this for some reason
+    delete $self->{_reduced};
+    $self;
+}
+
+sub dump {
+    my $self = shift;
+    my %copy = %$self;
+    delete $copy{_};
+    delete $copy{_reduced};
+    delete $copy{_fate};
+    delete $copy{_orig};
+    my $text = Perl::Dump(\%copy);
+    $text =~ s/^\s*_(?:pos|orig):.*\n//mg;
+    $text;
 }
 
 sub cursor_bind { my $self = shift;	# this is parent's match cursor
     my $bindings = shift;
     my $submatch = shift;		# this is the submatch's cursor
+    $submatch->cleanup;
 
     $self->deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
@@ -952,28 +973,18 @@ sub null { my $self = shift;
     return $self->cursor($self->{_pos})->retm();
 }
 
-## token ws
-##      token ws {
-##          :my @stub = return self if self.pos === $!ws_to; # really fast memoizing
-##          [
-##          || <?after \w> <?before \w> ::: <!>        # must \s+ between words
-##          || { $!ws_from = $¢.pos } \s* { $!ws_to = $¢.pos }
-##          ]
-##      }
-
-sub ws_from { $_[0]->{ws_from} }
-sub ws_to { $_[0]->{ws_to} }
-
 sub ws {
     my $self = shift;
-    my @stub = return $self if $self->pos == $self->{ws_to};
 
-    local $CTX = $self->callm() if $DEBUG & DEBUG::trace_call;
     if ($self->{_peek}) {
         return;
     }
+    local $CTX = $self->callm() if $DEBUG & DEBUG::trace_call;
+    my @stub = return $self if exists $$self{_}[$self->{_pos}]{ws};
 
     my $C = $self;
+    my $startpos = $C->pos;
+    $$self{_}[$startpos]{ws} = undef;	# exists means we know, undef means no ws  before here
 
     $self->_MATCHIFY(
         $C->_BRACKET( sub { my $C=shift;
@@ -996,11 +1007,11 @@ sub ws {
                     or
                     push @gather, (map { my $C=$_;
                         (map { my $C=$_;
-                            scalar(do { $self->{ws_to} = $C->{_pos} }, $C)
+                            scalar(do { $C->{_}[$C->{_pos}]{ws} = $startpos unless $C->{_pos} == $startpos }, $C)
                         } $C->_STARr(sub { my $C=shift;
                             $C->_SPACE()
                         }))
-                    } scalar(do { $self->{ws_from} = $C->{_pos} }, $C));
+                    } $C);
               @gather;
             }
         })
