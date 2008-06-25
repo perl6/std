@@ -741,6 +741,7 @@ sub _STARr { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
+    my $prev_to = $to->{_to};
     my @all;
     my $eos = length(${$self->{_orig}});
     for (;;) {
@@ -749,7 +750,8 @@ sub _STARr { my $self = shift;
 #            say @matches.perl;
       last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
-	last if $first->{_from} == $first->{_to};
+	last if $first->{_to} == $prev_to;
+	$prev_to = $first->{_to};
 	push @all, $first;
 	$to = $first;
     }

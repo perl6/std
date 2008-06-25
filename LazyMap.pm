@@ -33,8 +33,9 @@ sub lazymap (&@) {
     my $block = shift;
     my $lazy = bless { 'B' => $block, 'C' => [], 'L' => [@_] }, 'LazyMap';
     if (wantarray) {
-	if (my @eager = iter($lazy)) {
-	    return @eager, $lazy;
+	if (my @retval = iter($lazy)) {
+	    push @retval, $lazy if @{$lazy->{C}} || @{$lazy->{L}};
+	    return @retval;
 	}
 	return;
     }
