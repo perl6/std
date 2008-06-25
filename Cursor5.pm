@@ -551,6 +551,7 @@ sub cursor_fresh { my $self = shift;
     my %r;
     my $lang = @_ && $_[0] ? shift() : ref $self;
     $self->deb("cursor_fresh lang $lang") if $DEBUG & DEBUG::cursors;
+    $r{_} = $self->{_};
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};

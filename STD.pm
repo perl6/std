@@ -707,7 +707,7 @@ token pre {
 }
 
 token expect_term {
-    <!stdstopper>
+   # <!stdstopper>
     [
     | <noun>
     | <pre>+ :: <noun>
@@ -2861,7 +2861,7 @@ regex infixstopper {
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    <!{ $¢.<_>[$¢.pos]<endstmt> }>	# nullary but likely, check first
+    <?{ $¢.<_>[$¢.pos]<endstmt> }>	# nullary but likely, check first
     [
     | <?terminator>
     | <unitstopper>
@@ -2898,10 +2898,10 @@ method EXPR ($preclim = $LOOSEST)
                 push @chain, $op;
                 while @opstack {
                     last if $op<O><prec> ne @opstack[*-1]<O><prec>;
-                    push @chain, pop(@termstack);
+                    push @chain, pop(@termstack).cleanup;
                     push @chain, pop(@opstack);
                 }
-                push @chain, pop(@termstack);
+                push @chain, pop(@termstack).cleanup;
                 @chain = reverse @chain if @chain > 1;
                 $op<O><chain> = @chain;
                 push @termstack, $op;
@@ -2913,10 +2913,10 @@ method EXPR ($preclim = $LOOSEST)
                 while @opstack {
                     self.deb($op<sym>." ne ".@opstack[*-1]<sym>) if $DEBUG +& DEBUG::EXPR;
                     last if $op<sym> ne @opstack[*-1]<sym>;
-                    push @list, pop(@termstack);
+                    push @list, pop(@termstack).cleanup;
                     pop(@opstack);
                 }
-                push @list, pop(@termstack);
+                push @list, pop(@termstack).cleanup;
                 @list = reverse @list if @list > 1;
                 $op<list> = [@list];
                 push @termstack, $op;
