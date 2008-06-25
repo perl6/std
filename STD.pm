@@ -2,6 +2,8 @@ grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 my $LANG is context;
 
+my @endstmt;	# XXX temporary memoization, s/b per parse
+
 # random rule for debugging, please ignore
 regex foo {
    .*? X
@@ -211,7 +213,6 @@ class Terminator does PrecOp {
 # isn't called.
 
 my $endsym is context = "null";
-my $endstmt is context = -1;
 my $endargs is context = -1;
 
 proto token category { <...> }
@@ -420,7 +421,6 @@ token pod_comment {
 # we might be embedded in something else.
 rule comp_unit {
     :my $begin_compunit is context = 1;
-    :my $endstmt        is context<rw> = -1;
     :my $endargs        is context<rw> = -1;
 
     <statementlist>
@@ -448,9 +448,10 @@ token block {
     <statementlist>
     [ '}' || <.panic: "Missing right brace"> ]
     [
+    | <?before \h* \n> <.ws> { @endstmt[$¢.ws_from] = @endstmt[$¢.pos] = 1; } {*}  #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? <?before \n > <.ws>
-        { let $+endstmt = $.ws_from; } {*}                      #= endstmt
+        { @endstmt[$.ws_from] = @endstmt[$¢.pos] = 1; } {*}                        #= endstmt complex
     | {*} { let $+endargs = $¢.pos; }                           #= endargs
     ]
     {*}
@@ -461,9 +462,10 @@ token regex_block {  # perhaps parameterize and combine with block someday
     '{' [ :lang( ::Regex.unbalanced('}') ) <regex> ]
     [ '}' || <.panic: "Missing right brace"> ]
     [
+    | <?before \h* \n> <.ws> { @endstmt[$¢.ws_from] = @endstmt[$¢.pos] = 1; } {*}  #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]> > {*}                        #= normal
     | <.unv>? <?before \n > <.ws>
-        { let $+endstmt = $.ws_from; } {*}                      #= endstmt
+        { @endstmt[$.ws_from] = @endstmt[$¢.pos] = 1; } {*}                        #= endstmt complex
     | {*} { let $+endargs = $¢.pos; }                           #= endargs
     ]
     {*}
@@ -471,14 +473,12 @@ token regex_block {  # perhaps parameterize and combine with block someday
 
 # statement semantics
 rule statementlist {
-    :my StrPos $endstmt is context<rw> = -1;
     [<statement><.eat_terminator> ]*
     {*}
 }
 
 # embedded semis, context-dependent semantics
 rule semilist {
-    :my StrPos $endstmt is context<rw> = -1;
     [<statement><.eat_terminator> ]*
     {*}
 }
@@ -498,26 +498,18 @@ token label {
 }
 
 token statement {
-    { $+endargs = 0; $+endstmt = 0; }         # or next EXPR won't start right
+    :my $endargs is context = -1;
     <label>*                                     {*}            #= label
     [
     | <statement_control>                        {*}            #= control
     | <EXPR> {*}                                                #= expr
-        [
-	|| <!faststopper>
-	||  [
-	    | <?stdstopper>
-	    | <statement_mod_loop> {*}                          #= mod loop
-	    | <statement_mod_cond> {*}                          #= mod cond
-		[
-		|| <!faststopper>
-		||  [
-		    | <?stdstopper>
-		    | <statement_mod_loop> {*}                  #= mod condloop
-		    ]
-		]
-	    ]
-	]
+	[
+	| <statement_mod_loop> {*}                              #= mod loop
+	| <statement_mod_cond> {*}                              #= mod cond
+	    [
+	    | <statement_mod_loop> {*}                          #= mod condloop
+	    ]?
+	]?
         {*}                                                     #= modexpr
     | <?before ';'> {*}                                         #= null
     ]
@@ -528,7 +520,7 @@ token statement {
 token eat_terminator {
     [
     || ';'
-    || <?{ $+endstmt === $.ws_from }>
+    || <?{ @endstmt[$¢.pos] }>
     || <?before <terminator>>
     || $
     || {{ if $¢.pos === $.ws_to { $¢.pos = $.ws_from } }}   # undo any line transition
@@ -708,9 +700,8 @@ token pre {
 }
 
 token expect_term {
-    <!faststopper>
+    <!stdstopper>
     [
-    | <?stdstopper> :: <?fail>
     | <noun>
     | <pre>+ :: <noun>
     ]
@@ -723,7 +714,6 @@ token expect_term {
 }
 
 token adverbs {
-    <!faststopper>
     <!stdstopper>
     [ <colonpair> <.ws> ]+
     {
@@ -793,7 +783,6 @@ token expect_tight_infix ($loosest) {
 
 token expect_infix {
     :my $op is context;         # (used in infix_postfix_meta_operator)
-    <!faststopper>
     <!stdstopper>
     <!infixstopper>
     [
@@ -839,7 +828,6 @@ token dottyop {
 # as a lookahead by the quote interpolator.
 
 token post {
-    <!faststopper>
     <!stdstopper>
     # last whitespace didn't end here (or was zero width)
     <?{ $¢.pos !=== $.ws_to or $.ws_to === $.ws_from  }>
@@ -1008,6 +996,7 @@ token variable_declarator {
 
 rule scoped {
     [
+    | <declarator>
     | <regex_declarator>
     | <package_declarator>
     | <fulltypename>+ <multi_declarator>
@@ -2269,7 +2258,7 @@ token param_var {
         <ident=sublongname>
 
     ||  # Is it a shaped array or hash declaration?
-        <?{ $<sigil> eq '@' | '%' }>
+        <?{ $<sigil> eq '@' || $<sigil> eq '%' }>
         <ident>?
         <.ws>
         <?before <[ \< \( \[ \{ ]> >
@@ -2861,27 +2850,14 @@ regex infixstopper {
     <?before '{' | <lambda> ><?after \s>
 }
 
-# don't check other stoppers if we already know we stop here
-method faststopper {
-    no warnings;
-    my $pos = self.pos || -2;
-    return self if $pos === $+endargs;
-    my $ws = self.ws_from || -2;
-    if $ws === $+endstmt {
-        $+endargs = $pos;  #  cache current stop pos
-        return self;
-    }
-    return ();
-}
-
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
+    <!{ !@endstmt[$self.pos] }>
     [
     | <?terminator>
-    | $
     | <unitstopper>
+    | $
     ]
-    { $+endargs = $¢.pos }
 }
 
 # A fairly complete operator precedence parser

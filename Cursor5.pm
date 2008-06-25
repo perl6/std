@@ -64,7 +64,7 @@ BEGIN {
 use Carp;
 use utf8;
 
-$SIG{__DIE__} = sub { confess(@_) };
+#$SIG{__DIE__} = sub { confess(@_) };
 
 sub new {
     my $class = shift;
@@ -749,6 +749,7 @@ sub _STARr { my $self = shift;
 #            say @matches.perl;
       last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
+	last if $first->{_from} == $first->{_to};
 	push @all, $first;
 	$to = $first;
     }
