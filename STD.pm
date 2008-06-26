@@ -3334,7 +3334,7 @@ grammar Regex is Perl {
         <quotepair> { $/<sym> := «: $<quotepair><key>» }
     }
 
-    token regex_mod_internal:sym<:my>    { <sym> » \N* ';' }
+    token regex_mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($+LANG) <statement> <eat_terminator> ] }
 
     token regex_mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 1 } }
     token regex_mod_internal:sym<:!i>   { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 0 } }

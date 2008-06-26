@@ -969,7 +969,7 @@ sub _BRACKET { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    lazymap(sub { $_[0]->retm() },
+    lazymap(sub { bless($_[0],ref($self))->retm() },
         $block->($self));
 }
 
