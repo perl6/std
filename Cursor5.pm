@@ -657,7 +657,13 @@ sub cursor_all { my $self = shift;
 sub cursor { my $self = shift;
     my $tpos = shift;
 
-    $self->deb("cursor to $tpos") if $DEBUG & DEBUG::cursors;
+    if ($DEBUG & DEBUG::cursors) {
+	my $buf = $self->{_orig};
+	my $peek = substr($$buf,$tpos,20);
+	$peek =~ s/\n/\\n/g;
+	$peek =~ s/\t/\\t/g;
+	$self->deb("cursor to $tpos at --------->$peek");
+    }
     my %r = %$self;
     $r{_from} = $self->{_pos} // 0;
     $r{_to} = $tpos;
@@ -669,7 +675,13 @@ sub cursor { my $self = shift;
 sub cursor_rev { my $self = shift;
     my $fpos = shift;
 
-    $self->deb("cursor_rev back to $fpos") if $DEBUG & DEBUG::cursors;
+    if ($DEBUG & DEBUG::cursors) {
+	my $buf = $self->{_orig};
+	my $peek = substr($$buf,$fpos,20);
+	$peek =~ s/\n/\\n/g;
+	$peek =~ s/\t/\\t/g;
+	$self->deb("cursor_rev to $fpos at --------->$peek");
+    }
     my %r = %$self;
     $r{_pos} = $fpos;
     $r{_from} = $fpos;
@@ -1768,7 +1780,7 @@ sub fail { my $self = shift;
 		local $PREFIX = "";
 		$lexer = eval { $C->cursor_peek->$name() };
 	    }
-	    return $IMP unless $lexer;
+	    return $IMP unless $lexer and exists $lexer->{PATS};
 	    my @pat = @{$lexer->{PATS}};
 	    return unless @pat;
 	    if ($PREFIX) {

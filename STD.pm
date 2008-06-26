@@ -350,16 +350,21 @@ token ws {
     :my @stub = return self if exists self.<_>[self.pos]<ws>;
     :my $startpos = self.pos;
 
-    { self.<_>[$startpos]<ws> = undef; }   # assume no ws, but memoize we were here
     [
-    || <?after \w> <?before \w> ::: <!>        # must \s+ between words
+    || <?after \w> <?before \w> :::
+	{ $¢.<_>[$startpos]<ws> = undef; }
+	<!>        # must \s+ between words
     || [
        | <.unsp>
        | <.vws> <.heredoc>
        | <.unv>
        | $ { $¢.moreinput }
        ]*
-       { $¢.<_>[$¢.pos]<ws> = $startpos unless $¢.pos == $startpos; }
+        { $¢.<_>[$¢.pos]<ws> =
+	    $¢.pos == $startpos
+		?? undef
+		!! $startpos;
+	}
     ]
     {*}
 }
@@ -997,7 +1002,7 @@ token variable_declarator {
     <trait>*
     <.ws>
     [
-    | '=' <.ws> <EXPR( $<sigil> eq '$' ?? %item_assignment !! %list_prefix )>
+    | '=' <.ws> <EXPR( ($<sigil> // '') eq '$' ?? %item_assignment !! %list_prefix )>
     | '.=' <.ws> <EXPR(%item_assignment)>
     ]?
 }
@@ -2201,15 +2206,20 @@ rule macro_def {
     {*}
 }
 
-rule trait { <trait_verb> | <trait_auxiliary> }
+rule trait {
+    [
+    | <trait_verb>
+    | <trait_auxiliary>
+    ]
+}
 
-rule trait_auxiliary:is   { <sym> <name><postcircumfix>? }
-rule trait_auxiliary:does { <sym> <role_name> }
-rule trait_auxiliary:will { <sym> <ident> <block> }
+rule trait_auxiliary:is   {<sym> <name><postcircumfix>? }
+rule trait_auxiliary:does {<sym> <role_name> }
+rule trait_auxiliary:will {<sym> <ident> <block> }
 
-rule trait_verb:of      { <sym> <fulltypename> }
-rule trait_verb:returns { <sym> <fulltypename> }
-rule trait_verb:handles { <sym> <EXPR> }
+rule trait_verb:of      {<sym> <fulltypename> }
+rule trait_verb:returns {<sym> <fulltypename> }
+rule trait_verb:handles {<sym> <EXPR> }
 
 token capterm {
     '\\(' <capture> ')'
