@@ -104,7 +104,7 @@ constant $LOOSEST = "a=!"; # XXX preceding line is busted
 role PrecOp {
 
     # This is hopefully called on a match to mix in operator info by type.
-    method coerce(Match $m) {
+    method coerce (Match $m) {
         # $m but= ::?CLASS;
         my $var = self.WHAT ~ '::o';
         my $d = %::($var); 
@@ -372,8 +372,8 @@ token ws {
 token unsp {
     \\ <?before [\s|'#']>
     [
-    | <vws>                     {*}                             #= vwhite
-    | <unv>                  {*}                                #= unv
+    | <.vws>                     {*}                             #= vwhite
+    | <.unv>                  {*}                                #= unv
     | $ { $¢.moreinput }
     ]*
     {*}
@@ -393,14 +393,14 @@ method moreinput () {
 token unv {
    | \h+                 {*}                                    #= hwhite
    | <?before '='> ^^ :: <.pod_comment>  {*}                    #= pod
-   | '#' [
+   | \h* '#' :: [
          # assuming <bracketed> defaults to standard set
-         || <?opener>
+         |  <?opener> ::
             [
-            || <?after ^^ . > <.panic: "Can't use embedded comments in column 1">
+               <?after ^^ . > <.panic: "Can't use embedded comments in column 1">
             || <.bracketed>   {*}                               #= embedded
             ]
-         || \N*            {*}                                 #= end
+         | :: \N*            {*}                                 #= end
          ]
 }
 
@@ -499,7 +499,7 @@ rule semilist {
 token label {
     <ident> ':' <?before \s> <.ws>
 
-    [ <?{ $¢.is_type($<ident>) }>
+    [ <?{ $¢.is_type($<ident>.text) }>
       <suppose("You tried to use an existing name $/{'ident'} as a label")>
     ]?
 
@@ -712,7 +712,6 @@ token pre {
 }
 
 token expect_term {
-   # <!stdstopper>
     [
     | <noun>
     | <pre>+ :: <noun>
@@ -720,9 +719,11 @@ token expect_term {
     ::
 
     # also queue up any postfixes, since adverbs could change things
-    <post>*
-    <.ws>
-    <adverbs>?
+    [ <?stdstopper> ||
+	<post>*
+	<.ws>
+	<adverbs>?
+    ]
 }
 
 token adverbs {
@@ -762,7 +763,7 @@ token noun {
 
 
 token fatarrow {
-    <key=ident> \h* '=>' :: <.ws> <val=EXPR(%item_assignment<prec>)>
+    <key=ident> \h* '=>' :: <.ws> <val=EXPR(item %item_assignment)>
 }
 
 token colonpair {
@@ -981,7 +982,7 @@ token methodop {
 token arglist {
     :my StrPos $endargs is context<rw> = 0;
     <.ws>
-#    <EXPR(%list_prefix)>
+#    <EXPR(item %list_prefix)>
     <EXPR>
     {*}
 }
@@ -1002,8 +1003,8 @@ token variable_declarator {
     <trait>*
     <.ws>
     [
-    | '=' <.ws> <EXPR( ($<sigil> // '') eq '$' ?? %item_assignment !! %list_prefix )>
-    | '.=' <.ws> <EXPR(%item_assignment)>
+    | '=' <.ws> <EXPR( ($<sigil> // '') eq '$' ?? item %item_assignment !! item %list_prefix )>
+    | '.=' <.ws> <EXPR(item %item_assignment)>
     ]?
 }
 
@@ -1063,7 +1064,7 @@ rule package_def ($namerule) {
 token declarator {
     [
     | <variable_declarator>
-    | '(' <signature> ')' <trait>*
+    | '(' <signature> [ ')' || <.panic: "Missing right parenthsesis"> ] <trait>*
     | <routine_declarator>
     | <regex_declarator>
     | <type_declarator>
@@ -1389,11 +1390,15 @@ token sigil:sym<::> { <sym> }
 token twigil:sym<.> { <sym> }
 token twigil:sym<!> { <sym> }
 token twigil:sym<^> { <sym> }
-token twigil:sym<:> { <sym> }
+token twigil:sym<:> { <sym> <!before ':'> }
 token twigil:sym<*> { <sym> }
 token twigil:sym<+> { <sym> }
 token twigil:sym<?> { <sym> }
 token twigil:sym<=> { <sym> }
+
+token longname {
+    <name> <colonpair>*
+}
 
 token name {
     [
@@ -1408,7 +1413,7 @@ token morename {
     <?before <alpha> | '(' > ::
     [
     | <ident>
-    | '(' <EXPR> ')'
+    | '(' <EXPR> [ ')' || <.panic: "Missing right parenthesis"> ]
     ]
 }
 
@@ -1453,7 +1458,7 @@ token value {
 token typename {
     <name>
     <?{
-        $¢.is_type($<name>)
+        $¢.is_type($<name>.text)
     }>
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -1683,7 +1688,7 @@ token quote:tr {
 #          <infix>            # looking for pseudoassign here
 #          { $<infix><O><prec> == %item_assignment<prec> or
 #              $¢.panic("Bracketed subst must use some form of assignment") }
-#          <repl=EXPR(%item_assignment)>
+#          <repl=EXPR(item %item_assignment)>
 #    # unbracketed form
 #    | <repl=q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
 #    ]
@@ -1905,7 +1910,7 @@ token peek_brackets {
 ##        <!before $stop>
 #        [ # XXX triple rule should just be in escapes to be customizable
 #        | <?before $start ** 3>
-#            $<dequote> = <EXPR(%LOOSEST,/<$stop> ** 3/)>
+#            $<dequote> = <EXPR(item %LOOSEST,/<$stop> ** 3/)>
 #        | <?before <$start>>
 #            $<subtext> = <q_balanced($lang, $start, $stop, :@esc)>
 #        | <?before @esc>
@@ -2161,11 +2166,14 @@ regex extrapost {
 }
 
 rule multisig {
-    ':'?'(' <signature> ')' [ '|' ':'?'(' <signature> ')' ]*
+    [
+	':'?'(' <signature> [ ')' || <.panic: "Missing right parenthesis"> ]
+    ]
+    ** '|'
 }
 
 rule routine_def {
-    | <ident>?  <multisig>?
+    <longname>?  <multisig>?
     <trait>*
     <block>
     {*}
@@ -2173,7 +2181,7 @@ rule routine_def {
 
 rule method_def {
     [
-    | <ident>  <multisig>?
+    | <longname>  <multisig>?
     | <?before <sigil> '.' [ '[' | '{' | '(' ] > <sigil> <postcircumfix>
     ]
     <trait>*
@@ -2182,7 +2190,7 @@ rule method_def {
 }
 
 rule regex_def {
-    <ident>?
+    <longname>?
     <trait>*
     [ ':'?'(' <signature> ')']?
     <regex_block>
@@ -2191,7 +2199,7 @@ rule regex_def {
 
 # XXX redundant with routine_def?
 rule macro_def {
-    | <ident>?  <multisig>?
+    | <longname>?  <multisig>?
     <trait>*
     <block>
     {*}
@@ -2223,16 +2231,21 @@ rule capture {
 }
 
 token sigterm {
-    ':(' <signature> ')'
+    ':(' <signature> [ ')' || <.panic: "Missing right parenthesis"> ]
     {*}
 }
 
-rule signature {
+rule param_sep { [','|':'|';'|';;'] }
+
+token signature {
     :my $zone is context<rw> = 'posreq';
-    @<parsep> = ( <parameter>
-                    ( ',' | ':' | ';' | ';;' | <?before '-->' | ')' | '{' > )
-                 )*
-    [ '-->' <fulltypename> ]?
+    <.ws>
+    [
+    | <?before '-->' | ')' | '{' >
+    | <parameter>
+    ] ** <param_sep>
+    <.ws>
+    [ '-->' <.ws> <fulltypename> ]?
     {*}
 }
 
@@ -2247,7 +2260,8 @@ rule type_declarator:subset {\
 rule type_constraint {
     [
     | <value>
-    | where <EXPR(%chaining)>
+    | <fulltypename>
+    | where <EXPR(item %chaining)>
     ]
     {*}
 }
@@ -2255,7 +2269,7 @@ rule type_constraint {
 rule post_constraint {
     [
     | <multisig>
-    | where <EXPR(%chaining)>
+    | where <EXPR(item %chaining)>
     ]
     {*}
 }
@@ -2344,7 +2358,7 @@ $¢.panic("Can't use optional positional parameter in variadic zone");
 }
 
 rule default_value {
-    '=' <EXPR(%item_assignment)>
+    '=' <EXPR(item %item_assignment)>
 }
 
 token statement_prefix:do      { <sym> <.ws> <statement> {*} }
@@ -2679,7 +2693,7 @@ token infix:sym<//> ( --> Tight_or)
 token infix:sym<?? !!> ( --> Conditional) {
     '??'
     <.ws>
-    <EXPR(%conditional)>
+    <EXPR(item %conditional)>
     [ '!!' ||
         [
         || <?before '='> <.panic: "Assignment not allowed within ??!!">
@@ -2703,12 +2717,11 @@ token infix:sym<?> ( --> Conditional)
 token infix:sym<=> ()
 {
     <sym>
-# this was broken so i commented it out - pmurias
-#    { self.<sigil> eq '$' 
-#        ?? make Item_assignment($/)
-#        !! make List_assignment($/);
-#    }
-#    {*}
+    { $¢ = (self.<sigil>//'') eq '$' 
+        ?? Perl::Item_assignment.coerce($¢)
+        !! Perl::List_assignment.coerce($¢);
+    }
+    {*}
 }
 
 token infix:sym<:=> ( --> Item_assignment)
@@ -2768,7 +2781,7 @@ token term:name ( --> List_prefix)
     <name> ::
     [
     ||  <?{
-            $¢.is_type($<name>)
+            $¢.is_type($<name>.text)
         }> ::
         # parametric type?
         <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -2865,19 +2878,21 @@ regex stdstopper {
     <?{ $¢.<_>[$¢.pos]<endstmt> }>	# nullary but likely, check first
     [
     | <?terminator>
-    | <unitstopper>
+    | <?unitstopper>
     | $					# unlikely, check last (normal LTM behavior)
     ]
+    { $¢.<_>[$¢.pos]<endstmt> = 1; }
 }
 
 # A fairly complete operator precedence parser
 
-method EXPR ($preclim = $LOOSEST)
+method EXPR ($preclvl)
 {
     temp $CTX = self.callm if $DEBUG +& DEBUG::trace_call;
     if self.peek {
         return self._AUTOLEXpeek('EXPR');
     }
+    my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $inquote is context = 0;
     my $prevop is context<rw>;
     my @termstack;
@@ -2927,7 +2942,7 @@ method EXPR ($preclim = $LOOSEST)
                 my @list;
                 self.deb("Termstack size: ", +@termstack) if $DEBUG +& DEBUG::EXPR;
 
-                self.deb(Dump($op)) if $DEBUG +& DEBUG::EXPR;
+                self.deb($op.dump) if $DEBUG +& DEBUG::EXPR;
 		$op<arg> = (pop @termstack).cleanup;
 		$op<_from> = $op<arg><_from>
 		    if $op<_from> > $op<arg><_from>;
@@ -2941,7 +2956,7 @@ method EXPR ($preclim = $LOOSEST)
                 my @list;
                 self.deb("Termstack size: ", +@termstack) if $DEBUG +& DEBUG::EXPR;
 
-                self.deb(Dump($op)) if $DEBUG +& DEBUG::EXPR;
+                self.deb($op.dump) if $DEBUG +& DEBUG::EXPR;
 		$op<right> = (pop @termstack).cleanup;
 		$op<left> = (pop @termstack).cleanup;
 		$op<_from> = $op<left><_from>;
@@ -2996,7 +3011,7 @@ method EXPR ($preclim = $LOOSEST)
         if not $infix { $here.panic("Can't have two terms in a row") }
 
         if not $infix<sym> {
-            die Dump($infix) if $DEBUG +& DEBUG::EXPR;
+            die $infix.dump if $DEBUG +& DEBUG::EXPR;
         }
 
 
@@ -3004,11 +3019,11 @@ method EXPR ($preclim = $LOOSEST)
         my Str $inprec = $inO<prec>;
         if not defined $inprec {
             self.deb("No prec given in infix!") if $DEBUG +& DEBUG::EXPR;
-            die Dump($infix) if $DEBUG +& DEBUG::EXPR;
+            die $infix.dump if $DEBUG +& DEBUG::EXPR;
             $inprec = %terminator<prec>;
         }
 
-#        last unless $inprec gt $preclim;
+        last unless $inprec gt $preclim;
 
         $here = $infix.cursor_fresh.ws();
 
@@ -3174,10 +3189,6 @@ grammar Regex is Perl {
         {*}
     }
 
-    token regex_metachar:sym« <...> » { <sym> {*} }
-    token regex_metachar:sym« <???> » { <sym> {*} }
-    token regex_metachar:sym« <!!!> » { <sym> {*} }
-
     token regex_metachar:sym« <( » { '<(' {*} }
     token regex_metachar:sym« )> » { ')>' {*} }
 
@@ -3267,6 +3278,10 @@ grammar Regex is Perl {
     token regex_backslash:misc { $<litchar>=(\W) }
     token regex_backslash:oops { :: <.panic: "unrecognized regex backslash sequence"> }
 
+    token regex_assertion:sym<...> { <sym> {*} }
+    token regex_assertion:sym<???> { <sym> {*} }
+    token regex_assertion:sym<!!!> { <sym> {*} }
+
     token regex_assertion:sym<?> { <sym> <regex_assertion> }
     token regex_assertion:sym<!> { <sym> <regex_assertion> }
 
@@ -3274,7 +3289,7 @@ grammar Regex is Perl {
 
     token regex_assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        [:lang($+LANG) <variable=EXPR(%LOOSEST)>]
+        [:lang($+LANG) <variable=EXPR(item %LOOSEST)>]
         {*}
     }
 
@@ -3313,29 +3328,31 @@ grammar Regex is Perl {
         ]
     }
 
-    token regex_mod_arg { '(' <semilist> ')' }
+    token regex_mod_arg { '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] }
 
     token regex_mod_internal:adv {
         <quotepair> { $/<sym> := «: $<quotepair><key>» }
     }
 
-    token regex_mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] { $+ignorecase = 1 } }
-    token regex_mod_internal:sym<:!i>   { $<sym>=[':i'|':ignorecase'] { $+ignorecase = 0 } }
+    token regex_mod_internal:sym<:my>    { <sym> » \N* ';' }
+
+    token regex_mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 1 } }
+    token regex_mod_internal:sym<:!i>   { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 0 } }
     # XXX will this please work somehow ???
     token regex_mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <regex_mod_arg> { $+ignorecase = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] { $+ignoreaccent = 1 } }
-    token regex_mod_internal:sym<:!a>   { $<sym>=[':a'|':ignoreaccent'] { $+ignoreaccent = 0 } }
+    token regex_mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { $+ignoreaccent = 1 } }
+    token regex_mod_internal:sym<:!a>   { $<sym>=[':a'|':ignoreaccent'] » { $+ignoreaccent = 0 } }
     # XXX will this please work somehow ???
     token regex_mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <regex_mod_arg> { $+ignoreaccent = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:sym<:s>    { <sym> 'igspace'? { $+sigspace = 1 } }
-    token regex_mod_internal:sym<:!s>   { <sym> 'igspace'? { $+sigspace = 0 } }
+    token regex_mod_internal:sym<:s>    { <sym> 'igspace'? » { $+sigspace = 1 } }
+    token regex_mod_internal:sym<:!s>   { <sym> 'igspace'? » { $+sigspace = 0 } }
     token regex_mod_internal:sym<:s( )> { <sym> 'igspace'? <regex_mod_arg> { $+sigspace = $<regex_mod_arg>.eval } }
 
-    token regex_mod_internal:sym<:r>    { <sym> 'atchet'? { $+ratchet = 1 } }
-    token regex_mod_internal:sym<:!r>   { <sym> 'atchet'? { $+ratchet = 0 } }
-    token regex_mod_internal:sym<:r( )> { <sym> 'atchet'? <regex_mod_arg> { $+ratchet = $<regex_mod_arg>.eval } }
+    token regex_mod_internal:sym<:r>    { <sym> 'atchet'? » { $+ratchet = 1 } }
+    token regex_mod_internal:sym<:!r>   { <sym> 'atchet'? » { $+ratchet = 0 } }
+    token regex_mod_internal:sym<:r( )> { <sym> 'atchet'? » <regex_mod_arg> { $+ratchet = $<regex_mod_arg>.eval } }
 
     token regex_mod_internal:oops { ':' <.panic: "unrecognized regex modifier"> }
 
@@ -3402,7 +3419,7 @@ my @typenames = (      # (need parens for gimme5 translator)
     <StrPos StrLen Version P6opaque>,
     <bit int uint buf num complex bool rat>,
     <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
-    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>
+    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>,
 );
 my %typenames;
 %typenames{@typenames} = (1 xx @typenames);

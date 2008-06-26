@@ -932,7 +932,7 @@ sub _REPSEPr { my $self = shift;
 	$to = $sep;
     }
     return () unless @all;
-    my $r = $self->cursor($to->{_pos});
+    my $r = $self->cursor($all[-1]->{_pos});
     $r->retm();
 }
 
@@ -1662,7 +1662,7 @@ sub fail { my $self = shift;
         for (scalar($self->{'assert'})) { if ((0)) {}
             elsif ($_ eq '?') {
                 my $re = $self->{'re'};
-		$C->deb("\n",::Dump($self)) unless $re;
+#		$C->deb("\n",::Dump($self)) unless $re;
                 if (ref($re) eq 'RE_method_re' and $re->{'name'} eq 'before') {
                     my @result = $re->longest($C);
                     return map { $_ . $IMP } @result;
