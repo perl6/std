@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-our $CTX = 0;
+our $CTX = '';
 our $DEBUG = $ENV{STD5DEBUG} // 0;
 $::DEBUG = $DEBUG;
 
@@ -18,7 +18,8 @@ $::DEBUG = $DEBUG;
         cursors => 256,
         try_processing_in_STD5_dot_pm => 1024,
         mixins => 2048,
-        callm_show_subnames => 16384
+        callm_show_subnames => 16384,
+        use_color => 32768
     };
 }
 
@@ -32,9 +33,24 @@ package Cursor5;
 
 use LazyMap qw(lazymap eager);
 
+use Term::ANSIColor;
+my $BLUE = "";
+my $GREEN = "";
+my $YELLOW = "";
+my $RED = "";
+my $CLEAR = "";
+
+if ($DEBUG & DEBUG::use_color) {
+    $BLUE = color 'blue';
+    $GREEN = color 'green';
+    $YELLOW = color 'yellow';
+    $RED = color 'red';
+    $CLEAR = color 'clear';
+}
+
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
-    print ::LOG $pos, "\t", ':' x $CTX, ' ', @_, "\n";
+    print ::LOG $pos, "\t", $CTX, ' ', @_, "\n";
 }
 
 $::DEBUG //= 0;
@@ -418,7 +434,7 @@ sub _AUTOLEXnow { my $self = shift;
 		    my $peek = substr($$buf,$C->{_pos},20);
 		    $peek =~ s/\n/\\n/g;
 		    $peek =~ s/\t/\\t/g;
-		    $self->deb("looking for $key at --------->$peek");
+		    $self->deb("looking for $key at --------->$GREEN$peek$CLEAR");
 		}
 
 		##########################################
@@ -662,7 +678,7 @@ sub cursor { my $self = shift;
 	my $peek = substr($$buf,$tpos,20);
 	$peek =~ s/\n/\\n/g;
 	$peek =~ s/\t/\\t/g;
-	$self->deb("cursor to $tpos at --------->$peek");
+	$self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
     }
     my %r = %$self;
     $r{_from} = $self->{_pos} // 0;
@@ -680,7 +696,7 @@ sub cursor_rev { my $self = shift;
 	my $peek = substr($$buf,$fpos,20);
 	$peek =~ s/\n/\\n/g;
 	$peek =~ s/\t/\\t/g;
-	$self->deb("cursor_rev to $fpos at --------->$peek");
+	$self->deb("cursor_ref to $fpos --------->$GREEN$peek$CLEAR");
     }
     my %r = %$self;
     $r{_pos} = $fpos;
@@ -694,10 +710,30 @@ sub callm { my $self = shift;
     my $arg = shift;
 
     my $lvl = 0;
+    my $extralvl = 0;
     my @subs;
     if ($DEBUG & DEBUG::callm_show_subnames) {
-	while (my @c = caller($lvl)) { $lvl++; (my $s = $c[3]) =~ s/^.*:://; $s =~ s/^__ANON//; push @subs, $s; }
-	splice(@subs, 0, 2);
+	while (my @c = caller($lvl)) {
+	    $lvl++;
+	    my $s = $c[3];
+	    if ($s =~ /::_/) {
+		next;
+	    }
+	    elsif ($s =~ /^Cursor5::/) {
+		next;
+	    }
+	    elsif ($s =~ /^LazyMap::/) {
+		next;
+	    }
+	    elsif ($s =~ /^\(eval\)/) {
+		next;
+	    }
+	    else {
+		$extralvl = $lvl unless $extralvl;
+		$s =~ s/.*:://;
+		push @subs, $s;
+	    }
+	}
     }
     else {
 	while (my @c = caller($lvl)) { $lvl++; }
@@ -708,8 +744,13 @@ sub callm { my $self = shift;
         $name .= " " . $arg;
     }
     my $pos = '?';
-    $self->deb($name, " [", $file, ":", $line, "] @subs") if $DEBUG & DEBUG::trace_call;
-    $lvl;
+    $self->deb($name, " [", $file, ":", $line, "]") if $DEBUG & DEBUG::trace_call;
+    if ($DEBUG & DEBUG::callm_show_subnames) {
+	$RED . join(' ', reverse @subs) . $CLEAR . ':' x $extralvl;
+    }
+    else {
+	':' x $lvl;
+    }
 }
 
 sub retm { my $self = shift;

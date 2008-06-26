@@ -1026,11 +1026,11 @@ token scope_declarator:state    { <sym> <scoped> {*} }
 token scope_declarator:constant { <sym> <scoped> {*} }
 token scope_declarator:has      { <sym> <scoped> {*} }
 
-token package_declarator:class   { <sym> <package_def> {*} }
-token package_declarator:grammar { <sym> <package_def> {*} }
-token package_declarator:module  { <sym> <package_def> {*} }
-token package_declarator:package { <sym> <package_def> {*} }
-token package_declarator:role    { <sym> <role_def> {*} }
+token package_declarator:class   { <sym> <package_def('module_name')> {*} }
+token package_declarator:grammar { <sym> <package_def('module_name')> {*} }
+token package_declarator:module  { <sym> <package_def('module_name')> {*} }
+token package_declarator:package { <sym> <package_def('module_name')> {*} }
+token package_declarator:role    { <sym> <package_def('role_name')> {*} }
 
 token package_declarator:require {   # here because of declarational aspects
     <sym> <.ws>
@@ -1044,26 +1044,17 @@ token package_declarator:trusts {
     {*}
 }
 
-rule package_def {
-    <module_name>? <trait>*
-    <package_block>
-}
-
-rule role_def {
-    <role_name>? <trait>*
-    <package_block>
-}
-
-rule package_block {
+rule package_def ($namerule) {
+    $<name>=<$namerule>? <trait>*
     [
+       <block> {*}                                                     #= block
     || <?{ $+begin_compunit }> :: <?before ';'>
         {
-            $<module_name> orelse $¢.panic("Compilation unit cannot be anonymous");
+            $<name> orelse $¢.panic("Compilation unit cannot be anonymous");
+	    # do something semantic with name here
             $+begin_compunit = 0;
         }
         {*}                                                     #= semi
-    || <block>
-        {*}                                                     #= block
     || <panic: 'No block found for module definition'>
     ]
     {*}
