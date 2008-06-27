@@ -1,6 +1,8 @@
 use strict;
 use warnings;
 
+use feature 'say';
+
 our $CTX = '';
 our $DEBUG = $ENV{STD5DEBUG} // 0;
 $::DEBUG = $DEBUG;

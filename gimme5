@@ -246,7 +246,7 @@ use $extends; # for base class as well as DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
 moose_extends('$extends');
 my \$retree;
-use feature 'state';
+use feature 'state', 'say';
 use utf8;
 
 \$DB::deep = 1000;
@@ -1230,7 +1230,7 @@ sub atom {
             $adverbs{$adverb} = $code;
 	    ws();
 	    if ($adverb eq ':lang') {
-		$code = "my \$newlang = $code; local \$LANG = (ref(\$self)||\$self); \$C = \$C->cursor_fresh(\$newlang); ";
+		$code = "my \$newlang = $code;  \$C = \$C->cursor_fresh(\$newlang); ";
 		return bless { text => $code, min => 0, max => 0, noquant => 1 }, "RE_decl";
 	    }
         }

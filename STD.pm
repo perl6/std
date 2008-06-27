@@ -468,6 +468,7 @@ token block {
 
 
 token regex_block {  # XXX make polymorphic and combine with block someday
+    :my $LANG is context = ref $self;	# XXX p5 hack
     '{'
     [ :lang( ::Regex.unbalanced('}') ) <regex> ]
     [ '}' || <.panic: "Missing right brace"> ]
@@ -3149,7 +3150,7 @@ grammar Regex is Perl {
     }
 
     token regex_metachar:sym<{ }> {
-        <block>
+        [ :lang($+LANG) { say $+LANG; } <block> ]
         {{ $/<sym> := <{ }> }}
         {*}
     }
@@ -3176,7 +3177,7 @@ grammar Regex is Perl {
     }
 
     token regex_metachar:sym<[ ]> {
-        '[' [:lang(self.unbalanced(']')) <regex>]
+        '[' :: [:lang(self.unbalanced(']')) <regex>]
         [ ']' || <.panic: "Missing right bracket"> ]
         { $/<sym> := <[ ]> }
         {*}
@@ -3231,7 +3232,6 @@ grammar Regex is Perl {
         {*}
     }
 
-    # should be based on $+LANG...
     token regex_metachar:sym<' '> { <?before "'"> [:lang($+LANG) <quote>] }
     token regex_metachar:sym<" "> { <?before '"'> [:lang($+LANG) <quote>] }
 
