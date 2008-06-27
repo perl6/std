@@ -370,7 +370,7 @@ token ws {
 }
 
 token unsp {
-    \\ <?before [\s|'#']>
+    \\ <?before [\s|'#'] >
     [
     | <.vws>                     {*}                             #= vwhite
     | <.unv>                  {*}                                #= unv
@@ -466,11 +466,9 @@ token block {
     {*}
 }
 
-
 token regex_block {  # XXX make polymorphic and combine with block someday
-    :my $LANG is context = ref $self;	# XXX p5 hack
     '{'
-    [ :lang( ::Regex.unbalanced('}') ) <regex> ]
+    <regex( ::Regex.unbalanced('}') )>
     [ '}' || <.panic: "Missing right brace"> ]
 
     [
@@ -1361,7 +1359,6 @@ token desigilname {
 token variable {
     <?before <sigil> > ::
     [
-    | <special_variable> {*}                                    #= special
     | <sigil> <twigil>?
         [
         || <?{ $<sigil> eq '&' }> ::
@@ -1371,6 +1368,7 @@ token variable {
         [ <?{ $<twigil> eq '.' }>
             <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
         ]?
+    | <special_variable> {*}                                    #= special
     | <sigil> \d+ {*}                                           #= $0
     # Note: $() can also parse as contextualizer in an expression; should have same effect
     | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
@@ -1611,13 +1609,19 @@ token quibble ($lang) {
     :my ($start,$stop) = self.peek_delimiters();
     :my $sublang = $start eq $stop ?? $lang.balanced($start,$stop)
                                    !! $lang.unbalanced($stop);
-    $start [:lang($sublang) <nibble>] $stop
+    $start <nibble($sublang)> $stop
 }
 
 method nibble ($lang) {
     my $outerlang = self.WHAT;
     my $LANG is context = $outerlang;
     self.cursor_fresh($lang).nibbler;
+}
+
+method regex ($lang) {
+    my $outerlang = self.WHAT;
+    my $LANG is context = $outerlang;
+    self.cursor_fresh($lang).regex;
 }
 
 token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q).unbalanced("'"))> "'" }
@@ -1628,7 +1632,7 @@ token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('
 token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
-    '/' [:lang( ::Regex.unbalanced("/") ) <regex>] '/'
+    '/' <regex( ::Regex.unbalanced("/") )> '/'
     [ (< i g s m x c e ] >+) 
         # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
@@ -3072,12 +3076,6 @@ grammar Regex is Perl {
 
     proto token rxinfix { <...> }
 
-    method start ($lang) {
-        my $outerlang = self.WHAT;
-        my $LANG is context = $outerlang;
-        self.cursor_fresh($lang).regex();
-    }
-
     token ws {
         <!{ $+sigspace }>
         <nextsame>      # still get all the pod goodness, hopefully
@@ -3139,7 +3137,6 @@ grammar Regex is Perl {
     token regex_metachar:sym<|>   { '|'  :: <fail> }
     token regex_metachar:sym<]>   { ']'  :: <fail> }
     token regex_metachar:sym<)>   { ')'  :: <fail> }
-    token regex_metachar:sym<\\\\> { \\\\ :: <fail> }
 
     token regex_metachar:quant { <regex_quantifier> <.panic: "quantifier quantifies nothing"> }
 
@@ -3150,7 +3147,7 @@ grammar Regex is Perl {
     }
 
     token regex_metachar:sym<{ }> {
-        [ :lang($+LANG) { say $+LANG; } <block> ]
+        [ :lang($+LANG) <block> ]
         {{ $/<sym> := <{ }> }}
         {*}
     }
@@ -3209,6 +3206,7 @@ grammar Regex is Perl {
         [ '>' || <.panic: "regex assertion not terminated by angle bracket"> ]
         {*}
     }
+
     token regex_metachar:sym<\\> { <sym> <regex_backslash> {*} }
     token regex_metachar:sym<.>  { <sym> {*} }
     token regex_metachar:sym<^^> { <sym> {*} }
@@ -3282,8 +3280,8 @@ grammar Regex is Perl {
     token regex_assertion:sym<???> { <sym> {*} }
     token regex_assertion:sym<!!!> { <sym> {*} }
 
-    token regex_assertion:sym<?> { <sym> <regex_assertion> }
-    token regex_assertion:sym<!> { <sym> <regex_assertion> }
+    token regex_assertion:sym<?> { <sym> [ <?before '>'> | <regex_assertion> ] }
+    token regex_assertion:sym<!> { <sym> [ <?before '>'> | <regex_assertion> ] }
 
     token regex_assertion:sym<{ }> { <block> }
 
