@@ -104,7 +104,7 @@ sub eager {
 	    push @out, $head;
 	}
     }
-    print STDERR ::Dump(@out);
+#    print STDERR ::Dump(@out);
     @out;
 }
 

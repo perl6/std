@@ -1,6 +1,9 @@
 grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 my $LANG is context;
+my $PKGDECL is context = "";
+my $PKG is context = "";
+my @PKGS;
 
 # random rule for debugging, please ignore
 regex foo {
@@ -63,6 +66,27 @@ method TOP ($STOP = undef) {
     }
 }
 
+
+#XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
+
+my @typenames = (      # (need parens for gimme5 translator)
+    <Bit Int Str Num Complex Bool Rat>,
+    <Exception Code Block List Seq Range Set Bag Junction Pair>,
+    <Mapping Signature Capture Blob Whatever Undef Failure>,
+    <StrPos StrLen Version P6opaque>,
+    <bit int uint buf num complex bool rat>,
+    <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
+    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>,
+    ()
+);
+my %typenames;
+%typenames{@typenames} = (1 xx @typenames);
+
+method is_type ($name) {
+    return True if %typenames{$name};
+    #return True if GLOBAL::{$name}.:exists;
+    return False;
+}
 
 # The internal precedence levels are *not* part of the public interface.
 # The current values are mere implementation; they may change at any time.
@@ -360,7 +384,7 @@ token unsp {
 
 token vws {
     \v
-    [ '#DEBUG -1' { say "DEBUG"; $Perl::DEBUG = $Cursor5::DEBUG = $::DEBUG = -1; } ]?
+    [ '#DEBUG -1' { say "DEBUG"; $Perl::DEBUG = $::DEBUG = -1; } ]?
 }
 
 # We provide two mechanisms here:
@@ -600,7 +624,7 @@ rule statement_control:loop {\
 
 rule statement_control:for {\
     <sym>
-    [ <?before [my]? '$'\w+ '(' >
+    [ <?before 'my'? '$'\w+ '(' >
         <.panic: "This appears to be Perl 5 code"> ]?
     <EXPR>                             {*}                      #= expr
     <pblock>                           {*}                      #= block
@@ -658,11 +682,9 @@ rule statement_mod_loop:until {<sym> <modifier_expr> {*} }      #= until
 rule statement_mod_loop:for   {<sym> <modifier_expr> {*} }      #= for
 rule statement_mod_loop:given {<sym> <modifier_expr> {*} }      #= given
 
-token role_name { <module_name> [ <?before '['> <postcircumfix> ]? }
-
 token module_name:normal {
-    <name>                                          {*}         #= name
-    <colonpair>*
+    <longname>
+    [ <?{ ($+PKGDECL//'') eq 'role' }> <?before '['> <postcircumfix> ]?
     {*}
 }
 
@@ -719,16 +741,16 @@ token adverbs {
 token noun {
     [
     | <fatarrow>
+    | <variable> { $<sigil> = $<variable><sigil> }
     | <package_declarator>
     | <scope_declarator>
-    | <multi_declarator>
+    | <?before 'multi'|'proto'|'only'> <multi_declarator>
     | <routine_declarator>
     | <regex_declarator>
     | <type_declarator>
     | <circumfix>
     | <dotty>
 #    | <subcall>
-    | <variable> { $<sigil> = $<variable><sigil> }
     | <value>
     | <capterm>
     | <sigterm>
@@ -929,13 +951,13 @@ token postcircumfix:sym<{ }> ( --> Methodcall)
     { '{' <semilist> '}' {*} }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble(Perl::Q.tweak(:q).tweak(:w), rx/\>/)> '>' {*} }
+    { '<' <nibble(Perl::Q.tweak(:q).tweak(:w).balanced('<','>'))> '>' {*} }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww), rx/\>\>/)> '>>' {*}}
+    { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' {*} }
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww), rx/\»/)> {*} }
+    { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('«','»'))> '»' {*} }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O> }
@@ -944,7 +966,7 @@ token postop {
 
 token methodop {
     [
-    | <name>
+    | <longname>
     | <?before '$' | '@' > <variable>
     | <?before <[ ' " ]> > <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
@@ -1009,7 +1031,36 @@ token package_declarator:class   { <sym> <package_def('module_name')> {*} }
 token package_declarator:grammar { <sym> <package_def('module_name')> {*} }
 token package_declarator:module  { <sym> <package_def('module_name')> {*} }
 token package_declarator:package { <sym> <package_def('module_name')> {*} }
-token package_declarator:role    { <sym> <package_def('role_name')> {*} }
+
+token package_declarator:class {
+    :my $PKGDECL is context = 'class';
+    <sym> <package_def>
+    {*}
+}
+
+token package_declarator:grammar {
+    :my $PKGDECL is context = 'grammar';
+    <sym> <package_def>
+    {*}
+}
+
+token package_declarator:module {
+    :my $PKGDECL is context = 'module';
+    <sym> <package_def>
+    {*}
+}
+
+token package_declarator:package {
+    :my $PKGDECL is context = 'package';
+    <sym> <package_def>
+    {*}
+}
+
+token package_declarator:role {
+    :my $PKGDECL is context = 'role';
+    <sym> <package_def>
+    {*}
+}
 
 token package_declarator:require {   # here because of declarational aspects
     <sym> <.ws>
@@ -1023,14 +1074,43 @@ token package_declarator:trusts {
     {*}
 }
 
-rule package_def ($namerule) {
-    $<name>=<$namerule>? <trait>*
+rule package_def {
     [
-       <block> {*}                                                     #= block
+	<module_name>{{
+	    my $longname = $<module_name>[0]<longname>;
+	    my $shortname = $longname.<name>.text;
+	    my $typename = main::mangle($shortname);
+	    my $qualname = ($+PKG // 'GLOBAL') ~ '::' ~ $typename;
+	    %typenames{$typename} = $qualname;
+	    %typenames{$qualname} = $qualname;
+	}}
+    ]?
+    <trait>*
+    [
+       <?before '{'>
+       {{
+	   # figure out the actual full package name (nested in outer package)
+	    push @PKGS, $+PKG;
+	    if $<module_name> {
+		my $longname = $<module_name>[0]<longname>;
+		my $shortname = $longname.<name>.text;
+		$+PKG = $+PKG ~ '::' ~ $shortname;
+	    }
+	    else {
+		$+PKG = $+PKG ~ '::_anon_';
+	    }
+	}}
+        <block>
+	{{
+	    $+PKG = pop(@PKGS);
+	}}
+	{*}                                                     #= block
     || <?{ $+begin_compunit }> :: <?before ';'>
         {
-            $<name> orelse $¢.panic("Compilation unit cannot be anonymous");
-	    # do something semantic with name here
+            $<module_name> orelse $¢.panic("Compilation unit cannot be anonymous");
+	    my $longname = $<module_name>[0]<longname>;
+	    my $shortname = $longname.<name>.text;
+	    $+PKG = $shortname;
             $+begin_compunit = 0;
         }
         {*}                                                     #= semi
@@ -1053,6 +1133,7 @@ token declarator {
 token multi_declarator:multi { <sym> <.ws> <declarator> {*} }
 token multi_declarator:proto { <sym> <.ws> <declarator> {*} }
 token multi_declarator:only  { <sym> <.ws> <declarator> {*} }
+token multi_declarator:null  { <declarator> {*} }
 
 token routine_declarator:sub       { <sym> <routine_def> {*} }
 token routine_declarator:method    { <sym> <method_def> {*} }
@@ -1103,7 +1184,7 @@ token special_variable:sym<$@> {
 token special_variable:sym<$#> {
     <sym> ::
     [
-    || (\w+) <obs("\$#$0 variable", "@{$0}.end")>
+    || (\w+) <obs("\$#$0 variable", "\@{$0}.end")>
     || <obs('$# variable', '.fmt')>
     ]
 }
@@ -1214,7 +1295,7 @@ token special_variable:sym<${^ }> {
 
 # XXX should eventually rely on multi instead of nested cases here...
 method obscaret (Str $var, Str $sigil, Str $name) {
-    my $repl = do given $sigil {
+    my $repl = do { given $sigil {
         when '$' {
             given $name {
                 when 'MATCH'         { '$/' }
@@ -1251,7 +1332,8 @@ method obscaret (Str $var, Str $sigil, Str $name) {
             }
         }
         when * { "a global form such as $sigil*$0" }
-    }; # XXX pugs needs semi here for some reason
+    };
+    };
     return self.obs("$var variable", $repl);
 }
 
@@ -1302,7 +1384,7 @@ token special_variable:sym<$"> {
 
 token special_variable:sym<$,> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs(q/$, variable/, ".join() method")>
+    <obs('$, variable', ".join() method")>
 }
 
 token special_variable:sym['$<'] {
@@ -1310,14 +1392,14 @@ token special_variable:sym['$<'] {
     <obs('$< variable', '$*UID')>
 }
 
-token special_variable:sym«$>» {
+token special_variable:sym«\$>» {
     <sym> :: <?before \s | ',' | <terminator> >
     <obs("$() variable", '$*EUID')>
 }
 
 token special_variable:sym<$.> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs(q/$. variable/, "filehandle's .line method")>
+    <obs('$. variable', "filehandle's .line method")>
 }
 
 token special_variable:sym<$?> {
@@ -1330,7 +1412,7 @@ token special_variable:sym<$?> {
 token desigilname {
     [
     | <?before '$' > <variable>
-    | <name>
+    | <longname>
     ]
     {*}
 }
@@ -1434,9 +1516,9 @@ token value {
 }
 
 token typename {
-    <name>
+    <longname>
     <?{
-        $¢.is_type($<name>.text)
+        $¢.is_type($<longname>.text)
     }>
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -1551,7 +1633,7 @@ method heredoc () {
         my $lang = $herestub.lang;
         my $doc;
         my $ws = "";
-        $here = $here.q_unbalanced_rule($lang, :stop(&theredoc)).MATCHIFY;
+        $here = $here.unbalanced();  # XXX
         if $here {
             if $ws {
                 my $wsequiv = $ws;
@@ -1946,12 +2028,15 @@ grammar Q is Perl {
     } # end role
 
     role w {
-        token stopper { '>' } # wrong
         method postprocess ($s) { $s.comb }
     } # end role
 
     role _w {
         method postprocess ($s) { $s }
+    } # end role
+
+    role ww {
+        method postprocess ($s) { $s.comb }
     } # end role
 
     role q {
@@ -2144,9 +2229,16 @@ rule trait {
     ]
 }
 
-rule trait_auxiliary:is   {<sym> <name><postcircumfix>? }
-rule trait_auxiliary:does {<sym> <role_name> }
-rule trait_auxiliary:will {<sym> <ident> <block> }
+token trait_auxiliary:is {
+    <sym> <.ws> <longname><postcircumfix>?
+}
+token trait_auxiliary:does {
+    :my $PKGDECL is context = 'role';
+    <sym> <.ws> <module_name>
+}
+token trait_auxiliary:will {
+    <sym> <.ws> <ident> <.ws> <block>
+}
 
 rule trait_verb:of      {<sym> <fulltypename> }
 rule trait_verb:returns {<sym> <fulltypename> }
@@ -2183,7 +2275,7 @@ token signature {
 
 rule type_declarator:subset {\
     <sym>
-    <name>
+    <longname>
     [ of <fulltypename> ]?
     where <EXPR>
     {*}
@@ -2710,10 +2802,10 @@ token term:sigil ( --> List_prefix)
 # (XXX for cheating purposes this rule must be the last term: rule)
 token term:name ( --> List_prefix)
 {
-    <name> ::
+    <longname> ::
     [
     ||  <?{
-            $¢.is_type($<name>.text)
+            $¢.is_type($<longname>.text)
         }> ::
         # parametric type?
         <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -2864,13 +2956,24 @@ method EXPR ($preclvl)
                 self.deb("reducing list") if $DEBUG +& DEBUG::EXPR;
                 my @list;
                 push @list, pop(@termstack);
+		my $s = $op<sym>;
                 while @opstack {
-                    self.deb($op<sym>." ne ".@opstack[*-1]<sym>) if $DEBUG +& DEBUG::EXPR;
-                    last if $op<sym> ne @opstack[*-1]<sym>;
-                    push @list, pop(@termstack).cleanup;
+                    self.deb($s ~ " vs " ~ @opstack[*-1]<sym>) if $DEBUG +& DEBUG::EXPR;
+                    last if $s ne @opstack[*-1]<sym>;
+		    if @termstack and defined @termstack[0] {
+			push @list, pop(@termstack).cleanup;
+		    }
+		    else {
+			self.worry("Missing term in " ~ $s ~ " list");
+		    }
                     pop(@opstack);
                 }
-                push @list, pop(@termstack).cleanup;
+		if @termstack and defined @termstack[0] {
+		    push @list, pop(@termstack).cleanup;
+		}
+		elsif $s ne ',' {
+		    self.worry("Missing final term in '" ~ $s ~ "' list");
+		}
                 @list = reverse @list if @list > 1;
                 $op<list> = [@list];
                 push @termstack, $op;
@@ -3270,7 +3373,7 @@ grammar Regex is Perl {
         [ '+' | '-' ]?
         [
         | <name>
-        | <before '['> <quibble(Perl::Q.tweak(:q))>
+        | <before '['> <quibble(Perl::Q.tweak(:q))> # XXX parse as q[] for now
         ]
     }
 
@@ -3355,25 +3458,6 @@ method worry (Str $s) {
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
 method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
     self.panic("Obsolete use of $old;$when please use $new instead");
-}
-
-#XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
-my @typenames = (      # (need parens for gimme5 translator)
-    <Bit Int Str Num Complex Bool Rat>,
-    <Exception Code Block List Seq Range Set Bag Junction Pair>,
-    <Mapping Signature Capture Blob Whatever Undef Failure>,
-    <StrPos StrLen Version P6opaque>,
-    <bit int uint buf num complex bool rat>,
-    <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
-    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>,
-);
-my %typenames;
-%typenames{@typenames} = (1 xx @typenames);
-
-method is_type ($name) {
-    return True if %typenames{$name};
-    #return True if GLOBAL::{$name}.:exists;
-    return False;
 }
 
 ## vim: expandtab sw=4 syn=perl6
