@@ -1838,7 +1838,7 @@ sub fail { my $self = shift;
 		my $sym = $self->{'sym'};
 		Encode::_utf8_on($sym);
 		my $text = ::qm($sym);
-		$text =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
+		$text =~ s/([[:alpha:]])/'[' . lc($1) . uc($1) . ']'/eg if $self->{i};
                 return $text;
             }
             elsif ($_ eq 'alpha') {
