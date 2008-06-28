@@ -54,7 +54,7 @@ sub process_events {
 }
 sub traverse_match {
     my ($r,$label,$depth,$events) = @_;
-    return unless ref $r;
+    return unless ref $r && ref $r ne 'SCALAR' && ref $r ne 'ARRAY';
      if (defined $r->{_from}) {
          if ($r->{_from} == $r->{_to}) {
             push(@{$events},[$r->{_from},'empty',$label,$r,$depth]);
