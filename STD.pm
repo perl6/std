@@ -321,30 +321,30 @@ token spacey { <?before \s | '#'> }
 
 # Lexical routines
 
-# make sure we're at end of a non-autoquoted identifier
-#regex nofat { <!before » \h* <.unsp>? '=>' > <!before \w> }
-
 token ws {
     # XXX exists is a p5ism
     :my @stub = return self if exists self.<_>[self.pos]<ws>;
     :my $startpos = self.pos;
 
     [
-    || <?after \w> <?before \w> :::
-	{ $¢.<_>[$startpos]<ws> = undef; }
-	<!>        # must \s+ between words
-    || [
-       | <.unsp>
-       | <.vws> <.heredoc>
-       | <.unv>
-       | $ { $¢.moreinput }
-       ]*
-        { $¢.<_>[$¢.pos]<ws> =
-	    $¢.pos == $startpos
-		?? undef
-		!! $startpos;
-	}
+	| \h+ <![#\s\\]> { $¢.<_>[$¢.pos]<ws> = $startpos; }	# common case
+	| <?before \w> <?after \w> :::
+	    { $¢.<_>[$startpos]<ws> = undef; }
+	    <!>        # must \s+ between words
     ]
+    ||
+    [
+    | <.unsp>
+    | <.vws> <.heredoc>
+    | <.unv>
+    | $ { $¢.moreinput }
+    ]*
+
+    { $¢.<_>[$¢.pos]<ws> =
+	$¢.pos == $startpos
+	    ?? undef
+	    !! $startpos;
+    }
     {*}
 }
 
@@ -360,6 +360,7 @@ token unsp {
 
 token vws {
     \v
+    [ '#DEBUG -1' { say "DEBUG"; $Perl::DEBUG = $Cursor5::DEBUG = $::DEBUG = -1; } ]?
 }
 
 # We provide two mechanisms here:
@@ -555,7 +556,7 @@ rule statement_control:unless {\
 
 rule statement_control:while {\
     <sym>
-    [ <?before '(' [[my]? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
+    [ <?before '(' ['my'? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
         <.panic: "This appears to be Perl 5 code"> ]?
     <EXPR>                             {*}                      #= expr
     <pblock>                           {*}                      #= block
@@ -574,10 +575,10 @@ rule statement_control:until {\
 rule statement_control:repeat {\
     <sym>
     [
-        | (while|until) <EXPR>         {*}                      #= wu expr
+        | ('while'|'until') <EXPR>         {*}                      #= wu expr
           <block>                      {*}                      #= wu block
         | <block>                      {*}                      #= block wu
-          (while|until) <EXPR>         {*}                      #= expr wu
+          ('while'|'until') <EXPR>         {*}                      #= expr wu
     ]
     {*}
 }
@@ -667,7 +668,6 @@ token module_name:normal {
 
 token module_name:deprecated { 'v6-alpha' }
 
-
 token version:sym<v> {
     'v' [\d+ | '*'] ** '.' '+'?
 }
@@ -710,9 +710,8 @@ token adverbs {
     [ <colonpair> <.ws> ]+
     {
         my $prop = $+prevop orelse
-            $¢.panic('No previous operator visible to adverbial pair (' ~
-                $<colonpair> ~ ')');
-        $prop.adverb($<colonpair>)
+            $¢.panic('No previous operator visible to adverbial pair');
+        $prop.adverb($<colonpair>);
     }
     {*}
 }
@@ -2740,12 +2739,18 @@ token term:name ( --> List_prefix)
 token infix:sym<and> ( --> Loose_and)
     { <sym> » {*} }
 
+token infix:sym<andthen> ( --> Loose_and)
+    { <sym> » {*} }
+
 # XXX tre workaround
 # token infix:sym<andthen> ( --> Loose_and)
 #     { <sym> » {*} }
 
 ## loose or
 token infix:sym<or> ( --> Loose_or)
+    { <sym> » {*} }
+
+token infix:sym<orelse> ( --> Loose_or)
     { <sym> » {*} }
 
 token infix:sym<xor> ( --> Loose_or)
@@ -3020,8 +3025,12 @@ grammar Regex is Perl {
     proto token rxinfix { <...> }
 
     token ws {
-        <!{ $+sigspace }>
-        <nextsame>      # still get all the pod goodness, hopefully
+        <?{ $+sigspace }>
+	|| [ <?before \s | '#'> <nextsame> ]?   # still get all the pod goodness, hopefully
+    }
+
+    token sigspace {
+	<?before \s | '#'> [ :lang($+LANG) <.ws> ]
     }
 
     rule regex {
@@ -3035,6 +3044,7 @@ grammar Regex is Perl {
     }
 
     token expect_term {
+	<.ws>
         <quantified_atom>+
     }
     token expect_infix {
@@ -3052,21 +3062,22 @@ grammar Regex is Perl {
     token rxinfix:sym<|> ( --> Junctive_or ) { <sym> }
     token rxinfix:sym<&> ( --> Junctive_and ) { <sym> }
 
-    rule quantified_atom {
+    token quantified_atom {
         <!stopper>
         <!rxinfix>
         <atom>
-        [ <quantifier>
+        [ <.ws> <quantifier>
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Can't quantify zero-width atom">
         ]?
+	<.ws>
         {*}
     }
 
-    rule atom {
+    token atom {
         [
-         <metachar>
-        | (\w)
+        | \w
+        | <metachar>
         | :: <.panic: "unrecognized metacharacter">
         ]
         {*}
@@ -3086,7 +3097,7 @@ grammar Regex is Perl {
     # "normal" metachars
 
     token metachar:sigwhite {
-        <?before \s|'#'> <.SUPER::ws>   # significant whitespace
+	<sigspace>
     }
 
     token metachar:sym<{ }> {
@@ -3124,7 +3135,7 @@ grammar Regex is Perl {
     }
 
     token metachar:sym<( )> {
-        '(' [:lang(self.unbalanced(')')) <regex>]
+        '(' :: [:lang(self.unbalanced(')')) <regex>]
         [ ')' || <.panic: "Missing right parenthesis"> ]
         { $/<sym> := <( )> }
         {*}
@@ -3294,7 +3305,7 @@ grammar Regex is Perl {
     token quantifier:sym<*>  { <sym> <quantmod> }
     token quantifier:sym<+>  { <sym> <quantmod> }
     token quantifier:sym<?>  { <sym> <quantmod> }
-    token quantifier:sym<**> { <sym> <sigspace> <quantmod> <sigspace>
+    token quantifier:sym<**> { <sym> <sigspace>? <quantmod> <sigspace>?
         [
         | \d+ [ '..' [ \d+ | '*' ] ]?
         | <block>

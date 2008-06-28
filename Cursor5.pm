@@ -36,19 +36,11 @@ package Cursor5;
 use LazyMap qw(lazymap eager);
 
 use Term::ANSIColor;
-my $BLUE = "";
-my $GREEN = "";
-my $YELLOW = "";
-my $RED = "";
-my $CLEAR = "";
-
-if ($DEBUG & DEBUG::use_color) {
-    $BLUE = color 'blue';
-    $GREEN = color 'green';
-    $YELLOW = color 'yellow';
-    $RED = color 'red';
-    $CLEAR = color 'clear';
-}
+my $BLUE = color 'blue';
+my $GREEN = color 'green';
+my $YELLOW = color 'yellow';
+my $RED = color 'red';
+my $CLEAR = color 'clear';
 
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
