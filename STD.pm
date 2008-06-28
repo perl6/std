@@ -478,7 +478,8 @@ token label {
     <ident> ':' <?before \s> <.ws>
 
     [ <?{ $¢.is_type($<ident>.text) }>
-      <suppose("You tried to use an existing name $/{'ident'} as a label")>
+      <.panic("You tried to use an existing typename as a label")>
+#      <suppose("You tried to use an existing name $/{'ident'} as a label")>
     ]?
 
     # add label as a pseudo type
@@ -537,9 +538,9 @@ rule statement_control:if {\
     <sym>
     <EXPR>                           {*}                        #= if expr
     <pblock>                         {*}                        #= if block
-    @<elsif> = ( 'elsif'<?spacey> <EXPR>       {*}                #= elsif expr
+    $<elsif> = ( 'elsif'<?spacey> <EXPR>       {*}                #= elsif expr
                         <pblock>     {*} )*                     #= elsif block
-    @<else> = ( 'else'<?spacey> <pblock>       {*} )?             #= else
+    $<else> = ( 'else'<?spacey> <pblock>       {*} )?             #= else
     {*}
 }
 
@@ -1586,7 +1587,7 @@ method heredoc () {
 
 token quibble ($lang) {
     :my ($start,$stop) = self.peek_delimiters();
-    :my $sublang = $start eq $stop ?? $lang.balanced($start,$stop)
+    :my $sublang = $start ne $stop ?? $lang.balanced($start,$stop)
                                    !! $lang.unbalanced($stop);
     $start <nibble($sublang)> $stop
 }
@@ -1822,88 +1823,32 @@ token opener {
 
 # assumes whitespace is eaten already
 
-method peek_delimiters () {
-    return self.peek_brackets() || do {
-        my $buf = self.orig;
-        substr($$buf,self.pos,1) xx 2;
+method peek_delimiters {
+    my $buf = self.orig;
+    my $pos = self.pos;
+    my $startpos = $pos;
+    my $char = substr($$buf,$pos++,1);
+    if $char ~~ /^\s$/ {
+	self.panic("Whitespace not allowed as delimiter");
     }
-}
 
-token peek_brackets {
-    <?before \s> {
-        self.panic("Whitespace not allowed as delimiter");
-    }
 # XXX not defined yet
 #    <?before <+isPe> > {
 #        self.panic("Use a closing delimiter for an opener is reserved");
 #    }
-    (.) ** <?same> {{
-        my $start = ~$/;
-        my $rightbrack = %open2close{$0} orelse
-            die "No matching close delimiter";
-        my $stop = $rightbrack x $start.chars;
-        return($start, $stop);
-    }}
+
+    my $rightbrack = %open2close{$char};
+    if not defined $rightbrack {
+	return $char, $char;
+    }
+    while substr($$buf,$pos,1) eq $char {
+	$pos++;
+    }
+    my $len = $pos - $startpos;
+    my $start = $char x $len;
+    my $stop = $rightbrack x $len;
+    return $start, $stop;
 }
-
-#regex bracketed ($lang = 'Perl::Q') {
-#    :my ($start,$stop);
-#    <?{ ($start,$stop) = $¢.peek_brackets() }>
-#    <q=q_balanced($lang, $start, $stop)>
-#    {*}
-#}
-#
-#regex q_pickdelim ($lang) {
-#    :my ($start,$stop) = self.peek_delimiters();
-#    [
-#    || <?{ $start eq $stop }> :: <q=q_unbalanced($lang, $stop)>
-#    ||                           <q=q_balanced($lang, $start, $stop)>
-#    ]
-#    {*}
-#}
-
-#regex rx_pickdelim ($lang) {
-#    [
-#    || { ($<start>,$<stop>) = $¢.peek_delimiters() }
-#      $<start>
-#      <rx=regex($<stop>)>        # counts its own brackets, we hope
-#    || $<stop> = [ [\S] || <.panic: "Regex delimiter must not be whitespace"> ]
-#      <rx=regex($<stop>)>
-#    ]
-#    {*}
-#}
-#
-#regex tr_pickdelim ($lang) {
-#    [
-#    || { ($<start>,$<stop>) = $¢.peek_delimiters() }
-#      $<start>
-#      <tr=transliterator($<stop>)>
-#    || $<stop> = [ [\S] || <.panic: "tr delimiter must not be whitespace"> ]
-#      <tr=transliterator($<stop>)>
-#    ]
-#    {*}
-#}
-#
-#regex transliterator($stop) {
-#    # XXX your ad here
-#}
-#
-#token q_balanced ($lang, $start, $stop, :@esc = $lang.escset) {
-#    $start
-#    $<text> = [.*?] ** [
-##        <!before $stop>
-#        [ # XXX triple rule should just be in escapes to be customizable
-#        | <?before $start ** 3>
-#            $<dequote> = <EXPR(item %LOOSEST,/<$stop> ** 3/)>
-#        | <?before <$start>>
-#            $<subtext> = <q_balanced($lang, $start, $stop, :@esc)>
-#        | <?before @esc>
-#            $<escape> = [ <q_escape($lang)> ]
-#        ]
-#    ]
-#    $stop
-#    {*}
-#}
 
 role startstop[$start,$stop] {
     token starter { $start }
@@ -3273,7 +3218,7 @@ grammar Regex is Perl {
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
 
-    token assertion:sym<{ }> { <block> }
+    token assertion:sym<{ }> { [ :lang($+LANG) <block> ] }
 
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
@@ -3284,18 +3229,20 @@ grammar Regex is Perl {
     token assertion:method {
         '.' [
             | <?before <alpha> > <assertion>
-            | <dottyop>
+            | [ :lang($+LANG) <dottyop> ]
             ]
         {*}
     }
 
     token assertion:ident { <ident> [               # is qq right here?
                                     | <?before '>' >
+                                    | <.ws> <regex>
                                     | '=' <assertion>
                                     | ':' <.ws>
-                                        <q_unbalanced(qlang('Q',':qq'), :stop«>»)>
-                                    | '(' <semilist> ')'
-                                    | <.ws> <regex>
+                                        [ :lang($+LANG.unbalanced('>')) <arglist> ]
+                                    | '(' ::
+					[ :lang($+LANG) <arglist> ]
+					[ ')' || <.panic: "Assertion call missing right parenthesis"> ]
                                     ]?
     }
 
