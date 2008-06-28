@@ -291,7 +291,7 @@ sub canmatch {
 	elsif ($p =~ s/^(\w)//) {
 	    $f .= $1;
 	    if ($1 eq 'x') {
-		if ($p =~ s/^([0-9a-zA-Z]{2,4})//) {
+		if ($p =~ s/^([[:digit:][:alpha:]]{2,4})//) {
 		    $f .= $1;
 		}
 		elsif ($p =~ s/^(\[\w+\])//) {
@@ -302,7 +302,7 @@ sub canmatch {
 	}
     }
     elsif ($f eq '[') {
-	if ($p =~ s/^(\^?.[^]]*\])//) {
+	if ($p =~ s/^(\^?.(?:\:\]|\\\]|.)*?\])//) {
 	    $f .= $1;
 	    return 1 if $c =~ /^$f/;
 	}
@@ -1306,7 +1306,7 @@ sub alpha { my $self = shift;
     my $P = $self->{_pos};
     my $buf = $self->{_orig};
     my $char = substr($$buf, $P, 1);
-    if ($char =~ /^[a-z_A-Z]$/) {
+    if ($char =~ /^[[:alpha:]_]$/) {
         my $r = $self->cursor($P+1);
         return $r->retm();
     }
@@ -1324,7 +1324,7 @@ sub alpha_rev { my $self = shift;
     }
     my $buf = $self->{_orig};
     my $char = substr($$buf, $from, 1);
-    if ($char =~ /^[a-z_A-Z]$/) {
+    if ($char =~ /^[_[:alpha:]]$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm();
     }
@@ -1769,7 +1769,7 @@ sub fail { my $self = shift;
 	    $fakepos++;
 	    ::qm($fixed);
 	}
-	$fixed =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
+	$fixed =~ s/([[:alpha:]])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
         $fixed;
     }
 }
@@ -1843,7 +1843,7 @@ sub fail { my $self = shift;
             }
             elsif ($_ eq 'alpha') {
                 $fakepos++;
-                return '[a-z_A-Z]';	# XXX not unicodey
+                return '[_[:alpha:]]';	# XXX not unicodey
             }
 	    my $lexer;
 	    {
@@ -2045,7 +2045,7 @@ sub fail { my $self = shift;
         ::here($text);
         $fakepos++ if $self->{'min'};
         $text = ::qm($text);
-	$text =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
+	$text =~ s/([[:alpha:]])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
 	$text;
     }
 }
