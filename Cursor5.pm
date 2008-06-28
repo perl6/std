@@ -1121,6 +1121,25 @@ sub _EXACT { my $self = shift;
     }
 }
 
+sub _PATTERN { my $self = shift;
+    my $qr = shift;
+
+    local $CTX = $self->callm($qr) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    my $buf = $self->{_orig};
+    pos($$buf) = $P;
+    if ($$buf =~ $qr) {
+	my $len = pos($$buf) - $P;
+        $self->deb("PATTERN $qr matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        my $r = $self->cursor($P+$len);
+        $r->retm();
+    }
+    else {
+        $self->deb("PATTERN $qr didn't match at $P") if $DEBUG & DEBUG::matchers;
+        return ();
+    }
+}
+
 sub _BACKREFn { my $self = shift;
     my $n = shift;
 
@@ -1142,12 +1161,16 @@ sub _BACKREFn { my $self = shift;
 
 sub _SYM { my $self = shift;
     my $s = shift;
+    my $i = shift;
 
     local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
     my $len = length($s);
     my $buf = $self->{_orig};
-    if (substr($$buf, $P, $len) eq $s) {
+    if ($i
+	? lc substr($$buf, $P, $len) eq lc $s
+	: substr($$buf, $P, $len) eq $s
+    ) {
         $self->deb("SYM $s matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
         my $r = $self->cursor($P+$len);
 	$r->{sym} = $s;
@@ -1720,6 +1743,7 @@ sub fail { my $self = shift;
         $cc =~ s/^\+\[/[/;
         $cc =~ s/\s*\.\.\s*/-/g;
         $cc =~ s/\s*//g;
+	$cc = "(?i:$cc)" if $self->{i};   # does TRE grok this?
         $cc;
     }
 }
@@ -1745,6 +1769,7 @@ sub fail { my $self = shift;
 	    $fakepos++;
 	    ::qm($fixed);
 	}
+	$fixed =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
         $fixed;
     }
 }
@@ -1812,7 +1837,9 @@ sub fail { my $self = shift;
                 $fakepos++;
 		my $sym = $self->{'sym'};
 		Encode::_utf8_on($sym);
-                return ::qm($sym);
+		my $text = ::qm($sym);
+		$text =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
+                return $text;
             }
             elsif ($_ eq 'alpha') {
                 $fakepos++;
@@ -1863,29 +1890,6 @@ sub fail { my $self = shift;
                 my $lexer = $C->cursor_peek->$name($re);
 		my @pat = @{$lexer->{PATS}};
 		return unless @pat;
-		return @pat;
-            }
-        }
-    }
-}
-
-{ package RE_method_str; our @ISA = 'RE_base';
-    sub longest { my $self = shift; my ($C) = @_; 
-        my $name = $self->{'name'};
-	Encode::_utf8_on($name);
-        ::here($name);
-        my $str = $self->{'str'};
-        for (scalar($name)) { if ((0)) {}
-            elsif ($_ eq 'lex1') {
-                return;
-            }
-            elsif ($_ eq 'panic' | 'obs') {
-                return $IMP;
-            }
-            else {
-                my $lexer = $C->cursor_peek->$name($str);
-		my @pat = @{$lexer->{PATS}};
-		return '' unless @pat;
 		return @pat;
             }
         }
@@ -2041,6 +2045,7 @@ sub fail { my $self = shift;
         ::here($text);
         $fakepos++ if $self->{'min'};
         $text = ::qm($text);
+	$text =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
 	$text;
     }
 }

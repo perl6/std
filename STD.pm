@@ -3312,7 +3312,7 @@ grammar Regex is Perl {
         [ '+' | '-' ]?
         [
         | <name>
-        | <before '['> <bracketed(QLang('cclass'))>
+        | <before '['> <quibble(Perl::Q.tweak(:q))>
         ]
     }
 

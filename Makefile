@@ -1,4 +1,4 @@
-STD5.pm: STD.pm gimme5 STD5_run
+STD5.pm: STD.pm gimme5 STD5_run Cursor5.pm LazyMap.pm mangle.pl
 	./gimme5 STD.pm >STD5.pm
 	perl -c STD5.pm
 	rm -rf lex

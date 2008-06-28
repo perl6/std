@@ -34,7 +34,7 @@ our $BINDNUM = 1;	# is this a singular or plural binding?
 our $KIND = "";
 our $PARSEBIND = 0;
 our $PAREN = 0;
-our %adverbs = ();
+our %adverbs = ('i' => 0, 'a' => 0,);
 our %fixedprefix;
 our $PURE;
 our $MAYBACKTRACK;
@@ -973,7 +973,7 @@ sub regex {
     while (s/^\s*:(my|state|our|constant)\b/$1/) {
         my $code = unbalanced(";");
         s/^;// or panic "Missing ;";
-        push @decl, bless { text => $code, min => 0, max => 0 }, "RE_decl";
+        push @decl, bless { text => $code, min => 0, max => 0, %adverbs }, "RE_decl";
     }
 
     my $od = first();
@@ -997,7 +997,7 @@ sub first {
     } while s/^\|\|//;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => $min}, "RE_first";
+    return bless { zyg => [@kids], min => $min, %adverbs}, "RE_first";
 }
 
 sub every {
@@ -1015,7 +1015,7 @@ sub every {
     } while s/^\&\&//;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => $min }, "RE_every";
+    return bless { zyg => [@kids], min => $min, %adverbs }, "RE_every";
 }
 
 sub submatch {
@@ -1029,7 +1029,7 @@ sub submatch {
     } while s/^\!?\~\~//;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => 0 }, "RE_submatch";
+    return bless { zyg => [@kids], min => 0, %adverbs }, "RE_submatch";
 }
 
 sub any {
@@ -1071,7 +1071,7 @@ sub all {
     } while s/^ \& (?!\&) //x;
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => $min }, "RE_all";
+    return bless { zyg => [@kids], min => $min, %adverbs }, "RE_all";
 }
 
 sub sequence {
@@ -1093,7 +1093,7 @@ sub sequence {
     }
 
     return $kids[0] if @kids == 1;
-    return bless { zyg => [@kids], min => $min }, "RE_sequence";
+    return bless { zyg => [@kids], min => $min, %adverbs }, "RE_sequence";
 }
 
 sub quantified_atom {
@@ -1175,12 +1175,12 @@ sub atom {
     if (s/^ (\w+) (?! \s* [*+?]) //x) {
         my $word = $1;
         ws();
-        return bless { text => $word, min => length($word) }, "RE_string";
+        return bless { text => $word, min => length($word), %adverbs }, "RE_string";
     }
     if (s/^ (\w) //x) {
         my $word = $1;
         ws();
-        return bless { text => $word, min => length($word) }, "RE_string";
+        return bless { text => $word, min => length($word), %adverbs }, "RE_string";
     }
 
     if (s/^\{\*\}//) {
@@ -1220,23 +1220,24 @@ sub atom {
         return $re;
     }
 
-    if (s/^ (: !? \w+)//x) {
-        my $adverb = $1;
+    if (s/^ : (!?) (\w+)//x) {
+        my $not = $1 ne '';
+        my $adverb = $2;
         local %adverbs = %adverbs;
         
         if (m/^\(/) {
 	    pos($_) = 0;
 	    my $code = extract_bracketed($_,'(q)');
+	    $code = ::un6($code);
             $adverbs{$adverb} = $code;
 	    ws();
-	    if ($adverb eq ':lang') {
+	    if ($adverb eq 'lang') {
 		$code = "my \$newlang = $code;  \$C = \$C->cursor_fresh(\$newlang); ";
-		return bless { text => $code, min => 0, max => 0, noquant => 1 }, "RE_decl";
+		return bless { text => $code, min => 0, max => 0, noquant => 1, %adverbs }, "RE_decl";
 	    }
         }
         else {
-            my $not = $adverb =~ s/!//;
-            $adverbs{$adverb} = !$not;
+            $adverbs{$adverb} = 0+!$not;
         }
         ws();
 
@@ -1248,25 +1249,25 @@ sub atom {
     if (s/^(<<|>>|«|»)//) {
         my $boundary = $1;
         ws();
-        return bless { text => $boundary, min => 0 }, "RE_meta";
+        return bless { text => $boundary, min => 0, %adverbs }, "RE_meta";
     }
 
     if (s/^(<(\.\.\.|!!!|\?\?\?)>)//) {
         my $notyet = $1;
         ws();
-        return bless { text => $notyet, min => 0 }, "RE_meta";
+        return bless { text => $notyet, min => 0, %adverbs }, "RE_meta";
     }
 
     if (s/^(<\(|\)>)//) {
         my $boundary = $1;
         ws();
-        return bless { text => $boundary, min => 0 }, "RE_meta";
+        return bless { text => $boundary, min => 0, %adverbs }, "RE_meta";
     }
 
     if (s/^(<~~>)//) {
 	my $recurse = $1;
         ws();
-        return bless { text => $recurse, min => 0 }, "RE_meta";
+        return bless { text => $recurse, min => 0, %adverbs }, "RE_meta";
     }
 
     if (/^<\s/) {
@@ -1278,7 +1279,7 @@ sub atom {
         for (@elems) { $min = length($_) if length($_) < $min }
         $re .= '>';
         ws();
-        return bless { text => $re, min => $min }, "RE_qw";
+        return bless { text => $re, min => $min, %adverbs }, "RE_qw";
     }
 
     # assertions
@@ -1296,7 +1297,7 @@ sub atom {
         my $re = unbalanced("'");
         s/^'// or panic "Missing '";
         ws();
-        return bless { text => $re, min => length($re) }, "RE_string";
+        return bless { text => $re, min => length($re), %adverbs }, "RE_string";
     }
     if (s/^"//) {
         my $re = unbalanced('"');
@@ -1305,7 +1306,7 @@ sub atom {
         $tmp =~ s/\\\w/X/g;    # XXX ignoring \x and \o for now
         $tmp =~ s/\$\w+//g;    # assume vars interpolate nothing
         ws();
-        return bless { text => $re, min => length($tmp) }, "RE_double";
+        return bless { text => $re, min => length($tmp), %adverbs }, "RE_double";
     }
 
     if (/^[\$\@\%]/) {
@@ -1329,13 +1330,14 @@ sub atom {
                 if ($code =~ /[\$\@%]<(.*?)>/) {
                     return bless { var => $1,
                                    atom => $atom,
-                                   min => $atom->{min}
-                                 }, "RE_bindnamed";
+                                   min => $atom->{min},
+				   %adverbs
+				}, "RE_bindnamed";
                 }
-                return bless { var => $code, atom => $atom, min => $atom->{min} }, "RE_bindvar";
+                return bless { var => $code, atom => $atom, min => $atom->{min}, %adverbs }, "RE_bindvar";
             }
             else {
-                return bless { var => $code, min => 0 }, "RE_var";
+                return bless { var => $code, min => 0, %adverbs }, "RE_var";
             }
         }
     }
@@ -1344,21 +1346,21 @@ sub atom {
     if (s/^([\^\$]{1,2})//) {
         my $anchor = $1;
         ws();
-        return bless { text => $anchor, min => 0 }, "RE_meta";
+        return bless { text => $anchor, min => 0, %adverbs }, "RE_meta";
     }
     if (s/^(:+)//) {
         my $colons = $1;
         ws();
-        return bless { text => $colons, min => 0 }, "RE_meta";
+        return bless { text => $colons, min => 0, %adverbs }, "RE_meta";
     }
     if (s/^(\.\*\??)//) {
 	my $scan = $1;
         ws();
-        return bless { text => $scan, min => 1 }, "RE_meta";
+        return bless { text => $scan, min => 1, %adverbs }, "RE_meta";
     }
     if (s/^\.//) {
         ws();
-        return bless { text => '.', min => 1 }, "RE_meta";
+        return bless { text => '.', min => 1, %adverbs }, "RE_meta";
     }
 
     panic "unrecognized metacharacter @{[ substr($_,0,1) ]}";
@@ -1369,25 +1371,25 @@ sub backslash {
     
     if ($ch =~ /^\w$/) {
         if ($ch =~ /^[ftnr]/) {
-            return bless { text => '\\' . $ch, min => 1  }, "RE_double";
+            return bless { text => '\\' . $ch, min => 1, %adverbs  }, "RE_double";
         }
         if ($ch eq 'x') {
             s/^\[?([0-9a-fA-f]*)\]?//;
-            return bless { text => '\\x' . $1, min => 1  }, "RE_double";
+            return bless { text => '\\x' . $1, min => 1, %adverbs  }, "RE_double";
         }
         if ($ch eq 'o') {
             s/^\[?([0-7]*)\]?//;
-            return bless { text => '\\o' . $1, min => 1  }, "RE_double";
+            return bless { text => '\\o' . $1, min => 1, %adverbs  }, "RE_double";
         }
         if ($ch =~ /^[hvdswHVDSWNRTBF]/) {
-            return bless { text => "\\$ch", min => 1  }, "RE_meta";
+            return bless { text => "\\$ch", min => 1, %adverbs  }, "RE_meta";
         }
         panic "Unrecognized \\$ch";
     }
     if ($ch eq '\\') {
-        return bless { text => '\\', min => 1  }, "RE_string";
+        return bless { text => '\\', min => 1, %adverbs  }, "RE_string";
     }
-    return bless { text => $ch, min => 1 }, "RE_string";
+    return bless { text => $ch, min => 1, %adverbs }, "RE_string";
 }
 
 sub assertion {
@@ -1401,14 +1403,14 @@ sub assertion {
             "RE_assertion";
     }
     if (s/^>//) {
-        return bless { min => 0 }, "RE_noop";
+        return bless { min => 0, %adverbs }, "RE_noop";
     }
 
     if (/^[+-]?\[/) {
         my $cclass = unbalanced(']>');
         s/^]>// or panic "Missing ]>";
         $cclass =~ s/\\x([0-9a-fA-F]{3,4})/\\x\{$1\}/g;
-        return bless { text => $cclass . ']', min => 1 }, "RE_cclass";
+        return bless { text => $cclass . ']', min => 1, %adverbs }, "RE_cclass";
     }
 
     if (s/^\.//) {
@@ -1427,7 +1429,7 @@ sub assertion {
 		    s/^/<.$ENDSYM>/;	# hopefully checks word boundary
 		}
             }
-            return bless { name => $word, min => 12345, rest => '' }, "RE_method";
+            return bless { name => $word, min => 12345, rest => '', %adverbs }, "RE_method";
         }
         if ($ch eq ':') {
             my $code = code('>');
@@ -1446,17 +1448,17 @@ sub assertion {
         s/^\s*//;
         my $re = regex('\\>[^>]');
         s/^>// or panic "Missing >";
-        return bless { name => $word, re => $re, min => 0 }, "RE_method_re";
+        return bless { name => $word, re => $re, min => 0, %adverbs }, "RE_method_re";
     }
 
     if (/^[\$\@\%]/) {
         my $code = code('>');
         s/^>// or panic "Missing >";
         if ($code =~ s/(\(.*\))//) {
-            return bless { name => $code, rest => $1, min => 0 }, "RE_method";
+            return bless { name => $code, rest => $1, min => 0, %adverbs }, "RE_method";
         }
         else {
-            return bless { name => $code, min => 0, rest => '' }, "RE_method";
+            return bless { name => $code, min => 0, rest => '', %adverbs }, "RE_method";
         }
     }
 
@@ -1476,7 +1478,7 @@ sub block {
     my $term = '\\}' x length($1);
     my $block = code($term);
     s/^$term// or panic "Missing }" ;
-    return bless { text => $block, context => $context, min => 0 }, "RE_block";
+    return bless { text => $block, context => $context, min => 0, %adverbs }, "RE_block";
 }
 
 sub code {
@@ -1683,7 +1685,12 @@ sub unbalanced {
         $text =~ s/\s//g;
         $text =~ s/\.\./-/g;
 	$text =~ s/^-\[/[^/;
-        $self->bind("\$C->_CCLASS$REV(qr/^$text\$/)");
+	if ($$self{i}) {
+	    $self->bind("\$C->_CCLASS$REV(qr/^(?i)$text\$/)");
+	}
+	else {
+	    $self->bind("\$C->_CCLASS$REV(qr/^$text\$/)");
+	}
     }
 }
 
@@ -1701,7 +1708,12 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $text = $$self{text};
-        $self->bind('$C->_EXACT' . $REV . '("' . $text . '")');
+	if ($$self{i}) {
+	    $self->bind('$C->_PATTERN' . $REV . '(qr/(?i)\\Q' . $text . '\\E/")');
+	}
+	else {
+	    $self->bind('$C->_EXACT' . $REV . '("' . $text . '")');
+	}
     }
 }
 
@@ -1710,7 +1722,12 @@ sub unbalanced {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s/(['\\])/\\$1/g;
-        "\$C->_EXACT$REV('" . $text . "')";
+	if ($$self{i}) {
+	    '$C->_PATTERN' . $REV . '(qr/(?i)\\Q' . $text . '\\E/")';
+	}
+	else {
+	    "\$C->_EXACT$REV('" . $text . "')";
+	}
     }
 }
 
@@ -1815,7 +1832,7 @@ sub unbalanced {
         if ($name eq "sym") {
             $$self{sym} = $SYM;
             $$self{endsym} = $ENDSYM if $ENDSYM;
-            return $re = '$C->_SYM($sym)';	# could pass endsym too here...
+            return $re = '$C->_SYM($sym, ' . ($$self{i}//0) . ')';	# could pass endsym too here...
         }
         elsif ($name eq "nextsame") {
             $NEEDORIGARGS++;
