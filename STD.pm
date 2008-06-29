@@ -457,7 +457,7 @@ token lambda { '->' | '<->' }
 token block {
     '{'
     <statementlist>
-    [ '}' || <.panic: "Missing right brace"> ]
+    [ '}' || <.panic: "Missing right brace after block"> ]
 
     [
     | <?before \h* \n> <.ws>	# (usual case without comments)
@@ -473,7 +473,7 @@ token block {
 token regex_block {  # XXX make polymorphic and combine with block someday
     '{'
     <regex( ::Regex.unbalanced('}') )>
-    [ '}' || <.panic: "Missing right brace"> ]
+    [ '}' || <.panic: "Missing right brace after regex"> ]
 
     [
     | <?before \h* \n> <.ws>	# (usual case without comments)
@@ -515,8 +515,8 @@ token label {
 
 token statement {
     :my $endargs is context = -1;
-    <label>*                                     {*}            #= label
     [
+    | <label> <statement>                        {*}            #= label
     | <statement_control>                        {*}            #= control
     | <EXPR> {*}                                                #= expr
 	[
@@ -898,7 +898,8 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
 }
 
 method lex1 (Str $s) {
-    self.<O>{$s}++ or self.panic("Nested $s metaoperators not allowed");
+    self.<O>{$s}++ and self.panic("Nested $s metaoperators not allowed");
+    self;
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
@@ -1122,7 +1123,7 @@ rule package_def {
 token declarator {
     [
     | <variable_declarator>
-    | '(' <signature> [ ')' || <.panic: "Missing right parenthsesis"> ] <trait>*
+    | '(' <signature> [ ')' || <.panic: "Missing right parenthsesis after signature"> ] <trait>*
     | <routine_declarator>
     | <regex_declarator>
     | <type_declarator>
@@ -1189,7 +1190,7 @@ token special_variable:sym<$#> {
     ]
 }
 token special_variable:sym<$$> {
-    <sym> :: <?before \s | ',' | <terminator> >
+    <sym> <!alpha> :: <?before \s | ',' | <terminator> >
     <obs('$$ variable', '$*PID')>
 }
 token special_variable:sym<$%> {
@@ -1473,7 +1474,7 @@ token morename {
     <?before <alpha> | '(' > ::
     [
     | <ident>
-    | '(' <EXPR> [ ')' || <.panic: "Missing right parenthesis"> ]
+    | '(' <EXPR> [ ')' || <.panic: "Missing right parenthesis in indirect name"> ]
     ]
 }
 
@@ -1679,6 +1680,34 @@ method nibble ($lang) {
     self.cursor_fresh($lang).nibbler;
 }
 
+token sibble ($lang1, $lang2 = $lang1) {
+    :my ($start,$stop) = self.peek_delimiters();
+    :my $sublang;
+    
+    [ <?{ $start ne $stop }> ::
+	{ $sublang = $lang1.balanced($start,$stop); }
+	$start <left=regex($sublang)> $stop '=' <right=EXPR(item %item_assignment)>
+    || { $sublang = $lang1.unbalanced($stop); }
+	$start <left=regex($sublang)> $stop
+	{ $sublang = $lang2.unbalanced($stop); }
+	<right=nibble($sublang)> $stop
+    ]
+}
+
+token tribble ($lang1, $lang2 = $lang1) {
+    :my ($start,$stop) = self.peek_delimiters();
+    :my $sublang;
+    
+    [ <?{ $start ne $stop }> ::
+	{ $sublang = $lang1.balanced($start,$stop); }
+	$start <left=nibble($sublang)> $stop <.ws> <quibble($lang2)>
+    || { $sublang = $lang1.unbalanced($stop); }
+	$start <left=nibble($sublang)> $stop
+	{ $sublang = $lang2.unbalanced($stop); }
+	<right=nibble($sublang)> $stop
+    ]
+}
+
 method regex ($lang) {
     my $outerlang = self.WHAT;
     my $LANG is context = $outerlang;
@@ -1734,16 +1763,13 @@ token quote:m  { <sym> » <quibble( ::Regex )> }
 token quote:mm { <sym> » <quibble( ::Regex.tweak(:s))> }
 
 token quote:s {
-    <sym> » <pat=quibble( ::Regex )>
-    <finish_subst($<pat>)>
+    <sym> » <pat=sibble( ::Regex, ::Perl::Q.tweak(:qq))>
 }
 token quote:ss {
-    <sym> » <pat=quibble( ::Regex.tweak(:s))>
-    <finish_subst($<pat>)>
+    <sym> » <pat=sibble( ::Regex.tweak(:s), ::Perl::Q.tweak(:qq))>
 }
 token quote:tr {
-    <sym> » <pat=quibble( ::Trans )>
-    <finish_trans($<pat>)>
+    <sym> » <pat=tribble( ::Perl::Q.tweak(:q))>
 }
 
 #token finish_subst ($pat) {
@@ -2080,11 +2106,11 @@ grammar Q is Perl {
         [
             [
             | <?before <stopper> > :: <fail>
-            | <0=starter> :: <nibbler> <1=stopper>
+            | <starter> :: <nibbler> <stopper>
                             {
                                 my @n = $<nibbler><nibbles>.list;
-                                $text ~= $0 ~ shift(@n);
-                                $text = (@n ?? pop(@n) !! '') ~ $1;
+                                $text ~= $<starter>.text ~ shift(@n);
+                                $text = (@n ?? pop(@n) !! '') ~ $<stopper>.text;
                                 push @nibbles, @n;
                             }
             | <escape>   :: {
@@ -2182,7 +2208,7 @@ regex extrapost {
 
 rule multisig {
     [
-	':'?'(' <signature> [ ')' || <.panic: "Missing right parenthesis"> ]
+	':'?'(' <signature> [ ')' || <.panic: "Missing right parenthesis in signature"> ]
     ]
     ** '|'
 }
@@ -2253,7 +2279,7 @@ rule capture {
 }
 
 token sigterm {
-    ':(' <signature> [ ')' || <.panic: "Missing right parenthesis"> ]
+    ':(' <signature> [ ')' || <.panic: "Missing right parenthesis in signature"> ]
     {*}
 }
 
@@ -2296,6 +2322,16 @@ rule post_constraint {
     {*}
 }
 
+token named_param {
+    ':'
+    [
+    | <name=ident> '(' <.ws>
+	[ <named_param> | <param_var> <.ws> ]
+	[ ')' || <.panic: "Missing right parenthesis in named parameter"> ]
+    | <param_var>
+    ]
+}
+
 token param_var {
     <sigil> <twigil>?
     [
@@ -2318,41 +2354,35 @@ token param_var {
 }
 
 token parameter {
-    :my $quant;
+    :my $kind;
     <type_constraint>*
     [
-    | $<slurp> = [ $<quantchar>=[ '*' ] <param_var> ]
-        { let $quant := '*' }
-    |   [ $<named> =
-            [ $<quantchar> = [ ':' ]
-                [
-                | <name=ident> '(' <param_var>  ')'
-                | <param_var> { $<name> := $<param_var><ident> }
-                ]
-                { let $quant = '*' }
-            ]
-        | <param_var>
-            { let $quant := '!'; }
+    | $<slurp> = [ $<quant>=[ '*' ] <param_var> ]
+        { $kind = '*' }
+    |   [
+	| <named_param> { $kind = '*'; }
+        | <param_var> { $kind = '!'; }
         ]
-        [ $<quantchar> = <[ ? ! ]> { let $quant := $<quantchar> } ]?
+        [ $<quant> = <[ ? ! ]> { $kind = $<quant> } ]?
     ]
+
     <trait>*
 
     <post_constraint>*
 
     [
         <default_value> {{
-            given $<quantchar> {
+            given $<quant> {
               when '!' { $¢.panic("Can't put a default on a required parameter") }
               when '*' { $¢.panic("Can't put a default on a slurpy parameter") }
             }
-            let $quant := '?';
+            $kind = '?';
         }}
     ]?
 
     # enforce zone constraints
     {{
-        given $quant {
+        given $kind {
             when '!' {
                 given $+zone {
                     when 'posopt' {
@@ -2691,6 +2721,9 @@ token infix:sym<=:=> ( --> Chaining)
 token infix:sym<===> ( --> Chaining)
     { <sym> {*} }
 
+token infix:sym<eqv> ( --> Chaining)
+    { <sym> {*} }
+
 
 ## tight and
 token infix:sym<&&> ( --> Tight_and)
@@ -2817,7 +2850,7 @@ token term:name ( --> List_prefix)
         [
         | '.(' <semilist> ')' {*}                               #= func args
         | '(' <semilist> ')' {*}                                #= func args
-        | <?before \s> <arglist> {*}                            #= listop args
+        | <?before \s> <?{ substr($<longname>.text,0,2) ne '::' }> <arglist> {*}                            #= listop args
         | <.unsp> '.'? '(' <semilist> ')' {*}                   #= func args
         | :: {*}                                                #= listop noarg
         ]
@@ -3085,14 +3118,14 @@ method EXPR ($preclvl)
         # Equal precedence, so use associativity to decide.
         if @opstack[*-1]<O><prec> eq $inprec {
             given $inO<assoc> {
-                when 'non'   { $here.panic(qq["$infix" is not associative]) }
+                when 'non'   { $here.panic("\"$infix\" is not associative") }
                 when 'left'  { reduce() }   # reduce immediately
                 when 'right' { }            # just shift
                 when 'chain' { }            # just shift
                 when 'list'  {              # if op differs reduce else shift
                     reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
                 }
-                default { $here.panic(qq[Unknown associativity "$_" for "$infix"]) }
+                default { $here.panic("Unknown associativity \"$_\" for \"$infix\"") }
             }
         }
         push @opstack, $infix;
@@ -3183,7 +3216,7 @@ grammar Regex is Perl {
         [
         | \w
         | <metachar>
-        | :: <.panic: "unrecognized metacharacter">
+        | :: <.panic: "unrecognized regex metacharacter">
         ]
         {*}
     }
@@ -3234,14 +3267,14 @@ grammar Regex is Perl {
 
     token metachar:sym<[ ]> {
         '[' :: [:lang(self.unbalanced(']')) <regex>]
-        [ ']' || <.panic: "Missing right bracket"> ]
+        [ ']' || <.panic: "Missing right bracket in regex"> ]
         { $/<sym> := <[ ]> }
         {*}
     }
 
     token metachar:sym<( )> {
         '(' :: [:lang(self.unbalanced(')')) <regex>]
-        [ ')' || <.panic: "Missing right parenthesis"> ]
+        [ ')' || <.panic: "Missing right parenthesis in regex"> ]
         { $/<sym> := <( )> }
         {*}
     }
@@ -3277,7 +3310,7 @@ grammar Regex is Perl {
     }
     token metachar:sym<$>  {
         '$'
-        <before
+        <?before
         | \s
         | '|'
         | '&'
@@ -3285,6 +3318,7 @@ grammar Regex is Perl {
         | ']'
         | '>'
         | $
+	| <stopper>
         >
         {*}
     }
@@ -3379,7 +3413,7 @@ grammar Regex is Perl {
         ]
     }
 
-    token mod_arg { '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] }
+    token mod_arg { '(' <semilist> [ ')' || <.panic: "Missing right parenthesis in regex modifier"> ] }
 
     token mod_internal:adv {
         <quotepair> { $/<sym> := «: $<quotepair><key>» }
@@ -3441,7 +3475,7 @@ method mess (Str $s) {
     my $pre = substr($text, 0, self.pos);
     my $line = 1 + $pre ~~ tr!\n!\n!;
     $pre = substr($pre, -40, 40);
-    1 while $pre =~ s!.*\n!!;
+    1 while $pre ~~ s!.*\n!!;
     my $post = substr($text, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
     "############# PARSE FAILED #############\n----> $pre" ~
