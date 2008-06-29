@@ -1155,6 +1155,8 @@ sub _SYM { my $self = shift;
     my $s = shift;
     my $i = shift;
 
+    $s = $s->[0] if ref $s eq 'ARRAY';
+
     local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
     my $len = length($s);

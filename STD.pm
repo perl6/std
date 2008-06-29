@@ -1628,41 +1628,41 @@ token theredoc {
 method heredoc () {
     return if self.peek;
     my $here = self;
-    while my $herestub = shift @herestub_queue {
-        my $DELIM is context = $herestub.delim;
-        my $lang = $herestub.lang;
-        my $doc;
-        my $ws = "";
-        $here = $here.unbalanced();  # XXX
-        if $here {
-            if $ws {
-                my $wsequiv = $ws;
-                $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
-                $here<text>[0] ~~ s/^/\n/; # so we don't match ^^ after escapes
-                for @($here<text>) {
-                    s:g[\n ($ws || \h*)] = do {
-                        my $white = $0;
-                        if $white eq $ws {
-                            '';
-                        }
-                        else {
-                            $white ~~ s[^ (\t+) ] = do {
-                                ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
-                            };
-                            $white ~~ s/^ $wsequiv //
-                                ?? $white
-                                !! '';
-                        }
-                    }
-                }
-                $here<text>[0] ~~ s/^ \n //;
-            }
-            $herestub.orignode<doc> = $here;
-        }
-        else {
-            self.panic("Ending delimiter $DELIM not found");
-        }
-    }
+#    while my $herestub = shift @herestub_queue {
+#        my $DELIM is context = $herestub.delim;
+#        my $lang = $herestub.lang;
+#        my $doc;
+#        my $ws = "";
+#        $here = $here.unbalanced();  # XXX
+#        if $here {
+#            if $ws {
+#                my $wsequiv = $ws;
+#                $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
+#                $here<text>[0] ~~ s/^/\n/; # so we don't match ^^ after escapes
+#                for @($here<text>) {
+#                    s:g[\n ($ws || \h*)] = do {
+#                        my $white = $0;
+#                        if $white eq $ws {
+#                            '';
+#                        }
+#                        else {
+#                            $white ~~ s[^ (\t+) ] = do {
+#                                ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
+#                            };
+#                            $white ~~ s/^ $wsequiv //
+#                                ?? $white
+#                                !! '';
+#                        }
+#                    }
+#                }
+#                $here<text>[0] ~~ s/^ \n //;
+#            }
+#            $herestub.orignode<doc> = $here;
+#        }
+#        else {
+#            self.panic("Ending delimiter $DELIM not found");
+#        }
+#    }
     return $here;
 }
 
@@ -1976,10 +1976,10 @@ grammar Q is Perl {
         token backslash:e { <sym> }
         token backslash:f { <sym> }
         token backslash:n { <sym> }
-        token backslash:o { <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
+        token backslash:o { <sym> [ <octint> | '[' <octint>**',' ']' ] }
         token backslash:r { <sym> }
         token backslash:t { <sym> }
-        token backslash:x { <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+        token backslash:x { <sym> [ <hexint> | '[' <hexint>**',' ']' ] }
         token backslash:sym<0> { <sym> }
     } # end role
 
@@ -2119,8 +2119,6 @@ grammar Q is Perl {
     multi method tweak (:quotewords(:$ww)) { self.mixin($ww ?? ::ww !! ::_ww) }
 
     multi method tweak (:heredoc(:$to)) {
-        # $.parser = &Perl::q_heredoc;
-        # %.option<to> = $to;
     }
 
     multi method tweak (:$regex) {
@@ -2900,8 +2898,12 @@ token terminator:sym<!!> ( --> Terminator)
     { <?before '!!' > {*} }
 
 regex infixstopper {
-    <?before '{' | <lambda> > <?{ $¢.<_>[$¢.pos]<ws> }>
+    | <?before <stopper> >
+    | <?before '{' | <lambda> > <?{ $¢.<_>[$¢.pos]<ws> }>
 }
+
+# overridden in subgrammars
+token stopper { <!> }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
