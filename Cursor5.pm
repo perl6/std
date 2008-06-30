@@ -115,7 +115,7 @@ sub mixin {
 	eval $eval;
 	warn $@ if $@;
     }
-    return $NEWWHAT;
+    return $self->cursor_fresh($NEWWHAT);
 }
 
 sub _PARAMS {}	# overridden in parametric role packages
@@ -565,7 +565,7 @@ sub cursor_fresh { my $self = shift;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
-    bless \%r, $lang;
+    bless \%r, ref $lang || $lang;
 }
 
 sub cleanup {
@@ -702,6 +702,7 @@ sub cursor_rev { my $self = shift;
 
 sub callm { my $self = shift;
     my $arg = shift;
+    my $class = ref($self) || $self;
 
     my $lvl = 0;
     my $extralvl = 0;
@@ -738,7 +739,7 @@ sub callm { my $self = shift;
         $name .= " " . $arg;
     }
     my $pos = '?';
-    $self->deb($name, " [", $file, ":", $line, "]") if $DEBUG & DEBUG::trace_call;
+    $self->deb($name, " [", $file, ":", $line, "] $class") if $DEBUG & DEBUG::trace_call;
     if ($DEBUG & DEBUG::callm_show_subnames) {
 	$RED . join(' ', reverse @subs) . $CLEAR . ':' x $extralvl;
     }

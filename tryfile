@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-BEGIN { $ENV{STD5DEBUG} = 16383; }
+BEGIN { $ENV{STD5DEBUG} = -1; }
 my $file = shift;
 
 use STD5;

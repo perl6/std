@@ -472,7 +472,7 @@ token block {
 
 token regex_block {  # XXX make polymorphic and combine with block someday
     '{'
-    <regex( ::Regex.unbalanced('}') )>
+    <regex( $¢.cursor_fresh( ::Regex ).unbalanced('}') )>
     [ '}' || <.panic: "Missing right brace after regex"> ]
 
     [
@@ -776,7 +776,7 @@ token colonpair {
         { $key = $<ident>.text; $value = 0; }
         {*}                                                     #= false
     | <ident>
-        { $key = $<ident.text>; }
+        { $key = $<ident>.text; }
         [
         || <.unsp>? <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
@@ -803,7 +803,7 @@ token quotepair {
         { $key = $<ident>.text; $value = 0; }
         {*}                                                     #= false
     | <ident>
-        { $key = $<ident.text>; }
+        { $key = $<ident>.text; }
         [
         || <.unsp>? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
@@ -982,13 +982,13 @@ token postcircumfix:sym<{ }> ( --> Methodcall)
     { '{' <semilist> '}' {*} }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble(Perl::Q.tweak(:q).tweak(:w).balanced('<','>'))> '>' {*} }
+    { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' {*} }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' {*} }
+    { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' {*} }
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('«','»'))> '»' {*} }
+    { '«' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' {*} }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O> }
@@ -1632,7 +1632,7 @@ token hexint {
 our @herestub_queue;
 
 token q_herestub ($lang) {
-    $<delimstr> = <quibble('Perl::Q')>  # force raw semantics on /END/ marker
+    $<delimstr> = <quibble($¢.cursor_fresh( ::Perl::Q ))>  # force raw semantics on /END/ marker
     {
         push @herestub_queue,
             Herestub.new(
@@ -1697,12 +1697,19 @@ method heredoc () {
     return $here;
 }
 
+# XXX the front stuff needs to be factored out
 token quibble ($lang) {
     :my $start;
     :my $stop;
 
     <.ws>
-    [ <colonpair> <.ws> { $lang = $lang.tweak($<colonpair>[*-1]); } ]*
+    [ <quotepair> <.ws>
+	{
+	    my $kv = $<quotepair>[*-1];
+	    print Dump($kv);
+	    $lang = $lang.tweak($kv.<k>, $kv.<v>);
+	}
+    ]*
 
     {
         ($start,$stop) = $¢.peek_delimiters();
@@ -1724,7 +1731,12 @@ token sibble ($lang, $lang2) {
     :my $stop;
 
     <.ws>
-    [ <colonpair> <.ws> { $lang = $lang.tweak($<colonpair>[*-1]); } ]*
+    [ <quotepair> <.ws>
+	{
+	    my $kv = $<quotepair>[*-1];
+	    $lang = $lang.tweak($kv.<k>, $kv.<v>);
+	}
+    ]*
 
     {
         ($start,$stop) = $¢.peek_delimiters();
@@ -1747,7 +1759,12 @@ token tribble ($lang, $lang2 = $lang) {
     :my $stop;
 
     <.ws>
-    [ <colonpair> <.ws> { $lang = $lang.tweak($<colonpair>[*-1]); } ]*
+    [ <quotepair> <.ws>
+	{
+	    my $kv = $<quotepair>[*-1];
+	    $lang = $lang.tweak($kv.<k>, $kv.<v>);
+	}
+    ]*
 
     {
         ($start,$stop) = $¢.peek_delimiters();
@@ -1771,15 +1788,15 @@ method regex ($lang) {
     self.cursor_fresh($lang).regex;
 }
 
-token quote:sym<' '>   { "'" <nibble(Perl::Q.tweak(:q).unbalanced("'"))> "'" }
-token quote:sym<" ">   { '"' <nibble(Perl::Q.tweak(:qq).unbalanced('"'))> '"' }
+token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).unbalanced("'"))> "'" }
+token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).unbalanced('"'))> '"' }
 
-token quote:sym<« »>   { '«' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
-token quote:sym«<< >>» { '<<' <nibble(Perl::Q.tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
-token quote:sym«< >»   { '<' <nibble(Perl::Q.tweak(:q).tweak(:w).balanced('<','>'))> '>' }
+token quote:sym<« »>   { '«' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
+token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
+token quote:sym«< >»   { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
-    '/' <regex( ::Regex.unbalanced("/") )> '/'
+    '/' <regex( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> '/'
     [ (< i g s m x c e ] >+) 
         # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
@@ -1797,15 +1814,15 @@ token quote:sym</ />   {
 token quote:qq {
     'qq'
     [
-    | <quote_mod> » <.ws> <quibble(Perl::Q.tweak(:qq).tweak($<quote_mod>.text => 1))>
-    | » <.ws> <quibble(Perl::Q.tweak(:qq))>
+    | <quote_mod> » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak($<quote_mod>.text => 1))>
+    | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
     ]
 }
 token quote:q {
     'q'
     [
-    | <quote_mod> » <quibble(Perl::Q.tweak(:q).tweak($<quote_mod>.text => 1))>
-    | » <.ws> <quibble(Perl::Q.tweak(:q))>
+    | <quote_mod> » <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak($<quote_mod>.text => 1))>
+    | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
     ]
 }
 
@@ -1820,19 +1837,19 @@ token quote_mod:f  { <sym> }
 token quote_mod:c  { <sym> }
 token quote_mod:b  { <sym> }
 
-token quote:rx { <sym> » <quibble( ::Regex )> }
+token quote:rx { <sym> » <quibble( $¢.cursor_fresh( ::Regex ) )> }
 
-token quote:m  { <sym> » <quibble( ::Regex )> }
-token quote:mm { <sym> » <quibble( ::Regex.tweak(:s))> }
+token quote:m  { <sym> » <quibble( $¢.cursor_fresh( ::Regex ) )> }
+token quote:mm { <sym> » <quibble( $¢.cursor_fresh( ::Regex ).tweak(:s))> }
 
 token quote:s {
-    <sym> » <pat=sibble( ::Regex, ::Perl::Q.tweak(:qq))>
+    <sym> » <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
 }
 token quote:ss {
-    <sym> » <pat=sibble( ::Regex.tweak(:s), ::Perl::Q.tweak(:qq))>
+    <sym> » <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
 }
 token quote:tr {
-    <sym> » <pat=tribble( ::Perl::Q.tweak(:q))>
+    <sym> » <pat=tribble( $¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
 }
 
 # XXX should eventually be derived from current Unicode tables.
@@ -3419,7 +3436,7 @@ grammar Regex is Perl {
         [ '+' | '-' ]?
         [
         | <name>
-        | <before '['> <quibble(Perl::Q.tweak(:q))> # XXX parse as q[] for now
+        | <before '['> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q))> # XXX parse as q[] for now
         ]
     }
 
