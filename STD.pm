@@ -767,23 +767,53 @@ token fatarrow {
 }
 
 token colonpair {
+    :my $key;
+    :my $value;
+
     ':'
     [
-    | '!' <ident>                                        {*}    #= false
-    | <ident> [ <.unsp>? <postcircumfix> ]?              {*}    #= value
-    | <postcircumfix>                                    {*}    #= structural
-    | <sigil> :: <twigil>? <desigilname>                 {*}    #= varname
+    | '!' <ident>
+        { $key = $<ident>.text; $value = 0; }
+        {*}                                                     #= false
+    | <ident>
+        { $key = $<ident.text>; }
+        [
+        || <.unsp>? <postcircumfix> { $value = $<postcircumfix>; }
+        || { $value = 1; }
+        ]
+        {*}                                                     #= value
+    | <postcircumfix>
+        { $key = ""; $value = $<postcircumfix>; }
+        {*}                                                     #= structural
+    | $<var> = (<sigil> :: <twigil>? <desigilname>)
+        { $key = $<desigilname>.text; $value = $<var>; }
+        {*}                                                     #= varname
     ]
+    { $<k> = $key; $<v> = $value; }
     {*}
 }
 
 token quotepair {
+    :my $key;
+    :my $value;
+
     ':'
     [
-    | '!' <ident>                                        {*}    #= false
-    | <ident> [ <unsp>? <?before '('> <postcircumfix> ]? {*}    #= value
-    | \d+ <[a..z]>+                                             #= nth
+    | '!' <ident>
+        { $key = $<ident>.text; $value = 0; }
+        {*}                                                     #= false
+    | <ident>
+        { $key = $<ident.text>; }
+        [
+        || <.unsp>? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
+        || { $value = 1; }
+        ]
+        {*}                                                     #= value
+    | $<n>=(\d+) $<id>=(<[a..z]>+)
+        { $key = $<id>.text; $value = $<n>.text; }
+        {*}                                                     #= nth
     ]
+    { $<k> = $key; $<v> = $value; }
     {*}
 }
 
@@ -1668,10 +1698,19 @@ method heredoc () {
 }
 
 token quibble ($lang) {
-    :my ($start,$stop) = self.peek_delimiters();
-    :my $sublang = $start ne $stop ?? $lang.balanced($start,$stop)
-                                   !! $lang.unbalanced($stop);
-    $start <nibble($sublang)> $stop
+    :my $start;
+    :my $stop;
+
+    <.ws>
+    [ <colonpair> <.ws> { $lang = $lang.tweak($<colonpair>[*-1]); } ]*
+
+    {
+        ($start,$stop) = $¢.peek_delimiters();
+        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
+                                !! $lang.unbalanced($stop);
+    }
+
+    $start <nibble($lang)> $stop
 }
 
 method nibble ($lang) {
@@ -1680,31 +1719,49 @@ method nibble ($lang) {
     self.cursor_fresh($lang).nibbler;
 }
 
-token sibble ($lang1, $lang2 = $lang1) {
-    :my ($start,$stop) = self.peek_delimiters();
-    :my $sublang;
-    
+token sibble ($lang, $lang2) {
+    :my $start;
+    :my $stop;
+
+    <.ws>
+    [ <colonpair> <.ws> { $lang = $lang.tweak($<colonpair>[*-1]); } ]*
+
+    {
+        ($start,$stop) = $¢.peek_delimiters();
+        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
+                                !! $lang.unbalanced($stop);
+    }
+
     [ <?{ $start ne $stop }> ::
-	{ $sublang = $lang1.balanced($start,$stop); }
-	$start <left=regex($sublang)> $stop '=' <right=EXPR(item %item_assignment)>
-    || { $sublang = $lang1.unbalanced($stop); }
-	$start <left=regex($sublang)> $stop
-	{ $sublang = $lang2.unbalanced($stop); }
-	<right=nibble($sublang)> $stop
+	{ $lang = $lang.balanced($start,$stop); }
+	$start <left=regex($lang)> $stop '=' <right=EXPR(item %item_assignment)>
+    || { $lang = $lang.unbalanced($stop); }
+	$start <left=regex($lang)> $stop
+	{ $lang = $lang2.unbalanced($stop); }
+	<right=nibble($lang)> $stop
     ]
 }
 
-token tribble ($lang1, $lang2 = $lang1) {
-    :my ($start,$stop) = self.peek_delimiters();
-    :my $sublang;
-    
+token tribble ($lang, $lang2 = $lang) {
+    :my $start;
+    :my $stop;
+
+    <.ws>
+    [ <colonpair> <.ws> { $lang = $lang.tweak($<colonpair>[*-1]); } ]*
+
+    {
+        ($start,$stop) = $¢.peek_delimiters();
+        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
+                                !! $lang.unbalanced($stop);
+    }
+
     [ <?{ $start ne $stop }> ::
-	{ $sublang = $lang1.balanced($start,$stop); }
-	$start <left=nibble($sublang)> $stop <.ws> <quibble($lang2)>
-    || { $sublang = $lang1.unbalanced($stop); }
-	$start <left=nibble($sublang)> $stop
-	{ $sublang = $lang2.unbalanced($stop); }
-	<right=nibble($sublang)> $stop
+	{ $lang = $lang.balanced($start,$stop); }
+	$start <left=nibble($lang)> $stop <.ws> <quibble($lang2)>
+    || { $lang = $lang.unbalanced($stop); }
+	$start <left=nibble($lang)> $stop
+	{ $lang = $lang2.unbalanced($stop); }
+	<right=nibble($lang)> $stop
     ]
 }
 
@@ -1738,12 +1795,18 @@ token quote:sym</ />   {
 
 # handle composite forms like qww
 token quote:qq {
-    'qq' <quote_mod>? »
-    <quibble(Perl::Q.tweak(:qq).tweak($<quote_mod>))>
+    'qq'
+    [
+    | <quote_mod> » <.ws> <quibble(Perl::Q.tweak(:qq).tweak($<quote_mod>.text => 1))>
+    | » <.ws> <quibble(Perl::Q.tweak(:qq))>
+    ]
 }
 token quote:q {
-    'q' <quote_mod>? »
-    <quibble(Perl::Q.tweak(:q).tweak($<quote_mod>))>
+    'q'
+    [
+    | <quote_mod> » <quibble(Perl::Q.tweak(:q).tweak($<quote_mod>.text => 1))>
+    | » <.ws> <quibble(Perl::Q.tweak(:q))>
+    ]
 }
 
 token quote_mod:w  { <sym> }
@@ -1771,31 +1834,6 @@ token quote:ss {
 token quote:tr {
     <sym> » <pat=tribble( ::Perl::Q.tweak(:q))>
 }
-
-#token finish_subst ($pat) {
-#    [
-#    # bracketed form
-#    | <?{ $pat<delim> == 2 }> ::
-#          <.ws>
-#          <infix>            # looking for pseudoassign here
-#          { $<infix><O><prec> == %item_assignment<prec> or
-#              $¢.panic("Bracketed subst must use some form of assignment") }
-#          <repl=EXPR(item %item_assignment)>
-#    # unbracketed form
-#    | <repl=q_unbalanced(qlang('Q',':qq'), $pat<delim>[0])>
-#    ]
-#}
-#
-#token finish_trans ($pat) {
-#    [
-#    # bracketed form
-#    | <?{ $pat<delim> == 2 }> ::
-#          <.ws>
-#          <repl=q_pickdelim(qlang('Q',':tr'))>
-#    # unbracketed form
-#    | <repl=q_unbalanced(qlang('Q',':tr'), $pat<delim>[0])>
-#    ]
-#}
 
 # XXX should eventually be derived from current Unicode tables.
 constant %open2close = (
@@ -2108,9 +2146,10 @@ grammar Q is Perl {
             | <?before <stopper> > :: <fail>
             | <starter> :: <nibbler> <stopper>
                             {
-                                my @n = $<nibbler><nibbles>.list;
-                                $text ~= $<starter>.text ~ shift(@n);
-                                $text = (@n ?? pop(@n) !! '') ~ $<stopper>.text;
+                                my $n = $<nibbler>[*-1]<nibbles>;
+				my @n = @$n;
+                                $text ~= $<starter>[*-1].text ~ shift(@n);
+                                $text = (@n ?? pop(@n) !! '') ~ $<stopper>[*-1].text;
                                 push @nibbles, @n;
                             }
             | <escape>   :: {
@@ -2167,35 +2206,6 @@ grammar Q is Perl {
 
 
 } # end grammar
-
-#token q_unbalanced_rule ($lang, $stop, :@esc = $lang.escset) {
-#    $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!$stop>. ] ]*? ]
-#    <stop=$stop>
-#    {*}
-#}
-#
-#token q_unbalanced ($lang, $stop, :@esc = $lang.escset) {
-#    $stop
-#    $<text> = [ [ [ <?before @esc> <escape=q_escape($lang)> | <!before $stop >. ] ]*? ]
-#    $stop
-#    {*}
-#}
-#
-## We get here only for escapes in escape set, even though more are defined.
-#method q_escape ($lang) {
-#    $lang<escrule>(self);
-#}
-#
-#token quote_escapes {
-#    [
-#    || \\ <qq_backslash>
-#    || <?before '{'> <block>
-#    || <?before '$'> <variable> <extrapost>?
-#    || <variable> <extrapost>
-#    || .
-#    ]
-#    {*}
-#}
 
 # Note, backtracks!  So post mustn't commit to anything permanent.
 regex extrapost {

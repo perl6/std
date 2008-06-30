@@ -8,8 +8,8 @@ use utf8;
 use YAML::XS;
 use Encode;
 
-print "Starting...\n";
+print STDERR "Starting...\n";
 my $what = 'comp_unit';
-my $text = Encode::decode('utf8', "1   ");
+my $text = Encode::decode('utf8', `cat $file`);
 my $r = Perl->new($text)->$what();
 print Dump($r);
