@@ -578,6 +578,31 @@ sub cleanup {
     $self;
 }
 
+sub clean {
+    my $self = shift;
+    delete $self->{_fate};
+    delete $self->{_};
+#    delete $self->{_orig};	# needs some kind of weakening
+    delete $self->{_pos};	# EXPR blows up without this for some reason
+    delete $self->{_reduced};
+    for my $k (values %$self) {
+	next unless ref $k;
+	if (ref $k eq 'ARRAY') {
+	    for my $k2 (@$k) {
+		eval {
+		    $k2->clean if ref $k2;
+		}
+	    }
+	}
+	else {
+	    eval {
+		$k->clean;
+	    }
+	}
+    }
+    $self;
+}
+
 sub dump {
     my $self = shift;
     my %copy = %$self;

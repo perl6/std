@@ -2043,7 +2043,7 @@ grammar Q is Perl {
 
     role b {
         token escape:sym<\\> { <sym> <item=backslash> }
-        token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
+        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh($+LANG).quote(); } }
         token backslash:sym<\\> { <text=sym> }
         token backslash:stopper { <text=stopper> }
         token backslash:a { <sym> }
@@ -2125,7 +2125,7 @@ grammar Q is Perl {
 
         token escape:sym<\\> { <sym> <item=backslash> }
 
-        token backslash:qq { <?before 'q'> { $<quote> = $+LANG.quote(); } }
+        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh($+LANG).quote(); } }
         token backslash:sym<\\> { <text=sym> }
         token backslash:stopper { <text=stopper> }
 
@@ -3195,7 +3195,7 @@ grammar Regex is Perl {
     }
 
     token sigspace {
-	<?before \s | '#'> [ :lang($+LANG) <.ws> ]
+	<?before \s | '#'> [ :lang($¢.cursor_fresh($+LANG)) <.ws> ]
     }
 
     rule regex {
@@ -3266,7 +3266,7 @@ grammar Regex is Perl {
     }
 
     token metachar:sym<{ }> {
-        [ :lang($+LANG) <block> ]
+        [ :lang($¢.cursor_fresh($+LANG)) <block> ]
         {{ $/<sym> := <{ }> }}
         {*}
     }
@@ -3350,13 +3350,13 @@ grammar Regex is Perl {
         {*}
     }
 
-    token metachar:sym<' '> { <?before "'"> [:lang($+LANG) <quote>] }
-    token metachar:sym<" "> { <?before '"'> [:lang($+LANG) <quote>] }
+    token metachar:sym<' '> { <?before "'"> [:lang($¢.cursor_fresh($+LANG)) <quote>] }
+    token metachar:sym<" "> { <?before '"'> [:lang($¢.cursor_fresh($+LANG)) <quote>] }
 
     token metachar:var {
         <!before '$$'>
         <?before <sigil>>
-        [:lang($+LANG) <variable>]
+        [:lang($¢.cursor_fresh($+LANG)) <variable>]
         <.ws>
         $<binding> = ( '=' <.ws> <quantified_atom> )?
         { $<sym> = $<variable>.item; }
@@ -3395,18 +3395,18 @@ grammar Regex is Perl {
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
 
-    token assertion:sym<{ }> { [ :lang($+LANG) <block> ] }
+    token assertion:sym<{ }> { [ :lang($¢.cursor_fresh($+LANG)) <block> ] }
 
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        [:lang($+LANG) <variable=EXPR(item %LOOSEST)>]
+        [:lang($¢.cursor_fresh($+LANG)) <variable=EXPR(item %LOOSEST)>]
         {*}
     }
 
     token assertion:method {
         '.' [
             | <?before <alpha> > <assertion>
-            | [ :lang($+LANG) <dottyop> ]
+            | [ :lang($¢.cursor_fresh($+LANG)) <dottyop> ]
             ]
         {*}
     }
@@ -3416,9 +3416,9 @@ grammar Regex is Perl {
                                     | <.ws> <regex>
                                     | '=' <assertion>
                                     | ':' <.ws>
-                                        [ :lang($+LANG.unbalanced('>')) <arglist> ]
+                                        [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]
                                     | '(' ::
-					[ :lang($+LANG) <arglist> ]
+					[ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
 					[ ')' || <.panic: "Assertion call missing right parenthesis"> ]
                                     ]?
     }
@@ -3446,7 +3446,7 @@ grammar Regex is Perl {
         <quotepair> { $/<sym> := «: $<quotepair><key>» }
     }
 
-    token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($+LANG) <statement> <eat_terminator> ] }
+    token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($+LANG)) <statement> <eat_terminator> ] }
 
     token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 1 } }
     token mod_internal:sym<:!i>   { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 0 } }
