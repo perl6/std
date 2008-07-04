@@ -1604,9 +1604,9 @@ token escale {
 # careful to distinguish from both integer and 42.method
 token dec_number {
     [
-    |            '.' \d+[_\d+]* <escale>?
-    | \d+[_\d+]* '.' \d+[_\d+]* <escale>?
-    | \d+[_\d+]*                <escale>
+    | $<coeff> = [           '.' \d+[_\d+]* ] <escale>?
+    | $<coeff> = [\d+[_\d+]* '.' \d+[_\d+]* ] <escale>?
+    | $<coeff> = [\d+[_\d+]*                ] <escale>
     ]
     {*}
 }
