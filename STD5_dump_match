@@ -13,7 +13,7 @@ my $vertical = 0;
 my $yaml = 0;
 GetOptions("nocolor"=>\$nocolor,"vertical"=>\$vertical,"yaml"=>\$yaml);
 unless ($#ARGV <= 0) {
-    die "USAGE: [--nocolor] [filename]\n";
+    die "USAGE: [--nocolor --vertical] [filename]\n";
 }
 if ($nocolor) {
     $DumpMatch::NOCOLOR = 1;

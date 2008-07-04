@@ -53,7 +53,7 @@ sub process_events {
     $str;
 }
 sub traverse_match {
-    my ($r,$label,$depth,$events) = @_;
+    my ($r,$label,$depth,$events,$opt) = @_;
     return unless ref $r && ref $r ne 'SCALAR' && ref $r ne 'ARRAY';
      if (defined $r->{_from}) {
          if ($r->{_from} == $r->{_to}) {
@@ -67,12 +67,13 @@ sub traverse_match {
         next if $name eq '';
         my $v = $r->{$name};
         if (ref $v eq 'ARRAY') {
+            $name = "[$name]" if $opt->{mark_arrays};
             for my $i (0 .. scalar @{$v}) {
-                traverse_match($v->[$i],$name,$depth+1,$events);
+                traverse_match($v->[$i],$name,$depth+1,$events,$opt);
             }
         } elsif (ref $v eq 'SCALAR') {
         } elsif (ref $v) {
-            traverse_match($v,$name,$depth+1,$events);
+            traverse_match($v,$name,$depth+1,$events,$opt);
         } else {
         }
     }
@@ -82,7 +83,7 @@ sub dump_match {
     my $r = shift;
     my $opt = shift || {};
     my $events = [];
-    traverse_match($r,$name,0,$events);
+    traverse_match($r,$name,0,$events,$opt);
     process_events(${$r->{_orig}},$events,$opt);
 }
 1;
