@@ -7,7 +7,7 @@ my @PKGS;
 
 # random rule for debugging, please ignore
 regex foo {
-   a|b
+   <dec_number>
 }
 
 =begin things todo
@@ -1597,12 +1597,15 @@ token radint {
     {*}
 }
 
+token escale {
+    <[Ee]> <[+\-]>? \d+
+}
+
+# careful to distinguish from both integer and 42.method
 token dec_number {
-    \d+[_\d+]*
-        [
-        | '.' \d+[_\d+]* [ <[Ee]> <[+\-]>? \d+ ]?
-        |                  <[Ee]> <[+\-]>? \d+
-        ] # careful to distinguish from both integer and 42.method
+    |            '.' \d+[_\d+]* <escale>?
+    | \d+[_\d+]* '.' \d+[_\d+]* <escale>?
+    | \d+[_\d+]*                <escale>
     {*}
 }
 
