@@ -2299,7 +2299,8 @@ END
 END
             }
             my $result = <<"END";
-do { my \@result = eval {
+do {
+  my \@result = eval {
     my \$trystate;
     my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$retree, \$trystate);
 $policy
@@ -2337,14 +2338,19 @@ END
         )[$try])->($C);
     }
     @gather;
-};
-return @result if @result;
-if ($@) {
+  };
+  if (@result) {
+    @result;
+  }
+  elsif ($@) {
     my ($first) = $@ =~ /(^.*)/;
     $self->deb("CAUGHT $first") if $::DEBUG & DEBUG::trace_call;
     die $@ if $@ !~ /^ABORTBRANCH/;
-}
-();
+    ();
+  }
+  else {
+    ();
+  }
 }
 END
             $result;

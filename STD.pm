@@ -7,7 +7,7 @@ my @PKGS;
 
 # random rule for debugging, please ignore
 regex foo {
-   .*? X
+   a|b
 }
 
 =begin things todo
@@ -574,6 +574,7 @@ rule statement_control:unless {\
     <sym> 
     <EXPR>                           {*}                        #= expr
     <pblock>                         {*}                        #= block
+    [ <!before 'else'> || <.panic: "unless does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
     {*}
 }
 
