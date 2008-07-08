@@ -18,7 +18,7 @@ $::DEBUG = $DEBUG;
         matchers => 64,
         trace_call=> 128,
         cursors => 256,
-        try_processing_in_STD5_dot_pm => 1024,
+        try_processing => 1024,
         mixins => 2048,
         callm_show_subnames => 16384,
         use_color => 32768
@@ -31,7 +31,7 @@ sub ::deb {
     print ::LOG @_, "\n";
 }
 
-package Cursor5;
+package Cursor;
 
 use LazyMap qw(lazymap eager);
 
@@ -739,7 +739,7 @@ sub callm { my $self = shift;
 	    if ($s =~ /::_/) {
 		next;
 	    }
-	    elsif ($s =~ /^Cursor5::/) {
+	    elsif ($s =~ /^Cursor::/) {
 		next;
 	    }
 	    elsif ($s =~ /^LazyMap::/) {

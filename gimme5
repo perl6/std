@@ -1,10 +1,5 @@
 #!/usr/local/bin/perl
 
-# This is a version of "metholate" that spits out Perl 5 instead of Perl 6.
-# If metholate is hacky, I hate to think what this is...
-
-# Note: expects you to pipe STD through cheat first
-
 use 5.010;
 use strict;
 use warnings;
@@ -238,7 +233,7 @@ sub MAIN {
 
     if (s/^\s*grammar (\w+)(?::\w+<.*?>)*(?:\s*is\s+(\w+))?;\n//) {
 	$TOP = $PKG = $1;
-	my $extends = $2 // 'Cursor5';
+	my $extends = $2 // 'Cursor';
 	$out .= "package $PKG;\n";
 	$out .= <<"END";
 use strict;
@@ -371,7 +366,7 @@ sub $name {
 	    if (ref \$try) {
 		if (ref \$try eq 'ARRAY') {
 		    (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
-		    \$C->deb("Retrying with \$tag \$try") if \$::DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+		    \$C->deb("Retrying with \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 		}
 		elsif (ref \$try eq 'CODE') {
 		    my \@more = \$relex->(\$C, \$trystate);
@@ -382,7 +377,7 @@ sub $name {
 		}
 	    }
     
-	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 	    push \@gather, \$C->\$try(\@_);
 	}
 	\$self->_MATCHIFY(\@gather);
@@ -499,7 +494,7 @@ END
 
             if ($args =~ s/ *--> *(\w*) *$//) {
 		my $pkg = $pkg_really{$1} || "${PKG}::$1";
-                $coercion = " Cursor5::lazymap sub { $pkg->coerce(\$_[0]) }, ";
+                $coercion = " Cursor::lazymap sub { $pkg->coerce(\$_[0]) }, ";
             }
             $args .= ', ';
             my $sym = "";
@@ -2125,7 +2120,7 @@ END
     sub wrapone {
         my ($outer, $inner) = @_;
         if ($MAYBACKTRACK) {
-            "Cursor5::lazymap(sub { my \$C=\$_[0];\n" .
+            "Cursor::lazymap(sub { my \$C=\$_[0];\n" .
                 ::indent($inner) .
             "\n}, $outer)";
         }
@@ -2315,7 +2310,7 @@ END
         if (ref $try) {
             if (ref $try eq 'ARRAY') {
                 ($tag, $try, $C->{_fate}) = @$try;	# next candidate fate
-                $C->deb("Retrying with $tag $try") if $::DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+                $C->deb("Retrying with $tag $try") if $::DEBUG & DEBUG::try_processing;
             }
             elsif (ref $try eq 'CODE') {
                 my @more = $relex->($C, $trystate);
@@ -2329,7 +2324,7 @@ END
 END
 
             $result .= <<"END";
-        \$C->deb("$altname trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing_in_STD5_dot_pm;
+        \$C->deb("$altname trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
         push \@gather, ((
 @{[ ::indent(join("\n", @result),3) ]}
 END

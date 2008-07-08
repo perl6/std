@@ -1,6 +1,6 @@
-STD5.pm: STD.pm gimme5 STD5_run Cursor5.pm LazyMap.pm mangle.pl
-	./gimme5 STD.pm >STD5.pm
-	perl -c STD5.pm
+STD.pmc: STD.pm gimme5 try5 Cursor.pmc LazyMap.pm mangle.pl
+	./gimme5 STD.pm >STD.pmc
+	perl -c STD.pmc
 	rm -rf lex
 	# pre-generate common sublexers
-	./STD5_run comp_unit -e 'say "howdy" ~ "";'
+	./try5 comp_unit -e 'say "howdy" ~ "";'

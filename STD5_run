@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl
-# A script to make running STD5.pm easier,
+# A script to make running STD.pmc easier,
 # by providing it input, and isolating it's Match yaml output.
 use strict;
 use warnings;
@@ -34,10 +34,10 @@ sub main {
     }
     if(-e 'STD.pm' and -e 'gimme5') { # We're in the right place.
 	# pretend we're 'make'
-	if(!-e 'STD5.pm' or
-		-M 'STD5.pm' > -M 'STD.pm' or
-		-M 'STD5.pm' > -M 'gimme5') {
-	    system("$^X gimme5 $fo STD.pm >STD5.pm");
+	if(!-e 'STD.pmc' or
+		-M 'STD.pmc' > -M 'STD.pm' or
+		-M 'STD.pmc' > -M 'gimme5') {
+	    system("$^X gimme5 $fo STD.pm >STD.pmc");
 	    system("rm -rf lex");
 	}
     }
@@ -45,7 +45,7 @@ sub main {
     #warn "# ",$cmd,"\n";
     #system "$cmd 2>std5.err";
     unshift(@INC,'.');
-    require "STD5.pm";
+    require "STD.pmc";
     my $err = "std5.err";
     my $perl = Perl->new($input);
     if(!$perl->can($rule)) { die "\nERROR: Unknown rule: $rule\n"; }

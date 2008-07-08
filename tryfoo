@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 
 BEGIN { $ENV{STD5DEBUG} = 16383; }
-use STD5;
+use STD;
 use utf8;
 use YAML::XS;
 use Encode;

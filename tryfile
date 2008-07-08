@@ -3,7 +3,7 @@
 BEGIN { $ENV{STD5DEBUG} = -1; }
 my $file = shift;
 
-use STD5;
+use STD;
 use utf8;
 use YAML::XS;
 use Encode;

@@ -1557,7 +1557,7 @@ token typename {
     {*}
 }
 
-rule fulltypename {<typename>
+rule fulltypename {<typename>['|'<typename>]*
     [ of <fulltypename> ]?
     {*}
 }
