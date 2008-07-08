@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 
-use STD5;
+use STD;
 use DumpMatch;
 use utf8;
 use YAML::XS;
