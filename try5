@@ -43,10 +43,10 @@ sub main {
     }
     #my $cmd = qq/perl -w -I . -MSTD5 -e 'print Perl::Dump(Perl->new(orig=>$input)->${rule}(["$rule"]));'/;
     #warn "# ",$cmd,"\n";
-    #system "$cmd 2>std5.err";
+    #system "$cmd 2>try5.err";
     unshift(@INC,'.');
     require "STD.pmc";
-    my $err = "std5.err";
+    my $err = "try5.err";
     my $perl = Perl->new($input);
     if(!$perl->can($rule)) { die "\nERROR: Unknown rule: $rule\n"; }
     open(STDERR,">$err") or die;
