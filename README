@@ -1,0 +1,31 @@
+== Perl 6 Parser Stuff in the Pugs Repo
+
+This is a start of some notes about what's going on in this magical directory
+of pugs/Perl6. Larry mostly hacks in here, I think.
+
+== Prerequisites
+
+You'll need the following Perl stuff to run stuff:
+
+* Perl 5.10.0 in /usr/local/bin/
+* YAML::XS
+* Moose
+* re::engine::TRE
+** This module seems completely busted on darwin (MacOSX)
+** Better have a linux box handy for now
+
+== Running Stuff
+
+You can get started by using the following Makefile commands:
+
+> make
+> make all
+> make check
+> make try
+> make try cat
+> make clean
+> make distclean
+
+== The End
+
+for now...
