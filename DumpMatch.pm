@@ -52,9 +52,14 @@ sub process_events {
     }
     $str;
 }
+our %seen;
 sub traverse_match {
     my ($r,$label,$depth,$events,$opt) = @_;
+
+
     return unless ref $r && ref $r ne 'SCALAR' && ref $r ne 'ARRAY';
+    return if $seen{$r};$seen{$r}++;
+
      if (defined $r->{_from}) {
          if ($r->{_from} == $r->{_to}) {
             push(@{$events},[$r->{_from},'empty',$label,$r,$depth]);
@@ -83,6 +88,7 @@ sub dump_match {
     my $r = shift;
     my $opt = shift || {};
     my $events = [];
+    local %seen;
     traverse_match($r,$name,0,$events,$opt);
     process_events(${$r->{_orig}},$events,$opt);
 }

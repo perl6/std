@@ -9,11 +9,11 @@ use strict;
 use warnings;
 use Getopt::Long;
 my $nocolor = 0;
-my $vertical = 0;
+my $horizontal = 0;
 my $yaml = 0;
-GetOptions("nocolor"=>\$nocolor,"vertical"=>\$vertical,"yaml"=>\$yaml);
+GetOptions("nocolor"=>\$nocolor,"horizontal"=>\$horizontal,"yaml"=>\$yaml);
 unless ($#ARGV <= 0) {
-    die "USAGE: [--nocolor --vertical] [filename]\n";
+    die "USAGE: [--nocolor --horizontal] [filename]\n";
 }
 if ($nocolor) {
     $DumpMatch::NOCOLOR = 1;
@@ -31,6 +31,6 @@ if ($yaml) {
     print Dump($r);
     exit;
 } else {
-    print dump_match($what=>$r,{vertical=>$vertical}),"\n";
+    print dump_match($what=>$r,{vertical=>!$horizontal}),"\n";
 }
 
