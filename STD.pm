@@ -3017,7 +3017,7 @@ method EXPR ($preclvl)
                 }
                 push @chain, pop(@termstack).cleanup;
                 @chain = reverse @chain if @chain > 1;
-                $op<O><chain> = @chain;
+                $op<O><chain> = [@chain];
                 push @termstack, $op;
             }
             when 'list' {
