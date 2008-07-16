@@ -818,13 +818,6 @@ token quotepair {
     {*}
 }
 
-token expect_tight_infix ($loosest) {
-    <!before '{' | <lambda> >     #'  # presumably a statement control block
-    <expect_infix>
-    { $<O> := $<expect_infix><O> }
-    ::: <?{ $<O><prec> ge $loosest }>
-}
-
 token expect_infix {
     :my $op is context;         # (used in infix_postfix_meta_operator)
     <!stdstopper>
@@ -3109,7 +3102,6 @@ method EXPR ($preclvl)
 
         push @termstack, $here;
         self.deb("after push: " ~ (0+@termstack)) if $DEBUG +& DEBUG::EXPR;
-#        my @infix = $here.expect_tight_infix($preclim);
         $oldpos = $here.pos;
         my @infix = $here.cursor_fresh.expect_infix();
         last unless @infix;
