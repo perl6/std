@@ -296,7 +296,7 @@ sub heredoc { my $self = shift;
         my $lang = $herestub->lang;
         my $doc;
         my $ws = "";
-        $here = $here->q_unbalanced_rule($lang, stop => \&theredoc)->MATCHIFY;
+        $here = $here->q_unbalanced_rule($lang, stop => \&theredoc)->_MATCHIFY;
         if ($here) {
             if ($ws) {
                 my $wsequiv = $ws;
