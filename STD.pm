@@ -7,7 +7,7 @@ my @PKGS;
 
 # random rule for debugging, please ignore
 regex foo {
-   <dec_number>
+   'foo' 'bar' 'baz'
 }
 
 =begin things todo
@@ -470,9 +470,18 @@ token block {
     {*}
 }
 
-token regex_block {  # XXX make polymorphic and combine with block someday
+token regex_block {
+    :my $lang = ::Regex;
+
+    [ <quotepair> <.ws>
+	{
+	    my $kv = $<quotepair>[*-1];
+	    $lang = $lang.tweak($kv.<k>, $kv.<v>);
+	}
+    ]*
+
     '{'
-    <regex( $¢.cursor_fresh( ::Regex ).unbalanced('}') )>
+    <regex( $¢.cursor_fresh($lang).unbalanced('}') )>
     [ '}' || <.panic: "Missing right brace after regex"> ]
 
     [
@@ -757,7 +766,7 @@ token noun {
     | <sigterm>
     | <term>
     | <statement_prefix>
-    | <colonpair>
+    | [ <colonpair> <.ws> ]+
     ]
     {*}
 }
@@ -1155,9 +1164,9 @@ token declarator {
     {*}
 }
 
-token multi_declarator:multi { <sym> <.ws> <declarator> {*} }
-token multi_declarator:proto { <sym> <.ws> <declarator> {*} }
-token multi_declarator:only  { <sym> <.ws> <declarator> {*} }
+token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> ] {*} }
+token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> ] {*} }
+token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> ] {*} }
 token multi_declarator:null  { <declarator> {*} }
 
 token routine_declarator:sub       { <sym> <routine_def> {*} }
@@ -1697,7 +1706,8 @@ method heredoc () {
 }
 
 # XXX the front stuff needs to be factored out
-token quibble ($lang) {
+token quibble ($l) {
+    :my $lang = $l;
     :my $start;
     :my $stop;
 
@@ -1705,7 +1715,6 @@ token quibble ($lang) {
     [ <quotepair> <.ws>
 	{
 	    my $kv = $<quotepair>[*-1];
-	    print Dump($kv);
 	    $lang = $lang.tweak($kv.<k>, $kv.<v>);
 	}
     ]*
@@ -1725,7 +1734,8 @@ method nibble ($lang) {
     self.cursor_fresh($lang).nibbler;
 }
 
-token sibble ($lang, $lang2) {
+token sibble ($l, $lang2) {
+    :my $lang = $l;
     :my $start;
     :my $stop;
 
@@ -1753,7 +1763,8 @@ token sibble ($lang, $lang2) {
     ]
 }
 
-token tribble ($lang, $lang2 = $lang) {
+token tribble ($l, $lang2 = $l) {
+    :my $lang = $l;
     :my $start;
     :my $stop;
 
@@ -2258,8 +2269,8 @@ rule method_def {
 
 rule regex_def {
     <longname>?
-    <trait>*
     [ ':'?'(' <signature> ')']?
+    <trait>*
     <regex_block>
     {*}
 }
@@ -2295,7 +2306,7 @@ rule trait_verb:returns {<sym> <fulltypename> }
 rule trait_verb:handles {<sym> <EXPR> }
 
 token capterm {
-    '\\(' <capture> ')'
+    '\\(' <capture>? ')'
     {*}
 }
 
@@ -2384,6 +2395,8 @@ token parameter {
     <type_constraint>*
     [
     | $<slurp> = [ $<quant>=[ '*' ] <param_var> ]
+        { $kind = '*' }
+    | $<slurp> = [ $<quant>=[ '|' ] <param_var> ]
         { $kind = '*' }
     |   [
 	| <named_param> { $kind = '*'; }
@@ -2829,6 +2842,9 @@ token prefix:sym<not> ( --> Loose_unary)
 
 ## list item separator
 token infix:sym<,> ( --> Comma)
+    { <sym> {*} }
+
+token infix:sym<:> ( --> Comma)
     { <sym> {*} }
 
 token infix:sym« p5=> » ( --> Comma)
@@ -3521,4 +3537,4 @@ method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
     self.panic("Obsolete use of $old;$when please use $new instead");
 }
 
-## vim: expandtab sw=4 syn=perl6
+## vim: expandtab sw=4 syntax=perl6
