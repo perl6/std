@@ -1293,6 +1293,7 @@ sub atom {
     if (s/^'//) {
         my $re = unbalanced("'");
         s/^'// or panic "Missing '";
+	$re =~ s/\\(\\|')/$1/g;
         ws();
         return bless { text => $re, min => length($re), %adverbs }, "RE_string";
     }

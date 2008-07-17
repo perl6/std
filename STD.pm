@@ -398,11 +398,10 @@ token unv {
    | \h+                 {*}                                    #= hwhite
    | <?before '='> ^^ :: <.pod_comment>  {*}                    #= pod
    | \h* '#' :: [
-         # assuming <bracketed> defaults to standard set
          |  <?opener> ::
             [
                <?after ^^ . > <.panic: "Can't use embedded comments in column 1">
-            || <.bracketed>   {*}                               #= embedded
+            || <.quibble($¢.cursor_fresh( ::Perl::Q ))>   {*}                               #= embedded
             ]
          | :: \N*            {*}                                 #= end
          ]
@@ -788,7 +787,7 @@ token colonpair {
     | <ident>
         { $key = $<ident>.text; }
         [
-        || <.unsp>? <postcircumfix> { $value = $<postcircumfix>; }
+        || <.unsp>? '.'? <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
         ]
         {*}                                                     #= value
@@ -879,7 +878,7 @@ token post {
     # last whitespace didn't end here
     <!{ $¢.<_>[$¢.pos]<ws> }>
 
-    <?unspacey>
+    [ <.unsp> | '\\' <?before '.'> ]?
 
     [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
 
@@ -2050,6 +2049,7 @@ grammar Q is Perl {
     proto token backslash {}
     proto token escape {}
     token starter { <!> }
+    token escape:none { <!> }
 
     role b {
         token escape:sym<\\> { <sym> <item=backslash> }
