@@ -1123,14 +1123,15 @@ rule package_def {
        <?before '{'>
        {{
 	   # figure out the actual full package name (nested in outer package)
-	    push @PKGS, $+PKG;
+            my $pkg = $+PKG // "GLOBAL";
+	    push @PKGS, $pkg;
 	    if $<module_name> {
 		my $longname = $<module_name>[0]<longname>;
 		my $shortname = $longname.<name>.text;
-		$+PKG = $+PKG ~ '::' ~ $shortname;
+		$+PKG = $pkg ~ '::' ~ $shortname;
 	    }
 	    else {
-		$+PKG = $+PKG ~ '::_anon_';
+		$+PKG = $pkg ~ '::_anon_';
 	    }
 	}}
         <block>
@@ -2306,7 +2307,11 @@ rule trait_verb:returns {<sym> <fulltypename> }
 rule trait_verb:handles {<sym> <EXPR> }
 
 token capterm {
-    '\\(' <capture>? ')'
+    '\\'
+    [
+    | '(' <capture>? ')'
+    | <expect_term>
+    ]
     {*}
 }
 
