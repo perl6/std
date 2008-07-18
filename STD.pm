@@ -1016,7 +1016,7 @@ token arglist {
     :my StrPos $endargs is context<rw> = 0;
     <.ws>
     <!stdstopper>
-    <EXPR>
+    <EXPR(item %list_prefix)>
     {*}
 }
 
