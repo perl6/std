@@ -1836,6 +1836,14 @@ token quote:q {
     ]
 }
 
+token quote:Q {
+    'Q'
+    [
+    | <quote_mod> » <quibble($¢.cursor_fresh( ::Perl::Q ).tweak($<quote_mod>.text => 1))>
+    | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ))>
+    ]
+}
+
 token quote_mod:w  { <sym> }
 token quote_mod:ww { <sym> }
 token quote_mod:x  { <sym> }
