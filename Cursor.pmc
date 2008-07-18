@@ -1625,7 +1625,6 @@ sub _COMMITBRANCH { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     $self->deb("Commit branch to $P") if $DEBUG & DEBUG::matchers;
-#    $self->cursor($P);  # XXX currently noop
     $self, LazyMap->new(sub { $self->deb("ABORTBRANCH") if $DEBUG & DEBUG::trace_call; die "ABORTBRANCH" }, $self);
 }
 
@@ -1633,7 +1632,6 @@ sub _COMMITRULE { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     $self->deb("Commit rule to $P") if $DEBUG & DEBUG::matchers;
-#    $self->cursor($P);  # XXX currently noop
     $self, LazyMap->new(sub { $self->deb("ABORTRULE") if $DEBUG & DEBUG::trace_call; die "ABORTRULE" }, $self);
 }
 
@@ -1641,7 +1639,6 @@ sub commit { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     $self->deb("Commit match to $P") if $DEBUG & DEBUG::matchers;
-#    $self->cursor($P);  # XXX currently noop
     $self, LazyMap->new(sub { $self->deb("ABORTMATCH") if $DEBUG & DEBUG::trace_call; die "ABORTMATCH" }, 1);
 }
 

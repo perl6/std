@@ -814,7 +814,7 @@ token quotepair {
     | <ident>
         { $key = $<ident>.text; }
         [
-        || <.unsp>? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
+        || <.unsp>? '.'? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
         ]
         {*}                                                     #= value
@@ -2095,7 +2095,7 @@ grammar Q is Perl {
     } # end role
 
     role a {
-        token escape:sym<@> { <?before '@'> <variable> <extrapost> }
+        token escape:sym<@> { <?before '@'> [ <variable> <extrapost> | <!> ] } # trap ABORTBRANCH from variable's ::
     } # end role
 
     role _a {
@@ -2103,7 +2103,7 @@ grammar Q is Perl {
     } # end role
 
     role h {
-        token escape:sym<%> { <?before '%'> <variable> <extrapost> }
+        token escape:sym<%> { <?before '%'> [ <variable> <extrapost> | <!> ] }
     } # end role
 
     role _h {
@@ -2111,7 +2111,7 @@ grammar Q is Perl {
     } # end role
 
     role f {
-        token escape:sym<&> { <?before '&'> <variable> <extrapost> }
+        token escape:sym<&> { <?before '&'> [ <variable> <extrapost> | <!> ] }
     } # end role
 
     role _f {
