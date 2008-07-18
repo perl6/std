@@ -1015,7 +1015,7 @@ token methodop {
 token arglist {
     :my StrPos $endargs is context<rw> = 0;
     <.ws>
-#    <EXPR(item %list_prefix)>
+    <!stdstopper>
     <EXPR>
     {*}
 }
