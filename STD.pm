@@ -555,7 +555,7 @@ token eat_terminator {
     || <?before <terminator>>
     || $
     || {{ if $¢.<_>[$¢.pos]<ws> { $¢.pos = $¢.<_>[$¢.pos]<ws>; } }}   # undo any line transition
-        <.panic: "Statement not terminated properly">  # "can't happen" anyway :)
+        <.panic: "Syntax error">
     ]
 }
 
@@ -1042,6 +1042,7 @@ token variable_declarator {
     <variable> { $<sigil> = $<variable><sigil> }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
+        <.unsp>?
         <?before [ '<' | '(' |  '[' | '{' ] >
         <postcircumfix>
     ]?
@@ -2110,10 +2111,16 @@ grammar Q is Perl {
 
     role s {
         token escape:sym<$> { <?before '$'> <variable> <extrapost>? }
+        token special_variable:sym<$"> {
+            '$' <stopper>
+            <.panic: "Can't use a \$ in the last position of an interpolating string">
+        }
+
     } # end role
 
     role _s {
         token escape:sym<$> { <!> }
+        token special_variable:sym<$"> { <!> }
     } # end role
 
     role a {
