@@ -1859,6 +1859,9 @@ sub fail { my $self = shift;
             elsif ($_ eq '\\N') {
                 return '[^\\x0a]';
             }
+            elsif ($_ eq '$$') {
+		return '(?:$|\\x0a)';
+	    }
             elsif ($_ eq ':' or $_ eq '^^') {
 		return;
 	    }

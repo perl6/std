@@ -459,10 +459,10 @@ token block {
     [ '}' || <.panic: "Missing right brace after block"> ]
 
     [
-    | <?before \h* \n> <.ws>	# (usual case without comments)
+    | <?before \h* $$> <.ws>	# (usual case without comments)
 	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
-    | <.unv>? <?before \n > <.ws>
+    | <.unv>? $$ <.ws>
 	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt complex
     | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
     ]
@@ -484,10 +484,10 @@ token regex_block {
     [ '}' || <.panic: "Missing right brace after regex"> ]
 
     [
-    | <?before \h* \n> <.ws>	# (usual case without comments)
+    | <?before \h* $$> <.ws>	# (usual case without comments)
 	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
-    | <.unv>? <?before \n > <.ws>
+    | <.unv>? $$ <.ws>
 	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt complex
     | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
     ]
