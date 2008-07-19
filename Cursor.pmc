@@ -600,7 +600,15 @@ sub cursor_fresh { my $self = shift;
     $r{_orig} = $self->{_orig};
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
+    $r{_herelang} = $self->{_herelang} if $self->{_herelang};
     bless \%r, ref $lang || $lang;
+}
+
+sub cursor_herelang { my $self = shift;
+    $self->deb("cursor_herelang") if $DEBUG & DEBUG::cursors;
+    my %r = %$self;
+    $r{_herelang} = $self;
+    bless \%r, 'Perl::Q';
 }
 
 sub cleanup {

@@ -717,10 +717,14 @@ END
                 $out .= $line;
                 next;
             }
+            if ($line =~ m/^(\s*)has\s+(?:[A-Z]\w+\s+)?[\$\@%][.!](\w+).*/) {
+	    	$out .= "$1moose_has '$2' => (is => 'rw');";
+                next;
+            }
+
             $line = un6($line);
 
 	    $line =~ s/COMPILING::<(\W+)(\w+)>/$1COMPILING::$2/g;
-            $line =~ s/^(\s*has) /#$1 /;
             $line =~ s/&reduce = ->/\$reduce = sub/;
             $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
             $line =~ s/ -> {/sub {/;

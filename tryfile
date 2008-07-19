@@ -1,6 +1,5 @@
 #!/usr/local/bin/perl
 
-BEGIN { $ENV{STD5DEBUG} = 0; }
 my $file = shift;
 
 use STD;

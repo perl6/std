@@ -1653,19 +1653,6 @@ token hexint {
 
 our @herestub_queue;
 
-token q_herestub ($lang) {
-    $<delimstr> = <quibble($¢.cursor_fresh( ::Perl::Q ))>  # force raw semantics on /END/ marker
-    {
-        push @herestub_queue,
-            Herestub.new(
-                delim => $<delimstr><delimited><q><text>, # XXX or some such
-                orignode => $_,
-                lang => $lang,
-            );
-    }
-    {*}
-}
-
 class Herestub {
     has Str $.delim;
     has $.orignode;
@@ -1680,6 +1667,7 @@ token theredoc {
 
 method heredoc () {
     return if self.peek;
+    warn "HERE";
     my $here = self;
 #    while my $herestub = shift @herestub_queue {
 #        my $DELIM is context = $herestub.delim;
@@ -1740,6 +1728,17 @@ token quibble ($l) {
     }
 
     $start <nibble($lang)> $stop
+
+    {{
+        if $lang<_herelang> {
+            push @herestub_queue,
+                Perl::Herestub.new(
+                    delim => $<nibble><nibbles>[0],
+                    orignode => $_,
+                    lang => $lang<_herelang>,
+                );
+        }
+    }}
 }
 
 method nibble ($lang) {
@@ -2068,6 +2067,11 @@ token codepoint {
     '[' :: ( [<!before ']'> .]*? ) ']'
 }
 
+method truly ($bool,$opt) {
+    return self if $bool;
+    self.panic("Can't negate $opt adverb");
+}
+
 grammar Q is Perl {
     proto token backslash { <...> }
     proto token escape { <...> }
@@ -2224,9 +2228,9 @@ grammar Q is Perl {
 
     # begin tweaks (DO NOT ERASE)
 
-    multi method tweak (:single(:$q)) { self.mixin( ::q ); }
+    multi method tweak (:single(:$q)) { self.truly($q,':q'); self.mixin( ::q ); }
 
-    multi method tweak (:double(:$qq)) { self.mixin( ::qq ); }
+    multi method tweak (:double(:$qq)) { self.truly($qq, ':qq'); self.mixin( ::qq ); }
 
     multi method tweak (:backslash(:$b))   { self.mixin($b ?? ::b !! ::_b) }
     multi method tweak (:scalar(:$s))      { self.mixin($s ?? ::s !! ::_s) }
@@ -2239,8 +2243,7 @@ grammar Q is Perl {
     multi method tweak (:words(:$w))       { self.mixin($w ?? ::w !! ::_w) }
     multi method tweak (:quotewords(:$ww)) { self.mixin($ww ?? ::ww !! ::_ww) }
 
-    multi method tweak (:heredoc(:$to)) {
-    }
+    multi method tweak (:heredoc(:$to)) { self.truly($to, ':to'); self.cursor_herelang; }
 
     multi method tweak (:$regex) {
         return ::Regex;
