@@ -89,6 +89,7 @@ sub un6 {
         $f =~ s!^(?:rx)?/(.+?)/!!              	and $t .= "qr/$1/", next;
         $f =~ s/^\$¢\.\$parser//                and $t .= qq/\$C->\$parser/, next;
         $f =~ s/^\$¢//                  	and $t .= qq/\$C/, next;
+        $f =~ s/^\$\*(\w+)//                  	and $t .= qq/\$::$1/, next;
         $f =~ s/^\$\/</.</                  	and $t .= qq/\$M/, $NEEDMATCH++, next;
         $f =~ s/^ ::(\w+(?:::\w+)*)\[(.*?)\]/$2)/ and $t .= qq/ '@{[ $pkg_really{$1} || "${PKG}::$1" ]}'->__instantiate__(/, next;
         $f =~ s/^ ::($TOP(?:::\w+)*)// 		and $t .= qq/ '$1'/, next;
@@ -334,7 +335,7 @@ END
 
 	if (s/^(\s*)(proto \s+ (regex|rule|token|method) \s+
 	    (\w+) \s*
-	    (?:\(([^)]*)\))?.*?\{[<.>\s]*}.*?\n)//x)
+	    (?:\(([^)]*)\))?.*?\{[<.!>\s]*}.*?\n)//x)
 	{
 	    $out .= '#' . $2;
 	    my $name = $4;

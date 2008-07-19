@@ -6,6 +6,8 @@ use feature 'say';
 our $CTX = '';
 our $DEBUG = $ENV{STD5DEBUG} // 0;
 $::DEBUG = $DEBUG;
+$::HIGHWATER = 0;
+$::HIGHEXPECT = {};
 
 { package DEBUG;
     use constant {
@@ -36,11 +38,11 @@ package Cursor;
 use LazyMap qw(lazymap eager);
 
 use Term::ANSIColor;
-my $BLUE = color 'blue';
-my $GREEN = color 'green';
-my $YELLOW = color 'yellow';
-my $RED = color 'red';
-my $CLEAR = color 'clear';
+our $BLUE = color 'blue';
+our $GREEN = color 'green';
+our $YELLOW = color 'yellow';
+our $RED = color 'red';
+our $CLEAR = color 'clear';
 
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
@@ -526,13 +528,46 @@ sub _AUTOLEXnow { my $self = shift;
 			$result;
 		    }
 		    else {
-			$self->deb("NO LEXER MATCH") if $DEBUG & DEBUG::lexer;
+			my %expect;
+			my $a;
+			for my $fate (@$fates) {
+			    my $c;
+			    ($a,undef,$c) = split(' ', $fate->[3]);
+			    if ($c) {
+				$expect{$c}++;
+			    }
+			}
+			local $Perl::DEBUG = -1;
+			local $CTX = $self->callm;
+			if (%expect) {
+			    $self->deb("NO LEXER MATCH expecting " . join(' ', keys(%expect)));
+			    $self->highwater(keys(%expect));
+			}
+			else {
+			    $self->deb("NO LEXER MATCH");
+			    $self->highwater($a);
+			}
 			return;
 		    }
 		}
 	    }
 	}
     };
+}
+
+sub highwater {
+    my $self = shift;
+    if ($self->{_pos} >= $::HIGHWATER) {
+	if ($self->{_pos} > $::HIGHWATER) {
+	    %$::HIGHEXPECT = ();
+	}
+	for (@_) {
+	    s/_\d\d$//;
+	    s/:\*$//;
+	    $::HIGHEXPECT->{$_}++;
+	}
+	$::HIGHWATER = $self->{_pos};
+    }
 }
 
 { package Match;
@@ -669,6 +704,7 @@ sub cursor_fate { my $self = shift;
 	    $r{_fate} = $fate;
         }
         else {
+	    $self->highwater($name);
             $self->deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
             $tag = '';
         }

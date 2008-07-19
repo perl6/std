@@ -111,7 +111,7 @@ constant %tight_or        = (:prec<k=>, :assoc<left>,  :assign);
 constant %conditional     = (:prec<j=>, :assoc<right>);
 constant %item_assignment = (:prec<i=>, :assoc<right>);
 constant %loose_unary     = (:prec<h=>);
-constant %comma           = (:prec<g=>, :assoc<list>);
+constant %comma           = (:prec<g=>, :assoc<list>, :nullok);
 constant %list_infix      = (:prec<f=>, :assoc<list>,  :assign);
 constant %list_assignment = (:prec<i=>, :sub<e=>, :assoc<right>);
 constant %list_prefix     = (:prec<e=>);
@@ -496,13 +496,19 @@ token regex_block {
 
 # statement semantics
 rule statementlist {
-    [<statement><.eat_terminator> ]*
+    [
+    | <?before \) | \] | \} >
+    | [<statement><.eat_terminator> ]*
+    ]
     {*}
 }
 
 # embedded semis, context-dependent semantics
 rule semilist {
-    [<statement><.eat_terminator> ]*
+    [
+    | <?before \) | \] | \} >
+    | [<statement><.eat_terminator> ]*
+    ]
     {*}
 }
 
@@ -523,6 +529,7 @@ token label {
 
 token statement {
     :my $endargs is context = -1;
+    <!before \) | \] | \} >
     [
     | <label> <statement>                        {*}            #= label
     | <statement_control>                        {*}            #= control
@@ -552,17 +559,19 @@ token eat_terminator {
     ]
 }
 
-
 rule statement_control:use {\
     <sym>
-    <module_name> <EXPR>?
+    [
+    | <version>
+    | <module_name><arglist>?
+    ]
     {*}
 }
 
 
 rule statement_control:no {\
     <sym>
-    <module_name> <EXPR>?
+    <module_name><arglist>?
     {*}
 }
 
@@ -699,8 +708,12 @@ token module_name:normal {
 
 token module_name:deprecated { 'v6-alpha' }
 
+token vnum {
+    \d+ | '*'
+}
+
 token version:sym<v> {
-    'v' [\d+ | '*'] ** '.' '+'?
+    'v' <?before \d> :: <vnum> ** '.' '+'?
 }
 
 ###################################################
@@ -1233,8 +1246,8 @@ token special_variable:sym<$%> {
 
 # Note: this works because placeholders are restricted to lowercase
 token special_variable:sym<$^X> {
-    ( <sigil> '^' (<[A..Z]>) \W )
-    <obscaret($0, $<sigil>, $1)>
+    <sigil> '^' $<letter> = [<[A..Z]>] \W
+    <obscaret($<sigil>.text ~ '^' ~ $<letter>.text, $<sigil>, $<letter>.text)>
 }
 
 token special_variable:sym<$^> {
@@ -2055,8 +2068,8 @@ token codepoint {
 }
 
 grammar Q is Perl {
-    proto token backslash {}
-    proto token escape {}
+    proto token backslash { <...> }
+    proto token escape { <...> }
     token starter { <!> }
     token escape:none { <!> }
 
@@ -2088,7 +2101,7 @@ grammar Q is Perl {
     } # end role
 
     role c {
-        token escape:sym<{ }> { <?before '{'> <block> }
+        token escape:sym<{ }> { <?before '{'> [ :lang($+LANG) <block> ] }
     } # end role
 
     role _c {
@@ -2995,7 +3008,7 @@ token stopper { <!> }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    <?{ $¢.<_>[$¢.pos]<endstmt> }>	# nullary but likely, check first
+    :my @stub = return self if exists self.<_>[self.pos]<endstmt>;
     [
     | <?terminator>
     | <?unitstopper>
@@ -3017,6 +3030,7 @@ method EXPR ($preclvl)
     my $prevop is context<rw>;
     my @termstack;
     my @opstack;
+    my $nullok = 0;
 
     push @opstack, { 'O' => item %terminator, 'sym' => '' };         # (just a sentinel value)
 
@@ -3102,9 +3116,11 @@ method EXPR ($preclvl)
         self.deb("In loop, at ", $here.pos) if $DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
         my @t = $here.expect_term();       # eats ws too
-        last unless @t;
-        $here = @t[0];
-        $here.panic("Expected term") unless $here.pos > $oldpos;
+
+        if not @t or not $here = @t[0] or $here.pos == $oldpos {
+            last if $nullok;
+            $here.panic("Failed to parse a required term");
+        }
 
         # interleave prefix and postfix, pretend they're infixish
         my $M = $here;
@@ -3182,6 +3198,7 @@ method EXPR ($preclvl)
                 default { $here.panic("Unknown associativity \"$_\" for \"$infix\"") }
             }
         }
+        $nullok = 1 if $inO<nullok>;
         push @opstack, $infix;
     }
     reduce() while +@termstack > 1;
@@ -3223,6 +3240,12 @@ grammar Regex is Perl {
 
     token sigspace {
 	<?before \s | '#'> [ :lang($¢.cursor_fresh($+LANG)) <.ws> ]
+    }
+
+    # suppress fancy end-of-line checking
+    token codeblock {
+        '{' :: [ :lang($¢.cursor_fresh($+LANG)) <statementlist> ]
+        [ '}' || <.panic: "Missing right brace"> ]
     }
 
     rule regex {
@@ -3293,7 +3316,7 @@ grammar Regex is Perl {
     }
 
     token metachar:sym<{ }> {
-        [ :lang($¢.cursor_fresh($+LANG)) <block> ]
+        <codeblock>
         {{ $/<sym> := <{ }> }}
         {*}
     }
@@ -3422,7 +3445,7 @@ grammar Regex is Perl {
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
 
-    token assertion:sym<{ }> { [ :lang($¢.cursor_fresh($+LANG)) <block> ] }
+    token assertion:sym<{ }> { <codeblock> }
 
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
@@ -3501,7 +3524,7 @@ grammar Regex is Perl {
     token quantifier:sym<**> { <sym> <sigspace>? <quantmod> <sigspace>?
         [
         | \d+ [ '..' [ \d+ | '*' ] ]?
-        | <block>
+        | <codeblock>
         | <quantified_atom>
         ]
     }
@@ -3532,13 +3555,26 @@ method mess (Str $s) {
     1 while $pre ~~ s!.*\n!!;
     my $post = substr($text, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
-    "############# PARSE FAILED #############\n----> $pre" ~
-        '<<<HERE>>>' ~
-        "$post\n$s at line $line\n";
+    "$s at line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
+        "$post$Cursor::CLEAR\n";
 }
 
 method panic (Str $s) {
-    die self.mess($s);
+    my $m = "############# PARSE FAILED #############\n";
+    if self.pos <= $*HIGHWATER and %$*HIGHEXPECT {
+        $m ~= self.cursor($*HIGHWATER).mess($s);
+        my @keys = sort keys %$*HIGHEXPECT;
+        if @keys > 1 {
+            $m ~= "    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT) ~ "\n";
+        }
+        else {
+            $m ~= "    expecting @keys\n";
+        }
+    }
+    else {
+        $m ~= self.mess($s);
+    }
+    die $m;
 }
 
 method worry (Str $s) {
