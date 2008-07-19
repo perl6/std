@@ -1666,44 +1666,45 @@ token theredoc {
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
 method heredoc () {
+    temp $CTX = self.callm if $DEBUG +& DEBUG::trace_call;
     return if self.peek;
-    warn "HERE";
     my $here = self;
-#    while my $herestub = shift @herestub_queue {
-#        my $DELIM is context = $herestub.delim;
-#        my $lang = $herestub.lang;
-#        my $doc;
-#        my $ws = "";
-#        $here = $here.unbalanced();  # XXX
-#        if $here {
-#            if $ws {
-#                my $wsequiv = $ws;
-#                $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
-#                $here<text>[0] ~~ s/^/\n/; # so we don't match ^^ after escapes
-#                for @($here<text>) {
-#                    s:g[\n ($ws || \h*)] = do {
-#                        my $white = $0;
-#                        if $white eq $ws {
-#                            '';
-#                        }
-#                        else {
-#                            $white ~~ s[^ (\t+) ] = do {
-#                                ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
-#                            };
-#                            $white ~~ s/^ $wsequiv //
-#                                ?? $white
-#                                !! '';
-#                        }
-#                    }
-#                }
-#                $here<text>[0] ~~ s/^ \n //;
-#            }
-#            $herestub.orignode<doc> = $here;
-#        }
-#        else {
-#            self.panic("Ending delimiter $DELIM not found");
-#        }
-#    }
+    while my $herestub = shift @herestub_queue {
+        my $DELIM is context = $herestub.delim;
+        my $lang = $herestub.lang.unbalanced($DELIM); # XXX wrong, needs ^^ \h* $DELIM \h* [#|$$]
+        my $doc;
+        my $ws = "";
+        $here = $here.nibble($lang);
+        if $here {
+            if $ws {
+                my $wsequiv = $ws;
+                $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
+                $here<text>[0] ~~ s/^/\n/; # so we don't match ^^ after escapes
+                for @($here<nibbles>) {
+                    next unless $_ ~~ Str;
+                    s:g/<?after \n> [$ws || \h*] /{
+                        my $white = $0;
+                        if $white eq $ws {
+                            '';
+                        }
+                        else {
+                            $white ~~ s/^ (\t+) /{
+                                ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
+                            }/;
+                            $white ~~ s/^ $wsequiv //
+                                ?? $white
+                                !! '';
+                        }
+                    }/;
+                }
+                $here<text>[0] ~~ s/^ \n //;
+            }
+            $herestub.orignode<doc> = $here;
+        }
+        else {
+            self.panic("Ending delimiter $DELIM not found");
+        }
+    }
     return $here;
 }
 
@@ -2943,9 +2944,8 @@ token infix:sym<and> ( --> Loose_and)
 token infix:sym<andthen> ( --> Loose_and)
     { <sym> » {*} }
 
-# XXX tre workaround
-# token infix:sym<andthen> ( --> Loose_and)
-#     { <sym> » {*} }
+token infix:sym<andthen> ( --> Loose_and)
+    { <sym> » {*} }
 
 ## loose or
 token infix:sym<or> ( --> Loose_or)
@@ -2957,9 +2957,8 @@ token infix:sym<orelse> ( --> Loose_or)
 token infix:sym<xor> ( --> Loose_or)
     { <sym> » {*} }
 
-# XXX tre workaround
-# token infix:sym<orelse> ( --> Loose_or)
-#     { <sym> » {*} }
+token infix:sym<orelse> ( --> Loose_or)
+     { <sym> » {*} }
 
 ## expression terminator
 
@@ -3228,8 +3227,8 @@ grammar Regex is Perl {
 
     # begin tweaks (DO NOT ERASE)
     multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( ::Perl::Q ) }
-    multi method tweak (:sigspace(:$s)) { XXX() }
-    multi method tweak (:global(:$g)) { XXX() }
+    multi method tweak (:sigspace(:$s)) { self }
+    multi method tweak (:global(:$g)) { self }
     # end tweaks (DO NOT ERASE)
 
     token category:metachar { <sym> }
