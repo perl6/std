@@ -3216,6 +3216,12 @@ method EXPR ($preclvl)
 
 grammar Regex is Perl {
 
+    # begin tweaks (DO NOT ERASE)
+    multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( ::Perl::Q ) }
+    multi method tweak (:sigspace(:$s)) { XXX() }
+    multi method tweak (:global(:$g)) { XXX() }
+    # end tweaks (DO NOT ERASE)
+
     token category:metachar { <sym> }
     proto token metachar { <...> }
 
