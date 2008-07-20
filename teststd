@@ -1,5 +1,7 @@
 #!/usr/local/bin/perl
 
+use strict;
+my $fail = 0;
 my @files = sort `find ../../t/spec/ -name '*.t'`;
 chomp(@files);
 $| = 1;
