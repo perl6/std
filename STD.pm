@@ -1659,9 +1659,9 @@ class Herestub {
     has $.lang;
 } # end class
 
-token theredoc {
-    ^^ $<ws>=(\h*?) $+DELIM \h* $$ \n?
-}
+role herestop {
+    token stopper { ^^ {*} $<ws>=(\h*?) $+DELIM \h* <.unv>?? $$ \v? }
+} # end role
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
@@ -1671,41 +1671,17 @@ method heredoc () {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $DELIM is context = $herestub.delim;
-        my $lang = $herestub.lang.unbalanced($DELIM); # XXX wrong, needs ^^ \h* $DELIM \h* [#|$$]
+        my $lang = $herestub.lang.mixin( ::herestop );
         my $doc;
-        my $ws = "";
-        $here = $here.nibble($lang);
-        if $here {
-            if $ws {
-                my $wsequiv = $ws;
-                $wsequiv ~~ s/^ (\t+) /{ ' ' x ($0 * 8) }/; # per spec
-                $here<text>[0] ~~ s/^/\n/; # so we don't match ^^ after escapes
-                for @($here<nibbles>) {
-                    next unless $_ ~~ Str;
-                    s:g/<?after \n> [$ws || \h*] /{
-                        my $white = $0;
-                        if $white eq $ws {
-                            '';
-                        }
-                        else {
-                            $white ~~ s/^ (\t+) /{
-                                ' ' x ($0.chars * (COMPILING::<$?TABSTOP> // 8))
-                            }/;
-                            $white ~~ s/^ $wsequiv //
-                                ?? $white
-                                !! '';
-                        }
-                    }/;
-                }
-                $here<text>[0] ~~ s/^ \n //;
-            }
-            $herestub.orignode<doc> = $here;
+        if ($doc) = $here.nibble($lang) {
+            $here = $doc.trim_heredoc();
+            $herestub.orignode<doc> = $doc;
         }
         else {
             self.panic("Ending delimiter $DELIM not found");
         }
     }
-    return $here;
+    return self.cursor($here.pos);  # return to initial type
 }
 
 # XXX the front stuff needs to be factored out
@@ -1735,7 +1711,7 @@ token quibble ($l) {
             push @herestub_queue,
                 Perl::Herestub.new(
                     delim => $<nibble><nibbles>[0],
-                    orignode => $_,
+                    orignode => $¢,
                     lang => $lang<_herelang>,
                 );
         }

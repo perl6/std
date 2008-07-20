@@ -611,6 +611,45 @@ sub cursor_herelang { my $self = shift;
     bless \%r, 'Perl::Q';
 }
 
+# remove consistent leading whitespace (mutates text nibbles in place)
+
+sub trim_heredoc { my $doc = shift;
+    my ($stopper) = $doc->stopper() or
+	$doc->panic("Couldn't find delimiter for heredoc\n");
+    my $ws = $stopper->{ws}->text;
+    return $doc if $ws eq '';
+
+    my $wsequiv = $ws;
+    $wsequiv =~ s{^(\t+)}[' ' x (length($1) * ($::TABSTOP // 8))]xe;
+
+    # We can't use ^^ after escapes, since the escape may be mid-line
+    # and we'd get false positives.  Use a fake newline instead.
+    $doc->{nibbles}[0] =~ s/^/\n/;
+
+    for (@{$doc->{nibbles}}) {
+	next if ref $_;   # next unless $_ =~ Str;
+
+	# prefer exact match over any ws
+	s{(?<=\n)(\Q$ws\E|[ \t]+)}{
+	    my $white = $1;
+	    if ($white eq $ws) {
+		'';
+	    }
+	    else {
+		$white =~ s[^ (\t+) ][ ' ' x (length($1) * ($::TABSTOP // 8)) ]xe;
+		if ($white =~ s/^\Q$wsequiv\E//) {
+		    $white;
+		}
+		else {
+		    '';
+		}
+	    }
+	}eg;
+    }
+    $doc->{nibbles}[0] =~ s/^\n//;  # undo fake newline
+    $stopper;
+}
+
 sub cleanup {
     my $self = shift;
     delete $self->{_fate};
