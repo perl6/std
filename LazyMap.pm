@@ -31,6 +31,7 @@ sub new {
 
 sub lazymap (&@) {
     my $block = shift;
+    return () unless @_;
     my $lazy = bless { 'B' => $block, 'C' => [], 'L' => [@_] }, 'LazyMap';
     if (wantarray) {
 	if (my @retval = iter($lazy)) {

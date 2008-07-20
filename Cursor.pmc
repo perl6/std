@@ -853,6 +853,7 @@ sub retm { my $self = shift;
 }
 
 sub _MATCHIFY { my $self = shift;
+    return () unless @_;
     my @result = lazymap( sub { my $x = shift; $x->{_from} = $self->{_from}; $x->retm() }, @_);
     if (wantarray) {
 	@result;
