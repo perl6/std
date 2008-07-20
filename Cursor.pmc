@@ -193,6 +193,8 @@ sub _AUTOLEXgen { my $self = shift;
     (my $dir = 'lex::' . $lang) =~ s/::/\//g;
     (my $file = $key) =~ s/::/-/g;
     $file =~ s/:\*$//;
+    my $name = $key;
+    $name =~ s/_01//;
 
     if (open(LEX, "$dir/$file")) {
 	binmode(LEX, ":utf8");
@@ -200,9 +202,10 @@ sub _AUTOLEXgen { my $self = shift;
 
 	my @pat = <LEX>;
 	chomp(@pat);
+	$name = shift @pat;
 	close LEX;
 
-	return {"PATS" => \@pat};
+	return {"NAME" => $name, "PATS" => \@pat};
     }
     else {
 	{ package RE_base; 1; }
@@ -251,7 +254,7 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
-	$lexer = { PATS => [@pat] };
+	$lexer = { NAME => $name, PATS => [@pat] };
 
 	if (not -d $dir) {
 	    use File::Path 'mkpath';
@@ -260,12 +263,13 @@ sub _AUTOLEXgen { my $self = shift;
 
 	open(my $cache, '>', "$dir/$file") // die "Can't print: $!";
 	binmode($cache, ":utf8");
+	print $cache $name,"\n";
 	print $cache join("\n",@pat),"\n" or die "Can't print: $!";
 	close($cache) or die "Can't close: $!";
 	$self->deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
 	# force operator precedence method to look like a term
-	if ($file eq 'expect_term') {
-	    system "cp $dir/expect_term $dir/EXPR";
+	if ($file eq 'termish') {
+	    system "cp $dir/termish $dir/EXPR";
 	}
     }
     $lexer;
@@ -352,6 +356,7 @@ sub _AUTOLEXnow { my $self = shift;
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key,$retree);
     };
+    $self->highwater($lexer->{NAME});
     my $buf = $self->{_orig};
     my $P = $self->{_pos};
     if ($P == length($$buf)) {
@@ -528,25 +533,7 @@ sub _AUTOLEXnow { my $self = shift;
 			$result;
 		    }
 		    else {
-			my %expect;
-			my $a;
-			for my $fate (@$fates) {
-			    my $c;
-			    ($a,undef,$c) = split(' ', $fate->[3]);
-			    if ($c) {
-				$expect{$c}++;
-			    }
-			}
-			local $Perl::DEBUG = -1;
-			local $CTX = $self->callm;
-			if (%expect) {
-			    $self->deb("NO LEXER MATCH expecting " . join(' ', keys(%expect)));
-			    $self->highwater(keys(%expect));
-			}
-			else {
-			    $self->deb("NO LEXER MATCH");
-			    $self->highwater($a);
-			}
+			$self->deb("NO LEXER MATCH");
 			return;
 		    }
 		}
@@ -562,9 +549,11 @@ sub highwater {
 	    %$::HIGHEXPECT = ();
 	}
 	for (@_) {
-	    s/_\d\d$//;
-	    s/:\*$//;
-	    $::HIGHEXPECT->{$_}++;
+	    my $name = $_;
+	    $name =~ s/_0[01]$//;
+	    $name =~ s/_(\d\d)$/ (alt $1)/;
+	    $name =~ s/:\*$//;
+	    $::HIGHEXPECT->{$name}++;
 	}
 	$::HIGHWATER = $self->{_pos};
     }
@@ -751,7 +740,6 @@ sub cursor_fate { my $self = shift;
 	    $r{_fate} = $fate;
         }
         else {
-	    $self->highwater($name);
             $self->deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
             $tag = '';
         }

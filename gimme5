@@ -256,8 +256,8 @@ sub BUILD {
 END
 
 	$out .= <<'END' if $TOP eq 'Perl';
-    $self->_AUTOLEXpeek('expect_term',$retree);
-    system('cp lex/Perl/expect_term lex/Perl/EXPR');
+    $self->_AUTOLEXpeek('termish',$retree);
+    system('cp lex/Perl/termish lex/Perl/EXPR');
 END
 
 	$out .= <<'END';
@@ -1041,6 +1041,7 @@ sub any {
     my @kids;
     my $min = 1_000_000_000;
     local $ALTNAME = $NAME . '_' . $ALTNAMES++;
+    my $name = $ALTNAME;
 
     s/^ \| (?!\|) //x;
 
@@ -1055,7 +1056,7 @@ sub any {
 
     return $kids[0] if @kids == 1;
 
-    return bless { zyg => [@kids], min => $min, altname => $ALTNAME },
+    return bless { zyg => [@kids], min => $min, altname => $ALTNAME, name => $name },
               "RE_any";
 }
 

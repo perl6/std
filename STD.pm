@@ -734,7 +734,7 @@ token pre {
     {*}
 }
 
-token expect_term {
+token termish {
     [
     | <noun>
     | <pre>+ :: <noun>
@@ -839,7 +839,7 @@ token quotepair {
     {*}
 }
 
-token expect_infix {
+token infixish {
     :my $op is context;         # (used in infix_postfix_meta_operator)
     <!stdstopper>
     <!infixstopper>
@@ -908,9 +908,9 @@ token post {
 regex prefix_circumfix_meta_operator:reduce {
     '[' <?before \S* ']' > ::
     \\??   # prefer no meta \ if op has \
-    <expect_infix>
+    <infixish>
     ']'
-    { $<O> = $<expect_infix><O>; }
+    { $<O> = $<infixish><O>; }
 
     [ <!{ $<O><assoc> eq 'non' }>
         || <.panic: "Can't reduce a non-associative operator"> ]
@@ -2318,7 +2318,7 @@ token capterm {
     '\\'
     [
     | '(' <capture>? ')'
-    | <expect_term>
+    | <termish>
     ]
     {*}
 }
@@ -3100,7 +3100,7 @@ method EXPR ($preclvl)
     loop {
         self.deb("In loop, at ", $here.pos) if $DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
-        my @t = $here.expect_term();       # eats ws too
+        my @t = $here.termish();       # eats ws too
 
         if not @t or not $here = @t[0] or $here.pos == $oldpos {
             last if $nullok;
@@ -3133,7 +3133,7 @@ method EXPR ($preclvl)
         push @termstack, $here;
         self.deb("after push: " ~ (0+@termstack)) if $DEBUG +& DEBUG::EXPR;
         $oldpos = $here.pos;
-        my @infix = $here.cursor_fresh.expect_infix();
+        my @infix = $here.cursor_fresh.infixish();
         last unless @infix;
         my $infix = @infix[0];
         last unless $infix.pos > $oldpos;
@@ -3249,11 +3249,11 @@ grammar Regex is Perl {
         {*}
     }
 
-    token expect_term {
+    token termish {
 	<.ws>
         <quantified_atom>+
     }
-    token expect_infix {
+    token infixish {
         <!infixstopper>
         <!stdstopper>
         <rxinfix>
