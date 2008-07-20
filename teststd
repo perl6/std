@@ -7,7 +7,7 @@ $| = 1;
 my $total = 0+@files;
 for my $file (@files) {
     print $file, "...";
-    system "tryfile $file >tryfile.out";
+    system "./tryfile $file >tryfile.out";
     if ($?) {
 	$fail++;
     }
