@@ -906,7 +906,7 @@ token post {
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
 # (Also backtracks if on \op when no \op infix exists.)
 regex prefix_circumfix_meta_operator:reduce {
-    '[' <?before \S* ']' > ::
+    '[' <?before \S* ']' >
     \\??   # prefer no meta \ if op has \
     <infixish>
     ']'

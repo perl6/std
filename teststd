@@ -1,0 +1,19 @@
+#!/usr/local/bin/perl
+
+my @files = sort `find ../../t/spec/ -name '*.t'`;
+chomp(@files);
+$| = 1;
+
+my $total = 0+@files;
+for my $file (@files) {
+    print $file, "...";
+    system "tryfile $file >tryfile.out";
+    if ($?) {
+	$fail++;
+    }
+    else {
+	print "ok\n";
+    }
+}
+
+print "Failed $fail/$total, ", int $fail/$total * 100, "%\n";
