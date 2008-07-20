@@ -11,9 +11,10 @@ use Getopt::Long;
 my $nocolor = 0;
 my $horizontal = 0;
 my $yaml = 0;
-GetOptions("nocolor"=>\$nocolor,"horizontal"=>\$horizontal,"yaml"=>\$yaml);
+my $mark_arrays;
+GetOptions("nocolor"=>\$nocolor,"horizontal"=>\$horizontal,"yaml"=>\$yaml,"mark-arrays"=>\$mark_arrays);
 unless ($#ARGV <= 0) {
-    die "USAGE: [--nocolor --horizontal] [filename]\n";
+    die "USAGE: [--nocolor --horizontal --mark-arrays] [filename]\n";
 }
 if ($nocolor) {
     $DumpMatch::NOCOLOR = 1;
@@ -31,6 +32,6 @@ if ($yaml) {
     print Dump($r);
     exit;
 } else {
-    print dump_match($what=>$r,{vertical=>!$horizontal}),"\n";
+    print dump_match($what=>$r,{vertical=>!$horizontal,mark_arrays=>$mark_arrays,visit_twice=>1}),"\n";
 }
 

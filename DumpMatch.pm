@@ -58,7 +58,6 @@ sub traverse_match {
 
 
     return unless ref $r && ref $r ne 'SCALAR' && ref $r ne 'ARRAY';
-    return if $seen{$r};$seen{$r}++;
 
      if (defined $r->{_from}) {
          if ($r->{_from} == $r->{_to}) {
@@ -68,6 +67,7 @@ sub traverse_match {
             push(@{$events},[$r->{_to},'to',$label,$r,-$depth]);
         }
      }
+    return if $seen{$r};$seen{$r}++;
     for my $name (keys %$r) {
         next if $name eq '';
         my $v = $r->{$name};
