@@ -955,22 +955,22 @@ token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
-    { '(' <semilist> ')' }
+    { '(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ] }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { '[' <semilist> ']' }
+    { '[' <semilist> [ ']' || <panic: "Missing right bracket"> ] }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
-    { '{' <semilist> '}' }
+    { '{' <semilist> [ '}' || <panic: "Missing right brace"> ] }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
+    { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <panic: "Missing right angle quote"> ] }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
+    { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <panic: "Missing right double-angle quote"> ] }
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
+    { '«' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <panic: "Missing right double-angle quote"> ] }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O> }
@@ -986,7 +986,7 @@ token methodop {
     ] <.unsp>? 
 
     [
-    | '.'? <.unsp>? '(' <semilist> ')'
+    | '.'? <.unsp>? '(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ]
     | ':' <?before \s> <!{ $+inquote }> <arglist>
     ]?
 }
@@ -1007,8 +1007,12 @@ token variable_declarator {
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
-        <?before [ '<' | '(' |  '[' | '{' ] >
-        <postcircumfix>
+        [
+        | '(' :: <signature> [ ')' || <panic: "Missing right parenthesis"> ]
+        | '[' :: <semilist> [ ']' || <panic: "Missing right bracket"> ]
+        | '{' :: <semilist> [ '}' || <panic: "Missing right brace"> ]
+        | <?before '<'> <postcircumfix>
+        ]
     ]?
 
     <trait>*
@@ -1487,7 +1491,7 @@ token sublongname {
 
 #token subcall {
 #    # XXX should this be sublongname?
-#    <subshortname> <.unsp>? '.'? '(' <semilist> ')'
+#    <subshortname> <.unsp>? '.'? '(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ]
 #    {*}
 #}
 
@@ -1679,7 +1683,7 @@ token sibble ($l, $lang2) {
 	    my $kv = $<quotepair>[*-1];
 	    $lang = $lang.tweak($kv.<k>, $kv.<v>);
 	}
-    ]?
+    ]*
 
     { ($start,$stop) = $¢.peek_delimiters(); }
 
@@ -2054,7 +2058,7 @@ grammar Q is Perl {
     } # end role
 
     role s {
-        token escape:sym<$> { <?before '$'> <variable> <extrapost>? }
+        token escape:sym<$> { <?before '$'> [ :lang($+LANG) <variable> <extrapost>? ] }
         token special_variable:sym<$"> {
             '$' <stopper>
             <.panic: "Can't use a \$ in the last position of an interpolating string">
@@ -2068,7 +2072,7 @@ grammar Q is Perl {
     } # end role
 
     role a {
-        token escape:sym<@> { <?before '@'> [ <variable> <extrapost> | <!> ] } # trap ABORTBRANCH from variable's ::
+        token escape:sym<@> { <?before '@'> [ :lang($+LANG) <variable> <extrapost> | <!> ] } # trap ABORTBRANCH from variable's ::
     } # end role
 
     role _a {
@@ -2076,7 +2080,7 @@ grammar Q is Perl {
     } # end role
 
     role h {
-        token escape:sym<%> { <?before '%'> [ <variable> <extrapost> | <!> ] }
+        token escape:sym<%> { <?before '%'> [ :lang($+LANG) <variable> <extrapost> | <!> ] }
     } # end role
 
     role _h {
@@ -2084,7 +2088,7 @@ grammar Q is Perl {
     } # end role
 
     role f {
-        token escape:sym<&> { <?before '&'> [ <variable> <extrapost> | <!> ] }
+        token escape:sym<&> { <?before '&'> [ :lang($+LANG) <variable> <extrapost> | <!> ] }
     } # end role
 
     role _f {
@@ -2438,16 +2442,16 @@ token term:sym<**> ( --> Term)
     { <sym> }
 
 token circumfix:sigil ( --> Term)
-    { <sigil> '(' <semilist> ')' }
+    { <sigil> '(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ] }
 
 #token circumfix:typecast ( --> Term)
-#    { <typename> '(' <semilist> ')' }
+#    { <typename> '(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ] }
 
 token circumfix:sym<( )> ( --> Term)
-    { '(' <semilist> ')'  }
+    { '(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ] }
 
 token circumfix:sym<[ ]> ( --> Term)
-    { '[' <semilist> ']' }
+    { '[' <semilist> [ ']' || <panic: "Missing right bracket"> ] }
 
 ## methodcall
 
@@ -2538,6 +2542,9 @@ token infix:sym« +> » ( --> Multiplicative)
     { <sym> }
 
 token infix:sym<~&> ( --> Multiplicative)
+    { <sym> }
+
+token infix:sym<?&> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym« ~< » ( --> Multiplicative)
@@ -2842,10 +2849,10 @@ token term:name ( --> List_prefix)
         {*}                                                     #= typename
     ||
         [
-        | '.(' <semilist> ')' {*}                               #= func args
-        | '(' <semilist> ')' {*}                                #= func args
+        | '.(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ] {*}                               #= func args
+        | '(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ] {*}                                #= func args
         | <?before \s> <?{ substr($<longname>.text,0,2) ne '::' }> <arglist> {*}                            #= listop args
-        | <.unsp> '.'? '(' <semilist> ')' {*}                   #= func args
+        | <.unsp> '.'? '(' <semilist> [ ')' || <panic: "Missing right parenthesis"> ] {*}                   #= func args
         | :: {*}                                                #= listop noarg
         ]
     ]
@@ -3143,6 +3150,10 @@ grammar Regex is Perl {
     multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( ::Perl::Q ) }
     multi method tweak (:sigspace(:$s)) { self }
     multi method tweak (:global(:$g)) { self }
+    multi method tweak (:ignorecase(:$i)) { self }
+    multi method tweak (:ignoreaccent(:$a)) { self }
+    multi method tweak (:ii(:$ii)) { self }
+    multi method tweak (:aa(:$aa)) { self }
     # end tweaks (DO NOT ERASE)
 
     token category:metachar { <sym> }
@@ -3404,10 +3415,6 @@ grammar Regex is Perl {
 
     token mod_arg { '(' <semilist> [ ')' || <.panic: "Missing right parenthesis in regex modifier"> ] }
 
-    token mod_internal:adv {
-        <quotepair> { $/<sym> := «: $<quotepair><key>» }
-    }
-
     token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($+LANG)) <statement> <eat_terminator> ] }
 
     token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 1 } }
@@ -3427,6 +3434,10 @@ grammar Regex is Perl {
     token mod_internal:sym<:r>    { <sym> 'atchet'? » { $+ratchet = 1 } }
     token mod_internal:sym<:!r>   { <sym> 'atchet'? » { $+ratchet = 0 } }
     token mod_internal:sym<:r( )> { <sym> 'atchet'? » <mod_arg> { $+ratchet = $<mod_arg>.eval } }
+
+    token mod_internal:adv {
+        <?before ':' <ident> > [ :lang($¢.cursor_fresh($+LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
+    }
 
     token mod_internal:oops { ':' <.panic: "unrecognized regex modifier"> }
 
