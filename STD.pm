@@ -369,7 +369,6 @@ token ws {
 	    ?? undef
 	    !! $startpos;
     }
-    {*}
 }
 
 token unsp {
@@ -379,7 +378,6 @@ token unsp {
     | <.unv>                  {*}                                #= unv
     | $ { $¢.moreinput }
     ]*
-    {*}
 }
 
 token vws {
@@ -422,7 +420,6 @@ token pod_comment {
       '=' <.unsp>? 'end' » \N*                      {*}         #= anon
     | :: \N*                                           {*}         #= misc
     ]
-    {*}
 }
 
 # Top-level rules
@@ -435,7 +432,6 @@ rule comp_unit {
 
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
-    {*}
 }
 
 # Note: because of the possibility of placeholders we can't determine arity of
@@ -466,7 +462,6 @@ token block {
 	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt complex
     | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
     ]
-    {*}
 }
 
 token regex_block {
@@ -480,7 +475,7 @@ token regex_block {
     ]*
 
     '{'
-    <regex( $¢.cursor_fresh($lang).unbalanced('}') )>
+    <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
     [ '}' || <.panic: "Missing right brace after regex"> ]
 
     [
@@ -491,7 +486,6 @@ token regex_block {
 	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt complex
     | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
     ]
-    {*}
 }
 
 # statement semantics
@@ -500,7 +494,6 @@ rule statementlist {
     | <?before <[\)\]\}]> >
     | [<statement><.eat_terminator> ]*
     ]
-    {*}
 }
 
 # embedded semis, context-dependent semantics
@@ -509,7 +502,6 @@ rule semilist {
     | <?before <[\)\]\}]> >
     | [<statement><.eat_terminator> ]*
     ]
-    {*}
 }
 
 
@@ -524,7 +516,6 @@ token label {
     # add label as a pseudo type
     {{ eval 'COMPILING::{"::$<ident>"} = Label.new($<ident>)' }}  # XXX need statement ref too?
 
-    {*}
 }
 
 token statement {
@@ -544,7 +535,6 @@ token statement {
         {*}                                                     #= modexpr
     | <?before ';'> {*}                                         #= null
     ]
-    {*}
 }
 
 
@@ -565,14 +555,12 @@ rule statement_control:use {\
     | <version>
     | <module_name><arglist>?
     ]
-    {*}
 }
 
 
 rule statement_control:no {\
     <sym>
     <module_name><arglist>?
-    {*}
 }
 
 
@@ -583,7 +571,6 @@ rule statement_control:if {\
     $<elsif> = ( 'elsif'<?spacey> <EXPR>       {*}                #= elsif expr
                         <pblock>     {*} )*                     #= elsif block
     $<else> = ( 'else'<?spacey> <pblock>       {*} )?             #= else
-    {*}
 }
 
 
@@ -592,7 +579,6 @@ rule statement_control:unless {\
     <EXPR>                           {*}                        #= expr
     <pblock>                         {*}                        #= block
     [ <!before 'else'> || <.panic: "unless does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
-    {*}
 }
 
 
@@ -602,7 +588,6 @@ rule statement_control:while {\
         <.panic: "This appears to be Perl 5 code"> ]?
     <EXPR>                             {*}                      #= expr
     <pblock>                           {*}                      #= block
-    {*}
 }
 
 
@@ -610,7 +595,6 @@ rule statement_control:until {\
     <sym>
     <EXPR>                             {*}                      #= expr
     <pblock>                           {*}                      #= block
-    {*}
 }
 
 
@@ -622,7 +606,6 @@ rule statement_control:repeat {\
         | <block>                      {*}                      #= block wu
           ('while'|'until') <EXPR>         {*}                      #= expr wu
     ]
-    {*}
 }
 
 
@@ -636,7 +619,6 @@ rule statement_control:loop {\
         ')'                      {*}                            #= eee
     )?
     <block>                     {*}                             #= block
-    {*}
 }
 
 
@@ -646,7 +628,6 @@ rule statement_control:for {\
         <.panic: "This appears to be Perl 5 code"> ]?
     <EXPR>                             {*}                      #= expr
     <pblock>                           {*}                      #= block
-    {*}
 }
 
 
@@ -654,41 +635,39 @@ rule statement_control:given {\
     <sym>
     <EXPR>                             {*}                      #= expr
     <pblock>                           {*}                      #= block
-    {*}
 }
 rule statement_control:when {\
     <sym>
     <EXPR>                             {*}                      #= expr
     <pblock>                           {*}                      #= block
-    {*}
 }
-rule statement_control:default {<sym> <block> {*} }
+rule statement_control:default {<sym> <block> }
 
-rule statement_control:BEGIN   {<sym> <block> {*} }
-rule statement_control:CHECK   {<sym> <block> {*} }
-rule statement_control:INIT    {<sym> <block> {*} }
-rule statement_control:END     {<sym> <block> {*} }
-rule statement_control:START   {<sym> <block> {*} }
-rule statement_control:ENTER   {<sym> <block> {*} }
-rule statement_control:LEAVE   {<sym> <block> {*} }
-rule statement_control:KEEP    {<sym> <block> {*} }
-rule statement_control:UNDO    {<sym> <block> {*} }
-rule statement_control:FIRST   {<sym> <block> {*} }
-rule statement_control:NEXT    {<sym> <block> {*} }
-rule statement_control:LAST    {<sym> <block> {*} }
-rule statement_control:PRE     {<sym> <block> {*} }
-rule statement_control:POST    {<sym> <block> {*} }
-rule statement_control:CATCH   {<sym> <block> {*} }
-rule statement_control:CONTROL {<sym> <block> {*} }
+rule statement_control:BEGIN   {<sym> <block> }
+rule statement_control:CHECK   {<sym> <block> }
+rule statement_control:INIT    {<sym> <block> }
+rule statement_control:END     {<sym> <block> }
+rule statement_control:START   {<sym> <block> }
+rule statement_control:ENTER   {<sym> <block> }
+rule statement_control:LEAVE   {<sym> <block> }
+rule statement_control:KEEP    {<sym> <block> }
+rule statement_control:UNDO    {<sym> <block> }
+rule statement_control:FIRST   {<sym> <block> }
+rule statement_control:NEXT    {<sym> <block> }
+rule statement_control:LAST    {<sym> <block> }
+rule statement_control:PRE     {<sym> <block> }
+rule statement_control:POST    {<sym> <block> }
+rule statement_control:CATCH   {<sym> <block> }
+rule statement_control:CONTROL {<sym> <block> }
 
-rule term:BEGIN   {<sym> <block> {*} }
-rule term:CHECK   {<sym> <block> {*} }
-rule term:INIT    {<sym> <block> {*} }
-rule term:START   {<sym> <block> {*} }
-rule term:ENTER   {<sym> <block> {*} }
-rule term:FIRST   {<sym> <block> {*} }
+rule term:BEGIN   {<sym> <block> }
+rule term:CHECK   {<sym> <block> }
+rule term:INIT    {<sym> <block> }
+rule term:START   {<sym> <block> }
+rule term:ENTER   {<sym> <block> }
+rule term:FIRST   {<sym> <block> }
 
-rule modifier_expr { <EXPR> {*} }
+rule modifier_expr { <EXPR> }
 
 rule statement_mod_cond:if     {<sym> <modifier_expr> {*} }     #= if
 rule statement_mod_cond:unless {<sym> <modifier_expr> {*} }     #= unless
@@ -703,7 +682,6 @@ rule statement_mod_loop:given {<sym> <modifier_expr> {*} }      #= given
 token module_name:normal {
     <longname>
     [ <?{ ($+PKGDECL//'') eq 'role' }> <?before '['> <postcircumfix> ]?
-    {*}
 }
 
 token module_name:deprecated { 'v6-alpha' }
@@ -732,7 +710,6 @@ token pre {
     <prefix_postfix_meta_operator>*                 {*}         #= prepost
     { $+prevop = $<O> }
     <.ws>
-    {*}
 }
 
 token termish {
@@ -758,7 +735,6 @@ token adverbs {
             $¢.panic('No previous operator visible to adverbial pair');
 #        $prop.adverb($<colonpair>);
     }
-    {*}
 }
 
 token noun {
@@ -781,7 +757,6 @@ token noun {
     | <statement_prefix>
     | [ <colonpair> <.ws> ]+
     ]
-    {*}
 }
 
 
@@ -813,7 +788,6 @@ token colonpair {
         {*}                                                     #= varname
     ]
     { $<k> = $key; $<v> = $value; }
-    {*}
 }
 
 token quotepair {
@@ -837,7 +811,6 @@ token quotepair {
         {*}                                                     #= nth
     ]
     { $<k> = $key; $<v> = $value; }
-    {*}
 }
 
 token infixish {
@@ -845,34 +818,30 @@ token infixish {
     <!stdstopper>
     <!infixstopper>
     [
-    | <infix> { $op = $<infix>; }
-       <infix_postfix_meta_operator>*  # may modify $op
-       { $<O> = $op<O>; $<sym> = $op<sym>; }
+    | <infix> <!!{ $op = $<infix>; }> ::
+       ['' | <infix_postfix_meta_operator> ]  # may modify $op
+       <!!{ $<O> = $op<O>; $<sym> = $op<sym>; }>
     | <infix_prefix_meta_operator>
-        { $<O> = $<infix_prefix_meta_operator><O>;
-        $<sym> = $<infix_prefix_meta_operator><sym>; }
+        <!!{ $<O> = $<infix_prefix_meta_operator><O>;
+        $<sym> = $<infix_prefix_meta_operator><sym>; }>
     | <infix_circumfix_meta_operator>
-        { $<O> = $<infix_circumfix_meta_operator><O>;
-        $<sym> = $<infix_circumfix_meta_operator><sym>; }
+        <!!{ $<O> = $<infix_circumfix_meta_operator><O>;
+        $<sym> = $<infix_circumfix_meta_operator><sym>; }>
     ]
-    {*}
 }
 
 # doing fancy as one rule simplifies LTM
 token dotty:sym<.*> ( --> Methodcall) {
     ('.' <[+*?=^:]>) <?unspacey> <methodop>
     { $<sym> = $0.item; }
-    {*}
 }
 
 token dotty:sym<.> ( --> Methodcall) {
     <sym> <dottyop>
-    {*}
 }
 
 token privop ( --> Methodcall) {
     '!' <methodop>
-    {*}
 }
 
 token dottyop {
@@ -880,7 +849,6 @@ token dottyop {
     | <methodop>
     | <postop>     # forcing postop's precedence to methodcall here
     ]
-    {*}
 }
 
 # Note, this rule mustn't do anything irreversible because it's used
@@ -902,18 +870,18 @@ token post {
     | <postop> { $<O> = $<postop><O> }
     ]
     { $+prevop = $<O> }
-    {*}
 }
 
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
 # (Also backtracks if on \op when no \op infix exists.)
 regex prefix_circumfix_meta_operator:reduce {
-    '['
+    '[' <!!before \S+ ']'>
     [
     | <infixish>
     | \\<infixish>
     ]
     ']'
+
     { $<O> = $<infixish><O>; }
 
     [ <!{ $<O><assoc> eq 'non' }>
@@ -922,12 +890,11 @@ regex prefix_circumfix_meta_operator:reduce {
     [ <!{ $<O><prec> eq %conditional<prec> }>
         || <.panic: "Can't reduce a conditional operator"> ]
 
-    {*}
 }
 
-token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' {*} }
+token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
 
-token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' {*} }
+token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' }
 
 token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     <sym> <!before '!'> <infix> ::
@@ -943,7 +910,6 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
 
     { $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }
 
-    {*}
 }
 
 method lex1 (Str $s) {
@@ -955,7 +921,6 @@ token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
     X <infix> X
     { $<O> = $<infix><O>; }
     <?lex1: 'cross'>
-    {*}
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
@@ -965,7 +930,6 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
     ]
     { $<O> := $<infix><O>; }
     <?lex1: 'hyper'>
-    {*}
 }
 
 token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
@@ -988,26 +952,25 @@ token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
     || <.panic: "Can't make assignment op of non-associative operator">
     ]
     
-    {*}
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
-    { '(' <semilist> ')' {*} }
+    { '(' <semilist> ')' }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { '[' <semilist> ']' {*} }
+    { '[' <semilist> ']' }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
-    { '{' <semilist> '}' {*} }
+    { '{' <semilist> '}' }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' {*} }
+    { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' {*} }
+    { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' {*} }
+    { '«' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O> }
@@ -1026,7 +989,6 @@ token methodop {
     | '.'? <.unsp>? '(' <semilist> ')'
     | ':' <?before \s> <!{ $+inquote }> <arglist>
     ]?
-    {*}
 }
 
 token arglist {
@@ -1034,12 +996,10 @@ token arglist {
     <.ws>
     <!stdstopper>
     <EXPR(item %list_prefix)>
-    {*}
 }
 
 token circumfix:sym<{ }> ( --> Term) {
     <?before '{' | <lambda> > <pblock>
-    {*}
 }
 
 token variable_declarator {
@@ -1067,62 +1027,53 @@ rule scoped {
     | <fulltypename>+ <multi_declarator>
     | <multi_declarator>
     ]
-    
-    {*}
 }
 
 
-token scope_declarator:my       { <sym> <scoped> {*} }
-token scope_declarator:our      { <sym> <scoped> {*} }
-token scope_declarator:state    { <sym> <scoped> {*} }
-token scope_declarator:constant { <sym> <scoped> {*} }
-token scope_declarator:has      { <sym> <scoped> {*} }
+token scope_declarator:my       { <sym> <scoped> }
+token scope_declarator:our      { <sym> <scoped> }
+token scope_declarator:state    { <sym> <scoped> }
+token scope_declarator:constant { <sym> <scoped> }
+token scope_declarator:has      { <sym> <scoped> }
 
-token package_declarator:class   { <sym> <package_def('module_name')> {*} }
-token package_declarator:grammar { <sym> <package_def('module_name')> {*} }
-token package_declarator:module  { <sym> <package_def('module_name')> {*} }
-token package_declarator:package { <sym> <package_def('module_name')> {*} }
+token package_declarator:class   { <sym> <package_def('module_name')> }
+token package_declarator:grammar { <sym> <package_def('module_name')> }
+token package_declarator:module  { <sym> <package_def('module_name')> }
+token package_declarator:package { <sym> <package_def('module_name')> }
 
 token package_declarator:class {
     :my $PKGDECL is context = 'class';
     <sym> <package_def>
-    {*}
 }
 
 token package_declarator:grammar {
     :my $PKGDECL is context = 'grammar';
     <sym> <package_def>
-    {*}
 }
 
 token package_declarator:module {
     :my $PKGDECL is context = 'module';
     <sym> <package_def>
-    {*}
 }
 
 token package_declarator:package {
     :my $PKGDECL is context = 'package';
     <sym> <package_def>
-    {*}
 }
 
 token package_declarator:role {
     :my $PKGDECL is context = 'role';
     <sym> <package_def>
-    {*}
 }
 
 token package_declarator:require {   # here because of declarational aspects
     <sym> <.ws>
     <module_name> <EXPR>?
-    {*}
 }
 
 token package_declarator:trusts {
     <sym> <.ws>
     <module_name>
-    {*}
 }
 
 rule package_def {
@@ -1168,7 +1119,6 @@ rule package_def {
         {*}                                                     #= semi
     || <panic: 'No block found for module definition'>
     ]
-    {*}
 }
 
 token declarator {
@@ -1179,28 +1129,27 @@ token declarator {
     | <regex_declarator>
     | <type_declarator>
     ]
-    {*}
 }
 
-token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> ] {*} }
-token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> ] {*} }
-token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> ] {*} }
-token multi_declarator:null  { <declarator> {*} }
+token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> ] }
+token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> ] }
+token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> ] }
+token multi_declarator:null  { <declarator> }
 
-token routine_declarator:sub       { <sym> <routine_def> {*} }
-token routine_declarator:method    { <sym> <method_def> {*} }
-token routine_declarator:submethod { <sym> <method_def> {*} }
-token routine_declarator:macro     { <sym> <macro_def> {*} }
+token routine_declarator:sub       { <sym> <routine_def> }
+token routine_declarator:method    { <sym> <method_def> }
+token routine_declarator:submethod { <sym> <method_def> }
+token routine_declarator:macro     { <sym> <macro_def> }
 
-token regex_declarator:regex { <sym>       <regex_def> {*} }
-token regex_declarator:token { <sym>       <regex_def> {*} }
-token regex_declarator:rule  { <sym>       <regex_def> {*} }
+token regex_declarator:regex { <sym>       <regex_def> }
+token regex_declarator:token { <sym>       <regex_def> }
+token regex_declarator:rule  { <sym>       <regex_def> }
 
 # Most of these special variable rules are there simply to catch old p5 brainos
 
-token special_variable:sym<$¢> { <sym> {*} }
+token special_variable:sym<$¢> { <sym> }
 
-token special_variable:sym<$!> { <sym> <!before \w> {*} }
+token special_variable:sym<$!> { <sym> <!before \w> }
 
 token special_variable:sym<$!{ }> {
     # XXX the backslashes are necessary here for bootstrapping, not for P6...
@@ -1215,7 +1164,6 @@ token special_variable:sym<$/> {
         <obs('$/ variable as input record separator',
              "filehandle's :irs attribute")>
     ]?
-    {*}
 }
 
 token special_variable:sym<$~> {
@@ -1466,7 +1414,6 @@ token desigilname {
     | <?before '$' > <variable>
     | <longname>
     ]
-    {*}
 }
 
 token variable {
@@ -1486,7 +1433,6 @@ token variable {
     # Note: $() can also parse as contextualizer in an expression; should have same effect
     | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
     ]
-    {*}
 }
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
@@ -1517,7 +1463,6 @@ token name {
     | <ident> <morename>*
     | <morename>+
     ]
-    {*}
 }
 
 token morename {
@@ -1534,12 +1479,10 @@ token subshortname {
     | <category> <colonpair>+
     | <desigilname>
     ]
-    {*}
 }
 
 token sublongname {
     <subshortname> <sigterm>?
-    {*}
 }
 
 #token subcall {
@@ -1564,7 +1507,6 @@ token value {
 #    | <packagevar>     # XXX see term:name for now
 #    | <fulltypename>   # XXX see term:name for now
     ]
-    {*}
 }
 
 token typename {
@@ -1574,12 +1516,10 @@ token typename {
     }>
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
-    {*}
 }
 
 rule fulltypename {<typename>['|'<typename>]*
     [ of <fulltypename> ]?
-    {*}
 }
 
 token number {
@@ -1588,7 +1528,6 @@ token number {
     | <integer>
     | <rad_number>
     ]
-    {*}
 }
 
 token integer {
@@ -1602,7 +1541,6 @@ token integer {
         ]
     | \d+[_\d+]*
     ]
-    {*}
 }
 
 token radint {
@@ -1614,7 +1552,6 @@ token radint {
                         not defined $<rad_number><fracpart>
                     }>
     ]
-    {*}
 }
 
 token escale {
@@ -1628,7 +1565,6 @@ token dec_number {
     | $<coeff> = [\d+[_\d+]* '.' \d+[_\d+]* ] <escale>?
     | $<coeff> = [\d+[_\d+]*                ] <escale>
     ]
-    {*}
 }
 
 token rad_number {
@@ -1644,7 +1580,6 @@ token rad_number {
     || <?before '['> <postcircumfix>
     || <?before '('> <postcircumfix>
     ]
-    {*}
 }
 
 token octint {
@@ -1744,19 +1679,15 @@ token sibble ($l, $lang2) {
 	    my $kv = $<quotepair>[*-1];
 	    $lang = $lang.tweak($kv.<k>, $kv.<v>);
 	}
-    ]*
+    ]?
 
-    {
-        ($start,$stop) = $¢.peek_delimiters();
-        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
-                                !! $lang.unbalanced($stop);
-    }
+    { ($start,$stop) = $¢.peek_delimiters(); }
 
     [ <?{ $start ne $stop }> ::
 	{ $lang = $lang.balanced($start,$stop); }
-	$start <left=regex($lang)> $stop '=' <right=EXPR(item %item_assignment)>
+	$start <left=nibble($lang)> $stop '=' <right=EXPR(item %item_assignment)>
     || { $lang = $lang.unbalanced($stop); }
-	$start <left=regex($lang)> $stop
+	$start <left=nibble($lang)> $stop
 	{ $lang = $lang2.unbalanced($stop); }
 	<right=nibble($lang)> $stop
     ]
@@ -1791,12 +1722,6 @@ token tribble ($l, $lang2 = $l) {
     ]
 }
 
-method regex ($lang) {
-    my $outerlang = self.WHAT;
-    my $LANG is context = $outerlang;
-    self.cursor_fresh($lang).regex;
-}
-
 # note: polymorphic over many quote languages, we hope
 token nibbler {
     :my $text = '';
@@ -1824,7 +1749,6 @@ token nibbler {
         ]
     ]*
     { push @nibbles, $text; $<nibbles> = [@nibbles]; }
-    {*}
 }
 
 
@@ -1836,7 +1760,7 @@ token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq)
 token quote:sym«< >»   { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
-    '/' <regex( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> '/'
+    '/' <nibble( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> '/'
     [ (< i g s m x c e ] >+) 
         # note: inner failure of obs caught by ? so we report all suggestions
         [ $0 ~~ 'i' <obs('/i',':i')> ]?
@@ -1852,24 +1776,27 @@ token quote:sym</ />   {
 
 # handle composite forms like qww
 token quote:qq {
+    :my $qm;
     'qq'
     [
-    | <quote_mod> » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak($<quote_mod>.text => 1))>
+    | <quote_mod> » { $qm = $<quote_mod>.text } <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak($qm => 1))>
     | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
     ]
 }
 token quote:q {
+    :my $qm;
     'q'
     [
-    | <quote_mod> » <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak($<quote_mod>.text => 1))>
+    | <quote_mod> » { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak($qm => 1))>
     | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
     ]
 }
 
 token quote:Q {
+    :my $qm;
     'Q'
     [
-    | <quote_mod> » <quibble($¢.cursor_fresh( ::Perl::Q ).tweak($<quote_mod>.text => 1))>
+    | <quote_mod> » { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::Perl::Q ).tweak($qm => 1))>
     | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ))>
     ]
 }
@@ -2255,7 +2182,6 @@ regex extrapost {
     <post>*
     # XXX Shouldn't need a backslash on anything but the right square here
     <?after <[ \] } > ) ]> > 
-    {*}
 }
 
 rule multisig {
@@ -2269,7 +2195,6 @@ rule routine_def {
     <longname>?  <multisig>?
     <trait>*
     <block>
-    {*}
 }
 
 rule method_def {
@@ -2279,7 +2204,6 @@ rule method_def {
     ]
     <trait>*
     <block>
-    {*}
 }
 
 rule regex_def {
@@ -2287,7 +2211,6 @@ rule regex_def {
     [ ':'?'(' <signature> ')']?
     <trait>*
     <regex_block>
-    {*}
 }
 
 # XXX redundant with routine_def?
@@ -2295,7 +2218,6 @@ rule macro_def {
     | <longname>?  <multisig>?
     <trait>*
     <block>
-    {*}
 }
 
 rule trait {
@@ -2326,17 +2248,14 @@ token capterm {
     | '(' <capture>? ')'
     | <termish>
     ]
-    {*}
 }
 
 rule capture {
     <EXPR>
-    {*}
 }
 
 token sigterm {
     ':(' <signature> [ ')' || <.panic: "Missing right parenthesis in signature"> ]
-    {*}
 }
 
 rule param_sep { [','|':'|';'|';;'] }
@@ -2350,7 +2269,6 @@ token signature {
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
-    {*}
 }
 
 rule type_declarator:subset {\
@@ -2358,7 +2276,6 @@ rule type_declarator:subset {\
     <longname>
     [ of <fulltypename> ]?
     where <EXPR>
-    {*}
 }
 
 rule type_constraint {
@@ -2367,7 +2284,6 @@ rule type_constraint {
     | <fulltypename>
     | where <EXPR(item %chaining)>
     ]
-    {*}
 }
 
 rule post_constraint {
@@ -2375,7 +2291,6 @@ rule post_constraint {
     | <multisig>
     | where <EXPR(item %chaining)>
     ]
-    {*}
 }
 
 token named_param {
@@ -2476,19 +2391,18 @@ $¢.panic("Can't use optional positional parameter in variadic zone");
             }
         }
     }}
-    {*}
 }
 
 rule default_value {
     '=' <EXPR(item %item_assignment)>
 }
 
-token statement_prefix:do      { <sym> <.ws> <statement> {*} }
-token statement_prefix:try     { <sym> <.ws> <statement> {*} }
-token statement_prefix:gather  { <sym> <.ws> <statement> {*} }
-token statement_prefix:contend { <sym> <.ws> <statement> {*} }
-token statement_prefix:async   { <sym> <.ws> <statement> {*} }
-token statement_prefix:lazy    { <sym> <.ws> <statement> {*} }
+token statement_prefix:do      { <sym> <.ws> <statement> }
+token statement_prefix:try     { <sym> <.ws> <statement> }
+token statement_prefix:gather  { <sym> <.ws> <statement> }
+token statement_prefix:contend { <sym> <.ws> <statement> }
+token statement_prefix:async   { <sym> <.ws> <statement> }
+token statement_prefix:lazy    { <sym> <.ws> <statement> }
 
 ## term
 token term:sym<undef> ( --> Term) {
@@ -2500,41 +2414,40 @@ token term:sym<undef> ( --> Term) {
     [ <?before < $ @ % & > >
         <obs('undef as a verb', 'undefine function')>
     ]?
-    {*}
 }
 
 token term:sym<self> ( --> Term)
-    { <sym> » {*} }
+    { <sym> » }
 
 token term:rand ( --> Term)
-    { <sym> » {*} }
+    { <sym> » }
 
 token term:e ( --> Term)
-    { <sym> » {*} }
+    { <sym> » }
 
 token term:i ( --> Term)
-    { <sym> » {*} }
+    { <sym> » }
 
 token term:pi ( --> Term)
-    { <sym> » {*} }
+    { <sym> » }
 
 token term:sym<*> ( --> Term)
-    { <sym> {*} }
+    { <sym> }
 
 token term:sym<**> ( --> Term)
-    { <sym> {*} }
+    { <sym> }
 
 token circumfix:sigil ( --> Term)
-    { <sigil> '(' <semilist> ')' {*} }
+    { <sigil> '(' <semilist> ')' }
 
 #token circumfix:typecast ( --> Term)
-#    { <typename> '(' <semilist> ')' {*} }
+#    { <typename> '(' <semilist> ')' }
 
 token circumfix:sym<( )> ( --> Term)
-    { '(' <semilist> ')'  {*} }
+    { '(' <semilist> ')'  }
 
 token circumfix:sym<[ ]> ( --> Term)
-    { '[' <semilist> ']' {*} }
+    { '[' <semilist> ']' }
 
 ## methodcall
 
@@ -2546,74 +2459,74 @@ token postfix:sym['->'] ()
 
 ## autoincrement
 token postfix:sym<++> ( --> Autoincrement)
-    { <sym> {*} }
+    { <sym> }
 
 token postfix:sym<--> ( --> Autoincrement)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<++> ( --> Autoincrement)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<--> ( --> Autoincrement)
-    { <sym> {*} }
+    { <sym> }
 
 token postfix:sym<i> ( --> Autoincrement)
-    { <sym> » {*} }
+    { <sym> » }
 
 ## exponentiation
 token infix:sym<**> ( --> Exponentiation)
-    { <sym> {*} }
+    { <sym> }
 
 ## symbolic unary
 token prefix:sym<!> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<+> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<-> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<~> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<?> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<=> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<~^> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<+^> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<?^> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<^> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 token prefix:sym<|> ( --> Symbolic_unary)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## multiplicative
 token infix:sym<*> ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym</> ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<%> ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<+&> ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« +< » ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« << » ( --> Multiplicative)
     { <sym> <obs('<< to do left shift', '+< or ~<')> }
@@ -2622,156 +2535,156 @@ token infix:sym« >> » ( --> Multiplicative)
     { <sym> <obs('>> to do right shift', '+> or ~>')> }
 
 token infix:sym« +> » ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<~&> ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« ~< » ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« ~> » ( --> Multiplicative)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## additive
 token infix:sym<+> ( --> Additive)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<-> ( --> Additive)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<+|> ( --> Additive)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<+^> ( --> Additive)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<~|> ( --> Additive)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<~^> ( --> Additive)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<?|> ( --> Additive)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<?^> ( --> Additive)
-    { <sym> {*} }
+    { <sym> }
 
 ## replication
 # Note: no word boundary check after x, relies on longest token for x2 xx2 etc
 token infix:sym<x> ( --> Replication)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<xx> ( --> Replication)
-    { <sym> {*} }
+    { <sym> }
 
 ## concatenation
 token infix:sym<~> ( --> Concatenation)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## junctive and (all)
 token infix:sym<&> ( --> Junctive_and)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## junctive or (any)
 token infix:sym<|> ( --> Junctive_or)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<^> ( --> Junctive_or)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## named unary examples
 token prefix:sleep ( --> Named_unary)
-    { <sym> » {*} }
+    { <sym> » }
 
 token prefix:abs ( --> Named_unary)
-    { <sym> » {*} }
+    { <sym> » }
 
 token prefix:int ( --> Named_unary)
-    { <sym> » {*} }
+    { <sym> » }
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:cmp ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:leg ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:is ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:but ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:does ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<..> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<^..> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<..^> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<^..^> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<ff> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<^ff> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<ff^> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<^ff^> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<fff> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<^fff> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<fff^> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<^fff^> ( --> Nonchaining)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## chaining binary
 token infix:sym<==> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<!=> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« < » ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« <= » ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« > » ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« >= » ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<~~> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<!~> ( --> Chaining)
     { <sym> <obs('!~ to do negated pattern matching', '!~~')> }
@@ -2780,50 +2693,49 @@ token infix:sym<=~> ( --> Chaining)
     { <sym> <obs('=~ to do pattern matching', '~~')> }
 
 token infix:sym<eq> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<ne> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<lt> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<le> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<gt> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<ge> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<=:=> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<===> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<eqv> ( --> Chaining)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## tight and
 token infix:sym<&&> ( --> Tight_and)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## tight or
 token infix:sym<||> ( --> Tight_or)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<^^> ( --> Tight_or)  {
     <sym>
     { $<O><assoc> := 'list' }  # override Tight_or's 'left' associativity
-    {*}
 }
 
 token infix:sym<//> ( --> Tight_or)
-    { <sym> {*} }
+    { <sym> }
 
 
 ## conditional
@@ -2840,7 +2752,6 @@ token infix:sym<?? !!> ( --> Conditional) {
         || <.panic: "Found ?? but no !!; possible precedence problem">
         ]
     ]
-    {*}
 }
 
 token infix:sym<?> ( --> Conditional)
@@ -2858,61 +2769,59 @@ token infix:sym<=> ()
         ?? Perl::Item_assignment.coerce($¢)
         !! Perl::List_assignment.coerce($¢);
     }
-    {*}
 }
 
 token infix:sym<:=> ( --> Item_assignment)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<::=> ( --> Item_assignment)
-    { <sym> {*} }
+    { <sym> }
 
 # XXX need to do something to turn subcall into method call here...
 token infix:sym<.=> ( --> Item_assignment)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« => » ( --> Item_assignment)
-    { <sym> {*} }
+    { <sym> }
 
 # Note, other assignment ops generated by infix_postfix_meta_operator rule
 
 ## loose unary
 token prefix:sym<true> ( --> Loose_unary)
-    { <sym> » {*} }
+    { <sym> » }
 
 token prefix:sym<not> ( --> Loose_unary)
-    { <sym> » {*} }
+    { <sym> » }
 
 ## list item separator
 token infix:sym<,> ( --> Comma)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<:> ( --> Comma)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym« p5=> » ( --> Comma)
-    { <sym> {*} }
+    { <sym> }
 
 ## list infix
 token infix:sym<X> ( --> List_infix)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<Z> ( --> List_infix)
-    { <sym> {*} }
+    { <sym> }
 
 # XXX tre workaround
 # token infix:sym<minmax> ( --> List_infix)
-#     { <sym> {*} }
+#     { <sym> }
 
 token term:sigil ( --> List_prefix)
 {
     <sigil> <?before \s> <arglist>
     { $<sym> = $<sigil>.item; }
-    {*}
 }
 
 # token term:typecast ( --> List_prefix)
-#     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.item; } {*} }
+#     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.item; } }
 
 # unrecognized identifiers are assumed to be post-declared listops.
 # (XXX for cheating purposes this rule must be the last term: rule)
@@ -2940,60 +2849,59 @@ token term:name ( --> List_prefix)
         | :: {*}                                                #= listop noarg
         ]
     ]
-    {*}
 }
 
 ## loose and
 token infix:sym<and> ( --> Loose_and)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<andthen> ( --> Loose_and)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<andthen> ( --> Loose_and)
-    { <sym> {*} }
+    { <sym> }
 
 ## loose or
 token infix:sym<or> ( --> Loose_or)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<orelse> ( --> Loose_or)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<xor> ( --> Loose_or)
-    { <sym> {*} }
+    { <sym> }
 
 token infix:sym<orelse> ( --> Loose_or)
-     { <sym> {*} }
+     { <sym> }
 
 ## expression terminator
 
 token terminator:sym<;> ( --> Terminator)
-    { <?before ';' > {*} }
+    { <?before ';' > }
 
 token terminator:sym<if> ( --> Terminator)
-    { <?before 'if' » > {*} }
+    { <?before 'if' » > }
 
 token terminator:sym<unless> ( --> Terminator)
-    { <?before 'unless' » > {*} }
+    { <?before 'unless' » > }
 
 token terminator:sym<while> ( --> Terminator)
-    { <?before 'while' » > {*} }
+    { <?before 'while' » > }
 
 token terminator:sym<until> ( --> Terminator)
-    { <?before 'until' » > {*} }
+    { <?before 'until' » > }
 
 token terminator:sym<for> ( --> Terminator)
-    { <?before 'for' » > {*} }
+    { <?before 'for' » > }
 
 token terminator:sym<given> ( --> Terminator)
-    { <?before 'given' » > {*} }
+    { <?before 'given' » > }
 
 token terminator:sym<when> ( --> Terminator)
-    { <?before 'when' » > {*} }
+    { <?before 'when' » > }
 
 token terminator:sym« <== » ( --> Terminator)
-    { <?before '<==' > {*} }
+    { <?before '<==' > }
 
 token terminator:sym« ==> » ( --> Terminator)
     { <?before '==>' > {*} }              #'
@@ -3002,16 +2910,16 @@ token terminator:sym« --> » ( --> Terminator)
     { <?before '-->' > {*} }              #'
 
 token terminator:sym<)> ( --> Terminator)
-    { <?before <sym> > {*} }
+    { <?before <sym> > }
 
 token terminator:sym<]> ( --> Terminator)
-    { <?before ']' > {*} }
+    { <?before ']' > }
 
 token terminator:sym<}> ( --> Terminator)
-    { <?before '}' > {*} }
+    { <?before '}' > }
 
 token terminator:sym<!!> ( --> Terminator)
-    { <?before '!!' > {*} }
+    { <?before '!!' > }
 
 regex infixstopper {
     | <?before <stopper> >
@@ -3269,14 +3177,13 @@ grammar Regex is Perl {
         [ '}' || <.panic: "Missing right brace"> ]
     }
 
-    rule regex {
+    rule nibbler {
         :my $sigspace    is context<rw> = $+sigspace    // 0;
         :my $ratchet     is context<rw> = $+ratchet     // 0;
         :my $ignorecase is context<rw> = $+ignorecase // 0;
         :my $ignoreaccent    is context<rw> = $+ignoreaccent    // 0;
         < || | && & >?
         <EXPR>
-        {*}
     }
 
     token termish {
@@ -3307,7 +3214,6 @@ grammar Regex is Perl {
 #                || <.panic: "Can't quantify zero-width atom">
         ]?
 	<.ws>
-        {*}
     }
 
     token atom {
@@ -3316,7 +3222,6 @@ grammar Regex is Perl {
         | <metachar>
         | :: <.panic: "unrecognized regex metacharacter">
         ]
-        {*}
     }
 
     # sequence stoppers
@@ -3339,72 +3244,62 @@ grammar Regex is Perl {
     token metachar:sym<{ }> {
         <codeblock>
         {{ $/<sym> := <{ }> }}
-        {*}
     }
 
     token metachar:mod {
         <mod_internal>
         { $/<sym> := $<mod_internal><sym> }
-        {*}
     }
 
     token metachar:sym<:> {
         <sym>
-        {*}
     }
 
     token metachar:sym<::> {
         <sym>
-        {*}
     }
 
     token metachar:sym<:::> {
         <sym>
-        {*}
     }
 
     token metachar:sym<[ ]> {
-        '[' :: [:lang(self.unbalanced(']')) <regex>]
+        '[' :: [:lang(self.unbalanced(']')) <nibbler>]
         [ ']' || <.panic: "Missing right bracket in regex"> ]
         { $/<sym> := <[ ]> }
-        {*}
     }
 
     token metachar:sym<( )> {
-        '(' :: [:lang(self.unbalanced(')')) <regex>]
+        '(' :: [:lang(self.unbalanced(')')) <nibbler>]
         [ ')' || <.panic: "Missing right parenthesis in regex"> ]
         { $/<sym> := <( )> }
-        {*}
     }
 
-    token metachar:sym« <( » { '<(' {*} }
-    token metachar:sym« )> » { ')>' {*} }
+    token metachar:sym« <( » { '<(' }
+    token metachar:sym« )> » { ')>' }
 
-    token metachar:sym« << » { '<<' {*} }
-    token metachar:sym« >> » { '>>' {*} }
-    token metachar:sym< « > { '«' {*} }
-    token metachar:sym< » > { '»' {*} }
+    token metachar:sym« << » { '<<' }
+    token metachar:sym« >> » { '>>' }
+    token metachar:sym< « > { '«' }
+    token metachar:sym< » > { '»' }
 
     token metachar:qw {
         <?before '<' \s >  # (note required whitespace)
         <quote>
-        {*}
     }
 
     token metachar:sym«< >» {
         '<' <unsp>? :: <assertion>
         [ '>' || <.panic: "regex assertion not terminated by angle bracket"> ]
-        {*}
     }
 
-    token metachar:sym<\\> { <sym> <backslash> {*} }
-    token metachar:sym<.>  { <sym> {*} }
-    token metachar:sym<^^> { <sym> {*} }
-    token metachar:sym<^>  { <sym> {*} }
+    token metachar:sym<\\> { <sym> <backslash> }
+    token metachar:sym<.>  { <sym> }
+    token metachar:sym<^^> { <sym> }
+    token metachar:sym<^>  { <sym> }
     token metachar:sym<$$> {
         <sym>
         [ <?before (\w+)> <obs("\$\$$0 to deref var inside a regex","\$(\$$0)")> ]?
-        {*}
     }
     token metachar:sym<$>  {
         '$'
@@ -3418,7 +3313,6 @@ grammar Regex is Perl {
         | $
 	| <stopper>
         >
-        {*}
     }
 
     token metachar:sym<' '> { <?before "'"> [:lang($¢.cursor_fresh($+LANG)) <quote>] }
@@ -3431,7 +3325,6 @@ grammar Regex is Perl {
         <.ws>
         $<binding> = ( '=' <.ws> <quantified_atom> )?
         { $<sym> = $<variable>.item; }
-        {*}
     }
 
     token backslash:unspace { <?before \s> <.SUPER::ws> }
@@ -3459,9 +3352,9 @@ grammar Regex is Perl {
     token backslash:misc { $<litchar>=(\W) }
     token backslash:oops { :: <.panic: "unrecognized regex backslash sequence"> }
 
-    token assertion:sym<...> { <sym> {*} }
-    token assertion:sym<???> { <sym> {*} }
-    token assertion:sym<!!!> { <sym> {*} }
+    token assertion:sym<...> { <sym> }
+    token assertion:sym<???> { <sym> }
+    token assertion:sym<!!!> { <sym> }
 
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
@@ -3471,7 +3364,6 @@ grammar Regex is Perl {
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
         [:lang($¢.cursor_fresh($+LANG)) <variable=EXPR(item %LOOSEST)>]
-        {*}
     }
 
     token assertion:method {
@@ -3479,12 +3371,11 @@ grammar Regex is Perl {
             | <?before <alpha> > <assertion>
             | [ :lang($¢.cursor_fresh($+LANG)) <dottyop> ]
             ]
-        {*}
     }
 
     token assertion:ident { <ident> [               # is qq right here?
                                     | <?before '>' >
-                                    | <.ws> <regex>
+                                    | <.ws> <nibbler>
                                     | '=' <assertion>
                                     | ':' <.ws>
                                         [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]

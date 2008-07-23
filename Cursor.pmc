@@ -59,6 +59,7 @@ our %AUTOLEXED;
 our $ALT;
 our $PREFIX = "";
 my $IMP = '(?#::)';
+our $PURIFY = 0;	# ignore {*} IMPs?
 
 binmode(STDIN, ":utf8");
 binmode(STDERR, ":utf8");
@@ -1824,6 +1825,7 @@ sub fail { my $self = shift;
 
 { package RE_block; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
+	return '' if $PURIFY;
         return $IMP;
     }
 }
