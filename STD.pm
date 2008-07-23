@@ -88,6 +88,14 @@ method is_type ($name) {
     return False;
 }
 
+method add_type ($longname) {
+    my $shortname = $longname.<name>.text;
+    my $typename = main::mangle($shortname);
+    my $qualname = ($+PKG // 'GLOBAL') ~ '::' ~ $typename;
+    %typenames{$typename} = $qualname;
+    %typenames{$qualname} = $qualname;
+}
+
 # The internal precedence levels are *not* part of the public interface.
 # The current values are mere implementation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
@@ -456,10 +464,10 @@ token block {
 
     [
     | <?before \h* $$> <.ws>	# (usual case without comments)
-	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt simple 
+	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$ <.ws>
-	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt complex
+	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
     | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
     ]
 }
@@ -480,10 +488,10 @@ token regex_block {
 
     [
     | <?before \h* $$> <.ws>	# (usual case without comments)
-	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt simple 
+	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$ <.ws>
-	{ $¢.<_>[$¢.pos]<endstmt> = 1; } {*}                    #= endstmt complex
+	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
     | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
     ]
 }
@@ -525,13 +533,18 @@ token statement {
     | <label> <statement>                        {*}            #= label
     | <statement_control>                        {*}            #= control
     | <EXPR> {*}                                                #= expr
-	[
-	| <statement_mod_loop> {*}                              #= mod loop
-	| <statement_mod_cond> {*}                              #= mod cond
-	    [
-	    | <statement_mod_loop> {*}                          #= mod condloop
-	    ]?
-	]?
+        [
+        || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
+        ||
+            [
+            | <statement_mod_loop> {*}                              #= mod loop
+            | <statement_mod_cond> {*}                              #= mod cond
+                [
+                || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>
+                || <statement_mod_loop>? {*}                          #= mod condloop
+                ]
+            ]?
+        ]
         {*}                                                     #= modexpr
     | <?before ';'> {*}                                         #= null
     ]
@@ -1082,14 +1095,7 @@ token package_declarator:trusts {
 
 rule package_def {
     [
-	<module_name>{{
-	    my $longname = $<module_name>[0]<longname>;
-	    my $shortname = $longname.<name>.text;
-	    my $typename = main::mangle($shortname);
-	    my $qualname = ($+PKG // 'GLOBAL') ~ '::' ~ $typename;
-	    %typenames{$typename} = $qualname;
-	    %typenames{$qualname} = $qualname;
-	}}
+	<module_name>{ $¢.add_type($<module_name>[0]<longname>); }
     ]?
     <trait>*
     [
@@ -2277,7 +2283,7 @@ token signature {
 
 rule type_declarator:subset {\
     <sym>
-    <longname>
+    <longname> { $¢.add_type($<longname>); }
     [ of <fulltypename> ]?
     where <EXPR>
 }
@@ -2944,7 +2950,7 @@ regex stdstopper {
     | <?unitstopper>
     | $					# unlikely, check last (normal LTM behavior)
     ]
-    { $¢.<_>[$¢.pos]<endstmt> = 1; }
+    { $¢.<_>[$¢.pos]<endstmt> ||= 1; }
 }
 
 # A fairly complete operator precedence parser

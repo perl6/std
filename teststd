@@ -2,20 +2,22 @@
 
 use strict;
 my $fail = 0;
+my $success = 0;
 my @files = sort `find ../../t/spec/ -name '*.t'`;
 chomp(@files);
 $| = 1;
 
 my $total = 0+@files;
 for my $file (@files) {
-    print $file, "...";
+    print $file, "\n";
     system "./tryfile $file >tryfile.out";
     if ($?) {
 	$fail++;
     }
     else {
+	$success++;
 	print "ok\n";
     }
 }
 
-print "Failed $fail/$total, ", int $fail/$total * 100, "%\n";
+print "Passed $success/$total, ", int $success/$total * 100, "%\n";
