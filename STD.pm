@@ -3375,6 +3375,7 @@ grammar Regex is Perl {
 
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
+    token assertion:sym<*> { <sym> [ <?before '>'> | <assertion> ] }
 
     token assertion:sym<{ }> { <codeblock> }
 
