@@ -2282,6 +2282,7 @@ token trait_auxiliary:will {
 }
 
 rule trait_verb:of      {<sym> <fulltypename> }
+rule trait_verb:as      {<sym> <fulltypename> }
 rule trait_verb:returns {<sym> <fulltypename> }
 rule trait_verb:handles {<sym> <EXPR> }
 
