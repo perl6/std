@@ -27,6 +27,6 @@ clean:
 distclean purge: clean
 	rm -rf STD.pmc*
 
-test:
+test: all
 	./tryfile STD.pm >STD.out
 	./teststd
