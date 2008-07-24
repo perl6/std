@@ -1482,6 +1482,15 @@ token twigil:sym<+> { <sym> }
 token twigil:sym<?> { <sym> }
 token twigil:sym<=> { <sym> }
 
+token deflongname {
+    <name> <colonpair>*
+    {{
+        if $<colonpair> {
+            $¢ = $¢.add_macro($<name>);
+        }
+    }}
+}
+
 token longname {
     <name> <colonpair>*
 }
@@ -2236,7 +2245,7 @@ rule multisig {
 }
 
 rule routine_def {
-    <longname>?  <multisig>?
+    <deflongname>?  <multisig>?
     <trait>*
     <block>
 }

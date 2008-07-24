@@ -826,6 +826,17 @@ sub cursor_rev { my $self = shift;
     bless \%r, ref $self;
 }
 
+sub add_macro { my $lang = shift;
+    my $start = shift;
+    $lang->{_from} = $start->{_from};
+    my $name = $lang->text;
+    if ($name =~ s/:/:sym/) {
+	eval <<"END";
+END
+    }
+    $lang;
+}
+
 sub callm { my $self = shift;
     my $arg = shift;
     my $class = ref($self) || $self;
