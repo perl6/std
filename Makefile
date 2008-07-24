@@ -1,4 +1,4 @@
-.PHONY: check try cat clean distclean purge
+.PHONY: check try cat clean distclean purge test
 
 FIXINS=Cursor.pmc LazyMap.pm mangle.pl
 
@@ -26,3 +26,6 @@ clean:
 
 distclean purge: clean
 	rm -rf STD.pmc*
+
+test:
+	./teststd
