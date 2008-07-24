@@ -331,7 +331,7 @@ token category:infix_prefix_meta_operator { <sym> }
 proto token infix_prefix_meta_operator is binary { <...> }
 
 token category:infix_postfix_meta_operator { <sym> }
-proto token infix_postfix_meta_operator is binary { <...> }
+proto token infix_postfix_meta_operator ($op) is binary { <...> }
 
 token category:infix_circumfix_meta_operator { <sym> }
 proto token infix_circumfix_meta_operator is binary { <...> }
@@ -716,7 +716,7 @@ token pre {
         { $<O> = $<prefix><O> }
                                                     {*}         #= prefix
     | <prefix_circumfix_meta_operator>
-        { $<O> = $<prefix_circumfix_meta_operator><O> }
+        { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.text }
                                                     {*}         #= precircum
     ]
     # XXX assuming no precedence change
@@ -828,19 +828,22 @@ token quotepair {
 }
 
 token infixish {
-    :my $op is context;         # (used in infix_postfix_meta_operator)
     <!stdstopper>
     <!infixstopper>
     [
-    | <infix> <!!{ $op = $<infix>; }> ::
-       ['' | <infix_postfix_meta_operator> ]  # may modify $op
-       <!!{ $<O> = $op<O>; $<sym> = $op<sym>; }>
+    | <infix>
+       [
+       | ''
+           { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
+       | <infix_postfix_meta_operator($<infix>)>
+           { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
+       ]
     | <infix_prefix_meta_operator>
-        <!!{ $<O> = $<infix_prefix_meta_operator><O>;
-        $<sym> = $<infix_prefix_meta_operator><sym>; }>
+        { $<O> = $<infix_prefix_meta_operator><O>;
+          $<sym> = $<infix_prefix_meta_operator><sym>; }
     | <infix_circumfix_meta_operator>
-        <!!{ $<O> = $<infix_circumfix_meta_operator><O>;
-        $<sym> = $<infix_circumfix_meta_operator><sym>; }>
+        { $<O> = $<infix_circumfix_meta_operator><O>;
+          $<sym> = $<infix_circumfix_meta_operator><sym>; }
     ]
 }
 
@@ -888,27 +891,31 @@ token post {
 
 # Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
 # (Also backtracks if on \op when no \op infix exists.)
-regex prefix_circumfix_meta_operator:reduce {
-    '[' <!!before \S+ ']'>
-    [
-    | <op=infix>
-    | <op=infix_prefix_meta_operator>
-    | <op=infix_circumfix_meta_operator>
-    | <infix> <op=infix_postfix_meta_operator>
-    | \\<op=infix>
-    | \\<op=infix_prefix_meta_operator>
-    | \\<op=infix_circumfix_meta_operator>
-    | \\<infix> <op=infix_postfix_meta_operator>
-    ]
-    ']' <?before \s | '(' >
+regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
+    $<s> = (
+        '[' <!!before \S+ ']'>
+        [
+        | <op=infix>
+        | <op=infix_prefix_meta_operator>
+        | <op=infix_circumfix_meta_operator>
+        | <infix> <op=infix_postfix_meta_operator($<infix>)>
+        | \\<op=infix>
+        | \\<op=infix_prefix_meta_operator>
+        | \\<op=infix_circumfix_meta_operator>
+        | \\<infix> <op=infix_postfix_meta_operator($<infix>)>
+        ]
+        ']'
+    ) <?before \s | '(' >
 
-    { $<O> = $<op><O>; }
+    { $<O> = $<s><op><O>; $<sym> = $<s>.text; }
 
     [ <!{ $<O><assoc> eq 'non' }>
         || <.panic: "Can't reduce a non-associative operator"> ]
 
     [ <!{ $<O><prec> eq %conditional<prec> }>
         || <.panic: "Can't reduce a conditional operator"> ]
+
+    { $<O><assoc> = 'unary'; }
 
 }
 
@@ -954,9 +961,9 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
     <?lex1: 'hyper'>
 }
 
-token infix_postfix_meta_operator:sym<=> ( --> Item_assignment) {
+token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     '=' ::
-    { $<O> = $+op<O>; }
+    { $<O> = $op<O>; }
     <?lex1: 'assignment'>
 
     [
