@@ -1,0 +1,103 @@
+#!/usr/local/bin/perl
+
+use Term::ANSIColor qw(:constants);
+use STD;
+use utf8;
+use YAML::XS;
+use Encode;
+use strict;
+use feature 'say';
+my $fail = 0;
+
+my @files = sort `find ../../t/spec/ -name '*.t'`;
+chomp(@files);
+$| = 1;
+
+our $foo = 2;
+our %foo = (a=>7);
+{ package foo;
+    our $foo = 1;
+}
+{ package foo::bar;
+    our $bar = 1;
+    our %foo = (a=>6,b=>4);
+    our %bar = (A=>6,B=>4);
+}
+{ package foo::bar::baz;
+    our $baz = 1;
+}
+sub traverse {
+    my $package  = shift;
+    my $callback = shift;
+    for (sort keys %{$package}) {
+        next if /^main::$/;
+        if (/::$/) {
+            next if /^Config/;
+            next if /^DB/;
+            #say "descending into $_";
+            traverse($package->{$_},$callback);
+            #say "ascending";
+        } elsif ($package->{$_} =~ /^\*/) {
+            #say "callback on $_:",$package->{$_},;
+            $callback->($package->{$_});
+        }
+    }
+}
+traverse(\%main::,sub {
+    my $sym=shift;
+});
+
+print "pristine\n";
+my %pristine;
+use Data::Dumper;
+traverse(\%main::,sub {
+    my $sym=shift;
+    $pristine{'$'.$sym} = Dumper(*{$sym}{SCALAR});
+    $pristine{'%'.$sym} = Dumper(*{$sym}{HASH});
+    $pristine{'@'.$sym} = Dumper(*{$sym}{ARRAY});
+});
+#warn Dumper(\%pristine);
+
+my $dump_limit = 100;
+sub part {
+    return $_[0] if length $_[0] < $dump_limit+3;
+    return substr($_[0],0,$dump_limit)."...";
+}
+sub check {
+    my ($name,$what) = @_;
+
+    say YELLOW,$name,RESET,":",RED," ",part($what),RESET," ne ",GREEN,part($pristine{$name}),RESET unless $pristine{$name} eq $what;
+}
+sub globals {
+    traverse(\%main::,sub {
+        my $sym=shift;
+        check(('%'.$sym),Dumper(*{$sym}{HASH}));
+        check(('$'.$sym),Dumper(*{$sym}{SCALAR}));
+    });
+}
+
+#$foo::bar::foo{asadas} = 123;
+#globals;
+my $total = 0+@files;
+for my $file (@files) {
+    $::HIGHWATER = 0;
+    %{$::HIGHEXPECT} = ();
+    globals;
+    print $file, "...";
+    #system "./tryfile $file >tryfile.out";
+
+    eval {
+        my $what = 'comp_unit';
+        my $text = Encode::decode('utf8', `cat $file`);
+        my $r = Perl->new($text)->$what();
+    };
+    if ($@) {
+        $fail++;
+        die if $fail > 1;
+        warn;
+   } else {
+        print "ok\n";
+   }
+}
+
+print "Failed $fail/$total, ", int $fail/$total * 100, "%\n";
