@@ -74,7 +74,7 @@ my @typenames = (      # (need parens for gimme5 translator)
     <Exception Code Block List Seq Range Set Bag Junction Pair>,
     <Mapping Signature Capture Blob Whatever Undef Failure>,
     <StrPos StrLen Version P6opaque>,
-    <bit int uint buf num complex bool rat>,
+    <bit int int8 int16 int32 uint uint8 uint16 uint32 buf buf8 buf16 buf32 num complex bool rat>,
     <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
     <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>,
     ()
@@ -938,8 +938,10 @@ token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
     [
-    | [ '«' | '»' ] <infix> [ '«' | '»' ]
-    | [ '<<' | '>>' ] <infix> [ '<<' | '>>' ]
+    | '«' <infix> [ '«' | '»' ]
+    | '»' <infix> [ '«' | '»' ]
+    | '<<' <infix> [ '<<' | '>>' ]
+    | '>>' <infix> [ '<<' | '>>' ]
     ]
     { $<O> := $<infix><O>; }
     <?lex1: 'hyper'>
