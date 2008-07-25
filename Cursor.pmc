@@ -683,7 +683,7 @@ sub clean {
     my $self = shift;
     delete $self->{_fate};
     delete $self->{_};
-#    delete $self->{_orig};	# needs some kind of weakening
+    delete $self->{_orig};	# needs some kind of weakening
     delete $self->{_pos};	# EXPR blows up without this for some reason
     delete $self->{_reduced};
     for my $k (values %$self) {

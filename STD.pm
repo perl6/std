@@ -70,7 +70,7 @@ method TOP ($STOP = undef) {
 #XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
 
 my @typenames = (      # (need parens for gimme5 translator)
-    <Void Bit Int Str Num Complex Bool True False Rat>,
+    <Void Bit Int UInt Str Num Complex Bool True False Rat>,
     <Exception Code Block List Seq Range Set Bag Junction Pair>,
     <Mapping Signature Capture Blob Whatever Undef Failure>,
     <StrPos StrLen Version P6opaque>,
@@ -142,7 +142,7 @@ role PrecOp {
         my $d = %::($var); 
         if not $d<transparent> {
             for keys(%$d) { $m<O>{$_} = $d.{$_} };
-            $m.deb("coercing to " ~ self) if $DEBUG +& DEBUG::EXPR;
+            $m.deb("coercing to " ~ self) if $*DEBUG +& DEBUG::EXPR;
         }
         return $m;
     }
@@ -390,7 +390,7 @@ token unsp {
 
 token vws {
     \v ::
-    [ '#DEBUG -1' { say "DEBUG"; $Perl::DEBUG = $DEBUG = -1; } ]?
+    [ '#DEBUG -1' { say "DEBUG"; $Perl::DEBUG = $*DEBUG = -1; } ]?
 }
 
 # We provide two mechanisms here:
@@ -1643,7 +1643,7 @@ role herestop {
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
 method heredoc () {
-    temp $CTX = self.callm if $DEBUG +& DEBUG::trace_call;
+    temp $CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
     return if self.peek;
     my $here = self;
     while my $herestub = shift @herestub_queue {
@@ -3024,7 +3024,7 @@ regex stdstopper {
 
 method EXPR ($preclvl)
 {
-    temp $CTX = self.callm if $DEBUG +& DEBUG::trace_call;
+    temp $CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
     if self.peek {
         return self._AUTOLEXpeek('EXPR');
     }
@@ -3038,14 +3038,14 @@ method EXPR ($preclvl)
     push @opstack, { 'O' => item %terminator, 'sym' => '' };         # (just a sentinel value)
 
     my $here = self;
-    self.deb("In EXPR, at ", $here.pos) if $DEBUG +& DEBUG::EXPR;
+    self.deb("In EXPR, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
 
     my &reduce := -> {
-        self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $DEBUG +& DEBUG::EXPR;
+        self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $*DEBUG +& DEBUG::EXPR;
         my $op = pop @opstack;
         given $op<O><assoc> // 'unary' {
             when 'chain' {
-                self.deb("reducing chain") if $DEBUG +& DEBUG::EXPR;
+                self.deb("reducing chain") if $*DEBUG +& DEBUG::EXPR;
                 my @chain;
                 push @chain, pop(@termstack);
                 push @chain, $op;
@@ -3060,12 +3060,12 @@ method EXPR ($preclvl)
                 push @termstack, $op;
             }
             when 'list' {
-                self.deb("reducing list") if $DEBUG +& DEBUG::EXPR;
+                self.deb("reducing list") if $*DEBUG +& DEBUG::EXPR;
                 my @list;
                 push @list, pop(@termstack);
 		my $s = $op<sym>;
                 while @opstack {
-                    self.deb($s ~ " vs " ~ @opstack[*-1]<sym>) if $DEBUG +& DEBUG::EXPR;
+                    self.deb($s ~ " vs " ~ @opstack[*-1]<sym>) if $*DEBUG +& DEBUG::EXPR;
                     last if $s ne @opstack[*-1]<sym>;
 		    if @termstack and defined @termstack[0] {
 			push @list, pop(@termstack).cleanup;
@@ -3086,11 +3086,11 @@ method EXPR ($preclvl)
                 push @termstack, $op;
             }
             when 'unary' {
-                self.deb("reducing") if $DEBUG +& DEBUG::EXPR;
+                self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
                 my @list;
-                self.deb("Termstack size: ", +@termstack) if $DEBUG +& DEBUG::EXPR;
+                self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
-                self.deb($op.dump) if $DEBUG +& DEBUG::EXPR;
+                self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
 		$op<arg> = (pop @termstack).cleanup;
 		$op<_from> = $op<arg><_from>
 		    if $op<_from> > $op<arg><_from>;
@@ -3100,11 +3100,11 @@ method EXPR ($preclvl)
                 push @termstack, $op;
             }
             default {
-                self.deb("reducing") if $DEBUG +& DEBUG::EXPR;
+                self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
                 my @list;
-                self.deb("Termstack size: ", +@termstack) if $DEBUG +& DEBUG::EXPR;
+                self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
-                self.deb($op.dump) if $DEBUG +& DEBUG::EXPR;
+                self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
 		$op<right> = (pop @termstack).cleanup;
 		$op<left> = (pop @termstack).cleanup;
 		$op<_from> = $op<left><_from>;
@@ -3116,7 +3116,7 @@ method EXPR ($preclvl)
     };
 
     loop {
-        self.deb("In loop, at ", $here.pos) if $DEBUG +& DEBUG::EXPR;
+        self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
         my @t = $here.termish();       # eats ws too
 
@@ -3149,7 +3149,7 @@ method EXPR ($preclvl)
         }
 
         push @termstack, $here;
-        self.deb("after push: " ~ (0+@termstack)) if $DEBUG +& DEBUG::EXPR;
+        self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
         $oldpos = $here.pos;
         my @infix = $here.cursor_fresh.infixish();
         last unless @infix;
@@ -3160,15 +3160,15 @@ method EXPR ($preclvl)
         if not $infix { $here.panic("Can't have two terms in a row") }
 
         if not $infix<sym> {
-            die $infix.dump if $DEBUG +& DEBUG::EXPR;
+            die $infix.dump if $*DEBUG +& DEBUG::EXPR;
         }
 
         my $inO = $infix<O>;
         $prevop = $inO;
         my Str $inprec = $inO<prec>;
         if not defined $inprec {
-            self.deb("No prec given in infix!") if $DEBUG +& DEBUG::EXPR;
-            die $infix.dump if $DEBUG +& DEBUG::EXPR;
+            self.deb("No prec given in infix!") if $*DEBUG +& DEBUG::EXPR;
+            die $infix.dump if $*DEBUG +& DEBUG::EXPR;
             $inprec = %terminator<prec>;
         }
 
