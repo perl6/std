@@ -831,7 +831,12 @@ sub add_macro { my $lang = shift;
     $lang->{_from} = $start->{_from};
     my $name = $lang->text;
     if ($name =~ s/:/:sym/) {
-	eval <<"END";
+	print "macro $name\n";
+	eval <<'END';
+#package $genpkg;
+#use Moose ':all' => { -prefix => 'moose_' };
+#moose_extends('$WHAT');
+#moose_with(" . join(',', map {"'$_'"} @newmix) . ");
 END
     }
     $lang;

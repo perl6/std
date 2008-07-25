@@ -798,7 +798,7 @@ token colonpair {
         { $key = ""; $value = $<postcircumfix>; }
         {*}                                                     #= structural
     | $<var> = (<sigil> :: <twigil>? <desigilname>)
-        { $key = $<desigilname>.text; $value = $<var>; }
+        { $key = $<var><desigilname>.text; $value = $<var>; }
         {*}                                                     #= varname
     ]
     { $<k> = $key; $<v> = $value; }
@@ -893,18 +893,15 @@ token post {
 # (Also backtracks if on \op when no \op infix exists.)
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     $<s> = (
-        '[' <!!before \S+ ']'>
+        '['
         [
-        | <op=infix>
-        | <op=infix_prefix_meta_operator>
-        | <op=infix_circumfix_meta_operator>
-        | <infix> <op=infix_postfix_meta_operator($<infix>)>
-        | \\<op=infix>
-        | \\<op=infix_prefix_meta_operator>
-        | \\<op=infix_circumfix_meta_operator>
-        | \\<infix> <op=infix_postfix_meta_operator($<infix>)>
+        | <op=infix> ']' ['«'|<?>]
+        | <op=infix_prefix_meta_operator> ']' ['«'|<?>]
+        | <op=infix_circumfix_meta_operator> ']' ['«'|<?>]
+        | \\<op=infix> ']' ['«'|<?>]
+        | \\<op=infix_prefix_meta_operator> ']' ['«'|<?>]
+        | \\<op=infix_circumfix_meta_operator> ']' ['«'|<?>]
         ]
-        ']'
     ) <?before \s | '(' >
 
     { $<O> = $<s><op><O>; $<sym> = $<s>.text; }
@@ -924,18 +921,18 @@ token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
 token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' }
 
 token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
-    <sym> <!before '!'> <infix> ::
+    <sym> <!before '!'> <infix>
 
-    { $<O> = $<infix><O>; }
-    <?lex1: 'negation'>
+    <!!{ $<O> = $<infix><O>; }>
+    <!!lex1: 'negation'>
 
     [
-    || <?{ $<O><assoc> eq 'chain'}>
-    || <?{ $<O><assoc> and $<O><bool> }>
+    || <!!{ $<O><assoc> eq 'chain'}>
+    || <!!{ $<O><assoc> and $<O><bool> }>
     || <.panic: "Only boolean infix operators may be negated">
     ]
 
-    { $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }
+    <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
 
 }
 
@@ -946,8 +943,8 @@ method lex1 (Str $s) {
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
     X <infix> X
-    { $<O> = $<infix><O>; }
-    <?lex1: 'cross'>
+    <!!{ $<O> = $<infix><O>; }>
+    <!!lex1: 'cross'>
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
@@ -957,17 +954,17 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
     | '<<' <infix> [ '<<' | '>>' ]
     | '>>' <infix> [ '<<' | '>>' ]
     ]
-    { $<O> := $<infix><O>; }
-    <?lex1: 'hyper'>
+    <!!{ $<O> := $<infix><O>; }>
+    <!!lex1: 'hyper'>
 }
 
 token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
-    '=' ::
-    { $<O> = $op<O>; }
-    <?lex1: 'assignment'>
+    '='
+    <!!{ $<O> = $op<O>; }>
+    <!!lex1: 'assignment'>
 
     [
-    || <?{ $<O><prec> gt %item_assignment<prec> }>
+    || <!!{ $<O><prec> gt %item_assignment<prec> }>
     || <.panic: "Can't make assignment op of operator looser than assignment">
     ]
 
