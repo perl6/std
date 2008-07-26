@@ -1,7 +1,8 @@
+#!perl
 use strict;
 use warnings;
 
-use feature 'say';
+use feature 'say', 'state';
 
 our $CTX = '';
 our $DEBUG = $ENV{STD5DEBUG} // 0;
@@ -284,55 +285,57 @@ sub _AUTOLEXgen { my $self = shift;
 sub canmatch {
     my ($p,$s) = @_;
     while ($p ne '' and $s ne '') {
-	$p =~ s/\(\?#[^)]*\)//g;	# remove comments
 	my $f = substr($p,0,1,'');
-	if ($f eq '(') {
-	    return 1 if $p =~ /\|/; #guess positive on alternation
-	    s/^\?://;
-	    next;	# ignore left paren
-	}
 	my $c = substr($s,0,1,'');
-	if ($f eq '\\') {
-	    if ($p =~ s/^(\W)//) {
-		return 1 if $p =~ s/^[*?]//;
-		return 1 if $1 eq '>';
-		return 0 unless $c eq $1;
-	    }
-	    elsif ($p =~ s/^(\w)//) {
-		$f .= $1;
-		if ($1 eq 'x') {
-		    if ($p =~ s/^([[:digit:][:alpha:]]{2,4})//) {
-			$f .= $1;
-		    }
-		    elsif ($p =~ s/^(\[\w+\])//) {
-			$f .= $1;
-		    }
+	if ($f =~ /[\[\\\$.()\t]/) {
+	    if ($f eq '\\') {
+		if ($p =~ s/^(\W)//) {
+		    return 1 if $p =~ s/^[*?]//;
+		    return 1 if $1 eq '>';
+		    return 0 unless $c eq $1;
 		}
+		elsif ($p =~ s/^(\w)//) {
+		    $f .= $1;
+		    if ($1 eq 'x') {
+			if ($p =~ s/^([[:digit:][:alpha:]]{2,4})//) {
+			    $f .= $1;
+			}
+			elsif ($p =~ s/^(\[\w+\])//) {
+			    $f .= $1;
+			}
+		    }
+		    return 1 if $p =~ s/^[*?]//;
+		    return 0 unless $c =~ /^$f/;
+		}
+	    }
+	    elsif ($f eq '[') {
+		if ($p =~ s/^(\^?\]?(?:\:\]|\\\]|.)*?\])//) {
+		    $f .= $1;
+		    return 1 if $p =~ s/^[*?]//;
+		    return 0 unless $c =~ /^$f/;
+		}
+		else {
+		    return 1;	# guess positive
+		}
+	    }
+	    elsif ($f eq '(') {
+		return 1 if $p =~ /\|/; #guess positive on alternation
+		$p =~ s/^\?://;
+		substr($s,0,0,$c);
+		next;	# ignore left paren
+	    }
+	    elsif ($f eq ')') {
+		return 1;		# guess positive
+	    }
+	    elsif ($f eq '.') {
 		return 1 if $p =~ s/^[*?]//;
-		return 0 unless $c =~ /^$f/;
 	    }
-	}
-	elsif ($f eq '[') {
-	    if ($p =~ s/^(\^?\]?(?:\:\]|\\\]|.)*?\])//) {
-		$f .= $1;
-		return 1 if $p =~ s/^[*?]//;
-		return 0 unless $c =~ /^$f/;
+	    elsif ($f eq '$') {
+		return 1;
 	    }
-	    else {
-		return 1;	# guess positive
+	    else { # \t
+		return 1;
 	    }
-	}
-	elsif ($f eq ')') {
-	    return 1;		# guess positive
-	}
-	elsif ($f eq '.') {
-	    return 1 if $p =~ s/^[*?]//;
-	}
-	elsif ($f eq '$') {
-	    return 1;
-	}
-	elsif ($f eq "\t") {
-	    return 1;
 	}
 	elsif ($f eq $c) {
 	    return 1 if $p =~ s/^[*?]//;
@@ -389,9 +392,12 @@ sub _AUTOLEXnow { my $self = shift;
     $lexer->{$ch2} //= do {
 	$self->deb("Selecting $key patterns starting with '$ch2'") if $DEBUG & DEBUG::autolexer;
 
-	my @tmp =  @{$lexer->{PATS}};
-	my @pats = map { s/\t/.?\t/; $_; } grep { canmatch($_, $ch2) }  @tmp;
-	if (0 and @pats > 10) {
+	my @pats = grep { canmatch($_, $ch2) } @{
+	    $lexer->{FASTPATS} //= [
+		map { my $x = $_; $x =~ s/\(\?#::\)//g; $x =~ s/\t/.?\t/; $x } @{$lexer->{PATS}}
+	    ]
+	};
+	if (@pats > 10) {
 	    print STDERR "PATS: ",0+@pats," $ch2 ", substr($$buf,$P+length($ch2), 5), "\n";
 	    print "PATS: ",0+@pats," $ch2 ", substr($$buf,$P+length($ch2), 5), "\n";
 	    print join "\n", @pats, '';
@@ -455,7 +461,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    sub {
 		my $C = shift;
 
-		die "orig disappeared!!!" unless length($$buf);
+		# die "orig disappeared!!!" unless length($$buf);
 
 		return unless $lexer;
 
@@ -536,31 +542,45 @@ sub _AUTOLEXnow { my $self = shift;
 
 		    $self->deb("/ running tre match at @{[ pos($$buf) ]} /") if $DEBUG & DEBUG::lexer;
 
-		    if (($$buf =~ m/$pat/xgc)) {	# XXX does this recompile $pat every time?
-			my $max = @+ - 1;
-			my $last = @- - 1;	# ignore '$0'
-#		        $self->deb("LAST: $last\n");
-			my $result = $fates->[$last-1];
-			for my $x (1 .. $max) {
-			    my $beg = $-[$x];
-			    next unless defined $beg;
-			    my $end = $+[$x];
-#			    return if $stoplen >= $end - $beg;
-			    my $f = $fates->[$x-1][3];
-			    no strict 'refs';
-			    if ($DEBUG & DEBUG::fates or ($DEBUG & DEBUG::lexer and $x == $last)) {
-				my $p = $pats[$x] // '<nopat>';
-				$self->deb("\$$x: $beg..$end\t$$x\t ",
-				    $x == $last ? "====>" : "---->",
-				    " $f\t/$p/");
+		    # Try Real Hard to prevent TRE from recompiling $pat
+		    state $matcher = eval(do { my $prog = <<"END" .
+		    \$self->deb("GENERATING");
+		    sub {
+			pos(\$\$buf) = \$C->{_pos};
+
+			my \$result;
+			if ((\$\$buf =~ m\0$pat\0xgc)) {
+END
+<<'END'; $prog; });
+			    my $max = @+ - 1;
+			    my $last = @- - 1;	# ignore '$0'
+		            $C->deb("LAST: $last\n");
+			    $result = $fates->[$last-1];
+			    for my $x (1 .. $max) {
+				my $beg = $-[$x];
+				next unless defined $beg;
+				my $end = $+[$x];
+#			        return if $stoplen >= $end - $beg;
+				my $f = $fates->[$x-1][3];
+				no strict 'refs';
+				if ($DEBUG & DEBUG::fates or ($DEBUG & DEBUG::lexer and $x == $last)) {
+				    my $p = $pats[$x] // '<nopat>';
+				    $self->deb("\$$x: $beg..$end\t$$x\t ",
+					$x == $last ? "====>" : "---->",
+					" $f\t/$p/");
+				}
 			    }
+			    $C->deb("success at '", substr($$buf,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
+			    my $tried = "";
+			    vec($tried,$last-1,1) = 1;
+			    $_[0] = [$tried, $+[0] - $-[0], []];
 			}
-#			$self->deb("success at '", substr($$buf,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
-			my $tried = "";
-			vec($tried,$last-1,1) = 1;
-			$_[0] = [$tried, $+[0] - $-[0], []];
-			return unless $result;
 			$result;
+		    };
+END
+		    my $result = $matcher->(@_);
+		    if ($result) {
+			return $result;
 		    }
 		    else {
 			$self->deb("NO LEXER MATCH");
