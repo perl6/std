@@ -2070,7 +2070,7 @@ grammar Q is Perl {
             [
             | <codepoint>
             | \d+
-            | :: [ <[ ?.._ ]> || <.panic: "Unrecognized \c character"> ]
+            | :: [ <[ ?.._ ]> || <.panic: "Unrecognized \\c character"> ]
             ]
         }
         token backslash:e { <sym> }
@@ -3444,7 +3444,7 @@ grammar Regex is Perl {
         [
         | <codepoint>
         | \d+
-        | :: [ <[ ?.._ ]> || <.panic: "Unrecognized \c character"> ]
+        | :: [ <[ ?.._ ]> || <.panic: "Unrecognized \\c character"> ]
         ]
     }
     token backslash:d { :i <sym> }
