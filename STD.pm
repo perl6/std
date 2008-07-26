@@ -1179,7 +1179,7 @@ token special_variable:sym<$!> { <sym> <!before \w> }
 token special_variable:sym<$!{ }> {
     # XXX the backslashes are necessary here for bootstrapping, not for P6...
     ( '$!{' :: (.*?) '}' )
-    <obs("$0 variable", 'smart match against $!')>
+    <obs($0.text ~ " variable", 'smart match against $!')>
 }
 
 token special_variable:sym<$/> {
@@ -1209,7 +1209,7 @@ token special_variable:sym<$@> {
 token special_variable:sym<$#> {
     <sym> ::
     [
-    || (\w+) <obs("\$#$0 variable", "\@{$0}.end")>
+    || (\w+) <obs("\$#" ~ $0.text ~ " variable", "\@{" ~ $0.text ~ "}.end")>
     || <obs('$# variable', '.fmt')>
     ]
 }
@@ -1315,7 +1315,7 @@ token special_variable:sym<$+> {
 
 token special_variable:sym<${^ }> {
     ( <sigil> '{^' :: (.*?) '}' )
-    <obscaret($0, $<sigil>, $1)>
+    <obscaret($0.text, $<sigil>, $0.{0}.text)>
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
@@ -1356,7 +1356,7 @@ method obscaret (Str $var, Str $sigil, Str $name) {
                 when *               { "a global form such as $sigil*$name" }
             }
         }
-        when * { "a global form such as $sigil*$0" }
+        when * { "a global form such as $sigil*$name" }
     };
     };
     return self.obs("$var variable", $repl);
@@ -1364,7 +1364,7 @@ method obscaret (Str $var, Str $sigil, Str $name) {
 
 token special_variable:sym<${ }> {
     ( <sigil> '{' :: (.*?) '}' )
-    <obs("$0 variable", "{$<sigil>}($1)")>
+    <obs("" ~ $0.text ~ " variable", "{" ~ $<sigil>.text ~ "}(" ~ $0.{0}.text ~ ")")>
 }
 
 token special_variable:sym<$[> {
@@ -1800,15 +1800,18 @@ token quote:sym«< >»   { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).t
 token quote:sym</ />   {
     '/' <nibble( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> '/'
     [ (< i g s m x c e ] >+) 
-        # note: inner failure of obs caught by ? so we report all suggestions
-        [ $0 ~~ 'i' <obs('/i',':i')> ]?
-        [ $0 ~~ 'g' <obs('/g',':g')> ]?
-        [ $0 ~~ 's' <obs('/s','^^ and $$ anchors')> ]?
-        [ $0 ~~ 'm' <obs('/m','. or \N')> ]?
-        [ $0 ~~ 'x' <obs('/x','normal default whitespace')> ]?
-        [ $0 ~~ 'c' <obs('/c',':c or :p')> ]?
-        [ $0 ~~ 'e' <obs('/e','interpolated {...} or s{} = ... form')> ]?
-        <obs('suffix regex modifiers','prefix adverbs')>
+        {{
+            given $0 {
+                /i/ and $¢.obs('/i',':i');
+                /g/ and $¢.obs('/g',':g');
+                /s/ and $¢.obs('/s','^^ and $$ anchors');
+                /m/ and $¢.obs('/m','. or \N');
+                /x/ and $¢.obs('/x','normal default whitespace');
+                /c/ and $¢.obs('/c',':c or :p');
+                /e/ and $¢.obs('/e','interpolated {...} or s{} = ... form');
+                $¢.obs('suffix regex modifiers','prefix adverbs');
+            }
+        }}
     ]?
 }
 
@@ -2065,8 +2068,9 @@ grammar Q is Perl {
         token backslash:b { <sym> }
         token backslash:c { <sym>
             [
-            || '[' <-[ \] \v ]>* ']'
-            || <codepoint>
+            | <codepoint>
+            | \d+
+            | :: [ <[ ?.._ ]> || <.panic: "Unrecognized \c character"> ]
             ]
         }
         token backslash:e { <sym> }
@@ -2141,6 +2145,14 @@ grammar Q is Perl {
         method postprocess ($s) { $s.comb }
     } # end role
 
+    role x {
+        method postprocess ($s) { $s.run }
+    } # end role
+
+    role _x {
+        method postprocess ($s) { $s }
+    } # end role
+
     role q {
         token stopper { \' }
 
@@ -2151,7 +2163,7 @@ grammar Q is Perl {
         token backslash:stopper { <text=stopper> }
 
         # in single quotes, keep backslash on random character by default
-        token backslash:misc { :: (.) { $<text> = "\\$0"; } }
+        token backslash:misc { :: (.) { $<text> = "\\" ~ $0; } }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
@@ -2164,7 +2176,7 @@ grammar Q is Perl {
     role qq does b does c does s does a does h does f {
         token stopper { \" }
         # in double quotes, omit backslash on random \W backslash by default
-        token backslash:misc { :: [ (\W) { $<text> = "$0"; } | (\w) <.panic: "unrecognized backslash sequence: '\\$0'"> ] }
+        token backslash:misc { :: [ (\W) { $<text> = $0.text; } | $<x>=(\w) <.panic("Unrecognized backslash sequence: '\\" ~ $<x>.text ~ "'")> ] }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
@@ -2219,7 +2231,7 @@ grammar Q is Perl {
 
     multi method tweak (*%x) {
         my @k = keys(%x);
-        Perl.panic("Unrecognized quote modifier: " ~ @k);
+        self.panic("Unrecognized quote modifier: " ~ @k);
     }
     # end tweaks (DO NOT ERASE)
 
@@ -3317,7 +3329,7 @@ grammar Regex is Perl {
         [
         | \w
         | <metachar>
-        | :: <.panic: "unrecognized regex metacharacter">
+        | :: <.panic: "Unrecognized regex metacharacter">
         ]
     }
 
@@ -3396,7 +3408,7 @@ grammar Regex is Perl {
     token metachar:sym<^>  { <sym> }
     token metachar:sym<$$> {
         <sym>
-        [ <?before (\w+)> <obs("\$\$$0 to deref var inside a regex","\$(\$$0)")> ]?
+        [ (\w+) <obs("\$\$" ~ $0.text ~ " to deref var inside a regex", "\$(\$" ~ $0.text ~ ")")> ]?
     }
     token metachar:sym<$>  {
         '$'
@@ -3430,8 +3442,9 @@ grammar Regex is Perl {
     token backslash:b { :i <sym> }
     token backslash:c { :i <sym>
         [
-        || '[' <-[ \] \v ]>* ']'
-        || <codepoint>
+        | <codepoint>
+        | \d+
+        | :: [ <[ ?.._ ]> || <.panic: "Unrecognized \c character"> ]
         ]
     }
     token backslash:d { :i <sym> }
@@ -3447,7 +3460,7 @@ grammar Regex is Perl {
     token backslash:w { :i <sym> }
     token backslash:x { :i <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
     token backslash:misc { $<litchar>=(\W) }
-    token backslash:oops { :: <.panic: "unrecognized regex backslash sequence"> }
+    token backslash:oops { :: <.panic: "Unrecognized regex backslash sequence"> }
 
     token assertion:sym<...> { <sym> }
     token assertion:sym<???> { <sym> }
@@ -3490,7 +3503,7 @@ grammar Regex is Perl {
     token assertion:sym<,> { <sym> }
     token assertion:sym<~~> { <sym> <desigilname>? }
 
-    token assertion:bogus { <.panic: "unrecognized regex assertion"> }
+    token assertion:bogus { <.panic: "Unrecognized regex assertion"> }
 
     token cclass_elem {
         [ '+' | '-' ]?
@@ -3526,7 +3539,7 @@ grammar Regex is Perl {
         <?before ':' <ident> > [ :lang($¢.cursor_fresh($+LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
     }
 
-    token mod_internal:oops { ':' <.panic: "unrecognized regex modifier"> }
+    token mod_internal:oops { ':' <.panic: "Unrecognized regex modifier"> }
 
     token quantifier:sym<*>  { <sym> <quantmod> }
     token quantifier:sym<+>  { <sym> <quantmod> }

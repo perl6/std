@@ -72,8 +72,8 @@ sub un6 {
     my $f = shift;
     my $t;
     $f =~ s/\\x([0-9a-fA-F]{3,4})/\\x{$1}/g;
+    $f =~ s!\$([0-9]+)!\$\$C{$1}!g;
     while ($f ne "") {
-	$f =~ s!^\$([0-9]+)!!			and $t .= '$C->{"' . $1 . '"}', next;
         $f =~ s/^\)</.</                  	and $t .= ')', next;
         $f =~ s/^\.\(/(/                  	and $t .= '->', next;
 	$f =~ s/^\[\*-1\]//			and $t .= '[-1]';
@@ -288,52 +288,6 @@ END
         if ( s/^(#.*\n)// ) { $out .= $1; next }
 
         my $remaining = length($_);
-
-        if (s/^(XXX method heredoc[^\n{]*).*?\n}\n//s) {
-            $out .= "# $1\n";
-            $out .= <<'END';
-sub heredoc { my $self = shift;  
-    my $here = $self;
-    while (my $herestub = shift @herestub_queue) {
-        local $DELIM = $herestub->delim;
-        my $lang = $herestub->lang;
-        my $doc;
-        my $ws = "";
-        $here = $here->q_unbalanced_rule($lang, stop => \&theredoc)->_MATCHIFY;
-        if ($here) {
-            if ($ws) {
-                my $wsequiv = $ws;
-                $wsequiv =~ s/^(\t+)/' ' x ($1 * 8)/e; # per spec
-                $here->{text}[0] =~ s/^/\n/; # so we don't match ^^ after escapes
-                for (@{$here->{text}}) {
-                    s{\n($ws|[ \t]*)}!do {
-                        my $white = $1;
-                        if ($white eq $ws) {
-                            '';
-                        }
-                        else {
-                            $white =~ s{^(\t+)}{
-                                ' ' x (length($1) * 8)
-                            }e;
-                            $white =~ s/^$wsequiv//
-                                ? $white
-                                : '';
-                        }
-                    }!eg;
-                }
-                $here->{text}[0] =~ s/^\n//;
-            }
-            $herestub->orignode->{doc} = $here;
-        }
-        else {
-            self->panic("Ending delimiter $DELIM not found");
-        }
-    }
-    return $here;
-}
-END
-            next;
-        }
 
 	if (s/^(\s*)(proto \s+ (regex|rule|token|method) \s+
 	    (\w+) \s*
