@@ -391,11 +391,11 @@ sub _AUTOLEXnow { my $self = shift;
 
 	my @tmp =  @{$lexer->{PATS}};
 	my @pats = map { s/\t/.?\t/; $_; } grep { canmatch($_, $ch2) }  @tmp;
-#	if (@pats > 10) {
-#	    print STDERR "PATS: ",0+@pats," $ch2 ", substr($$buf,$P+length($ch2), 5), "\n";
-#	    print "PATS: ",0+@pats," $ch2 ", substr($$buf,$P+length($ch2), 5), "\n";
-#	    print join "\n", @pats, '';
-#	}
+	if (0 and @pats > 10) {
+	    print STDERR "PATS: ",0+@pats," $ch2 ", substr($$buf,$P+length($ch2), 5), "\n";
+	    print "PATS: ",0+@pats," $ch2 ", substr($$buf,$P+length($ch2), 5), "\n";
+	    print join "\n", @pats, '';
+	}
 	my @rxlenmemo;
 	if (!@pats) {
 	    $self->deb("No $key patterns start with '$ch2'") if $DEBUG & DEBUG::autolexer;
@@ -954,7 +954,7 @@ sub _STARr { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
-    my $prev_to = $to->{_to};
+    my $prev_to = $to->{_to} // 0;
     my @all;
     my $eos = length(${$self->{_orig}});
     for (;;) {

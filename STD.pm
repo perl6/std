@@ -2096,7 +2096,7 @@ grammar Q is Perl {
     } # end role
 
     role s {
-        token escape:sym<$> { <?before '$'> [ :lang($+LANG) <variable> <extrapost>? ] }
+        token escape:sym<$> { <?before '$'> [ :lang($+LANG) <variable> <extrapost>? ] || <.panic: "Non-variable \$ must be backslashed"> }
         token special_variable:sym<$"> {
             '$' <stopper>
             <.panic: "Can't use a \$ in the last position of an interpolating string">
@@ -3131,7 +3131,8 @@ method EXPR ($preclvl)
 
         if not @t or not $here = @t[0] or $here.pos == $oldpos {
             last if $nullok;
-            $here.panic("Failed to parse a required term");
+            return ();
+            # $here.panic("Failed to parse a required term");
         }
 
         # interleave prefix and postfix, pretend they're infixish

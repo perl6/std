@@ -101,7 +101,7 @@ sub un6 {
         $f =~ s/^([^:]):(\w+)«(.*?)»//  	and $t .= qq/$1'$2' => '$3'/, next;
         $f =~ s/^([^:]):(\w+)//         	and $t .= qq/$1'$2' => 1/, next;
         $f =~ s/^([^:]):!(\w+)//        	and $t .= qq/$1'$2' => 0/, next;
-        $f =~ s/^\%::\((.*?)\)// 		and $t .= ('do { no strict "refs"; \%{' . $1 . '}}'), next;
+        $f =~ s/^\%::\((.*?)\)// 		and $t .= ("do { no strict 'refs'; \\%{$1}}"), next;
         $f =~ s/^\%\+?(\w+)((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
         $f =~ s/^\%\+?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
         $f =~ s/^\%\+?(\w+)\{//         	and $t .= qq/\$$1\{/, next;
@@ -528,7 +528,8 @@ END
 
             if ($KIND eq 'method') {
                 $out .= <<"END";
-${indent}sub $NAME { my \$self = shift;
+${indent}sub $NAME {
+${indent}    my \$self = shift;
 $sym
 END
                 next;
@@ -1476,7 +1477,7 @@ sub unbalanced {
 	return $re unless @BINDINGS;
 	$re = "\$C->_SUBSUME([" .
 	    join(',', map {"'$_'"} @BINDINGS) .
-	    "], sub { my \$C = shift()->cursor_fresh; $re })";
+	    "], sub {\n" . ::indent("my \$C = shift()->cursor_fresh;\n" . $re) . "\n})";
 	@BINDINGS = ();
 	$re;
     }
@@ -1555,18 +1556,18 @@ sub unbalanced {
         my $ctx = $$self{context};
         $text = 'my $M = $C; ' . $text . ';' if $NEEDMATCH;
         if ($text =~ s/\bmake\b/scalar/g) {  # XXX hack, avoid using $<make>
-            "do {$text}";
+            "do {\n" . ::indent($text) . "\n}";
         }
         elsif ($ctx eq 'void') {
             $PURE = 0;
-            "scalar(do {$text}, \$C)";
+            "scalar(do {\n" . ::indent($text) . "\n}, \$C)";
         }
         elsif ($ctx eq 'bool') {
-            "((\$C) x !!do {$text})";
+            "((\$C) x !!do {\n" . ::indent($text) . "\n})";
         }
         else {
             $PURE = 0;
-            " sub { my \$C=shift;$text}";
+            " sub { my \$C=shift;\n" . ::indent($text) . "\n}";
         }
     }
 }
@@ -1620,7 +1621,7 @@ sub unbalanced {
 	    local @BINDINGS;
 	    $re = ::indent($$self{re}->walk(@_));
 	}
-        $re = "\$C->_BRACKET$REV( sub { my \$C=shift;\n" . $re . "\n})";
+        $re = "\$C->_BRACKET$REV( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
 	$self->bind($re);
     }
 
@@ -1774,7 +1775,7 @@ sub unbalanced {
         }
         if ($not) { # XXX or maybe just .NOT on the end...
             $PURE = 0;
-            $code = "\$C->_NOTCHAR( sub { my \$C=shift; $code })";
+            $code = "\$C->_NOTCHAR( sub { my \$C=shift;\n" . ::indent($code) . "\n})";
         }
         $code;
     }
@@ -1826,7 +1827,7 @@ END
 	    push @BINDINGS, $name;
 	    $BINDINGS{$name} += $BINDNUM;
 	}
-        $re = 'do { my $M = $C; ' . $re . '; }' if $NEEDMATCH;
+        $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $NEEDMATCH;
 	$self->bind($re);
     }
 }
@@ -1841,7 +1842,7 @@ END
         $PURE = 0 if $impure{$name};
 
         my $re = '$C->' . $name . "($args)";
-        $re = 'do {my $M = $C; ' . $re . '; }' if $NEEDMATCH;
+        $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $NEEDMATCH;
         $re;
     }
 }
@@ -1860,7 +1861,7 @@ END
 	}
         $REV = '';
 
-        $re = '$C->' . $name . "(sub { my \$C=shift;\n$re\n})";
+        $re = '$C->' . $name . "(sub { my \$C=shift;\n" . ::indent($re) . "\n})";
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    push @BINDINGS, $name;
 	    $BINDINGS{$name} += $BINDNUM;
@@ -1941,10 +1942,10 @@ END
         }
         else {
             ::panic("Can't reverse serial disjunction") if $REV;
-            for (@result) { s/^/push \@gather, / }
+            for (@result) { s/^/eval { push \@gather, / }
             my $result = "do { my \@gather;\n" .
-                            ::indent(join("\nor\n", @result),2) .
-                          ";\n  \@gather;\n}";
+                            ::indent(join("} \nor\n", @result),2) .
+                          "} or do { die \$@ if \$@ };\n  \@gather;\n}";
             $result;
         }
     }
@@ -1983,7 +1984,7 @@ END
 		}
 	    }
 	}
-        $re = "do { \$C->_${REV}PAREN( sub { my \$C=shift;\n" . $re . "\n})}";
+        $re = "do { \$C->_${REV}PAREN( sub { my \$C=shift;\n" . ::indent($re) . "\n})}";
 	$self->bind($re);
     }
 
@@ -2242,7 +2243,7 @@ END
             $result[0];
         }
         else {
-            for (@result) { $_ = "sub { my \$C=shift; $_ }," }
+            for (@result) { $_ = "sub { my \$C=shift;\n" . ::indent($_) . "\n}," }
             my $policy;
             if ($failover) {
                 $policy = <<"END"
