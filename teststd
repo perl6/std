@@ -8,10 +8,12 @@ chomp(@files);
 $| = 1;
 
 my $total = 0+@files;
+my @failed;
 for my $file (@files) {
     print $file, "\n";
     system "./tryfile $file >tryfile.out";
     if ($?) {
+        push(@failed,$file);
 	$fail++;
     }
     else {
@@ -21,3 +23,7 @@ for my $file (@files) {
 }
 
 print "Passed $success/$total, ", int $success/$total * 100, "%\n";
+print "Failed tests:\n";
+for my $file (@failed) {
+    print "$file\n";
+}

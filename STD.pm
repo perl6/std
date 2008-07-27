@@ -524,7 +524,7 @@ token label {
     ]?
 
     # add label as a pseudo type
-    {{ eval 'COMPILING::{"::$<ident>"} = Label.new($<ident>)' }}  # XXX need statement ref too?
+    # {{ eval 'COMPILING::{"::$<ident>"} = Label.new($<ident>)' }}  # XXX need statement ref too?
 
 }
 
