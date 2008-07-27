@@ -1063,6 +1063,8 @@ rule scoped {
 
 token scope_declarator:my       { <sym> <scoped> }
 token scope_declarator:our      { <sym> <scoped> }
+token scope_declarator:let      { <sym> <scoped> }
+token scope_declarator:temp     { <sym> <scoped> }
 token scope_declarator:state    { <sym> <scoped> }
 token scope_declarator:constant { <sym> <scoped> }
 token scope_declarator:has      { <sym> <scoped> }
