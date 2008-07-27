@@ -390,6 +390,7 @@ token unsp {
 
 token vws {
     \v ::
+    { $*LINE++ }
     [ '#DEBUG -1' { say "DEBUG"; $Perl::DEBUG = $*DEBUG = -1; } ]?
 }
 
