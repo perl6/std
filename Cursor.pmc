@@ -399,7 +399,7 @@ sub _AUTOLEXnow { my $self = shift;
 	my @pats;
 	my $file = $lexer->{FILE} . '__' . ::mangle($ch2);
 	if (open PATS, '<', $file) {
-	    binmode(PATS ":utf8");
+	    binmode(PATS, ":utf8");
 #	    print STDERR "<$file\n";
 	    $self->deb("Using cached $key patterns starting with '$ch2'") if $DEBUG & DEBUG::autolexer;
 	    chomp(@pats = <PATS>);
@@ -419,7 +419,7 @@ sub _AUTOLEXnow { my $self = shift;
 #		print join "\n", @pats, '';
 #	    }
 	    if (open PATS, '>', $file) {
-		binmode(PATS ":utf8");
+		binmode(PATS, ":utf8");
 		print PATS join("\n", @pats, '');
 		close PATS;
 	    }
