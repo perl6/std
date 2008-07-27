@@ -1039,7 +1039,7 @@ token variable_declarator {
         | '[' :: <semilist> [ ']' || <.panic: "Missing right bracket"> ]
         | '{' :: <semilist> [ '}' || <.panic: "Missing right brace"> ]
         | <?before '<'> <postcircumfix>
-        ]
+        ]*
     ]?
 
     <trait>*
