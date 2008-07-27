@@ -1363,8 +1363,12 @@ method obscaret (Str $var, Str $sigil, Str $name) {
     return self.obs("$var variable", $repl);
 }
 
+token special_variable:sym<::{ }> {
+    '::' <?before '{'>
+}
+
 token special_variable:sym<${ }> {
-    ( <sigil> '{' :: (.*?) '}' )
+    ( <[$@%]> '{' :: (.*?) '}' )
     <obs("" ~ $0.text ~ " variable", "{" ~ $<sigil>.text ~ "}(" ~ $0.{0}.text ~ ")")>
 }
 
