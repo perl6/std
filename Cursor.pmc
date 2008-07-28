@@ -1,6 +1,7 @@
 #!perl
 use strict;
 use warnings;
+use utf8;
 
 use feature 'say', 'state';
 
@@ -38,6 +39,10 @@ sub ::deb {
 }
 
 package Cursor;
+
+use Carp;
+
+# $SIG{__DIE__} = sub { confess(@_) };
 
 use LazyMap qw(lazymap eager);
 
@@ -77,11 +82,6 @@ BEGIN {
     }
     binmode(::LOG, ":utf8");
 }
-
-use Carp;
-use utf8;
-
-#$SIG{__DIE__} = sub { confess(@_) };
 
 sub new {
     my $class = shift;
@@ -123,6 +123,21 @@ sub mixin {
 	warn $@ if $@;
     }
     return $self->cursor_fresh($NEWWHAT);
+}
+
+sub tweak {
+    my $self = shift;
+    my $class = ref $self;
+    no strict 'refs';
+    for (;;) {
+	my $retval = eval {
+	    $self->deb("Calling $class" . '::multitweak');
+	    &{$class . '::multitweak'}($self,@_);
+	}; 
+	return $retval if $retval;
+	die $@ unless $@ =~ /^NOMATCH|^Undefined subroutine/;
+	last unless $class =~ s/(.*)::.*/$1/;
+    }
 }
 
 sub _PARAMS {}	# overridden in parametric role packages

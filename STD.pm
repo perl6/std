@@ -2175,7 +2175,6 @@ grammar Q is Perl {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
-        multi method tweak (*%x) { self.HOW.find_next_method_by_name('tweak').(self,%x) }
         # end tweaks (DO NOT ERASE)
 
     } # end role
@@ -2188,7 +2187,6 @@ grammar Q is Perl {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
-        multi method tweak (*%x) { self.HOW.find_next_method_by_name('tweak').(self,%x) }
         # end tweaks (DO NOT ERASE)
 
     } # end role
