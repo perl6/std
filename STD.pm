@@ -1021,8 +1021,10 @@ token methodop {
 token arglist {
     :my StrPos $endargs is context<rw> = 0;
     <.ws>
-    <!stdstopper>
-    <EXPR(item %list_prefix)>
+    [
+    | <?stdstopper>
+    | <EXPR(item %list_prefix)>
+    ]
 }
 
 token circumfix:sym<{ }> ( --> Term) {
@@ -1785,7 +1787,7 @@ token nibbler {
                             push @nibbles, $text, $<escape>;
                             $text = '';
                         }
-        |            :: <!stopper> .
+        |            :: .
                         {
                             $text ~= substr($$buf, $¢.pos-1, 1);
                         }
@@ -3484,17 +3486,31 @@ grammar Regex is Perl {
 
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        [:lang($¢.cursor_fresh($+LANG)) <variable=EXPR(item %LOOSEST)>]
+        [:lang($¢.cursor_fresh($+LANG).unbalanced('>')) <variable=EXPR(item %LOOSEST)>]
     }
 
     token assertion:method {
         '.' [
             | <?before <alpha> > <assertion>
-            | [ :lang($¢.cursor_fresh($+LANG)) <dottyop> ]
+            | [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <dottyop> ]
             ]
     }
 
     token assertion:ident { <ident> [               # is qq right here?
+                                    | <?before '>' >
+                                    | <.ws> <nibbler>
+                                    | '=' <assertion>
+                                    | ':' <.ws>
+                                        [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]
+                                    | '(' ::
+					[ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
+					[ ')' || <.panic: "Assertion call missing right parenthesis"> ]
+                                    ]?
+    }
+
+    # stupid special case
+    token assertion:name { <?before \w*'::('> [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <name> ]
+                                    [
                                     | <?before '>' >
                                     | <.ws> <nibbler>
                                     | '=' <assertion>

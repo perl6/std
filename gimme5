@@ -2089,7 +2089,9 @@ END
             "\n}, $outer)";
         }
         else {
-            "$outer andthen\n$inner\n}";
+            "map({ my \$C=\$_;\n" .
+                ::indent($inner) .
+            "\n} ($outer)[0])";
         }
     }
 
