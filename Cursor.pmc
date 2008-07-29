@@ -115,7 +115,7 @@ sub mixin {
     }
     $self->deb("mixin $NEWWHAT from $WHAT @newmix") if $DEBUG & DEBUG::mixins;
     no strict 'refs';
-    if (not @{$NEWWHAT.'::ISA'}) {		# never composed this one yet?
+    if (not exists &{$NEWWHAT.'::meta'}) {		# never composed this one yet?
 	# fake up mixin with MI, being sure to put "roles" in front
 	my $eval = "package $NEWWHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$WHAT'); moose_with(" . join(',', map {"'$_'"} @newmix) . ");\n";
 	$self->deb($eval) if $DEBUG & DEBUG::mixins;

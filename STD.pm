@@ -1827,16 +1827,16 @@ token quote:qq {
     :my $qm;
     'qq'
     [
-    | <quote_mod> » { $qm = $<quote_mod>.text } <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak($qm => 1))>
-    | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
     ]
 }
 token quote:q {
     :my $qm;
     'q'
     [
-    | <quote_mod> » { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak($qm => 1))>
-    | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
     ]
 }
 
@@ -1844,8 +1844,8 @@ token quote:Q {
     :my $qm;
     'Q'
     [
-    | <quote_mod> » { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::Perl::Q ).tweak($qm => 1))>
-    | » <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::Perl::Q ).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ))>
     ]
 }
 
@@ -1860,19 +1860,19 @@ token quote_mod:f  { <sym> }
 token quote_mod:c  { <sym> }
 token quote_mod:b  { <sym> }
 
-token quote:rx { <sym> » <quibble( $¢.cursor_fresh( ::Regex ) )> }
+token quote:rx { <sym> » <!before '('> <quibble( $¢.cursor_fresh( ::Regex ) )> }
 
-token quote:m  { <sym> » <quibble( $¢.cursor_fresh( ::Regex ) )> }
-token quote:mm { <sym> » <quibble( $¢.cursor_fresh( ::Regex ).tweak(:s))> }
+token quote:m  { <sym> » <!before '('> <quibble( $¢.cursor_fresh( ::Regex ) )> }
+token quote:mm { <sym> » <!before '('> <quibble( $¢.cursor_fresh( ::Regex ).tweak(:s))> }
 
 token quote:s {
-    <sym> » <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
+    <sym> » <!before '('> <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
 }
 token quote:ss {
-    <sym> » <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
+    <sym> » <!before '('> <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
 }
 token quote:tr {
-    <sym> » <pat=tribble( $¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
+    <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
 }
 
 # XXX should eventually be derived from current Unicode tables.
