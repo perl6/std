@@ -1,4 +1,4 @@
-grammar Perl:ver<6.0.0.alpha>:auth<http://perl.org>;
+grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 my $LANG is context;
 my $PKGDECL is context = "";
@@ -391,7 +391,7 @@ token unsp {
 token vws {
     \v ::
     { $*LINE++ }
-    [ '#DEBUG -1' { say "DEBUG"; $Perl::DEBUG = $*DEBUG = -1; } ]?
+    [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
 }
 
 # We provide two mechanisms here:
@@ -408,7 +408,7 @@ token unv {
          |  <?opener> ::
             [
                <?after ^^ . > <.panic: "Can't use embedded comments in column 1">
-            || <.quibble($¢.cursor_fresh( ::Perl::Q ))>   {*}                               #= embedded
+            || <.quibble($¢.cursor_fresh( ::STD::Q ))>   {*}                               #= embedded
             ]
          | :: \N*            {*}                                 #= end
          ]
@@ -991,13 +991,13 @@ token postcircumfix:sym<{ }> ( --> Methodcall)
     { '{' <semilist> [ '}' || <.panic: "Missing right brace"> ] }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Missing right angle quote"> ] }
+    { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Missing right angle quote"> ] }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Missing right double-angle quote"> ] }
+    { '<<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Missing right double-angle quote"> ] }
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Missing right double-angle quote"> ] }
+    { '«' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Missing right double-angle quote"> ] }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O> }
@@ -1696,7 +1696,7 @@ token quibble ($l) {
     {{
         if $lang<_herelang> {
             push @herestub_queue,
-                Perl::Herestub.new(
+                STD::Herestub.new(
                     delim => $<nibble><nibbles>[0],
                     orignode => $¢,
                     lang => $lang<_herelang>,
@@ -1797,12 +1797,12 @@ token nibbler {
 }
 
 
-token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).unbalanced("'"))> "'" }
-token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).unbalanced('"'))> '"' }
+token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).unbalanced("'"))> "'" }
+token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).unbalanced('"'))> '"' }
 
-token quote:sym<« »>   { '«' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
-token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
-token quote:sym«< >»   { '<' <nibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
+token quote:sym<« »>   { '«' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
+token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
+token quote:sym«< >»   { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
     '/' <nibble( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> '/'
@@ -1827,16 +1827,16 @@ token quote:qq {
     :my $qm;
     'qq'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
     ]
 }
 token quote:q {
     :my $qm;
     'q'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))>
     ]
 }
 
@@ -1844,8 +1844,8 @@ token quote:Q {
     :my $qm;
     'Q'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::Perl::Q ).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::Perl::Q ))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::STD::Q ).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ))>
     ]
 }
 
@@ -1866,13 +1866,13 @@ token quote:m  { <sym> » <!before '('> <quibble( $¢.cursor_fresh( ::Regex ) )>
 token quote:mm { <sym> » <!before '('> <quibble( $¢.cursor_fresh( ::Regex ).tweak(:s))> }
 
 token quote:s {
-    <sym> » <!before '('> <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
+    <sym> » <!before '('> <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
 }
 token quote:ss {
-    <sym> » <!before '('> <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::Perl::Q ).tweak(:qq))>
+    <sym> » <!before '('> <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
 }
 token quote:tr {
-    <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( ::Perl::Q ).tweak(:q))>
+    <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( ::STD::Q ).tweak(:q))>
 }
 
 # XXX should eventually be derived from current Unicode tables.
@@ -2064,9 +2064,9 @@ method truly ($bool,$opt) {
     self.panic("Can't negate $opt adverb");
 }
 
-grammar Q is Perl {
+grammar Q is STD {
 
-    role b {
+    role b1 {
         token escape:sym<\\> { <sym> <item=backslash> }
         token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh($+LANG).quote(); } }
         token backslash:sym<\\> { <text=sym> }
@@ -2090,19 +2090,19 @@ grammar Q is Perl {
         token backslash:sym<0> { <sym> }
     } # end role
 
-    role _b {
+    role b0 {
         token escape:sym<\\> { <!> }
     } # end role
 
-    role c {
+    role c1 {
         token escape:sym<{ }> { <?before '{'> [ :lang($+LANG) <block> ] }
     } # end role
 
-    role _c {
+    role c0 {
         token escape:sym<{ }> { <!> }
     } # end role
 
-    role s {
+    role s1 {
         token escape:sym<$> { <?before '$'> [ :lang($+LANG) <variable> <extrapost>? ] || <.panic: "Non-variable \$ must be backslashed"> }
         token special_variable:sym<$"> {
             '$' <stopper>
@@ -2111,52 +2111,56 @@ grammar Q is Perl {
 
     } # end role
 
-    role _s {
+    role s0 {
         token escape:sym<$> { <!> }
         token special_variable:sym<$"> { <!> }
     } # end role
 
-    role a {
+    role a1 {
         token escape:sym<@> { <?before '@'> [ :lang($+LANG) <variable> <extrapost> | <!> ] } # trap ABORTBRANCH from variable's ::
     } # end role
 
-    role _a {
+    role a0 {
         token escape:sym<@> { <!> }
     } # end role
 
-    role h {
+    role h1 {
         token escape:sym<%> { <?before '%'> [ :lang($+LANG) <variable> <extrapost> | <!> ] }
     } # end role
 
-    role _h {
+    role h0 {
         token escape:sym<%> { <!> }
     } # end role
 
-    role f {
+    role f1 {
         token escape:sym<&> { <?before '&'> [ :lang($+LANG) <variable> <extrapost> | <!> ] }
     } # end role
 
-    role _f {
+    role f0 {
         token escape:sym<&> { <!> }
     } # end role
 
-    role w {
+    role w1 {
         method postprocess ($s) { $s.comb }
     } # end role
 
-    role _w {
+    role w0 {
         method postprocess ($s) { $s }
     } # end role
 
-    role ww {
+    role ww1 {
         method postprocess ($s) { $s.comb }
     } # end role
 
-    role x {
+    role ww0 {
+        method postprocess ($s) { $s }
+    } # end role
+
+    role x1 {
         method postprocess ($s) { $s.run }
     } # end role
 
-    role _x {
+    role x0 {
         method postprocess ($s) { $s }
     } # end role
 
@@ -2179,7 +2183,7 @@ grammar Q is Perl {
 
     } # end role
 
-    role qq does b does c does s does a does h does f {
+    role qq does b1 does c1 does s1 does a1 does h1 does f1 {
         token stopper { \" }
         # in double quotes, omit backslash on random \W backslash by default
         token backslash:misc { :: [ (\W) { $<text> = $0.text; } | $<x>=(\w) <.panic("Unrecognized backslash sequence: '\\" ~ $<x>.text ~ "'")> ] }
@@ -2209,16 +2213,16 @@ grammar Q is Perl {
 
     multi method tweak (:double(:$qq)) { self.truly($qq, ':qq'); self.mixin( ::qq ); }
 
-    multi method tweak (:backslash(:$b))   { self.mixin($b ?? ::b !! ::_b) }
-    multi method tweak (:scalar(:$s))      { self.mixin($s ?? ::s !! ::_s) }
-    multi method tweak (:array(:$a))       { self.mixin($a ?? ::a !! ::_a) }
-    multi method tweak (:hash(:$h))        { self.mixin($h ?? ::h !! ::_h) }
-    multi method tweak (:function(:$f))    { self.mixin($f ?? ::f !! ::_f) }
-    multi method tweak (:closure(:$c))     { self.mixin($c ?? ::c !! ::_c) }
+    multi method tweak (:backslash(:$b))   { self.mixin($b ?? ::b1 !! ::b0) }
+    multi method tweak (:scalar(:$s))      { self.mixin($s ?? ::s1 !! ::s0) }
+    multi method tweak (:array(:$a))       { self.mixin($a ?? ::a1 !! ::a0) }
+    multi method tweak (:hash(:$h))        { self.mixin($h ?? ::h1 !! ::h0) }
+    multi method tweak (:function(:$f))    { self.mixin($f ?? ::f1 !! ::f0) }
+    multi method tweak (:closure(:$c))     { self.mixin($c ?? ::c1 !! ::c0) }
 
-    multi method tweak (:exec(:$x))        { self.mixin($x ?? ::x !! ::_x) }
-    multi method tweak (:words(:$w))       { self.mixin($w ?? ::w !! ::_w) }
-    multi method tweak (:quotewords(:$ww)) { self.mixin($ww ?? ::ww !! ::_ww) }
+    multi method tweak (:exec(:$x))        { self.mixin($x ?? ::x1 !! ::x0) }
+    multi method tweak (:words(:$w))       { self.mixin($w ?? ::w1 !! ::w0) }
+    multi method tweak (:quotewords(:$ww)) { self.mixin($ww ?? ::ww1 !! ::ww0) }
 
     multi method tweak (:heredoc(:$to)) { self.truly($to, ':to'); self.cursor_herelang; }
 
@@ -2852,8 +2856,8 @@ token infix:sym<=> ()
 {
     <sym>
     { $¢ = (self.<sigil>//'') eq '$' 
-        ?? Perl::Item_assignment.coerce($¢)
-        !! Perl::List_assignment.coerce($¢);
+        ?? STD::Item_assignment.coerce($¢)
+        !! STD::List_assignment.coerce($¢);
     }
 }
 
@@ -2924,8 +2928,17 @@ token term:sigil ( --> List_prefix)
 #     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.item; } }
 
 # unrecognized identifiers are assumed to be post-declared listops.
-# (XXX for cheating purposes this rule must be the last term: rule)
-token term:name ( --> List_prefix)
+token term:ident ( --> Term )
+{
+    <ident>
+    [
+    | '.(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                               #= func args
+    | '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                                #= func args
+    | <.unsp> '.'? '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                   #= func args
+    ]
+}
+
+token term:name ( --> Term)
 {
     <longname> ::
     [
@@ -3238,10 +3251,10 @@ method EXPR ($preclvl)
 ## Regex
 #################################################
 
-grammar Regex is Perl {
+grammar Regex is STD {
 
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( ::Perl::Q ).mixin( ::p5 ) }
+    multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( ::STD::Q ).mixin( ::p5 ) }
     multi method tweak (:overlap(:$ov)) { self }
     multi method tweak (:exhaustive(:$ex)) { self }
     multi method tweak (:continue(:$c)) { self }
@@ -3535,7 +3548,7 @@ grammar Regex is Perl {
         [ '+' | '-' ]?
         [
         | <name>
-        | <before '['> <quibble($¢.cursor_fresh( ::Perl::Q ).tweak(:q))> # XXX parse as q[] for now
+        | <before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
         ]
     }
 

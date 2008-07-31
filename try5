@@ -41,19 +41,19 @@ sub main {
 	    system("rm -rf lex");
 	}
     }
-    #my $cmd = qq/perl -w -I . -MSTD5 -e 'print Perl::Dump(Perl->new(orig=>$input)->${rule}(["$rule"]));'/;
+    #my $cmd = qq/perl -w -I . -MSTD5 -e 'print STD::Dump(STD->new(orig=>$input)->${rule}(["$rule"]));'/;
     #warn "# ",$cmd,"\n";
     #system "$cmd 2>try5.err";
     unshift(@INC,'.');
     require "STD.pmc";
     my $err = "try5.err";
-    my $perl = Perl->new($input);
+    my $perl = STD->new($input);
     if(!$perl->can($rule)) { die "\nERROR: Unknown rule: $rule\n"; }
     open(STDERR,">$err") or die;
     my $result = eval { $perl->${rule}(); };
     if($result) { 
       print $result->dump();
-#      print Perl::Dump($result);
+#      print STD::Dump($result);
     } else {
       print "Parse failed.  See $err.\n";
     }

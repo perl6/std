@@ -40,7 +40,7 @@ our $NEEDMATCH;
 our %NEEDSEMI;
 our $NEEDORIGARGS;
 our $PKG = "main";
-our $TOP = "Perl";
+our $TOP = "STD";
 our @PKG = ();
 our $ALTNAME;
 our $ALTNAMES;
@@ -255,9 +255,9 @@ sub BUILD {
     my \$self = shift;
 END
 
-	$out .= <<'END' if $TOP eq 'Perl';
+	$out .= <<'END' if $TOP eq 'STD';
     $self->_AUTOLEXpeek('termish',$retree);
-    system('cp lex/Perl/termish lex/Perl/EXPR');
+    system('cp lex/STD/termish lex/STD/EXPR');
 END
 
 	$out .= <<'END';

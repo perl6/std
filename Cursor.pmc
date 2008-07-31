@@ -110,8 +110,8 @@ sub mixin {
     for my $mixin (@mixins) {
 	my $ext = ref($mixin) || $mixin;
 	push @newmix, $ext;
-	$ext =~ s/^.*:://;	# just looking for a "cache" key, really
-	$NEWWHAT .= '_' . $ext;
+	$ext =~ s/(\w)\w*::/$1/g;	# just looking for a "cache" key, really
+	$NEWWHAT .= '_X_' . $ext;
     }
     $self->deb("mixin $NEWWHAT from $WHAT @newmix") if $DEBUG & DEBUG::mixins;
     no strict 'refs';
@@ -686,7 +686,7 @@ sub cursor_herelang { my $self = shift;
     $self->deb("cursor_herelang") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_herelang} = $self;
-    bless \%r, 'Perl::Q';
+    bless \%r, 'STD::Q';
 }
 
 # remove consistent leading whitespace (mutates text nibbles in place)
@@ -770,7 +770,7 @@ sub dump {
     delete $copy{_reduced};
     delete $copy{_fate};
     delete $copy{_orig};
-    my $text = Perl::Dump(\%copy);
+    my $text = STD::Dump(\%copy);
     $text =~ s/^\s*_(?:pos|orig):.*\n//mg;
     $text;
 }

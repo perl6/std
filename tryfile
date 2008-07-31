@@ -9,5 +9,5 @@ use Encode;
 
 my $what = 'comp_unit';
 my $text = Encode::decode('utf8', `cat $file`);
-my $r = Perl->new($text)->$what();
+my $r = STD->new($text)->$what();
 print Dump($r);
