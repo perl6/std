@@ -2356,6 +2356,12 @@ rule type_declarator:subset {\
     where <EXPR>
 }
 
+rule type_declarator:enum {
+    <sym>
+    [ <longname> { $¢.add_type($<longname>); } ]?
+    <EXPR>
+}
+
 rule type_constraint {
     [
     | <value>
@@ -3493,7 +3499,7 @@ grammar Regex is STD {
 
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
-    token assertion:sym<*> { <sym> [ <?before '>'> | <assertion> ] }
+    token assertion:sym<*> { <sym> [ <?before '>'> | <.ws> <nibbler> ] }
 
     token assertion:sym<{ }> { <codeblock> }
 
@@ -3540,7 +3546,7 @@ grammar Regex is STD {
     token assertion:sym<-> { <before '-' > <cclass_elem>+ }
     token assertion:sym<.> { <sym> }
     token assertion:sym<,> { <sym> }
-    token assertion:sym<~~> { <sym> <desigilname>? }
+    token assertion:sym<~~> { <sym> [ <?before '>'> | \d+ | <desigilname> ] }
 
     token assertion:bogus { <.panic: "Unrecognized regex assertion"> }
 
