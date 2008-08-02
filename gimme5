@@ -257,7 +257,7 @@ END
 
 	$out .= <<'END' if $TOP eq 'STD';
     $self->_AUTOLEXpeek('termish',$retree);
-    system('cp lex/STD/termish lex/STD/EXPR');
+    system('cp','lex/'.ref($self).'/termish','lex/'.ref($self).'/EXPR');
 END
 
 	$out .= <<'END';
