@@ -427,7 +427,9 @@ token pod_comment {
       '=' <.unsp>? 'end' \h+ $<ident> » \N*         {*}         #= tagged
     | 'begin' » :: \h* \n .*? \n
       '=' <.unsp>? 'end' » \N*                      {*}         #= anon
-    | :: \N*                                           {*}         #= misc
+    | :: 
+        [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
+        \N*                                           {*}         #= misc
     ]
 }
 
