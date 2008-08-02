@@ -2506,7 +2506,7 @@ token term:sym<self> ( --> Term)
     { <sym> » }
 
 token term:rand ( --> Term)
-    { <sym> » }
+    { <sym> » [ <?before \h+ [\d|'$']> <.obs('1-arg rand', 'method form')> ]? }
 
 token term:e ( --> Term)
     { <sym> » }
@@ -2515,6 +2515,12 @@ token term:i ( --> Term)
     { <sym> » }
 
 token term:pi ( --> Term)
+    { <sym> » }
+
+token term:Inf ( --> Term)
+    { <sym> » }
+
+token term:NaN ( --> Term)
     { <sym> » }
 
 token term:sym<*> ( --> Term)
