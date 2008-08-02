@@ -630,9 +630,9 @@ rule statement_control:loop {\
     <sym>
     $<eee> = (
         '('
-            $<e1> = <EXPR> ';'   {*}                            #= e1
-            $<e2> = <EXPR> ';'   {*}                            #= e2
-            $<e3> = <EXPR>       {*}                            #= e3
+            <e1=EXPR>? ';'   {*}                            #= e1
+            <e2=EXPR>? ';'   {*}                            #= e2
+            <e3=EXPR>?       {*}                            #= e3
         ')'                      {*}                            #= eee
     )?
     <block>                     {*}                             #= block
@@ -2088,7 +2088,7 @@ grammar Q is STD {
         token backslash:o { <sym> [ <octint> | '[' <octint>**',' ']' ] }
         token backslash:r { <sym> }
         token backslash:t { <sym> }
-        token backslash:x { <sym> [ <hexint> | '[' <hexint>**',' ']' ] }
+        token backslash:x { <sym> [ <hexint> | '[' [<.ws><hexint><.ws> ] ** ',' ']' ] }
         token backslash:sym<0> { <sym> }
     } # end role
 
@@ -2294,7 +2294,7 @@ rule regex_def {
 
 # XXX redundant with routine_def?
 rule macro_def {
-    | <longname>?  <multisig>?
+    <deflongname>?  <multisig>?
     <trait>*
     <block>
 }
@@ -2506,7 +2506,7 @@ token term:sym<self> ( --> Term)
     { <sym> » }
 
 token term:rand ( --> Term)
-    { <sym> » [ <?before \h+ [\d|'$']> <.obs('1-arg rand', 'method form')> ]? }
+    { <sym> » [ <?before \h+ [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]? }
 
 token term:e ( --> Term)
     { <sym> » }
@@ -3497,7 +3497,7 @@ grammar Regex is STD {
     token backslash:t { :i <sym> }
     token backslash:v { :i <sym> }
     token backslash:w { :i <sym> }
-    token backslash:x { :i <sym> [ <hexint> | '['<hexint>[','<hexint>]*']' ] }
+    token backslash:x { :i <sym> [ <hexint> | '[' [<.ws><hexint><.ws> ] ** ',' ']' ] }
     token backslash:misc { $<litchar>=(\W) }
     token backslash:oops { :: <.panic: "Unrecognized regex backslash sequence"> }
 
