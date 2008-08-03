@@ -11,6 +11,7 @@ our $CTX = '';
 our $DEBUG = $ENV{STD5DEBUG} // 0;
 $::DEBUG = $DEBUG;
 $::HIGHWATER = 0;
+$::HIGHMESS = '';
 $::HIGHEXPECT = {};
 $::LINE = 1;
 
@@ -636,6 +637,7 @@ sub highwater {
     if ($self->{_pos} >= $::HIGHWATER) {
 	if ($self->{_pos} > $::HIGHWATER) {
 	    %$::HIGHEXPECT = ();
+	    $::HIGHMESS = '';
 	}
 	for (@_) {
 	    my $name = $_;

@@ -461,9 +461,7 @@ token lambda { '->' | '<->' }
 
 
 token block {
-    '{'
-    <statementlist>
-    [ '}' || <.panic: "Missing right brace after block"> ]
+    '{' <.until: '}', 'statementlist', 'block'>
 
     [
     | <?before \h* $$> <.ws>	# (usual case without comments)
@@ -488,7 +486,7 @@ token regex_block {
 
     '{'
     <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
-    [ '}' || <.panic: "Missing right brace after regex"> ]
+    [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
 
     [
     | <?before \h* $$> <.ws>	# (usual case without comments)
@@ -984,22 +982,22 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
-    { '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] }
+    { '(' <.until: ')', 'semilist', 'argument list'> }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { '[' <semilist> [ ']' || <.panic: "Missing right bracket"> ] }
+    { '[' <.until: ']', 'semilist', 'subscript'> }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
-    { '{' <semilist> [ '}' || <.panic: "Missing right brace"> ] }
+    { '{' <.until: '}', 'semilist', 'subscript'> }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Missing right angle quote"> ] }
+    { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Missing right double-angle quote"> ] }
+    { '<<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Missing right double-angle quote"> ] }
+    { '«' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O> }
@@ -1015,7 +1013,7 @@ token methodop {
     ] <.unsp>? 
 
     [
-    | '.'? <.unsp>? '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ]
+    | '.'? <.unsp>? '(' <.until: ')', 'semilist', 'argument list'>
     | ':' <?before \s> <!{ $+inquote }> <arglist>
     ]?
 }
@@ -1039,9 +1037,9 @@ token variable_declarator {
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
         [
-        | '(' :: <signature> [ ')' || <.panic: "Missing right parenthesis"> ]
-        | '[' :: <semilist> [ ']' || <.panic: "Missing right bracket"> ]
-        | '{' :: <semilist> [ '}' || <.panic: "Missing right brace"> ]
+        | '(' :: <.until: ')', 'signature'>
+        | '[' :: <.until: ']', 'semilist', 'shape definition'>
+        | '{' :: <.until: '}', 'semilist', 'shape definition'>
         | <?before '<'> <postcircumfix>
         ]*
     ]?
@@ -1061,6 +1059,7 @@ rule scoped {
     | <package_declarator>
     | <fulltypename>+ <multi_declarator>
     | <multi_declarator>
+    | <?before <[A..Z]> > <name> <.panic("Apparent type name " ~ $<name>.text ~ " is not declared yet")>
     ]
 }
 
@@ -1071,10 +1070,6 @@ token scope_declarator:state    { <sym> <scoped> }
 token scope_declarator:constant { <sym> <scoped> }
 token scope_declarator:has      { <sym> <scoped> }
 
-token package_declarator:class   { <sym> <package_def('module_name')> }
-token package_declarator:grammar { <sym> <package_def('module_name')> }
-token package_declarator:module  { <sym> <package_def('module_name')> }
-token package_declarator:package { <sym> <package_def('module_name')> }
 
 token package_declarator:class {
     :my $PKGDECL is context = 'class';
@@ -1147,14 +1142,14 @@ rule package_def {
             $+begin_compunit = 0;
         }
         {*}                                                     #= semi
-    || <.panic: 'No block found for module definition'>
+    || <.panic: "Unable to parse " ~ $+PKGDECL ~ " definition">
     ]
 }
 
 token declarator {
     [
     | <variable_declarator>
-    | '(' <signature> [ ')' || <.panic: "Missing right parenthsesis after signature"> ] <trait>*
+    | '(' <.until: ')', 'signature'> <trait>*
     | <routine_declarator>
     | <regex_declarator>
     | <type_declarator>
@@ -1514,7 +1509,7 @@ token morename {
     <?before '(' | <alpha> >
     [
     | <ident>
-    | '(' :: <EXPR> [ ')' || <.panic: "Missing right parenthesis in indirect name"> ]
+    | '(' :: <EXPR> [ ')' || <.panic: "Unable to parse indirect name; couldn't find right parenthesis"> ]
     ]
 }
 
@@ -1531,7 +1526,7 @@ token sublongname {
 
 #token subcall {
 #    # XXX should this be sublongname?
-#    <subshortname> <.unsp>? '.'? '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ]
+#    <subshortname> <.unsp>? '.'? '(' <.until: ')', 'semilist'>
 #    {*}
 #}
 
@@ -1599,7 +1594,7 @@ token radint {
 }
 
 token escale {
-    <[Ee]> <[+\-]>? \d+
+    <[Ee]> <[+\-]>? \d+[_\d+]*
 }
 
 # careful to distinguish from both integer and 42.method
@@ -2259,7 +2254,7 @@ regex extrapost {
 
 rule multisig {
     [
-	':'?'(' <signature> [ ')' || <.panic: "Missing right parenthesis in signature"> ]
+	':'?'(' <.until: ')', 'signature'>
     ]
     ** '|'
 }
@@ -2275,9 +2270,9 @@ rule method_def {
     | '!'?<longname>  <multisig>?
     | <sigil> '.'
         [
-        | '(' :: <signature> [ ')' || <.panic: "Missing right parenthesis"> ]
-        | '[' :: <signature> [ ']' || <.panic: "Missing right bracket"> ]
-        | '{' :: <signature> [ '}' || <.panic: "Missing right brace"> ]
+        | '(' :: <.until: ')', 'signature'>
+        | '[' :: <.until: ']', 'signature'>
+        | '{' :: <.until: '}', 'signature'>
         | <?before '<'> <postcircumfix>
         ]
     ]
@@ -2335,7 +2330,7 @@ rule capture {
 }
 
 token sigterm {
-    ':(' <signature> [ ')' || <.panic: "Missing right parenthesis in signature"> ]
+    ':(' <.until: ')', 'signature'>
 }
 
 rule param_sep { [','|':'|';'|';;'] }
@@ -2384,7 +2379,7 @@ token named_param {
     [
     | <name=ident> '(' <.ws>
 	[ <named_param> | <param_var> <.ws> ]
-	[ ')' || <.panic: "Missing right parenthesis in named parameter"> ]
+	[ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
     | <param_var>
     ]
 }
@@ -2530,16 +2525,16 @@ token term:sym<**> ( --> Term)
     { <sym> }
 
 token circumfix:sigil ( --> Term)
-    { <sigil> '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] }
+    { <sigil> '(' <.until: ')', 'semilist', 'contextualizer'> }
 
 #token circumfix:typecast ( --> Term)
-#    { <typename> '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] }
+#    { <typename> '(' <.until: ')', 'semilist'> }
 
 token circumfix:sym<( )> ( --> Term)
-    { '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] }
+    { '(' <.until: ')', 'semilist', 'parenthesized expression'> }
 
 token circumfix:sym<[ ]> ( --> Term)
-    { '[' <semilist> [ ']' || <.panic: "Missing right bracket"> ] }
+    { '[' <.until: ']', 'semilist', 'array composer'> }
 
 ## methodcall
 
@@ -2946,9 +2941,9 @@ token term:ident ( --> Term )
 {
     <ident>
     [
-    | '.(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                               #= func args
-    | '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                                #= func args
-    | <.unsp> '.'? '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                   #= func args
+    | '.(' <.until: ')', 'semilist', 'argument list'> {*}                               #= func args
+    | '(' <.until: ')', 'semilist', 'argument list'> {*}                                #= func args
+    | <.unsp> '.'? '(' <.until: ')', 'semilist', 'argument list'> {*}                   #= func args
     ]
 }
 
@@ -2969,10 +2964,10 @@ token term:name ( --> Term)
         {*}                                                     #= typename
     ||
         [
-        | '.(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                               #= func args
-        | '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                                #= func args
+        | '.(' <.until: ')', 'semilist', 'argument list'> {*}                               #= func args
+        | '(' <.until: ')', 'semilist', 'argument list'> {*}                                #= func args
         | <?before \s> <?{ substr($<longname>.text,0,2) ne '::' }> <arglist> {*}                            #= listop args
-        | <.unsp> '.'? '(' <semilist> [ ')' || <.panic: "Missing right parenthesis"> ] {*}                   #= func args
+        | <.unsp> '.'? '(' <.until: ')', 'semilist', 'argument list'> {*}                   #= func args
         | :: {*}                                                #= listop noarg
         ]
     ]
@@ -3322,7 +3317,7 @@ grammar Regex is STD {
     # suppress fancy end-of-line checking
     token codeblock {
         '{' :: [ :lang($¢.cursor_fresh($+LANG)) <statementlist> ]
-        [ '}' || <.panic: "Missing right brace"> ]
+        [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
     }
 
     rule nibbler {
@@ -3413,13 +3408,13 @@ grammar Regex is STD {
 
     token metachar:sym<[ ]> {
         '[' :: [:lang(self.unbalanced(']')) <nibbler>]
-        [ ']' || <.panic: "Missing right bracket in regex"> ]
+        [ ']' || <.panic: "Unable to parse regex; couldn't find right bracket"> ]
         { $/<sym> := <[ ]> }
     }
 
     token metachar:sym<( )> {
         '(' :: [:lang(self.unbalanced(')')) <nibbler>]
-        [ ')' || <.panic: "Missing right parenthesis in regex"> ]
+        [ ')' || <.panic: "Unable to parse regex; couldn't find right parenthesis"> ]
         { $/<sym> := <( )> }
     }
 
@@ -3566,7 +3561,7 @@ grammar Regex is STD {
         ]
     }
 
-    token mod_arg { '(' <semilist> [ ')' || <.panic: "Missing right parenthesis in regex modifier"> ] }
+    token mod_arg { '(' <.until: ')', 'semilist', 'modifier argument'> }
 
     token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($+LANG)) <statement> <eat_terminator> ] }
 
@@ -3627,7 +3622,7 @@ grammar Regex is STD {
 
 # token panic (Str $s) { <commit> <fail($s)> }
 
-method mess (Str $s) {
+method locmess () {
     my $orig = self.orig;
     my $text = $$orig;
     my $pre = substr($text, 0, self.pos);
@@ -3636,14 +3631,15 @@ method mess (Str $s) {
     1 while $pre ~~ s!.*\n!!;
     my $post = substr($text, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
-    "$s at line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
+    " at line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR\n";
 }
 
 method panic (Str $s) {
-    my $m = "############# PARSE FAILED #############\n";
+    my $m = "############# PARSE FAILED #############\n$s";
     if self.pos <= $*HIGHWATER and %$*HIGHEXPECT {
-        $m ~= self.cursor($*HIGHWATER).mess($s);
+        $m ~= "\n" ~ $*HIGHMESS if $*HIGHMESS;
+        $m ~= self.cursor($*HIGHWATER).locmess;
         my @keys = sort keys %$*HIGHEXPECT;
         if @keys > 1 {
             $m ~= "    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT) ~ "\n";
@@ -3653,13 +3649,18 @@ method panic (Str $s) {
         }
     }
     else {
-        $m ~= self.mess($s);
+        $*HIGHMESS = $s;
+        $m ~= self.locmess;
     }
     die $m;
 }
 
 method worry (Str $s) {
-    warn self.mess($s);
+    warn $s ~ self.loc;
+}
+
+token until (Str $stop, Str $insides, Str $name = $insides) {
+    <$insides> $stop || <.panic: "Unable to parse $name; couldn't find final '$stop'">
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
