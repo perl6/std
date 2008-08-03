@@ -650,6 +650,11 @@ sub highwater {
     }
 }
 
+sub delete {
+    my $self = shift;
+    delete $self->{@_};
+}
+
 { package Match;
     sub new { my $self = shift;
 	my %args = @_;

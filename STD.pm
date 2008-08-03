@@ -461,7 +461,7 @@ token lambda { '->' | '<->' }
 
 
 token block {
-    '{' <.until: '}', 'statementlist', 'block'>
+    '{' <in: '}', 'statementlist', 'block'>
 
     [
     | <?before \h* $$> <.ws>	# (usual case without comments)
@@ -982,13 +982,13 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
-    { '(' <.until: ')', 'semilist', 'argument list'> }
+    { '(' <in: ')', 'semilist', 'argument list'> }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { '[' <.until: ']', 'semilist', 'subscript'> }
+    { '[' <in: ']', 'semilist', 'subscript'> }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
-    { '{' <.until: '}', 'semilist', 'subscript'> }
+    { '{' <in: '}', 'semilist', 'subscript'> }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
     { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
@@ -1013,7 +1013,7 @@ token methodop {
     ] <.unsp>? 
 
     [
-    | '.'? <.unsp>? '(' <.until: ')', 'semilist', 'argument list'>
+    | '.'? <.unsp>? '(' <in: ')', 'semilist', 'argument list'>
     | ':' <?before \s> <!{ $+inquote }> <arglist>
     ]?
 }
@@ -1037,9 +1037,9 @@ token variable_declarator {
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
         [
-        | '(' :: <.until: ')', 'signature'>
-        | '[' :: <.until: ']', 'semilist', 'shape definition'>
-        | '{' :: <.until: '}', 'semilist', 'shape definition'>
+        | '(' :: <in: ')', 'signature'>
+        | '[' :: <in: ']', 'semilist', 'shape definition'>
+        | '{' :: <in: '}', 'semilist', 'shape definition'>
         | <?before '<'> <postcircumfix>
         ]*
     ]?
@@ -1149,7 +1149,7 @@ rule package_def {
 token declarator {
     [
     | <variable_declarator>
-    | '(' <.until: ')', 'signature'> <trait>*
+    | '(' <in: ')', 'signature'> <trait>*
     | <routine_declarator>
     | <regex_declarator>
     | <type_declarator>
@@ -1526,7 +1526,7 @@ token sublongname {
 
 #token subcall {
 #    # XXX should this be sublongname?
-#    <subshortname> <.unsp>? '.'? '(' <.until: ')', 'semilist'>
+#    <subshortname> <.unsp>? '.'? '(' <in: ')', 'semilist'>
 #    {*}
 #}
 
@@ -2254,7 +2254,7 @@ regex extrapost {
 
 rule multisig {
     [
-	':'?'(' <.until: ')', 'signature'>
+	':'?'(' <in: ')', 'signature'>
     ]
     ** '|'
 }
@@ -2270,9 +2270,9 @@ rule method_def {
     | '!'?<longname>  <multisig>?
     | <sigil> '.'
         [
-        | '(' :: <.until: ')', 'signature'>
-        | '[' :: <.until: ']', 'signature'>
-        | '{' :: <.until: '}', 'signature'>
+        | '(' :: <in: ')', 'signature'>
+        | '[' :: <in: ']', 'signature'>
+        | '{' :: <in: '}', 'signature'>
         | <?before '<'> <postcircumfix>
         ]
     ]
@@ -2330,7 +2330,7 @@ rule capture {
 }
 
 token sigterm {
-    ':(' <.until: ')', 'signature'>
+    ':(' <in: ')', 'signature'>
 }
 
 rule param_sep { [','|':'|';'|';;'] }
@@ -2525,16 +2525,16 @@ token term:sym<**> ( --> Term)
     { <sym> }
 
 token circumfix:sigil ( --> Term)
-    { <sigil> '(' <.until: ')', 'semilist', 'contextualizer'> }
+    { <sigil> '(' <in: ')', 'semilist', 'contextualizer'> }
 
 #token circumfix:typecast ( --> Term)
-#    { <typename> '(' <.until: ')', 'semilist'> }
+#    { <typename> '(' <in: ')', 'semilist'> }
 
 token circumfix:sym<( )> ( --> Term)
-    { '(' <.until: ')', 'semilist', 'parenthesized expression'> }
+    { '(' <in: ')', 'semilist', 'parenthesized expression'> }
 
 token circumfix:sym<[ ]> ( --> Term)
-    { '[' <.until: ']', 'semilist', 'array composer'> }
+    { '[' <in: ']', 'semilist', 'array composer'> }
 
 ## methodcall
 
@@ -2941,9 +2941,9 @@ token term:ident ( --> Term )
 {
     <ident>
     [
-    | '.(' <.until: ')', 'semilist', 'argument list'> {*}                               #= func args
-    | '(' <.until: ')', 'semilist', 'argument list'> {*}                                #= func args
-    | <.unsp> '.'? '(' <.until: ')', 'semilist', 'argument list'> {*}                   #= func args
+    | '.(' <in: ')', 'semilist', 'argument list'> {*}                               #= func args
+    | '(' <in: ')', 'semilist', 'argument list'> {*}                                #= func args
+    | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*}                   #= func args
     ]
 }
 
@@ -2964,10 +2964,10 @@ token term:name ( --> Term)
         {*}                                                     #= typename
     ||
         [
-        | '.(' <.until: ')', 'semilist', 'argument list'> {*}                               #= func args
-        | '(' <.until: ')', 'semilist', 'argument list'> {*}                                #= func args
+        | '.(' <in: ')', 'semilist', 'argument list'> {*}                               #= func args
+        | '(' <in: ')', 'semilist', 'argument list'> {*}                                #= func args
         | <?before \s> <?{ substr($<longname>.text,0,2) ne '::' }> <arglist> {*}                            #= listop args
-        | <.unsp> '.'? '(' <.until: ')', 'semilist', 'argument list'> {*}                   #= func args
+        | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*}                   #= func args
         | :: {*}                                                #= listop noarg
         ]
     ]
@@ -3561,7 +3561,7 @@ grammar Regex is STD {
         ]
     }
 
-    token mod_arg { '(' <.until: ')', 'semilist', 'modifier argument'> }
+    token mod_arg { '(' <in: ')', 'semilist', 'modifier argument'> }
 
     token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($+LANG)) <statement> <eat_terminator> ] }
 
@@ -3659,8 +3659,8 @@ method worry (Str $s) {
     warn $s ~ self.loc;
 }
 
-token until (Str $stop, Str $insides, Str $name = $insides) {
-    <$insides> $stop || <.panic: "Unable to parse $name; couldn't find final '$stop'">
+token in (Str $stop, Str $insides, Str $name = $insides) {
+    <x=$insides> $stop {{ $/.{$insides} = $<x>; delete $<x> }} || <.panic: "Unable to parse $name; couldn't find final '$stop'">
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
