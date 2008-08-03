@@ -94,6 +94,7 @@ method add_type ($longname) {
     my $qualname = ($+PKG // 'GLOBAL') ~ '::' ~ $typename;
     %typenames{$typename} = $qualname;
     %typenames{$qualname} = $qualname;
+    %typenames{$shortname} = $qualname;
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -569,6 +570,10 @@ rule statement_control:use {\
     [
     | <version>
     | <module_name><arglist>?
+        {{
+            my $longname = $<module_name><longname>;
+            $¢.add_type($longname);
+        }}
     ]
 }
 
@@ -836,7 +841,7 @@ token infixish {
        [
        | ''
            { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
-       | <infix_postfix_meta_operator($<infix>)>
+       | <?before '='> <infix_postfix_meta_operator($<infix>)>
            { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
        ]
     | <infix_prefix_meta_operator>
@@ -961,24 +966,11 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
 
 token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     '='
-    <!!{ $<O> = $op<O>; }>
-    <!!lex1: 'assignment'>
+    { $<O> = $op<O>; }
+    <?lex1: 'assignment'>
 
-    [
-    || <!!{ $<O><prec> gt %item_assignment<prec> }>
-    || <.panic: "Can't make assignment op of operator looser than assignment">
-    ]
-
-    [
-    || <!{ $<O><assoc> eq 'chain' }>
-    || <.panic: "Can't make assignment op of boolean operator">
-    ]
-    
-    [
-    || <!{ $<O><assoc> eq 'non' }>
-    || <.panic: "Can't make assignment op of non-associative operator">
-    ]
-    
+    [ <?{ ($<O><assoc> // '') eq 'chain' }> <.panic: "Can't make assignment op of boolean operator"> ]?
+    [ <?{ ($<O><assoc> // '') eq 'non'   }> <.panic: "Can't make assignment op of non-associative operator"> ]?
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
@@ -1576,7 +1568,7 @@ token integer {
         | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
         | d \d+               [ _ \d+]*
         | \d+[_\d+]*
-            {{ START { worry("Leading 0 does not indicate octal in Perl 6") } }}
+#            {{ START { $¢.worry("Leading 0 does not indicate octal in Perl 6") } }}
         ]
     | \d+[_\d+]*
     ]
@@ -3263,7 +3255,7 @@ method EXPR ($preclvl)
 grammar Regex is STD {
 
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( ::STD::Q ).mixin( ::p5 ) }
+    multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( ::STD::Q ).mixin( ::q ).mixin( ::p5 ) }
     multi method tweak (:overlap(:$ov)) { self }
     multi method tweak (:exhaustive(:$ex)) { self }
     multi method tweak (:continue(:$c)) { self }
@@ -3656,7 +3648,7 @@ method panic (Str $s) {
 }
 
 method worry (Str $s) {
-    warn $s ~ self.loc;
+    warn $s ~ self.locmess;
 }
 
 token in (Str $stop, Str $insides, Str $name = $insides) {
