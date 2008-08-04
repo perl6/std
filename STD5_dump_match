@@ -14,20 +14,15 @@ my $yaml = 0;
 my $mark_arrays;
 GetOptions("nocolor"=>\$nocolor,"horizontal"=>\$horizontal,"yaml"=>\$yaml,"mark-arrays"=>\$mark_arrays);
 unless ($#ARGV <= 0) {
-    die "USAGE: [--nocolor --horizontal --mark-arrays] [filename]\n";
+    die "USAGE: [--nocolor --horizontal --mark-arrays] filename [rule]\n";
 }
 if ($nocolor) {
     $DumpMatch::NOCOLOR = 1;
 }
+my $file = shift;
+my $what = shift // 'comp_unit';
 
-my $what = 'comp_unit';
-my $text;
-{
-local $/;
-$text = Encode::decode('utf8', scalar <>);
-}
-
-my $r = STD->new($text)->$what();
+my $r = STD->parsefile($file,$what);
 if ($yaml) {
     print Dump($r);
     exit;
