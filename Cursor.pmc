@@ -13,7 +13,8 @@ $::DEBUG = $DEBUG;
 $::HIGHWATER = 0;
 $::HIGHMESS = '';
 $::HIGHEXPECT = {};
-$::LINE = 1;
+$::COMPILING::LINE = 1;
+$::COMPILING::FILE = '(eval)';
 
 { package DEBUG;
     use constant {
@@ -56,7 +57,7 @@ our $CLEAR = color 'clear';
 
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
-    print ::LOG $pos,'/',$::LINE, "\t", $CTX, ' ', @_, "\n";
+    print ::LOG $pos,'/',$::COMPILING::LINE, "\t", $CTX, ' ', @_, "\n";
 }
 
 $::DEBUG //= 0;
@@ -99,6 +100,23 @@ sub new {
 #    $self->deb(" orig ", $$buf) if $DEBUG & DEBUG::cursors;
     $self->BUILD;
     $self;
+}
+
+sub parse {
+    my $class = shift;
+    my $text = shift;
+    my $rule = shift() // 'comp_unit';
+    local $::COMPILING::FILE = '(eval)';
+    $class->new($text)->$rule();
+}
+
+sub parsefile {
+    my $class = shift;
+    my $file = shift;
+    my $rule = shift() // 'comp_unit';
+    local $::COMPILING::FILE = $file;
+    my $text = Encode::decode('utf8', `cat $file`);
+    $class->new($text)->$rule();
 }
 
 sub mixin {

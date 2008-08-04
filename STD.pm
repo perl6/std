@@ -391,7 +391,7 @@ token unsp {
 
 token vws {
     \v ::
-    { $*LINE++ }
+    { $COMPILING::LINE++ }
     [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
 }
 
@@ -3690,7 +3690,7 @@ method locmess () {
     1 while $pre ~~ s!.*\n!!;
     my $post = substr($text, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
-    " at line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
+    " at " ~ $COMPILING::FILE ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR\n";
 }
 
