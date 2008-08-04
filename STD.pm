@@ -1756,6 +1756,32 @@ token tribble ($l, $lang2 = $l) {
     ]
 }
 
+token quasiquibble ($l) {
+    :my $lang = $l;
+    :my $start;
+    :my $stop;
+
+    <.ws>
+    [ <quotepair> <.ws>
+	{
+	    my $kv = $<quotepair>[*-1];
+	    $lang = $lang.tweak($kv.<k>, $kv.<v>)
+                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
+	}
+    ]*
+
+    {
+        ($start,$stop) = $¢.peek_delimiters();
+        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
+                                !! $lang.unbalanced($stop);
+    }
+
+    [
+    || <?{ $start eq '{' }> [ :lang($lang) <block> ]
+    || $start [ :lang($lang) <statementlist> ] $stop
+    ]
+}
+
 # note: polymorphic over many quote languages, we hope
 token nibbler {
     :my $text = '';
@@ -1862,6 +1888,10 @@ token quote:ss {
 }
 token quote:tr {
     <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( ::STD::Q ).tweak(:q))>
+}
+
+token quote:quasi {
+    <sym> » <!before '('> <pat=quasiquibble($¢.cursor_fresh( ::STD::Quasi ))>
 }
 
 # XXX should eventually be derived from current Unicode tables.
@@ -2223,10 +2253,6 @@ grammar Q is STD {
         return ::Trans;
     }
 
-    multi method tweak (:$code) {
-        return ::RegexCode;
-    }
-
     multi method tweak (*%x) {
         my @k = keys(%x);
         self.panic("Unrecognized quote modifier: " ~ @k);
@@ -2234,6 +2260,12 @@ grammar Q is STD {
     # end tweaks (DO NOT ERASE)
 
 
+} # end grammar
+
+grammar Quasi is STD {
+    token term:unquote {
+        <starter><starter><starter> :: <statementlist> <stopper><stopper><stopper>
+    }
 } # end grammar
 
 # Note, backtracks!  So post mustn't commit to anything permanent.
@@ -2380,11 +2412,11 @@ token param_var {
     <sigil> <twigil>?
     [
         # Is it a longname declaration?
-    || <?{ $<sigil> eq '&' }> <?ident> ::
+    || <?{ $<sigil>.text eq '&' }> <?ident> ::
         <ident=sublongname>
 
     ||  # Is it a shaped array or hash declaration?
-        <?{ $<sigil> eq '@' || $<sigil> eq '%' }>
+        <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
         <ident>?
         <.ws>
         <?before <[ \< \( \[ \{ ]> >
@@ -2904,17 +2936,17 @@ token infix:sym<Z> ( --> List_infix)
 token infix:sym<minmax> ( --> List_infix)
     { <sym> }
 
-token term:sym<...> ( --> List_prefix)
+token prefix:sym<...> ( --> List_prefix)
 {
     '...'
 }
 
-token term:sym<???> ( --> List_prefix)
+token prefix:sym<???> ( --> List_prefix)
 {
     '???'
 }
 
-token term:sym<!!!> ( --> List_prefix)
+token prefix:sym<!!!> ( --> List_prefix)
 {
     '!!!'
 }
@@ -2928,23 +2960,30 @@ token term:sigil ( --> List_prefix)
 # token term:typecast ( --> List_prefix)
 #     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.item; } }
 
-# unrecognized identifiers are assumed to be post-declared listops.
+# force ident(), ident.(), etc. to be a function call always
 token term:ident ( --> Term )
 {
     <ident>
     [
-    | '.(' <in: ')', 'semilist', 'argument list'> {*}                               #= func args
-    | '(' <in: ')', 'semilist', 'argument list'> {*}                                #= func args
-    | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*}                   #= func args
+    | '.(' <in: ')', 'semilist', 'argument list'> {*}             #= func args
+    | '(' <in: ')', 'semilist', 'argument list'> {*}              #= func args
+    | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*} #= func args
+    ]
+
+    [
+    || ':' <?before \s> <arglist>    # either switch to listopiness
+    || {{ $+prevop = $<O> = {}; }}   # or allow adverbs
     ]
 }
 
+# names containing :: may or may not be function calls
+# bare ident without parens also handled here if no other rule parses it
 token term:name ( --> Term)
 {
     <longname> ::
     [
     ||  <?{
-            $¢.is_type($<longname>.text)
+            $¢.is_type($<longname>.text) or substr($<longname>.text,0,2) eq '::'
         }> ::
         # parametric type?
         <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -2954,13 +2993,28 @@ token term:name ( --> Term)
             {*}                                                 #= packagevar 
         ]?
         {*}                                                     #= typename
+
+    # unrecognized names are assumed to be post-declared listops.
+    || <?before \s> <arglist>
+        {*}                                                     #= listop args
     ||
         [
-        | '.(' <in: ')', 'semilist', 'argument list'> {*}                               #= func args
-        | '(' <in: ')', 'semilist', 'argument list'> {*}                                #= func args
-        | <?before \s> <?{ substr($<longname>.text,0,2) ne '::' }> <arglist> {*}                            #= listop args
-        | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*}                   #= func args
-        | :: {*}                                                #= listop noarg
+        | '.(' <in: ')', 'semilist', 'argument list'>
+            {*}                                                 #= func args
+
+        | '(' <in: ')', 'semilist', 'argument list'>
+            {*}                                                 #= func args
+
+        | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'>
+            {*}                                                 #= func args
+
+
+        | ::  {*}                                               #= listop noarg
+        ]
+
+        [
+        || ':' <?before \s> <arglist>    # either switch to listopiness
+        || {{ $+prevop = $<O> = {}; }}   # or allow adverbs
         ]
     ]
 }
