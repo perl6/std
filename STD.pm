@@ -1891,7 +1891,7 @@ token quote:tr {
 }
 
 token quote:quasi {
-    <sym> » <!before '('> <pat=quasiquibble($¢.cursor_fresh( ::STD::Quasi ))>
+    <sym> » <!before '('> <quasiquibble($¢.cursor_fresh( ::STD::Quasi ))>
 }
 
 # XXX should eventually be derived from current Unicode tables.
@@ -2266,6 +2266,19 @@ grammar Quasi is STD {
     token term:unquote {
         <starter><starter><starter> :: <statementlist> <stopper><stopper><stopper>
     }
+
+    # begin tweaks (DO NOT ERASE)
+    multi method tweak (:$ast) { self; } # XXX some transformer operating on the normal AST?
+    multi method tweak (:$lang) { self.cursor_fresh( $lang ); }
+    multi method tweak (:$unquote) { self; } # XXX needs to override unquote
+    multi method tweak (:$COMPILING) { self; } # XXX needs to lazify the lexical lookups somehow
+
+    multi method tweak (*%x) {
+        my @k = keys(%x);
+        self.panic("Unrecognized quasiquote modifier: " ~ @k);
+    }
+    # end tweaks (DO NOT ERASE)
+
 } # end grammar
 
 # Note, backtracks!  So post mustn't commit to anything permanent.
@@ -3114,7 +3127,7 @@ method EXPR ($preclvl)
 {
     temp $CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
     if self.peek {
-        return self._AUTOLEXpeek('EXPR');
+        return self._AUTOLEXpeek('EXPR', $retree);
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $inquote is context = 0;
