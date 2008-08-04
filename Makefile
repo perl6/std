@@ -30,3 +30,6 @@ distclean purge: clean
 test: all
 	./tryfile STD.pm >STD.out
 	./teststd
+testt: all
+	./tryfile STD.pm >STD.out
+	./teststd ../../t

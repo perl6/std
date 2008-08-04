@@ -1,9 +1,10 @@
 #!/usr/local/bin/perl
 
 use strict;
+my $dir_to_test = shift @ARGV || '../../t/spec/';
 my $fail = 0;
 my $success = 0;
-my @files = sort `find ../../t/spec/ -name '*.t'`;
+my @files = sort `find $dir_to_test -name '*.t'`;
 chomp(@files);
 $| = 1;
 
