@@ -122,7 +122,7 @@ constant %tight_or        = (:prec<k=>, :assoc<left>,  :assign);
 constant %conditional     = (:prec<j=>, :assoc<right>);
 constant %item_assignment = (:prec<i=>, :assoc<right>);
 constant %loose_unary     = (:prec<h=>);
-constant %comma           = (:prec<g=>, :assoc<list>, :nullok);
+constant %comma           = (:prec<g=>, :assoc<list>, :nextterm<nulltermish>);
 constant %list_infix      = (:prec<f=>, :assoc<list>,  :assign);
 constant %list_assignment = (:prec<i=>, :sub<e=>, :assoc<right>);
 constant %list_prefix     = (:prec<e=>);
@@ -734,6 +734,13 @@ token pre {
     <prefix_postfix_meta_operator>*                 {*}         #= prepost
     { $+prevop = $<O> }
     <.ws>
+}
+
+token nulltermish {
+    [
+    | <?stdstopper>
+    | <termish>?
+    ]
 }
 
 token termish {
@@ -2931,7 +2938,7 @@ token infix:sym<::=> ( --> Item_assignment)
 
 # XXX need to do something to turn subcall into method call here...
 token infix:sym<.=> ( --> Item_assignment)
-    { <sym> }
+    { <sym> <.ws> { $<O><nextterm> = 'dottyop' } }
 
 token infix:sym« => » ( --> Item_assignment)
     { <sym> }
@@ -3158,7 +3165,7 @@ method EXPR ($preclvl)
     my $prevop is context<rw>;
     my @termstack;
     my @opstack;
-    my $nullok = 0;
+    my $termish = 'termish';
 
     push @opstack, { 'O' => item %terminator, 'sym' => '' };         # (just a sentinel value)
 
@@ -3243,13 +3250,13 @@ method EXPR ($preclvl)
     loop {
         self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
-        my @t = $here.termish();       # eats ws too
+        my @t = $here.$termish;       # presumed to eat trailing ws too
 
-        if not @t or not $here = @t[0] or $here.pos == $oldpos {
-            last if $nullok;
+        if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
             return ();
             # $here.panic("Failed to parse a required term");
         }
+        $termish = 'termish';
 
         # interleave prefix and postfix, pretend they're infixish
         my $M = $here;
@@ -3327,7 +3334,7 @@ method EXPR ($preclvl)
                 default { $here.panic("Unknown associativity \"$_\" for \"$infix\"") }
             }
         }
-        $nullok = 1 if $inO<nullok>;
+        $termish = $inO<nextterm> if $inO<nextterm>;
         push @opstack, $infix;
     }
     reduce() while +@termstack > 1;

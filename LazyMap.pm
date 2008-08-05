@@ -46,6 +46,7 @@ sub lazymap (&@) {
 }
 
 sub iter {
+    no warnings 'recursion';
     my $self = shift;
     my $lazies = $self->{L};
     my $called = $self->{C};
