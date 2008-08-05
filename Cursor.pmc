@@ -15,6 +15,7 @@ $::HIGHMESS = '';
 $::HIGHEXPECT = {};
 $::COMPILING::LINE = 1;
 $::COMPILING::FILE = '(eval)';
+$::GOAL = "(eof)";
 
 { package DEBUG;
     use constant {
@@ -623,7 +624,7 @@ END
 				my $f = $fates->[$x-1][3];
 				no strict 'refs';
 				if ($DEBUG & DEBUG::fates or ($DEBUG & DEBUG::lexer and $x == $last)) {
-				    my $p = $pats[$x] // '<nopat>';
+				    my $p = $pats[$x-1] // '<nopat>';
 				    $self->deb("\$$x: $beg..$end\t$$x\t ",
 					$x == $last ? "====>" : "---->",
 					" $f\t/$p/");

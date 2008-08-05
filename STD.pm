@@ -4,6 +4,7 @@ my $LANG is context;
 my $PKGDECL is context = "";
 my $PKG is context = "";
 my @PKGS;
+my $GOAL is context = "(eof)";
 
 # random rule for debugging, please ignore
 regex foo {
@@ -59,6 +60,7 @@ to become less true over time.)
 
 method TOP ($STOP = undef) {
     if defined $STOP {
+        my $GOAL is context = $STOP;
         self.unitstop($STOP).comp_unit;
     }
     else {
@@ -457,9 +459,15 @@ token pblock {
     [ <lambda> <signature> ]? <block>
 }
 
-
 token lambda { '->' | '<->' }
 
+# Look for an expression followed by a required lambda.
+token xblock {
+    :my $GOAL is context = '{';
+    <EXPR>
+    <.ws>
+    <pblock>
+}
 
 token block {
     '{' <in: '}', 'statementlist', 'block'>
@@ -476,6 +484,7 @@ token block {
 
 token regex_block {
     :my $lang = ::Regex;
+    :my $GOAL is context = '}';
 
     [ <quotepair> <.ws>
 	{
@@ -586,18 +595,19 @@ rule statement_control:no {\
 
 rule statement_control:if {\
     <sym>
-    <EXPR>                           {*}                        #= if expr
-    <pblock>                         {*}                        #= if block
-    $<elsif> = ( 'elsif'<?spacey> <EXPR>       {*}                #= elsif expr
-                        <pblock>     {*} )*                     #= elsif block
-    $<else> = ( 'else'<?spacey> <pblock>       {*} )?             #= else
+    <xblock>
+    $<elsif> = (
+        'elsif'<?spacey> <xblock>       {*}                #= elsif
+    )*
+    $<else> = (
+        'else'<?spacey> <pblock>       {*}             #= else
+    )?
 }
 
 
 rule statement_control:unless {\
     <sym> 
-    <EXPR>                           {*}                        #= expr
-    <pblock>                         {*}                        #= block
+    <xblock>
     [ <!before 'else'> || <.panic: "unless does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
 }
 
@@ -606,15 +616,13 @@ rule statement_control:while {\
     <sym>
     [ <?before '(' ['my'? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
         <.panic: "This appears to be Perl 5 code"> ]?
-    <EXPR>                             {*}                      #= expr
-    <pblock>                           {*}                      #= block
+    <xblock>
 }
 
 
 rule statement_control:until {\
     <sym>
-    <EXPR>                             {*}                      #= expr
-    <pblock>                           {*}                      #= block
+    <xblock>
 }
 
 
@@ -646,20 +654,16 @@ rule statement_control:for {\
     <sym>
     [ <?before 'my'? '$'\w+ '(' >
         <.panic: "This appears to be Perl 5 code"> ]?
-    <EXPR>                             {*}                      #= expr
-    <pblock>                           {*}                      #= block
+    <xblock>
 }
-
 
 rule statement_control:given {\
     <sym>
-    <EXPR>                             {*}                      #= expr
-    <pblock>                           {*}                      #= block
+    <xblock>
 }
 rule statement_control:when {\
     <sym>
-    <EXPR>                             {*}                      #= expr
-    <pblock>                           {*}                      #= block
+    <xblock>
 }
 rule statement_control:default {<sym> <block> }
 
@@ -1501,7 +1505,7 @@ token morename {
     <?before '(' | <alpha> >
     [
     | <ident>
-    | '(' :: <EXPR> [ ')' || <.panic: "Unable to parse indirect name; couldn't find right parenthesis"> ]
+    | '(' :: <in: ')', 'EXPR', 'indirect name'>
     ]
 }
 
@@ -2412,6 +2416,7 @@ rule post_constraint {
 }
 
 token named_param {
+    :my $GOAL is context = ')';
     ':'
     [
     | <name=ident> '(' <.ws>
@@ -2431,7 +2436,6 @@ token param_var {
     ||  # Is it a shaped array or hash declaration?
         <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
         <ident>?
-        <.ws>
         <?before <[ \< \( \[ \{ ]> >
         <postcircumfix>
 
@@ -2524,15 +2528,27 @@ token statement_prefix:lazy    { <sym> <?before \s> <.ws> <statement> }
 
 ## term
 token term:sym<undef> ( --> Term) {
-    <sym> » \h*
-    [ <?before '$/' >
+    <sym> »
+    [ <?before \h*'$/' >
         <obs('$/ variable as input record separator',
              "the filehandle's .slurp method")>
     ]?
-    [ <?before < $ @ % & > >
+    [ <?before \h*< $ @ % & > >
         <obs('undef as a verb', 'undefine function')>
     ]?
 }
+
+token term:sym<next> ( --> Term)
+    { <sym> » <.ws> <termish>? }
+
+token term:sym<last> ( --> Term)
+    { <sym> » <.ws> <termish>? }
+
+token term:sym<redo> ( --> Term)
+    { <sym> » <.ws> <termish>? }
+
+token term:sym<goto> ( --> Term)
+    { <sym> » <.ws> <termish> }
 
 token term:sym<self> ( --> Term)
     { <sym> » }
@@ -2876,6 +2892,7 @@ token infix:sym<//> ( --> Tight_or)
 
 ## conditional
 token infix:sym<?? !!> ( --> Conditional) {
+    :my $GOAL is context = '!!';
     '??'
     <.ws>
     <EXPR(item %item_assignment)>
@@ -2892,7 +2909,6 @@ token infix:sym<?? !!> ( --> Conditional) {
 
 token infix:sym<?> ( --> Conditional)
     { <sym> <obs('?: for the conditional operator', '??!!')> }
-
 
 ## assignment
 # There is no "--> type" because assignment may be coerced to either
@@ -2949,20 +2965,14 @@ token infix:sym<Z> ( --> List_infix)
 token infix:sym<minmax> ( --> List_infix)
     { <sym> }
 
-token prefix:sym<...> ( --> List_prefix)
-{
-    '...'
-}
+token term:sym<...> ( --> List_prefix)
+    { <sym> <args>? }
 
-token prefix:sym<???> ( --> List_prefix)
-{
-    '???'
-}
+token term:sym<???> ( --> List_prefix)
+    { <sym> <args>? }
 
-token prefix:sym<!!!> ( --> List_prefix)
-{
-    '!!!'
-}
+token term:sym<!!!> ( --> List_prefix)
+    { <sym> <args>? }
 
 token term:sigil ( --> List_prefix)
 {
@@ -2976,16 +2986,28 @@ token term:sigil ( --> List_prefix)
 # force ident(), ident.(), etc. to be a function call always
 token term:ident ( --> Term )
 {
-    <ident>
+    :my $i;
+    $i = <ident> <args( $¢.is_type($i.text) )>
+}
+
+token term:opfunc ( --> Term )
+{
+    <category> <colonpair>+ <args>
+}
+
+token args ($istype = 0) {
+    :my $listopy = 0;
     [
     | '.(' <in: ')', 'semilist', 'argument list'> {*}             #= func args
     | '(' <in: ')', 'semilist', 'argument list'> {*}              #= func args
     | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*} #= func args
+    | :: [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]? { $listopy = 1 }
     ]
 
     [
+    || <?{ $listopy }>
     || ':' <?before \s> <arglist>    # either switch to listopiness
-    || {{ $+prevop = $<O> = {}; }}   # or allow adverbs
+    || {{ $+prevop = $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
     ]
 }
 
@@ -3008,27 +3030,28 @@ token term:name ( --> Term)
         {*}                                                     #= typename
 
     # unrecognized names are assumed to be post-declared listops.
-    || <?before \s> <arglist>
-        {*}                                                     #= listop args
-    ||
-        [
-        | '.(' <in: ')', 'semilist', 'argument list'>
-            {*}                                                 #= func args
-
-        | '(' <in: ')', 'semilist', 'argument list'>
-            {*}                                                 #= func args
-
-        | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'>
-            {*}                                                 #= func args
-
-
-        | ::  {*}                                               #= listop noarg
-        ]
-
-        [
-        || ':' <?before \s> <arglist>    # either switch to listopiness
-        || {{ $+prevop = $<O> = {}; }}   # or allow adverbs
-        ]
+    || <args>?
+#    || <?before \s> <arglist>
+#        {*}                                                     #= listop args
+#    ||
+#        [
+#        | '.(' <in: ')', 'semilist', 'argument list'>
+#            {*}                                                 #= func args
+#
+#        | '(' <in: ')', 'semilist', 'argument list'>
+#            {*}                                                 #= func args
+#
+#        | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'>
+#            {*}                                                 #= func args
+#
+#
+#        | ::  {*}                                               #= listop noarg
+#        ]
+#
+#        [
+#        || ':' <?before \s> <arglist>    # either switch to listopiness
+#        || {{ $+prevop = $<O> = {}; }}   # or allow adverbs
+#        ]
     ]
 }
 
@@ -3100,11 +3123,12 @@ token terminator:sym<}> ( --> Terminator)
     { <?before '}' > }
 
 token terminator:sym<!!> ( --> Terminator)
-    { <?before '!!' > }
+    { <?before '!!' > <?{ $+GOAL eq '!!' }> }
 
 regex infixstopper {
     | <?before <stopper> >
-    | <?before '{' | <lambda> > <?{ $¢.<_>[$¢.pos]<ws> }>
+    | <?before '!!' > <?{ $+GOAL eq '!!' }>
+    | <?before '{' | <lambda> > <?{ $+GOAL eq '{' and $¢.<_>[$¢.pos]<ws> }>
 }
 
 # overridden in subgrammars
@@ -3375,6 +3399,7 @@ grammar Regex is STD {
 
     # suppress fancy end-of-line checking
     token codeblock {
+        :my $GOAL is context = '}';
         '{' :: [ :lang($¢.cursor_fresh($+LANG)) <statementlist> ]
         [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
     }
@@ -3718,7 +3743,9 @@ method worry (Str $s) {
     warn $s ~ self.locmess;
 }
 
+# not quite a "between" combinator...
 token in (Str $stop, Str $insides, Str $name = $insides) {
+    :my $GOAL is context = $stop;
     <x=$insides> $stop {{ $/.{$insides} = $<x>; delete $<x> }} || <.panic: "Unable to parse $name; couldn't find final '$stop'">
 }
 

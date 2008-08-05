@@ -1578,7 +1578,7 @@ sub unbalanced {
         my $self = shift;
         my $var = $$self{var};
         my $re = $$self{atom}->walk(@_);
-        "bindvar($var,$re)";	# doesn't do "let" semantics yet
+        "($var = $re)";	# doesn't do "let" semantics yet
     }
 }
 
