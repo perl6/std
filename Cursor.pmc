@@ -13,6 +13,8 @@ $::DEBUG = $DEBUG;
 $::HIGHWATER = 0;
 $::HIGHMESS = '';
 $::HIGHEXPECT = {};
+$::COMPILING::LAST_NIBBLE = { firstline => 0, lastline => 0 };
+$::COMPILING::LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
 $::COMPILING::LINE = 1;
 $::COMPILING::FILE = '(eval)';
 $::GOAL = "(eof)";
@@ -58,7 +60,7 @@ our $CLEAR = color 'clear';
 
 sub deb { my $self = shift;
     my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
-    print ::LOG $pos,'/',$::COMPILING::LINE, "\t", $CTX, ' ', @_, "\n";
+    print ::LOG $pos,'/',$self->lineof($pos), "\t", $CTX, ' ', @_, "\n";
 }
 
 $::DEBUG //= 0;

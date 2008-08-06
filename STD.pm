@@ -393,7 +393,7 @@ token unsp {
 
 token vws {
     \v ::
-    { $COMPILING::LINE++ }
+    { $COMPILING::LINE++ } # XXX wrong several ways
     [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
 }
 
@@ -1579,7 +1579,7 @@ token integer {
         | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
         | d \d+               [ _ \d+]*
         | \d+[_\d+]*
-#            {{ START { $¢.worry("Leading 0 does not indicate octal in Perl 6") } }}
+            { $¢.worry("Leading 0 does not indicate octal in Perl 6") }
         ]
     | \d+[_\d+]*
     ]
@@ -1798,6 +1798,8 @@ token nibbler {
     :my $text = '';
     :my @nibbles = ();
     :my $buf = self.orig;
+    :my $multiline = 0;
+    { $<firstpos> = self.pos; }
     [
         [
         | <?before <stopper> > :: <fail>
@@ -1814,12 +1816,22 @@ token nibbler {
                             $text = '';
                         }
         |            :: .
-                        {
-                            $text ~= substr($$buf, $¢.pos-1, 1);
-                        }
+                        {{
+                            my $ch = substr($$buf, $¢.pos-1, 1);
+                            $text ~= $ch;
+                            if $ch ~~ "\n" {
+                                $multiline++;
+                                $COMPILING::LINE++; # bypasses <vws>
+                            }
+                        }}
         ]
     ]*
-    { push @nibbles, $text; $<nibbles> = [@nibbles]; }
+    {
+        push @nibbles, $text; $<nibbles> = [@nibbles];
+        $<lastpos> = $¢.pos;
+        $COMPILING::LAST_NIBBLE = $¢;
+        $COMPILING::LAST_NIBBLE_MULTILINE = $¢ if $multiline;
+    }
 }
 
 
@@ -1831,21 +1843,8 @@ token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).
 token quote:sym«< >»   { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
-    '/' <nibble( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> '/'
-    [ (< i g s m x c e ] >+) 
-        {{
-            given $0 {
-                /i/ and $¢.obs('/i',':i');
-                /g/ and $¢.obs('/g',':g');
-                /s/ and $¢.obs('/s','^^ and $$ anchors');
-                /m/ and $¢.obs('/m','. or \N');
-                /x/ and $¢.obs('/x','normal default whitespace');
-                /c/ and $¢.obs('/c',':c or :p');
-                /e/ and $¢.obs('/e','interpolated {...} or s{} = ... form');
-                $¢.obs('suffix regex modifiers','prefix adverbs');
-            }
-        }}
-    ]?
+    '/' <nibble( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
+    <old_rx_mods>?
 }
 
 # handle composite forms like qww
@@ -1886,20 +1885,68 @@ token quote_mod:f  { <sym> }
 token quote_mod:c  { <sym> }
 token quote_mod:b  { <sym> }
 
-token quote:rx { <sym> » <!before '('> <quibble( $¢.cursor_fresh( ::Regex ) )> }
+token quote:rx {
+    <sym> » <!before '('>
+    <quibble( $¢.cursor_fresh( ::Regex ) )>
+    <old_rx_mods>?
+}
 
-token quote:m  { <sym> » <!before '('> <quibble( $¢.cursor_fresh( ::Regex ) )> }
-token quote:mm { <sym> » <!before '('> <quibble( $¢.cursor_fresh( ::Regex ).tweak(:s))> }
+token quote:m  {
+    <sym> » <!before '('>
+    <quibble( $¢.cursor_fresh( ::Regex ) )>
+    <old_rx_mods>?
+}
+
+token quote:mm {
+    <sym> » <!before '('>
+    <quibble( $¢.cursor_fresh( ::Regex ).tweak(:s))>
+    <old_rx_mods>?
+}
 
 token quote:s {
-    <sym> » <!before '('> <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
+    <sym> » <!before '('>
+    <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
+    <old_rx_mods>?
 }
+
 token quote:ss {
-    <sym> » <!before '('> <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
+    <sym> » <!before '('>
+    <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
+    <old_rx_mods>?
 }
 token quote:tr {
     <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( ::STD::Q ).tweak(:q))>
+    <old_tr_mods>?
 }
+
+token old_rx_mods {
+    (< i g s m x c e ] >+) 
+    {{
+        given $0.text {
+            $_ ~~ /i/ and $¢.worryobs('/i',':i');
+            $_ ~~ /g/ and $¢.worryobs('/g',':g');
+            $_ ~~ /s/ and $¢.worryobs('/s','^^ and $$ anchors');
+            $_ ~~ /m/ and $¢.worryobs('/m','. or \N');
+            $_ ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
+            $_ ~~ /c/ and $¢.worryobs('/c',':c or :p');
+            $_ ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
+            $¢.obs('suffix regex modifiers','prefix adverbs');
+        }
+    }}
+}
+
+token old_tr_mods {
+    (< c d s ] >+) 
+    {{
+        given $0.text {
+            $_ ~~ /c/ and $¢.worryobs('/c',':c');
+            $_ ~~ /d/ and $¢.worryobs('/g',':d');
+            $_ ~~ /s/ and $¢.worryobs('/s',':s');
+            $¢.obs('suffix transliteration modifiers','prefix adverbs');
+        }
+    }}
+}
+
 
 token quote:quasi {
     <sym> » <!before '('> <quasiquibble($¢.cursor_fresh( ::STD::Quasi ))>
@@ -2936,9 +2983,11 @@ token infix:sym<:=> ( --> Item_assignment)
 token infix:sym<::=> ( --> Item_assignment)
     { <sym> }
 
-# XXX need to do something to turn subcall into method call here...
-token infix:sym<.=> ( --> Item_assignment)
-    { <sym> <.ws> { $<O><nextterm> = 'dottyop' } }
+token infix:sym<.=> ( --> Item_assignment) {
+    <sym> <.ws>
+    [ <?before \w+';' | < new sort subst trans > > || <worryobs('.= as append operator', '~=')> ]
+    { $<O><nextterm> = 'dottyop' }
+}
 
 token infix:sym« => » ( --> Item_assignment)
     { <sym> }
@@ -3713,41 +3762,90 @@ grammar Regex is STD {
 
 # token panic (Str $s) { <commit> <fail($s)> }
 
+method panic (Str $s) {
+    my $m = "############# PARSE FAILED #############";
+    my $here = self;
+
+    # Have we backed off recently?
+    my $highvalid = self.pos <= $*HIGHWATER;
+
+    $here = self.cursor($*HIGHWATER) if $highvalid;
+
+    my $first = $here.lineof($COMPILING::LAST_NIBBLE.<firstpos>);
+    my $last = $here.lineof($COMPILING::LAST_NIBBLE.<lastpos>);
+    if $here.lineof($here.pos) == $last and $first != $last {
+        $m ~= "\n(Possible runaway string from line $first)";
+    }
+    else {
+        $first = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<firstpos>);
+        $last = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<lastpos>);
+        # the bigger the string (in lines), the further back we suspect it
+        if $here.lineof($here.pos) - $last < $last - $first  {
+            $m ~= "\n(Possible runaway string from line $first to line $last)";
+        }
+    }
+
+    $m ~= "\n" ~ $s;
+
+    if $highvalid {
+        $m ~= $*HIGHMESS if $*HIGHMESS;
+    }
+    else {
+        # not in backoff, so at "bleeding edge", as it were... therefore probably
+        # the exception will be caught and re-panicked later, so remember message
+        $*HIGHMESS ~= "\n" ~ $s;
+    }
+
+    $m ~= $here.locmess;
+
+    if $highvalid and %$*HIGHEXPECT {
+        my @keys = sort keys %$*HIGHEXPECT;
+        if @keys > 1 {
+            $m ~= "\n    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT);
+        }
+        else {
+            $m ~= "\n    expecting @keys";
+        }
+    }
+
+    if @COMPILING::WORRIES {
+        $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES);
+    }
+
+    die $m ~ "\n";
+}
+
+method worry (Str $s) {
+    push @COMPILING::WORRIES, $s ~ self.locmess;
+}
+
 method locmess () {
     my $orig = self.orig;
     my $text = $$orig;
     my $pre = substr($text, 0, self.pos);
-    my $line = 1 + $pre ~~ tr!\n!\n!;
+    my $line = self.lineof(self.pos);
     $pre = substr($pre, -40, 40);
     1 while $pre ~~ s!.*\n!!;
     my $post = substr($text, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
     " at " ~ $COMPILING::FILE ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
-        "$post$Cursor::CLEAR\n";
+        "$post$Cursor::CLEAR";
 }
 
-method panic (Str $s) {
-    my $m = "############# PARSE FAILED #############\n$s";
-    if self.pos <= $*HIGHWATER and %$*HIGHEXPECT {
-        $m ~= "\n" ~ $*HIGHMESS if $*HIGHMESS;
-        $m ~= self.cursor($*HIGHWATER).locmess;
-        my @keys = sort keys %$*HIGHEXPECT;
-        if @keys > 1 {
-            $m ~= "    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT) ~ "\n";
-        }
-        else {
-            $m ~= "    expecting @keys\n";
-        }
+method lineof ($p) {
+    return 1 unless defined $p;
+    my $posprops = self.<_>;
+    my $line = $posprops.[$p]<line>;
+    return $line if $line;
+    $line = 1;
+    my $pos = 0;
+    my $orig = self.orig;
+    my $text = $$orig;
+    while $text ne '' {
+        $posprops.[$pos++]<line> = $line;
+        $line++ if substr($text,0,1,'') eq "\n";
     }
-    else {
-        $*HIGHMESS = $s;
-        $m ~= self.locmess;
-    }
-    die $m;
-}
-
-method worry (Str $s) {
-    warn $s ~ self.locmess;
+    return $posprops.[$p]<line> // 0;
 }
 
 # not quite a "between" combinator...
@@ -3759,6 +3857,11 @@ token in (Str $stop, Str $insides, Str $name = $insides) {
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
 method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
     self.panic("Obsolete use of $old;$when please use $new instead");
+}
+
+method worryobs (Str $old, Str $new, Str $when = ' in Perl 6') {
+    self.worry("Possible obsolete use of $old;$when please use $new instead");
+    self;
 }
 
 ## vim: expandtab sw=4 syntax=perl6
