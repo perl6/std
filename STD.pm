@@ -89,7 +89,7 @@ my @typenames = qw[
 
     Int  int   int1  int2  int4 int8  int16  int32  int64
     Rat  rat   rat1  rat2  rat4 rat8  rat16  rat32  rat64
-    Uint uint uint1 uint2 uint4 uint8 uint16 uint32 uint64
+    UInt uint uint1 uint2 uint4 uint8 uint16 uint32 uint64
     Buf  buf   buf1  buf2  buf4 buf8  buf16  buf32  buf64
 
     Bit Bool True False
