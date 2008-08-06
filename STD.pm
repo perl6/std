@@ -69,18 +69,41 @@ method TOP ($STOP = undef) {
 }
 
 
-#XXX shouldn't need this, it should all be in GLOBAL:: or the current package hash
+# XXX shouldn't need this, it should all be defined/imported by the prelude
 
-my @typenames = (      # (need parens for gimme5 translator)
-    <Void Bit Int UInt Str Num Complex Bool True False Rat>,
-    <Exception Code Block List Seq Range Set Bag Junction Pair>,
-    <Mapping Signature Capture Blob Whatever Undef Failure>,
-    <StrPos StrLen Version P6opaque>,
-    <bit int int8 int16 int32 uint uint8 uint16 uint32 buf buf8 buf16 buf32 num complex bool rat>,
-    <Scalar Array Hash KeyHash KeySet KeyBag Buf IO Routine Sub Method>,
-    <Submethod Macro Regex Match Package Module Class Role Grammar Any Object>,
-    ()
-);
+my @typenames = qw[
+    Object Any Junction Whatever
+    Capture Match Signature
+    Package Module Class Role Grammar
+    Scalar Array Hash KeyHash KeySet KeyBag
+    Pair List Seq Range Set Bag Mapping
+    Void Undef Failure Exception
+    Code Block Routine Sub Macro
+    Method Submethod Regex
+
+    Str Blob
+    Char Byte Codepoint Grapheme StrPos StrLen Version
+
+    Num Complex
+    num complex
+
+    Int  int   int1  int2  int4 int8  int16  int32  int64
+    Rat  rat   rat1  rat2  rat4 rat8  rat16  rat32  rat64
+    Uint uint uint1 uint2 uint4 uint8 uint16 uint32 uint64
+    Buf  buf   buf1  buf2  buf4 buf8  buf16  buf32  buf64
+
+    Bit Bool True False
+    bit bool
+
+    Order Increasing Decreasing
+    Ordered Callable Positional Associatve
+    Ordering KeyExtractor Comparator OrderingPair
+
+    IO
+
+    KitchenSink
+];
+
 my %typenames;
 %typenames{@typenames} = (1 xx @typenames);
 
@@ -1670,8 +1693,7 @@ proto token escape { <...> }
 token starter { <!> }
 token escape:none { <!> }
 
-# XXX the front stuff needs to be factored out
-token quibble ($l) {
+token babble ($l) {
     :my $lang = $l;
     :my $start;
     :my $stop;
@@ -1689,7 +1711,14 @@ token quibble ($l) {
         ($start,$stop) = $¢.peek_delimiters();
         $lang = $start ne $stop ?? $lang.balanced($start,$stop)
                                 !! $lang.unbalanced($stop);
+        $<B> = [$lang,$start,$stop];
     }
+}
+
+token quibble ($l) {
+    :my ($lang, $start, $stop);
+    <babble($l)>
+    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
     $start <nibble($lang)> $stop
 
@@ -1705,87 +1734,41 @@ token quibble ($l) {
     }}
 }
 
-method nibble ($lang) {
-    my $outerlang = self.WHAT;
-    my $LANG is context = $outerlang;
-    self.cursor_fresh($lang).nibbler;
-}
-
 token sibble ($l, $lang2) {
-    :my $lang = $l;
-    :my $start;
-    :my $stop;
+    :my ($lang, $start, $stop);
+    <babble($l)>
+    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
-    <.ws>
-    [ <quotepair> <.ws>
-	{
-	    my $kv = $<quotepair>[*-1];
-	    $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-	}
-    ]*
-
-    { ($start,$stop) = $¢.peek_delimiters(); }
-
+    $start <left=nibble($lang)> $stop 
     [ <?{ $start ne $stop }> ::
-	{ $lang = $lang.balanced($start,$stop); }
-	$start <left=nibble($lang)> $stop <.ws> '='<.ws> <right=EXPR(item %item_assignment)>
-    || { $lang = $lang.unbalanced($stop); }
-	$start <left=nibble($lang)> $stop
+	<.ws>
+        [ '=' || <.panic: "Missing '='"> ]
+        <.ws>
+        <right=EXPR(item %item_assignment)>
+    || 
 	{ $lang = $lang2.unbalanced($stop); }
 	<right=nibble($lang)> $stop
     ]
 }
 
 token tribble ($l, $lang2 = $l) {
-    :my $lang = $l;
-    :my $start;
-    :my $stop;
+    :my ($lang, $start, $stop);
+    <babble($l)>
+    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
-    <.ws>
-    [ <quotepair> <.ws>
-	{
-	    my $kv = $<quotepair>[*-1];
-	    $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-	}
-    ]*
-
-    {
-        ($start,$stop) = $¢.peek_delimiters();
-        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
-                                !! $lang.unbalanced($stop);
-    }
-
+    $start <left=nibble($lang)> $stop 
     [ <?{ $start ne $stop }> ::
-	{ $lang = $lang.balanced($start,$stop); }
-	$start <left=nibble($lang)> $stop <.ws> <quibble($lang2)>
-    || { $lang = $lang.unbalanced($stop); }
-	$start <left=nibble($lang)> $stop
+	<.ws> <quibble($lang2)>
+    || 
 	{ $lang = $lang2.unbalanced($stop); }
 	<right=nibble($lang)> $stop
     ]
 }
 
 token quasiquibble ($l) {
-    :my $lang = $l;
-    :my $start;
-    :my $stop;
-
-    <.ws>
-    [ <quotepair> <.ws>
-	{
-	    my $kv = $<quotepair>[*-1];
-	    $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-	}
-    ]*
-
-    {
-        ($start,$stop) = $¢.peek_delimiters();
-        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
-                                !! $lang.unbalanced($stop);
-    }
+    :my ($lang, $start, $stop);
+    <babble($l)>
+    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
     [
     || <?{ $start eq '{' }> [ :lang($lang) <block> ]
@@ -1832,6 +1815,13 @@ token nibbler {
         $COMPILING::LAST_NIBBLE = $¢;
         $COMPILING::LAST_NIBBLE_MULTILINE = $¢ if $multiline;
     }
+}
+
+# and this is what makes nibbler polymorphic...
+method nibble ($lang) {
+    my $outerlang = self.WHAT;
+    my $LANG is context = $outerlang;
+    self.cursor_fresh($lang).nibbler;
 }
 
 

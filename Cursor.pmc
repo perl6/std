@@ -1329,7 +1329,7 @@ sub _SUBSUME { my $self = shift;
 }
 
 sub _EXACT { my $self = shift;
-    my $s = shift;
+    my $s = shift() // '';
 
     local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
