@@ -242,7 +242,7 @@ sub MAIN {
 	$out .= <<"END";
 use strict;
 use warnings;
-no warnings 'qw';
+no warnings 'qw', 'recursion';
 use $extends; # for base class as well as DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
 moose_extends('$extends');

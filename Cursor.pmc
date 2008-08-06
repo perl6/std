@@ -1,6 +1,7 @@
 #!perl
 use strict;
 use warnings;
+no warnings 'recursion';
 use utf8;
 
 use feature 'say', 'state';

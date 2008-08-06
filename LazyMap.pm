@@ -1,6 +1,7 @@
 package LazyMap;
 use strict;
 use warnings;
+no warnings 'recursion';
 
 use Exporter;
 
@@ -46,7 +47,6 @@ sub lazymap (&@) {
 }
 
 sub iter {
-    no warnings 'recursion';
     my $self = shift;
     my $lazies = $self->{L};
     my $called = $self->{C};

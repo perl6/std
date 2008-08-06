@@ -409,10 +409,8 @@ token unv {
    | <?before '='> ^^ :: <.pod_comment>  {*}                    #= pod
    | \h* '#' :: [
          |  <?opener> ::
-            [
-               <?after ^^ . > <.panic: "Can't use embedded comments in column 1">
-            || <.quibble($¢.cursor_fresh( ::STD::Q ))>   {*}                               #= embedded
-            ]
+            [ <!after ^^ . > || <.panic: "Can't use embedded comments in column 1"> ]
+            <.quibble($¢.cursor_fresh( ::STD::Q ))>   {*}                               #= embedded
          | :: \N*            {*}                                 #= end
          ]
 }
@@ -734,6 +732,11 @@ token pre {
     <prefix_postfix_meta_operator>*                 {*}         #= prepost
     { $+prevop = $<O> }
     <.ws>
+}
+
+# (for when you want to tell EXPR that infix already parsed the term)
+token nullterm {
+    <?>
 }
 
 token nulltermish {
@@ -1452,6 +1455,7 @@ token variable {
     <?before <sigil> > ::
     [
     || '&' <twigil>?  <sublongname> {*}                                   #= subnoun
+    || <?before '$::('> '$' <name>?
     || '$::' <name>? # XXX
     || '$:' <name>? # XXX
     || [
@@ -1475,7 +1479,6 @@ token sigil:sym<@@> { <sym> }
 token sigil:sym<@>  { <sym> }
 token sigil:sym<%>  { <sym> }
 token sigil:sym<&>  { <sym> }
-token sigil:sym<::> { <sym> }
 
 token twigil:sym<.> { <sym> }
 token twigil:sym<!> { <sym> }
@@ -1487,12 +1490,8 @@ token twigil:sym<?> { <sym> }
 token twigil:sym<=> { <sym> }
 
 token deflongname {
-    <name> <colonpair>*
-    {{
-        if $<colonpair> {
-            $¢ = $¢.add_macro($<name>);
-        }
-    }}
+    <name>
+    [ <colonpair>+ { $¢ = $¢.add_macro($<name>); } ]?
 }
 
 token longname {
@@ -1554,7 +1553,8 @@ token value {
 token typename {
     <longname>
     <?{
-        $¢.is_type($<longname>.text)
+        my $longname = $<longname>.text;
+        substr($longname, 0, 2) eq '::' or $¢.is_type($longname)
     }>
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -1729,7 +1729,7 @@ token sibble ($l, $lang2) {
 
     [ <?{ $start ne $stop }> ::
 	{ $lang = $lang.balanced($start,$stop); }
-	$start <left=nibble($lang)> $stop '=' <right=EXPR(item %item_assignment)>
+	$start <left=nibble($lang)> $stop <.ws> '='<.ws> <right=EXPR(item %item_assignment)>
     || { $lang = $lang.unbalanced($stop); }
 	$start <left=nibble($lang)> $stop
 	{ $lang = $lang2.unbalanced($stop); }
@@ -1844,7 +1844,7 @@ token quote:sym«< >»   { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tw
 
 token quote:sym</ />   {
     '/' <nibble( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
-    <old_rx_mods>?
+    <.old_rx_mods>?
 }
 
 # handle composite forms like qww
@@ -1888,35 +1888,35 @@ token quote_mod:b  { <sym> }
 token quote:rx {
     <sym> » <!before '('>
     <quibble( $¢.cursor_fresh( ::Regex ) )>
-    <old_rx_mods>?
+    <!old_rx_mods>
 }
 
 token quote:m  {
     <sym> » <!before '('>
     <quibble( $¢.cursor_fresh( ::Regex ) )>
-    <old_rx_mods>?
+    <!old_rx_mods>
 }
 
 token quote:mm {
     <sym> » <!before '('>
     <quibble( $¢.cursor_fresh( ::Regex ).tweak(:s))>
-    <old_rx_mods>?
+    <!old_rx_mods>
 }
 
 token quote:s {
     <sym> » <!before '('>
     <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
-    <old_rx_mods>?
+    <!old_rx_mods>
 }
 
 token quote:ss {
     <sym> » <!before '('>
     <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
-    <old_rx_mods>?
+    <!old_rx_mods>
 }
 token quote:tr {
     <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( ::STD::Q ).tweak(:q))>
-    <old_tr_mods>?
+    <!old_tr_mods>
 }
 
 token old_rx_mods {
@@ -2581,6 +2581,11 @@ token statement_prefix:async   { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:lazy    { <sym> <?before \s> <.ws> <statement> }
 
 ## term
+
+token term:sym<::?IDENT> ( --> Term) {
+    $<sym> = [ '::?' <ident> ] »
+}
+
 token term:sym<undef> ( --> Term) {
     <sym> »
     [ <?before \h*'$/' >
@@ -3763,7 +3768,7 @@ grammar Regex is STD {
 # token panic (Str $s) { <commit> <fail($s)> }
 
 method panic (Str $s) {
-    my $m = "############# PARSE FAILED #############";
+    my $m;
     my $here = self;
 
     # Have we backed off recently?
@@ -3789,6 +3794,7 @@ method panic (Str $s) {
 
     if $highvalid {
         $m ~= $*HIGHMESS if $*HIGHMESS;
+        $*HIGHMESS = $m;
     }
     else {
         # not in backoff, so at "bleeding edge", as it were... therefore probably
@@ -3812,7 +3818,7 @@ method panic (Str $s) {
         $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES);
     }
 
-    die $m ~ "\n";
+    die "############# PARSE FAILED #############" ~ $m ~ "\n";
 }
 
 method worry (Str $s) {
@@ -3841,7 +3847,7 @@ method lineof ($p) {
     my $pos = 0;
     my $orig = self.orig;
     my $text = $$orig;
-    while $text ne '' {
+    while $text ne '' { # XXX needs to recognize #line?
         $posprops.[$pos++]<line> = $line;
         $line++ if substr($text,0,1,'') eq "\n";
     }
