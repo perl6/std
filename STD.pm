@@ -747,7 +747,7 @@ token version:sym<v> {
 token pre {
     [
     | <prefix>
-        { $<O> = $<prefix><O> }
+        { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
                                                     {*}         #= prefix
     | <prefix_circumfix_meta_operator>
         { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.text }
@@ -2790,20 +2790,21 @@ token infix:sym<^> ( --> Junctive_or)
 
 
 ## named unary examples
+# (need \s* to win LTM battle with listops)
 token prefix:sleep ( --> Named_unary)
-    { <sym> » }
+    { <sym> » <?before \s*> }
 
 token prefix:abs ( --> Named_unary)
-    { <sym> » }
+    { <sym> » <?before \s*> }
 
 token prefix:int ( --> Named_unary)
-    { <sym> » }
+    { <sym> » <?before \s*> }
 
 token prefix:let ( --> Named_unary)
-    { <sym> » }
+    { <sym> » <?before \s*> }
 
 token prefix:temp ( --> Named_unary)
-    { <sym> » }
+    { <sym> » <?before \s*> }
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
