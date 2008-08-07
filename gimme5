@@ -70,10 +70,12 @@ sub unangle {
 
 sub un6 {
     my $f = shift;
+    #my $trace = $f =~ /PARSER/;
     my $t;
     $f =~ s/\\x([0-9a-fA-F]{3,4})/\\x{$1}/g;
     $f =~ s!\$([0-9]+)!\$\$C{$1}!g;
     while ($f ne "") {
+	#print "$f\n" if $trace;
         $f =~ s/^\)</.</                  	and $t .= ')', next;
         $f =~ s/^\.\(/(/                  	and $t .= '->', next;
 	$f =~ s/^\[\*-1\]//			and $t .= '[-1]';
@@ -183,7 +185,7 @@ sub un6 {
         $f =~ s/^\belsif\s+(.*?) \{/($1) {/     and $t .= qq/elsif /, next;
         $f =~ s/^\bwhile\s+(.*?) \{/($1) {/     and $t .= qq/while /, next;
         $f =~ s/^\bfor\s+(.*?) \{/($1) {/       and $t .= qq/for /, next;
-        $f =~ s/^\bmy\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s*rw)?\s*=\s*(.*);/$2;/s
+        $f =~ s/^\bmy\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s*rw)?\s*=(\s*.*);/$2;/s
                                         	and $t .= qq/local $1 = /, $OUR{$1}++, next;
         $f =~ s/^\bdo given\s+(.*?\S)\s+\{/$1; if (0) {}/
                                                 and $t .= qq/do { my \$_ = /, next;

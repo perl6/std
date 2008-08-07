@@ -5,6 +5,7 @@ my $PKGDECL is context = "";
 my $PKG is context = "";
 my @PKGS;
 my $GOAL is context = "(eof)";
+my $PARSER is context<rw>;
 
 # random rule for debugging, please ignore
 regex foo {
@@ -531,6 +532,7 @@ token regex_block {
 
 # statement semantics
 rule statementlist {
+    :my $PARSER is context<rw> = self;
     [
     | <?before <[\)\]\}]> >
     | [<statement><.eat_terminator> ]*
@@ -562,6 +564,7 @@ token label {
 token statement {
     :my $endargs is context = -1;
     <!before <[\)\]\}]> >
+    <!!{ bless $¢, ref $PARSER; }>
     [
     | <label> <statement>                        {*}            #= label
     | <statement_control>                        {*}            #= control
@@ -806,7 +809,6 @@ token noun {
     | <type_declarator>
     | <circumfix>
     | <dotty>
-#    | <subcall>
     | <value>
     | <capterm>
     | <sigterm>
@@ -932,8 +934,6 @@ token post {
     { $+prevop = $<O> }
 }
 
-# Note: backtracks, or we'd never get to parse [LIST] on seeing [+ and such.
-# (Also backtracks if on \op when no \op infix exists.)
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     $<s> = (
         '['
@@ -1514,7 +1514,8 @@ token twigil:sym<=> { <sym> }
 
 token deflongname {
     <name>
-    [ <colonpair>+ { $¢ = $¢.add_macro($<name>); } ]?
+    # XXX too soon
+    [ <colonpair>+ { $¢.add_macro($<name>); } ]?
 }
 
 token longname {
@@ -1540,7 +1541,8 @@ token morename {
 
 token subshortname {
     [
-    | <category> <colonpair>+
+    | <category>
+        [ <colonpair>+ { $¢.add_macro($<category>); } ]?
     | <desigilname>
     ]
 }
@@ -2345,14 +2347,14 @@ rule multisig {
 }
 
 rule routine_def {
-    <deflongname>?  <multisig>?
-    <trait>*
+    [ '&'<deflongname>? | <deflongname> ]? [ <multisig> | <trait> ]*
+    <!!{ bless $¢, ref $PARSER; }>
     <block>
 }
 
 rule method_def {
     [
-    | '!'?<longname>  <multisig>?
+    | '!'?<longname> [ <multisig> | <trait> ]*
     | <sigil> '.'
         [
         | '(' :: <in: ')', 'signature'>
@@ -2360,22 +2362,19 @@ rule method_def {
         | '{' :: <in: '}', 'signature'>
         | <?before '<'> <postcircumfix>
         ]
+        <trait>*
     ]
-    <trait>*
     <block>
 }
 
 rule regex_def {
     <longname>?
-    [ ':'?'(' <signature> ')']?
-    <trait>*
+    [ [ ':'?'(' <signature> ')'] | <trait> ]*
     <regex_block>
 }
 
-# XXX redundant with routine_def?
 rule macro_def {
-    <deflongname>?  <multisig>?
-    <trait>*
+    [ '&'<deflongname>? | <deflongname> ]? [ <multisig> | <trait> ]*
     <block>
 }
 
@@ -2383,6 +2382,7 @@ rule trait {
     [
     | <trait_verb>
     | <trait_auxiliary>
+    | <colonpair>
     ]
 }
 

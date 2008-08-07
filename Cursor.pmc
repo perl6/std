@@ -11,6 +11,8 @@ require 'mangle.pl';
 our $CTX = '';
 our $DEBUG = $ENV{STD5DEBUG} // 0;
 $::DEBUG = $DEBUG;
+
+# various bits of info useful for error messages
 $::HIGHWATER = 0;
 $::HIGHMESS = '';
 $::HIGHEXPECT = {};
@@ -917,16 +919,98 @@ sub cursor_rev { my $self = shift;
 
 sub add_macro { my $lang = shift;
     my $start = shift;
+    state $GEN = "500";
     $lang->{_from} = $start->{_from};
     my $name = $lang->text;
+    my $WHAT = ref $lang;
     if ($name =~ s/:/:sym/) {
-	print "macro $name\n";
-	eval <<'END';
-#package $genpkg;
-#use Moose ':all' => { -prefix => 'moose_' };
-#moose_extends('$WHAT');
-#moose_with(" . join(',', map {"'$_'"} @newmix) . ");
+	my ($sym) = $name =~ /:sym(.*)/;
+	if ($sym =~ s/^«(.*)»$/$1/) {
+	    my $ok = "'";
+	    for my $try (qw( ' / ! : ; | + - = )) {
+		$ok = $try, last if index($sym,$try) < 0;
+	    }
+	    $sym = $ok . $sym . $ok;
+	}
+
+	my $rule = "token $name { <sym> }";
+
+	my $mangle = $name;
+	$mangle =~ s/^(\w*):(sym)?//;
+	my $category = $1;
+	my @list;
+	if ($mangle =~ s/^<(.*)>$/$1/ or
+	    $mangle =~ s/^«(.*)»$/$1/) {
+	    $mangle =~ s/\\(.)/$1/g;
+	    @list = $mangle =~ /(\S+)/g;
+	}
+	elsif ($mangle =~ s/^\[(.*)\]$/$1/ or
+	    $mangle =~ s/^\{(.*)\}$/$1/) {
+	    @list = eval $mangle;
+	}
+	else {
+	    @list = $mangle;
+	}
+	$mangle = ::mangle(@list);
+	$mangle = $category . '__S_' . sprintf("%03d",$GEN++) . $mangle;
+
+	# XXX assuming no equiv
+	my $coercion = 'Additive';
+	if ($name =~ /^prefix:/) {
+	    if ($sym =~ /^\W/) {
+		$coercion = 'Symbolic_unary';
+	    }
+	    else {
+		$coercion = 'Named_unary';
+	    }
+	}
+	elsif ($name =~ /^postfix:/) {
+	    $coercion = 'Methodcall';
+	}
+
+	my $genpkg = $WHAT . '::_' . $mangle;
+	my $e = <<"END";
+package $genpkg;
+use Moose ':all' => { -prefix => 'moose_' };
+moose_extends('$WHAT');
+
+# $rule
+
+my \$retree = {
+    '$mangle' => bless({
+	'kind' => 'token',
+	'min' => 12345,
+	're' => bless({
+	    'a' => 0,
+	    'i' => 0,
+	    'min' => 12345,
+	    'name' => 'sym',
+	    'rest' => '',
+	    'sym' => q$sym,
+	}, 'RE_method'),
+    }, 'RE'),
+};
+
+sub $mangle {
+    my \$self = shift;
+    local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+    if (\$self->{_peek}) {
+        return \$self->_AUTOLEXpeek('$mangle',\$retree)
+    }
+    my %args = \@_;
+    my \$sym = \$args{sym} // q$sym;
+
+    my \$C = \$self;
+    \$C->{'sym'} = \$sym;
+
+    \$self->_MATCHIFY( Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
+        \$C->_SYM(\$sym, 0)
+    );
+}
+1;
 END
+	eval $e or die "Can't create $name: $@\n";
+	$::PARSER = $lang->cursor_fresh($genpkg);
     }
     $lang;
 }

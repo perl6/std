@@ -36,7 +36,7 @@ sub mangle {
 	s/\./Dot/g;
 	s/\?/Question/g;
 	s/\//Slash/g;
-	s/(\W)/sprintf("_%02x_",ord($1))/eg;
+	s/([^a-zA-Z_0-9])/sprintf("_%02x_",ord($1))/eg;
     }
     join '_', @list;
 }
