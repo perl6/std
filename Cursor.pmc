@@ -433,8 +433,8 @@ sub _AUTOLEXnow { my $self = shift;
 	return sub { return };
     }
     my $ch2 = substr($$buf,$P,5);
-#    $ch2 .= substr($$buf,$P+1,3) if $ch2 eq '[';
-    $ch2 =~ s/^(\[[\\<>«»]*..|[<>][<>]..|..).*$/$1/s;
+    # wish I could persuade p5 to parse this directly out of $$buf...
+    $ch2 =~ s/^(\[[\\<>«»]*..|[<>][<>]..|[ -~].|.).*$/$1/s;
 
 
     $lexer->{$ch2} //= do {

@@ -1785,10 +1785,9 @@ token nibbler {
     :my $buf = self.orig;
     :my $multiline = 0;
     { $<firstpos> = self.pos; }
-    [
+    [ <!before <stopper> >
         [
-        | <?before <stopper> > :: <fail>
-        | <starter> :: <nibbler> <stopper>
+        || <starter> :: <nibbler> <stopper>
                         {
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
@@ -1796,11 +1795,11 @@ token nibbler {
                             $text = (@n ?? pop(@n) !! '') ~ $<stopper>[*-1].text;
                             push @nibbles, @n;
                         }
-        | <escape>   :: {
+        || <escape>   :: {
                             push @nibbles, $text, $<escape>;
                             $text = '';
                         }
-        |            :: .
+        ||            :: .
                         {{
                             my $ch = substr($$buf, $¢.pos-1, 1);
                             $text ~= $ch;
@@ -2537,10 +2536,10 @@ token parameter {
             when '!' {
                 given $+zone {
                     when 'posopt' {
-$¢.panic("Can't use required parameter in optional zone");
+$¢.panic("Can't put required parameter after optional parameters");
                     }
                     when 'var' {
-$¢.panic("Can't use required parameter in variadic zone");
+$¢.panic("Can't put required parameter after variadic parameters");
                     }
                 }
             }
@@ -2548,7 +2547,7 @@ $¢.panic("Can't use required parameter in variadic zone");
                 given $+zone {
                     when 'posreq' { $+zone = 'posopt' }
                     when 'var' {
-$¢.panic("Can't use optional positional parameter in variadic zone");
+$¢.panic("Can't put optional positional parameter after slurpy parameters");
                     }
                 }
             }
