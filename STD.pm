@@ -2372,13 +2372,18 @@ rule method_def {
 }
 
 rule regex_def {
-    <longname>?
+    :my $IN_DECL is context<rw> = 1;
+    [ '&'<deflongname>? | <deflongname> ]?
     [ [ ':'?'(' <signature> ')'] | <trait> ]*
+    { $IN_DECL = 0; }
     <regex_block>
 }
 
 rule macro_def {
+    :my $IN_DECL is context<rw> = 1;
     [ '&'<deflongname>? | <deflongname> ]? [ <multisig> | <trait> ]*
+    <!!{ bless $¢, ref $PARSER; }>
+    { $IN_DECL = 0; }
     <block>
 }
 

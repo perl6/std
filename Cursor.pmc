@@ -923,7 +923,7 @@ sub add_macro { my $lang = shift;
     $lang->{_from} = $start->{_from};
     my $name = $lang->text;
     my $WHAT = ref $lang;
-    if ($name =~ s/:/:sym/) {
+    if ($name =~ s/:(?=[«<({[])/:sym/) {
 	my ($sym) = $name =~ /:sym(.*)/;
 	if ($sym =~ s/^«(.*)»$/$1/) {
 	    my $ok = "'";
