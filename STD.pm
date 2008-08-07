@@ -6,6 +6,7 @@ my $PKG is context = "";
 my @PKGS;
 my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
+my $IN_DECL is context<rw>;
 
 # random rule for debugging, please ignore
 regex foo {
@@ -1061,7 +1062,9 @@ token circumfix:sym<{ }> ( --> Term) {
 }
 
 token variable_declarator {
+    :my $IN_DECL is context<rw> = 1;
     <variable> { $<sigil> = $<variable><sigil> }
+    { $IN_DECL = 0; }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
@@ -1515,7 +1518,7 @@ token twigil:sym<=> { <sym> }
 token deflongname {
     <name>
     # XXX too soon
-    [ <colonpair>+ { $¢.add_macro($<name>); } ]?
+    [ <colonpair>+ { $¢.add_macro($<name>) if $+IN_DECL; } ]?
 }
 
 token longname {
@@ -1542,7 +1545,7 @@ token morename {
 token subshortname {
     [
     | <category>
-        [ <colonpair>+ { $¢.add_macro($<category>); } ]?
+        [ <colonpair>+ { $¢.add_macro($<category>) if $+IN_DECL; } ]?
     | <desigilname>
     ]
 }
@@ -2346,8 +2349,10 @@ rule multisig {
 }
 
 rule routine_def {
+    :my $IN_DECL is context<rw> = 1;
     [ '&'<deflongname>? | <deflongname> ]? [ <multisig> | <trait> ]*
     <!!{ bless $¢, ref $PARSER; }>
+    { $IN_DECL = 0; }
     <block>
 }
 
@@ -2420,6 +2425,8 @@ token sigterm {
 rule param_sep { [','|':'|';'|';;'] }
 
 token signature {
+    # XXX incorrectly scopes &infix:<x> parameters to outside following block
+    :my $IN_DECL is context<rw> = 1;
     :my $zone is context<rw> = 'posreq';
     <.ws>
     [
@@ -2428,6 +2435,7 @@ token signature {
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
+    { $IN_DECL = 0; }
 }
 
 rule type_declarator:subset {\
