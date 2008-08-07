@@ -2645,9 +2645,6 @@ token infix:sym<.> ()
 token postfix:sym['->'] ()
     { '->' <obs('-> to call a method', '.')> }
 
-# XXX temporary cheat on macro processing
-token postfix:sym<!> (--> Methodcall) { <sym> }
-
 ## autoincrement
 token postfix:sym<++> ( --> Autoincrement)
     { <sym> }
