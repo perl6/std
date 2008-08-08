@@ -19,7 +19,7 @@ try5.out: try5 clean
 	./try5 comp_unit -e 'say "howdy" ~ "";' > $@
 
 cat:
-	cat try5.out	
+	cat try5.out
 
 clean:
 	rm -rf lex try5.*
