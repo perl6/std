@@ -156,7 +156,7 @@ sub tweak {
     no strict 'refs';
     for (;;) {
 	my $retval = eval {
-	    $self->deb("Calling $class" . '::multitweak');
+	    $self->deb("Calling $class" . '::multitweak') if $DEBUG & DEBUG::mixins;
 	    &{$class . '::multitweak'}($self,@_);
 	}; 
 	return $retval if $retval;
@@ -608,7 +608,6 @@ sub _AUTOLEXnow { my $self = shift;
 
 		    # Try Real Hard to prevent TRE from recompiling $pat
 		    state $matcher = eval(do { my $prog = <<"END" .
-		    \$self->deb("GENERATING");
 		    sub {
 			my \$C = shift;
 			pos(\$\$buf) = \$C->{_pos};
@@ -619,7 +618,7 @@ END
 <<'END'; $prog; });
 			    my $max = @+ - 1;
 			    my $last = @- - 1;	# ignore '$0'
-		            $C->deb("LAST: $last\n");
+		            $C->deb("LAST: $last\n") if $DEBUG & DEBUG::lexer;
 			    $result = $fates->[$last-1];
 			    for my $x (1 .. $max) {
 				my $beg = $-[$x];
@@ -651,7 +650,7 @@ END
 			return $result;
 		    }
 		    else {
-			$self->deb("NO LEXER MATCH");
+			$self->deb("NO LEXER MATCH") if $DEBUG & DEBUG::lexer;
 			return;
 		    }
 		}

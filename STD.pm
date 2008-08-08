@@ -440,8 +440,12 @@ token unv {
          ]
 }
 
-token ident {
+token identish {
     <.alpha> \w*
+}
+
+token ident {
+    <.identish> [<[ ' \- ]><identish>]*
 }
 
 # XXX We need to parse the pod eventually to support $= variables.
@@ -3841,17 +3845,18 @@ method locmess () {
 method lineof ($p) {
     return 1 unless defined $p;
     my $posprops = self.<_>;
-    my $line = $posprops.[$p]<line>;
+    my $line = $posprops.[$p]<L>;
     return $line if $line;
     $line = 1;
     my $pos = 0;
     my $orig = self.orig;
-    my $text = $$orig;
-    while $text ne '' { # XXX needs to recognize #line?
-        $posprops.[$pos++]<line> = $line;
-        $line++ if substr($text,0,1,'') eq "\n";
+    my @text = split(/^/,$$orig);
+    for @text {
+        $posprops.[$pos++]<L> = $line
+            for 1 .. length($_);
+        $line++;
     }
-    return $posprops.[$p]<line> // 0;
+    return $posprops.[$p]<L> // 0;
 }
 
 # not quite a "between" combinator...
