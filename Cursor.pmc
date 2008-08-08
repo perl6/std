@@ -643,6 +643,9 @@ END
 			$result;
 		    };
 END
+                    if ($@) {
+                        die;
+                    }
 		    my $result = $matcher->($C, @_);
 		    if ($result) {
 			return $result;
