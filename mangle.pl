@@ -1,4 +1,5 @@
 package main;
+use utf8;
 
 sub mangle {
     my @list = @_;

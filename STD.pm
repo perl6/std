@@ -9,7 +9,7 @@ my $PARSER is context<rw>;
 my $IN_DECL is context<rw>;
 
 # random rule for debugging, please ignore
-regex foo {
+token foo {
    'foo' 'bar' 'baz'
 }
 
@@ -153,6 +153,7 @@ constant %list_assignment = (:prec<i=>, :sub<e=>, :assoc<right>);
 constant %list_prefix     = (:prec<e=>);
 constant %loose_and       = (:prec<d=>, :assoc<left>,  :assign);
 constant %loose_or        = (:prec<c=>, :assoc<left>,  :assign);
+constant %feed_infix      = (:prec<b=>, :assoc<left>);
 constant %LOOSEST         = (:prec<a=!>);
 constant %terminator      = (:prec<a=>, :assoc<list>);
 
@@ -255,6 +256,9 @@ class Loose_and does PrecOp {
 } # end class
 class Loose_or does PrecOp {
     our %o = %loose_or;
+} # end class
+class Feed_infix does PrecOp {
+    our %o = %feed_infix;
 } # end class
 class Terminator does PrecOp {
     our %o = %terminator;
@@ -418,7 +422,7 @@ token unsp {
 
 token vws {
     \v ::
-    { $COMPILING::LINE++ } # XXX wrong several ways
+    { $COMPILING::LINE++ } # XXX wrong several ways, use self.lineof($¢.pos)
     [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
 }
 
@@ -440,12 +444,16 @@ token unv {
          ]
 }
 
-token identish {
+token identifier {
     <.alpha> \w*
 }
 
+token apostrophe {
+    <[ ' \- ]>
+}
+
 token ident {
-    <.identish> [<[ ' \- ]><identish>]*
+    <.identifier> [ <.apostrophe> <.identifier> ]*
 }
 
 # XXX We need to parse the pod eventually to support $= variables.
@@ -453,10 +461,10 @@ token ident {
 token pod_comment {
     ^^ '=' <.unsp>?
     [
-    | 'begin' \h+ <ident> :: .*? \n
-      '=' <.unsp>? 'end' \h+ $<ident> » \N*         {*}         #= tagged
-    | 'begin' » :: \h* \n .*? \n
-      '=' <.unsp>? 'end' » \N*                      {*}         #= anon
+    | 'begin' \h+ <ident> :: .*?
+      "\n=" <.unsp>? 'end' \h+ $<ident> » \N*         {*}         #= tagged
+    | 'begin' » :: \h* \n .*?
+      "\n=" <.unsp>? 'end' » \N*                      {*}         #= anon
     | :: 
         [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
         \N*                                           {*}         #= misc
@@ -539,6 +547,7 @@ token regex_block {
 rule statementlist {
     :my $PARSER is context<rw> = self;
     [
+    | $
     | <?before <[\)\]\}]> >
     | [<statement><.eat_terminator> ]*
     ]
@@ -569,7 +578,11 @@ token label {
 token statement {
     :my $endargs is context = -1;
     <!before <[\)\]\}]> >
+
+    # this could either be a statement that follows a declaration
+    # or a statement that is within the block of a code declaration
     <!!{ bless $¢, ref $PARSER; }>
+
     [
     | <label> <statement>                        {*}            #= label
     | <statement_control>                        {*}            #= control
@@ -2994,7 +3007,7 @@ token infix:sym<::=> ( --> Item_assignment)
 
 token infix:sym<.=> ( --> Item_assignment) {
     <sym> <.ws>
-    [ <?before \w+';' | < new sort subst trans > > || <worryobs('.= as append operator', '~=')> ]
+    [ <?before \w+';' | 'new' | 'sort' | 'subst' | 'trans' > || <worryobs('.= as append operator', '~=')> ]
     { $<O><nextterm> = 'dottyop' }
 }
 
@@ -3096,27 +3109,6 @@ token term:name ( --> Term)
 
     # unrecognized names are assumed to be post-declared listops.
     || <args>?
-#    || <?before \s> <arglist>
-#        {*}                                                     #= listop args
-#    ||
-#        [
-#        | '.(' <in: ')', 'semilist', 'argument list'>
-#            {*}                                                 #= func args
-#
-#        | '(' <in: ')', 'semilist', 'argument list'>
-#            {*}                                                 #= func args
-#
-#        | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'>
-#            {*}                                                 #= func args
-#
-#
-#        | ::  {*}                                               #= listop noarg
-#        ]
-#
-#        [
-#        || ':' <?before \s> <arglist>    # either switch to listopiness
-#        || {{ $+prevop = $<O> = {}; }}   # or allow adverbs
-#        ]
     ]
 }
 
@@ -3143,6 +3135,18 @@ token infix:sym<xor> ( --> Loose_or)
 token infix:sym<orelse> ( --> Loose_or)
      { <sym> }
 
+token infix:sym« <== » ( --> Feed_infix)
+    { <sym> }
+
+token infix:sym« ==> » ( --> Feed_infix)
+    { <sym> {*} }              #'
+
+token infix:sym« <<== » ( --> Feed_infix)
+    { <sym> }
+
+token infix:sym« ==>> » ( --> Feed_infix)
+    { <sym> {*} }              #'
+
 ## expression terminator
 
 token terminator:sym<;> ( --> Terminator)
@@ -3168,12 +3172,6 @@ token terminator:sym<given> ( --> Terminator)
 
 token terminator:sym<when> ( --> Terminator)
     { <?before 'when' » > }
-
-token terminator:sym« <== » ( --> Terminator)
-    { <?before '<==' > }
-
-token terminator:sym« ==> » ( --> Terminator)
-    { <?before '==>' > {*} }              #'
 
 token terminator:sym« --> » ( --> Terminator)
     { <?before '-->' > {*} }              #'
@@ -3724,13 +3722,13 @@ grammar Regex is STD {
     # XXX will this please work somehow ???
     token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { $+ignoreaccent = $<mod_arg>.eval } }
 
-    token mod_internal:sym<:s>    { <sym> 'igspace'? » { $+sigspace = 1 } }
-    token mod_internal:sym<:!s>   { <sym> 'igspace'? » { $+sigspace = 0 } }
-    token mod_internal:sym<:s( )> { <sym> 'igspace'? <mod_arg> { $+sigspace = $<mod_arg>.eval } }
+    token mod_internal:sym<:s>    { ':s' 'igspace'? » { $+sigspace = 1 } }
+    token mod_internal:sym<:!s>   { ':s' 'igspace'? » { $+sigspace = 0 } }
+    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { $+sigspace = $<mod_arg>.eval } }
 
-    token mod_internal:sym<:r>    { <sym> 'atchet'? » { $+ratchet = 1 } }
-    token mod_internal:sym<:!r>   { <sym> 'atchet'? » { $+ratchet = 0 } }
-    token mod_internal:sym<:r( )> { <sym> 'atchet'? » <mod_arg> { $+ratchet = $<mod_arg>.eval } }
+    token mod_internal:sym<:r>    { ':r' 'atchet'? » { $+ratchet = 1 } }
+    token mod_internal:sym<:!r>   { ':r' 'atchet'? » { $+ratchet = 0 } }
+    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $+ratchet = $<mod_arg>.eval } }
 
     token mod_internal:adv {
         <?before ':' <ident> > [ :lang($¢.cursor_fresh($+LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }

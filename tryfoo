@@ -9,5 +9,5 @@ use Encode;
 print "Starting...\n";
 my $what = 'foo';
 my $text = "@ARGV";
-my $r = Perl->new($text)->$what();
+my $r = STD->new($text)->$what();
 print Dump($r);

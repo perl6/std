@@ -1439,7 +1439,7 @@ sub _PATTERN { my $self = shift;
     my $P = $self->{_pos} // 0;
     my $buf = $self->{_orig};
     pos($$buf) = $P;
-    if ($$buf =~ $qr) {
+    if ($$buf =~ /$qr/gc) {
 	my $len = $+[0] - $P;
         $self->deb("PATTERN $qr matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
         my $r = $self->cursor($P+$len);

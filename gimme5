@@ -4,6 +4,11 @@ use 5.010;
 use strict;
 use warnings;
 use Text::Balanced qw(extract_bracketed);
+binmode(STDIN, ":utf8");
+binmode(STDOUT, ":utf8");
+binmode(STDERR, ":utf8");
+use Encode;
+use utf8;
 
 my $failover = 0;
 if (@ARGV) {
@@ -200,8 +205,13 @@ sub un6 {
 }
 
 {
-    local $/;
-    $_ = <>;
+    open(IN, $ARGV[0]) or die "Can't open $ARGV[0]: $!\n";
+    {
+	local $/;
+	binmode(IN, ':utf8');
+	$_ = <IN>;
+    }
+    close IN;
     push @impure, m/^method (\w+)/mg;
     @impure{@impure} = (1) x @impure;
     #warn "@impure\n";
@@ -447,9 +457,9 @@ END
             warn "ARGSTUFF: ", $argstuff if $argstuff =~ /\S/;
             my $p = "";
 
-            local $MAYBACKTRACK = 1;  # XXX ratchet current broken
-            if ($KIND eq 'regex') {
-                $MAYBACKTRACK = 1;
+            local $MAYBACKTRACK = 1;
+            if ($KIND eq 'token' or $KIND eq 'rule') {
+                $MAYBACKTRACK = 0;
             }
 
             if ($args =~ s/ *--> *(\w*) *$//) {
@@ -879,6 +889,7 @@ our $DELIM;
 
 our %INSTANTIATED;
 require 'mangle.pl';
+use utf8;
 
 END
 
@@ -888,7 +899,7 @@ END
 sub dumpretree {
     if (%$RETREE) {
 	$out .= "BEGIN {\n    \$retree = YAML::XS::Load(<<'RETREE_END');\n";
-	$out .= Dump($RETREE);
+	$out .= Encode::decode("utf8", Dump($RETREE));
 	$out .= "RETREE_END\n}\n";
     }
 }
@@ -904,12 +915,14 @@ sub here {
 sub ws {
     return if $KIND eq 'rule';  # meta whitespace parsed in atom
     for (;;) {
-        next if s/^\s+//;
-        next if s/^#\(.*?\)//s;
-        next if s/^#\{.*?\}//s;
-        next if s/^#\[.*?\]//s;
-        next if s/^#\<.*?\>//s;
-        next if s/^#.*\n//;
+#	next if s/^(?!=[\0-~])\s+//;
+        next if s/^[\x20\t\n\r]+//;
+	last unless s/^#//;
+        next if s/^\(.*?\)//s;
+        next if s/^\{.*?\}//s;
+        next if s/^\[.*?\]//s;
+        next if s/^\<.*?\>//s;
+        next if s/^.*\n//;
         last;
     }
 }
@@ -1650,10 +1663,10 @@ sub unbalanced {
         $text =~ s/\.\./-/g;
 	$text =~ s/^-\[/[^/;
 	if ($$self{i}) {
-	    $self->bind("\$C->_CCLASS$REV(qr/^(?i)$text\$/)");
+	    $self->bind("\$C->_PATTERN$REV(qr/\\G(?i:$text)/)");
 	}
 	else {
-	    $self->bind("\$C->_CCLASS$REV(qr/^$text\$/)");
+	    $self->bind("\$C->_PATTERN$REV(qr/\\G$text/)");
 	}
     }
 }
@@ -1672,11 +1685,12 @@ sub unbalanced {
     sub walk {
         my $self = shift;
         my $text = $$self{text};
+	$text = "(?<=$text)" if $REV;
 	if ($$self{i}) {
-	    $self->bind('$C->_PATTERN' . $REV . '(qr/(?i)\\Q' . $text . '\\E/")');
+	    $self->bind('$C->_PATTERN(qr/\\G(?i:' . $text . ')/")');
 	}
 	else {
-	    $self->bind('$C->_EXACT' . $REV . '("' . $text . '")');
+	    $self->bind('$C->_PATTERN(qr/\\G' . $text . '/)');
 	}
     }
 }
@@ -1684,13 +1698,15 @@ sub unbalanced {
 { package RE_string; use base "REbase";
     sub walk {
         my $self = shift;
-        my $text = $$self{text};
-        $text =~ s/(['\\])/\\$1/g;
+        my $text = quotemeta($$self{text});
+	$text = "(?<=$text)" if $REV;
 	if ($$self{i}) {
-	    '$C->_PATTERN' . $REV . '(qr/(?i)\\Q' . $text . '\\E/")';
+	    '$C->_PATTERN(qr/\\G(?i:' . $text . ')/)';
 	}
 	else {
-	    "\$C->_EXACT$REV('" . $text . "')";
+	    "\$C->_PATTERN(qr/\\G$text/)";
+#	    my $l = length($text);
+#	    "(substr(\$\$buf, \$C->{_pos}, $l) eq '" . $text .  "' ? \$C->cursor(\$C->{_pos} + $l) : ())"
 	}
     }
 }
@@ -1706,25 +1722,47 @@ sub unbalanced {
             $not = 1;
         }
         if ($text eq '.') {
-            $code = "\$C->_ANY$REV()";
+	    if ($REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=(?s:.))/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G(?s:.)/)";
+	    }
+#            $code = "\$C->_ANY$REV()";
         }
         elsif ($text eq '.*') {
+#	    if ($REV) {
+#		$code = "\$C->_PATTERN(qr/\\G(?<=.*)/)";
+#	    }
+#	    else {
+#		$code = "\$C->_PATTERN(qr/\\G.*/)";
+#	    }
             $code = "\$C->_SCANg$REV()";
         }
         elsif ($text eq '.*?') {
+#	    if ($REV) {
+#		$code = "\$C->_PATTERN(qr/\\G(?<=.*?)/)";
+#	    }
+#	    else {
+#		$code = "\$C->_PATTERN(qr/\\G.*?/)";
+#	    }
             $code = "\$C->_SCANf$REV()";
         }
         elsif ($text eq '^') {
-            $code = "\$C->_BOS$REV()";
+	    $code = "\$C->_PATTERN(qr/\\G\\A/)";
+#            $code = "\$C->_BOS$REV()";
         }
         elsif ($text eq '^^') {
-            $code = "\$C->_BOL$REV()";
+	    $code = "\$C->_PATTERN(qr/\\G(?m:^)/)";
+#            $code = "\$C->_BOL$REV()";
         }
         elsif ($text eq '$') {
-            $code = "\$C->_EOS$REV()";
+	    $code = "\$C->_PATTERN(qr/\\G\\z/)";
+#            $code = "\$C->_EOS$REV()";
         }
         elsif ($text eq '$$') {
-            $code = "\$C->_EOL$REV()";
+	    $code = "\$C->_PATTERN(qr/\\G(?m:\$)/)";
+#            $code = "\$C->_EOL$REV()";
         }
         elsif ($text eq ':') {
             $code = "\$C->_COMMITATOM$REV()";
@@ -1732,31 +1770,65 @@ sub unbalanced {
         elsif ($text eq '::') {
             $PURE = 0;
             $code = "\$C->_COMMITBRANCH$REV()";
+            $MAYBACKTRACK = 1;
         }
         elsif ($text eq ':::') {
             $PURE = 0;
             $code = "\$C->_COMMITRULE$REV()";
+            $MAYBACKTRACK = 1;
         }
         elsif ($text eq '\\d') {
-            $code = "\$C->_DIGIT$REV()";
+	    if ($REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=\\d)/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G\\d/)";
+	    }
+#            $code = "\$C->_DIGIT$REV()";
         }
         elsif ($text eq '\\w') {
-            $code = "\$C->_ALNUM$REV()";
+	    if ($REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=\\w)/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G\\w/)";
+	    }
+#           $code = "\$C->_ALNUM$REV()";
         }
         elsif ($text eq '\\s') {
-            $code = "\$C->_SPACE$REV()";
+	    if ($REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=\\s)/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G\\s/)";
+	    }
+#            $code = "\$C->_SPACE$REV()";
         }
         elsif ($text eq '\\h') {
-            $code = "\$C->_HSPACE$REV()";
+	    if ($REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=[\\x20\\t\\r])/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G[\\x20\\t\\r]/)";
+	    }
+#            $code = "\$C->_HSPACE$REV()";
         }
         elsif ($text eq '\\v') {
-            $code = "\$C->_VSPACE$REV()";
+	    if ($REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=[\\n])/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G[\\n]/)";
+	    }
+#            $code = "\$C->_VSPACE$REV()";
         }
         elsif ($text eq '»') {
-            $code = "\$C->_RIGHTWB$REV()";
+	    $code = "\$C->_PATTERN(qr/\\G\\b/)";
+#            $code = "\$C->_RIGHTWB$REV()";
         }
         elsif ($text eq '«') {
-            $code = "\$C->_LEFTWB$REV()";
+	    $code = "\$C->_PATTERN(qr/\\G\\b/)";
+#            $code = "\$C->_LEFTWB$REV()";
         }
         elsif ($text eq '>>') {
             $code = "\$C->_RIGHTWB$REV()";
@@ -1796,8 +1868,23 @@ sub unbalanced {
         if ($name eq "sym") {
             $$self{sym} = $SYM;
             $$self{endsym} = $ENDSYM if $ENDSYM;
+	    if ($$self{i}) {
+		return "\$C->_PATTERN(qr/\\G(?i:" . quotemeta($SYM) . ")/)";
+	    }
+	    else {
+		return "\$C->_PATTERN(qr/\\G" . quotemeta($SYM) . "/)";
+	    }
             return $re = '$C->_SYM($sym, ' . ($$self{i}//0) . ')';	# could pass endsym too here...
         }
+        elsif ($name eq "alpha") {
+            return "\$C->_PATTERN(qr/\\G[_[:alpha:]]/)";
+        }
+        elsif ($name eq "_ALNUM") {
+            return "\$C->_PATTERN(qr/\\G\\w/)";
+        }
+#        elsif ($name eq "ws") {
+#            return "\$C->_PATTERN(qr/\\G(?{ \$C = \$C->ws; pos(\$_) = \$C->{_pos} })/)";
+#        }
         elsif ($name eq "nextsame") {
             $NEEDORIGARGS++;
             $re = '$self->SUPER::' . $NAME . '(@origargs)';
@@ -2016,44 +2103,79 @@ END
             my $quant = "";
             my $rep = "_REP";
             my $q = $$self{quant};
-            if ($q) {
-                my ($qfer,$how,$rest) = @{$$self{quant}};
-                my $h = $how eq '!' ? 'g' :
-                        $how eq '?' ? 'f' :
-                                      'r';
-                if ($qfer eq '*') {
-                    $PURE = 0;
-                    $quant = "\$C->_STAR$h$REV(";
-                }
-                elsif ($qfer eq '+') {
-                    $quant = "\$C->_PLUS$h$REV(";
-                }
-                elsif ($qfer eq '?') {
-                    $PURE = 0;
-                    $quant = "\$C->_OPT$h$REV(";
-                }
-                elsif ($qfer eq '**') {
-                    if (ref $rest) {
-                        if (ref $rest eq "RE_block") {
-                            $PURE = 0;
-                            $rep = "_REPINDIRECT$REV";
-                            $rest = $rest->walk();
-                        }
-                        else {
-                            $rep = "_REPSEP$REV";
-                            $rest = " sub { my \$C=shift;\n" . ::indent($rest->walk()) . "\n}";
-                        }
-                    }
-                    else {
-                        $PURE = 0 if $rest =~ /^0/;
-                        $rest = "'$rest'";
-                    }
-                    $quant = "\$C->$rep$h( $rest, ";
-                }
-                $result = $quant . "sub { my \$C=shift;\n" . ::indent($$self{atom}->walk(@_)) . "\n})";
-            }
+	    my $atom = $$self{atom}->walk(@_);
+	    if ($q) {
+		if ($atom =~ s{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) $ }{(?:$1)}sx) {
+		    my ($qfer,$how,$rest) = @{$$self{quant}};
+		    my $h = $how eq '!' ? '' :
+			    $how eq '?' ? '?' :
+					  '+';
+		    if ($qfer eq '**') {
+			$h = $how eq '!' ? 'g' :
+			     $how eq '?' ? 'f' :
+					   'r';
+			if (ref $rest) {
+			    if (ref $rest eq "RE_block") {
+				$PURE = 0;
+				$rep = "_REPINDIRECT$REV";
+				$rest = $rest->walk();
+			    }
+			    else {
+				$rep = "_REPSEP$REV";
+				$rest = " sub { my \$C=shift;\n" . ::indent($rest->walk()) . "\n}";
+			    }
+			}
+			else {
+			    $PURE = 0 if $rest =~ /^0/;
+			    $rest = "'$rest'";
+			}
+			$quant = "\$C->$rep$h( $rest, ";
+			$result = $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
+		    }
+		    else {
+			$PURE = 0;
+			$result = "\$C->_PATTERN\(qr/\\G($atom$qfer$h)/\)";
+		    }
+		}
+		else {
+		    my ($qfer,$how,$rest) = @{$$self{quant}};
+		    my $h = $how eq '!' ? 'g' :
+			    $how eq '?' ? 'f' :
+					  'r';
+		    if ($qfer eq '*') {
+			$PURE = 0;
+			$quant = "\$C->_STAR$h$REV(";
+		    }
+		    elsif ($qfer eq '+') {
+			$quant = "\$C->_PLUS$h$REV(";
+		    }
+		    elsif ($qfer eq '?') {
+			$PURE = 0;
+			$quant = "\$C->_OPT$h$REV(";
+		    }
+		    elsif ($qfer eq '**') {
+			if (ref $rest) {
+			    if (ref $rest eq "RE_block") {
+				$PURE = 0;
+				$rep = "_REPINDIRECT$REV";
+				$rest = $rest->walk();
+			    }
+			    else {
+				$rep = "_REPSEP$REV";
+				$rest = " sub { my \$C=shift;\n" . ::indent($rest->walk()) . "\n}";
+			    }
+			}
+			else {
+			    $PURE = 0 if $rest =~ /^0/;
+			    $rest = "'$rest'";
+			}
+			$quant = "\$C->$rep$h( $rest, ";
+		    }
+		    $result = $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
+		}
+	    }
             else {
-                $result = $$self{atom}->walk(@_);
+                $result = $atom;
             }
         }
         else {
@@ -2092,9 +2214,27 @@ END
             "\n}, $outer)";
         }
         else {
-            "map({ my \$C=\$_;\n" .
-                ::indent($inner) .
-            "\n} ($outer)[0])";
+	    my $oi = $outer . $inner;
+	    if ($oi =~ s{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) \$C->_PATTERN\(qr/\\G(.*?)/\) $ }{\$C->_PATTERN(qr/\\G$1$2/)}sx) {
+		$oi;
+	    }
+	    else {
+		my $in = ::indent($inner,2);
+		substr(<<"END",0,-1);
+do {
+    if (my (\$C) = ($outer)[0]) {
+$in;
+    }
+    else {
+        ();
+    }
+}
+END
+
+#               "map({ my \$C=\$_;\n" .
+#                   ::indent($inner) .
+#               "\n} ($outer)[0])";
+	    }
         }
     }
 
