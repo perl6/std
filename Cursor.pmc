@@ -563,13 +563,14 @@ sub _AUTOLEXnow { my $self = shift;
 			}
 			my @result;
 			while (not @result and $$trylen >= 0) {
+			    $self->deb("Trying at length $$trylen\n") if $DEBUG & DEBUG::fixed_length;
 			    for my $px (0..@pats-1) {
 				next if vec($$tried,$px,1);	# already tried this one
 				my $l = $$rxlens[$px];
 				if ($l == -1) {
-				    my $p = '^' . $pats[$px];
+				    my $p = $pats[$px];
 				    pos($$buf) = $P;
-				    if (($$buf =~ m/$p/xgc)) {
+				    if (($$buf =~ m/\G$p/gc)) {
 					$$rxlens[$px] = $l = pos($$buf) - $P;
 					if ($l == $$trylen) {
 					    push @result, $fates->[$px];
@@ -588,9 +589,9 @@ sub _AUTOLEXnow { my $self = shift;
 					push @result, $fates->[$px];
 				    }
 				    else {
-					my $p = '^' . $pats[$px];
+					my $p = $pats[$px];
 					pos($$buf) = $P;
-					if ($$buf =~ m/$p/xgc) {
+					if ($$buf =~ m/\G$p/gc) {
 					    push @result, $fates->[$px];
 					}
 				    }
