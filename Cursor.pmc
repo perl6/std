@@ -519,6 +519,7 @@ sub _AUTOLEXnow { my $self = shift;
 	    }
 	    for my $pat (@pats) {
 		$pat =~ s/\.\?$//;	# ltm backoff doesn't need tre workaround
+		$pat =~ s/\\>/\\b/g;	# perl regex doesn't use \>
 	    }
 
 	    # generate match closure at the last moment
@@ -529,7 +530,8 @@ sub _AUTOLEXnow { my $self = shift;
 
 		return unless $lexer;
 
-		pos($$buf) = $C->{_pos};
+		my $P = $C->{_pos};
+		pos($$buf) = $P;
 
 		if ($DEBUG & DEBUG::lexer) {
 		    my $peek = substr($$buf,$C->{_pos},20);
@@ -538,12 +540,7 @@ sub _AUTOLEXnow { my $self = shift;
 		    $self->deb("looking for $key at --------->$GREEN$peek$CLEAR");
 		}
 
-		##########################################
-		# No normal p5 match/subst below here!!! #
-		##########################################
 		{
-		    use re::engine::TRE;
-
 		    # if trystate is defined, the "obvious" LTM failed, so must back off
 		    # a parallel nfa matcher might or might not do better here...
 		    # this has the advantage of being fairly compact
@@ -571,8 +568,9 @@ sub _AUTOLEXnow { my $self = shift;
 				my $l = $$rxlens[$px];
 				if ($l == -1) {
 				    my $p = '^' . $pats[$px];
+				    pos($$buf) = $P;
 				    if (($$buf =~ m/$p/xgc)) {
-					$$rxlens[$px] = $l = $+[0] - $-[0];
+					$$rxlens[$px] = $l = pos($$buf) - $P;
 					if ($l == $$trylen) {
 					    push @result, $fates->[$px];
 					    vec($$tried,$px,1) = 1;
@@ -591,6 +589,7 @@ sub _AUTOLEXnow { my $self = shift;
 				    }
 				    else {
 					my $p = '^' . $pats[$px];
+					pos($$buf) = $P;
 					if ($$buf =~ m/$p/xgc) {
 					    push @result, $fates->[$px];
 					}
@@ -603,6 +602,12 @@ sub _AUTOLEXnow { my $self = shift;
 
 			return @result;
 		    }
+
+		    ##########################################
+		    # No normal p5 match/subst below here!!! #
+		    ##########################################
+		    use re::engine::TRE;
+
 
 		    $self->deb("/ running tre match at @{[ pos($$buf) ]} /") if $DEBUG & DEBUG::lexer;
 
@@ -1440,7 +1445,7 @@ sub _PATTERN { my $self = shift;
     my $buf = $self->{_orig};
     pos($$buf) = $P;
     if ($$buf =~ /$qr/gc) {
-	my $len = $+[0] - $P;
+	my $len = pos($$buf) - $P;
         $self->deb("PATTERN $qr matched @{[substr($$buf,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
         my $r = $self->cursor($P+$len);
         $r->retm();
