@@ -857,6 +857,7 @@ token colonpair {
         || { $value = 1; }
         ]
         {*}                                                     #= value
+    | '(' <in: ')', 'signature'>
     | <postcircumfix>
         { $key = ""; $value = $<postcircumfix>; }
         {*}                                                     #= structural
@@ -2544,6 +2545,7 @@ token parameter {
         | <param_var> { $kind = '!'; }
         ]
         [ $<quant> = <[ ? ! ]> { $kind = $<quant> } ]?
+    | <?> { $kind = '!' }
     ]
 
     <trait>*
