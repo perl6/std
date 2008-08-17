@@ -1662,11 +1662,12 @@ sub unbalanced {
         $text =~ s/\s//g;
         $text =~ s/\.\./-/g;
 	$text =~ s/^-\[/[^/;
+	$text = "(?<=$text)" if $REV;
 	if ($$self{i}) {
-	    $self->bind("\$C->_PATTERN$REV(qr/\\G(?i:$text)/)");
+	    $self->bind("\$C->_PATTERN(qr/\\G(?i:$text)/)");
 	}
 	else {
-	    $self->bind("\$C->_PATTERN$REV(qr/\\G$text/)");
+	    $self->bind("\$C->_PATTERN(qr/\\G$text/)");
 	}
     }
 }
@@ -2105,12 +2106,16 @@ END
             my $q = $$self{quant};
 	    my $atom = $$self{atom}->walk(@_);
 	    if ($q) {
-		if ($atom =~ s{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) $ }{(?:$1)}sx) {
+		if ($atom =~ m{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) $ }sx ) {
+		    my $a = "(?:$1)";
 		    my ($qfer,$how,$rest) = @{$$self{quant}};
 		    my $h = $how eq '!' ? '' :
 			    $how eq '?' ? '?' :
 					  '+';
-		    if ($qfer eq '**') {
+		    if ($how eq '?' or $REV) {
+			;
+		    }
+		    elsif ($qfer eq '**') {
 			$h = $how eq '!' ? 'g' :
 			     $how eq '?' ? 'f' :
 					   'r';
@@ -2130,56 +2135,55 @@ END
 			    $rest = "'$rest'";
 			}
 			$quant = "\$C->$rep$h( $rest, ";
-			$result = $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
+			return $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
 		    }
 		    else {
 			$PURE = 0;
-			$result = "\$C->_PATTERN\(qr/\\G($atom$qfer$h)/\)";
+			return "\$C->_PATTERN\(qr/\\G($a$qfer$h)/\)";
 		    }
 		}
-		else {
-		    my ($qfer,$how,$rest) = @{$$self{quant}};
-		    my $h = $how eq '!' ? 'g' :
-			    $how eq '?' ? 'f' :
-					  'r';
-		    if ($qfer eq '*') {
-			$PURE = 0;
-			$quant = "\$C->_STAR$h$REV(";
-		    }
-		    elsif ($qfer eq '+') {
-			$quant = "\$C->_PLUS$h$REV(";
-		    }
-		    elsif ($qfer eq '?') {
-			$PURE = 0;
-			$quant = "\$C->_OPT$h$REV(";
-		    }
-		    elsif ($qfer eq '**') {
-			if (ref $rest) {
-			    if (ref $rest eq "RE_block") {
-				$PURE = 0;
-				$rep = "_REPINDIRECT$REV";
-				$rest = $rest->walk();
-			    }
-			    else {
-				$rep = "_REPSEP$REV";
-				$rest = " sub { my \$C=shift;\n" . ::indent($rest->walk()) . "\n}";
-			    }
+
+		my ($qfer,$how,$rest) = @{$$self{quant}};
+		my $h = $how eq '!' ? 'g' :
+			$how eq '?' ? 'f' :
+				      'r';
+		if ($qfer eq '*') {
+		    $PURE = 0;
+		    $quant = "\$C->_STAR$h$REV(";
+		}
+		elsif ($qfer eq '+') {
+		    $quant = "\$C->_PLUS$h$REV(";
+		}
+		elsif ($qfer eq '?') {
+		    $PURE = 0;
+		    $quant = "\$C->_OPT$h$REV(";
+		}
+		elsif ($qfer eq '**') {
+		    if (ref $rest) {
+			if (ref $rest eq "RE_block") {
+			    $PURE = 0;
+			    $rep = "_REPINDIRECT$REV";
+			    $rest = $rest->walk();
 			}
 			else {
-			    $PURE = 0 if $rest =~ /^0/;
-			    $rest = "'$rest'";
+			    $rep = "_REPSEP$REV";
+			    $rest = " sub { my \$C=shift;\n" . ::indent($rest->walk()) . "\n}";
 			}
-			$quant = "\$C->$rep$h( $rest, ";
 		    }
-		    $result = $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
+		    else {
+			$PURE = 0 if $rest =~ /^0/;
+			$rest = "'$rest'";
+		    }
+		    $quant = "\$C->$rep$h( $rest, ";
 		}
+		return $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
 	    }
             else {
-                $result = $atom;
+                return $atom;
             }
         }
         else {
-            $result = '"' . $$self{atom} . '"';
+            return '"' . $$self{atom} . '"';
         }
         $result;
     }
