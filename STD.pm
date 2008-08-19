@@ -10,7 +10,7 @@ my $IN_DECL is context<rw>;
 
 # random rule for debugging, please ignore
 token foo {
-   'foo' 'bar' 'baz'
+   'foo' <.ws> 'bar' <.ws> 'baz'
 }
 
 =begin things todo
@@ -435,9 +435,9 @@ method moreinput () {
 
 token unv {
    | \h+                 {*}                                    #= hwhite
-   | <?before '='> ^^ :: <.pod_comment>  {*}                    #= pod
-   | \h* '#' :: [
-         |  <?opener> ::
+   | <?before '='> ^^ <.pod_comment>  {*}                    #= pod
+   | \h* '#' [
+         |  <?opener>
             [ <!after ^^ . > || <.panic: "Can't use embedded comments in column 1"> ]
             <.quibble($¢.cursor_fresh( ::STD::Q ))>   {*}                               #= embedded
          | :: \N*            {*}                                 #= end
@@ -1093,9 +1093,12 @@ token variable_declarator {
         | <?before '<'> <postcircumfix>
         ]*
     ]?
+    <.ws>
 
     <trait>*
-    <.ws>
+
+    <post_constraint>*
+
     [
     | '=' <.ws> <EXPR( ($<sigil> // '') eq '$' ?? item %item_assignment !! item %list_prefix )>
     | '.=' <.ws> <EXPR(item %item_assignment)>
@@ -1109,7 +1112,7 @@ rule scoped {
     | <package_declarator>
     | <fulltypename>+ <multi_declarator>
     | <multi_declarator>
-    | <?before <[A..Z]> > <name> <.panic("Apparent type name " ~ $<name>.text ~ " is not declared yet")>
+#    | <?before <[A..Z]> > <name> <.panic("Apparent type name " ~ $<name>.text ~ " is not declared yet")>
     ]
 }
 
@@ -1511,6 +1514,7 @@ token variable {
         | <sigil> \d+ {*}                                           #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
         | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
+	| <sigil> <?{ $+IN_DECL }> {*}				    #= anondecl
         ]
     ]
 }
@@ -1808,7 +1812,7 @@ token nibbler {
     { $<firstpos> = self.pos; }
     [ <!before <stopper> >
         [
-        || <starter> :: <nibbler> <stopper>
+        || <starter> <nibbler> <stopper>
                         {
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
@@ -1816,11 +1820,11 @@ token nibbler {
                             $text = (@n ?? pop(@n) !! '') ~ $<stopper>[*-1].text;
                             push @nibbles, @n;
                         }
-        || <escape>   :: {
+        || <escape>   {
                             push @nibbles, $text, $<escape>;
                             $text = '';
                         }
-        ||            :: .
+        || .
                         {{
                             my $ch = substr($$buf, $¢.pos-1, 1);
                             $text ~= $ch;
@@ -3474,7 +3478,7 @@ grammar Regex is STD {
         :my $ratchet     is context<rw> = $+ratchet     // 0;
         :my $ignorecase is context<rw> = $+ignorecase // 0;
         :my $ignoreaccent    is context<rw> = $+ignoreaccent    // 0;
-        < || | && & >?
+        [ \s* < || | && & > ]?
         <EXPR>
     }
 

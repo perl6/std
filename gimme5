@@ -960,7 +960,7 @@ sub first {
     my @kids;
     my $min = 1_000_000_000;
 
-    s/^\|\|//;
+    s/^\s*\|\|//;
 
     do {
         ws();
@@ -1014,7 +1014,7 @@ sub any {
     local $ALTNAME = $NAME . '_' . $ALTNAMES++;
     my $name = $ALTNAME;
 
-    s/^ \| (?!\|) //x;
+    s/^ \s*\| (?!\|) //x;
 
     do {
         ws();
@@ -2226,7 +2226,7 @@ END
 		my $in = ::indent($inner,2);
 		substr(<<"END",0,-1);
 do {
-    if (my (\$C) = ($outer)[0]) {
+    if (my (\$C) = ($outer)) {
 $in;
     }
     else {

@@ -24,7 +24,9 @@ for my $file (@files) {
 }
 
 printf "Passed $success/$total, %6.2f%%\n", $success/$total * 100;
-print "Failed tests:\n";
-for my $file (@failed) {
-    print "$file\n";
+if (@failed) {
+    print "Failed tests:\n";
+    for my $file (@failed) {
+	print "$file\n";
+    }
 }
