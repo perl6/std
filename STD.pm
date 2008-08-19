@@ -153,7 +153,7 @@ constant %list_assignment = (:prec<i=>, :sub<e=>, :assoc<right>);
 constant %list_prefix     = (:prec<e=>);
 constant %loose_and       = (:prec<d=>, :assoc<left>,  :assign);
 constant %loose_or        = (:prec<c=>, :assoc<left>,  :assign);
-constant %feed_infix      = (:prec<b=>, :assoc<left>);
+constant %sequencer      = (:prec<b=>, :assoc<left>);
 constant %LOOSEST         = (:prec<a=!>);
 constant %terminator      = (:prec<a=>, :assoc<list>);
 
@@ -257,8 +257,8 @@ class Loose_and does PrecOp {
 class Loose_or does PrecOp {
     our %o = %loose_or;
 } # end class
-class Feed_infix does PrecOp {
-    our %o = %feed_infix;
+class Sequencer does PrecOp {
+    our %o = %sequencer;
 } # end class
 class Terminator does PrecOp {
     our %o = %terminator;
@@ -3144,16 +3144,19 @@ token infix:sym<xor> ( --> Loose_or)
 token infix:sym<orelse> ( --> Loose_or)
      { <sym> }
 
-token infix:sym« <== » ( --> Feed_infix)
+token infix:sym<;> ( --> Sequencer)
     { <sym> }
 
-token infix:sym« ==> » ( --> Feed_infix)
+token infix:sym« <== » ( --> Sequencer)
+    { <sym> }
+
+token infix:sym« ==> » ( --> Sequencer)
     { <sym> {*} }              #'
 
-token infix:sym« <<== » ( --> Feed_infix)
+token infix:sym« <<== » ( --> Sequencer)
     { <sym> }
 
-token infix:sym« ==>> » ( --> Feed_infix)
+token infix:sym« ==>> » ( --> Sequencer)
     { <sym> {*} }              #'
 
 ## expression terminator
