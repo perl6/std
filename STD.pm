@@ -444,7 +444,7 @@ token unv {
          ]
 }
 
-token identifier {
+token ident {
     <.alpha> \w*
 }
 
@@ -452,8 +452,8 @@ token apostrophe {
     <[ ' \- ]>
 }
 
-token ident {
-    <.identifier> [ <.apostrophe> <.identifier> ]*
+token identifier {
+    <.ident> [ <.apostrophe> <.ident> ]*
 }
 
 # XXX We need to parse the pod eventually to support $= variables.
@@ -461,8 +461,8 @@ token ident {
 token pod_comment {
     ^^ '=' <.unsp>?
     [
-    | 'begin' \h+ <ident> :: .*?
-      "\n=" <.unsp>? 'end' \h+ $<ident> » \N*         {*}         #= tagged
+    | 'begin' \h+ <identifier> :: .*?
+      "\n=" <.unsp>? 'end' \h+ $<identifier> » \N*         {*}         #= tagged
     | 'begin' » :: \h* \n .*?
       "\n=" <.unsp>? 'end' » \N*                      {*}         #= anon
     | :: 
@@ -563,15 +563,15 @@ rule semilist {
 
 
 token label {
-    <ident> ':' <?before \s> <.ws>
+    <identifier> ':' <?before \s> <.ws>
 
-    [ <?{ $¢.is_type($<ident>.text) }>
+    [ <?{ $¢.is_type($<identifier>.text) }>
       <.panic("You tried to use an existing typename as a label")>
-#      <suppose("You tried to use an existing name $/{'ident'} as a label")>
+#      <suppose("You tried to use an existing name $/{'identifier'} as a label")>
     ]?
 
     # add label as a pseudo type
-    # {{ eval 'COMPILING::{"::$<ident>"} = Label.new($<ident>)' }}  # XXX need statement ref too?
+    # {{ eval 'COMPILING::{"::$<identifier>"} = Label.new($<identifier>)' }}  # XXX need statement ref too?
 
 }
 
@@ -838,7 +838,7 @@ token noun {
 
 
 token fatarrow {
-    <key=ident> \h* '=>' :: <.ws> <val=EXPR(item %item_assignment)>
+    <key=identifier> \h* '=>' :: <.ws> <val=EXPR(item %item_assignment)>
 }
 
 token colonpair {
@@ -847,11 +847,11 @@ token colonpair {
 
     ':'
     [
-    | '!' <ident>
-        { $key = $<ident>.text; $value = 0; }
+    | '!' <identifier>
+        { $key = $<identifier>.text; $value = 0; }
         {*}                                                     #= false
-    | <ident>
-        { $key = $<ident>.text; }
+    | <identifier>
+        { $key = $<identifier>.text; }
         [
         || <.unsp>? '.'? <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
@@ -874,11 +874,11 @@ token quotepair {
 
     ':'
     [
-    | '!' <ident>
-        { $key = $<ident>.text; $value = 0; }
+    | '!' <identifier>
+        { $key = $<identifier>.text; $value = 0; }
         {*}                                                     #= false
-    | <ident>
-        { $key = $<ident>.text; }
+    | <identifier>
+        { $key = $<identifier>.text; }
         [
         || <.unsp>? '.'? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
@@ -1549,7 +1549,7 @@ token longname {
 
 token name {
     [
-    | <ident> <morename>*
+    | <identifier> <morename>*
     | <morename>+
     ]?
     '::'?
@@ -1559,7 +1559,7 @@ token morename {
     '::'
     <?before '(' | <alpha> >
     [
-    | <ident>
+    | <identifier>
     | '(' :: <in: ')', 'EXPR', 'indirect name'>
     ]
 }
@@ -1601,11 +1601,14 @@ token value {
 }
 
 token typename {
-    <longname>
-    <?{
+    [
+    | '::?'<identifier>			# parse ::?CLASS as special case
+    | <longname>
+      <?{
         my $longname = $<longname>.text;
         substr($longname, 0, 2) eq '::' or $¢.is_type($longname)
-    }>
+      }>
+    ]
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
 }
@@ -2425,7 +2428,7 @@ token trait_auxiliary:does {
     <sym> <.ws> <module_name>
 }
 token trait_auxiliary:will {
-    <sym> <.ws> <ident> <.ws> <block>
+    <sym> <.ws> <identifier> <.ws> <block>
 }
 
 rule trait_verb:of      {<sym> <fulltypename> }
@@ -2497,7 +2500,7 @@ token named_param {
     :my $GOAL is context = ')';
     ':'
     [
-    | <name=ident> '(' <.ws>
+    | <name=identifier> '(' <.ws>
 	[ <named_param> | <param_var> <.ws> ]
 	[ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
     | <param_var>
@@ -2508,17 +2511,17 @@ token param_var {
     <sigil> <twigil>?
     [
         # Is it a longname declaration?
-    || <?{ $<sigil>.text eq '&' }> <?ident> ::
-        <ident=sublongname>
+    || <?{ $<sigil>.text eq '&' }> <?identifier> ::
+        <identifier=sublongname>
 
     ||  # Is it a shaped array or hash declaration?
         <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
-        <ident>?
+        <identifier>?
         <?before <[ \< \( \[ \{ ]> >
         <postcircumfix>
 
         # ordinary parameter name
-    || <ident>
+    || <identifier>
 
         # bare sigil?
     ]?
@@ -2608,7 +2611,7 @@ token statement_prefix:lazy    { <sym> <?before \s> <.ws> <statement> }
 ## term
 
 token term:sym<::?IDENT> ( --> Term) {
-    $<sym> = [ '::?' <ident> ] »
+    $<sym> = [ '::?' <identifier> ] »
 }
 
 token term:sym<undef> ( --> Term) {
@@ -3067,11 +3070,11 @@ token term:sigil ( --> List_prefix)
 # token term:typecast ( --> List_prefix)
 #     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.item; } }
 
-# force ident(), ident.(), etc. to be a function call always
-token term:ident ( --> Term )
+# force identifier(), identifier.(), etc. to be a function call always
+token term:identifier ( --> Term )
 {
     :my $i;
-    $i = <ident> <args( $¢.is_type($i.text) )>
+    $i = <identifier> <args( $¢.is_type($i.text) )>
 }
 
 token term:opfunc ( --> Term )
@@ -3096,7 +3099,7 @@ token args ($istype = 0) {
 }
 
 # names containing :: may or may not be function calls
-# bare ident without parens also handled here if no other rule parses it
+# bare identifier without parens also handled here if no other rule parses it
 token term:name ( --> Term)
 {
     <longname> ::
@@ -3671,7 +3674,7 @@ grammar Regex is STD {
             ]
     }
 
-    token assertion:ident { <ident> [               # is qq right here?
+    token assertion:identifier { <identifier> [               # is qq right here?
                                     | <?before '>' >
                                     | <.ws> <nibbler>
                                     | '=' <assertion>
@@ -3737,7 +3740,7 @@ grammar Regex is STD {
     token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $+ratchet = $<mod_arg>.eval } }
 
     token mod_internal:adv {
-        <?before ':' <ident> > [ :lang($¢.cursor_fresh($+LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
+        <?before ':' <identifier> > [ :lang($¢.cursor_fresh($+LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
     }
 
     token mod_internal:oops { ':' <.panic: "Unrecognized regex modifier"> }
