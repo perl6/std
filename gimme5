@@ -462,9 +462,9 @@ END
                 $MAYBACKTRACK = 0;
             }
 
+	    my $pkg;
             if ($args =~ s/ *--> *(\w*) *$//) {
-		my $pkg = $pkg_really{$1} || "${PKG}::$1";
-                $coercion = " Cursor::lazymap sub { $pkg->coerce(\$_[0]) }, ";
+		$pkg = $pkg_really{$1} || "${PKG}::$1";
             }
             $args .= ', ';
             my $sym = "";
@@ -604,9 +604,18 @@ END
 END
             }
             else {
+		if ($pkg) {
+		    if ($MAYBACKTRACK) {
+			$coercion = " Cursor::lazymap sub { $pkg->coerce(\$_[0]) }, ";
+		    }
+		    else {
+			$coercion = " map { $pkg->coerce(\$_) } ";
+		    }
+		}
+		my $ratchet = $MAYBACKTRACK ? '' : 'r';
                 $body .= <<"END";
 
-    \$self->_MATCHIFY($coercion
+    \$self->_MATCHIFY$ratchet($coercion
 <<MEAT>>
     );
 END
@@ -1491,7 +1500,8 @@ sub unbalanced {
     sub bind { my $self = shift;
 	my $re = shift;
 	return $re unless @BINDINGS;
-	$re = "\$C->_SUBSUME([" .
+	my $ratchet = $MAYBACKTRACK ? '' : 'r';
+	$re = "\$C->_SUBSUME$ratchet([" .
 	    join(',', map {"'$_'"} @BINDINGS) .
 	    "], sub {\n" . ::indent("my \$C = shift()->cursor_fresh;\n" . $re) . "\n})";
 	@BINDINGS = ();
@@ -1637,7 +1647,8 @@ sub unbalanced {
 	    local @BINDINGS;
 	    $re = ::indent($$self{re}->walk(@_));
 	}
-        $re = "\$C->_BRACKET$REV( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+	my $ratchet = $MAYBACKTRACK ? '' : 'r';
+        $re = "\$C->_BRACKET$ratchet( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
 	$self->bind($re);
     }
 

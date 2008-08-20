@@ -1090,6 +1090,13 @@ sub _MATCHIFY { my $self = shift;
     }
 }
 
+sub _MATCHIFYr { my $self = shift;
+    return () unless @_;
+    my $var = shift;
+    $var->{_from} = $self->{_from};
+    $var->retm();
+}
+
 sub _SCANf { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
@@ -1292,6 +1299,14 @@ sub _BRACKET { my $self = shift;
         $block->($self));
 }
 
+sub _BRACKETr { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my ($val) = $block->($self) or return ();
+    bless($val,ref($self))->retm();
+}
+
 sub _PAREN { my $self = shift;
     my $block = shift;
 
@@ -1418,6 +1433,15 @@ sub _SUBSUME { my $self = shift;
     local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
     lazymap(sub { $self->cursor_bind($names, $_[0])->retm() },
         $block->($self));
+}
+
+sub _SUBSUMEr { my $self = shift;
+    my $names = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
+    my ($var) = $block->($self) or return ();
+    $self->cursor_bind($names, $var)->retm();
 }
 
 sub _EXACT { my $self = shift;
@@ -2218,7 +2242,7 @@ sub fail { my $self = shift;
 
 { package RE_noop; our @ISA = 'RE_base';
     sub longest { my $self = shift; my ($C) = @_; 
-        return;
+        return $IMP;
     }
 }
 

@@ -421,7 +421,7 @@ token unsp {
 }
 
 token vws {
-    \v ::
+    \v
     { $COMPILING::LINE++ } # XXX wrong several ways, use self.lineof($¢.pos)
     [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
 }
@@ -440,7 +440,7 @@ token unv {
          |  <?opener>
             [ <!after ^^ . > || <.panic: "Can't use embedded comments in column 1"> ]
             <.quibble($¢.cursor_fresh( ::STD::Q ))>   {*}                               #= embedded
-         | :: \N*            {*}                                 #= end
+         | {} \N*            {*}                                 #= end
          ]
 }
 
@@ -772,7 +772,7 @@ token pre {
                                                     {*}         #= precircum
     ]
     # XXX assuming no precedence change
-    ::
+    
     <prefix_postfix_meta_operator>*                 {*}         #= prepost
     { $+prevop = $<O> }
     <.ws>
@@ -792,10 +792,9 @@ token nulltermish {
 
 token termish {
     [
-    | <pre>+ :: <noun>
+    | <pre>+ <noun>
     | <noun>
     ]
-    ::
 
     # also queue up any postfixes, since adverbs could change things
     [ <?stdstopper> ||
@@ -838,7 +837,7 @@ token noun {
 
 
 token fatarrow {
-    <key=identifier> \h* '=>' :: <.ws> <val=EXPR(item %item_assignment)>
+    <key=identifier> \h* '=>' <.ws> <val=EXPR(item %item_assignment)>
 }
 
 token colonpair {
@@ -861,7 +860,7 @@ token colonpair {
     | <postcircumfix>
         { $key = ""; $value = $<postcircumfix>; }
         {*}                                                     #= structural
-    | $<var> = (<sigil> :: <twigil>? <desigilname>)
+    | $<var> = (<sigil> {} <twigil>? <desigilname>)
         { $key = $<var><desigilname>.text; $value = $<var>; }
         {*}                                                     #= varname
     ]
@@ -1087,9 +1086,9 @@ token variable_declarator {
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
         [
-        | '(' :: <in: ')', 'signature'>
-        | '[' :: <in: ']', 'semilist', 'shape definition'>
-        | '{' :: <in: '}', 'semilist', 'shape definition'>
+        | '(' <in: ')', 'signature'>
+        | '[' <in: ']', 'semilist', 'shape definition'>
+        | '{' <in: '}', 'semilist', 'shape definition'>
         | <?before '<'> <postcircumfix>
         ]*
     ]?
@@ -1187,7 +1186,7 @@ rule package_def {
 	    $+PKG = pop(@PKGS);
 	}}
 	{*}                                                     #= block
-    || <?{ $+begin_compunit }> :: <?before ';'>
+    || <?{ $+begin_compunit }> {} <?before ';'>
         {
             $longname orelse $¢.panic("Compilation unit cannot be anonymous");
 	    my $shortname = $longname.<name>.text;
@@ -1499,7 +1498,7 @@ token desigilname {
 }
 
 token variable {
-    <?before <sigil> > ::
+    <?before <sigil> > {}
     [
     || '&' <twigil>?  <sublongname> {*}                                   #= subnoun
     || <?before '$::('> '$' <name>?
@@ -1560,7 +1559,7 @@ token morename {
     <?before '(' | <alpha> >
     [
     | <identifier>
-    | '(' :: <in: ')', 'EXPR', 'indirect name'>
+    | '(' <in: ')', 'EXPR', 'indirect name'>
     ]
 }
 
@@ -1664,7 +1663,7 @@ token dec_number {
 
 token rad_number {
     ':' $<radix> = [\d+] <.unsp>?      # XXX optional dot here?
-    ::           # don't recurse in lexer
+    {}           # don't recurse in lexer
     [
     || '<'
             $<intpart> = <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]*
@@ -1770,7 +1769,7 @@ token sibble ($l, $lang2) {
     { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
     $start <left=nibble($lang)> $stop 
-    [ <?{ $start ne $stop }> ::
+    [ <?{ $start ne $stop }>
 	<.ws>
         [ '=' || <.panic: "Missing '='"> ]
         <.ws>
@@ -1787,7 +1786,7 @@ token tribble ($l, $lang2 = $l) {
     { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
     $start <left=nibble($lang)> $stop 
-    [ <?{ $start ne $stop }> ::
+    [ <?{ $start ne $stop }>
 	<.ws> <quibble($lang2)>
     || 
 	{ $lang = $lang2.unbalanced($stop); }
@@ -2152,7 +2151,7 @@ method unbalanced ($stop) { self.mixin( ::stop[$stop] ); }
 method unitstop ($stop) { self.mixin( ::unitstop[$stop] ); }
 
 token codepoint {
-    '[' :: ( [<!before ']'> .]*? ) ']'
+    '[' {} ( [<!before ']'> .]*? ) ']'
 }
 
 method truly ($bool,$opt) {
@@ -2173,7 +2172,7 @@ grammar Q is STD {
             [
             | <codepoint>
             | \d+
-            | :: [ <[ ?.._ ]> || <.panic: "Unrecognized \\c character"> ]
+            | [ <[ ?.._ ]> || <.panic: "Unrecognized \\c character"> ]
             ]
         }
         token backslash:e { <sym> }
@@ -2270,7 +2269,7 @@ grammar Q is STD {
         token backslash:stopper { <text=stopper> }
 
         # in single quotes, keep backslash on random character by default
-        token backslash:misc { :: (.) { $<text> = "\\" ~ $0; } }
+        token backslash:misc { {} (.) { $<text> = "\\" ~ $0; } }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
@@ -2282,7 +2281,7 @@ grammar Q is STD {
     role qq does b1 does c1 does s1 does a1 does h1 does f1 {
         token stopper { \" }
         # in double quotes, omit backslash on random \W backslash by default
-        token backslash:misc { :: [ (\W) { $<text> = $0.text; } | $<x>=(\w) <.panic("Unrecognized backslash sequence: '\\" ~ $<x>.text ~ "'")> ] }
+        token backslash:misc { {} [ (\W) { $<text> = $0.text; } | $<x>=(\w) <.panic("Unrecognized backslash sequence: '\\" ~ $<x>.text ~ "'")> ] }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
@@ -2341,7 +2340,7 @@ grammar Q is STD {
 
 grammar Quasi is STD {
     token term:unquote {
-        <starter><starter><starter> :: <statementlist> <stopper><stopper><stopper>
+        <starter><starter><starter> <statementlist> <stopper><stopper><stopper>
     }
 
     # begin tweaks (DO NOT ERASE)
@@ -2386,9 +2385,9 @@ rule method_def {
     | '!'?<longname> [ <multisig> | <trait> ]*
     | <sigil> '.'
         [
-        | '(' :: <in: ')', 'signature'>
-        | '[' :: <in: ']', 'signature'>
-        | '{' :: <in: '}', 'signature'>
+        | '(' <in: ')', 'signature'>
+        | '[' <in: ']', 'signature'>
+        | '{' <in: '}', 'signature'>
         | <?before '<'> <postcircumfix>
         ]
         <trait>*
@@ -2511,7 +2510,7 @@ token param_var {
     <sigil> <twigil>?
     [
         # Is it a longname declaration?
-    || <?{ $<sigil>.text eq '&' }> <?identifier> ::
+    || <?{ $<sigil>.text eq '&' }> <?ident> {}
         <identifier=sublongname>
 
     ||  # Is it a shaped array or hash declaration?
@@ -3088,7 +3087,7 @@ token args ($istype = 0) {
     | '.(' <in: ')', 'semilist', 'argument list'> {*}             #= func args
     | '(' <in: ')', 'semilist', 'argument list'> {*}              #= func args
     | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*} #= func args
-    | :: [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]? { $listopy = 1 }
+    | {} [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]? { $listopy = 1 }
     ]
 
     [
@@ -3102,11 +3101,11 @@ token args ($istype = 0) {
 # bare identifier without parens also handled here if no other rule parses it
 token term:name ( --> Term)
 {
-    <longname> ::
+    <longname>
     [
     ||  <?{
             $¢.is_type($<longname>.text) or substr($<longname>.text,0,2) eq '::'
-        }> ::
+        }>
         # parametric type?
         <.unsp>? [ <?before '['> <postcircumfix> ]?
         [
@@ -3521,8 +3520,8 @@ grammar Regex is STD {
     token atom {
         [
         | \w
-        | <metachar>
-        | :: <.panic: "Unrecognized regex metacharacter">
+        | <metachar> ::
+        | <.panic: "Unrecognized regex metacharacter">
         ]
     }
 
@@ -3544,6 +3543,7 @@ grammar Regex is STD {
     }
 
     token metachar:sym<{ }> {
+        <?before '{'>
         <codeblock>
         {{ $/<sym> := <{ }> }}
     }
@@ -3566,13 +3566,13 @@ grammar Regex is STD {
     }
 
     token metachar:sym<[ ]> {
-        '[' :: [:lang(self.unbalanced(']')) <nibbler>]
+        '[' {} [:lang(self.unbalanced(']')) <nibbler>]
         [ ']' || <.panic: "Unable to parse regex; couldn't find right bracket"> ]
         { $/<sym> := <[ ]> }
     }
 
     token metachar:sym<( )> {
-        '(' :: [:lang(self.unbalanced(')')) <nibbler>]
+        '(' {} [:lang(self.unbalanced(')')) <nibbler>]
         [ ')' || <.panic: "Unable to parse regex; couldn't find right parenthesis"> ]
         { $/<sym> := <( )> }
     }
@@ -3591,7 +3591,7 @@ grammar Regex is STD {
     }
 
     token metachar:sym«< >» {
-        '<' <unsp>? :: <assertion>
+        '<' <unsp>? {} <assertion>
         [ '>' || <.panic: "regex assertion not terminated by angle bracket"> ]
     }
 
@@ -3637,7 +3637,7 @@ grammar Regex is STD {
         [
         | <codepoint>
         | \d+
-        | :: [ <[ ?.._ ]> || <.panic: "Unrecognized \\c character"> ]
+        | [ <[ ?.._ ]> || <.panic: "Unrecognized \\c character"> ]
         ]
     }
     token backslash:d { :i <sym> }
@@ -3653,7 +3653,7 @@ grammar Regex is STD {
     token backslash:w { :i <sym> }
     token backslash:x { :i <sym> [ <hexint> | '[' [<.ws><hexint><.ws> ] ** ',' ']' ] }
     token backslash:misc { $<litchar>=(\W) }
-    token backslash:oops { :: <.panic: "Unrecognized regex backslash sequence"> }
+    token backslash:oops { <.panic: "Unrecognized regex backslash sequence"> }
 
     token assertion:sym<...> { <sym> }
     token assertion:sym<???> { <sym> }
@@ -3683,7 +3683,7 @@ grammar Regex is STD {
                                     | '=' <assertion>
                                     | ':' <.ws>
                                         [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]
-                                    | '(' ::
+                                    | '(' {}
 					[ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
 					[ ')' || <.panic: "Assertion call missing right parenthesis"> ]
                                     ]?
@@ -3697,7 +3697,7 @@ grammar Regex is STD {
                                     | '=' <assertion>
                                     | ':' <.ws>
                                         [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]
-                                    | '(' ::
+                                    | '(' {}
 					[ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
 					[ ')' || <.panic: "Assertion call missing right parenthesis"> ]
                                     ]?
