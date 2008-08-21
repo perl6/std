@@ -136,7 +136,7 @@ my @routinenames = qw[
     caller want
     eval evalfile
     callsame callwith nextsame nextwith lastcall
-    defined undefine item list slice
+    defined undefine item list slice eager hyper
 
     cat classify
     quotemeta
@@ -1240,6 +1240,11 @@ token package_declarator:require {   # here because of declarational aspects
 token package_declarator:trusts {
     <sym> <.ws>
     <module_name>
+}
+
+token package_declarator:does {
+    <sym> <.ws>
+    <typename>
 }
 
 rule package_def {
@@ -2721,6 +2726,12 @@ token term:sym<last> ( --> Term)
 
 token term:sym<redo> ( --> Term)
     { <sym> » <.ws> [<!stdstopper> <termish>]? }
+
+token term:sym<break> ( --> Term)
+    { <sym> » <.ws> [<!stdstopper> <termish>]? }
+
+token term:sym<continue> ( --> Term)
+    { <sym> » }
 
 token term:sym<goto> ( --> Term)
     { <sym> » <.ws> <termish> }
