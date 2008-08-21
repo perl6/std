@@ -101,7 +101,7 @@ sub new {
 	my $name = shift;
 	$args{'_' . $name} = shift;
     }
-    my $self = bless \%args, ref $class || $class;
+    my $self = CORE::bless \%args, ref $class || $class;
     my $buf = $self->{_orig};
 #    $self->deb(" orig ", $$buf) if $DEBUG & DEBUG::cursors;
     $self->BUILD;
@@ -185,7 +185,8 @@ sub text { substr(${$_[0]->{_orig}}, $_[0]->{_from}, $_[0]->{_to} - $_[0]->{_fro
 sub pos { $_[0]->{_pos} }
 sub peek { $_[0]->{_peek} }
 sub orig { $_[0]->{_orig} }
-sub WHAT { ref $_[0] }
+sub WHAT { ref $_[0] || $_[0] }
+sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 sub item { exists $_[0]->{''} ? $_[0]->{''} : $_[0]->text }
 
@@ -691,7 +692,7 @@ sub delete {
 { package Match;
     sub new { my $self = shift;
 	my %args = @_;
-	bless \%args, $self;
+	CORE::bless \%args, $self;
     }
 
     sub from { my $self = shift;
@@ -707,7 +708,7 @@ sub cursor_peek { my $self = shift;
     $self->deb("cursor_peek") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_peek} = 1;
-    bless \%r, ref $self;
+    CORE::bless \%r, ref $self;
 }
 
 sub cursor_fresh { my $self = shift;
@@ -719,14 +720,14 @@ sub cursor_fresh { my $self = shift;
     $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
     $r{_herelang} = $self->{_herelang} if $self->{_herelang};
-    bless \%r, ref $lang || $lang;
+    CORE::bless \%r, ref $lang || $lang;
 }
 
 sub cursor_herelang { my $self = shift;
     $self->deb("cursor_herelang") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_herelang} = $self;
-    bless \%r, 'STD::Q';
+    CORE::bless \%r, 'STD::Q';
 }
 
 # remove consistent leading whitespace (mutates text nibbles in place)
@@ -834,7 +835,7 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
     }
     $r{_pos} = $r{_to} = $submatch->{_to};
     delete $r{_fate};
-    bless \%r, ref $self;		# return new match cursor for parent
+    CORE::bless \%r, ref $self;		# return new match cursor for parent
 }
 
 sub cursor_fate { my $self = shift;
@@ -873,7 +874,7 @@ sub cursor_fate { my $self = shift;
             $tag = '';
         }
     }
-    return (bless \%r, ref $self), $tag, $try, $relex;
+    return (CORE::bless \%r, ref $self), $tag, $try, $relex;
 }
 
 sub cursor_all { my $self = shift;
@@ -886,7 +887,7 @@ sub cursor_all { my $self = shift;
     $r{_to} = $tpos;
     $r{_pos} = $tpos;
 
-    bless \%r, ref $self;
+    CORE::bless \%r, ref $self;
 }
 
 sub cursor { my $self = shift;
@@ -904,7 +905,7 @@ sub cursor { my $self = shift;
     $r{_to} = $tpos;
     $r{_pos} = $tpos;
 
-    bless \%r, ref $self;
+    CORE::bless \%r, ref $self;
 }
 
 sub cursor_rev { my $self = shift;
@@ -922,7 +923,7 @@ sub cursor_rev { my $self = shift;
     $r{_from} = $fpos;
     $r{_to} = $self->{_from};
 
-    bless \%r, ref $self;
+    CORE::bless \%r, ref $self;
 }
 
 sub add_macro { my $lang = shift;
@@ -1295,7 +1296,7 @@ sub _BRACKET { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    lazymap(sub { bless($_[0],ref($self))->retm() },
+    lazymap(sub { CORE::bless($_[0],ref($self))->retm() },
         $block->($self));
 }
 
@@ -1304,7 +1305,7 @@ sub _BRACKETr { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my ($val) = $block->($self) or return ();
-    bless($val,ref($self))->retm();
+    CORE::bless($val,ref($self))->retm();
 }
 
 sub _PAREN { my $self = shift;

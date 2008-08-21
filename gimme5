@@ -181,7 +181,7 @@ sub un6 {
         $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/else {/, next;
         $f =~ s/^\bdefault\s+\{//               and $t .= qq/else {/, next;
         $f =~ s/^\btemp\b//             	and $t .= qq/local/, next;
-        $f =~ s/^\bchars\(\b//             	and $t .= qq/length(/, next;
+        $f =~ s/^\bchars\(//             	and $t .= qq/length(/, next;
 
         # the following must do partial rescan of final expression
 
@@ -1564,7 +1564,7 @@ sub unbalanced {
         my $self = shift;
         local $NEEDMATCH = 0;
         %NEEDSEMI = ();
-        my $text;
+        my $text = '';
         for my $line (split /^/,$$self{text}) {
             if ($line =~ /^(\s*).*?given/) {
                 my $len = length($1);
@@ -1578,7 +1578,7 @@ sub unbalanced {
             }
             $text .= $line;
         }
-        $text = ::un6($text);
+        $text = ::un6($text) // '';
         my $ctx = $$self{context};
         $text = 'my $M = $C; ' . $text . ';' if $NEEDMATCH;
         if ($text =~ s/\bmake\b/scalar/g) {  # XXX hack, avoid using $<make>

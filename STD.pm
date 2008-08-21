@@ -7,6 +7,7 @@ my @PKGS;
 my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
 my $IN_DECL is context<rw>;
+my %ROUTINES;
 
 # random rule for debugging, please ignore
 token foo {
@@ -94,7 +95,7 @@ my @typenames = qw[
     UInt uint uint1 uint2 uint4 uint8 uint16 uint32 uint64
     Buf  buf   buf1  buf2  buf4 buf8  buf16  buf32  buf64
 
-    Bit Bool True False
+    Bit Bool
     bit bool
 
     Order Increasing Decreasing
@@ -105,6 +106,7 @@ my @typenames = qw[
 
     KitchenSink
 ];
+push @typenames, "True", "False";  # in quotes lest gimme5 translate them
 
 my %typenames;
 %typenames{@typenames} = (1 xx @typenames);
@@ -122,6 +124,42 @@ method add_type ($longname) {
     %typenames{$typename} = $qualname;
     %typenames{$qualname} = $qualname;
     %typenames{$shortname} = $qualname;
+}
+
+# XXX likewise for routine defs
+
+my @routinenames = qw[
+    WHAT WHICH VAR
+    die exit warn eval temp
+    callsame callwith nextsame nextwith lastcall
+    defined undefine item list slice
+    join split substr index chars pack unpack uc ucfirst lc lcfirst
+    say print open close printf sprintf slurp unlink
+    elems grep map sort push reverse take splice
+    zip each roundrobin caller
+    return leave pop shift unshift reduce
+    keys values hash
+    sqrt floor ceil
+    any all none one
+    plan is ok dies_ok lives_ok skip todo pass flunk force_todo use_ok isa_ok
+    cmp_ok diag is_deeply isnt like skip_rest unlike nonce skip_rest eval_dies_okay
+];
+push @routinenames, "HOW", "fail";
+
+# if True ref False unless length bless delete exists
+
+my %routinenames;
+%routinenames{@routinenames} = (1 xx @routinenames);
+
+method is_routine ($name) {
+    return True if %routinenames{$name};
+    return True if %typenames{$name};
+    #return True if GLOBAL::{$name}.:exists;
+    return False;
+}
+
+method add_routine ($name) {
+    %routinenames{$name} = 1;
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -481,6 +519,20 @@ rule comp_unit {
 
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
+    # "CHECK" time...
+    {{
+        my %UNKNOWN;
+        for keys(%ROUTINES) {
+            next if $¢.is_routine($_);
+            %UNKNOWN{$_} = %ROUTINES{$_};
+        }
+        if %UNKNOWN {
+            warn "Unknown routines:\n";
+            for sort keys(%UNKNOWN) {
+                warn "\t$_ called at ", %UNKNOWN{$_}, "\n";
+            }
+        }
+    }}
 }
 
 # Note: because of the possibility of placeholders we can't determine arity of
@@ -581,7 +633,7 @@ token statement {
 
     # this could either be a statement that follows a declaration
     # or a statement that is within the block of a code declaration
-    <!!{ bless $¢, ref $PARSER; }>
+    <!!{ $¢ = $+PARSER.bless($¢); }>
 
     [
     | <label> <statement>                        {*}            #= label
@@ -1540,6 +1592,7 @@ token deflongname {
     <name>
     # XXX too soon
     [ <colonpair>+ { $¢.add_macro($<name>) if $+IN_DECL; } ]?
+    { $¢.add_routine($<name>.text) if $+IN_DECL; }
 }
 
 token longname {
@@ -2375,8 +2428,10 @@ rule multisig {
 rule routine_def {
     :my $IN_DECL is context<rw> = 1;
     [ '&'<deflongname>? | <deflongname> ]? [ <multisig> | <trait> ]*
-    <!!{ bless $¢, ref $PARSER; }>
-    { $IN_DECL = 0; }
+    <!{
+        $¢ = $+PARSER.bless($¢);
+        $IN_DECL = 0;
+    }>
     <block>
 }
 
@@ -2406,8 +2461,10 @@ rule regex_def {
 rule macro_def {
     :my $IN_DECL is context<rw> = 1;
     [ '&'<deflongname>? | <deflongname> ]? [ <multisig> | <trait> ]*
-    <!!{ bless $¢, ref $PARSER; }>
-    { $IN_DECL = 0; }
+    <!{
+        $¢ = $+PARSER.bless($¢);
+        $IN_DECL = 0;
+    }>
     <block>
 }
 
@@ -2625,13 +2682,13 @@ token term:sym<undef> ( --> Term) {
 }
 
 token term:sym<next> ( --> Term)
-    { <sym> » <.ws> <termish>? }
+    { <sym> » <.ws> [<!stdstopper> <termish>]? }
 
 token term:sym<last> ( --> Term)
-    { <sym> » <.ws> <termish>? }
+    { <sym> » <.ws> [<!stdstopper> <termish>]? }
 
 token term:sym<redo> ( --> Term)
-    { <sym> » <.ws> <termish>? }
+    { <sym> » <.ws> [<!stdstopper> <termish>]? }
 
 token term:sym<goto> ( --> Term)
     { <sym> » <.ws> <termish> }
@@ -3074,6 +3131,7 @@ token term:identifier ( --> Term )
 {
     :my $i;
     $i = <identifier> <args( $¢.is_type($i.text) )>
+    {{ %ROUTINES{$i.text} ~= $¢.lineof($¢.pos) ~ ' ' }}
 }
 
 token term:opfunc ( --> Term )
@@ -3863,7 +3921,7 @@ method lineof ($p) {
     my @text = split(/^/,$$orig);
     for @text {
         $posprops.[$pos++]<L> = $line
-            for 1 .. length($_);
+            for 1 .. chars($_);
         $line++;
     }
     return $posprops.[$p]<L> // 0;
