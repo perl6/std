@@ -169,7 +169,7 @@ my @routinenames = qw[
 
     plan is ok dies_ok lives_ok skip todo pass flunk force_todo use_ok
     isa_ok cmp_ok diag is_deeply isnt like skip_rest unlike nonce
-    skip_rest eval_dies_okay approx is_approx throws_ok version_lt
+    skip_rest eval_dies_ok eval_lives_ok approx is_approx throws_ok version_lt
 
     gmtime localtime time
     gethost getpw chroot getlogin
