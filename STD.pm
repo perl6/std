@@ -1652,7 +1652,7 @@ token subshortname {
     [
     | <category>
         [ <colonpair>+ { $¢.add_macro($<category>) if $+IN_DECL; } ]?
-    | <desigilname> { $¢.add_routine($<desiglname>.text) if $+IN_DECL; }
+    | <desigilname> { $¢.add_routine($<desigilname>.text) if $+IN_DECL; }
     ]
 }
 
