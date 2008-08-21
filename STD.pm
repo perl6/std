@@ -132,7 +132,7 @@ my @routinenames = qw[
     WHAT WHICH VAR
     any all none one
 
-    die exit warn temp let
+    die exit warn
     caller want
     eval evalfile
     callsame callwith nextsame nextwith lastcall
@@ -176,7 +176,7 @@ my @routinenames = qw[
     run runinstead
     fork wait kill sleep
 ];
-push @routinenames, "HOW", "fail";
+push @routinenames, "HOW", "fail", "temp", "let";
 
 # if True ref False unless length bless delete exists
 
