@@ -153,6 +153,7 @@ my @routinenames = qw[
 
     say print open close printf sprintf slurp unlink link symlink
     elems grep map first reduce sort push reverse take splice
+    exists delete
 
     zip each roundrobin caller
     return leave pop shift unshift reduce
