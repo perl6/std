@@ -142,7 +142,8 @@ my @routinenames = qw[
     sqrt floor ceil
     any all none one
     plan is ok dies_ok lives_ok skip todo pass flunk force_todo use_ok isa_ok
-    cmp_ok diag is_deeply isnt like skip_rest unlike nonce skip_rest eval_dies_okay
+    cmp_ok diag is_deeply isnt like skip_rest unlike nonce skip_rest
+    eval_dies_ok eval_lives_ok
 ];
 push @routinenames, "HOW", "fail";
 
