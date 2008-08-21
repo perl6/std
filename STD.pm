@@ -76,7 +76,7 @@ method TOP ($STOP = undef) {
 
 my @typenames = qw[
     Object Any Junction Whatever
-    Capture Match Signature
+    Capture Match Signature Proxy Matcher
     Package Module Class Role Grammar
     Scalar Array Hash KeyHash KeySet KeyBag
     Pair List Seq Range Set Bag Mapping
@@ -130,20 +130,51 @@ method add_type ($longname) {
 
 my @routinenames = qw[
     WHAT WHICH VAR
-    die exit warn eval temp
+    any all none one
+
+    die exit warn temp let
+    caller want
+    eval evalfile
     callsame callwith nextsame nextwith lastcall
     defined undefine item list slice
-    join split substr index chars pack unpack uc ucfirst lc lcfirst
-    say print open close printf sprintf slurp unlink
-    elems grep map sort push reverse take splice
+
+    cat classify
+    quotemeta
+    chr ord
+    p5chop chop p5chomp chomp
+    index rindex substr
+    join split comb pack unpack
+    uc ucfirst lc lcfirst
+    normalize
+    nfc nfd nfkc nfkd
+    samecase sameaccent
+    capitalize
+    chars graphs codes bytes
+
+    say print open close printf sprintf slurp unlink link symlink
+    elems grep map first reduce sort push reverse take splice
+
     zip each roundrobin caller
     return leave pop shift unshift reduce
     keys values hash
-    sqrt floor ceil
-    any all none one
-    plan is ok dies_ok lives_ok skip todo pass flunk force_todo use_ok isa_ok
-    cmp_ok diag is_deeply isnt like skip_rest unlike nonce skip_rest
-    eval_dies_ok eval_lives_ok
+
+    sign abs floor ceiling round truncate
+    exp log log10 sqrt roots
+    rand srand pick
+    cis unpolar
+
+    sin cos tan asin acos atan sec cosec cotan asec acosec
+    acotan sinh cosh tanh asinh acosh atanh sech cosech cotanh
+    asech acosech acotanh atan2
+
+    plan is ok dies_ok lives_ok skip todo pass flunk force_todo use_ok
+    isa_ok cmp_ok diag is_deeply isnt like skip_rest unlike nonce
+    skip_rest eval_dies_okay approx is_approx throws_ok version_lt
+
+    gmtime localtime time
+    gethost getpw chroot getlogin
+    run runinstead
+    fork wait kill sleep
 ];
 push @routinenames, "HOW", "fail";
 
@@ -1153,7 +1184,7 @@ token variable_declarator {
 
     [
     | '=' <.ws> <EXPR( ($<sigil> // '') eq '$' ?? item %item_assignment !! item %list_prefix )>
-    | '.=' <.ws> <EXPR(item %item_assignment)>
+    | '.=' <.ws> <dottyop>
     ]?
 }
 
@@ -1621,7 +1652,7 @@ token subshortname {
     [
     | <category>
         [ <colonpair>+ { $¢.add_macro($<category>) if $+IN_DECL; } ]?
-    | <desigilname>
+    | <desigilname> { $¢.add_routine($<desiglname>.text) if $+IN_DECL; }
     ]
 }
 
