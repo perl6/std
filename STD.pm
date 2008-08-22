@@ -3072,6 +3072,12 @@ token infix:sym<^^> ( --> Tight_or)  {
 token infix:sym<//> ( --> Tight_or)
     { <sym> }
 
+token infix:sym<min> ( --> Tight_or)
+    { <sym> }
+
+token infix:sym<max> ( --> Tight_or)
+    { <sym> }
+
 
 ## conditional
 token infix:sym<?? !!> ( --> Conditional) {
