@@ -628,21 +628,23 @@ END
 			    my $last = @- - 1;	# ignore '$0'
 		            $C->deb("LAST: $last\n") if $DEBUG & DEBUG::lexer;
 			    $result = $fates->[$last-1];
-			    for my $x (1 .. $max) {
-				my $beg = $-[$x];
-				next unless defined $beg;
-				my $end = $+[$x];
-#			        return if $stoplen >= $end - $beg;
-				my $f = $fates->[$x-1][3];
-				no strict 'refs';
-				if ($DEBUG & DEBUG::fates or ($DEBUG & DEBUG::lexer and $x == $last)) {
-				    my $p = $pats[$x-1] // '<nopat>';
-				    $self->deb("\$$x: $beg..$end\t$$x\t ",
-					$x == $last ? "====>" : "---->",
-					" $f\t/$p/");
+			    if ($DEBUG) {
+				for my $x (1 .. $max) {
+				    my $beg = $-[$x];
+				    next unless defined $beg;
+				    my $end = $+[$x];
+    #			        return if $stoplen >= $end - $beg;
+				    my $f = $fates->[$x-1][3];
+				    no strict 'refs';
+				    if ($DEBUG & DEBUG::fates or ($DEBUG & DEBUG::lexer and $x == $last)) {
+					my $p = $pats[$x-1] // '<nopat>';
+					$self->deb("\$$x: $beg..$end\t$$x\t ",
+					    $x == $last ? "====>" : "---->",
+					    " $f\t/$p/");
+				    }
 				}
+				$C->deb("success at '", substr($$buf,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
 			    }
-			    $C->deb("success at '", substr($$buf,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
 			    my $tried = "";
 			    vec($tried,$last-1,1) = 1;
 			    $_[0] = [$tried, pos($$buf) - $P, []];
