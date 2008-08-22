@@ -153,7 +153,6 @@ my @routinenames = qw[
 
     say print open close printf sprintf slurp unlink link symlink
     elems grep map first reduce sort push reverse take splice
-    exists delete
 
     zip each roundrobin caller
     return leave pop shift unshift reduce
@@ -179,7 +178,7 @@ my @routinenames = qw[
 ];
 push @routinenames, "HOW", "fail", "temp", "let";
 
-# if True ref False unless length bless delete exists
+# please don't add: ref length bless delete exists
 
 my %routinenames;
 %routinenames{@routinenames} = (1 xx @routinenames);
@@ -457,8 +456,7 @@ token spacey { <?before \s | '#'> }
 # Lexical routines
 
 token ws {
-    # XXX exists is a p5ism
-    :my @stub = return self if exists self.<_>[self.pos]<ws>;
+    :my @stub = return self if self.<_>[self.pos].:exists<ws>;
     :my $startpos = self.pos;
 
     [
@@ -3312,7 +3310,7 @@ token stopper { <!> }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    :my @stub = return self if exists self.<_>[self.pos]<endstmt>;
+    :my @stub = return self if self.<_>[self.pos].:exists<endstmt>;
     [
     | <?terminator>
     | <?unitstopper>
@@ -3974,7 +3972,7 @@ method lineof ($p) {
 # not quite a "between" combinator...
 token in (Str $stop, Str $insides, Str $name = $insides) {
     :my $GOAL is context = $stop;
-    <x=$insides> $stop {{ $/.{$insides} = $<x>; delete $<x> }} || <.panic: "Unable to parse $name; couldn't find final '$stop'">
+    <x=$insides> $stop {{ $/.{$insides} = $<x>; $/.:delete<x> }} || <.panic: "Unable to parse $name; couldn't find final '$stop'">
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...

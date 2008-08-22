@@ -79,6 +79,7 @@ sub un6 {
     my $t;
     $f =~ s/\\x([0-9a-fA-F]{3,4})/\\x{$1}/g;
     $f =~ s!\$([0-9]+)!\$\$C{$1}!g;
+    $f =~ s/(\S+\.):(exists|delete)/$2 $1/g if $f =~ /\.:(exists|delete)/;
     while ($f ne "") {
 	#print "$f\n" if $trace;
         $f =~ s/^\)</.</                  	and $t .= ')', next;
