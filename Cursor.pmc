@@ -617,7 +617,8 @@ sub _AUTOLEXnow { my $self = shift;
 		    state $matcher = eval(do { my $prog = <<"END" .
 		    sub {
 			my \$C = shift;
-			pos(\$\$buf) = \$C->{_pos};
+			my \$P = \$C->{_pos};
+			pos(\$\$buf) = \$P;
 
 			my \$result;
 			if ((\$\$buf =~ m\0$pat\0xgc)) {
@@ -644,7 +645,7 @@ END
 			    $C->deb("success at '", substr($$buf,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
 			    my $tried = "";
 			    vec($tried,$last-1,1) = 1;
-			    $_[0] = [$tried, $+[0] - $-[0], []];
+			    $_[0] = [$tried, pos($$buf) - $P, []];
 			}
 			$result;
 		    };
@@ -851,28 +852,31 @@ sub cursor_fate { my $self = shift;
     my $relex;
     
     my $fate = $self->{_fate};
-    if ($fate and $fate->[0] eq $name) {
-        $self->deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
-        ($tag, $try, $fate) = @$fate;
-	$r{_fate} = $fate;
+    if ($fate) {
+	if ($fate->[0] eq $name) {
+	    $self->deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
+	    ($tag, $try, $fate) = @$fate;
+	    $r{_fate} = $fate;
+	    return (CORE::bless \%r, ref $self), $tag, $try, $relex;
+	}
+	elsif ($fate->[0] . ':*' eq $name) {
+	    $self->deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
+	    ($tag, $try, $fate) = @$fate;
+	    $r{_fate} = $fate;
+	    return (CORE::bless \%r, ref $self), $tag, $try, $relex;
+	}
     }
-    elsif ($fate and $fate->[0] . ':*' eq $name) {
-        $self->deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
-        ($tag, $try, $fate) = @$fate;
+
+    $relex = $self->_AUTOLEXnow($name,$retree);
+    $fate = $relex->($self,$_[0]);
+    if ($fate) {
+	$self->deb("FATE OF ${pkg}::$name: $$fate[3]") if $DEBUG & DEBUG::fates;
+	($tag, $try, $fate) = @$fate;
 	$r{_fate} = $fate;
     }
     else {
-        $relex = $self->_AUTOLEXnow($name,$retree);
-	$fate = $relex->($self,$_[0]);
-        if ($fate) {
-            $self->deb("FATE OF ${pkg}::$name: $$fate[3]") if $DEBUG & DEBUG::fates;
-            ($tag, $try, $fate) = @$fate;
-	    $r{_fate} = $fate;
-        }
-        else {
-            $self->deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
-            $tag = '';
-        }
+	$self->deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
+	$tag = '';
     }
     return (CORE::bless \%r, ref $self), $tag, $try, $relex;
 }
