@@ -754,8 +754,8 @@ rule statement_control:until {\
 rule statement_control:repeat {\
     <sym>
     [
-        | ('while'|'until') <EXPR>         {*}                      #= wu expr
-          <block>                      {*}                      #= wu block
+        | ('while'|'until')
+          <xblock>
         | <block>                      {*}                      #= block wu
           ('while'|'until') <EXPR>         {*}                      #= expr wu
     ]
@@ -1639,17 +1639,18 @@ token name {
     [
     | <identifier> <morename>*
     | <morename>+
-    ]?
-    '::'?
+    ]
 }
 
 token morename {
     '::'
-    <?before '(' | <alpha> >
     [
-    | <identifier>
-    | '(' <in: ')', 'EXPR', 'indirect name'>
-    ]
+        <?before '(' | <alpha> >
+        [
+        | <identifier>
+        | '(' <in: ')', 'EXPR', 'indirect name'>
+        ]
+    ]?
 }
 
 token subshortname {
@@ -2567,7 +2568,7 @@ rule type_declarator:subset {\
     where <EXPR>
 }
 
-rule type_declarator:enum {
+rule type_declarator:enum {\
     <sym>
     [ <longname> { $¢.add_type($<longname>); } ]?
     <EXPR>
