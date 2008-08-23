@@ -2568,10 +2568,11 @@ rule type_declarator:subset {\
     where <EXPR>
 }
 
-rule type_declarator:enum {\
-    <sym>
-    [ <longname> { $¢.add_type($<longname>); } ]?
-    <EXPR>
+token type_declarator:enum {
+    :my $l;
+    <sym> <.ws>
+    [ $l = <longname> { $¢.add_type($l); } <.ws> ]?
+    <EXPR> <.ws>
 }
 
 rule type_constraint {
