@@ -223,7 +223,7 @@ constant %list_assignment = (:prec<i=>, :sub<e=>, :assoc<right>);
 constant %list_prefix     = (:prec<e=>);
 constant %loose_and       = (:prec<d=>, :assoc<left>,  :assign);
 constant %loose_or        = (:prec<c=>, :assoc<left>,  :assign);
-constant %sequencer      = (:prec<b=>, :assoc<left>);
+constant %sequencer      = (:prec<b=>, :assoc<left>, :nextterm<statement>);
 constant %LOOSEST         = (:prec<a=!>);
 constant %terminator      = (:prec<a=>, :assoc<list>);
 
@@ -2714,7 +2714,7 @@ token term:sym<undef> ( --> Term) {
         <obs('$/ variable as input record separator',
              "the filehandle's .slurp method")>
     ]?
-    [ <?before \h*< $ @ % & > >
+    [ <?before \h*<variable> >
         <obs('undef as a verb', 'undefine function')>
     ]?
 }
