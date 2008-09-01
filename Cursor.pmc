@@ -427,16 +427,15 @@ sub _AUTOLEXnow { my $self = shift;
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key,$retree);
     };
-    $self->highwater($lexer->{NAME});
+    $self->highwater($lexer->{NAME}) if $self->{_pos} >= $::HIGHWATER;
     my $buf = $self->{_orig};
     my $P = $self->{_pos};
     if ($P == length($$buf)) {
 	return sub { return };
     }
-    my $ch2 = substr($$buf,$P,5);
-    # wish I could persuade p5 to parse this directly out of $$buf...
-    $ch2 =~ s/^(\[[\\<>«»]*..|[<>][<>]..|[ -~].|.).*$/$1/s;
-
+    pos($$buf) = $P;
+    $$buf =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[ -~].|.)/smgc;
+    my $ch2 = $1;
 
     $lexer->{$ch2} //= do {
 	my @pats;
@@ -461,6 +460,8 @@ sub _AUTOLEXnow { my $self = shift;
 #		print "PATS: ",0+@pats," $ch2 ", substr($$buf,$P+length($ch2), 5), "\n";
 #		print join "\n", @pats, '';
 #	    }
+	    # XXX this could be greatly compactified by just storing offsets into @pats
+	    # and just appending a single line to a single digraph cache file.
 	    if (open PATS, '>', $file) {
 		binmode(PATS, ":utf8");
 		print PATS join("\n", @pats, '');
@@ -671,20 +672,18 @@ END
 
 sub highwater {
     my $self = shift;
-    if ($self->{_pos} >= $::HIGHWATER) {
-	if ($self->{_pos} > $::HIGHWATER) {
-	    %$::HIGHEXPECT = ();
-	    $::HIGHMESS = '';
-	}
-	for (@_) {
-	    my $name = $_;
-	    $name =~ s/_0[01]$//;
-	    $name =~ s/_(\d\d)$/ (alt $1)/;
-	    $name =~ s/:\*$//;
-	    $::HIGHEXPECT->{$name}++;
-	}
-	$::HIGHWATER = $self->{_pos};
+    if ($self->{_pos} > $::HIGHWATER) {
+	%$::HIGHEXPECT = ();
+	$::HIGHMESS = '';
     }
+    for (@_) {
+	my $name = $_;
+	$name =~ s/_0[01]$//;
+	$name =~ s/_(\d\d)$/ (alt $1)/;
+	$name =~ s/:\*$//;
+	$::HIGHEXPECT->{$name}++;
+    }
+    $::HIGHWATER = $self->{_pos};
 }
 
 sub delete {

@@ -2571,7 +2571,7 @@ rule type_declarator:subset {\
 token type_declarator:enum {
     :my $l;
     <sym> <.ws>
-    [ $l = <longname> { $¢.add_type($l); } <.ws> ]?
+    [ $l = <longname> :: { $¢.add_type($l); } <.ws> ]?
     <EXPR> <.ws>
 }
 
