@@ -106,7 +106,7 @@ my @typenames = qw[
 
     KitchenSink
 ];
-push @typenames, "True", "False";  # in quotes lest gimme5 translate them
+push @typenames, "True", "False", "Bool::True", "Bool::False";  # in quotes lest gimme5 translate them
 
 my %typenames;
 %typenames{@typenames} = (1 xx @typenames);
