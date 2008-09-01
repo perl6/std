@@ -152,11 +152,11 @@ my @routinenames = qw[
     chars graphs codes bytes
 
     say print open close printf sprintf slurp unlink link symlink
-    elems grep map first reduce sort push reverse take splice
+    elems grep map first reduce sort uniq push reverse take splice
 
     zip each roundrobin caller
     return leave pop shift unshift reduce
-    keys values hash
+    keys values hash kv key value pairs pair
 
     sign abs floor ceiling round truncate
     exp log log10 sqrt roots
@@ -171,7 +171,7 @@ my @routinenames = qw[
     isa_ok cmp_ok diag is_deeply isnt like skip_rest unlike nonce
     skip_rest eval_dies_ok eval_lives_ok approx is_approx throws_ok version_lt
 
-    gmtime localtime time
+    gmtime localtime time times
     gethost getpw chroot getlogin
     run runinstead
     fork wait kill sleep
