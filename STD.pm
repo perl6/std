@@ -2745,7 +2745,7 @@ token term:sym<self> ( --> Term)
     { <sym> » }
 
 token term:sym<defer> ( --> Term)
-    { <defer> » }
+    { <sym> » }
 
 token term:rand ( --> Term)
     { <sym> » [ <?before \h+ [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]? }
