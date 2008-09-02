@@ -654,7 +654,7 @@ token label {
     ]?
 
     # add label as a pseudo type
-    # {{ eval 'COMPILING::{"::$<identifier>"} = Label.new($<identifier>)' }}  # XXX need statement ref too?
+    {{ %typenames{$<identifier>.text} = 'LABEL'; }}
 
 }
 
@@ -1233,7 +1233,10 @@ token package_declarator:role {
 
 token package_declarator:require {   # here because of declarational aspects
     <sym> <.ws>
-    <module_name> <EXPR>?
+    [
+    || <module_name> <EXPR>?
+    || <EXPR>
+    ]
 }
 
 token package_declarator:trusts {
@@ -2700,6 +2703,7 @@ token statement_prefix:try     { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:gather  { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:contend { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:async   { <sym> <?before \s> <.ws> <statement> }
+token statement_prefix:maybe   { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:lazy    { <sym> <?before \s> <.ws> <statement> }
 
 ## term
@@ -2739,6 +2743,9 @@ token term:sym<goto> ( --> Term)
 
 token term:sym<self> ( --> Term)
     { <sym> » }
+
+token term:sym<defer> ( --> Term)
+    { <defer> » }
 
 token term:rand ( --> Term)
     { <sym> » [ <?before \h+ [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]? }
