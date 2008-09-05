@@ -3746,7 +3746,10 @@ grammar Regex is STD {
 
     token backslash:unspace { <?before \s> <.SUPER::ws> }
 
-    token backslash:a { :i <sym> }
+    token backslash:sym<0> { '0' <!before <[0..7]> > }
+
+    token backslash:A { <sym> <.obs('\\A as beginning-of-string matcher', '^')> }
+    token backslash:a { <sym> <.panic: "\\a is allowed only in strings, not regexes"> }
     token backslash:b { :i <sym> }
     token backslash:c { :i <sym>
         [
@@ -3761,12 +3764,15 @@ grammar Regex is STD {
     token backslash:h { :i <sym> }
     token backslash:n { :i <sym> }
     token backslash:o { :i <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
+    token backslash:Q { <sym> <obs('\\Q as quotemeta', 'quotes or literal variable match')> }
     token backslash:r { :i <sym> }
     token backslash:s { :i <sym> }
     token backslash:t { :i <sym> }
     token backslash:v { :i <sym> }
     token backslash:w { :i <sym> }
     token backslash:x { :i <sym> [ <hexint> | '[' [<.ws><hexint><.ws> ] ** ',' ']' ] }
+    token backslash:z { <sym> <obs('\\z as end-of-string matcher', '$')> }
+    token backslash:Z { <sym> <obs('\\Z as end-of-string matcher', '\\n?$')> }
     token backslash:misc { $<litchar>=(\W) }
     token backslash:oops { <.panic: "Unrecognized regex backslash sequence"> }
 
@@ -3818,9 +3824,9 @@ grammar Regex is STD {
                                     ]?
     }
 
-    token assertion:sym<[> { <before '[' > <cclass_elem>+ }
-    token assertion:sym<+> { <before '+' > <cclass_elem>+ }
-    token assertion:sym<-> { <before '-' > <cclass_elem>+ }
+    token assertion:sym<[> { <before '[' > <cclass_elem> ** < + - > }
+    token assertion:sym<+> { <sym> <cclass_elem> ** < + - > }
+    token assertion:sym<-> { <sym> <cclass_elem> ** < + - > }
     token assertion:sym<.> { <sym> }
     token assertion:sym<,> { <sym> }
     token assertion:sym<~~> { <sym> [ <?before '>'> | \d+ | <desigilname> ] }
@@ -3828,40 +3834,47 @@ grammar Regex is STD {
     token assertion:bogus { <.panic: "Unrecognized regex assertion"> }
 
     token cclass_elem {
-        [ '+' | '-' ]?
+	<.ws>
         [
         | <name>
         | <before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
         ]
+	<.ws>
     }
 
     token mod_arg { '(' <in: ')', 'semilist', 'modifier argument'> }
 
     token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($+LANG)) <statement> <eat_terminator> ] }
 
+    # XXX needs some generalization
+
     token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 1 } }
-    token mod_internal:sym<:!i>   { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 0 } }
-    # XXX will this please work somehow ???
-    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { $+ignorecase = $<mod_arg>.eval } }
+    token mod_internal:sym<:!i>   { $<sym>=[':!i'|':!ignorecase'] » { $+ignorecase = 0 } }
+    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { $+ignorecase = eval $<mod_arg>.text } }
+    token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { $+ignorecase = $0 } }
 
     token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { $+ignoreaccent = 1 } }
-    token mod_internal:sym<:!a>   { $<sym>=[':a'|':ignoreaccent'] » { $+ignoreaccent = 0 } }
-    # XXX will this please work somehow ???
-    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { $+ignoreaccent = $<mod_arg>.eval } }
+    token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { $+ignoreaccent = 0 } }
+    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { $+ignoreaccent = eval $<mod_arg>.text } }
+    token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { $+ignoreaccent = $0 } }
 
     token mod_internal:sym<:s>    { ':s' 'igspace'? » { $+sigspace = 1 } }
-    token mod_internal:sym<:!s>   { ':s' 'igspace'? » { $+sigspace = 0 } }
-    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { $+sigspace = $<mod_arg>.eval } }
+    token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { $+sigspace = 0 } }
+    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { $+sigspace = eval $<mod_arg>.text } }
+    token mod_internal:sym<:0s>   { ':' (\d+) 's' 'igspace'? » { $+sigspace = $0 } }
 
     token mod_internal:sym<:r>    { ':r' 'atchet'? » { $+ratchet = 1 } }
-    token mod_internal:sym<:!r>   { ':r' 'atchet'? » { $+ratchet = 0 } }
-    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $+ratchet = $<mod_arg>.eval } }
+    token mod_internal:sym<:!r>   { ':!r' 'atchet'? » { $+ratchet = 0 } }
+    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $+ratchet = eval $<mod_arg>.text } }
+    token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { $+ratchet = $0 } }
+ 
+    token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] [ :lang( $¢.cursor_fresh( ::STD::P5Regex ).unbalanced($+GOAL) ) <nibbler> ] }
 
     token mod_internal:adv {
         <?before ':' <identifier> > [ :lang($¢.cursor_fresh($+LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
     }
 
-    token mod_internal:oops { ':' <.panic: "Unrecognized regex modifier"> }
+    token mod_internal:oops { ':'\w+ <.panic: "Unrecognized regex modifier"> }
 
     token quantifier:sym<*>  { <sym> <quantmod> }
     token quantifier:sym<+>  { <sym> <quantmod> }
@@ -3881,7 +3894,169 @@ grammar Regex is STD {
         ]
         <sigspace> <quantified_atom> }
 
-    token quantmod { [ '?' | '!' | ':' | '+' ]? }
+    token quantmod { ':'? [ '?' | '!' | '+' ]? }
+
+} # end grammar
+
+grammar P5Regex is STD {
+
+    # begin tweaks (DO NOT ERASE)
+    multi method tweak (:global(:$g)) { self }
+    multi method tweak (:ignorecase(:$i)) { self }
+    # end tweaks (DO NOT ERASE)
+
+    token category:metachar { <sym> }
+    proto token metachar { <...> }
+
+    token category:backslash { <sym> }
+    proto token backslash { <...> }
+
+    token category:assertion { <sym> }
+    proto token assertion { <...> }
+
+    token category:quantifier { <sym> }
+    proto token quantifier { <...> }
+
+    token category:mod_internal { <sym> }
+    proto token mod_internal { <...> }
+
+    proto token rxinfix { <...> }
+
+    # suppress fancy end-of-line checking
+    token codeblock {
+        :my $GOAL is context = '}';
+        '{' :: [ :lang($¢.cursor_fresh($+LANG)) <statementlist> ]
+        [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
+    }
+
+    rule nibbler {
+        :my $ignorecase is context<rw> = $+ignorecase // 0;
+        <EXPR>
+    }
+
+    token termish {
+	<.ws>  # XXX assuming old /x here?
+        <quantified_atom>+
+    }
+    token infixish {
+        <!infixstopper>
+        <!stdstopper>
+        <rxinfix>
+        {
+            $<O> = $<rxinfix><O>;
+            $<sym> = $<rxinfix><sym>;
+        }
+    }
+
+    token rxinfix:sym<|> ( --> Junctive_or ) { <sym> }
+
+    token quantified_atom {
+        <!stopper>
+        <!rxinfix>
+        <atom>
+        [ <.ws> <quantifier>
+#            <?{ $<atom>.max_width }>
+#                || <.panic: "Can't quantify zero-width atom">
+        ]?
+	<.ws>
+    }
+
+    token atom {
+        [
+        | \w
+        | <metachar>
+	| '\\' :: .
+        ]
+    }
+
+    # sequence stoppers
+    token metachar:sym<|>   { '|'  :: <fail> }
+    token metachar:sym<)>   { ')'  :: <fail> }
+
+    token metachar:quant { <quantifier> <.panic: "quantifier quantifies nothing"> }
+
+    # "normal" metachars
+
+    token metachar:sym<[ ]> {
+	<before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
+    }
+
+    token metachar:sym«(? )» {
+        '(?' {} <assertion>
+        [ ')' || <.panic: "Perl 5 regex assertion not terminated by parenthesis"> ]
+    }
+
+    token metachar:sym<( )> {
+        '(' {} [:lang(self.unbalanced(')')) <nibbler>]
+        [ ')' || <.panic: "Unable to parse Perl 5 regex; couldn't find right parenthesis"> ]
+        { $/<sym> := <( )> }
+    }
+
+    token metachar:sym<\\> { <sym> <backslash> }
+    token metachar:sym<.>  { <sym> }
+    token metachar:sym<^>  { <sym> }
+    token metachar:sym<$>  {
+        '$' <?before \W | $>
+    }
+
+    token metachar:var {
+        <?before <sigil>\w>
+	<.panic: "Can't interpolate variable in Perl 5 regex">
+    }
+
+    token backslash:A { <sym> }
+    token backslash:a { <sym> }
+    token backslash:b { :i <sym> }
+    token backslash:c { :i <sym>
+        <[ ?.._ ]> || <.panic: "Unrecognized \\c character">
+    }
+    token backslash:d { :i <sym> }
+    token backslash:e { :i <sym> }
+    token backslash:f { :i <sym> }
+    token backslash:h { :i <sym> }
+    token backslash:l { :i <sym> }
+    token backslash:n { :i <sym> }
+    token backslash:o { '0' [ <octint> | '{'<octint>[','<octint>]*'}' ]? }
+    token backslash:Q { <sym> }
+    token backslash:r { :i <sym> }
+    token backslash:s { :i <sym> }
+    token backslash:t { :i <sym> }
+    token backslash:u { :i <sym> }
+    token backslash:v { :i <sym> }
+    token backslash:w { :i <sym> }
+    token backslash:x { :i <sym> [ <hexint> | '{' [<.ws><hexint><.ws> ] ** ',' '}' ] }
+    token backslash:z { :i <sym> }
+    token backslash:misc { $<litchar>=(\W) }
+    token backslash:oops { <.panic: "Unrecognized Perl 5 regex backslash sequence"> }
+
+    token assertion:sym<?> { <sym> <codeblock> }
+    token assertion:sym<{ }> { <codeblock> }
+
+    token assertion:sym«<» { <sym> <?before '=' | '!'> <assertion> }
+    token assertion:sym<=> { <sym> [ <?before ')'> | <rx> ] }
+    token assertion:sym<!=> { <sym> [ <?before ')'> | <rx> ] }
+    token assertion:sym«>» { <sym> <rx> }
+
+    token rx {
+        [:lang(self.unbalanced(')')) <nibbler>]
+        [ ')' || <.panic: "Unable to parse Perl 5 regex; couldn't find right parenthesis"> ]
+    }
+
+    token assertion:identifier { <identifier> [               # is qq right here?
+                                    | <?before ')' >
+                                    | <.ws> <nibbler>
+				    ]
+				    [ ':' <rx> ]?
+    }
+
+    token assertion:bogus { <.panic: "Unrecognized Perl 5 regex assertion"> }
+
+    token quantifier:sym<*>  { <sym> <quantmod> }
+    token quantifier:sym<+>  { <sym> <quantmod> }
+    token quantifier:sym<?>  { <sym> <quantmod> }
+    token quantifier:sym<{ }> { '{' \d+ [','\d*]? '}' <quantmod> }
+
+    token quantmod { [ '?' | '+' ]? }
 
 } # end grammar
 
