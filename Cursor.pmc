@@ -2421,7 +2421,9 @@ sub fail { my $self = shift;
         my $minfakepos = $fakepos + 1;
 	my $base = $ALT // '';
 	$base .= ' ' if $base;
+	my %autolexbase = %AUTOLEXED;
         for my $alt (@$alts) {
+	    local %AUTOLEXED = %autolexbase;	# alts are independent
             $fakepos = $oldfakepos;
 	    local $ALT = $base . $alt->{alt};
 	    {

@@ -2536,7 +2536,7 @@ token capterm {
     '\\'
     [
     | '(' <capture>? ')'
-    | <termish>
+    | <?before \S> <termish>
     ]
 }
 
@@ -2568,7 +2568,7 @@ rule type_declarator:subset {\
     <sym>
     <longname> { $¢.add_type($<longname>); }
     [ of <fulltypename> ]?
-    where <EXPR>
+    where <termish>
 }
 
 token type_declarator:enum {
@@ -3197,16 +3197,21 @@ token term:opfunc ( --> Term )
 }
 
 token args ($istype = 0) {
-    :my $listopy = 0;
+    :my $listopish = 0;
     [
     | '.(' <in: ')', 'semilist', 'argument list'> {*}             #= func args
     | '(' <in: ')', 'semilist', 'argument list'> {*}              #= func args
     | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*} #= func args
-    | {} [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]? { $listopy = 1 }
+    | {} <?before \s> <.ws>
+	[
+	|| <!{ $istype }> <!infixstopper> <arglist> { $listopish = 1 }
+	|| <?{ $istype }> ['where' <.ws> <constraints=termish> <.ws>]*
+	]
+	
     ]
 
     [
-    || <?{ $listopy }>
+    || <?{ $listopish }>
     || ':' <?before \s> <arglist>    # either switch to listopiness
     || {{ $+prevop = $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
     ]
@@ -3228,6 +3233,9 @@ token term:name ( --> Term)
             <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
             {*}                                                 #= packagevar 
         ]?
+	# subset type?
+	<.ws>
+	[ 'where' <.ws> <constraints=termish> <.ws> ]*
         {*}                                                     #= typename
 
     # unrecognized names are assumed to be post-declared listops.
