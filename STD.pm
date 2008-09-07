@@ -2568,7 +2568,7 @@ rule type_declarator:subset {\
     <sym>
     <longname> { $¢.add_type($<longname>); }
     [ of <fulltypename> ]?
-    where <termish>
+    [where <EXPR(item %chaining)> ]?	# (EXPR can parse multiple where clauses)
 }
 
 token type_declarator:enum {
@@ -2926,6 +2926,9 @@ token infix:sym<~> ( --> Concatenation)
 token infix:sym<&> ( --> Junctive_and)
     { <sym> }
 
+token infix:where ( --> Junctive_and)
+    { <sym> }
+
 
 ## junctive or (any)
 token infix:sym<|> ( --> Junctive_or)
@@ -3202,12 +3205,7 @@ token args ($istype = 0) {
     | '.(' <in: ')', 'semilist', 'argument list'> {*}             #= func args
     | '(' <in: ')', 'semilist', 'argument list'> {*}              #= func args
     | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*} #= func args
-    | {} <?before \s> <.ws>
-	[
-	|| <!{ $istype }> <!infixstopper> <arglist> { $listopish = 1 }
-	|| <?{ $istype }> ['where' <.ws> <constraints=termish> <.ws>]*
-	]
-	
+    | {} [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist> { $listopish = 1 }]?
     ]
 
     [
@@ -3233,9 +3231,6 @@ token term:name ( --> Term)
             <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
             {*}                                                 #= packagevar 
         ]?
-	# subset type?
-	<.ws>
-	[ 'where' <.ws> <constraints=termish> <.ws> ]*
         {*}                                                     #= typename
 
     # unrecognized names are assumed to be post-declared listops.
