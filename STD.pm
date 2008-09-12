@@ -530,13 +530,16 @@ token identifier {
 token pod_comment {
     ^^ '=' <.unsp>?
     [
-    | 'begin' \h+ <identifier> :: .*?
-      "\n=" <.unsp>? 'end' \h+ $<identifier> » \N*         {*}         #= tagged
+    | 'begin' \h+ <identifier> ::
+        [
+        ||  .*? "\n=" <.unsp>? 'end' \h+ $<identifier> » \N*          {*} #= tagged
+        ||  .*?                                                       {*} #= end
+        ]
     | 'begin' » :: \h* \n .*?
-      "\n=" <.unsp>? 'end' » \N*                      {*}         #= anon
+      "\n=" <.unsp>? 'end' » \N*                      {*}       #= anon
     | :: 
         [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
-        \N*                                           {*}         #= misc
+        \N*                                           {*}       #= misc
     ]
 }
 
@@ -4178,4 +4181,4 @@ method worryobs (Str $old, Str $new, Str $when = ' in Perl 6') {
     self;
 }
 
-## vim: expandtab sw=4 syntax=perl6
+## vim: expandtab sw=4 ft=perl6
