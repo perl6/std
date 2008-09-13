@@ -1762,7 +1762,7 @@ token rad_number {
     {}           # don't recurse in lexer
     [
     || '<'
-            $<intpart> = <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]*
+            $<intpart> = [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
             $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]?
             [ '*' <base=radint> '**' <exp=radint> ]?
        '>'
