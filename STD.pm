@@ -695,7 +695,7 @@ token eat_terminator {
     [
     || ';'
     || <?{ $¢.<_>[$¢.pos]<endstmt> }>
-    || <?before <terminator>>
+    || <?terminator>
     || $
     || {{ if $¢.<_>[$¢.pos]<ws> { $¢.pos = $¢.<_>[$¢.pos]<ws>; } }}   # undo any line transition
         <.panic: "Syntax error">
@@ -3280,45 +3280,46 @@ token infix:sym« ==>> » ( --> Sequencer)
     { <sym> {*} }              #'
 
 ## expression terminator
+# Note: must always be called as <?terminator> or <?before ...<terminator>...>
 
 token terminator:sym<;> ( --> Terminator)
-    { <?before ';' > }
+    { ';' }
 
 token terminator:sym<if> ( --> Terminator)
-    { <?before 'if' » > }
+    { 'if' » }
 
 token terminator:sym<unless> ( --> Terminator)
-    { <?before 'unless' » > }
+    { 'unless' » }
 
 token terminator:sym<while> ( --> Terminator)
-    { <?before 'while' » > }
+    { 'while' » }
 
 token terminator:sym<until> ( --> Terminator)
-    { <?before 'until' » > }
+    { 'until' » }
 
 token terminator:sym<for> ( --> Terminator)
-    { <?before 'for' » > }
+    { 'for' » }
 
 token terminator:sym<given> ( --> Terminator)
-    { <?before 'given' » > }
+    { 'given' » }
 
 token terminator:sym<when> ( --> Terminator)
-    { <?before 'when' » > }
+    { 'when' » }
 
 token terminator:sym« --> » ( --> Terminator)
-    { <?before '-->' > {*} }              #'
+    { '-->' {*} }              #'
 
 token terminator:sym<)> ( --> Terminator)
-    { <?before <sym> > }
+    { <sym> }
 
 token terminator:sym<]> ( --> Terminator)
-    { <?before ']' > }
+    { ']' }
 
 token terminator:sym<}> ( --> Terminator)
-    { <?before '}' > }
+    { '}' }
 
 token terminator:sym<!!> ( --> Terminator)
-    { <?before '!!' > <?{ $+GOAL eq '!!' }> }
+    { '!!' <?{ $+GOAL eq '!!' }> }
 
 regex infixstopper {
     | <?before <stopper> >
