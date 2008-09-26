@@ -998,7 +998,7 @@ token infixish {
 
 # doing fancy as one rule simplifies LTM
 token dotty:sym<.*> ( --> Methodcall) {
-    ('.' <[+*?=^:]>) <.unspacey> <dottyop>
+    ('.' <[+*?=^:]>) :: <.unspacey> <dottyop>
     { $<sym> = $0.item; }
 }
 
