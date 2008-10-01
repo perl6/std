@@ -1086,8 +1086,9 @@ sub retm { my $self = shift;
 }
 
 sub _MATCHIFY { my $self = shift;
+    my $name = shift;
     return () unless @_;
-    my @result = lazymap( sub { my $x = shift; $x->{_from} = $self->{_from}; $x->retm() }, @_);
+    my @result = lazymap( sub { my $x = shift; $x->{_from} = $self->{_from}; $x->_REDUCE($name)->retm() }, @_);
     if (wantarray) {
 	@result;
     }
@@ -1097,10 +1098,11 @@ sub _MATCHIFY { my $self = shift;
 }
 
 sub _MATCHIFYr { my $self = shift;
+    my $name = shift;
     return () unless @_;
     my $var = shift;
     $var->{_from} = $self->{_from};
-    $var->retm();
+    $var->_REDUCE($name)->retm();
 }
 
 sub _SCANf { my $self = shift;
@@ -1940,7 +1942,6 @@ sub _LEFTRESULT_rev { $_[0]->_LEFTWB }
 sub _REDUCE { my $self = shift;
     my $tag = shift;
 
-    local $CTX = $self->callm($tag) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $F = $self->{_from};
     $self->{_reduced} = $tag;

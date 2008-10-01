@@ -351,7 +351,7 @@ sub $name {
 	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 	    push \@gather, \$C->\$try(\@_);
 	}
-	\$self->_MATCHIFY(\@gather);
+	\$self->_MATCHIFY("$NAME", \@gather);
     };
     if (\$@) {
 	return () if \$@ =~ /^ABORTRULE/;
@@ -616,7 +616,7 @@ END
 		my $ratchet = $MAYBACKTRACK ? '' : 'r';
                 $body .= <<"END";
 
-    \$self->_MATCHIFY$ratchet($coercion
+    \$self->_MATCHIFY$ratchet("$NAME", $coercion
 <<MEAT>>
     );
 END
