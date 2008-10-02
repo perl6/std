@@ -1174,6 +1174,7 @@ sub atom {
         if (s/^(.*?)\s*#=\s+(.*)/$1/) {
             $key .= " $2";
         }
+	$key =~ s/ +/_/g;
         ws();
         $key =~ s/(['\\])/\\$1/g;
         return bless { name => '_REDUCE', args => "'$key'", min => 0, max => 0},

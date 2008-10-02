@@ -1,11 +1,13 @@
 grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
+# should some of these be parser instance attributes?
 my $LANG is context;
 my $PKGDECL is context = "";
 my $PKG is context = "";
 my @PKGS;
 my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
+my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
 my %ROUTINES;
 
@@ -13,15 +15,6 @@ my %ROUTINES;
 token foo {
    'foo' <.ws> 'bar' <.ws> 'baz'
 }
-
-=begin things todo
-
-    add more suppositions and figure out exact error continuation semantics
-    think about longest-token-defeating {*} that maybe should be <?{ {*}; 1}>
-    add parsing this file to sanity tests :)
-    evaluate "is context<rw>" for reentrancy brokenness
-
-=end things todo
 
 =begin comment overview
 
@@ -47,17 +40,17 @@ need not match the symbol specified as part the rule name; that is just
 for disambiguating the name.  However, if no $sym is set, the original
 symbol will be used by default.
 
-Note that rules with only one action need no #= comment, so the identifier
-of the following stub is just "TOP".
+Note that rules automatically get an implicit {*} at their return, so
+for the TOP rule the implicit action name is also simply "TOP".
 
 Another nod toward preprocessing is that blocks that contain nested braces
 are delimited by double braces so that the preprocessor does not need to
 understand Perl 6 code.
 
-This grammar also assumes transitive longest-token semantics, though
-we make a feeble attempt to order rules so a procedural interpretation
-of alternation can usually produce a correct parse.  (This will tend
-to become less true over time.)
+This grammar relies on transitive longest-token semantics, though
+initially we made a feeble attempt to order rules so a procedural
+interpretation of alternation could usually produce a correct parse.
+(This is becoming less true over time.)
 
 =end comment overview
 

@@ -1945,6 +1945,9 @@ sub _REDUCE { my $self = shift;
     my $P = $self->{_pos};
     my $F = $self->{_from};
     $self->{_reduced} = $tag;
+    if ($::ACTIONS) {
+	eval { $::ACTIONS->$tag($self) }
+    }
     $self->deb("REDUCE $tag from $F to $P") if $DEBUG & DEBUG::matchers;
 #    $self->whats;
     $self;
