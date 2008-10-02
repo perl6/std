@@ -1017,7 +1017,7 @@ sub $mangle {
     my \$C = \$self;
     \$C->{'sym'} = \$sym;
 
-    \$self->_MATCHIFY( '$name', Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
+    \$self->_MATCHIFY( '$mangle', Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
         \$C->_SYM(\$sym, 0)
     );
 }
