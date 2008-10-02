@@ -1017,7 +1017,7 @@ sub $mangle {
     my \$C = \$self;
     \$C->{'sym'} = \$sym;
 
-    \$self->_MATCHIFY( Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
+    \$self->_MATCHIFY( '$name', Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
         \$C->_SYM(\$sym, 0)
     );
 }
@@ -1382,7 +1382,7 @@ sub ws {
     my $startpos = $C->pos;
     $$self{_}[$startpos]{ws} = undef;	# exists means we know, undef means no ws  before here
 
-    $self->_MATCHIFY(
+    $self->_MATCHIFY( 'ws',
         $C->_BRACKET( sub { my $C=shift;
             do { my @gather;
                     push @gather, (map { my $C=$_;
