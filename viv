@@ -1,0 +1,74 @@
+#!/usr/local/bin/perl
+
+# The start of a gimme5 replacement based on STD parsing.
+#
+use strict;
+use warnings;
+
+use STD;
+use utf8;
+use YAML::XS;
+use feature 'say';
+
+$::ACTIONS = 'Actions';
+
+print "Starting...\n";
+my $r = STD->parsefile($ARGV[0]);
+print Dump($r->item);
+
+package Actions;
+
+# Generic ast translation done via autoload
+
+our $AUTOLOAD;
+
+sub AUTOLOAD {
+    my $self = shift;
+    my $match = shift;
+    my $r = hoist($match);
+    (my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
+    $match->{''} = bless $r, $class;
+}
+
+# propagate ->{''} nodes upward
+# (untransformed STD nodes in output indicate bugs)
+
+sub hoist {
+    my $node = shift;
+    my $text = $node->text;
+    my %r;
+    for my $k (keys %$node) {
+	my $v = $node->{$k};
+	if ($k eq 'O') {
+	}
+	elsif ($k =~ /^[a-zA-Z]/) {
+	    if (ref $v eq 'ARRAY') {
+		my $zyg = [];
+		for my $z (@$v) {
+		    if (ref $z eq 'HASH' and exists $z->{''}) {
+			push @$zyg, $z->{''};
+		    }
+		    else {
+			push @$zyg, $z;
+		    }
+		    push @$zyg, $z;
+		}
+		$r{$k} = $zyg;
+	    }
+	    elsif (ref $v) {
+		if (exists $v->{''}) {
+		    $r{$k} = bless $v->{''}, "VAST::$k";
+		}
+		else {
+		    $r{$k} = bless $v, "VAST::$k";
+		}
+	    }
+	    else {
+		$r{$k} = $v;
+		$r{TEXT} = $text;
+	    }
+	}
+    }
+    $r{TEXT} = $text unless keys %r;
+    \%r;
+}

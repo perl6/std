@@ -1946,7 +1946,8 @@ sub _REDUCE { my $self = shift;
     my $F = $self->{_from};
     $self->{_reduced} = $tag;
     if ($::ACTIONS) {
-	eval { $::ACTIONS->$tag($self) }
+	eval { $::ACTIONS->$tag($self) };
+	warn $@ if $@ and not $@ =~ /locate/;
     }
     $self->deb("REDUCE $tag from $F to $P") if $DEBUG & DEBUG::matchers;
 #    $self->whats;

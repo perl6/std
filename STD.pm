@@ -3187,7 +3187,7 @@ token term:identifier ( --> Term )
 {
     :my $i;
     $i = <identifier> <args( $¢.is_type($i.text) )>
-    {{ %ROUTINES{$i.text} ~= $¢.lineof($¢.pos) ~ ' ' }}
+    {{ $<identifier> = $i; %ROUTINES{$i.text} ~= $¢.lineof($¢.pos) ~ ' ' }}
 }
 
 token term:opfunc ( --> Term )
@@ -3525,7 +3525,7 @@ method EXPR ($preclvl)
         @termstack[0]<_from> = self.pos;
         @termstack[0]<_to> = $here.pos;
     }
-    @termstack;
+    self._MATCHIFYr("EXPR", @termstack);
 }
 
 #################################################
