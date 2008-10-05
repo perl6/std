@@ -45,13 +45,18 @@ sub hoist {
 	    if (ref $v eq 'ARRAY') {
 		my $zyg = [];
 		for my $z (@$v) {
-		    if (ref $z eq 'HASH' and exists $z->{''}) {
-			push @$zyg, $z->{''};
+		    if (ref $z) {
+			if (ref $z eq 'ARRAY') {
+			    warn "ARRAY";
+			    push @$zyg, $z;
+			}
+			elsif (exists $z->{''}) {
+			    push @$zyg, $z->{''};
+			}
 		    }
 		    else {
 			push @$zyg, $z;
 		    }
-		    push @$zyg, $z;
 		}
 		$r{$k} = $zyg;
 	    }

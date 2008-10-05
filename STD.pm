@@ -1900,6 +1900,7 @@ token nibbler {
     :my @nibbles = ();
     :my $buf = self.orig;
     :my $multiline = 0;
+    :my $nibble;
     { $<firstpos> = self.pos; }
     [ <!before <stopper> >
         [
@@ -1912,7 +1913,7 @@ token nibbler {
                             push @nibbles, @n;
                         }
         || <escape>   {
-                            push @nibbles, $text, $<escape>;
+                            push @nibbles, $text, $<escape>[*-1];
                             $text = '';
                         }
         || .
@@ -1929,6 +1930,8 @@ token nibbler {
     {
         push @nibbles, $text; $<nibbles> = [@nibbles];
         $<lastpos> = $¢.pos;
+        $/.:delete<nibbler>;
+        $/.:delete<escape>;
         $COMPILING::LAST_NIBBLE = $¢;
         $COMPILING::LAST_NIBBLE_MULTILINE = $¢ if $multiline;
     }
@@ -2358,7 +2361,7 @@ grammar Q is STD {
         token backslash:stopper { <text=stopper> }
 
         # in single quotes, keep backslash on random character by default
-        token backslash:misc { {} (.) { $<text> = "\\" ~ $0; } }
+        token backslash:misc { {} (.) { $<text> = "\\" ~ $0.text; } }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
