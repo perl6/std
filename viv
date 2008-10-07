@@ -12,9 +12,11 @@ use feature 'say';
 
 $::ACTIONS = 'Actions';
 
-print "Starting...\n";
-my $r = STD->parsefile($ARGV[0]);
-print Dump($r->item);
+if ($0 eq __FILE__) {
+    print "Starting...\n";
+    my $r = STD->parsefile($ARGV[0]);
+    print Dump($r->item);
+}
 
 package Actions;
 
