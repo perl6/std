@@ -77,3 +77,5 @@ sub hoist {
     $r{TEXT} = $text unless keys %r;
     \%r;
 }
+
+# vim: ts=8 sw=4 noexpandtab smarttab
