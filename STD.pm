@@ -452,7 +452,7 @@ token ws {
     :my @stub = return self if self.<_>[self.pos].:exists<ws>;
     :my $startpos = self.pos;
 
-    :dba<simple whitespace>
+    :dba('whitespace')
     [
 	| \h+ <![#\s\\]> { $¢.<_>[$¢.pos]<ws> = $startpos; }	# common case
 	| <?before \w> <?after \w> :::
@@ -460,7 +460,6 @@ token ws {
 	    <!>        # must \s+ between words
     ]
     ||
-    :dba<complicated whitespace>
     [
     | <.unsp>
     | <.vws> <.heredoc>
@@ -477,6 +476,7 @@ token ws {
 
 token unsp {
     \\ <?before [\s|'#'] >
+    :dba('unspace')
     [
     | <.vws>                     {*}                             #= vwhite
     | <.unv>                  {*}                                #= unv
@@ -485,6 +485,7 @@ token unsp {
 }
 
 token vws {
+    :dba('vertical whitespace')
     \v
     { $COMPILING::LINE++ } # XXX wrong several ways, use self.lineof($¢.pos)
     [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
@@ -498,6 +499,8 @@ method moreinput () {
 }
 
 token unv {
+   :dba('horizontal whitespace')
+   [
    | \h+                 {*}                                    #= hwhite
    | <?before '='> ^^ <.pod_comment>  {*}                    #= pod
    | \h* '#' [
@@ -506,6 +509,7 @@ token unv {
             <.quibble($¢.cursor_fresh( ::STD::Q ))>   {*}                               #= embedded
          | {} \N*            {*}                                 #= end
          ]
+    ]
 }
 
 token ident {
@@ -572,6 +576,7 @@ rule comp_unit {
 # rule.  (Could also be done in a later pass.)
 
 token pblock {
+    :dba('parameterized block')
     [ <lambda> <signature> ]? <block>
 }
 
@@ -594,7 +599,7 @@ token block {
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$ <.ws>
 	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | { $¢.<_>[$¢.pos]<endargs> = 1; } <.ws> {*}                #= endargs
+    | <.unsp>? { $¢.<_>[$¢.pos]<endargs> = 1; } {*}             #= endargs
     ]
 }
 
@@ -620,13 +625,14 @@ token regex_block {
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$ <.ws>
 	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | { $¢.<_>[$¢.pos]<endargs> = 1; } <.ws>  {*}               #= endargs
+    | <.unsp>? { $¢.<_>[$¢.pos]<endargs> = 1; }   {*}           #= endargs
     ]
 }
 
 # statement semantics
 rule statementlist {
     :my $PARSER is context<rw> = self;
+    :dba('statement list')
     [
     | $
     | <?before <[\)\]\}]> >
@@ -636,6 +642,7 @@ rule statementlist {
 
 # embedded semis, context-dependent semantics
 rule semilist {
+    :dba('semicolon list')
     [
     | <?before <[\)\]\}]> >
     | [<statement><.eat_terminator> ]*
@@ -668,15 +675,15 @@ token statement {
     | <label> <statement>                        {*}            #= label
     | <statement_control>                        {*}            #= control
     | <EXPR> {*}                                                #= expr
-        :dba<statement end>
+        :dba('statement end')
         [
         || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
         ||
-            :dba<statement modifier>
+            :dba('statement modifier')
             [
             | <statement_mod_loop> {*}                              #= mod loop
             | <statement_mod_cond> {*}                              #= mod cond
-                :dba<statement modifier loop>
+                :dba('statement modifier loop')
                 [
                 || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>
                 || <statement_mod_loop>? {*}                          #= mod condloop
@@ -847,6 +854,7 @@ token version:sym<v> {
 ###################################################
 
 token pre {
+    :dba('prefix or meta-prefix')
     [
     | <prefix>
         { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
@@ -868,6 +876,7 @@ token nullterm {
 }
 
 token nulltermish {
+    :dba('null term')
     [
     | <?stdstopper>
     | <termish>?
@@ -875,12 +884,14 @@ token nulltermish {
 }
 
 token termish {
+    :dba('prefix or noun')
     [
     | <pre>+ <noun>
     | <noun>
     ]
 
     # also queue up any postfixes, since adverbs could change things
+    :dba('postfix')
     [ <?stdstopper> ||
 	<post>*
 	<.ws>
@@ -929,6 +940,7 @@ token colonpair {
     :my $value;
 
     ':'
+    :dba('colon pair')
     [
     | '!' <identifier>
         { $key = $<identifier>.text; $value = 0; }
@@ -940,7 +952,7 @@ token colonpair {
         || { $value = 1; }
         ]
         {*}                                                     #= value
-    | :dba<signature> '(' ~ ')' <signature>
+    | :dba('signature') '(' ~ ')' <signature>
     | <postcircumfix>
         { $key = ""; $value = $<postcircumfix>; }
         {*}                                                     #= structural
@@ -956,6 +968,7 @@ token quotepair {
     :my $value;
 
     ':'
+    :dba('colon pair (restricted)')
     [
     | '!' <identifier>
         { $key = $<identifier>.text; $value = 0; }
@@ -977,6 +990,7 @@ token quotepair {
 token infixish {
     <!stdstopper>
     <!infixstopper>
+    :dba('infix or meta-infix')
     [
     | <infix>
        [
@@ -1009,6 +1023,7 @@ token privop ( --> Methodcall) {
 }
 
 token dottyop {
+    :dba('dotty method or postfix')
     [
     | <methodop>
     | <postop>     # forcing postop's precedence to methodcall here
@@ -1028,6 +1043,7 @@ token post {
 
     [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
 
+    :dba('postfix')
     [
     | <dotty>  { $<O> = $<dotty><O> }
     | <privop> { $<O> = $<privop><O> }
@@ -1113,13 +1129,13 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
-    { :dba<argument list> '(' ~ ')' <semilist> }
+    { :dba('argument list') '(' ~ ')' <semilist> }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { :dba<subscript> '[' ~ ']' <semilist> }
+    { :dba('subscript') '[' ~ ']' <semilist> }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
-    { :dba<subscript> '{' ~ '}' <semilist> }
+    { :dba('subscript') '{' ~ '}' <semilist> }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
     { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
@@ -1143,6 +1159,7 @@ token methodop {
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
 
+    :dba('method arguments')
     [
     | '.'? <.unsp>? '(' ~ ')' <semilist>
     | ':' <?before \s> <!{ $+inquote }> <arglist>
@@ -1151,7 +1168,9 @@ token methodop {
 
 token arglist {
     :my StrPos $endargs is context<rw> = 0;
+    :my $GOAL is context = 'endargs';
     <.ws>
+    :dba('argument list')
     [
     | <?stdstopper>
     | <EXPR(item %list_prefix)>
@@ -1171,8 +1190,8 @@ token variable_declarator {
         <.unsp>?
         [
         | '(' ~ ')' <signature>
-        | :dba<shape definition> '[' ~ ']' <semilist>
-        | :dba<shape definition> '{' ~ '}' <semilist>
+        | :dba('shape definition') '[' ~ ']' <semilist>
+        | :dba('shape definition') '{' ~ '}' <semilist>
         | <?before '<'> <postcircumfix>
         ]*
     ]?
@@ -1182,6 +1201,8 @@ token variable_declarator {
 
     <post_constraint>*
 
+    # XXX generalize to any assignment operator?
+    :dba('variable initializer')
     [
     | '=' <.ws> <EXPR( ($<sigil> // '') eq '$' ?? item %item_assignment !! item %list_prefix )>
     | '.=' <.ws> <dottyop>
@@ -1189,6 +1210,7 @@ token variable_declarator {
 }
 
 rule scoped {
+    :dba('scoped declarator')
     [
     | <declarator>
     | <regex_declarator>
@@ -1629,6 +1651,7 @@ token twigil:sym<?> { <sym> }
 token twigil:sym<=> { <sym> }
 
 token deflongname {
+    :dba('name to be defined')
     <name>
     # XXX too soon
     [ <colonpair>+ { $¢.add_macro($<name>) if $+IN_DECL; } ]?
@@ -1652,7 +1675,7 @@ token morename {
         <?before '(' | <alpha> >
         [
         | <identifier>
-        | :dba<indirect name> '(' ~ ')' <EXPR>
+        | :dba('indirect name') '(' ~ ')' <EXPR>
         ]
     ]?
 }
@@ -1748,6 +1771,7 @@ token escale {
 
 # careful to distinguish from both integer and 42.method
 token dec_number {
+    :dba('decimal number')
     [
     | $<coeff> = [           '.' \d+[_\d+]* ] <escale>?
     | $<coeff> = [\d+[_\d+]* '.' \d+[_\d+]* ] <escale>?
@@ -1758,6 +1782,7 @@ token dec_number {
 token rad_number {
     ':' $<radix> = [\d+] <.unsp>?      # XXX optional dot here?
     {}           # don't recurse in lexer
+    :dba('number in radix notation')
     [
     || '<'
             $<intpart> = [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
@@ -2483,6 +2508,7 @@ rule method_def {
     [
     | '!'?<longname> [ <multisig> | <trait> ]*
     | <sigil> '.'
+        :dba('subscript signature')
         [
         | '(' ~ ')' <signature>
         | '[' ~ ']' <signature>
@@ -2776,16 +2802,16 @@ token term:sym<**> ( --> Term)
     { <sym> }
 
 token circumfix:sigil ( --> Term)
-    { :dba<contextualizer> <sigil> '(' ~ ')' <semilist> }
+    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> }
 
 #token circumfix:typecast ( --> Term)
 #    { <typename> '(' ~ ')' <semilist> }
 
 token circumfix:sym<( )> ( --> Term)
-    { :dba<parenthesized expression> '(' ~ ')' <semilist> }
+    { :dba('parenthesized expression') '(' ~ ')' <semilist> }
 
 token circumfix:sym<[ ]> ( --> Term)
-    { :dba<array composer> '[' ~ ']' <semilist> }
+    { :dba('array composer') '[' ~ ']' <semilist> }
 
 ## methodcall
 
@@ -3209,12 +3235,13 @@ token term:opfunc ( --> Term )
 token args ($istype = 0) {
     :my $listopish = 0;
     [
-    | :dba<argument list> '.(' ~ ')' <semilist> {*}             #= func args
-    | :dba<argument list> '(' ~ ')' <semilist> {*}              #= func args
-    | :dba<argument list> <.unsp> '.'? '(' ~ ')' <semilist> {*} #= func args
+    | :dba('argument list') '.(' ~ ')' <semilist> {*}             #= func args
+    | :dba('argument list') '(' ~ ')' <semilist> {*}              #= func args
+    | :dba('argument list') <.unsp> '.'? '(' ~ ')' <semilist> {*} #= func args
     | {} [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist> { $listopish = 1 }]?
     ]
 
+    :dba('extra arglist after (...):')
     [
     || <?{ $listopish }>
     || ':' <?before \s> <arglist>    # either switch to listopiness
@@ -3233,6 +3260,7 @@ token term:name ( --> Term)
         }>
         # parametric type?
         <.unsp>? [ <?before '['> <postcircumfix> ]?
+        :dba('type parameter')
         [
             '::'
             <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
@@ -3326,9 +3354,13 @@ token terminator:sym<!!> ( --> Terminator)
     { '!!' <?{ $+GOAL eq '!!' }> }
 
 regex infixstopper {
+    :dba('infix stopper')
+    [
     | <?before <stopper> >
     | <?before '!!' > <?{ $+GOAL eq '!!' }>
     | <?before '{' | <lambda> > <?{ $+GOAL eq '{' and $¢.<_>[$¢.pos]<ws> }>
+    | <?{ $+GOAL eq 'endargs' and $¢.<_>[$¢.pos]<endargs> }>
+    ]
 }
 
 # overridden in subgrammars
@@ -3337,6 +3369,7 @@ token stopper { <!> }
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
     :my @stub = return self if self.<_>[self.pos].:exists<endstmt>;
+    :dba('standard stopper')
     [
     | <?terminator>
     | <?unitstopper>
@@ -3631,6 +3664,7 @@ grammar Regex is STD {
     token rxinfix:sym<&&> ( --> Tight_and ) { <sym> }
     token rxinfix:sym<|> ( --> Junctive_or ) { <sym> }
     token rxinfix:sym<&> ( --> Junctive_and ) { <sym> }
+    token rxinfix:sym<~> ( --> Additive ) { <sym> }
 
     token quantified_atom {
         <!stopper>
@@ -3644,6 +3678,7 @@ grammar Regex is STD {
     }
 
     token atom {
+        :dba('regex atom')
         [
         | \w
         | <metachar> ::
@@ -3754,10 +3789,6 @@ grammar Regex is STD {
         { $<sym> = $<variable>.item; }
     }
 
-    token metachar:sym<~> {
-        <sym>
-    }
-
     token backslash:unspace { <?before \s> <.SUPER::ws> }
 
     token backslash:sym<0> { '0' <!before <[0..7]> > }
@@ -3849,6 +3880,7 @@ grammar Regex is STD {
 
     token cclass_elem {
 	<.ws>
+        :dba('character class element')
         [
         | <name>
         | <before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
@@ -3856,7 +3888,7 @@ grammar Regex is STD {
 	<.ws>
     }
 
-    token mod_arg { :dba<modifier argument> '(' ~ ')' <semilist> }
+    token mod_arg { :dba('modifier argument') '(' ~ ')' <semilist> }
 
     token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($+LANG)) <statement> <eat_terminator> ] }
 

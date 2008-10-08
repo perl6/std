@@ -456,7 +456,7 @@ END
                 $args =~ s/^\s+//;
                 $args =~ s/\s+$//;
             }
-            warn "ARGSTUFF: ", $argstuff if $argstuff =~ /\S/;
+            warn "ARGSTUFF in $NAME: ", $argstuff if $argstuff =~ /\S/;
             my $p = "";
 
             local $MAYBACKTRACK = 1;
@@ -1046,7 +1046,7 @@ sub any {
 
     return $kids[0] if @kids == 1;
 
-    return bless { zyg => [@kids], min => $min, altname => $ALTNAME, name => $name },
+    return bless { zyg => [@kids], min => $min, altname => $ALTNAME, name => $name, %adverbs },
               "RE_any";
 }
 
@@ -1256,6 +1256,9 @@ sub atom {
 	    if ($adverb eq 'lang') {
 		$code = "my \$newlang = $code;  \$C = \$C->cursor_fresh(\$newlang); ";
 		return bless { text => $code, min => 0, max => 0, noquant => 1, %adverbs }, "RE_decl";
+	    }
+	    elsif ($adverb eq 'dba') {
+		$adverbs{$adverb} = eval $code;
 	    }
         }
 	elsif (s/^<(.*?)>//) {

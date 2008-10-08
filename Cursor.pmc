@@ -253,6 +253,7 @@ sub _AUTOLEXgen { my $self = shift;
 	close LEX;
 	my %lexer;
 	$lexer{NAME} = $name;
+	$lexer{DBA} = $retree->{$key}{dba} // $name;
 	$lexer{FILE} = "$dir/$file";
 	$lexer{PATS} = \@pat;
 
@@ -264,7 +265,7 @@ sub _AUTOLEXgen { my $self = shift;
 	my $oldfakepos = $AUTOLEXED{$key} // 0;
 	$AUTOLEXED{$key} = $fakepos;
 	my $ast = $retree->{$key};
-	if ($ast) {
+	if ($ast and ref $ast ne 'HASH') {
 	    @pat = $ast->longest($self->cursor_peek());
 	}
 	else {	# a protomethod, look up all methods it can call
@@ -305,7 +306,7 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
-	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat] };
+	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "DBA" => $retree->{$key}{dba} // $name};
 
 	if (not -d $dir) {
 	    use File::Path 'mkpath';
@@ -427,7 +428,7 @@ sub _AUTOLEXnow { my $self = shift;
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key,$retree);
     };
-    $self->highwater($lexer->{NAME}) if $self->{_pos} >= $::HIGHWATER;
+    $self->highwater($lexer->{DBA}) if $self->{_pos} >= $::HIGHWATER;
     my $buf = $self->{_orig};
     my $P = $self->{_pos};
     if ($P == length($$buf)) {
