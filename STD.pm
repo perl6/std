@@ -3358,7 +3358,7 @@ regex infixstopper {
     [
     | <?before <stopper> >
     | <?before '!!' > <?{ $+GOAL eq '!!' }>
-    | <?before '{' | <lambda> > <?{ $+GOAL eq '{' and $¢.<_>[$¢.pos]<ws> }>
+    | <?before '{' | <lambda> > <?{ ($+GOAL eq '{' or $+GOAL eq 'endargs') and $¢.<_>[$¢.pos]<ws> }>
     | <?{ $+GOAL eq 'endargs' and $¢.<_>[$¢.pos]<endargs> }>
     ]
 }
