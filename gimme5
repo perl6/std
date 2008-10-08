@@ -38,6 +38,7 @@ our %adverbs = ('i' => 0, 'a' => 0,);
 our %fixedprefix;
 our $PURE;
 our $MAYBACKTRACK;
+our @STUFFED;
 our @DECL;
 our $SYM;
 our $ENDSYM;
@@ -459,8 +460,15 @@ END
             my $p = "";
 
             local $MAYBACKTRACK = 1;
+	    $adverbs{r} = 0;
+	    $adverbs{s} = 0;
+	    $adverbs{dba} = $NAME;
             if ($KIND eq 'token' or $KIND eq 'rule') {
                 $MAYBACKTRACK = 0;
+		$adverbs{r} = 1;
+		if ($KIND eq 'rule') {
+		    $adverbs{s} = 1;
+		}
             }
 
 	    my $pkg;
@@ -923,7 +931,7 @@ sub here {
 #############################################3333
 
 sub ws {
-    return if $KIND eq 'rule';  # meta whitespace parsed in atom
+    return if $adverbs{s};  # meta whitespace parsed in atom
     for (;;) {
 #	next if s/^(?!=[\0-~])\s+//;
         next if s/^[\x20\t\n\r]+//;
@@ -953,6 +961,7 @@ sub regex {
     here();
     ws();
     local $STOP = shift;
+    local %adverbs = %adverbs;
 
     my @decl;
     while (s/^\s*:(my|state|our|constant)\b/$1/) {
@@ -1102,7 +1111,7 @@ sub quantifier {
         my ($q,$m) = ($1,$2);
         my $min = 0;
         if (not $m) {
-            if ($KIND eq 'rule' or $KIND eq 'token') {
+            if ($adverbs{r}) {
                 $m = ':';
             }
             else {
@@ -1140,10 +1149,15 @@ sub quantifier {
 
 sub atom {
     here();
-    if (s/^\\\s/ /) {
-        wsany();
+    if (@STUFFED) {
+	return shift @STUFFED;
     }
-    if (/^[\s\#]/ and $KIND eq 'rule') {
+    # unspace
+    if (s/^\\\s/ /) {
+        panic("Attempt to quote whitespace");
+    }
+    # sigspace
+    if (/^[\s\#]/ and $adverbs{s}) {
         wsany();
         return bless { name => 'ws', nobind => 1, noquant => 1, min => 0, rest => '' },
             "RE_method";
@@ -1158,6 +1172,26 @@ sub atom {
 
     if (/^[*+?]/) { panic "quantifier quantifies nothing"; }
 
+    if (s/^~//) {
+	wsany();
+	my $beg = length($all) - length($_);
+	my $goal = quantified_atom();
+	my $end = length($all) - length($_);
+	my $goaltext = substr($all, $beg, $end - $beg);
+
+	my $dba = $adverbs{dba} // $NAME;
+	$dba =~ s/'/\\\'/g;
+	my $failgoal = bless { name => 'FAILGOAL', rest => "($goaltext, '$dba')", min => 0, nobind => 1 }, "RE_method";
+	my $check = bless { zyg => [$goal, $failgoal], min => 1, %adverbs}, "RE_first";
+	my $checkbrack = bless({ decl => [], re => $check, min => 1 }, "RE_bracket");
+
+	wsany();
+
+	my $nest = quantified_atom();
+
+	@STUFFED = ($nest, $checkbrack);
+        return bless { text => '::', min => 0, extra => "local \$::GOAL = $goaltext", %adverbs }, "RE_meta";
+    }
     if (s/^ (\w+) (?! \s* [*+?]) //x) {
         my $word = $1;
         ws();
@@ -1210,7 +1244,8 @@ sub atom {
     if (s/^ : (!?) (\w+)//x) {
         my $not = $1 ne '';
         my $adverb = $2;
-        local %adverbs = %adverbs;
+	$adverb =~ s/^sigspace/s/;
+	$adverb =~ s/^ratchet/r/;
         
         if (m/^\(/) {
 	    pos($_) = 0;
@@ -1223,6 +1258,9 @@ sub atom {
 		return bless { text => $code, min => 0, max => 0, noquant => 1, %adverbs }, "RE_decl";
 	    }
         }
+	elsif (s/^<(.*?)>//) {
+            $adverbs{$adverb} = $1;
+	}
         else {
             $adverbs{$adverb} = 0+!$not;
         }
@@ -1783,7 +1821,8 @@ sub unbalanced {
         }
         elsif ($text eq '::') {
             $PURE = 0;
-            $code = "\$C->_COMMITBRANCH$REV()";
+	    my $extra = $self->{extra} || '';
+            $code = "\$C->_COMMITBRANCH$REV($extra)";
             $MAYBACKTRACK = 1;
         }
         elsif ($text eq ':::') {
@@ -1875,6 +1914,7 @@ sub unbalanced {
         my $self = shift;
         my $rest = ::un6($$self{rest}) // '';
         my $name = $$self{name};
+	warn ::Dump(%adverbs) if $REV;
         ::panic("Can't reverse $name") if $REV;
         $PURE = 0 if $impure{$name};
 	my $re;

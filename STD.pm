@@ -452,6 +452,7 @@ token ws {
     :my @stub = return self if self.<_>[self.pos].:exists<ws>;
     :my $startpos = self.pos;
 
+    :dba<simple whitespace>
     [
 	| \h+ <![#\s\\]> { $¢.<_>[$¢.pos]<ws> = $startpos; }	# common case
 	| <?before \w> <?after \w> :::
@@ -459,6 +460,7 @@ token ws {
 	    <!>        # must \s+ between words
     ]
     ||
+    :dba<complicated whitespace>
     [
     | <.unsp>
     | <.vws> <.heredoc>
@@ -584,7 +586,7 @@ token xblock {
 }
 
 token block {
-    '{' <in: '}', 'statementlist', 'block'>
+    '{' ~ '}' <statementlist>
 
     [
     | <?before \h* $$> <.ws>	# (usual case without comments)
@@ -592,7 +594,7 @@ token block {
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$ <.ws>
 	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
+    | { $¢.<_>[$¢.pos]<endargs> = 1; } <.ws> {*}                #= endargs
     ]
 }
 
@@ -618,7 +620,7 @@ token regex_block {
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$ <.ws>
 	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | {*} { $¢.<_>[$¢.pos]<endargs> = 1; }                      #= endargs
+    | { $¢.<_>[$¢.pos]<endargs> = 1; } <.ws>  {*}               #= endargs
     ]
 }
 
@@ -666,12 +668,15 @@ token statement {
     | <label> <statement>                        {*}            #= label
     | <statement_control>                        {*}            #= control
     | <EXPR> {*}                                                #= expr
+        :dba<statement end>
         [
         || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
         ||
+            :dba<statement modifier>
             [
             | <statement_mod_loop> {*}                              #= mod loop
             | <statement_mod_cond> {*}                              #= mod cond
+                :dba<statement modifier loop>
                 [
                 || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>
                 || <statement_mod_loop>? {*}                          #= mod condloop
@@ -695,8 +700,8 @@ token eat_terminator {
     ]
 }
 
-rule statement_control:use {\
-    <sym>
+token statement_control:use {
+    <sym> :s
     [
     | <version>
     | <module_name><arglist>?
@@ -708,14 +713,14 @@ rule statement_control:use {\
 }
 
 
-rule statement_control:no {\
-    <sym>
+token statement_control:no {
+    <sym> :s
     <module_name><arglist>?
 }
 
 
-rule statement_control:if {\
-    <sym>
+token statement_control:if {
+    <sym> :s
     <xblock>
     $<elsif> = (
         'elsif'<?spacey> <xblock>       {*}                #= elsif
@@ -726,29 +731,29 @@ rule statement_control:if {\
 }
 
 
-rule statement_control:unless {\
-    <sym> 
+token statement_control:unless {
+    <sym> :s
     <xblock>
     [ <!before 'else'> || <.panic: "unless does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
 }
 
 
-rule statement_control:while {\
-    <sym>
+token statement_control:while {
+    <sym> :s
     [ <?before '(' ['my'? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
         <.panic: "This appears to be Perl 5 code"> ]?
     <xblock>
 }
 
 
-rule statement_control:until {\
-    <sym>
+token statement_control:until {
+    <sym> :s
     <xblock>
 }
 
 
-rule statement_control:repeat {\
-    <sym>
+token statement_control:repeat {
+    <sym> :s
     [
         | ('while'|'until')
           <xblock>
@@ -758,8 +763,8 @@ rule statement_control:repeat {\
 }
 
 
-rule statement_control:loop {\
-    <sym>
+token statement_control:loop {
+    <sym> :s
     $<eee> = (
         '('
             <e1=EXPR>? ';'   {*}                            #= e1
@@ -771,19 +776,19 @@ rule statement_control:loop {\
 }
 
 
-rule statement_control:for {\
-    <sym>
+token statement_control:for {
+    <sym> :s
     [ <?before 'my'? '$'\w+ '(' >
         <.panic: "This appears to be Perl 5 code"> ]?
     <xblock>
 }
 
-rule statement_control:given {\
-    <sym>
+token statement_control:given {
+    <sym> :s
     <xblock>
 }
-rule statement_control:when {\
-    <sym>
+token statement_control:when {
+    <sym> :s
     <xblock>
 }
 rule statement_control:default {<sym> <block> }
@@ -935,7 +940,7 @@ token colonpair {
         || { $value = 1; }
         ]
         {*}                                                     #= value
-    | '(' <in: ')', 'signature'>
+    | :dba<signature> '(' ~ ')' <signature>
     | <postcircumfix>
         { $key = ""; $value = $<postcircumfix>; }
         {*}                                                     #= structural
@@ -1108,13 +1113,13 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
-    { '(' <in: ')', 'semilist', 'argument list'> }
+    { :dba<argument list> '(' ~ ')' <semilist> }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { '[' <in: ']', 'semilist', 'subscript'> }
+    { :dba<subscript> '[' ~ ']' <semilist> }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
-    { '{' <in: '}', 'semilist', 'subscript'> }
+    { :dba<subscript> '{' ~ '}' <semilist> }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
     { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
@@ -1139,7 +1144,7 @@ token methodop {
     ] <.unsp>? 
 
     [
-    | '.'? <.unsp>? '(' <in: ')', 'semilist', 'argument list'>
+    | '.'? <.unsp>? '(' ~ ')' <semilist>
     | ':' <?before \s> <!{ $+inquote }> <arglist>
     ]?
 }
@@ -1165,9 +1170,9 @@ token variable_declarator {
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
         [
-        | '(' <in: ')', 'signature'>
-        | '[' <in: ']', 'semilist', 'shape definition'>
-        | '{' <in: '}', 'semilist', 'shape definition'>
+        | '(' ~ ')' <signature>
+        | :dba<shape definition> '[' ~ ']' <semilist>
+        | :dba<shape definition> '{' ~ '}' <semilist>
         | <?before '<'> <postcircumfix>
         ]*
     ]?
@@ -1288,7 +1293,7 @@ rule package_def {
 token declarator {
     [
     | <variable_declarator>
-    | '(' <in: ')', 'signature'> <trait>*
+    | '(' ~ ')' <signature> <trait>*
     | <routine_declarator>
     | <regex_declarator>
     | <type_declarator>
@@ -1647,7 +1652,7 @@ token morename {
         <?before '(' | <alpha> >
         [
         | <identifier>
-        | '(' <in: ')', 'EXPR', 'indirect name'>
+        | :dba<indirect name> '(' ~ ')' <EXPR>
         ]
     ]?
 }
@@ -1666,7 +1671,7 @@ token sublongname {
 
 #token subcall {
 #    # XXX should this be sublongname?
-#    <subshortname> <.unsp>? '.'? '(' <in: ')', 'semilist'>
+#    <subshortname> <.unsp>? '.'? '(' ~ ')' <semilist>
 #    {*}
 #}
 
@@ -2459,7 +2464,7 @@ regex extrapost {
 
 rule multisig {
     [
-	':'?'(' <in: ')', 'signature'>
+	':'?'(' ~ ')' <signature>
     ]
     ** '|'
 }
@@ -2479,9 +2484,9 @@ rule method_def {
     | '!'?<longname> [ <multisig> | <trait> ]*
     | <sigil> '.'
         [
-        | '(' <in: ')', 'signature'>
-        | '[' <in: ']', 'signature'>
-        | '{' <in: '}', 'signature'>
+        | '(' ~ ')' <signature>
+        | '[' ~ ']' <signature>
+        | '{' ~ '}' <signature>
         | <?before '<'> <postcircumfix>
         ]
         <trait>*
@@ -2544,7 +2549,7 @@ rule capture {
 }
 
 token sigterm {
-    ':(' <in: ')', 'signature'>
+    ':(' ~ ')' <signature>
 }
 
 rule param_sep { [','|':'|';'|';;'] }
@@ -2563,8 +2568,8 @@ token signature {
     { $IN_DECL = 0; }
 }
 
-rule type_declarator:subset {\
-    <sym>
+token type_declarator:subset {
+    <sym> :s
     <longname> { $¢.add_type($<longname>); }
     [ of <fulltypename> ]?
     [where <EXPR(item %chaining)> ]?	# (EXPR can parse multiple where clauses)
@@ -2771,16 +2776,16 @@ token term:sym<**> ( --> Term)
     { <sym> }
 
 token circumfix:sigil ( --> Term)
-    { <sigil> '(' <in: ')', 'semilist', 'contextualizer'> }
+    { :dba<contextualizer> <sigil> '(' ~ ')' <semilist> }
 
 #token circumfix:typecast ( --> Term)
-#    { <typename> '(' <in: ')', 'semilist'> }
+#    { <typename> '(' ~ ')' <semilist> }
 
 token circumfix:sym<( )> ( --> Term)
-    { '(' <in: ')', 'semilist', 'parenthesized expression'> }
+    { :dba<parenthesized expression> '(' ~ ')' <semilist> }
 
 token circumfix:sym<[ ]> ( --> Term)
-    { '[' <in: ']', 'semilist', 'array composer'> }
+    { :dba<array composer> '[' ~ ']' <semilist> }
 
 ## methodcall
 
@@ -3167,6 +3172,9 @@ token infix:sym<Z> ( --> List_infix)
 token infix:sym<minmax> ( --> List_infix)
     { <sym> }
 
+token infix:sym<...> ( --> List_infix)
+    { <sym> }
+
 token term:sym<...> ( --> List_prefix)
     { <sym> <args>? }
 
@@ -3201,9 +3209,9 @@ token term:opfunc ( --> Term )
 token args ($istype = 0) {
     :my $listopish = 0;
     [
-    | '.(' <in: ')', 'semilist', 'argument list'> {*}             #= func args
-    | '(' <in: ')', 'semilist', 'argument list'> {*}              #= func args
-    | <.unsp> '.'? '(' <in: ')', 'semilist', 'argument list'> {*} #= func args
+    | :dba<argument list> '.(' ~ ')' <semilist> {*}             #= func args
+    | :dba<argument list> '(' ~ ')' <semilist> {*}              #= func args
+    | :dba<argument list> <.unsp> '.'? '(' ~ ')' <semilist> {*} #= func args
     | {} [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist> { $listopish = 1 }]?
     ]
 
@@ -3741,10 +3749,13 @@ grammar Regex is STD {
     token metachar:var {
         <!before '$$'>
         <?before <sigil>>
-        [:lang($¢.cursor_fresh($+LANG)) <variable>]
-        <.ws>
-        $<binding> = ( '=' <.ws> <quantified_atom> )?
+        [:lang($¢.cursor_fresh($+LANG)) <variable> <.ws> ]
+        $<binding> = ( <.ws> '=' <.ws> <quantified_atom> )?
         { $<sym> = $<variable>.item; }
+    }
+
+    token metachar:sym<~> {
+        <sym>
     }
 
     token backslash:unspace { <?before \s> <.SUPER::ws> }
@@ -3845,7 +3856,7 @@ grammar Regex is STD {
 	<.ws>
     }
 
-    token mod_arg { '(' <in: ')', 'semilist', 'modifier argument'> }
+    token mod_arg { :dba<modifier argument> '(' ~ ')' <semilist> }
 
     token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($+LANG)) <statement> <eat_terminator> ] }
 
@@ -4162,10 +4173,9 @@ method lineof ($p) {
     return $posprops.[$p]<L> // 0;
 }
 
-# not quite a "between" combinator...
-token in (Str $stop, Str $insides, Str $name = $insides) {
-    :my $GOAL is context = $stop;
-    <x=$insides> $stop {{ $/.{$insides} = $<x>; $/.:delete<x> }} || <.panic: "Unable to parse $name; couldn't find final '$stop'">
+method SETGOAL { }
+method FAILGOAL (Str $stop, Str $name) {
+    self.panic("Unable to parse $name; couldn't find final '$stop'");
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
