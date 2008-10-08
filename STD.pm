@@ -3234,6 +3234,7 @@ token term:opfunc ( --> Term )
 
 token args ($istype = 0) {
     :my $listopish = 0;
+    :my $GOAL is context = '';
     [
     | :dba('argument list') '.(' ~ ')' <semilist> {*}             #= func args
     | :dba('argument list') '(' ~ ')' <semilist> {*}              #= func args
