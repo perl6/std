@@ -49,6 +49,7 @@ sub MAIN {
     # Generic ast translation done via autoload
 
     our $AUTOLOAD;
+    my $SEQ = 1;
 
     sub AUTOLOAD {
 	my $self = shift;
@@ -74,6 +75,9 @@ sub MAIN {
 		    $r{$key} = $$v{$key};
 		}
 	    }
+	    elsif ($k eq 'SIGIL') {
+		$r{SIGIL} = $v;
+	    }
 	    elsif ($k eq '_arity') {
 		$r{arity} = $v;
 	    }
@@ -94,6 +98,7 @@ sub MAIN {
 			}
 		    }
 		    $r{$k} = $zyg;
+		    $r{zygs}{$k} = $SEQ++ if @$zyg;
 		}
 		elsif (ref $v) {
 		    if (exists $v->{''}) {
@@ -102,6 +107,7 @@ sub MAIN {
 		    else {
 			$r{$k} = $v;
 		    }
+		    $r{zygs}{$k} = $SEQ++;
 		    unless (ref($r{$k}) =~ /^VAST/) {
 			my $class = "VAST::$k";
 			gen_class($class);
@@ -143,37 +149,68 @@ sub MAIN {
 
     sub emit_p6 { my $self = shift;
 	my $text;
-	# XXX bogus
-	if (exists $self->{TEXT}) {
-	    $text = $self->{TEXT};
-	}
-	elsif (exists $self->{sym}) {
+	my @sym;
+	if (exists $self->{sym}) {
 	    my $sym = $self->{sym};
 	    if (ref $sym eq 'ARRAY') {
-		$text = join '?', @$sym;
+		@sym = @$sym;
 	    }
 	    else {
-		$text = $sym;
+		@sym = $sym;
 	    }
 	}
-	else {
-	    for my $key (sort keys %$self) {
-		my $part = $$self{$key};
+	if ($self->{zygs}) {
+	    my @zyg = $self->visit_zygs;
+	    my $arity = $self->{arity} // '';
+	    if ($arity eq 'BINARY') {
+		$text .= shift @zyg;
+		$text .= shift @sym;
+		$text .= shift @zyg;
+	    }
+	    elsif ($arity eq 'UNARY') {
+		if ($self->{post}) {
+		    $text .= shift @zyg;
+		    $text .= shift @sym;
+		}
+		else {
+		    $text .= shift @sym;
+		    $text .= shift @zyg;
+		}
+	    }
+	    else {
+		$text .= join('', @zyg);
+	    }
+	}
+	elsif (exists $self->{TEXT}) {
+	    $text = $self->{TEXT};
+	}
+	elsif (@sym) {
+	    $text .= join('', @sym);
+	}
+	$text;
+    }
+
+    sub visit_zygs { my $self = shift;
+	my @zygs;
+	if ($self->{zygs}) {
+	    my $zygs = $self->{zygs};
+	    for my $key (sort {$zygs->{$a} <=> $zygs->{$b}} keys %$zygs) {
+		my $part = $self->{$key};
 		if (ref $part eq 'ARRAY') {
 		    my @kids = @$part;
 		    for my $kid (@kids) {
-			$text .= $kid->emit_p6;
+			push @zygs, $kid->emit_p6 // '';
 		    }
 		}
 		elsif (ref $part) {
-		    $text .= $part->emit_p6;
+		    push @zygs, $part->emit_p6 // '';
 		}
 		else {
-		    $text = $key . '=' . $part;
+		    push @zygs, $key . '=' . $part;
 		}
 	    }
 	}
-	$text;
+	@zygs;
     }
 }
 

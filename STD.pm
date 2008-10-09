@@ -913,7 +913,7 @@ token adverbs {
 token noun {
     [
     | <fatarrow>
-    | <variable> { $<sigil> = $<variable><sigil> }
+    | <variable> { $<SIGIL> = $<variable><sigil> }
     | <package_declarator>
     | <scope_declarator>
     | <?before 'multi'|'proto'|'only'> <multi_declarator>
@@ -1184,7 +1184,7 @@ token circumfix:sym<{ }> ( --> Term) {
 
 token variable_declarator {
     :my $IN_DECL is context<rw> = 1;
-    <variable> { $<sigil> = $<variable><sigil> }
+    <variable> { $<SIGIL> = $<variable><sigil> }
     { $IN_DECL = 0; }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
@@ -1205,7 +1205,7 @@ token variable_declarator {
     # XXX generalize to any assignment operator?
     :dba('variable initializer')
     [
-    | '=' <.ws> <EXPR( ($<sigil> // '') eq '$' ?? item %item_assignment !! item %list_prefix )>
+    | '=' <.ws> <EXPR( ($<SIGIL> // '') eq '$' ?? item %item_assignment !! item %list_prefix )>
     | '.=' <.ws> <dottyop>
     ]?
 }
@@ -3146,7 +3146,7 @@ token infix:sym<?> ( --> Conditional)
 token infix:sym<=> ()
 {
     <sym>
-    { $¢ = (self.<sigil>//'') eq '$' 
+    { $¢ = (self.<SIGIL> // self.<sigil> // '') eq '$' 
         ?? STD::Item_assignment.coerce($¢)
         !! STD::List_assignment.coerce($¢);
     }
