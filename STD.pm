@@ -236,6 +236,7 @@ role PrecOp {
             for keys(%$d) { $m<O>{$_} = $d.{$_} };
             $m.deb("coercing to " ~ self) if $*DEBUG +& DEBUG::EXPR;
         }
+        $m<O><kind> = self.WHAT;
         return $m;
     }
 
@@ -2995,9 +2996,6 @@ token infix:cmp ( --> Nonchaining)
 token infix:leg ( --> Nonchaining)
     { <sym> }
 
-token infix:is ( --> Nonchaining)
-    { <sym> }
-
 token infix:but ( --> Nonchaining)
     { <sym> }
 
@@ -3416,7 +3414,8 @@ method EXPR ($preclvl)
                 push @chain, pop(@termstack).cleanup;
                 @chain = reverse @chain if @chain > 1;
                 $op<O><chain> = [@chain];
-                push @termstack, $op;
+                $op<_arity> = 'CHAIN';
+                push @termstack, $op._REDUCE('EXPR');
             }
             when 'list' {
                 self.deb("reducing list") if $*DEBUG +& DEBUG::EXPR;
@@ -3442,7 +3441,8 @@ method EXPR ($preclvl)
 		}
                 @list = reverse @list if @list > 1;
                 $op<list> = [@list];
-                push @termstack, $op;
+                $op<_arity> = 'LIST';
+                push @termstack, $op._REDUCE('EXPR');
             }
             when 'unary' {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
@@ -3455,8 +3455,8 @@ method EXPR ($preclvl)
 		    if $op<_from> > $op<arg><_from>;
 		$op<_to> = $op<arg><_to>
 		    if $op<_to> < $op<arg><_to>;
-
-                push @termstack, $op;
+                $op<_arity> = 'UNARY';
+                push @termstack, $op._REDUCE('EXPR');
             }
             default {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
@@ -3468,8 +3468,8 @@ method EXPR ($preclvl)
 		$op<left> = (pop @termstack).cleanup;
 		$op<_from> = $op<left><_from>;
 		$op<_to> = $op<right><_to>;
-
-                push @termstack, $op;
+                $op<_arity> = 'BINARY';
+                push @termstack, $op._REDUCE('EXPR');
             }
         }
     };

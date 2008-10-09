@@ -184,6 +184,7 @@ sub un6 {
         $f =~ s/^\bdefault\s+\{//               and $t .= qq/else {/, next;
         $f =~ s/^\btemp\b//             	and $t .= qq/local/, next;
         $f =~ s/^\bchars\(//             	and $t .= qq/length(/, next;
+        $f =~ s/^\$\?PACKAGE//             	and $t .= qq/__PACKAGE__/, next;
 
         # the following must do partial rescan of final expression
 
