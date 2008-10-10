@@ -16,9 +16,9 @@ my $OPT_match = 0;
 
 sub MAIN {
     my $output = 'ast';
-    while (@ARGV) {
-	last unless $ARGV[0] =~ /^--/;
-	my $switch = shift @ARGV;
+    while (@_) {
+	last unless $_[0] =~ /^--/;
+	my $switch = shift @_;
 	if ($switch eq '--ast') {
 	    $output = 'ast';
 	}
@@ -35,7 +35,7 @@ sub MAIN {
 	    $OPT_match = 1;	# attach match object
 	}
     }
-    my $r = STD->parsefile($ARGV[0])->item;
+    my $r = STD->parsefile($_[0])->item;
     if ($output eq 'ast') {
 	print Dump($r);
     }
@@ -232,7 +232,7 @@ sub MAIN {
 
 
 if ($0 eq __FILE__) {
-    ::MAIN();
+    ::MAIN(@ARGV);
 }
 
 # vim: ts=8 sw=4 noexpandtab smarttab
