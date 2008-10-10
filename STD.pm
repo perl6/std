@@ -867,7 +867,6 @@ token pre {
     # XXX assuming no precedence change
     
     <prefix_postfix_meta_operator>*                 {*}         #= prepost
-    { $+prevop = $<O> }
     <.ws>
 }
 
@@ -891,23 +890,12 @@ token termish {
     | <noun>
     ]
 
-    # also queue up any postfixes, since adverbs could change things
+    # also queue up any postfixes
     :dba('postfix')
     [ <?stdstopper> ||
 	<post>*
-	<.ws>
-	<adverbs>?
     ]
-}
-
-token adverbs {
-    <!stdstopper>
-    [ <colonpair> <.ws> ]+
-    {
-        my $prop = $+prevop orelse
-            $¢.panic('No previous operator visible to adverbial pair');
-#        $prop.adverb($<colonpair>);
-    }
+    <.ws>
 }
 
 token noun {
@@ -946,6 +934,7 @@ token colonpair {
     | '!' <identifier>
         { $key = $<identifier>.text; $value = 0; }
         {*}                                                     #= false
+    | $<num> = [\d+] <identifier>
     | <identifier>
         { $key = $<identifier>.text; }
         [
@@ -993,6 +982,7 @@ token infixish {
     <!infixstopper>
     :dba('infix or meta-infix')
     [
+    | <colonpair> { $<fake> = 1; $<sym> = ':'; %<O><prec> = %loose_unary<prec>;  }
     | <infix>
        [
        | ''
@@ -1050,7 +1040,6 @@ token post {
     | <privop> { $<O> = $<privop><O> }
     | <postop> { $<O> = $<postop><O> }
     ]
-    { $+prevop = $<O> }
 }
 
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
@@ -3244,7 +3233,7 @@ token args ($istype = 0) {
     [
     || <?{ $listopish }>
     || ':' <?before \s> <arglist>    # either switch to listopiness
-    || {{ $+prevop = $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
+    || {{ $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
     ]
 }
 
@@ -3387,7 +3376,6 @@ method EXPR ($preclvl)
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $inquote is context = 0;
-    my $prevop is context<rw>;
     my @termstack;
     my @opstack;
     my $termish = 'termish';
@@ -3474,6 +3462,7 @@ method EXPR ($preclvl)
         }
     };
 
+  TERM:
     loop {
         self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
@@ -3510,59 +3499,66 @@ method EXPR ($preclvl)
 
         push @termstack, $here;
         self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
-        $oldpos = $here.pos;
-        my @infix = $here.cursor_fresh.infixish();
-        last unless @infix;
-        my $infix = @infix[0];
-        last unless $infix.pos > $oldpos;
-        
-        # XXX might want to allow this in a declaration though
-        if not $infix { $here.panic("Can't have two terms in a row") }
 
-        if not $infix<sym> {
-            die $infix.dump if $*DEBUG +& DEBUG::EXPR;
-        }
+        loop {     # while we see adverbs
+            $oldpos = $here.pos;
+            my @infix = $here.cursor_fresh.infixish();
+            last TERM unless @infix;
+            my $infix = @infix[0];
+            last TERM unless $infix.pos > $oldpos;
+            
+            if not $infix<sym> {
+                die $infix.dump if $*DEBUG +& DEBUG::EXPR;
+            }
 
-        my $inO = $infix<O>;
-        $prevop = $inO;
-        my Str $inprec = $inO<prec>;
-        if not defined $inprec {
-            self.deb("No prec given in infix!") if $*DEBUG +& DEBUG::EXPR;
-            die $infix.dump if $*DEBUG +& DEBUG::EXPR;
-            $inprec = %terminator<prec>;
-        }
+            my $inO = $infix<O>;
+            my Str $inprec = $inO<prec>;
+            if not defined $inprec {
+                self.deb("No prec given in infix!") if $*DEBUG +& DEBUG::EXPR;
+                die $infix.dump if $*DEBUG +& DEBUG::EXPR;
+                $inprec = %terminator<prec>;
+            }
 
-        last unless $inprec gt $preclim;
+            last TERM unless $inprec gt $preclim;
 
-        $here = $infix.cursor_fresh.ws();
+            $here = $infix.cursor_fresh.ws();
 
 
-        # substitute precedence for listops
-        $inO<prec> = $inO<sub> if $inO<sub>;
+            # substitute precedence for listops
+            $inO<prec> = $inO<sub> if $inO<sub>;
 
-        # Does new infix (or terminator) force any reductions?
-        while @opstack[*-1]<O><prec> gt $inprec {
-            reduce();
-        }
+            # Does new infix (or terminator) force any reductions?
+            while @opstack[*-1]<O><prec> gt $inprec {
+                reduce();
+            }
 
-        # Not much point in reducing the sentinels...
-        last if $inprec lt $LOOSEST;
+            # Not much point in reducing the sentinels...
+            last if $inprec lt $LOOSEST;
 
-        # Equal precedence, so use associativity to decide.
-        if @opstack[*-1]<O><prec> eq $inprec {
-            given $inO<assoc> {
-                when 'non'   { $here.panic("\"$infix\" is not associative") }
-                when 'left'  { reduce() }   # reduce immediately
-                when 'right' { }            # just shift
-                when 'chain' { }            # just shift
-                when 'list'  {              # if op differs reduce else shift
-                    reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
+            # Equal precedence, so use associativity to decide.
+            if @opstack[*-1]<O><prec> eq $inprec {
+                given $inO<assoc> {
+                    when 'non'   { $here.panic("\"$infix\" is not associative") }
+                    when 'left'  { reduce() }   # reduce immediately
+                    when 'right' { }            # just shift
+                    when 'chain' { }            # just shift
+                    when 'list'  {              # if op differs reduce else shift
+                        reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
+                    }
+                    default { $here.panic("Unknown associativity \"$_\" for \"$infix\"") }
                 }
-                default { $here.panic("Unknown associativity \"$_\" for \"$infix\"") }
+            }
+            if $infix<fake> {
+                my $adverbs = @termstack[*-1]<ADV> ||= [];
+                push @$adverbs, $infix<colonpair>;
+                next;  # not really an infix, so keep trying
+            }
+            else {
+                $termish = $inO<nextterm> if $inO<nextterm>;
+                push @opstack, $infix;
+                last;
             }
         }
-        $termish = $inO<nextterm> if $inO<nextterm>;
-        push @opstack, $infix;
     }
     reduce() while +@termstack > 1;
     if @termstack {
