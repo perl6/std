@@ -12,6 +12,7 @@ use feature 'say';
 
 $::ACTIONS = 'Actions';
 my $OPT_pos = 0;
+my $OPT_match = 0;
 
 sub MAIN {
     my $output = 'ast';
@@ -28,7 +29,10 @@ sub MAIN {
 	    $output = 'p6';
 	}
 	elsif ($switch eq '--pos') {
-	    $OPT_pos = 1;
+	    $OPT_pos = 1;	# attach position and prior ws len
+	}
+	elsif ($switch eq '--match') {
+	    $OPT_match = 1;	# attach match object
 	}
     }
     my $r = STD->parsefile($ARGV[0])->item;
@@ -62,6 +66,7 @@ sub MAIN {
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
 	gen_class($class);
 	bless $r, $class unless ref($r) =~ /^VAST/;
+	$r->{MATCH} = $match if $OPT_match;
 	$match->{''} = $r;
     }
 
