@@ -86,7 +86,11 @@ sub MAIN {
 		$r{ARITY} = $v;
 	    }
 	    elsif ($k eq '_from') {
-		$r{POS} = $v;
+		$r{POS} = $v if $OPT_pos;
+		if (exists $node->{'_'}[$v]{'ws'}) {
+		    my $wsstart = $node->{'_'}[$v]{'ws'};
+		    $r{WS} = $v - $wsstart if defined $wsstart and $wsstart < $v
+		}
 	    }
 	    elsif ($k =~ /^[a-zA-Z]/) {
 		if (ref $v eq 'ARRAY') {
