@@ -817,6 +817,7 @@ rule statement_control:PRE     {<sym> <block> }
 rule statement_control:POST    {<sym> <block> }
 rule statement_control:CATCH   {<sym> <block> }
 rule statement_control:CONTROL {<sym> <block> }
+rule statement_control:TEMP    {<sym> <block> }
 
 rule term:BEGIN   {<sym> <block> }
 rule term:CHECK   {<sym> <block> }
