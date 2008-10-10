@@ -11,6 +11,7 @@ use YAML::XS;
 use feature 'say';
 
 $::ACTIONS = 'Actions';
+my $OPT_pos = 0;
 
 sub MAIN {
     my $output = 'ast';
@@ -25,6 +26,9 @@ sub MAIN {
 	}
 	elsif ($switch eq '--p6') {
 	    $output = 'p6';
+	}
+	elsif ($switch eq '--pos') {
+	    $OPT_pos = 1;
 	}
     }
     my $r = STD->parsefile($ARGV[0])->item;
@@ -79,7 +83,10 @@ sub MAIN {
 		$r{SIGIL} = $v;
 	    }
 	    elsif ($k eq '_arity') {
-		$r{arity} = $v;
+		$r{ARITY} = $v;
+	    }
+	    elsif ($k eq '_from') {
+		$r{POS} = $v;
 	    }
 	    elsif ($k =~ /^[a-zA-Z]/) {
 		if (ref $v eq 'ARRAY') {
