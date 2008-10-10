@@ -106,7 +106,7 @@ my %typenames;
 
 method is_type ($name) {
     return True if %typenames{$name};
-    #return True if GLOBAL::{$name}.:exists;
+    #return True if GLOBAL::{$name} :exists;
     return False;
 }
 
@@ -179,7 +179,7 @@ my %routinenames;
 method is_routine ($name) {
     return True if %routinenames{$name};
     return True if %typenames{$name};
-    #return True if GLOBAL::{$name}.:exists;
+    #return True if GLOBAL::{$name} :exists;
     return False;
 }
 
@@ -450,7 +450,7 @@ token spacey { <?before \s | '#'> }
 # Lexical routines
 
 token ws {
-    :my @stub = return self if self.<_>[self.pos].:exists<ws>;
+    :my @stub = return self if self.<_>[self.pos]<ws> :exists;
     :my $startpos = self.pos;
 
     :dba('whitespace')
@@ -1950,8 +1950,8 @@ token nibbler {
     {
         push @nibbles, $text; $<nibbles> = [@nibbles];
         $<lastpos> = $¢.pos;
-        $/.:delete<nibbler>;
-        $/.:delete<escape>;
+        $<nibbler> :delete;
+        $<escape> :delete;
         $COMPILING::LAST_NIBBLE = $¢;
         $COMPILING::LAST_NIBBLE_MULTILINE = $¢ if $multiline;
     }
@@ -3356,7 +3356,7 @@ token stopper { <!> }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    :my @stub = return self if self.<_>[self.pos].:exists<endstmt>;
+    :my @stub = return self if self.<_>[self.pos]<endstmt> :exists;
     :dba('standard stopper')
     [
     | <?terminator>
