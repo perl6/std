@@ -3402,9 +3402,10 @@ method EXPR ($preclvl)
                 }
                 push @chain, pop(@termstack).cleanup;
                 @chain = reverse @chain if @chain > 1;
-                $op<O><chain> = [@chain];
-                $op<_arity> = 'CHAIN';
-                push @termstack, $op._REDUCE('EXPR');
+                my $nop = $op.cursor_fresh();
+                $nop<chain> = [@chain];
+                $nop<_arity> = 'CHAIN';
+                push @termstack, $nop._REDUCE('EXPR');
             }
             when 'list' {
                 self.deb("reducing list") if $*DEBUG +& DEBUG::EXPR;

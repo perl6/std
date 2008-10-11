@@ -121,7 +121,7 @@ sub MAIN {
 			}
 		    }
 		    $r{$k} = $zyg;
-		    $r{zygs}{$k} = $SEQ++ if @$zyg;
+		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
 		}
 		elsif (ref $v) {
 		    if (exists $v->{''}) {
@@ -194,6 +194,9 @@ sub MAIN {
 		else {
 		    $text .= $zyg[1] . $zyg[0];
 		}
+	    }
+	    elsif ($arity eq 'CHAIN') {
+		$text .= join('', @zyg);
 	    }
 	    else {
 		$text .= join('', reverse @zyg);
