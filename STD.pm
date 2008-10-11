@@ -2671,6 +2671,13 @@ token parameter {
     | <?> { $kind = '!' }
     ]
 
+    <.ws>
+    $<subsig> = [
+    | '[' ~ ']' <signature>
+    | <?before '{'> <!{ $+GOAL eq '{'}>
+      '{' ~ '}' <signature>
+    ]*
+
     <trait>*
 
     <post_constraint>*

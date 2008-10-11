@@ -188,6 +188,7 @@ sub MAIN {
 	if ($self->{zygs}) {
 	    my @zyg = $self->get_zygs;
 	    my $arity = $self->{ARITY} // '';
+	    my $sym = $self->{sym} // '';
 	    if ($arity eq 'BINARY') {
 		$text .= $zyg[0] . $zyg[2] . $zyg[1];
 	    }
@@ -199,7 +200,7 @@ sub MAIN {
 		    $text .= $zyg[1] . $zyg[0];
 		}
 	    }
-	    elsif ($self->{sym} eq 'identifier') {
+	    elsif ($sym eq 'identifier') {
 		$text .= join('', reverse @zyg);
 	    }
 	    else {
