@@ -983,7 +983,12 @@ token infixish {
     <!infixstopper>
     :dba('infix or meta-infix')
     [
-    | <colonpair> { $<fake> = 1; $<sym> = ':'; %<O><prec> = %loose_unary<prec>;  }
+    | <colonpair> {
+            $<fake> = 1;
+            $<sym> = ':';
+            %<O><prec> = %loose_unary<prec>;
+            %<O><assoc> = 'left';
+        }
     | <infix>
        [
        | ''
@@ -1179,7 +1184,7 @@ token variable_declarator {
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
-        [
+        $<shape> = [
         | '(' ~ ')' <signature>
         | :dba('shape definition') '[' ~ ']' <semilist>
         | :dba('shape definition') '{' ~ '}' <semilist>
@@ -1191,33 +1196,26 @@ token variable_declarator {
     <trait>*
 
     <post_constraint>*
-
-    # XXX generalize to any assignment operator?
-    :dba('variable initializer')
-    [
-    | '=' <.ws> <EXPR( ($<SIGIL> // '') eq '$' ?? item %item_assignment !! item %list_prefix )>
-    | '.=' <.ws> <dottyop>
-    ]?
 }
 
 rule scoped {
     :dba('scoped declarator')
     [
-    | <declarator>
+    | <declarator> { $<SIGIL> = $<declarator><SIGIL> }
     | <regex_declarator>
     | <package_declarator>
     | <fulltypename>+ <multi_declarator>
-    | <multi_declarator>
+    | <multi_declarator> { $<SIGIL> = $<multi_declarator><SIGIL> }
 #    | <?before <[A..Z]> > <name> <.panic("Apparent type name " ~ $<name>.text ~ " is not declared yet")>
     ]
 }
 
 
-token scope_declarator:my       { <sym> <scoped> }
-token scope_declarator:our      { <sym> <scoped> }
-token scope_declarator:state    { <sym> <scoped> }
-token scope_declarator:constant { <sym> <scoped> }
-token scope_declarator:has      { <sym> <scoped> }
+token scope_declarator:my       { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
+token scope_declarator:our      { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
+token scope_declarator:state    { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
+token scope_declarator:constant { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
+token scope_declarator:has      { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
 
 
 token package_declarator:class {
@@ -1305,7 +1303,7 @@ rule package_def {
 
 token declarator {
     [
-    | <variable_declarator>
+    | <variable_declarator> { $<SIGIL> = $<variable_declarator><SIGIL> }
     | '(' ~ ')' <signature> <trait>*
     | <routine_declarator>
     | <regex_declarator>
@@ -1313,10 +1311,10 @@ token declarator {
     ]
 }
 
-token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> ] }
-token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> ] }
-token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> ] }
-token multi_declarator:null  { <declarator> }
+token multi_declarator:multi { <sym> <.ws> [ <declarator> { $<SIGIL> = $<declarator><SIGIL> } || <routine_def> ] }
+token multi_declarator:proto { <sym> <.ws> [ <declarator> { $<SIGIL> = $<declarator><SIGIL> } || <routine_def> ] }
+token multi_declarator:only  { <sym> <.ws> [ <declarator> { $<SIGIL> = $<declarator><SIGIL> } || <routine_def> ] }
+token multi_declarator:null  { <declarator> { $<SIGIL> = $<declarator><SIGIL> } }
 
 token routine_declarator:sub       { <sym> <routine_def> }
 token routine_declarator:method    { <sym> <method_def> }

@@ -13,9 +13,10 @@ use feature 'say';
 $::ACTIONS = 'Actions';
 my $OPT_pos = 0;
 my $OPT_match = 0;
+my $OPT_log = 0;
 our $ORIG;
 our $POS;
-my %did_ws;
+my @did_ws;
 
 
 sub MAIN {
@@ -32,6 +33,9 @@ sub MAIN {
 	elsif ($switch eq '--p6') {
 	    $output = 'p6';
 	    $OPT_pos = 1;
+	}
+	elsif ($switch eq '--log') {
+	    $OPT_log = 1;
 	}
 	elsif ($switch eq '--pos') {
 	    $OPT_pos = 1;	# attach position and prior ws len
@@ -195,11 +199,11 @@ sub MAIN {
 		    $text .= $zyg[1] . $zyg[0];
 		}
 	    }
-	    elsif ($arity eq 'CHAIN') {
-		$text .= join('', @zyg);
+	    elsif ($self->{sym} eq 'identifier') {
+		$text .= join('', reverse @zyg);
 	    }
 	    else {
-		$text .= join('', reverse @zyg);
+		$text .= join('', @zyg);
 	    }
 	}
 	elsif (exists $self->{TEXT}) {
@@ -212,7 +216,7 @@ sub MAIN {
     }
 
     sub ret { my $self = shift;
-	warn ref $self, " returns ", $_[0], "\n";
+	warn ref $self, " returns ", $_[0], "\n" if $OPT_log;
 	$_[0];
     }
 
@@ -254,7 +258,7 @@ sub MAIN {
     sub get_ws { my $self = shift;
 	my $ws = $self->{WS} // 0;
 	my $pos = $self->{POS};
-	if ($ws and not $did_ws{$pos}++) {
+	if ($ws and not $did_ws[$pos]++) {
 	    substr($ORIG, $pos - $ws, $ws)
 	}
 	else {
@@ -281,8 +285,10 @@ sub MAIN {
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
 	my $text = $self->SUPER::emit_p6(@_);
-	my $finalws = $$POS[-1]{ws};
-	$text .= substr($ORIG, $finalws, -1) if $finalws;
+	if (not @did_ws[@$POS-1]) {
+	    my $finalws = $$POS[-1]{ws};
+	    $text .= substr($ORIG, $finalws, -1) if $finalws;
+	}
 	$self->ret($text);
     }
 }
@@ -356,8 +362,20 @@ sub MAIN {
     }
 }
 
+{ package VAST::scope_declarator; our @ISA = 'VAST::AddSym'; }
 { package VAST::statement_control; our @ISA = 'VAST::AddSym'; }
 { package VAST::version; our @ISA = 'VAST::AddSym'; }
+
+{ package VAST::variable_declarator; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->get_ws;
+	$text .= ($self->get_zyg('variable'))[0];
+	$text .= join '', $self->get_zyg('shape');
+	$text .= join '', $self->get_zyg('trait');
+	$text .= join '', $self->get_zyg('post_constraint');
+	$text;
+    }
+}
 
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);
