@@ -637,7 +637,7 @@ rule statementlist {
     [
     | $
     | <?before <[\)\]\}]> >
-    | [<statement><.eat_terminator> ]*
+    | [<statement><eat_terminator> ]*
     ]
 }
 
@@ -646,7 +646,7 @@ rule semilist {
     :dba('semicolon list')
     [
     | <?before <[\)\]\}]> >
-    | [<statement><.eat_terminator> ]*
+    | [<statement><eat_terminator> ]*
     ]
 }
 
@@ -3409,6 +3409,7 @@ method EXPR ($preclvl)
             when 'list' {
                 self.deb("reducing list") if $*DEBUG +& DEBUG::EXPR;
                 my @list;
+                my @delims = $op;
                 push @list, pop(@termstack);
 		my $s = $op<sym>;
                 while @opstack {
@@ -3420,7 +3421,7 @@ method EXPR ($preclvl)
 		    else {
 			self.worry("Missing term in " ~ $s ~ " list");
 		    }
-                    pop(@opstack);
+                    push @delims, pop(@opstack);
                 }
 		if @termstack and defined @termstack[0] {
 		    push @list, pop(@termstack).cleanup;
@@ -3429,9 +3430,13 @@ method EXPR ($preclvl)
 		    self.worry("Missing final term in '" ~ $s ~ "' list");
 		}
                 @list = reverse @list if @list > 1;
-                $op<list> = [@list];
-                $op<_arity> = 'LIST';
-                push @termstack, $op._REDUCE('EXPR');
+                @delims = reverse @delims if @delims > 1;
+                my $nop = $op.cursor_fresh();
+                $nop<O> = $op<O>;
+                $nop<list> = [@list];
+                $nop<delims> = [@delims];
+                $nop<_arity> = 'LIST';
+                push @termstack, $nop._REDUCE('EXPR');
             }
             when 'unary' {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;

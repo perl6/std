@@ -13,6 +13,10 @@ use feature 'say';
 $::ACTIONS = 'Actions';
 my $OPT_pos = 0;
 my $OPT_match = 0;
+our $ORIG;
+our $POS;
+my %did_ws;
+
 
 sub MAIN {
     my $output = 'ast';
@@ -27,6 +31,7 @@ sub MAIN {
 	}
 	elsif ($switch eq '--p6') {
 	    $output = 'p6';
+	    $OPT_pos = 1;
 	}
 	elsif ($switch eq '--pos') {
 	    $OPT_pos = 1;	# attach position and prior ws len
@@ -62,6 +67,8 @@ sub MAIN {
     sub AUTOLOAD {
 	my $self = shift;
 	my $match = shift;
+	$ORIG ||= ${$match->{_orig}};
+	$POS ||= $match->{'_'};
 	my $r = hoist($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
 	gen_class($class);
@@ -92,8 +99,8 @@ sub MAIN {
 	    }
 	    elsif ($k eq '_from') {
 		$r{POS} = $v if $OPT_pos;
-		if (exists $node->{'_'}[$v]{'ws'}) {
-		    my $wsstart = $node->{'_'}[$v]{'ws'};
+		if (exists $$POS[$v]{'ws'}) {
+		    my $wsstart = $$POS[$v]{'ws'};
 		    $r{WS} = $v - $wsstart if defined $wsstart and $wsstart < $v
 		}
 	    }
@@ -132,11 +139,10 @@ sub MAIN {
 		}
 		else {
 		    $r{$k} = $v;
-		    $r{TEXT} = $text;
 		}
 	    }
 	}
-	$r{TEXT} = $text unless keys %r;
+	$r{TEXT} = $text unless exists $r{zygs};
 	\%r;
     }
 
@@ -144,7 +150,7 @@ sub MAIN {
 	my $self = shift;
 	my $match = shift;
 	my $r = hoist($match);
-	(my $class = $r->{kind} // "STD::TERM") =~ s/^STD/VAST/;
+	(my $class = $r->{kind} // ref $r) =~ s/^STD/VAST/;
 	gen_class($class);
 	$match->{''} = bless $r, $class;
     }
@@ -164,7 +170,7 @@ sub MAIN {
     sub emit_p5 { die "Perl 5 emitter unimplemented" }
 
     sub emit_p6 { my $self = shift;
-	my $text;
+	my $text = $self->get_ws;
 	my @sym;
 	if (exists $self->{sym}) {
 	    my $sym = $self->{sym};
@@ -176,60 +182,179 @@ sub MAIN {
 	    }
 	}
 	if ($self->{zygs}) {
-	    my @zyg = $self->visit_zygs;
-	    my $arity = $self->{arity} // '';
+	    my @zyg = $self->get_zygs;
+	    my $arity = $self->{ARITY} // '';
 	    if ($arity eq 'BINARY') {
-		$text .= shift @zyg;
-		$text .= shift @sym;
-		$text .= shift @zyg;
+		$text .= $zyg[0] . $zyg[2] . $zyg[1];
 	    }
 	    elsif ($arity eq 'UNARY') {
 		if ($self->{post}) {
-		    $text .= shift @zyg;
-		    $text .= shift @sym;
+		    $text .= $zyg[0] . $zyg[1];
 		}
 		else {
-		    $text .= shift @sym;
-		    $text .= shift @zyg;
+		    $text .= $zyg[1] . $zyg[0];
 		}
 	    }
 	    else {
-		$text .= join('', @zyg);
+		$text .= join('', reverse @zyg);
 	    }
 	}
 	elsif (exists $self->{TEXT}) {
-	    $text = $self->{TEXT};
+	    $text .= $self->{TEXT};
 	}
 	elsif (@sym) {
 	    $text .= join('', @sym);
 	}
-	$text;
+	$self->ret($text);
     }
 
-    sub visit_zygs { my $self = shift;
+    sub ret { my $self = shift;
+	warn ref $self, " returns ", $_[0], "\n";
+	$_[0];
+    }
+
+    sub get_zygs { my $self = shift;
 	my @zygs;
 	if ($self->{zygs}) {
 	    my $zygs = $self->{zygs};
 	    for my $key (sort {$zygs->{$a} <=> $zygs->{$b}} keys %$zygs) {
-		my $part = $self->{$key};
-		if (ref $part eq 'ARRAY') {
-		    my @kids = @$part;
-		    for my $kid (@kids) {
-			push @zygs, $kid->emit_p6 // '';
-		    }
-		}
-		elsif (ref $part) {
-		    push @zygs, $part->emit_p6 // '';
-		}
-		else {
-		    push @zygs, $key . '=' . $part;
-		}
+		push @zygs, $self->get_zyg($key);
 	    }
 	}
 	@zygs;
     }
+
+    sub get_zyg { my $self = shift;
+	my $key = shift;
+	my $part = $self->{$key};
+	my @zygs;
+	if (ref $part eq 'ARRAY') {
+	    my @kids = @$part;
+	    for my $kid (@kids) {
+		if (ref $kid) {
+		    push @zygs, $kid->emit_p6 // '';
+		}
+		else {
+		    push @zygs, $kid;
+		}
+	    }
+	}
+	elsif (ref $part) {
+	    push @zygs, $part->emit_p6 // '';
+	}
+	else {
+	    push @zygs, $key . '=' . $part;
+	}
+	@zygs;
+    }
+
+    sub get_ws { my $self = shift;
+	my $ws = $self->{WS} // 0;
+	my $pos = $self->{POS};
+	if ($ws and not $did_ws{$pos}++) {
+	    substr($ORIG, $pos - $ws, $ws)
+	}
+	else {
+	    '';
+	}
+    }
+	
 }
 
+{ package VAST::sample; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+    }
+}
+
+{ package VAST::AddSym; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->get_ws;
+	$text .= $self->{sym};
+	$text .= $self->SUPER::emit_p6(@_);
+	$text;
+    }
+}
+
+{ package VAST::comp_unit; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->SUPER::emit_p6(@_);
+	my $finalws = $$POS[-1]{ws};
+	$text .= substr($ORIG, $finalws, -1) if $finalws;
+	$self->ret($text);
+    }
+}
+
+{ package VAST::Comma; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->get_ws;
+	
+	my @list = $self->get_zyg('list');
+	my @delims = $self->get_zyg('delims');
+	while (@list) {
+	    $text .= shift(@list) . (shift(@delims)//'');
+	}
+	$self->ret($text);
+    }
+}
+
+{ package VAST::statementlist; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->get_ws;
+	
+	my @statement = $self->get_zyg('statement');
+	my @terminator = $self->get_zyg('eat_terminator');
+	while (@statement or @terminator) {
+	    $text .= shift(@statement) . (shift(@terminator)//'');
+	}
+	$self->ret($text);
+    }
+}
+
+{ package VAST::nibbler; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = '';
+	my @nibbles = $self->get_zyg('nibbles');
+	for my $nibble (@nibbles) {
+	    if (ref $nibble) {
+		$text .= $nibble->emit_p6;
+	    }
+	    else {
+		$text .= $nibble;
+	    }
+	}
+	$self->ret($text);
+    }
+}
+
+{ package VAST::quibble; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->get_ws;
+	
+	my @babble = @{$self->{babble}{B}};
+	my @nibble = $self->get_zyg('nibble');
+	$text .= $babble[0] . $nibble[0] . $babble[1];
+	$self->ret($text);
+    }
+}
+
+{ package VAST::quote; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->get_ws;
+	
+	if ($self->{nibble}) {
+	    my @nibble = $self->get_zyg('nibble');
+	    $text .= $self->{sym}[0] . $nibble[0] . $self->{sym}[1];
+	}
+	else {	
+	    my @quibble = $self->get_zyg('quibble');
+	    $text .= $self->{sym} . $quibble[0];
+	}
+	$self->ret($text);
+    }
+}
+
+{ package VAST::statement_control; our @ISA = 'VAST::AddSym'; }
+{ package VAST::version; our @ISA = 'VAST::AddSym'; }
 
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);
