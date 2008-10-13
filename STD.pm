@@ -2670,12 +2670,11 @@ token parameter {
         [ $<quant> = <[ ? ! ]> { $kind = $<quant> } ]?
     | <?> { $kind = '!' }
     ]
-
     <.ws>
+
     $<subsig> = [
-    | '[' ~ ']' <signature>
-    | <?before '{'> <!{ $+GOAL eq '{'}>
-      '{' ~ '}' <signature>
+	'[' ~ ']' <signature>
+	<.ws>
     ]*
 
     <trait>*
@@ -3232,13 +3231,13 @@ token args ($istype = 0) {
     | :dba('argument list') '.(' ~ ')' <semilist> {*}             #= func args
     | :dba('argument list') '(' ~ ')' <semilist> {*}              #= func args
     | :dba('argument list') <.unsp> '.'? '(' ~ ')' <semilist> {*} #= func args
-    | {} [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist> { $listopish = 1 }]?
+    | {} [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <listopargs=arglist> { $listopish = 1 }]?
     ]
 
     :dba('extra arglist after (...):')
     [
     || <?{ $listopish }>
-    || ':' <?before \s> <arglist>    # either switch to listopiness
+    || ':' <?before \s> <listopargs=arglist>    # either switch to listopiness
     || {{ $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
     ]
 }
@@ -3450,13 +3449,19 @@ method EXPR ($preclvl)
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-		$op<arg> = (pop @termstack).cleanup;
-		$op<_from> = $op<arg><_from>
-		    if $op<_from> > $op<arg><_from>;
-		$op<_to> = $op<arg><_to>
-		    if $op<_to> < $op<arg><_to>;
-                $op<_arity> = 'UNARY';
-                push @termstack, $op._REDUCE('EXPR');
+                my $nop = $op.cursor_fresh();
+                $nop<_from> = $op<_from>;
+                $nop<_to> = $op<_to>;
+                $nop<_pos> = $op<_pos>;
+		$nop<arg> = (pop @termstack).cleanup;
+                if ($nop<arg><_from> < $nop<_from>) {
+                    $nop<_from> = $nop<arg><_from>;
+                }
+                if ($nop<arg><_to> > $nop<_to>) {
+                    $nop<_to> = $nop<arg><_to>;
+                }
+                $nop<_arity> = 'UNARY';
+                push @termstack, $nop._REDUCE('EXPR');
             }
             default {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
@@ -3464,12 +3469,13 @@ method EXPR ($preclvl)
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-		$op<right> = (pop @termstack).cleanup;
-		$op<left> = (pop @termstack).cleanup;
-		$op<_from> = $op<left><_from>;
-		$op<_to> = $op<right><_to>;
-                $op<_arity> = 'BINARY';
-                push @termstack, $op._REDUCE('EXPR');
+                my $nop = $op.cursor_fresh();
+		$nop<right> = (pop @termstack).cleanup;
+		$nop<left> = (pop @termstack).cleanup;
+		$nop<_from> = $nop<left><_from>;
+		$nop<_to> = $nop<right><_to>;
+                $nop<_arity> = 'BINARY';
+                push @termstack, $nop._REDUCE('EXPR');
             }
         }
     };

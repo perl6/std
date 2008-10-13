@@ -274,11 +274,31 @@ sub MAIN {
     }
 }
 
-{ package VAST::AddSym; our @ISA = 'VAST::Base';
+{ package VAST::PreSym; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	$text .= $self->{sym};
 	$text .= $self->SUPER::emit_p6(@_);
+	$text;
+    }
+}
+
+{ package VAST::CircumSym; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->get_ws;
+	$text .= $self->{sym}[0];
+	$text .= $self->SUPER::emit_p6(@_);
+	$text .= $self->{sym}[1];
+	$text;
+    }
+}
+
+{ package VAST::FirstLast; our @ISA = 'VAST::Base';
+    sub emit_p6 { my $self = shift;
+	my $text = $self->get_ws;
+	$text .= $self->{FIRST};
+	$text .= $self->SUPER::emit_p6(@_);
+	$text .= $self->{LAST};
 	$text;
     }
 }
@@ -363,10 +383,6 @@ sub MAIN {
     }
 }
 
-{ package VAST::scope_declarator; our @ISA = 'VAST::AddSym'; }
-{ package VAST::statement_control; our @ISA = 'VAST::AddSym'; }
-{ package VAST::version; our @ISA = 'VAST::AddSym'; }
-
 { package VAST::variable_declarator; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
 	my $text = $self->get_ws;
@@ -377,6 +393,16 @@ sub MAIN {
 	$text;
     }
 }
+
+{ package VAST::scope_declarator; our @ISA = 'VAST::PreSym'; }
+{ package VAST::statement_control; our @ISA = 'VAST::PreSym'; }
+{ package VAST::statement_prefix; our @ISA = 'VAST::PreSym'; }
+{ package VAST::version; our @ISA = 'VAST::PreSym'; }
+
+{ package VAST::block; our @ISA = 'VAST::CircumSym'; }
+{ package VAST::circumfix; our @ISA = 'VAST::CircumSym'; }
+{ package VAST::postcircumfix; our @ISA = 'VAST::CircumSym'; }
+{ package VAST::args; our @ISA = 'VAST::FirstLast'; }
 
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);

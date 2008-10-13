@@ -1957,8 +1957,12 @@ sub _REDUCE { my $self = shift;
 }
 
 sub _COMMITBRANCH { my $self = shift;
+    $self->{LAST} = shift() if @_;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
+    my $F = $self->{_from};
+    my $buf = $self->{_orig};
+    $self->{FIRST} = substr($$buf, $F, $P - $F);
     $self->deb("Commit branch to $P") if $DEBUG & DEBUG::matchers;
     $self, LazyMap->new(sub { $self->deb("ABORTBRANCH") if $DEBUG & DEBUG::trace_call; die "ABORTBRANCH" }, $self);
 }
