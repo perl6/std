@@ -730,12 +730,12 @@ token statement_control:no {
 token statement_control:if {
     <sym> :s
     <xblock>
-    $<elsif> = (
+    [$<elsif> = (
         'elsif'<?spacey> <xblock>       {*}                #= elsif
-    )*
-    $<else> = (
+    )]*
+    [$<else> = (
         'else'<?spacey> <pblock>       {*}             #= else
-    )?
+    )]?
 }
 
 
