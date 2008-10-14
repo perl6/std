@@ -3575,7 +3575,7 @@ method EXPR ($preclvl)
             }
         }
     }
-    reduce() while +@termstack > 1;
+    reduce() while +@opstack > 1;
     if @termstack {
         +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
         @termstack[0]<_from> = self.pos;
