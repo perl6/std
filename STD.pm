@@ -855,7 +855,7 @@ token version:sym<v> {
 
 ###################################################
 
-token pre {
+token PRE {
     :dba('prefix or meta-prefix')
     [
     | <prefix>
@@ -887,14 +887,14 @@ token nulltermish {
 token termish {
     :dba('prefix or noun')
     [
-    | <pre>+ <noun>
+    | <PRE>+ <noun>
     | <noun>
     ]
 
     # also queue up any postfixes
     :dba('postfix')
     [ <?stdstopper> ||
-	<post>*
+	<POST>*
     ]
     <.ws>
 }
@@ -1030,7 +1030,7 @@ token dottyop {
 # Note, this rule mustn't do anything irreversible because it's used
 # as a lookahead by the quote interpolator.
 
-token post {
+token POST {
     <!stdstopper>
 
     # last whitespace didn't end here
@@ -2468,10 +2468,10 @@ grammar Quasi is STD {
 
 } # end grammar
 
-# Note, backtracks!  So post mustn't commit to anything permanent.
+# Note, backtracks!  So POST mustn't commit to anything permanent.
 regex extrapost {
     :my $inquote is context = 1;
-    <post>*
+    <POST>*
     # XXX Shouldn't need a backslash on anything but the right square here
     <?after <[ \] } > ) ]> > 
 }
@@ -3393,6 +3393,7 @@ method EXPR ($preclvl)
     my &reduce := -> {
         self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $*DEBUG +& DEBUG::EXPR;
         my $op = pop @opstack;
+	my $sym = $op<sym>;
         given $op<O><assoc> // 'unary' {
             when 'chain' {
                 self.deb("reducing chain") if $*DEBUG +& DEBUG::EXPR;
@@ -3416,27 +3417,27 @@ method EXPR ($preclvl)
                 my @list;
                 my @delims = $op;
                 push @list, pop(@termstack);
-		my $s = $op<sym>;
                 while @opstack {
-                    self.deb($s ~ " vs " ~ @opstack[*-1]<sym>) if $*DEBUG +& DEBUG::EXPR;
-                    last if $s ne @opstack[*-1]<sym>;
+                    self.deb($sym ~ " vs " ~ @opstack[*-1]<sym>) if $*DEBUG +& DEBUG::EXPR;
+                    last if $sym ne @opstack[*-1]<sym>;
 		    if @termstack and defined @termstack[0] {
 			push @list, pop(@termstack).cleanup;
 		    }
 		    else {
-			self.worry("Missing term in " ~ $s ~ " list");
+			self.worry("Missing term in " ~ $sym ~ " list");
 		    }
                     push @delims, pop(@opstack);
                 }
 		if @termstack and defined @termstack[0] {
 		    push @list, pop(@termstack).cleanup;
 		}
-		elsif $s ne ',' {
-		    self.worry("Missing final term in '" ~ $s ~ "' list");
+		elsif $sym ne ',' {
+		    self.worry("Missing final term in '" ~ $sym ~ "' list");
 		}
                 @list = reverse @list if @list > 1;
                 @delims = reverse @delims if @delims > 1;
                 my $nop = $op.cursor_fresh();
+                $nop<sym> = $sym;
                 $nop<O> = $op<O>;
                 $nop<list> = [@list];
                 $nop<delims> = [@delims];
@@ -3449,19 +3450,15 @@ method EXPR ($preclvl)
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-                my $nop = $op.cursor_fresh();
-                $nop<_from> = $op<_from>;
-                $nop<_to> = $op<_to>;
-                $nop<_pos> = $op<_pos>;
-		$nop<arg> = (pop @termstack).cleanup;
-                if ($nop<arg><_from> < $nop<_from>) {
-                    $nop<_from> = $nop<arg><_from>;
+		$op<arg> = (pop @termstack).cleanup;
+                if ($op<arg><_from> < $op<_from>) {
+                    $op<_from> = $op<arg><_from>;
                 }
-                if ($nop<arg><_to> > $nop<_to>) {
-                    $nop<_to> = $nop<arg><_to>;
+                if ($op<arg><_to> > $op<_to>) {
+                    $op<_to> = $op<arg><_to>;
                 }
-                $nop<_arity> = 'UNARY';
-                push @termstack, $nop._REDUCE('EXPR');
+                $op<_arity> = 'UNARY';
+                push @termstack, $op._REDUCE('EXPR');
             }
             default {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
@@ -3469,13 +3466,12 @@ method EXPR ($preclvl)
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-                my $nop = $op.cursor_fresh();
-		$nop<right> = (pop @termstack).cleanup;
-		$nop<left> = (pop @termstack).cleanup;
-		$nop<_from> = $nop<left><_from>;
-		$nop<_to> = $nop<right><_to>;
-                $nop<_arity> = 'BINARY';
-                push @termstack, $nop._REDUCE('EXPR');
+		$op<right> = (pop @termstack).cleanup;
+		$op<left> = (pop @termstack).cleanup;
+		$op<_from> = $op<left><_from>;
+		$op<_to> = $op<right><_to>;
+                $op<_arity> = 'BINARY';
+                push @termstack, $op._REDUCE('EXPR');
             }
         }
     };
@@ -3495,9 +3491,10 @@ method EXPR ($preclvl)
         # interleave prefix and postfix, pretend they're infixish
         my $M = $here;
         my @pre;
-        @pre = @($M<pre>) if $M<pre>;
+	my $tmp;
+        @pre = @$tmp if $tmp = ( $M<PRE> :delete );
         my @post;
-        @post = @($M<post>) if $M<post>;
+        @post = @$tmp if $tmp = ( $M<POST> :delete );
         loop {
             if @pre {
                 if @post and @post[0]<O><prec> gt @pre[0]<O><prec> {

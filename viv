@@ -193,7 +193,7 @@ sub MAIN {
 		$text .= $zyg[0] . $zyg[2] . $zyg[1];
 	    }
 	    elsif ($arity eq 'UNARY') {
-		if ($self->{post}) {
+		if ($self->{arg}{_from} > $self->{_from}) {
 		    $text .= $zyg[0] . $zyg[1];
 		}
 		else {
