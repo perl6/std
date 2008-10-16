@@ -18,9 +18,25 @@ our $ORIG;
 our $POS;
 my @did_ws;
 
+sub USAGE {
+    print <<'END';
+viv [switches] filename
+    where switches can be:
+    	--ast	spit out an abstract syntax tree (default)
+    	--p5	spit out a Perl 5 representation (unimpl)
+    	--p6	spit out a Perl 6 representation (partially impl)
+    	--pos	include position info in AST
+    	--match	include match tree info in AST
+    	--log	emit debugging info to standard error
+END
+    exit;
+}
+
 
 sub MAIN {
     my $output = 'ast';
+
+    USAGE() unless @_;
     while (@_) {
 	last unless $_[0] =~ /^--/;
 	my $switch = shift @_;
@@ -43,7 +59,11 @@ sub MAIN {
 	elsif ($switch eq '--match') {
 	    $OPT_match = 1;	# attach match object
 	}
+	elsif ($switch eq '--help') {
+	    USAGE();
+	}
     }
+    USAGE() unless -r $_[0];
     my $r = STD->parsefile($_[0])->item;
     if ($output eq 'ast') {
 	print Dump($r);
@@ -163,6 +183,7 @@ sub MAIN {
 	my $class = shift;
 	no strict 'refs';
 	return if @{$class . '::ISA'};
+	warn "Creating class $class\n" if $OPT_log;
 	@{$class . '::ISA'} = 'VAST::Base';
     }
 
