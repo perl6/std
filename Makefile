@@ -6,6 +6,7 @@ all: $(FIXINS) check try
 
 STD.pmc: STD.pm gimme5
 	./gimme5 $< > $@
+	rm -rf lex
 
 check: STD.pmc
 	/usr/local/bin/perl -c $<

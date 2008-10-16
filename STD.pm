@@ -2951,7 +2951,7 @@ token infix:sym<~> ( --> Concatenation)
 token infix:sym<&> ( --> Junctive_and)
     { <sym> }
 
-token infix:where ( --> Junctive_and)
+token infix:also ( --> Junctive_and)
     { <sym> }
 
 
