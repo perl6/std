@@ -66,6 +66,7 @@ sub highlight_perl6 {
         $css</style>
     </head>
     <body>
+<pre>
 HTML
  																	
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
@@ -81,6 +82,7 @@ HTML
     }
     
     $str .= <<HTML;
+</pre>
     </body>
 </html>
 HTML
