@@ -40,13 +40,16 @@ sub highlight_match {
 
 # CSS color table
 my %css_classes = (
+    comp_unit           => "blue",
     "scope_declarator"	=> "red",
     routine_declarator	=> "red",
+    statement_control   => 'red',
     block               => "black",
-    "sigil" 			=> "blue",
+    "sigil" 			=> "darkgreen",
     "identifier" 		=> "green",
     "quote" 			=> "orange",	
     "number"            => "orange",
+    infix               => "grey",
 );
 
 =item highlight_perl6
