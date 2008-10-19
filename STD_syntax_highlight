@@ -1,0 +1,53 @@
+#!/usr/local/bin/perl
+
+use STD;
+use DumpMatch;
+use utf8;
+use YAML::XS;
+use Encode;
+use strict;
+use warnings;
+use Getopt::Long;
+my $nocolor = 0;
+my $horizontal = 0;
+my $yaml = 0;
+my $mark_arrays;
+GetOptions("nocolor"=>\$nocolor,"horizontal"=>\$horizontal,"yaml"=>\$yaml,"mark-arrays"=>\$mark_arrays);
+unless ($#ARGV <= 0) {
+    die "USAGE: [--nocolor --horizontal --mark-arrays] filename [rule]\n";
+}
+if ($nocolor) {
+    $DumpMatch::NOCOLOR = 1;
+}
+my $file = shift;
+my $what = shift // 'comp_unit';
+
+my $r = STD->parsefile($file,$what);
+sub highlight_match {
+    my $name = shift;
+    my $r = shift;
+    my $opt = shift || {};
+    my $events = [];
+    traverse_match($r,$name,0,$events,$opt);
+    highlight_perl6(${$r->{_orig}},$events,$opt);
+}
+sub highlight_perl6 {
+    my ($orig,$events,$opt) = @_;
+    my $str = "";
+    my $at = 0;
+    my $indent=0;
+    for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
+        my $text = substr($orig,$at,$_->[0]-$at);
+        $str .= $text;
+        $at = $_->[0];
+    
+        if ($_->[1] eq 'from') {
+                $str .= '<span class="'.$_->[2].'">';
+        } elsif ($_->[1] eq 'to') {
+                $str .=  '</span>';
+        }
+    }
+    $str;
+}
+print highlight_match($what=>$r,{}),"\n";
+

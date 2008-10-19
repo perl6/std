@@ -20,7 +20,6 @@ sub process_events {
     my $str = "";
     my $at = 0;
     my $indent=0;
-    # I know, XML sucks, any suggestions? ;)
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
         if ($opt->{vertical}) {
