@@ -41,9 +41,12 @@ sub highlight_match {
 # CSS color table
 my %css_classes = (
     "scope_declarator"	=> "red",
+    routine_declarator	=> "red",
+    block               => "black",
     "sigil" 			=> "blue",
     "identifier" 		=> "green",
-    "quote" 			=> "orange"		
+    "quote" 			=> "orange",	
+    "number"            => "orange",
 );
 
 =item highlight_perl6
@@ -71,7 +74,7 @@ HTML
  																	
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
-        $str .= $text;
+        $str .= escape_html($text);
         $at = $_->[0];
     
         if ($_->[1] eq 'from') {
@@ -88,6 +91,19 @@ HTML
 HTML
 
     $str;
+}
+
+sub escape_html {
+    my $str = shift;
+    my %esc = (
+        '<'     => '&lt;',
+        '>'     => '&gt;',
+        '"'     => '&quot;',
+        '&'     => '&amp;'
+    );
+    my $re = join '|', map quotemeta, keys %esc;
+    $str =~ s/($re)/$esc{$1}/g;
+    return $str;
 }
 
 print highlight_match($what=>$r,{}),"\n";
