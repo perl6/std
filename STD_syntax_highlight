@@ -7,11 +7,14 @@ use YAML::XS;
 use Encode;
 use strict;
 use warnings;
+use English;
 use Getopt::Long;
+
 my $nocolor = 0;
 my $horizontal = 0;
 my $yaml = 0;
 my $mark_arrays;
+
 GetOptions("nocolor"=>\$nocolor,"horizontal"=>\$horizontal,"yaml"=>\$yaml,"mark-arrays"=>\$mark_arrays);
 unless ($#ARGV <= 0) {
     die "USAGE: [--nocolor --horizontal --mark-arrays] filename [rule]\n";
@@ -23,6 +26,9 @@ my $file = shift;
 my $what = shift // 'comp_unit';
 
 my $r = STD->parsefile($file,$what);
+
+=item highlight_match
+=cut
 sub highlight_match {
     my $name = shift;
     my $r = shift;
@@ -31,11 +37,37 @@ sub highlight_match {
     traverse_match($r,$name,0,$events,$opt);
     highlight_perl6(${$r->{_orig}},$events,$opt);
 }
+
+# CSS color table
+my %css_classes = (
+    "scope_declarator"	=> "red",
+    "sigil" 			=> "blue",
+    "identifier" 		=> "green",
+    "quote" 			=> "orange"		
+);
+
+=item highlight_perl6
+=cut
 sub highlight_perl6 {
     my ($orig,$events,$opt) = @_;
     my $str = "";
     my $at = 0;
     my $indent=0;
+    my $css = "";
+    foreach my $css_class ( keys %css_classes ) {
+       my $css_color = $css_classes{$css_class};
+       $css .= ".$css_class { color: $css_color; }\n";
+    }
+    $str .= <<HTML;
+<html>
+    <head>
+        <title>$PROGRAM_NAME $file</title>
+        <style type="text/css">
+        $css</style>
+    </head>
+    <body>
+HTML
+ 																	
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
         $str .= $text;
@@ -47,7 +79,14 @@ sub highlight_perl6 {
                 $str .=  '</span>';
         }
     }
+    
+    $str .= <<HTML;
+    </body>
+</html>
+HTML
+
     $str;
 }
+
 print highlight_match($what=>$r,{}),"\n";
 
