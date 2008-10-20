@@ -22,8 +22,10 @@ $(document.body).ready(function() {
             //last leaf node...
             if(lastSelectedNode) {
                 $(lastSelectedNode).css("border","");
+                $(lastSelectedNode).css("background-color","");
             }
-            $(this).css("border","1px solid black");
+            $(this).css("border","1px solid orange");
+            $(this).css("background-color","#FFF5DF");
             lastSelectedNode = this;                
         }
         rules.push(ruleName);

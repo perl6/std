@@ -98,11 +98,11 @@ $css
         position:absolute; 
         right: 10px; 
         top: 10px; 
-        width: 40%; 
         font-family: Verdana;
         color: black; 
-        background-color: white; 
-    }   
+        background-color: #FFF5DF;
+        border:1px solid orange;
+    }
     </style>    
     $jquery_js
     $js
