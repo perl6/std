@@ -1,13 +1,11 @@
 #!/usr/local/bin/perl
 
-use STD;
-use DumpMatch;
-use utf8;
-use YAML::XS;
-use Encode;
 use strict;
 use warnings;
+use utf8;
 use English;
+use STD;
+use DumpMatch;
 use Getopt::Long;
 use File::Slurp;
 
@@ -147,5 +145,5 @@ sub escape_html {
     return $str;
 }
 
-print highlight_match($what=>$r,{}),"\n";
+print highlight_match($what=>$r,{}) . "\n";
 
