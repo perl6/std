@@ -1,25 +1,44 @@
 #!/usr/local/bin/perl
 
 use strict;
+use warnings;
+use English;
+
+print <<WARNING;
+
+My job is to run tryfile over all the tests in t/spec.
+And since STD.pm is slow at the moment, this is going to take 
+too much time.
+
+You have been warned ;-)
+You can press CTRL-C when you feel bored.
+
+WARNING
+
 my $dir_to_test = shift @ARGV || '../../t/spec/';
 my $fail = 0;
 my $success = 0;
 my @files = sort `find $dir_to_test -name '*.t'`;
 chomp(@files);
-$| = 1;
+$OUTPUT_AUTOFLUSH = 1;
 
 my $total = 0+@files;
 my @failed;
 for my $file (@files) {
     print $file, "\n";
     system "./tryfile $file >tryfile.out";
-    if ($?) {
+    if ($CHILD_ERROR) {
         push(@failed,$file);
-	$fail++;
+        $fail++;
+        # catch those pesky CTRL-Cs
+        if($CHILD_ERROR &= 127) {
+            print "CTRL-C detected... bye bye\n";
+            last;
+        }
     }
     else {
-	$success++;
-	print "ok\n";
+	    $success++;
+	    print "ok\n";
     }
 }
 
@@ -27,6 +46,6 @@ printf "Passed $success/$total, %6.2f%%\n", $success/$total * 100;
 if (@failed) {
     print "Failed tests:\n";
     for my $file (@failed) {
-	print "$file\n";
+    	print "$file\n";
     }
 }
