@@ -14,36 +14,11 @@ $(document.body).ready(function() {
     var rules = [];
     var lastSelectedNode = null;
     $("span").mouseover(function(e) {
-        var ruleName = this.className;
-        var propogateEvent = true;
-        var i,r;
-        var parseTreeOutput;
-        if(rules.length == 0) {
-            //last leaf node...
-            if(lastSelectedNode) {
-                $(lastSelectedNode).css("border","");
-                $(lastSelectedNode).css("background-color","");
-            }
-            $(this).css("border","1px solid orange");
-            $(this).css("background-color","#FFF5DF");
-            lastSelectedNode = this;                
-        }
-        rules.push(ruleName);
-        if(ruleName == topLevelRuleName) {
-            parseTreeOutput = "";
-            ident = "";
-            for(i = rules.length - 1; i >= 0; i--) {
-                r = rules[i];
-                parseTreeOutput += ident + '<span class="' + r + '">' + r + '</span><br/>';
-                ident += "&nbsp;";
-            }
-            $("#parseTreeOutput").html(parseTreeOutput);
-            $("#parseTreeOutput").css("left", (Number(e.pageX)) + "px");
-            $("#parseTreeOutput").css("top", (Number(e.pageY) + 15) + "px");
-            rules = [];
-            propogateEvent = false;
-        } 
-        return propogateEvent;
+        $("span").css("border","");
+        $("span").css("background-color","");
+        $(this).css("border","1px solid orange");
+        $(this).css("background-color","#FFF5DF");
+        e.stopPropagation();
     });
 
 });
