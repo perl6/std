@@ -66,13 +66,26 @@ sub highlight_perl6 {
     }
     $str .= <<HTML;
 <html>
-    <head>
-        <title>$PROGRAM_NAME $file</title>
-        <style type="text/css">
-        $css</style>
-    </head>
-    <body>
-<pre>
+<head>
+    <title>$PROGRAM_NAME $file</title>
+    <style type="text/css">
+    $css
+    #parseTreeOutput { 
+        position:absolute; 
+        right: 10px; 
+        top: 10px; 
+        width: 20%; 
+        font-family: Verdana;
+        color: black; 
+        background-color: white; 
+    }   
+    </style>    
+    <script type="text/javascript" src="jquery-1.2.6.pack.js"></script>
+    <script type="text/javascript" src="STD_syntax_highlight.js"></script>
+</head>
+<body>
+	<div id="parseTreeOutput"></div>
+    <pre>
 HTML
  																	
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
@@ -88,14 +101,16 @@ HTML
     }
     
     $str .= <<HTML;
-</pre>
-    </body>
+    </pre>
+</body>
 </html>
 HTML
 
     $str;
 }
 
+=item escape_html
+=cut
 sub escape_html {
     my $str = shift;
     my %esc = (
