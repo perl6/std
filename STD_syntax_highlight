@@ -94,7 +94,7 @@ $css
         position:absolute; 
         right: 10px; 
         top: 10px; 
-        width: 20%; 
+        width: 40%; 
         font-family: Verdana;
         color: black; 
         background-color: white; 
