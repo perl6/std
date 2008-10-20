@@ -3,6 +3,8 @@
 use strict;
 use warnings;
 use English;
+use File::Path;
+use File::Basename;
 
 print <<WARNING;
 
@@ -26,7 +28,12 @@ my $total = 0+@files;
 my @failed;
 for my $file (@files) {
     print $file, "\n";
-    system "/usr/local/bin/perl STD_syntax_highlight $file >STD_syntax_highlight.out";
+    my $html_file = $file;
+    $html_file =~ s/\.t$/.html/;
+    $html_file =~ s/^\.\.\/\.\.\/t\/spec/html/;
+    my ($html_filename,$html_path,$html_suffix) = fileparse($html_file);
+    mkpath $html_path;
+    system "/usr/local/bin/perl STD_syntax_highlight $file >$html_file";
     if ($CHILD_ERROR) {
         push(@failed,$file);
         $fail++;
