@@ -33,7 +33,7 @@ for my $file (@files) {
     $html_file =~ s/^\.\.\/\.\.\/t\/spec/html/;
     my ($html_filename,$html_path,$html_suffix) = fileparse($html_file);
     mkpath $html_path;
-    system "/usr/local/bin/perl STD_syntax_highlight $file >$html_file";
+    system "/usr/local/bin/perl STD_syntax_highlight --clean-html $file >$html_file";
     if ($CHILD_ERROR) {
         push(@failed,$file);
         $fail++;
