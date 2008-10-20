@@ -13,6 +13,13 @@ $(document.body).ready(function() {
     
     var rules = [];
     var lastSelectedNode = null;
+    $("body").mouseover(function(e) {
+            if(lastSelectedNode) {
+                $(lastSelectedNode).css("border","");
+                $(lastSelectedNode).css("background-color","");
+            }
+            $("#parseTreeOutput").html("");
+    });
     $("span").mouseover(function(e) {
         var ruleName = this.className;
         var propogateEvent = true;
