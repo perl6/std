@@ -12,11 +12,20 @@ $(document.body).ready(function() {
     }
     
     var rules = [];
+    var lastSelectedNode = null;
     $("span").mouseover(function() {
         var ruleName = this.className;
         var propogateEvent = true;
         var i,r;
         var parseTreeOutput;
+        if(rules.length == 0) {
+            //last leaf node...
+            if(lastSelectedNode) {
+                $(lastSelectedNode).css("border","");
+            }
+            $(this).css("border","1px solid black");
+            lastSelectedNode = this;                
+        }
         rules.push(ruleName);
         if(ruleName == topLevelRuleName) {
             parseTreeOutput = "";
@@ -32,14 +41,6 @@ $(document.body).ready(function() {
         } 
         return propogateEvent;
     });
-    var lastSelectedNode = null;
-    $("span").click(function() {
-        if(lastSelectedNode) {
-            $(lastSelectedNode).css("border","");
-        }
-        $(this).css("border","1px solid black");
-        lastSelectedNode = this;
-        return false;
-    });
+
 });
 
