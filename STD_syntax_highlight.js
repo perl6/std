@@ -13,7 +13,7 @@ $(document.body).ready(function() {
     
     var rules = [];
     var lastSelectedNode = null;
-    $("span").mouseover(function() {
+    $("span").mouseover(function(e) {
         var ruleName = this.className;
         var propogateEvent = true;
         var i,r;
@@ -38,6 +38,8 @@ $(document.body).ready(function() {
                 ident += "&nbsp;";
             }
             $("#parseTreeOutput").html(parseTreeOutput);
+            $("#parseTreeOutput").css("left", (Number(e.pageX)) + "px");
+            $("#parseTreeOutput").css("top", (Number(e.pageY) + 15) + "px");
             rules = [];
             propogateEvent = false;
         } 

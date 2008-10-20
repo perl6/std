@@ -96,8 +96,6 @@ sub highlight_perl6 {
 $css
     #parseTreeOutput { 
         position:absolute; 
-        right: 10px; 
-        top: 10px; 
         font-family: Verdana;
         color: black; 
         background-color: #FFF5DF;
