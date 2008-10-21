@@ -227,7 +227,7 @@ sub _AUTOLEXpeek { my $self = shift;
 	return { PATS => ['(?#::)'] };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
-    return $self->lexers->{$key} = $self->_AUTOLEXgen($key, $retree);
+    return $self->lexers->{$key} //= $self->_AUTOLEXgen($key, $retree);
 }
 
 sub _AUTOLEXgen { my $self = shift;
@@ -307,6 +307,8 @@ sub _AUTOLEXgen { my $self = shift;
 	$AUTOLEXED{$key} = $oldfakepos;
 
 	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "DBA" => $retree->{$key}{dba} // $name};
+
+	return $lexer if $lang =~ /ANON/;
 
 	if (not -d $dir) {
 	    use File::Path 'mkpath';
@@ -463,7 +465,7 @@ sub _AUTOLEXnow { my $self = shift;
 #	    }
 	    # XXX this could be greatly compactified by just storing offsets into @pats
 	    # and just appending a single line to a single digraph cache file.
-	    if (open PATS, '>', $file) {
+	    if ($file !~ /ANON/ and open PATS, '>', $file) {
 		binmode(PATS, ":utf8");
 		print PATS join("\n", @pats, '');
 		close PATS;
@@ -938,7 +940,7 @@ sub add_macro { my $lang = shift;
     $lang->{_from} = $start->{_from};
     my $name = $lang->text;
     my $WHAT = ref $lang;
-    if ($name =~ s/:(?=[«<({[])/:sym/) {
+    if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
 	my ($sym) = $name =~ /:sym(.*)/;
 	if ($sym =~ s/^«(.*)»$/$1/) {
 	    my $ok = "'";
@@ -983,7 +985,7 @@ sub add_macro { my $lang = shift;
 	    $coercion = 'Methodcall';
 	}
 
-	my $genpkg = $WHAT . '::_' . $mangle;
+	my $genpkg = 'ANON' . substr(rand, 2);
 	my $e = <<"END";
 package $genpkg;
 use Moose ':all' => { -prefix => 'moose_' };
