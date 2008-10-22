@@ -58,9 +58,9 @@ sub highlight_perl6 {
         'jquery-1.2.6.pack.js', 
         'STD_syntax_highlight.js',
         'STD_syntax_highlight.css');
-    my $jquery_js = qq{<script type="text/javascript" src="$JQUERY_JS"></script>};
-    my $js = qq{<script type="text/javascript" src="$JS"></script>};
-    my $css = qq{<link href="$CSS" rel="stylesheet" type="text/css">};
+    my $jquery_js = qq{<script type="text/javascript" src="../$JQUERY_JS"></script>};
+    my $js = qq{<script type="text/javascript" src="../$JS"></script>};
+    my $css = qq{<link href="../$CSS" rel="stylesheet" type="text/css">};
     if(!$clean_html) {
         $jquery_js = read_file($JQUERY_JS) 
             or die "Error while slurping file: $OS_ERROR\n";    
