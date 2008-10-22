@@ -20,8 +20,12 @@ GetOptions(
     "yaml"=>\$yaml,
     "mark-arrays"=>\$mark_arrays,
     "clean-html"=>\$clean_html);
-unless ($#ARGV <= 0) {
-    die "USAGE: [--nocolor --horizontal --mark-arrays --clean-html] filename [rule]\n";
+
+if ($#ARGV < 0) {
+    die <<"HELP";
+USAGE: 
+    $PROGRAM_NAME [--nocolor --horizontal --mark-arrays --clean-html] filename [rule]
+HELP
 }
 if ($nocolor) {
     $DumpMatch::NOCOLOR = 1;
@@ -42,65 +46,38 @@ sub highlight_match {
     highlight_perl6(${$r->{_orig}},$events,$opt);
 }
 
-# CSS color table
-my %css_classes = (
-    "comp_unit"             => "blue",
-    "scope_declarator"	    => "red",
-    "routine_declarator"	=> "red",
-    "regex_declarator"      => "red",
-    "statement_control"     => 'red',
-    "block"                 => "black",
-    "regex_block"           => "black",
-    "noun"                  => "black",
-    "sigil" 			    => "darkgreen",
-    "variable"  		    => "green",
-    "assertion"             => "green",
-    "quote" 			    => "orange",	
-    "number"                => "orange",
-    "infix"                 => "grey",
-);
-
 =item highlight_perl6
 =cut
 sub highlight_perl6 {
     my ($orig,$events,$opt) = @_;
     my $str = "";
     my $at = 0;
-    my $indent=0;
-    my $css = "";
-    foreach my $css_class ( sort keys %css_classes ) {
-       my $css_color = $css_classes{$css_class};
-       $css .= (" " x 4) . ".$css_class { color: $css_color; }\n";
-    }
 
     # slurp libraries and javascript to inline them
-    my ($JQUERY_JS,$JS) = ("jquery-1.2.6.pack.js", "STD_syntax_highlight.js");
+    my ($JQUERY_JS,$JS,$CSS) = (
+        'jquery-1.2.6.pack.js', 
+        'STD_syntax_highlight.js',
+        'STD_syntax_highlight.css');
     my $jquery_js = qq{<script type="text/javascript" src="$JQUERY_JS"></script>};
     my $js = qq{<script type="text/javascript" src="$JS"></script>};
+    my $css = qq{<link href="$CSS" rel="stylesheet" type="text/css">};
     if(!$clean_html) {
         $jquery_js = read_file($JQUERY_JS) 
             or die "Error while slurping file: $OS_ERROR\n";    
         $js = read_file($JS) 
-            or die "Error while slurping file: $OS_ERROR\n";    
+            or die "Error while slurping file: $OS_ERROR\n";
+        $css = read_file($CSS)
+            or die "Error while slurping file: $OS_ERROR\n";
         $jquery_js = qq{<script type="text/javascript">\n$jquery_js\n</script>};
         $js = qq{<script type="text/javascript">\n$js\n</script>};
+        $css = qq{<style type="text/css">\n$css\n</style>};
     }
 
-    $str .= <<HTML;
+    $str .= <<"HTML";
 <html>
 <head>
     <title>$PROGRAM_NAME $file</title>
-    <style type="text/css">
-$css
-    #parseTreeOutput { 
-        position:absolute; 
-        font-family: Verdana;
-        color: black; 
-        background-color: #FFF5DF;
-        border:1px solid orange;
-        opacity: 0.7;
-    }
-    </style>    
+    $css
     $jquery_js
     $js
 </head>
@@ -115,13 +92,13 @@ HTML
         $at = $_->[0];
     
         if ($_->[1] eq 'from') {
-                $str .= '<span class="'.$_->[2].'">';
+            $str .= '<span class="'.$_->[2].'">';
         } elsif ($_->[1] eq 'to') {
-                $str .=  '</span>';
+            $str .=  '</span>';
         }
     }
     
-    $str .= <<HTML;
+    $str .= <<"HTML";
     </pre>
 </body>
 </html>

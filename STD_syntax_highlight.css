@@ -1,0 +1,54 @@
+.comp_unit {
+    color: blue;
+}
+.scope_declarator {
+    color: red;
+}
+.routine_declarator {
+    color: red;
+}
+.regex_declarator {
+    color: red;
+}
+.statement_control {
+    color: red;
+}
+.block {
+    color: black;
+}
+.regex_block {
+    color: black;
+}
+.noun {
+    color: black;
+}
+.sigil {
+    color: darkgreen;
+}
+.variable {
+    color: green;
+}
+.assertion {
+    color: green;
+}
+.quote {
+    color: orange;
+}	
+.number {
+    color: orange;
+}
+.infix {
+    color: grey;
+}
+
+#parseTreeOutput {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-family: Verdana;
+    color: black;
+    background-color: #FFF5DF;
+    border: 1px solid orange;
+    opacity: 0.7;
+}
+
