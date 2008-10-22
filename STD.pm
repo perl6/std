@@ -2505,6 +2505,7 @@ rule method_def {
         | <?before '<'> <postcircumfix>
         ]
         <trait>*
+    | <?>
     ]
     <block>
 }
