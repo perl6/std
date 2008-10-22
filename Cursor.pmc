@@ -616,6 +616,7 @@ sub _AUTOLEXnow { my $self = shift;
 
 
 		    $self->deb("/ running tre match at @{[ pos($$buf) ]} /") if $DEBUG & DEBUG::lexer;
+		    $pat =~ s/\$\.\?/\$(?:.?)/;   # XXX egregious hack to not interpolate $.
 
 		    # Try Real Hard to prevent TRE from recompiling $pat
 		    state $matcher = eval(do { my $prog = <<"END" .
@@ -650,7 +651,7 @@ END
 				$C->deb("success at '", substr($$buf,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
 			    }
 			    my $tried = "";
-			    vec($tried,$last-1,1) = 1;
+			    vec($tried,$last-1,1) = 1 if $last;
 			    $_[0] = [$tried, pos($$buf) - $P, []];
 			}
 			$result;
