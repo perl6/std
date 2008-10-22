@@ -82,7 +82,19 @@ sub highlight_perl6 {
     $js
 </head>
 <body>
-	<div id="parseTreeOutput"></div>
+    <div id="parse_tree">
+        <button id="parse_tree_expand">
+            Show Syntax Tree
+        </button>
+        <button id="parse_tree_collapse">
+            Hide it
+        </button>
+        <button id="parse_tree_help">
+            Help
+        </button>
+        <div id="parse_tree_output"></div>
+    </div>
+
     <pre>
 HTML
  																	

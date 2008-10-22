@@ -41,14 +41,15 @@
     color: grey;
 }
 
-#parseTreeOutput {
+#parse_tree {
     position: absolute;
     right: 10px;
     top: 10px;
-    font-family: Verdana;
+    font: 14px Verdana;
+}
+#parse_tree_output {
     color: black;
     background-color: #FFF5DF;
     border: 1px solid orange;
     opacity: 0.7;
 }
-
