@@ -990,18 +990,15 @@ token infixish {
             %<O><assoc> = 'left';
         }
     | <infix>
-       [
-       | ''
            { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
-       | <?before '='> <infix_postfix_meta_operator($<infix>)>
-           { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
-       ]
     | <infix_prefix_meta_operator>
         { $<O> = $<infix_prefix_meta_operator><O>;
           $<sym> = $<infix_prefix_meta_operator><sym>; }
     | <infix_circumfix_meta_operator>
         { $<O> = $<infix_circumfix_meta_operator><O>;
           $<sym> = $<infix_circumfix_meta_operator><sym>; }
+    | <infix> <?before '='> <infix_postfix_meta_operator($<infix>)>
+           { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
     ]
 }
 

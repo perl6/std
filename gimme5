@@ -565,6 +565,7 @@ END
             local $ALTNAME = $NAME;
             local $ALTNAMES = "00";
             my $re = regex('\\}');
+	    $re->{pkg} = $pkg;
 
             my $old = substr($all, length($all) - $remaining, $remaining - length($_)+1);
             $old =~ s/^/##      /mg;
