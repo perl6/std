@@ -1240,6 +1240,11 @@ token package_declarator:role {
     <sym> <package_def>
 }
 
+token package_declarator:knowhow {
+    :my $PKGDECL is context = 'knowhow';
+    <sym> <package_def>
+}
+
 token package_declarator:require {   # here because of declarational aspects
     <sym> <.ws>
     [
