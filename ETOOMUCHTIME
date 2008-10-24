@@ -30,6 +30,7 @@ my $total = 0+@files;
 print "Going to run $total tests... Maybe watch a movie meanwhile?\n";
 
 my $HILITE = "STD_syntax_highlight";
+my $JQUERY_JS = "jquery-1.2.6.pack.js";
 my $start_time = new Benchmark;
 my @failed;
 for my $file (@files) {
@@ -74,6 +75,7 @@ if (@failed) {
 #Copy javascript/css files and inform the user
 print "\nCopying javascript and css files to html directory..\n";
 copy("$HILITE.js","html/$HILITE.js") or die "Could not copy: $OS_ERROR\n";
+copy("$JQUERY_JS", "html/$JQUERY_JS") or die "Could not copy: $OS_ERROR\n";
 copy("$HILITE.css", "html/$HILITE.css") or die "Could not copy: $OS_ERROR\n";
 print "\nThe output is now in the html directory. Thanks for your time ;-)\n";
 

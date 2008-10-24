@@ -16,18 +16,18 @@ use DumpMatch;
 
 =head1 NAME
 
-STD_Syntax_Highlighter
+STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 
 =head1 SYNOPSIS
 
-# generate complete html with inlined resources for rule comp_unit
-STD_Syntax_Highlighter foo.pl
+    # print html output with inlined resources for 'comp_unit'
+    STD_syntax_highlight foo.pl
 
-# generate separate html, css and javascript files
-STD_Syntax_Highlighter --clean-html foo.pl
+    # print separate html, css and javascript files
+    STD_syntax_highlight --clean-html foo.pl
 
-# the top level rule is now statementlist
-STD_Syntax_Highlighter foo.pl statementlist
+    # print html for with 'statementlist' as the top-level rule
+    STD_syntax_highlight foo.pl statementlist
 
 =head1 SUBROUTINES
 
@@ -122,19 +122,19 @@ sub highlight_perl6 {
 
     <pre>
 HTML
- 																	
+
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
         $str .= escape_html($text);
         $at = $_->[0];
-    
+
         if ($_->[1] eq 'from') {
             $str .= '<span class="'.$_->[2].'">';
         } elsif ($_->[1] eq 'to') {
             $str .=  '</span>';
         }
     }
-    
+
     $str .= <<"HTML";
     </pre>
 </body>
@@ -162,6 +162,17 @@ sub escape_html {
 }
 
 =back
+
+=head1 AUTHOR
+
+Written by Ahmad M. Zawawi (azawawi), Moritz Lenz and Pawe. Murias (pmurias)
+
+The project idea was inspired by Moritz Lenz (moritz)
+See http://www.nntp.perl.org/group/perl.perl6.users/2008/07/msg788.html
+
+The initial STD tree traversal code was written by Pawe. Murias (pmurias).
+
+The browser code was written by Ahmad M. Zawawi (azawawi)
 =cut
 
 # and finally print out the html code
