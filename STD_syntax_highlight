@@ -37,8 +37,11 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 
 #process the command line
 my $clean_html = 0;
+my $simple;
 GetOptions(
-    "clean-html"=>\$clean_html);
+    "clean-html"=>\$clean_html,
+    "simple"=>\$simple
+);
 
 if ($#ARGV < 0) {
     die <<"HELP";
@@ -65,7 +68,11 @@ sub highlight_match {
     my $opt = shift || {};
     my $events = [];
     traverse_match($r,$name,0,$events,$opt);
-    highlight_perl6(${$r->{_orig}},$events,$opt);
+    if ($simple) {
+        highlight_perl6_simple(${$r->{_orig}},$events,$opt);
+    } else {
+        highlight_perl6(${$r->{_orig}},$events,$opt);
+    }
 }
 
 =item highlight_perl6
@@ -157,6 +164,31 @@ HTML
 
     $str;
 }
+sub highlight_perl6_simple {
+    my ($orig,$events,$opt) = @_;
+    my $str = "";
+    my $at = 0;
+    my $color = '';
+    for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
+        my $text = substr($orig,$at,$_->[0]-$at);
+        $str .= escape_html($text);
+        $at = $_->[0];
+        my %color = (sigil=>'DarkGreen',quote=>'Brown');
+        if ($_->[1] eq 'from') {
+            my $new_color = $color{$_->[2]} || '';
+            if ($color ne $new_color) {
+                if ($color) {
+                    $str .= "</span>";
+                } 
+                $color = $new_color;
+                if ($color) {
+                    $str .= "<span style=\"color: $color\">";
+                }
+            }
+        }
+    }
+    $str;
+}
 
 =item escape_html
 
@@ -179,12 +211,12 @@ sub escape_html {
 
 =head1 AUTHOR
 
-Written by Ahmad M. Zawawi (azawawi), Moritz Lenz and Pawe. Murias (pmurias)
+Written by Ahmad M. Zawawi (azawawi), Moritz Lenz and Paweł Murias (pmurias)
 
 The project idea was inspired by Moritz Lenz (moritz)
 See http://www.nntp.perl.org/group/perl.perl6.users/2008/07/msg788.html
 
-The initial STD tree traversal code was written by Pawe. Murias (pmurias).
+The initial STD tree traversal code was written by Paweł Murias (pmurias).
 
 The browser code was written by Ahmad M. Zawawi (azawawi)
 =cut
