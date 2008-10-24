@@ -164,30 +164,78 @@ HTML
 
     $str;
 }
+
+=item highlight_perl6_simple
+    
+This is same as C<highlight_perl> when --simple is used.
+No more javascript tree viewer or anything fancy. Only SPANs
+that make a color change are printed.
+=cut
 sub highlight_perl6_simple {
     my ($orig,$events,$opt) = @_;
     my $str = "";
     my $at = 0;
     my $color = '';
+    my %colors = ();
+
+    my $CSS = "STD_syntax_highlight.css";
+    open CSS_FILE, $CSS
+        or die "Could not open $CSS: $OS_ERROR\n";
+    my $line;
+    my $css_class;
+    while($line = <CSS_FILE>) {
+        if($line =~ /^\s*\.(\w+)/) {
+            $css_class = $1;
+        } elsif($line =~ /color\s*:\s*(\w+)/) {
+            $colors{$css_class} = $1;
+        }
+    }
+    close CSS_FILE;
+
+    # slurp libraries and javascript to inline them
+    my $css = qq{<link href="../$CSS" rel="stylesheet" type="text/css">};
+    if(!$clean_html) {
+        $css = read_file($CSS)
+            or die "Error while slurping file: $OS_ERROR\n";
+        $css = qq{<style type="text/css">\n$css\n</style>};
+    }
+
+    $str .= <<"HTML";
+<html>
+<head>
+    <title>$PROGRAM_NAME $file</title>
+    $css
+</head>
+<body>
+    <pre>
+HTML
+ 
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
         $str .= escape_html($text);
         $at = $_->[0];
-        my %color = (sigil=>'DarkGreen',quote=>'Brown');
         if ($_->[1] eq 'from') {
-            my $new_color = $color{$_->[2]} || '';
+            my $rule = $_->[2];
+            my $new_color = $colors{$rule} || '';
             if ($color ne $new_color) {
                 if ($color) {
                     $str .= "</span>";
                 } 
                 $color = $new_color;
                 if ($color) {
-                    $str .= "<span style=\"color: $color\">";
+                    $str .= qq{<span style="color: $color">};
                 }
             }
         }
     }
-    $str;
+    
+    $str .= <<"HTML";
+    </pre>
+</body>
+</html>
+HTML
+
+   $str;
 }
 
 =item escape_html
