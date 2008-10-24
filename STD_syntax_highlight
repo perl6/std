@@ -140,7 +140,7 @@ HTML
         } else {
             $str .= $esc_text;
         }
-        
+
         if ($_->[1] eq 'from') {
             $curr_rule = $_->[2];
             $str .= '<span class="'.$curr_rule.'">';
