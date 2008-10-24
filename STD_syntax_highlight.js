@@ -1,9 +1,9 @@
 $(document.body).ready(function() {
     //find first span after pre and use it as top-level node
-    var topLevelRuleName = "";
-    var lastSelectedNode;
-    var rules;
+    var topLevelRuleName = null;
+    var lastSelectedNode = null;
     var keepResults = false;
+    var timeoutId = null;
 
     $("pre > span").each(function(index,value) {
         topLevelRuleName = this.className;
@@ -15,88 +15,84 @@ $(document.body).ready(function() {
     }
     $("#parse_tree_output").html("Found " + $("span").size() + " node(s)");
 
-    function bind_body_mouseover() {
-        lastSelectedNode = null;
-        $("body").mouseover(function(e) {
-            if(keepResults) {
-                return;
-            }
-            
-            if(lastSelectedNode) {
+    function updateTree(node) {
+        if(lastSelectedNode) {
                 $(lastSelectedNode).css("border","");
                 $(lastSelectedNode).css("background-color","");
-            }
-            $("#parse_tree_output").html("...");
-        });
+        }
+        $(node).css("border","1px solid orange");
+        $(node).css("background-color","#FFF5DF");
+        lastSelectedNode = node;
+        var output = "";
+        var ident = "";
+        var rules = new Array();
+        var ruleName;
+        do {
+            var ruleName = node.className;
+            var r = ruleName;
+            rules.push(ruleName);
+            node = node.parentNode;
+        } while(ruleName != topLevelRuleName)
+        for(var i = rules.length - 1; i >= 0; i--) {
+                var r = rules[i];
+                output += ident + '<span class="' + r + '">' + r + '</span><br/>';
+                ident += "&nbsp;";
+        }
+        $("#parse_tree_output").html(output);
     }
-    
-    function bind_span_mouseover() {
-        rules = [];
-        $("span").mouseover(function(e) {
+
+    function bind_node_highlighter() {
+        $(document.body).mousemove(function(e) {
             if(keepResults) {
-                return;
+                return false;
             }
-            
-            var ruleName = this.className;
-            var propogateEvent = true;
-            var i,r;
-            var output;
-            if(rules.length == 0) {
-                //last leaf node...
+            var node =  $.browser.msie ? e.srcElement : e.target;
+            if(node.nodeName == "PRE") {
                 if(lastSelectedNode) {
                     $(lastSelectedNode).css("border","");
                     $(lastSelectedNode).css("background-color","");
+                    lastSelectedNode = null;
                 }
-                $(this).css("border","1px solid orange");
-                $(this).css("background-color","#FFF5DF");
-                lastSelectedNode = this;
+                $("#parse_tree_output").html("... ");
+                return false;
             }
-            rules.push(ruleName);
-            if(ruleName == topLevelRuleName) {
-                output = "";
-                ident = "";
-                for(i = rules.length - 1; i >= 0; i--) {
-                    r = rules[i];
-                    output += ident + '<span class="' + r + '">' + r + '</span><br/>';
-                    ident += "&nbsp;";
-                }
-                $("#parse_tree_output").html(output);
-                rules = [];
-                propogateEvent = false;
+            if (lastSelectedNode == node || node.nodeName != "SPAN") {
+                return false;
             }
-            return propogateEvent;
-        });
+            
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(function() { updateTree(node) }, 100);
+            return false;
+        });  
     }
     
     function bind_clicks() {
-        $("span").click(function(e) {
-            if(keepResults) {
-                if(lastSelectedNode) {
-                    $(lastSelectedNode).css("border","");
-                    $(lastSelectedNode).css("background-color","");
+        $(document.body).click(function(e) {
+            var node =  $.browser.msie ? e.srcElement : e.target;
+            if(node.nodeName == "SPAN") {
+                if(keepResults) {
+                    if(lastSelectedNode) {
+                        $(lastSelectedNode).css("border","");
+                        $(lastSelectedNode).css("background-color","");
+                    }
+                } else {
+                    $(node).css("border","1px solid black");
+                    lastSelectedNode = node;
                 }
+                keepResults = !keepResults;
             } else {
-                $(this).css("border","1px solid black");
-                lastSelectedNode = this;
-            }
-            keepResults = !keepResults;
-            return false;
-        });
-        $("body").click(function(e) {
-            if(keepResults) {
                 if(lastSelectedNode) {
-                    $(lastSelectedNode).css("border","");
-                    $(lastSelectedNode).css("background-color","");
+                        $(lastSelectedNode).css("border","");
+                        $(lastSelectedNode).css("background-color","");
                 }
                 keepResults = false;
             }
+            return false;
         });
-    
-    }
+     }
     
     function bind_events() {
-        bind_body_mouseover();
-        bind_span_mouseover();
+        bind_node_highlighter();
         bind_clicks();
     }
 
@@ -106,8 +102,7 @@ $(document.body).ready(function() {
     
     function unbind_events() {
         $("#parse_tree_output").html("Unbinding events... Please wait");
-        $("span").unbind();
-        $("body").unbind();
+        $(document.body).unbind();
     }
     
     $("#parse_tree_collapse").hide();
