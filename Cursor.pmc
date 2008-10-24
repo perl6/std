@@ -986,7 +986,8 @@ sub add_macro { my $lang = shift;
 	    $coercion = 'Methodcall';
 	}
 
-	my $genpkg = 'ANON' . substr(rand, 2);
+	state $genpkg = 'ANON000';
+	$genpkg++;
 	my $e = <<"END";
 package $genpkg;
 use Moose ':all' => { -prefix => 'moose_' };
