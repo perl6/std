@@ -1,41 +1,63 @@
 #!/usr/local/bin/perl
 
+# Core modules
 use strict;
 use warnings;
 use utf8;
 use English;
-use STD;
-use DumpMatch;
 use Getopt::Long;
+
+# CPAN modules
 use File::Slurp;
 
-my $nocolor = 0;
-my $horizontal = 0;
-my $yaml = 0;
-my $mark_arrays;
+# And finally our modules
+use STD;
+use DumpMatch;
+
+=head1 NAME
+
+STD_Syntax_Highlighter
+
+=head1 SYNOPSIS
+
+# generate complete html with inlined resources for rule comp_unit
+STD_Syntax_Highlighter foo.pl
+
+# generate separate html, css and javascript files
+STD_Syntax_Highlighter --clean-html foo.pl
+
+# the top level rule is now statementlist
+STD_Syntax_Highlighter foo.pl statementlist
+
+=head1 SUBROUTINES
+
+=over
+
+=cut
+
+#process the command line
 my $clean_html = 0;
 GetOptions(
-    "nocolor"=>\$nocolor,
-    "horizontal"=>\$horizontal,
-    "yaml"=>\$yaml,
-    "mark-arrays"=>\$mark_arrays,
     "clean-html"=>\$clean_html);
 
 if ($#ARGV < 0) {
     die <<"HELP";
 USAGE: 
-    $PROGRAM_NAME [--nocolor --horizontal --mark-arrays --clean-html] filename [rule]
+    $PROGRAM_NAME [--clean-html] filename [rule]
 HELP
 }
-if ($nocolor) {
-    $DumpMatch::NOCOLOR = 1;
-}
+
+#start parsing...
 my $file = shift;
 my $what = shift // 'comp_unit';
 
 my $r = STD->parsefile($file,$what);
 
 =item highlight_match
+
+Returns the generated Perl6 highlighted HTML from C<highlight_perl6>
+subroutine after traversing the STD parse tree using 
+DumpMatch.pm C<traverse_match>.
 =cut
 sub highlight_match {
     my $name = shift;
@@ -47,6 +69,9 @@ sub highlight_match {
 }
 
 =item highlight_perl6
+
+Generates the Perl6 highlighted HTML string for STD parse tree provided. 
+The resources can be inlined (by default) or externalized (--clean-html). 
 =cut
 sub highlight_perl6 {
     my ($orig,$events,$opt) = @_;
@@ -120,6 +145,8 @@ HTML
 }
 
 =item escape_html
+
+Converts some characters to their equivalent html entities 
 =cut
 sub escape_html {
     my $str = shift;
@@ -134,5 +161,9 @@ sub escape_html {
     return $str;
 }
 
+=back
+=cut
+
+# and finally print out the html code
 print highlight_match($what=>$r,{}) . "\n";
 
