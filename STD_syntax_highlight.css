@@ -40,6 +40,19 @@
 .infix {
     color: DimGray;
 }
+.methodop {
+    color: black;
+    font-weight: bold;
+}
+
+._routine {
+    color: DarkRed;
+    font-weight: bold;
+}
+._type {
+    color: DarkBlue;
+    font-weight: bold;
+}
 
 #parse_tree {
     position: absolute;
