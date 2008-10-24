@@ -34,7 +34,7 @@ my $start_time = new Benchmark;
 my @failed;
 for my $file (@files) {
     my $html_file = $file;
-    $html_file =~ s/\.t$/.html/;
+    $html_file =~ s/\/([^\/]+)\.t$/\/_$1.html/;
     $html_file =~ s/^\.\.\/\.\.\/t\/spec/html/;
     my ($html_filename,$html_path,$html_suffix) = fileparse($html_file);
     mkpath $html_path;
@@ -71,6 +71,7 @@ if (@failed) {
     }
 }
 
+#Copy javascript/css files and inform the user
 print "\nCopying javascript and css files to html directory..\n";
 copy("$HILITE.js","html/$HILITE.js") or die "Could not copy: $OS_ERROR\n";
 copy("$HILITE.css", "html/$HILITE.css") or die "Could not copy: $OS_ERROR\n";
