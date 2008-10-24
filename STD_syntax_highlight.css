@@ -1,44 +1,44 @@
 .comp_unit {
-    color: blue;
+    color: Blue;
 }
 .scope_declarator {
-    color: red;
+    color: DarkRed;
 }
 .routine_declarator {
-    color: red;
+    color: DarkRed;
 }
 .regex_declarator {
-    color: red;
+    color: DarkRed;
 }
 .statement_control {
-    color: red;
+    color: DarkRed;
 }
 .block {
-    color: black;
+    color: Black;
 }
 .regex_block {
-    color: black;
+    color: Black;
 }
 .noun {
-    color: black;
+    color: Black;
 }
 .sigil {
-    color: darkgreen;
+    color: DarkGreen;
 }
 .variable {
-    color: green;
+    color: DarkGreen;
 }
 .assertion {
-    color: green;
+    color: Darkgreen;
 }
 .quote {
-    color: orange;
-}	
+    color: Brown;
+}   
 .number {
-    color: orange;
+    color: DarkOrange;
 }
 .infix {
-    color: grey;
+    color: DimGray;
 }
 
 #parse_tree {
