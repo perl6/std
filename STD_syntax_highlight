@@ -209,32 +209,37 @@ sub highlight_perl6_simple {
 <body>
     <pre>
 HTML
-
-    my $first = 1;
+    my $curr_rule = q{};
+    my @rules = (); 
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
-        $str .= escape_html($text);
+        my $esc_text .= escape_html($text);
         $at = $_->[0];
-        if ($_->[1] eq 'from') {
-            my $rule = $_->[2];
-            my $new_color = $colors{$rule} || '';
-            if ($color ne $new_color) {
-                if ($first) {
-                    $first = 0;
-                } else {
-                    $str .= "</span>";
-                } 
-                $color = $new_color;
-                if ($color) {
-                    $str .= qq{<span style="color: $color">};
-                }
+
+        if($curr_rule eq 'identifier') {
+            if($r->is_type($text)) {
+                $str .= qq{<span class="_type">$esc_text</span>};
+            } elsif($r->is_routine($text)) {
+                $str .= qq{<span class="_routine">$esc_text</span>};
+            } else {
+                $str .= $esc_text;
             }
+        } else {
+            $str .= $esc_text;
+        }
+
+        if ($_->[1] eq 'from') {
+            $curr_rule = $_->[2];
+            push @rules, $curr_rule;
+            my $has_color = $colors{$curr_rule};
+            $str .= '<span class="'.$curr_rule.'">' if $has_color;
+        } elsif ($_->[1] eq 'to') {
+            my $rule = pop @rules;
+            my $has_color = $colors{$rule};
+            $str .=  '</span>' if $has_color;
         }
     }
-    unless ($first) {
-        $str .= "</span>";
-    }
-    $str .= <<"HTML";
+   $str .= <<"HTML";
     </pre>
 </body>
 </html>
