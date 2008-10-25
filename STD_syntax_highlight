@@ -210,6 +210,7 @@ sub highlight_perl6_simple {
     <pre>
 HTML
 
+    my $first = 1;
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
         $str .= escape_html($text);
@@ -218,7 +219,9 @@ HTML
             my $rule = $_->[2];
             my $new_color = $colors{$rule} || '';
             if ($color ne $new_color) {
-                if ($color) {
+                if ($first) {
+                    $first = 0;
+                } else {
                     $str .= "</span>";
                 } 
                 $color = $new_color;
@@ -228,7 +231,9 @@ HTML
             }
         }
     }
-
+    unless ($first) {
+        $str .= "</span>";
+    }
     $str .= <<"HTML";
     </pre>
 </body>
