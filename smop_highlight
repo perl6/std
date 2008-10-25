@@ -1,0 +1,85 @@
+#!/usr/local/bin/perl
+
+use strict;
+use warnings;
+use English;
+use Benchmark;
+use File::Path;
+use File::Basename;
+use File::Copy;
+
+print <<WARNING;
+
+My job is to run STD_syntax_highlight over *.pm in v6/smop/src-s1p.
+And since STD.pm is slow at the moment, this is going to take 
+too much time.
+
+You have been warned ;-)
+You can press CTRL-C when you feel bored.
+
+WARNING
+
+my $dir_to_test = '../../v6/smop/src-s1p';
+my $OUTPUT_DIR = 'html_smop';
+my $fail = 0;
+my $success = 0;
+my @files = sort `find $dir_to_test -name '*.pm'`;
+chomp(@files);
+$OUTPUT_AUTOFLUSH = 1;
+
+my $total = 0+@files;
+print "Going to run $total files... Maybe watch a movie meanwhile?\n";
+
+my $HILITE = "STD_syntax_highlight";
+my $JQUERY_JS = "jquery-1.2.6.pack.js";
+my $start_time = new Benchmark;
+my @failed;
+for my $file (@files) {
+    my $html_file = $file;
+    $html_file .= ".html";
+    $html_file =~ s{^\.\./\.\./v6/smop}{$OUTPUT_DIR};
+    my ($html_filename,$html_path,$html_suffix) = fileparse($html_file);
+    mkpath $html_path;
+   
+    #run the process and time it
+    print "\n$file" . "\n    -> $html_file\n";
+    my $t0 = new Benchmark;
+    system "./$HILITE --clean-html $file >$html_file";
+    print "It took " . 
+        timestr(timediff(new Benchmark,$t0),"noc") . "\n";
+
+    if ($CHILD_ERROR) {
+        push(@failed,$file);
+        $fail++;
+        # catch those pesky CTRL-Cs
+        if($CHILD_ERROR &= 127) {
+            print "CTRL-C detected... bye bye\n";
+            last;
+        }
+    } else {
+	    $success++;
+	    print "ok\n";
+    }
+}
+
+printf "\nPassed $success/$total, %6.2f%%\n", $success/$total * 100;
+print "It took " .
+    timestr(timediff(new Benchmark,$start_time),"noc") . "\n";
+
+if (@failed) {
+    print "Failed files:\n";
+    for my $file (@failed) {
+    	print "$file\n";
+    }
+}
+
+#Copy javascript/css files and inform the user
+print "\nCopying javascript and css files to $OUTPUT_DIR directory..\n";
+copy("$HILITE.js","$OUTPUT_DIR/$HILITE.js") 
+    or die "Could not copy: $OS_ERROR\n";
+copy("$JQUERY_JS", "$OUTPUT_DIR/$JQUERY_JS") 
+    or die "Could not copy: $OS_ERROR\n";
+copy("$HILITE.css", "$OUTPUT_DIR/$HILITE.css") 
+    or die "Could not copy: $OS_ERROR\n";
+print "\nThe output is now in the $OUTPUT_DIR directory. Thanks for your time ;-)\n";
+
