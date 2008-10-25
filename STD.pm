@@ -2580,6 +2580,7 @@ token signature {
     [
     | <?before '-->' | ')' | '{' >
     | <parameter>
+    | '[' ~ ']' <signature>
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
