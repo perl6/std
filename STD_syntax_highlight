@@ -166,7 +166,7 @@ HTML
 }
 
 =item highlight_perl6_simple
-    
+
 This is same as C<highlight_perl> when --simple is used.
 No more javascript tree viewer or anything fancy. Only SPANs
 that make a color change are printed.
@@ -209,7 +209,7 @@ sub highlight_perl6_simple {
 <body>
     <pre>
 HTML
- 
+
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
         $str .= escape_html($text);
@@ -228,7 +228,7 @@ HTML
             }
         }
     }
-    
+
     $str .= <<"HTML";
     </pre>
 </body>
