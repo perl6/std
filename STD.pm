@@ -2648,6 +2648,8 @@ token param_var {
 
 token parameter {
     :my $kind;
+    :my $quant = '';
+    :my $q;
 
     # XXX fake out LTM till we get * working right
     <?before
@@ -2662,19 +2664,21 @@ token parameter {
 
     <type_constraint>*
     [
-    | $<slurp> = [ $<quant>=[ '*' ] <param_var> ]
-        { $kind = '*' }
-    | $<slurp> = [ $<quant>=[ '|' ] <param_var> ]
-        { $kind = '*' }
+    | '*' <param_var>   { $quant = '*'; $kind = '*'; }
+    | '|' <param_var>   { $quant = '|'; $kind = '*'; }
     |   [
-	| <named_param> { $kind = '*'; }
-        | <param_var> { $kind = '!'; }
+        | <param_var>   { $quant = ''; $kind = '!'; }
+	| <named_param> { $quant = ''; $kind = '*'; }
         ]
-        [ $<quant> = <[ ? ! ]> { $kind = $<quant> } ]?
-    | <?> { $kind = '!' }
+        [
+        | '?'           { $quant = '?'; $kind = '?' }
+        | '!'           { $quant = '!'; $kind = '!' }
+        | <?>
+        ]
+    | <?>               { $quant = ''; $kind = '!'; }
     ]
-    <.ws>
 
+    <.ws>
     $<subsig> = [
 	'[' ~ ']' <signature>
 	<.ws>
@@ -2686,13 +2690,19 @@ token parameter {
 
     [
         <default_value> {{
-            given $<quant> {
+            given $quant {
               when '!' { $¢.panic("Can't put a default on a required parameter") }
               when '*' { $¢.panic("Can't put a default on a slurpy parameter") }
+              when '|' { $¢.panic("Can't put a default on a capture parameter") }
             }
             $kind = '?';
         }}
     ]?
+
+    {
+        $<quant> = $quant;
+        $<kind> = $kind;
+    }
 
     # enforce zone constraints
     {{
@@ -2711,7 +2721,7 @@ $¢.panic("Can't put required parameter after variadic parameters");
                 given $+zone {
                     when 'posreq' { $+zone = 'posopt' }
                     when 'var' {
-$¢.panic("Can't put optional positional parameter after slurpy parameters");
+$¢.panic("Can't put optional positional parameter after variadic parameters");
                     }
                 }
             }
