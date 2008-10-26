@@ -34,18 +34,24 @@ my $JQUERY_JS = "jquery-1.2.6.pack.js";
 my $start_time = new Benchmark;
 my @failed;
 for my $file (@files) {
-    my $html_file = $file;
-    $html_file =~ s/\/([^\/]+)\.t$/\/_$1.html/;
-    $html_file =~ s/^\.\.\/\.\.\/t\/spec/html/;
-    my ($html_filename,$html_path,$html_suffix) = fileparse($html_file);
+    my $myfile = $file;
+    $myfile =~ s/^\.\.\/\.\.\/t\/spec/html/;   
+    my ($simple_html,$full_html) = ("$myfile.simple.html", "$myfile.html");
+    my ($html_filename,$html_path,$html_suffix) = fileparse($full_html);
     mkpath $html_path;
    
     #run the process and time it
-    print "\n$file" . "\n    -> $html_file\n";
+    print <<"OUT";
+
+$file
+    -> $full_html
+    -> $simple_html
+OUT
+
     my $t0 = new Benchmark;
-    system "./$HILITE --clean-html $file >$html_file";
+    system "./$HILITE --clean-html --simple-html=$simple_html --full-html=$full_html $file";
     print "It took " . 
-        timestr(timediff(new Benchmark,$t0),"noc") . "\n";
+        timestr(timediff(new Benchmark,$t0),"nop") . "\n";
 
     if ($CHILD_ERROR) {
         push(@failed,$file);
