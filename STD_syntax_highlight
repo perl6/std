@@ -39,13 +39,15 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 
 #process the command line
 my $clean_html = 0;
-my $simple;
+my $simple = 0;
+my $help = 0;
 GetOptions(
     "clean-html"=>\$clean_html,
-    "simple"=>\$simple
+    "simple"=>\$simple,
+    "help"=>\$help
 );
 
-if ($#ARGV < 0) {
+if ($#ARGV < 0 || $help) {
     die <<"HELP";
 USAGE: 
     $PROGRAM_NAME [--clean-html] filename [rule]
@@ -55,6 +57,10 @@ HELP
 #start parsing...
 my $file = shift;
 my $what = shift // 'comp_unit';
+
+unless(-r $file) {
+    die "Could not open '$file' for reading\n";
+}
 
 my $r = STD->parsefile($file,$what);
 
