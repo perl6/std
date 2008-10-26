@@ -222,35 +222,40 @@ sub highlight_perl6_simple {
 HTML
     my $curr_rule = q{};
     my @rules = (); 
+    my $code = "";
     for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
         my $text = substr($orig,$at,$_->[0]-$at);
         my $esc_text .= escape_html($text);
         $at = $_->[0];
 
+        # process types, routines and identifiers
         if($curr_rule eq 'identifier') {
             if($r->is_type($text)) {
-                $str .= qq{<span class="_type">$esc_text</span>};
+                $code .= qq{<span class="_type">$esc_text</span>};
             } elsif($r->is_routine($text)) {
-                $str .= qq{<span class="_routine">$esc_text</span>};
+                $code .= qq{<span class="_routine">$esc_text</span>};
             } else {
-                $str .= $esc_text;
+                $code .= $esc_text;
             }
         } else {
-            $str .= $esc_text;
+            $code .= $esc_text;
         }
 
         if ($_->[1] eq 'from') {
             $curr_rule = $_->[2];
             push @rules, $curr_rule;
             my $has_color = $colors{$curr_rule};
-            $str .= '<span class="'.$curr_rule.'">' if $has_color;
+            $code .= '<span class="'.$curr_rule.'">' if $has_color;
         } elsif ($_->[1] eq 'to') {
             my $rule = pop @rules;
             my $has_color = $colors{$rule};
-            $str .=  '</span>' if $has_color;
+            $code .=  '</span>' if $has_color;
         }
     }
-   $str .= <<"HTML";
+    # process comments
+    $code =~ s{(#[^\n]*)}{<span class="_comment">$1</span>}g;
+    $str .= $code;
+    $str .= <<"HTML";
     </pre>
 </body>
 </html>

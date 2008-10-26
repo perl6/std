@@ -53,6 +53,10 @@
     color: DarkBlue;
     font-weight: bold;
 }
+._comment {
+    color: DarkGreen;
+    font-weight: bold;
+}
 
 #parse_tree {
     position: absolute;
