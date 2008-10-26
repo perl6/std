@@ -29,8 +29,8 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     # print html for with 'statementlist' as the top-level rule
     STD_syntax_highlight foo.pl statementlist
 
-    # print out only simple html/css
-    STD_syntax_highlight --simple foo.pl
+    # write only simple html/css to simple.html
+    STD_syntax_highlight --simple-html=simple.html foo.pl
 =head1 SUBROUTINES
 
 =over
@@ -38,19 +38,31 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 =cut
 
 #process the command line
-my $clean_html = 0;
-my $simple = 0;
-my $help = 0;
+my ($clean_html,$help) = (0,0);
+my ($simple_html,$full_html) = (0,'-');
 GetOptions(
     "clean-html"=>\$clean_html,
-    "simple"=>\$simple,
+    "simple-html=s"=>\$simple_html,
+    "full-html=s"=>\$full_html,
     "help"=>\$help
 );
 
 if ($#ARGV < 0 || $help) {
     die <<"HELP";
 USAGE: 
-    $PROGRAM_NAME [--clean-html] filename [rule]
+    $PROGRAM_NAME [options] filename [rule]
+
+    where options can be one of the following:
+
+    --clean-html    
+        generates separate html,css and javascript
+
+    --simple-html=filename
+        simple mode output filename (disabled by default, - for STDOUT)  
+
+    --full-html=filename   
+        full mode output filename (enabled by default, - for STDOUT)
+    
 HELP
 }
 
@@ -76,10 +88,27 @@ sub highlight_match {
     my $opt = shift || {};
     my $events = [];
     traverse_match($r,$name,0,$events,$opt);
-    if ($simple) {
-        highlight_perl6_simple(${$r->{_orig}},$events,$opt);
-    } else {
-        highlight_perl6(${$r->{_orig}},$events,$opt);
+    if($simple_html) {
+        my $output = highlight_perl6_simple(${$r->{_orig}},$events,$opt);
+        if($simple_html eq '-') {
+            print $output;
+        } else {
+            open FILE, ">$simple_html" or
+                die "Cannot open $simple_html for writing: $OS_ERROR\n";
+            print FILE $output;
+            close FILE;
+        }
+    }
+    if($full_html) {
+        my $output = highlight_perl6(${$r->{_orig}},$events,$opt);
+        if($full_html eq '-') {
+            print $output;
+        } else {
+            open FILE, ">$full_html" or
+                die "Cannot open $full_html for writing: $OS_ERROR\n";
+            print FILE $output;
+            close FILE;
+        }
     }
 }
 
@@ -296,5 +325,5 @@ The browser code was written by Ahmad M. Zawawi (azawawi)
 =cut
 
 # and finally print out the html code
-print highlight_match($what=>$r,{}) . "\n";
+highlight_match($what=>$r,{});
 
