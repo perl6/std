@@ -29,6 +29,8 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     # print html for with 'statementlist' as the top-level rule
     STD_syntax_highlight foo.pl statementlist
 
+    # print out only simple html/css
+    STD_syntax_highlight --simple foo.pl
 =head1 SUBROUTINES
 
 =over
