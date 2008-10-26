@@ -7,6 +7,10 @@ use Benchmark;
 use File::Path;
 use File::Basename;
 use File::Copy;
+use POSIX qw(nice); 
+
+#let us play nice with others
+nice(19);
 
 print <<WARNING;
 
