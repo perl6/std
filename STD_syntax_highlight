@@ -194,8 +194,11 @@ sub highlight_perl6_simple {
     while($line = <CSS_FILE>) {
         if($line =~ /^\s*\.(\w+)/) {
             $css_class = $1;
+        } elsif($line =~ /^#\w+/) {
+            # ignore #elem colors
+            $css_class = 0;
         } elsif($line =~ /color\s*:\s*(\w+)/) {
-            $colors{$css_class} = $1;
+            $colors{$css_class} = $1 if $css_class;
         }
     }
     close CSS_FILE;
