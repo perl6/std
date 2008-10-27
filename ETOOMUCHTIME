@@ -12,7 +12,7 @@ use POSIX qw(nice);
 #let us play nice with others
 nice(19);
 
-print <<WARNING;
+print <<"WARNING";
 
 My job is to run STD_syntax_highlight over all the tests in t/spec.
 And since STD.pm is slow at the moment, this is going to take 
@@ -26,6 +26,7 @@ WARNING
 my $dir_to_test = shift @ARGV || '../../t/spec/';
 my $fail = 0;
 my $success = 0;
+print "Finding *.t in $dir_to_test... Please wait\n";
 my @files = sort `find $dir_to_test -name '*.t'`;
 chomp(@files);
 $OUTPUT_AUTOFLUSH = 1;
@@ -51,20 +52,46 @@ $file
     -> $full_html
     -> $simple_html
 OUT
-
     my $t0 = new Benchmark;
-    system "./$HILITE --clean-html --simple-html=$simple_html --full-html=$full_html $file";
+    my $cmd = "./$HILITE --clean-html " .
+            "--simple-html=$simple_html " .
+            "--full-html=$full_html $file";
+    my $log = `$cmd 2>&1`;
     print "It took " . 
         timestr(timediff(new Benchmark,$t0),"nop") . "\n";
 
     if ($CHILD_ERROR) {
         push(@failed,$file);
         $fail++;
+    
         # catch those pesky CTRL-Cs
         if($CHILD_ERROR &= 127) {
             print "CTRL-C detected... bye bye\n";
             last;
         }
+        
+        # let us write something useful into those htmls
+        # when an error occurs
+        my $error_html = <<"ERROR";
+<html><title>Error</title><body><pre>
+
+An error has occured while processing this file:
+
+filename: 
+    $file
+Reason:
+    $log
+</pre></body></html>
+ERROR
+        open SIMPLE_HTML, ">$simple_html"
+            or die "Could not open $simple_html for writing: $OS_ERROR\n";
+        print SIMPLE_HTML $error_html;       
+        close SIMPLE_HTML;
+        open FULL_HTML, ">$full_html"
+            or die "Could not open $full_html for writing: $OS_ERROR\n";
+        print FULL_HTML $error_html;
+        close FULL_HTML;
+
     } else {
 	    $success++;
 	    print "ok\n";
