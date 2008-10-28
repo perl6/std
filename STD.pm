@@ -2580,7 +2580,6 @@ token signature {
     [
     | <?before '-->' | ')' | '{' >
     | <parameter>
-    | '[' ~ ']' <signature>
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
@@ -2611,7 +2610,8 @@ rule type_constraint {
 
 rule post_constraint {
     [
-    | <multisig>
+    | '[' ~ ']' <signature>
+    | '(' ~ ')' <signature>
     | where <EXPR(item %chaining)>
     ]
 }
@@ -2628,23 +2628,27 @@ token named_param {
 }
 
 token param_var {
-    <sigil> <twigil>?
     [
-        # Is it a longname declaration?
-    || <?{ $<sigil>.text eq '&' }> <?ident> {}
-        <identifier=sublongname>
+    | '[' ~ ']' <signature>
+    | '(' ~ ')' <signature>
+    | <sigil> <twigil>?
+        [
+            # Is it a longname declaration?
+        || <?{ $<sigil>.text eq '&' }> <?ident> {}
+            <identifier=sublongname>
 
-    ||  # Is it a shaped array or hash declaration?
-        <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
-        <identifier>?
-        <?before <[ \< \( \[ \{ ]> >
-        <postcircumfix>
+        ||  # Is it a shaped array or hash declaration?
+            <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
+            <identifier>?
+            <?before <[ \< \( \[ \{ ]> >
+            <postcircumfix>
 
-        # ordinary parameter name
-    || <identifier>
+            # ordinary parameter name
+        || <identifier>
 
-        # bare sigil?
-    ]?
+            # bare sigil?
+        ]?
+    ]
 }
 
 token parameter {
@@ -2678,12 +2682,6 @@ token parameter {
         ]
     | <?>               { $quant = ''; $kind = '!'; }
     ]
-
-    <.ws>
-    $<subsig> = [
-	'[' ~ ']' <signature>
-	<.ws>
-    ]*
 
     <trait>*
 
