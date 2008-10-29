@@ -60,3 +60,5 @@ sub MAIN {
 }
 
 MAIN(@ARGV);
+
+# vim: ts=8 sw=4
