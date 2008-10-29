@@ -1,0 +1,52 @@
+#!/usr/local/bin/perl
+
+use strict;
+use warnings;
+
+use STD;
+use utf8;
+use feature 'say';
+
+$::ACTIONS = 'Actions';
+
+my @loc;
+
+sub MAIN {
+    my $output = 'ast';
+    my $file = shift;
+
+    $loc[(-s $file) - 1] = [];
+
+    STD->parsefile($file);
+
+    for my $i (0 .. @loc-2) {
+	say "$i\t@{$loc[$i]}";
+    }
+}
+
+###################################################################
+
+{ package Actions;
+
+    our $AUTOLOAD;
+
+    sub AUTOLOAD {
+	my $self = shift;
+	my $C = shift;
+	my $F = $C->{_from};
+	my $P = $C->{_pos};
+	$AUTOLOAD =~ s/^Actions:://;
+	return unless $F or $AUTOLOAD ne 'ws';
+	$loc[$P] = [] if $loc[$P];	# in case we backtracked to here
+	for ($F..$P-1) {
+	    unshift @{$loc[$_]}, $AUTOLOAD;
+	}
+    }
+
+    sub stdstopper { }
+    sub terminator { }
+    sub unitstopper { }
+    sub comp_unit { }
+}
+
+MAIN(@ARGV);
