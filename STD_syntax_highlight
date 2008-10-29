@@ -336,7 +336,6 @@ No more javascript tree viewer or anything fancy.
 Only nodes that have a color are printed. Not optimal but works ;-)
 =cut
 sub highlight_perl6_redspans {
-   # my ($orig,$events,$opt) = @_;
     my $str = "";
     my %colors = ();
 
@@ -357,7 +356,7 @@ sub highlight_perl6_redspans {
     }
     close CSS_FILE;
 
-    # slurp libraries and javascript to inline them
+    # slurp css inline it
     my $css = qq{<link href="../$CSS" rel="stylesheet" type="text/css">};
     if(!$clean_html) {
         $css = read_file($CSS)
@@ -385,7 +384,22 @@ HTML
         my $c = substr($txt,$i,1);
         my $tree = "@{$loc[$i]}";
         if($tree ne $last_tree) {
-            $str .= "\n'$buffer'\n$last_tree\n" if $buffer ne '';
+            my $rule;
+            my $rule_to_color = 0;
+            $buffer = escape_html($buffer);
+            my @rules = ();
+            @rules = reverse(split / /,$last_tree) if $last_tree ne '';
+            for $rule (@rules) {
+                if($colors{$rule} && $buffer ne '') {
+                    $rule_to_color = $rule;
+                    last;
+                }
+            }
+            if($rule_to_color) {
+                $str .= qq{<span class='$rule_to_color'>$buffer</span>};
+            } else {
+                $str .= qq{$buffer};
+            }
             $buffer = $c;
         } else {
             $buffer .= $c;
