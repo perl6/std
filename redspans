@@ -20,12 +20,18 @@ sub MAIN {
 
     STD->parsefile($file);
 
+    my ($last_tree,$buffer) = ("","");
     for my $i (0 .. @loc-1) {
-	say("Undefined $i"),next unless defined $loc[$i];
-	my $c = substr($txt,$i,1);
-	$c = '\n' if $c eq "\n";
-	$c = '\t' if $c eq "\t";
-	say "$i\t$c\t@{$loc[$i]}";
+        say("Undefined $i"),next unless defined $loc[$i];
+        my $c = substr($txt,$i,1);
+        my $tree = "@{$loc[$i]}";
+        if($tree ne $last_tree) {
+            say "\n'$buffer'\n$last_tree";
+            $buffer = $c;
+        } else {
+            $buffer .= $c;
+        }
+        $last_tree = $tree;
     }
 }
 
