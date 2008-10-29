@@ -851,7 +851,6 @@ sub cursor_fate { my $self = shift;
     # $_[0] is now ref to a $trystate;
 
     $self->deb("cursor_fate $pkg $name") if $DEBUG & DEBUG::cursors;
-    my %r = %$self;
     my $tag;
     my $try;
     my $relex;
@@ -861,14 +860,14 @@ sub cursor_fate { my $self = shift;
 	if ($fate->[0] eq $name) {
 	    $self->deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
 	    ($tag, $try, $fate) = @$fate;
-	    $r{_fate} = $fate;
-	    return (CORE::bless \%r, ref $self), $tag, $try, $relex;
+	    $self->{_fate} = $fate;
+	    return $self, $tag, $try, $relex;
 	}
 	elsif ($fate->[0] . ':*' eq $name) {
 	    $self->deb("Fate passed to $name: $$fate[3]") if $DEBUG & DEBUG::fates;
 	    ($tag, $try, $fate) = @$fate;
-	    $r{_fate} = $fate;
-	    return (CORE::bless \%r, ref $self), $tag, $try, $relex;
+	    $self->{_fate} = $fate;
+	    return $self, $tag, $try, $relex;
 	}
     }
 
@@ -877,13 +876,13 @@ sub cursor_fate { my $self = shift;
     if ($fate) {
 	$self->deb("FATE OF ${pkg}::$name: $$fate[3]") if $DEBUG & DEBUG::fates;
 	($tag, $try, $fate) = @$fate;
-	$r{_fate} = $fate;
+	$self->{_fate} = $fate;
     }
     else {
 	$self->deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
 	$tag = '';
     }
-    return (CORE::bless \%r, ref $self), $tag, $try, $relex;
+    return $self, $tag, $try, $relex;
 }
 
 sub cursor_all { my $self = shift;
@@ -1947,17 +1946,13 @@ sub _LEFTRESULT_rev { $_[0]->_LEFTWB }
 sub _REDUCE { my $self = shift;
     my $tag = shift;
 
-    my $P = $self->{_pos};
-    my $F = $self->{_from};
     $self->{_reduced} = $tag;
     if ($::ACTIONS) {
 	eval { $::ACTIONS->$tag($self) };
 	warn $@ if $@ and not $@ =~ /locate/;
     }
-    $self->deb("REDUCE $tag from $F to $P") if $DEBUG & DEBUG::matchers;
-#    $self->whats;
+    $self->deb("REDUCE $tag from " . $self->{_from} . " to " . $self->{_pos}) if $DEBUG & DEBUG::matchers;
     $self;
-#    $self->cursor($P);
 }
 
 sub _COMMITBRANCH { my $self = shift;
