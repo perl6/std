@@ -325,6 +325,7 @@ sub $name {
     }
 
     my \$C = \$self;
+    \$C->{_to} = \$C->{_from} = \$C->{_pos};
 
     my \@result = eval {
 	my \$trystate;
@@ -594,6 +595,7 @@ END
 <<DECL>>
 
     my $C = $self;
+    $C->{_to} = $C->{_from} = $C->{_pos};
 END
 
 	    for my $binding ( keys %BINDINGS ) {

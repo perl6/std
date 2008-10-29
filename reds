@@ -19,8 +19,6 @@ sub MAIN {
 
 { package Actions;
 
-    # Generic ast translation done via autoload
-
     our $AUTOLOAD;
 
     sub AUTOLOAD {

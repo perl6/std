@@ -468,11 +468,16 @@ token ws {
     | $ { $¢.moreinput }
     ]*
 
-    { $¢.<_>[$¢.pos]<ws> =
-	$¢.pos == $startpos
-	    ?? undef
-	    !! $startpos;
-    }
+    {{
+        if ($¢.pos == $startpos) {
+            $¢.<_>[$¢.pos]<ws> = undef;
+        }
+        else {
+            $¢.<_>[$¢.pos]<ws> = $startpos;
+            $¢.<_>[$¢.pos]<endstmt> = self.<_>[$startpos]<endstmt>
+                if self.<_>[$startpos]<endstmt> :exists;
+        }
+    }}
 }
 
 token unsp {
@@ -595,10 +600,10 @@ token block {
     '{' ~ '}' <statementlist>
 
     [
-    | <?before \h* $$> <.ws>	# (usual case without comments)
+    | <?before \h* $$> 	# (usual case without comments)
 	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
-    | <.unv>? $$ <.ws>
+    | <.unv>? $$
 	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
     | <.unsp>? { $¢.<_>[$¢.pos]<endargs> = 1; } {*}             #= endargs
     ]
@@ -621,10 +626,10 @@ token regex_block {
     [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
 
     [
-    | <?before \h* $$> <.ws>	# (usual case without comments)
+    | <?before \h* $$> 	# (usual case without comments)
 	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
-    | <.unv>? $$ <.ws>
+    | <.unv>? $$
 	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
     | <.unsp>? { $¢.<_>[$¢.pos]<endargs> = 1; }   {*}           #= endargs
     ]
@@ -681,13 +686,14 @@ token statement {
         || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
         ||
             :dba('statement modifier')
+            <.ws>
             [
             | <statement_mod_loop> {*}                              #= mod loop
             | <statement_mod_cond> {*}                              #= mod cond
                 :dba('statement modifier loop')
                 [
                 || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>
-                || <statement_mod_loop>? {*}                          #= mod condloop
+                || <.ws> <statement_mod_loop>? {*}                  #= mod condloop
                 ]
             ]?
         ]
@@ -700,7 +706,7 @@ token statement {
 token eat_terminator {
     [
     || ';'
-    || <?{ $¢.<_>[$¢.pos]<endstmt> }>
+    || <?{ $¢.<_>[$¢.pos]<endstmt> }> <.ws>
     || <?terminator>
     || $
     || {{ if $¢.<_>[$¢.pos]<ws> { $¢.pos = $¢.<_>[$¢.pos]<ws>; } }}   # undo any line transition
@@ -896,7 +902,6 @@ token termish {
     [ <?stdstopper> ||
 	<POST>*
     ]
-    <.ws>
 }
 
 token noun {
@@ -2492,7 +2497,7 @@ rule routine_def {
         $¢ = $+PARSER.bless($¢);
         $IN_DECL = 0;
     }>
-    <block>
+    <block>:!s
 }
 
 rule method_def {
@@ -2509,7 +2514,7 @@ rule method_def {
         <trait>*
     | <?>
     ]
-    <block>
+    <block>:!s
 }
 
 rule regex_def {
@@ -2517,7 +2522,7 @@ rule regex_def {
     [ '&'<deflongname>? | <deflongname> ]?
     [ [ ':'?'(' <signature> ')'] | <trait> ]*
     { $IN_DECL = 0; }
-    <regex_block>
+    <regex_block>:!s
 }
 
 rule macro_def {
@@ -2527,7 +2532,7 @@ rule macro_def {
         $¢ = $+PARSER.bless($¢);
         $IN_DECL = 0;
     }>
-    <block>
+    <block>:!s
 }
 
 rule trait {
@@ -3492,7 +3497,7 @@ method EXPR ($preclvl)
     loop {
         self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
-        my @t = $here.$termish;       # presumed to eat trailing ws too
+        my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
             return ();
@@ -3529,6 +3534,8 @@ method EXPR ($preclvl)
 
         loop {     # while we see adverbs
             $oldpos = $here.pos;
+            last TERM if ($here.<_>[$oldpos]<endstmt> // 0) == 2;
+            $here = $here.ws;
             my @infix = $here.cursor_fresh.infixish();
             last TERM unless @infix;
             my $infix = @infix[0];
