@@ -15,12 +15,17 @@ sub MAIN {
     my $output = 'ast';
     my $file = shift;
 
-    $loc[(-s $file) - 1] = [];
+    my $txt = Encode::decode('utf8', `cat $file`);
+    $loc[length($txt) - 1] = [];
 
     STD->parsefile($file);
 
-    for my $i (0 .. @loc-2) {
-	say "$i\t@{$loc[$i]}";
+    for my $i (0 .. @loc-1) {
+	say("Undefined $i"),next unless defined $loc[$i];
+	my $c = substr($txt,$i,1);
+	$c = '\n' if $c eq "\n";
+	$c = '\t' if $c eq "\t";
+	say "$i\t$c\t@{$loc[$i]}";
     }
 }
 
@@ -36,7 +41,6 @@ sub MAIN {
 	my $F = $C->{_from};
 	my $P = $C->{_pos};
 	$AUTOLOAD =~ s/^Actions:://;
-	return unless $F or $AUTOLOAD ne 'ws';
 	$loc[$P] = [] if $loc[$P];	# in case we backtracked to here
 	for ($F..$P-1) {
 	    unshift @{$loc[$_]}, $AUTOLOAD;
