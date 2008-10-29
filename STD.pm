@@ -10,6 +10,8 @@ my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
 my %ROUTINES;
+my $ORIG is context;
+my @MEMOS is context;
 
 # random rule for debugging, please ignore
 token foo {
@@ -450,14 +452,14 @@ token spacey { <?before \s | '#'> }
 # Lexical routines
 
 token ws {
-    :my @stub = return self if self.<_>[self.pos]<ws> :exists;
+    :my @stub = return self if @+MEMOS[self.pos]<ws> :exists;
     :my $startpos = self.pos;
 
     :dba('whitespace')
     [
-	| \h+ <![#\s\\]> { $¢.<_>[$¢.pos]<ws> = $startpos; }	# common case
+	| \h+ <![#\s\\]> { @+MEMOS[$¢.pos]<ws> = $startpos; }	# common case
 	| <?before \w> <?after \w> :::
-	    { $¢.<_>[$startpos]<ws> = undef; }
+	    { @+MEMOS[$startpos]<ws> = undef; }
 	    <!>        # must \s+ between words
     ]
     ||
@@ -470,12 +472,12 @@ token ws {
 
     {{
         if ($¢.pos == $startpos) {
-            $¢.<_>[$¢.pos]<ws> = undef;
+            @+MEMOS[$¢.pos]<ws> = undef;
         }
         else {
-            $¢.<_>[$¢.pos]<ws> = $startpos;
-            $¢.<_>[$¢.pos]<endstmt> = self.<_>[$startpos]<endstmt>
-                if self.<_>[$startpos]<endstmt> :exists;
+            @+MEMOS[$¢.pos]<ws> = $startpos;
+            @+MEMOS[$¢.pos]<endstmt> = @+MEMOS[$startpos]<endstmt>
+                if @+MEMOS[$startpos]<endstmt> :exists;
         }
     }}
 }
@@ -601,11 +603,11 @@ token block {
 
     [
     | <?before \h* $$> 	# (usual case without comments)
-	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
+	{ @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$
-	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | <.unsp>? { $¢.<_>[$¢.pos]<endargs> = 1; } {*}             #= endargs
+	{ @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
+    | <.unsp>? { @+MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
     ]
 }
 
@@ -627,11 +629,11 @@ token regex_block {
 
     [
     | <?before \h* $$> 	# (usual case without comments)
-	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
+	{ @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$
-	{ $¢.<_>[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | <.unsp>? { $¢.<_>[$¢.pos]<endargs> = 1; }   {*}           #= endargs
+	{ @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
+    | <.unsp>? { @+MEMOS[$¢.pos]<endargs> = 1; }   {*}           #= endargs
     ]
 }
 
@@ -683,7 +685,7 @@ token statement {
     | <EXPR> {*}                                                #= expr
         :dba('statement end')
         [
-        || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
+        || <?{ (@+MEMOS[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
         ||
             :dba('statement modifier')
             <.ws>
@@ -692,7 +694,7 @@ token statement {
             | <statement_mod_cond> {*}                              #= mod cond
                 :dba('statement modifier loop')
                 [
-                || <?{ ($¢.<_>[$¢.pos]<endstmt> // 0) == 2 }>
+                || <?{ (@+MEMOS[$¢.pos]<endstmt> // 0) == 2 }>
                 || <.ws> <statement_mod_loop>? {*}                  #= mod condloop
                 ]
             ]?
@@ -706,10 +708,10 @@ token statement {
 token eat_terminator {
     [
     || ';'
-    || <?{ $¢.<_>[$¢.pos]<endstmt> }> <.ws>
+    || <?{ @+MEMOS[$¢.pos]<endstmt> }> <.ws>
     || <?terminator>
     || $
-    || {{ if $¢.<_>[$¢.pos]<ws> { $¢.pos = $¢.<_>[$¢.pos]<ws>; } }}   # undo any line transition
+    || {{ if @+MEMOS[$¢.pos]<ws> { $¢.pos = @+MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
         <.panic: "Syntax error">
     ]
 }
@@ -1036,7 +1038,7 @@ token POST {
     <!stdstopper>
 
     # last whitespace didn't end here
-    <!{ $¢.<_>[$¢.pos]<ws> }>
+    <!{ @+MEMOS[$¢.pos]<ws> }>
 
     [ <.unsp> | '\\' <?before '.'> ]?
 
@@ -1924,7 +1926,6 @@ token quasiquibble ($l) {
 token nibbler {
     :my $text = '';
     :my @nibbles = ();
-    :my $buf = self.orig;
     :my $multiline = 0;
     :my $nibble;
     { $<firstpos> = self.pos; }
@@ -1944,7 +1945,7 @@ token nibbler {
                         }
         || .
                         {{
-                            my $ch = substr($$buf, $¢.pos-1, 1);
+                            my $ch = substr($ORIG, $¢.pos-1, 1);
                             $text ~= $ch;
                             if $ch ~~ "\n" {
                                 $multiline++;
@@ -2222,10 +2223,9 @@ token opener {
 # assumes whitespace is eaten already
 
 method peek_delimiters {
-    my $buf = self.orig;
     my $pos = self.pos;
     my $startpos = $pos;
-    my $char = substr($$buf,$pos++,1);
+    my $char = substr($ORIG,$pos++,1);
     if $char ~~ /^\s$/ {
 	self.panic("Whitespace not allowed as delimiter");
     }
@@ -2239,7 +2239,7 @@ method peek_delimiters {
     if not defined $rightbrack {
 	return $char, $char;
     }
-    while substr($$buf,$pos,1) eq $char {
+    while substr($ORIG,$pos,1) eq $char {
 	$pos++;
     }
     my $len = $pos - $startpos;
@@ -3368,8 +3368,8 @@ regex infixstopper {
     [
     | <?before <stopper> >
     | <?before '!!' > <?{ $+GOAL eq '!!' }>
-    | <?before '{' | <lambda> > <?{ ($+GOAL eq '{' or $+GOAL eq 'endargs') and $¢.<_>[$¢.pos]<ws> }>
-    | <?{ $+GOAL eq 'endargs' and $¢.<_>[$¢.pos]<endargs> }>
+    | <?before '{' | <lambda> > <?{ ($+GOAL eq '{' or $+GOAL eq 'endargs') and @+MEMOS[$¢.pos]<ws> }>
+    | <?{ $+GOAL eq 'endargs' and @+MEMOS[$¢.pos]<endargs> }>
     ]
 }
 
@@ -3378,14 +3378,14 @@ token stopper { <!> }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    :my @stub = return self if self.<_>[self.pos]<endstmt> :exists;
+    :my @stub = return self if @+MEMOS[self.pos]<endstmt> :exists;
     :dba('standard stopper')
     [
     | <?terminator>
     | <?unitstopper>
     | $					# unlikely, check last (normal LTM behavior)
     ]
-    { $¢.<_>[$¢.pos]<endstmt> ||= 1; }
+    { @+MEMOS[$¢.pos]<endstmt> ||= 1; }
 }
 
 # A fairly complete operator precedence parser
@@ -3534,7 +3534,7 @@ method EXPR ($preclvl)
 
         loop {     # while we see adverbs
             $oldpos = $here.pos;
-            last TERM if ($here.<_>[$oldpos]<endstmt> // 0) == 2;
+            last TERM if (@+MEMOS[$oldpos]<endstmt> // 0) == 2;
             $here = $here.ws;
             my @infix = $here.cursor_fresh.infixish();
             last TERM unless @infix;
@@ -4207,13 +4207,11 @@ method worry (Str $s) {
 }
 
 method locmess () {
-    my $orig = self.orig;
-    my $text = $$orig;
-    my $pre = substr($text, 0, self.pos);
+    my $pre = substr($+ORIG, 0, self.pos);
     my $line = self.lineof(self.pos);
     $pre = substr($pre, -40, 40);
     1 while $pre ~~ s!.*\n!!;
-    my $post = substr($text, self.pos, 40);
+    my $post = substr($+ORIG, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
     " at " ~ $COMPILING::FILE ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR";
@@ -4221,19 +4219,17 @@ method locmess () {
 
 method lineof ($p) {
     return 1 unless defined $p;
-    my $posprops = self.<_>;
-    my $line = $posprops.[$p]<L>;
+    my $line = @+MEMOS[$p]<L>;
     return $line if $line;
     $line = 1;
     my $pos = 0;
-    my $orig = self.orig;
-    my @text = split(/^/,$$orig);
+    my @text = split(/^/,$+ORIG);
     for @text {
-        $posprops.[$pos++]<L> = $line
+        @+MEMOS[$pos++]<L> = $line
             for 1 .. chars($_);
         $line++;
     }
-    return $posprops.[$p]<L> // 0;
+    return @+MEMOS[$p]<L> // 0;
 }
 
 method SETGOAL { }

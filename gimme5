@@ -115,6 +115,7 @@ sub un6 {
         $f =~ s/^\%\+?(\w+)((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
         $f =~ s/^\%\+?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
         $f =~ s/^\%\+?(\w+)\{//         	and $t .= qq/\$$1\{/, next;
+        $f =~ s/^\@\+(\w+)\[//         	and $t .= qq/\$$1\[/, next;
         $f =~ s/^\$(\w+)((<[^>]*>)+)//  	and $t .= ('$' . $1 . '->' . unangle($2)), next;
         $f =~ s/^[\$\@%]((<[^>]*>)+)//       	and $t .= ('$M->' . unangle($1)), $NEEDMATCH++, next;
         $f =~ s/^ \.((<[^>]*>)+)//      	and $t .= (' $_->' . unangle($1)), next;
@@ -135,7 +136,7 @@ sub un6 {
         $f =~ s/^(\w+)((<[^>]*>)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
         $f =~ s/^(\w+)((«[^»]*»)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
         $f =~ s/^\.pos\b//         	        and $t .= qq/->{_pos}/, next;
-        $f =~ s/^\.orig\b//         	        and $t .= qq/->{_orig}/, next;
+        $f =~ s/^self\.orig\b//         	and $t .= qq/\$::ORIG/, next;
         $f =~ s/^(\$\w+)\.//            	and $t .= qq/$1->/, next;
         $f =~ s/^(\$\w+)\(/(/            	and $t .= qq/$1->/, next;
         $f =~ s/^\(\$s:\)//            	        and $t .= qq/(\$s)/, next;
@@ -1962,7 +1963,7 @@ do {
         \$C;
     }
     elsif (ref $name eq 'Regexp') {
-        if (\${\$C->{orig}} =~ m/$name/gc) {
+        if (\$::ORIG =~ m/$name/gc) {
             \$C->cursor(\$+[0]);
         }
         else {

@@ -14,8 +14,6 @@ $::ACTIONS = 'Actions';
 my $OPT_pos = 0;
 my $OPT_match = 0;
 my $OPT_log = 0;
-our $ORIG;
-our $POS;
 my @did_ws;
 
 sub USAGE {
@@ -91,8 +89,6 @@ sub MAIN {
     sub AUTOLOAD {
 	my $self = shift;
 	my $match = shift;
-	$ORIG ||= ${$match->{_orig}};
-	$POS ||= $match->{'_'};
 	my $r = hoist($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
 	gen_class($class);
@@ -123,8 +119,8 @@ sub MAIN {
 	    }
 	    elsif ($k eq '_from') {
 		$r{POS} = $v if $OPT_pos;
-		if (exists $$POS[$v]{'ws'}) {
-		    my $wsstart = $$POS[$v]{'ws'};
+		if (exists $::MEMOS[$v]{'ws'}) {
+		    my $wsstart = $::MEMOS[$v]{'ws'};
 		    $r{WS} = $v - $wsstart if defined $wsstart and $wsstart < $v
 		}
 	    }
@@ -281,7 +277,7 @@ sub MAIN {
 	my $ws = $self->{WS} // 0;
 	my $pos = $self->{POS};
 	if ($ws and not $did_ws[$pos]++) {
-	    substr($ORIG, $pos - $ws, $ws)
+	    substr($::ORIG, $pos - $ws, $ws)
 	}
 	else {
 	    '';
@@ -327,9 +323,9 @@ sub MAIN {
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
 	my $text = $self->SUPER::emit_p6(@_);
-	if (not @did_ws[@$POS-1]) {
-	    my $finalws = $$POS[-1]{ws};
-	    $text .= substr($ORIG, $finalws, -1) if $finalws;
+	if (not @did_ws[@::MEMOS-1]) {
+	    my $finalws = $::MEMOS[-1]{ws};
+	    $text .= substr($::ORIG, $finalws, -1) if $finalws;
 	}
 	$self->ret($text);
     }

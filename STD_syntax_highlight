@@ -106,7 +106,7 @@ sub highlight_match {
 
     if($simple_html) {
         traverse_match($r,$name,0,$events,$opt);
-        my $output = highlight_perl6_simple(${$r->{_orig}},$events,$opt);
+        my $output = highlight_perl6_simple($::ORIG,$events,$opt);
         if($simple_html eq '-') {
             print $output;
         } else {
@@ -118,7 +118,7 @@ sub highlight_match {
     }
     if($full_html) {
         traverse_match($r,$name,0,$events,$opt);
-        my $output = highlight_perl6(${$r->{_orig}},$events,$opt);
+        my $output = highlight_perl6($::ORIG,$events,$opt);
         if($full_html eq '-') {
             print $output;
         } else {
