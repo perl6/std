@@ -7,6 +7,9 @@ use STD;
 use utf8;
 use feature 'say';
 
+#let us play nice with others
+use POSIX qw(nice); nice 19;
+
 $::ACTIONS = 'Actions';
 
 my @loc;
