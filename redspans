@@ -29,7 +29,7 @@ sub MAIN {
         my $c = substr($txt,$i,1);
         my $tree = "@{$loc[$i]}";
         if($tree ne $last_tree) {
-            say "\n'$buffer'\n$last_tree";
+            say "\n'$buffer'\n$last_tree" if $buffer ne '';
             $buffer = $c;
         } else {
             $buffer .= $c;
