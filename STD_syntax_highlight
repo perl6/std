@@ -209,8 +209,8 @@ HTML
 =item highlight_perl6_simple
 
 This is same as C<highlight_perl> when --simple is used.
-No more javascript tree viewer or anything fancy. Only SPANs
-that make a color change are printed.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
 =cut
 sub highlight_perl6_simple {
     my ($orig,$events,$opt) = @_;
