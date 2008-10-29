@@ -30,7 +30,10 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     STD_syntax_highlight foo.pl statementlist
 
     # write only simple html/css to simple.html
-    STD_syntax_highlight --simple-html=simple.html foo.pl
+    STD_syntax_highlight --simple-html=foo.simple.html foo.pl
+
+    # write redspans output to foo.redspans.html
+    STD_syntax_highlight --redspans-html=foo.redspans.html foo.pl
 =head1 SUBROUTINES
 
 =over
@@ -39,11 +42,12 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 
 #process the command line
 my ($clean_html,$help) = (0,0);
-my ($simple_html,$full_html) = (0,'-');
+my ($simple_html,$full_html,$redspans_html) = (0,'-',0);
 GetOptions(
     "clean-html"=>\$clean_html,
     "simple-html=s"=>\$simple_html,
     "full-html=s"=>\$full_html,
+    "redspans-html=s"=>\$redspans_html,
     "help"=>\$help
 );
 
@@ -58,10 +62,13 @@ USAGE:
         generates separate html,css and javascript
 
     --simple-html=filename
-        simple mode output filename (disabled by default, - for STDOUT)  
+        write simple-mode html to filename (disabled by default, - for STDOUT)  
 
     --full-html=filename   
-        full mode output filename (enabled by default, - for STDOUT)
+        write full-mode html to filename (enabled by default, - for STDOUT)
+ 
+    --redspans-html=filename   
+        write redspans-mode html to filename (enabled by default, - for STDOUT)
     
 HELP
 }
@@ -106,6 +113,17 @@ sub highlight_match {
         } else {
             open FILE, ">$full_html" or
                 die "Cannot open $full_html for writing: $OS_ERROR\n";
+            print FILE $output;
+            close FILE;
+        }
+    }
+    if($redspans_html) {
+        my $output = highlight_perl6_redspans();
+        if($redspans_html eq '-') {
+            print $output;
+        } else {
+            open FILE, ">$redspans_html" or
+                die "Cannot open $redspans_html for writing: $OS_ERROR\n";
             print FILE $output;
             close FILE;
         }
@@ -301,6 +319,16 @@ HTML
    $str;
 }
 
+=item highlight_perl6_redspans
+
+This is same as C<highlight_perl> when --redspans is used.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
+=cut
+sub highlight_perl6_redspans {
+   # my ($orig,$events,$opt) = @_;
+}
+
 =item escape_html
 
 Converts some characters to their equivalent html entities 
@@ -328,6 +356,8 @@ The project idea was inspired by Moritz Lenz (moritz)
 See http://www.nntp.perl.org/group/perl.perl6.users/2008/07/msg788.html
 
 The initial STD tree traversal code was written by Paweł Murias (pmurias).
+
+The redspans traversal code was written by Larry Wall (TimToady).
 
 The browser code was written by Ahmad M. Zawawi (azawawi)
 =cut
