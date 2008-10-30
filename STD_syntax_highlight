@@ -386,7 +386,10 @@ HTML
             my @rules = ();
             @rules = reverse(split / /,$last_tree) if $last_tree ne '';
             for $rule (@rules) {
-                if($colors{$rule} && $buffer ne '') {
+                if($rule eq 'unv') {
+                    $rule_to_color = '_comment';
+                    last;
+                } elsif($colors{$rule} && $buffer ne '') {
                     $rule_to_color = $rule;
                     last;
                 }
@@ -398,10 +401,10 @@ HTML
                     } elsif($parser->is_routine($buffer)) {
                         $str .= qq{<span class="_routine">$buffer</span>};
                     } else {
-                        $str .= qq{<span class='$rule_to_color'>$buffer</span>};
+                        $str .= qq{<span class="$rule_to_color">$buffer</span>};
                     }
                 } else {              
-                    $str .= qq{<span class='$rule_to_color'>$buffer</span>};
+                    $str .= qq{<span class="$rule_to_color">$buffer</span>};
                 }
             } else {
                 $str .= qq{$buffer};
