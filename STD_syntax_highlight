@@ -15,10 +15,6 @@ use File::Slurp;
 use STD;
 use DumpMatch;
 
-# These are needed for redspan
-$::ACTIONS = 'Actions';
-my @loc;
-
 =head1 NAME
 
 STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
@@ -46,19 +42,31 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 
 =cut
 
-#process the command line
 my ($clean_html,$help) = (0,0);
 my ($simple_html,$full_html,$redspans_html) = (0,0,'-');
-GetOptions(
-    "clean-html"=>\$clean_html,
-    "simple-html=s"=>\$simple_html,
-    "full-html=s"=>\$full_html,
-    "redspans-html=s"=>\$redspans_html,
-    "help"=>\$help
-);
+my ($file, $parser, $src_text); 
 
-if ($#ARGV < 0 || $help) {
-    die <<"HELP";
+# These are needed for redspans
+$::ACTIONS = 'Actions';
+my @loc;
+
+=item main
+
+Your standard main method
+=cut
+sub main {
+    
+    #process the command line
+    GetOptions(
+        "clean-html"=>\$clean_html,
+        "simple-html=s"=>\$simple_html,
+        "full-html=s"=>\$full_html,
+        "redspans-html=s"=>\$redspans_html,
+        "help"=>\$help
+    );
+
+    if ($#ARGV < 0 || $help) {
+        die <<"HELP";
 USAGE: 
     $PROGRAM_NAME [options] filename [rule]
 
@@ -77,21 +85,25 @@ USAGE:
         write redspans-mode html to filename (enabled by default, - for STDOUT)
     
 HELP
+    }
+
+    #start parsing...
+    $file = shift @ARGV;
+    my $what = shift @ARGV // 'comp_unit';
+
+    unless(-r $file) {
+        die "Could not open '$file' for reading\n";
+    }
+
+    # slurp the file for redspans
+    $src_text = read_file($file);
+    $loc[length($src_text) - 1] = [];
+
+    $parser = STD->parsefile($file,$what);
+
+    # and finally print out the html code
+    highlight_match($what=>$parser,{});
 }
-
-#start parsing...
-my $file = shift;
-my $what = shift // 'comp_unit';
-
-unless(-r $file) {
-    die "Could not open '$file' for reading\n";
-}
-
-# slurp the file for redspans
-my $txt = read_file($file);
-$loc[length($txt) - 1] = [];
-
-my $r = STD->parsefile($file,$what);
 
 =item write_html_file
 
@@ -123,12 +135,12 @@ sub highlight_match {
 
     if($simple_html) {
         traverse_match($r,$name,0,$events,$opt);
-        my $html = highlight_perl6_simple($::ORIG,$events,$opt);
+        my $html = highlight_perl6_simple($r,$::ORIG,$events,$opt);
         write_html_file $simple_html, $html;
     }
     if($full_html) {
         traverse_match($r,$name,0,$events,$opt);
-        my $html = highlight_perl6($::ORIG,$events,$opt);
+        my $html = highlight_perl6_full($r,$::ORIG,$events,$opt);
         write_html_file $full_html, $html;
     }
     if($redspans_html) {
@@ -137,13 +149,13 @@ sub highlight_match {
     }
 }
 
-=item highlight_perl6
+=item highlight_perl6_full
 
 Generates the Perl6 highlighted HTML string for STD parse tree provided. 
 The resources can be inlined (by default) or externalized (--clean-html). 
 =cut
-sub highlight_perl6 {
-    my ($orig,$events,$opt) = @_;
+sub highlight_perl6_full {
+    my ($r,$orig,$events,$opt,$file) = @ARG,
     my $str = "";
     my $at = 0;
 
@@ -203,9 +215,9 @@ HTML
         $at = $_->[0];
 
         if($curr_rule eq 'identifier') {
-            if($r->is_type($text)) {
+            if($parser->is_type($text)) {
                 $str .= qq{<span class="_type">$esc_text</span>};
-            } elsif($r->is_routine($text)) {
+            } elsif($parser->is_routine($text)) {
                 $str .= qq{<span class="_routine">$esc_text</span>};
             } else {
                 $str .= $esc_text;
@@ -238,7 +250,7 @@ No more javascript tree viewer or anything fancy.
 Only nodes that have a color are printed. Not optimal but works ;-)
 =cut
 sub highlight_perl6_simple {
-    my ($orig,$events,$opt) = @_;
+    my ($orig,$events,$opt) = @ARG;
     my $str = "";
     my $at = 0;
     my %colors = ();
@@ -291,9 +303,9 @@ HTML
 
         # process types, routines and identifiers
         if($curr_rule eq 'identifier') {
-            if($r->is_type($text)) {
+            if($parser->is_type($text)) {
                 $code .= qq{<span class="_type">$esc_text</span>};
-            } elsif($r->is_routine($text)) {
+            } elsif($parser->is_routine($text)) {
                 $code .= qq{<span class="_routine">$esc_text</span>};
             } else {
                 $code .= $esc_text;
@@ -377,7 +389,7 @@ HTML
     my ($last_tree,$buffer) = ("","");
     for my $i (0 .. @loc-1) {
         say("Undefined $i"),next unless defined $loc[$i];
-        my $c = substr($txt,$i,1);
+        my $c = substr($src_text,$i,1);
         my $tree = "@{$loc[$i]}";
         if($tree ne $last_tree) {
             my $rule;
@@ -414,7 +426,6 @@ HTML
 
 ###################################################################
 # R E D S P A N S
-my @locs;
 { 
     package Actions;
 
@@ -472,6 +483,4 @@ The redspans traversal code was written by Larry Wall (TimToady).
 The browser code was written by Ahmad M. Zawawi (azawawi)
 =cut
 
-# and finally print out the html code
-highlight_match($what=>$r,{});
-
+main @ARGV;
