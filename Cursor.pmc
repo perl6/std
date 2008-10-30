@@ -877,6 +877,21 @@ sub cursor_all { my $self = shift;
     CORE::bless \%r, ref $self;
 }
 
+sub cursor_tweak { my $self = shift;
+    my $tpos = shift;
+
+    if ($DEBUG & DEBUG::cursors) {
+	my $peek = substr($::ORIG,$tpos,20);
+	$peek =~ s/\n/\\n/g;
+	$peek =~ s/\t/\\t/g;
+	$self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
+    }
+    $self->{_to} = $tpos;
+    $self->{_pos} = $tpos;
+
+    $self;
+}
+
 sub cursor { my $self = shift;
     my $tpos = shift;
 
@@ -1145,7 +1160,7 @@ sub _STARr { my $self = shift;
 	push @all, $first;
 	$to = $first;
     }
-    $self->cursor($to->{_pos})->retm();
+    $self->cursor_tweak($to->{_pos})->retm();
 }
 
 sub _PLUSf { my $self = shift;
@@ -1193,7 +1208,7 @@ sub _PLUSr { my $self = shift;
 	$to = $first;
     }
     return () unless @all;
-    my $r = $self->cursor($to->{_pos});
+    my $r = $self->cursor_tweak($to->{_pos});
     $r->retm();
 }
 
@@ -1247,7 +1262,7 @@ sub _REPSEPr { my $self = shift;
 	$to = $sep;
     }
     return () unless @all;
-    my $r = $self->cursor($all[-1]->{_pos});
+    my $r = $self->cursor_tweak($all[-1]->{_pos});
     $r->retm();
 }
 
@@ -1257,7 +1272,7 @@ sub _OPTr { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
     my $x = ($block->($self))[0];
-    my $r = $x // $self->cursor($self->{_pos});
+    my $r = $x // $self->cursor_tweak($self->{_pos});
     $r->retm();
 }
 
