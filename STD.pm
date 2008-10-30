@@ -542,8 +542,8 @@ token pod_comment {
         ||  .*? "\n=" <.unsp>? 'end' \h+ $<identifier> » \N*          {*} #= tagged
         ||  .*?                                                       {*} #= end
         ]
-    | 'begin' » :: \h* \n .*?
-      "\n=" <.unsp>? 'end' » \N*                      {*}       #= anon
+    | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
+        [ .*?  "\n=" <.unsp>? 'end' » \N* || <.panic: "=begin without =end"> ]   {*}       #= anon
     | :: 
         [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
         \N*                                           {*}       #= misc
