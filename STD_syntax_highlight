@@ -4,6 +4,7 @@
 use strict;
 use warnings;
 use utf8;
+use feature qw(say);
 use English;
 use Getopt::Long;
 
@@ -92,6 +93,22 @@ $loc[length($txt) - 1] = [];
 
 my $r = STD->parsefile($file,$what);
 
+=item write_html_file
+
+Writes the html file to filename or to STDOUT
+=cut
+sub write_html_file {
+    my ($html_file, $html) = @_;
+    if($html_file eq '-') {
+        say $html;
+    } else {
+        open FILE, ">$html_file" or
+            die "Cannot open $html_file for writing: $OS_ERROR\n";
+        say FILE $html;
+        close FILE;
+    }
+}
+
 =item highlight_match
 
 Returns the generated Perl6 highlighted HTML from C<highlight_perl6>
@@ -106,38 +123,17 @@ sub highlight_match {
 
     if($simple_html) {
         traverse_match($r,$name,0,$events,$opt);
-        my $output = highlight_perl6_simple($::ORIG,$events,$opt);
-        if($simple_html eq '-') {
-            print $output;
-        } else {
-            open FILE, ">$simple_html" or
-                die "Cannot open $simple_html for writing: $OS_ERROR\n";
-            print FILE $output;
-            close FILE;
-        }
+        my $html = highlight_perl6_simple($::ORIG,$events,$opt);
+        write_html_file $simple_html, $html;
     }
     if($full_html) {
         traverse_match($r,$name,0,$events,$opt);
-        my $output = highlight_perl6($::ORIG,$events,$opt);
-        if($full_html eq '-') {
-            print $output;
-        } else {
-            open FILE, ">$full_html" or
-                die "Cannot open $full_html for writing: $OS_ERROR\n";
-            print FILE $output;
-            close FILE;
-        }
+        my $html = highlight_perl6($::ORIG,$events,$opt);
+        write_html_file $full_html, $html;
     }
     if($redspans_html) {
-        my $output = highlight_perl6_redspans();
-        if($redspans_html eq '-') {
-            print $output;
-        } else {
-            open FILE, ">$redspans_html" or
-                die "Cannot open $redspans_html for writing: $OS_ERROR\n";
-            print FILE $output;
-            close FILE;
-        }
+        my $html = highlight_perl6_redspans();
+        write_html_file $redspans_html, $html;
     }
 }
 
