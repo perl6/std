@@ -110,7 +110,7 @@ HELP
 Writes the html file to filename or to STDOUT
 =cut
 sub write_html_file {
-    my ($html_file, $html) = @_;
+    my ($html_file, $html) = @ARG;
     if($html_file eq '-') {
         say $html;
     } else {
@@ -193,18 +193,11 @@ sub highlight_perl6_full {
 </head>
 <body>
     <div id="parse_tree">
-        <button id="parse_tree_expand">
-            Show Syntax Tree
-        </button>
-        <button id="parse_tree_collapse">
-            Hide it
-        </button>
-        <button id="parse_tree_help">
-            Help
-        </button>
+        <button id="parse_tree_expand">Show Syntax Tree</button>
+        <button id="parse_tree_collapse">Hide it</button>
+        <button id="parse_tree_help">Help</button>
         <div id="parse_tree_output"></div>
     </div>
-
     <pre>
 HTML
 
