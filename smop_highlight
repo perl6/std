@@ -44,7 +44,7 @@ for my $file (@files) {
     #run the process and time it
     print "\n$file" . "\n    -> $html_file\n";
     my $t0 = new Benchmark;
-    system "./$HILITE --clean-html $file >$html_file";
+    system "./$HILITE --redspans-html=$html_file $file";
     print "It took " . 
         timestr(timediff(new Benchmark,$t0),"noc") . "\n";
 
