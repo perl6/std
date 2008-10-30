@@ -259,15 +259,9 @@ sub highlight_perl6_simple {
     open CSS_FILE, $CSS
         or die "Could not open $CSS: $OS_ERROR\n";
     my $line;
-    my $css_class;
     while($line = <CSS_FILE>) {
-        if($line =~ /^\s*\.(\w+)/) {
-            $css_class = $1;
-        } elsif($line =~ /^#\w+/) {
-            # ignore #elem colors
-            $css_class = 0;
-        } elsif($line =~ /color\s*:\s*(\w+)/) {
-            $colors{$css_class} = $1 if $css_class;
+        if($line =~ /^\s*\.(\w+)\s*{\s*color\s*:\s*(\w+)/) {
+            $colors{$1} = $2;
         }
     }
     close CSS_FILE;
@@ -351,15 +345,9 @@ sub highlight_perl6_redspans {
     open CSS_FILE, $CSS
         or die "Could not open $CSS: $OS_ERROR\n";
     my $line;
-    my $css_class;
     while($line = <CSS_FILE>) {
-        if($line =~ /^\s*\.(\w+)/) {
-            $css_class = $1;
-        } elsif($line =~ /^#\w+/) {
-            # ignore #elem colors
-            $css_class = 0;
-        } elsif($line =~ /color\s*:\s*(\w+)/) {
-            $colors{$css_class} = $1 if $css_class;
+        if($line =~ /^\s*\.(\w+)\s*{\s*color\s*:\s*(\w+)/) {
+            $colors{$1} = $2;
         }
     }
     close CSS_FILE;
@@ -404,7 +392,17 @@ HTML
                 }
             }
             if($rule_to_color) {
-                $str .= qq{<span class='$rule_to_color'>$buffer</span>};
+                if($last_tree =~ /identifier/) {
+                    if($parser->is_type($buffer)) {
+                        $str .= qq{<span class="_type">$buffer</span>};
+                    } elsif($parser->is_routine($buffer)) {
+                        $str .= qq{<span class="_routine">$buffer</span>};
+                    } else {
+                        $str .= qq{<span class='$rule_to_color'>$buffer</span>};
+                    }
+                } else {              
+                    $str .= qq{<span class='$rule_to_color'>$buffer</span>};
+                }
             } else {
                 $str .= qq{$buffer};
             }
