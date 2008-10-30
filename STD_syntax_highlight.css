@@ -13,6 +13,7 @@
 .number { color: DarkOrange; }
 .infix { color: DimGray; }
 .methodop { color: black; font-weight: bold; }
+.pod_comment { color: DarkGreen; font-weight: bold; } 
 
 ._routine { color: DarkRed; font-weight: bold; }
 ._type { color: DarkBlue; font-weight: bold; }
