@@ -10,6 +10,7 @@ use Getopt::Long;
 
 # CPAN modules
 use File::Slurp;
+use Term::ANSIColor;
 
 # And finally our modules
 use STD;
@@ -29,8 +30,11 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     # print html for with 'statementlist' as the top-level rule
     STD_syntax_highlight foo.pl statementlist
 
-    # write simple output to foo.pl.html
+    # write simple html output to foo.pl.html
     STD_syntax_highlight --simple-html=foo.pl.html foo.pl
+
+    # write simple ansi-colored output to STDOUT
+    STD_syntax_highlight --ansi-text=- foo.pl
 
 =head1 SUBROUTINES
 
@@ -39,7 +43,7 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 =cut
 
 my ($clean_html,$help) = (0,0);
-my ($full_html,$simple_html) = (0,'-');
+my ($full_html,$simple_html,$ansi_text) = (0,'-',0);
 my ($file, $parser, $src_text); 
 
 # These are needed for redspans
@@ -56,6 +60,7 @@ sub main {
         "clean-html"=>\$clean_html,
         "full-html=s"=>\$full_html,
         "simple-html=s"=>\$simple_html,
+        "ansi-text=s"=>\$ansi_text,
         "help"=>\$help
     );
 
@@ -74,6 +79,9 @@ USAGE:
 
     --simple-html=filename   
         write simple-mode html to filename (enabled by default, - for STDOUT)
+
+    --ansi-text=filename   
+        write simple-mode ansi color text to filename (enabled by default, - for STDOUT)
 
 HELP
     }
@@ -98,34 +106,38 @@ HELP
 
 =item write_html_file
 
-Writes the html file to filename or to STDOUT
+Writes the output to a file or STDOUT
 =cut
-sub write_html_file {
-    my ($html_file, $html) = @ARG;
-    if($html_file eq '-') {
-        say $html;
+sub write_output {
+    my ($file, $output) = @ARG;
+    if($file eq '-') {
+        say $output;
     } else {
-        open FILE, ">$html_file" or
-            die "Cannot open $html_file for writing: $OS_ERROR\n";
-        say FILE $html;
+        open FILE, ">$file" or
+            die "Cannot open $file for writing: $OS_ERROR\n";
+        say FILE $output;
         close FILE;
     }
 }
 
 =item highlight_match
 
-Returns the generated Perl6 highlighted HTML from C<highlight_perl6>
+Returns the generated Perl6 highlighted HTML from C<highlight_perl6_*>
 subroutine after traversing the STD parse tree using 
 DumpMatch.pm C<traverse_match>.
 =cut
 sub highlight_match {
     if($full_html) {
         my $html = highlight_perl6_full();
-        write_html_file $full_html, $html;
+        write_output $full_html, $html;
     }
     if($simple_html) {
         my $html = highlight_perl6_simple();
-        write_html_file $simple_html, $html;
+        write_output $simple_html, $html;
+    }
+    if($ansi_text) {
+        my $text = highlight_perl6_ansi();
+        write_output $ansi_text, $text;
     }
 }
 
@@ -331,6 +343,72 @@ HTML
 </body>
 </html>
 HTML
+
+   $str;
+}
+
+=item highlight_perl6_ansi
+
+This is same as C<highlight_perl6_full> when --ansi-text is used.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
+=cut
+sub highlight_perl6_ansi {
+    my $str = "";
+    my %colors = ();
+
+    my $ANSI = "STD_syntax_highlight.ansi";
+    open ANSI_FILE, $ANSI
+        or die "Could not open $ANSI: $OS_ERROR\n";
+    my $line;
+    while($line = <ANSI_FILE>) {
+        if($line =~ /^(\w+)=(.+)$/) {
+            $colors{$1} = $2;
+        }
+    }
+    close ANSI_FILE;
+
+    my ($last_tree,$buffer) = ("","");
+    for my $i (0 .. @loc-1) {
+        next unless defined $loc[$i];
+        my $c = substr($src_text,$i,1);
+        my $tree = "@{$loc[$i]}";
+        if($tree ne $last_tree) {
+            my $rule;
+            my $rule_to_color = 0;
+            my @rules = ();
+            @rules = reverse(split / /,$last_tree) if $last_tree ne '';
+            for $rule (@rules) {
+                if($rule eq 'unv') {
+                    $rule_to_color = '_comment';
+                    last;
+                } elsif($colors{$rule} && $buffer ne '') {
+                    $rule_to_color = $rule;
+                    last;
+                }
+            }
+            if($rule_to_color) {
+                my $color = $colors{$rule_to_color};
+                if($last_tree =~ /identifier/) {
+                    if($parser->is_type($buffer)) {
+                        $str .= (color $color) . $buffer. (color 'reset');
+                    } elsif($parser->is_routine($buffer)) {
+                        $str .= (color $color) . $buffer . (color 'reset');
+                    } else {
+                        $str .= (color $color) . $buffer . (color 'reset');
+                    }
+                } else {              
+                    $str .= (color $color) . $buffer . (color 'reset');
+                }
+            } else {
+                $str .= qq{$buffer};
+            }
+            $buffer = $c;
+        } else {
+            $buffer .= $c;
+        }
+        $last_tree = $tree;
+    }
 
    $str;
 }
