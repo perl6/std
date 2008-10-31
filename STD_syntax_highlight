@@ -13,7 +13,6 @@ use File::Slurp;
 
 # And finally our modules
 use STD;
-use DumpMatch;
 
 =head1 NAME
 
@@ -39,7 +38,7 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 =cut
 
 my ($clean_html,$help) = (0,0);
-my ($full_html,$redspans_html) = (0,0,'-');
+my ($full_html,$redspans_html) = (0,'-');
 my ($file, $parser, $src_text); 
 
 # These are needed for redspans
@@ -94,7 +93,7 @@ HELP
     $parser = STD->parsefile($file,$what);
 
     # and finally print out the html code
-    highlight_match($what=>$parser,{});
+    highlight_match();
 }
 
 =item write_html_file
@@ -120,14 +119,8 @@ subroutine after traversing the STD parse tree using
 DumpMatch.pm C<traverse_match>.
 =cut
 sub highlight_match {
-    my $name = shift;
-    my $r = shift;
-    my $opt = shift || {};
-    my $events = [];
-
     if($full_html) {
-        traverse_match($r,$name,0,$events,$opt);
-        my $html = highlight_perl6_full($r,$::ORIG,$events,$opt);
+        my $html = highlight_perl6_full();
         write_html_file $full_html, $html;
     }
     if($redspans_html) {
@@ -142,15 +135,24 @@ Generates the Perl6 highlighted HTML string for STD parse tree provided.
 The resources can be inlined (by default) or externalized (--clean-html). 
 =cut
 sub highlight_perl6_full {
-    my ($r,$orig,$events,$opt,$file) = @ARG,
     my $str = "";
-    my $at = 0;
 
     # slurp libraries and javascript to inline them
     my ($JQUERY_JS,$JS,$CSS) = (
         'jquery-1.2.6.pack.js', 
         'STD_syntax_highlight.js',
         'STD_syntax_highlight.css');
+    my %colors = ();
+    my $line;
+    open CSS_FILE, $CSS
+        or die "Could not open $CSS: $OS_ERROR\n";
+    while($line = <CSS_FILE>) {
+        if($line =~ /^\s*\.(\w+)\s*{\s*color\s*:\s*(\w+)/) {
+            $colors{$1} = $2;
+        }
+    }
+    close CSS_FILE;
+
     my $jquery_js = qq{<script type="text/javascript" src="../$JQUERY_JS"></script>};
     my $js = qq{<script type="text/javascript" src="../$JS"></script>};
     my $css = qq{<link href="../$CSS" rel="stylesheet" type="text/css">};
@@ -188,32 +190,50 @@ sub highlight_perl6_full {
     <pre>
 HTML
 
-    my $curr_rule = q{}; 
-    for (sort {$a->[0] <=> $b->[0] or $a->[4] <=> $b->[4]} @{$events}) {
-        my $text = substr($orig,$at,$_->[0]-$at);
-        my $esc_text .= escape_html($text);
-        $at = $_->[0];
+    my ($last_tree,$buffer) = ("","");
+    for my $i (0 .. @loc-1) {
+        next unless defined $loc[$i];
+        my $c = substr($src_text,$i,1);
+        my $tree = "@{$loc[$i]}";
 
-        if($curr_rule eq 'identifier') {
-            if($parser->is_type($text)) {
-                $str .= qq{<span class="_type">$esc_text</span>};
-            } elsif($parser->is_routine($text)) {
-                $str .= qq{<span class="_routine">$esc_text</span>};
-            } else {
-                $str .= $esc_text;
+        if($tree ne $last_tree) {
+            $str .= qq{<span id="tree_$i" style="display:none;">$last_tree</span>};
+            my $rule;
+            my $rule_to_color = 0;
+            $buffer = escape_html($buffer);
+            my @rules = ();
+            @rules = reverse(split / /,$last_tree) if $last_tree ne '';
+            for $rule (@rules) {
+                if($rule eq 'unv') {
+                    $rule_to_color = '_comment';
+                    last;
+                } elsif($colors{$rule} && $buffer ne '') {
+                    $rule_to_color = $rule;
+                    last;
+                }
             }
+            if($rule_to_color) {
+                if($last_tree =~ /identifier/) {
+                    if($parser->is_type($buffer)) {
+                        $str .= qq{<span id="node_$i" class="_type">$buffer</span>};
+                    } elsif($parser->is_routine($buffer)) {
+                        $str .= qq{<span id="node_$i" class="_routine">$buffer</span>};
+                    } else {
+                        $str .= qq{<span id="node_$i" class="$rule_to_color">$buffer</span>};
+                    }
+                } else {              
+                    $str .= qq{<span id="node_$i" class="$rule_to_color">$buffer</span>};
+                }
+            } else {
+                $str .= qq{<span id="node_$i">$buffer</span>};
+            }
+            $buffer = $c;
         } else {
-            $str .= $esc_text;
+            $buffer .= $c;
         }
-
-        if ($_->[1] eq 'from') {
-            $curr_rule = $_->[2];
-            $str .= '<span class="'.$curr_rule.'">';
-        } elsif ($_->[1] eq 'to') {
-            $str .=  '</span>';
-        }
+        $last_tree = $tree;
     }
-
+ 
     $str .= <<"HTML";
     </pre>
 </body>
@@ -268,7 +288,7 @@ HTML
 
     my ($last_tree,$buffer) = ("","");
     for my $i (0 .. @loc-1) {
-        say("Undefined $i"),next unless defined $loc[$i];
+        next unless defined $loc[$i];
         my $c = substr($src_text,$i,1);
         my $tree = "@{$loc[$i]}";
         if($tree ne $last_tree) {

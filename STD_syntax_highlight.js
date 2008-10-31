@@ -1,41 +1,25 @@
 $(document.body).ready(function() {
     //find first span after pre and use it as top-level node
-    var topLevelRuleName = null;
     var lastSelectedNode = null;
     var keepResults = false;
     var timeoutId = null;
 
-    $("pre > span").each(function(index,value) {
-        topLevelRuleName = this.className;
-    });
-    
-    if(topLevelRuleName == "") {
-        alert("Assertion: Top Level node (pre > span) could not be found...");
-        return;
-    }
     $("#parse_tree_output").html("Found " + $("span").size() + " node(s)");
 
     function updateTree(node) {
         if(lastSelectedNode) {
-                $(lastSelectedNode).css("border","");
-                $(lastSelectedNode).css("background-color","");
+            $(lastSelectedNode).css("border","");
+            $(lastSelectedNode).css("background-color","");
         }
         $(node).css("border","1px solid orange");
         $(node).css("background-color","#FFF5DF");
         lastSelectedNode = node;
         var output = "";
         var ident = "";
-        var rules = new Array();
-        var ruleName;
-        do {
-            var ruleName = node.className;
-            var r = ruleName;
-            rules.push(ruleName);
-            node = node.parentNode;
-        } while(ruleName != topLevelRuleName)
-        for(var i = rules.length - 1; i >= 0; i--) {
-                var r = rules[i];
-                output += ident + '<span class="' + r + '">' + r + '</span><br/>';
+        var rules = $("#" + node.id.replace("node","tree")).text().split(/ /);
+        for(var i = 0; i < rules.length; i++) {
+            var r = rules[i];
+            output += ident + '<span class="' + r + '">' + r + '</span><br/>';
                 ident += "&nbsp;";
         }
         $("#parse_tree_output").html(output);
