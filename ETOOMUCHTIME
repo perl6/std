@@ -54,7 +54,7 @@ $file
 OUT
     my $t0 = new Benchmark;
     my $cmd = "./$HILITE --clean-html " .
-            "--redspans-html=$simple_html " .
+            "--simple-html=$simple_html " .
             "--full-html=$full_html $file";
     my $log = `$cmd 2>&1`;
     print "It took " . 
