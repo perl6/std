@@ -31,6 +31,7 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 
     # write redspans output to foo.redspans.html
     STD_syntax_highlight --redspans-html=foo.redspans.html foo.pl
+
 =head1 SUBROUTINES
 
 =over
@@ -50,7 +51,6 @@ my @loc;
 Your standard main method
 =cut
 sub main {
-    
     #process the command line
     GetOptions(
         "clean-html"=>\$clean_html,
@@ -71,10 +71,10 @@ USAGE:
 
     --full-html=filename   
         write full-mode html to filename (disabled by default, - for STDOUT)
-    
+
     --redspans-html=filename   
         write redspans-mode html to filename (enabled by default, - for STDOUT)
-    
+
 HELP
     }
 
@@ -233,7 +233,6 @@ HTML
         }
         $last_tree = $tree;
     }
- 
     $str .= <<"HTML";
     </pre>
 </body>
@@ -327,7 +326,6 @@ HTML
         }
         $last_tree = $tree;
     }
-    
     $str .= <<"HTML";
     </pre>
 </body>
