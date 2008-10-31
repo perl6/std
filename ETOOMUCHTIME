@@ -41,7 +41,7 @@ my @failed;
 for my $file (@files) {
     my $myfile = $file;
     $myfile =~ s/^\.\.\/\.\.\/t\/spec/html/;   
-    my ($redspans_html,$full_html) = ("$myfile.simple.html", "$myfile.html");
+    my ($simple_html,$full_html) = ("$myfile.simple.html", "$myfile.html");
     my ($html_filename,$html_path,$html_suffix) = fileparse($full_html);
     mkpath $html_path;
    
@@ -50,11 +50,11 @@ for my $file (@files) {
 
 $file
     -> $full_html
-    -> $redspans_html
+    -> $simple_html
 OUT
     my $t0 = new Benchmark;
     my $cmd = "./$HILITE --clean-html " .
-            "--redspans-html=$redspans_html " .
+            "--redspans-html=$simple_html " .
             "--full-html=$full_html $file";
     my $log = `$cmd 2>&1`;
     print "It took " . 
@@ -83,10 +83,10 @@ Reason:
     $log
 </pre></body></html>
 ERROR
-        open REDSPANS_HTML, ">$redspans_html"
-            or die "Could not open $redspans_html for writing: $OS_ERROR\n";
-        print REDSPANS_HTML $error_html;       
-        close REDSPANS_HTML;
+        open SIMPLE_HTML, ">$simple_html"
+            or die "Could not open $simple_html for writing: $OS_ERROR\n";
+        print SIMPLE_HTML $error_html;       
+        close SIMPLE_HTML;
         open FULL_HTML, ">$full_html"
             or die "Could not open $full_html for writing: $OS_ERROR\n";
         print FULL_HTML $error_html;

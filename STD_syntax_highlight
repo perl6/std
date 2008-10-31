@@ -29,8 +29,8 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     # print html for with 'statementlist' as the top-level rule
     STD_syntax_highlight foo.pl statementlist
 
-    # write redspans output to foo.redspans.html
-    STD_syntax_highlight --redspans-html=foo.redspans.html foo.pl
+    # write simple output to foo.pl.html
+    STD_syntax_highlight --simple-html=foo.pl.html foo.pl
 
 =head1 SUBROUTINES
 
@@ -39,7 +39,7 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 =cut
 
 my ($clean_html,$help) = (0,0);
-my ($full_html,$redspans_html) = (0,'-');
+my ($full_html,$simple_html) = (0,'-');
 my ($file, $parser, $src_text); 
 
 # These are needed for redspans
@@ -55,7 +55,7 @@ sub main {
     GetOptions(
         "clean-html"=>\$clean_html,
         "full-html=s"=>\$full_html,
-        "redspans-html=s"=>\$redspans_html,
+        "simple-html=s"=>\$simple_html,
         "help"=>\$help
     );
 
@@ -72,8 +72,8 @@ USAGE:
     --full-html=filename   
         write full-mode html to filename (disabled by default, - for STDOUT)
 
-    --redspans-html=filename   
-        write redspans-mode html to filename (enabled by default, - for STDOUT)
+    --simple-html=filename   
+        write simple-mode html to filename (enabled by default, - for STDOUT)
 
 HELP
     }
@@ -123,9 +123,9 @@ sub highlight_match {
         my $html = highlight_perl6_full();
         write_html_file $full_html, $html;
     }
-    if($redspans_html) {
-        my $html = highlight_perl6_redspans();
-        write_html_file $redspans_html, $html;
+    if($simple_html) {
+        my $html = highlight_perl6_simple();
+        write_html_file $simple_html, $html;
     }
 }
 
@@ -242,13 +242,13 @@ HTML
     $str;
 }
 
-=item highlight_perl6_redspans
+=item highlight_perl6_simple
 
-This is same as C<highlight_perl6_full> when --redspans is used.
+This is same as C<highlight_perl6_full> when --simple-html is used.
 No more javascript tree viewer or anything fancy. 
 Only nodes that have a color are printed. Not optimal but works ;-)
 =cut
-sub highlight_perl6_redspans {
+sub highlight_perl6_simple {
     my $str = "";
     my %colors = ();
 
