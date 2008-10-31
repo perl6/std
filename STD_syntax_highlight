@@ -43,7 +43,7 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 =cut
 
 my ($clean_html,$help) = (0,0);
-my ($full_html,$simple_html,$ansi_text) = (0,'-',0);
+my ($full_html,$simple_html,$ansi_text) = (0,0,0);
 my ($file, $parser, $src_text); 
 
 # These are needed for redspans
@@ -75,15 +75,21 @@ USAGE:
         generates separate html,css and javascript
 
     --full-html=filename   
-        write full-mode html to filename (disabled by default, - for STDOUT)
+        write full-mode html to filename (- for STDOUT)
 
     --simple-html=filename   
-        write simple-mode html to filename (enabled by default, - for STDOUT)
+        write simple-mode html to filename (defaults to STDOUT if no other 
+        option is selected, - for STDOUT)
 
     --ansi-text=filename   
-        write simple-mode ansi color text to filename (enabled by default, - for STDOUT)
+        write simple-mode ansi color text to filename (- for STDOUT)
 
 HELP
+    }
+
+    #default is --simple-html=- if no option is selected
+    if(!($ansi_text || $full_html) && !$simple_html) {
+        $simple_html = '-';    
     }
 
     #start parsing...
