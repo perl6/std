@@ -3405,7 +3405,8 @@ method EXPR ($preclvl)
     push @opstack, { 'O' => item %terminator, 'sym' => '' };         # (just a sentinel value)
 
     my $here = self;
-    self.deb("In EXPR, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
+    my $S = $here.pos;
+    self.deb("In EXPR, at $S") if $*DEBUG +& DEBUG::EXPR;
 
     my &reduce := -> {
         self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $*DEBUG +& DEBUG::EXPR;
@@ -3424,10 +3425,11 @@ method EXPR ($preclvl)
                 }
                 push @chain, pop(@termstack).cleanup;
                 @chain = reverse @chain if @chain > 1;
+                my $startpos = @chain[0].pos;
                 my $nop = $op.cursor_fresh();
                 $nop<chain> = [@chain];
                 $nop<_arity> = 'CHAIN';
-                push @termstack, $nop._REDUCE('EXPR');
+                push @termstack, $nop._REDUCE($startpos, 'EXPR');
             }
             when 'list' {
                 self.deb("reducing list") if $*DEBUG +& DEBUG::EXPR;
@@ -3452,6 +3454,7 @@ method EXPR ($preclvl)
 		    self.worry("Missing final term in '" ~ $sym ~ "' list");
 		}
                 @list = reverse @list if @list > 1;
+                my $startpos = @list[0].pos;
                 @delims = reverse @delims if @delims > 1;
                 my $nop = $op.cursor_fresh();
                 $nop<sym> = $sym;
@@ -3459,7 +3462,7 @@ method EXPR ($preclvl)
                 $nop<list> = [@list];
                 $nop<delims> = [@delims];
                 $nop<_arity> = 'LIST';
-                push @termstack, $nop._REDUCE('EXPR');
+                push @termstack, $nop._REDUCE($startpos, 'EXPR');
             }
             when 'unary' {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
@@ -3471,24 +3474,24 @@ method EXPR ($preclvl)
                 if ($op<arg><_from> < $op<_from>) {
                     $op<_from> = $op<arg><_from>;
                 }
-                if ($op<arg><_to> > $op<_to>) {
-                    $op<_to> = $op<arg><_to>;
+                if ($op<arg><_pos> > $op<_pos>) {
+                    $op<_pos> = $op<arg><_pos>;
                 }
                 $op<_arity> = 'UNARY';
-                push @termstack, $op._REDUCE('EXPR');
+                push @termstack, $op._REDUCE($op<_from>, 'EXPR');
             }
             default {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
                 my @list;
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
-                self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
 		$op<right> = (pop @termstack).cleanup;
 		$op<left> = (pop @termstack).cleanup;
 		$op<_from> = $op<left><_from>;
-		$op<_to> = $op<right><_to>;
+		$op<_pos> = $op<right><_pos>;
                 $op<_arity> = 'BINARY';
-                push @termstack, $op._REDUCE('EXPR');
+                self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
+                push @termstack, $op._REDUCE($op<_from>, 'EXPR');
             }
         }
     };
@@ -3598,9 +3601,9 @@ method EXPR ($preclvl)
     if @termstack {
         +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
         @termstack[0]<_from> = self.pos;
-        @termstack[0]<_to> = $here.pos;
+        @termstack[0]<_pos> = $here.pos;
     }
-    self._MATCHIFYr("EXPR", @termstack);
+    self._MATCHIFYr($S, "EXPR", @termstack);
 }
 
 #################################################

@@ -168,11 +168,11 @@ use YAML::XS;
 
 our %lexers;       # per language, the cache of lexers, keyed by rule name
 
-sub from { $_[0]->{_from} }
-sub to { $_[0]->{_to} }
-sub chars { $_[0]->{_to} - $_[0]->{_from} }
-sub text { substr($::ORIG, $_[0]->{_from}, $_[0]->{_to} - $_[0]->{_from}) }
+sub from { $_[0]->{_from} // $_[0]->{_pos} }
+sub to { $_[0]->{_pos} }
 sub pos { $_[0]->{_pos} }
+sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
+sub text { exists $_[0]->{_from} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from}) : '' }
 sub peek { $_[0]->{_peek} }
 sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
@@ -710,7 +710,8 @@ sub cursor_fresh { my $self = shift;
     my %r;
     my $lang = @_ && $_[0] ? shift() : ref $self;
     $self->deb("cursor_fresh lang $lang") if $DEBUG & DEBUG::cursors;
-    $r{_to} = $r{_from} = $r{_pos} = $self->{_pos};
+   # $r{_from} =
+    $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
     $r{_herelang} = $self->{_herelang} if $self->{_herelang};
     CORE::bless \%r, ref $lang || $lang;
@@ -797,7 +798,6 @@ sub dump {
     delete $copy{_reduced};
     delete $copy{_fate};
     my $text = STD::Dump(\%copy);
-    $text =~ s/^\s*_(?:pos|orig):.*\n//mg;
     $text;
 }
 
@@ -818,7 +818,8 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
 	    }
 	}
     }
-    $r{_pos} = $r{_to} = $submatch->{_to};
+    $submatch->{_from} = $r{_from} = $r{_pos};
+    $r{_pos} = $submatch->{_pos};
     delete $r{_fate};
     CORE::bless \%r, ref $self;		# return new match cursor for parent
 }
@@ -870,8 +871,7 @@ sub cursor_all { my $self = shift;
 
     $self->deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
-    $r{_from} = $fpos;
-    $r{_to} = $tpos;
+#    $r{_from} = $fpos;
     $r{_pos} = $tpos;
 
     CORE::bless \%r, ref $self;
@@ -886,7 +886,6 @@ sub cursor_tweak { my $self = shift;
 	$peek =~ s/\t/\\t/g;
 	$self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
     }
-    $self->{_to} = $tpos;
     $self->{_pos} = $tpos;
 
     $self;
@@ -902,8 +901,7 @@ sub cursor { my $self = shift;
 	$self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
     }
     my %r = %$self;
-    $r{_from} = $self->{_pos} // 0;
-    $r{_to} = $tpos;
+#    $r{_from} = $self->{_pos} // 0;
     $r{_pos} = $tpos;
 
     CORE::bless \%r, ref $self;
@@ -920,8 +918,7 @@ sub cursor_rev { my $self = shift;
     }
     my %r = %$self;
     $r{_pos} = $fpos;
-    $r{_from} = $fpos;
-    $r{_to} = $self->{_from};
+#    $r{_from} = $self->{_from};
 
     CORE::bless \%r, ref $self;
 }
@@ -1011,9 +1008,10 @@ sub $mangle {
     my \$sym = \$args{sym} // q$sym;
 
     my \$C = \$self;
+    my \$S = \$self->{_pos};
     \$C->{'sym'} = \$sym;
 
-    \$self->_MATCHIFY( '$mangle', Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
+    \$self->_MATCHIFY(\$S, '$mangle', Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
         \$C->_SYM(\$sym, 0)
     );
 }
@@ -1077,14 +1075,15 @@ sub retm { my $self = shift;
     return $self unless $DEBUG & DEBUG::trace_call;
     warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
-    $self->deb($subname, " returning @{[$self->{_from}]}..@{[$self->{_to}]}");
+    $self->deb($subname, " returning @{[$self->{_pos}]}");
     $self;
 }
 
 sub _MATCHIFY { my $self = shift;
+    my $S = shift;
     my $name = shift;
     return () unless @_;
-    my @result = lazymap( sub { my $x = shift; $x->{_from} = $self->{_from}; $x->_REDUCE($name)->retm() }, @_);
+    my @result = lazymap( sub { my $x = shift; $x->_REDUCE($S, $name)->retm() }, @_);
     if (wantarray) {
 	@result;
     }
@@ -1094,11 +1093,12 @@ sub _MATCHIFY { my $self = shift;
 }
 
 sub _MATCHIFYr { my $self = shift;
+    my $S = shift;
     my $name = shift;
     return () unless @_;
     my $var = shift;
-    $var->{_from} = $self->{_from};
-    $var->_REDUCE($name)->retm();
+#    $var->{_from} = $self->{_from};
+    $var->_REDUCE($S, $name)->retm();
 }
 
 sub _SCANf { my $self = shift;
@@ -1145,22 +1145,22 @@ sub _STARr { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $to = $self;
-    my $prev_to = $to->{_to} // 0;
+    my $pos = $self;
+    my $prev_pos = $pos->{_pos} // 0;
     my @all;
     my $eos = length(${\$::ORIG});
     for (;;) {
-      last if $to->{_pos} == $eos;
-	my @matches = $block->($to);  # XXX shouldn't read whole list
+      last if $pos->{_pos} == $eos;
+	my @matches = $block->($pos);  # XXX shouldn't read whole list
 #            say @matches.perl;
       last unless @matches;
 	my $first = $matches[0];  # no backtracking into block on ratchet
-	last if $first->{_to} == $prev_to;
-	$prev_to = $first->{_to};
+	last if $first->{_pos} == $prev_pos;
+	$prev_pos = $first->{_pos};
 	push @all, $first;
-	$to = $first;
+	$pos = $first;
     }
-    $self->cursor_tweak($to->{_pos})->retm();
+    $self->cursor_tweak($pos->{_pos})->retm();
 }
 
 sub _PLUSf { my $self = shift;
@@ -1176,7 +1176,7 @@ sub _PLUSf { my $self = shift;
 	    my $x = $_[0];
 	    lazymap(
 		sub {
-		    $self->cursor($_[0]->{_to})->retm()
+		    $self->cursor($_[0]->{_pos})->retm()
 		}, $x, LazyMap->new(sub { $x->_PLUSf($_[0]) }, $block)
 	    );
 	}, $block->($self)
@@ -1225,7 +1225,7 @@ sub _REPSEPf { my $self = shift;
     do {
 	for my $x ($block->($self)) {
 	    for my $s ($sep->($x)) {
-		push @result, lazymap(sub { $self->cursor($_[0]->{_to}) }, $x, $s->_REPSEPf($sep,$block));
+		push @result, lazymap(sub { $self->cursor($_[0]->{_pos}) }, $x, $s->_REPSEPf($sep,$block));
 	    }
 	}
     };
@@ -1353,7 +1353,7 @@ sub after { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $end = $self->cursor($self->{_pos});
-    my @all = $block->($end);          # Make sure $_->{_from} == $_->{_to}
+    my @all = $block->($end);          # Make sure $_->{_from} == $_->{_pos}
     if (@all and $all[0]) {
         return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
     }
@@ -1375,10 +1375,10 @@ sub ws {
     my @stub = return $self if exists $::MEMOS[$self->{_pos}]{ws};
 
     my $C = $self;
-    my $startpos = $C->pos;
-    $::MEMOS[$startpos]{ws} = undef;	# exists means we know, undef means no ws  before here
+    my $S = $C->pos;
+    $::MEMOS[$S]{ws} = undef;	# exists means we know, undef means no ws  before here
 
-    $self->_MATCHIFY( 'ws',
+    $self->_MATCHIFY($S, 'ws',
         $C->_BRACKET( sub { my $C=shift;
             do { my @gather;
                     push @gather, (map { my $C=$_;
@@ -1399,7 +1399,7 @@ sub ws {
                     or
                     push @gather, (map { my $C=$_;
                         (map { my $C=$_;
-                            scalar(do { $::MEMOS[$C->{_pos}]{ws} = $startpos unless $C->{_pos} == $startpos }, $C)
+                            scalar(do { $::MEMOS[$C->{_pos}]{ws} = $S unless $C->{_pos} == $S }, $C)
                         } $C->_STARr(sub { my $C=shift;
                             $C->_SPACE()
                         }))
@@ -1530,7 +1530,7 @@ sub _EXACT_rev { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $len = length($s);
-    my $from = $self->{_from} - $len;
+    my $from = $self->{_pos} - $len;
     if ($from >= 0 and substr($::ORIG, $from, $len) eq $s) {
         my $r = $self->cursor_rev($from);
         $r->retm();
@@ -1563,7 +1563,7 @@ sub _ARRAY_rev { my $self = shift;
     my @result = ();
     for my $s (@array) {
 	my $len = length($s);
-	my $from = $self->{_from} = $len;
+	my $from = $self->{_pos} = $len;
 	if (substr($::ORIG, $from, $len) eq $s) {
 	    $self->deb("ARRAY_rev elem $s matched @{[substr($::ORIG,$from,$len)]} at $from $len") if $DEBUG & DEBUG::matchers;
 	    my $r = $self->cursor_rev($from);
@@ -1589,7 +1589,7 @@ sub _DIGIT { my $self = shift;
 
 sub _DIGIT_rev { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $from = $self->{_from} - 1;
+    my $from = $self->{_pos} - 1;
     if ($from < 0) {
 #        say "DIGIT_rev didn't match $char at $from";
         return ();
@@ -1621,7 +1621,7 @@ sub _ALNUM { my $self = shift;
 
 sub _ALNUM_rev { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $from = $self->{_from} - 1;
+    my $from = $self->{_pos} - 1;
     if ($from < 0) {
 #        say "ALNUM_rev didn't match $char at $from";
         return ();
@@ -1653,7 +1653,7 @@ sub alpha { my $self = shift;
 
 sub alpha_rev { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $from = $self->{_from} - 1;
+    my $from = $self->{_pos} - 1;
     if ($from < 0) {
         return ();
     }
@@ -1683,7 +1683,7 @@ sub _SPACE { my $self = shift;
 
 sub _SPACE_rev { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $from = $self->{_from} - 1;
+    my $from = $self->{_pos} - 1;
     if ($from < 0) {
 #        say "SPACE_rev didn't match $char at $from";
         return ();
@@ -1715,7 +1715,7 @@ sub _HSPACE { my $self = shift;
 
 sub _HSPACE_rev { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $from = $self->{_from} - 1;
+    my $from = $self->{_pos} - 1;
     if ($from < 0) {
 #        say "HSPACE_rev didn't match $char at $from";
         return ();
@@ -1747,7 +1747,7 @@ sub _VSPACE { my $self = shift;
 
 sub _VSPACE_rev { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $from = $self->{_from} - 1;
+    my $from = $self->{_pos} - 1;
     if ($from < 0) {
 #        say "VSPACE_rev didn't match $char at $from";
         return ();
@@ -1783,7 +1783,7 @@ sub _CCLASS_rev { my $self = shift;
     my $cc = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $from = $self->{_from} - 1;
+    my $from = $self->{_pos} - 1;
     if ($from < 0) {
 #        say "CCLASS didn't match $char at $from";
         return ();
@@ -1813,7 +1813,7 @@ sub _ANY { my $self = shift;
 
 sub _ANY_rev { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $from = $self->{_from} - 1;
+    my $from = $self->{_pos} - 1;
     if ($from < 0) {
         return ();
     }
@@ -1908,14 +1908,16 @@ sub _LEFTRESULT { my $self = shift;
 sub _LEFTRESULT_rev { $_[0]->_LEFTWB }
 
 sub _REDUCE { my $self = shift;
+    my $S = shift;
     my $tag = shift;
 
     $self->{_reduced} = $tag;
+    $self->{_from} = $S;
     if ($::ACTIONS) {
 	eval { $::ACTIONS->$tag($self) };
 	warn $@ if $@ and not $@ =~ /locate/;
     }
-    $self->deb("REDUCE $tag from " . $self->{_from} . " to " . $self->{_pos}) if $DEBUG & DEBUG::matchers;
+    $self->deb("REDUCE $tag from " . $S . " to " . $self->{_pos}) if $DEBUG & DEBUG::matchers;
     $self;
 }
 
@@ -1923,8 +1925,6 @@ sub _COMMITBRANCH { my $self = shift;
     $self->{LAST} = shift() if @_;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    my $F = $self->{_from};
-    $self->{FIRST} = substr($::ORIG, $F, $P - $F);
     $self->deb("Commit branch to $P") if $DEBUG & DEBUG::matchers;
     $self, LazyMap->new(sub { $self->deb("ABORTBRANCH") if $DEBUG & DEBUG::trace_call; die "ABORTBRANCH" }, $self);
 }

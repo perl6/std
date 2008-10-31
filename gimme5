@@ -326,7 +326,7 @@ sub $name {
     }
 
     my \$C = \$self;
-    \$C->{_to} = \$C->{_from} = \$C->{_pos};
+    my \$S = \$C->{_pos};
 
     my \@result = eval {
 	my \$trystate;
@@ -355,7 +355,7 @@ sub $name {
 	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 	    push \@gather, \$C->\$try(\@_);
 	}
-	\$self->_MATCHIFY("$name", \@gather);
+	\$self->_MATCHIFY(\$S, "$name", \@gather);
     };
     if (\$@) {
 	return () if \$@ =~ /^ABORTRULE/;
@@ -596,7 +596,7 @@ END
 <<DECL>>
 
     my $C = $self;
-    $C->{_to} = $C->{_from} = $C->{_pos};
+    my $S = $C->{_pos};
 END
 
 	    for my $binding ( keys %BINDINGS ) {
@@ -629,7 +629,7 @@ END
 		my $ratchet = $MAYBACKTRACK ? '' : 'r';
                 $body .= <<"END";
 
-    \$self->_MATCHIFY$ratchet("$NAME", $coercion
+    \$self->_MATCHIFY$ratchet(\$S, "$NAME", $coercion
 <<MEAT>>
     );
 END
@@ -1217,7 +1217,7 @@ sub atom {
 	$key =~ s/ +/_/g;
         ws();
         $key =~ s/(['\\])/\\$1/g;
-        return bless { name => '_REDUCE', args => "'$key'", min => 0, max => 0},
+        return bless { name => '_REDUCE', args => "\$S, '$key'", min => 0, max => 0},
                      "RE_method_internal";
     }
     if (/^\{/) {
