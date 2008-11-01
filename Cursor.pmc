@@ -10,17 +10,27 @@ require 'mangle.pl';
 
 our $CTX = '';
 our $DEBUG = $ENV{STD5DEBUG} // 0;
-$::DEBUG = $DEBUG;
+our $DEPTH = 0;
+our %LEXERS;       # per language, the cache of lexers, keyed by rule name
 
-# various bits of info useful for error messages
-$::HIGHWATER = 0;
-$::HIGHMESS = '';
-$::HIGHEXPECT = {};
-$::COMPILING::LAST_NIBBLE = { firstline => 0, lastline => 0 };
-$::COMPILING::LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
-$::COMPILING::LINE = 1;
-$::COMPILING::FILE = '(eval)';
-$::GOAL = "(eof)";
+sub ::init_globals {
+    $::DEBUG = $DEBUG;
+    $::CTX = '';
+    $::DEPTH = 0;
+    $::ORIG = '';
+    @::MEMOS = ();
+    %::LEXERS = ();
+
+    # various bits of info useful for error messages
+    $::HIGHWATER = 0;
+    $::HIGHMESS = '';
+    $::HIGHEXPECT = {};
+    $::COMPILING::LAST_NIBBLE = { firstline => 0, lastline => 0 };
+    $::COMPILING::LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
+    $::COMPILING::LINE = 1;
+    $::COMPILING::FILE = '(eval)';
+    $::GOAL = "(eof)";
+}
 
 { package DEBUG;
     use constant {
@@ -39,8 +49,6 @@ $::GOAL = "(eof)";
         use_color => 32768
     };
 }
-
-our $DEPTH = 0;
 
 sub ::deb {
     print ::LOG @_, "\n";
@@ -109,6 +117,8 @@ sub parse {
     my $class = shift;
     my $text = shift;
     my $rule = shift() // 'comp_unit';
+    ::init_globals();
+    local $::VOID = 1 if not defined wantarray;
     local $::COMPILING::FILE = '(eval)';
     $class->new($text)->$rule();
 }
@@ -117,6 +127,8 @@ sub parsefile {
     my $class = shift;
     my $file = shift;
     my $rule = shift() // 'comp_unit';
+    ::init_globals();
+    local $::VOID = 1 if not defined wantarray;
     local $::COMPILING::FILE = $file;
     my $text = Encode::decode('utf8', `cat $file`);
     $class->new($text)->$rule();
@@ -166,8 +178,6 @@ sub _PARAMS {}	# overridden in parametric role packages
 
 use YAML::XS;
 
-our %lexers;       # per language, the cache of lexers, keyed by rule name
-
 sub from { $_[0]->{_from} // $_[0]->{_pos} }
 sub to { $_[0]->{_pos} }
 sub pos { $_[0]->{_pos} }
@@ -200,7 +210,7 @@ sub hash { my $self = shift;
 sub lexers { my $self = shift;
     my $lang = ref $self;
     $self->deb("LANG = $lang") if $DEBUG & DEBUG::autolexer;
-    $lexers{$lang} //= {};
+    $::LEXERS{$lang} //= {};
 }
 
 my $fakepos = 1;
@@ -473,7 +483,7 @@ sub _AUTOLEXnow { my $self = shift;
 		print "Too many patterns for $ch2 file $file\n";
 	    }
 	    for (@pats) {
-		s/\(\?#FATE (.*?)\)/(?#$i FATE $1)/ or return sub { return };
+		s/\(\?#FATE +(.*?)\)/(?#$i FATE $1)/ or return sub { return };
 		my $fstr = $1;
 		my $fate = $fates->[$i] = [0,0,0,$fstr];
 		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
@@ -763,12 +773,6 @@ sub trim_heredoc { my $doc = shift;
     $stopper;
 }
 
-sub cleanup {
-    my $self = shift;
-    delete $self->{_fate};
-    $self;
-}
-
 sub clean {
     my $self = shift;
     delete $self->{_fate};
@@ -804,7 +808,7 @@ sub dump {
 sub cursor_bind { my $self = shift;	# this is parent's match cursor
     my $bindings = shift;
     my $submatch = shift;		# this is the submatch's cursor
-    $submatch->cleanup;
+    delete $self->{_fate};
 
     $self->deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
@@ -820,7 +824,6 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
     }
     $submatch->{_from} = $r{_from} = $r{_pos};
     $r{_pos} = $submatch->{_pos};
-    delete $r{_fate};
     CORE::bless \%r, ref $self;		# return new match cursor for parent
 }
 
@@ -849,6 +852,10 @@ sub cursor_fate { my $self = shift;
 	    $self->{_fate} = $fate;
 	    return $self, $tag, $try, $relex;
 	}
+#	else {
+#	    warn Dump($fate);
+#	    warn "FATE mismatch: $name vs " . $fate->[0] . "\n";
+#	}
     }
 
     $relex = $self->_AUTOLEXnow($name,$retree);

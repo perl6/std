@@ -12,6 +12,7 @@ my $IN_DECL is context<rw>;
 my %ROUTINES;
 my $ORIG is context;
 my @MEMOS is context;
+my $VOID is context<rw>;
 
 # random rule for debugging, please ignore
 token foo {
@@ -69,7 +70,7 @@ method TOP ($STOP = undef) {
 
 # XXX shouldn't need this, it should all be defined/imported by the prelude
 
-my @typenames = qw[
+my @basetypenames = qw[
     Object Any Junction Whatever
     Capture Match Signature Proxy Matcher
     Package Module Class Role Grammar
@@ -101,10 +102,17 @@ my @typenames = qw[
 
     KitchenSink
 ];
-push @typenames, "True", "False", "Bool::True", "Bool::False";  # in quotes lest gimme5 translate them
+push @basetypenames, "True", "False", "Bool::True", "Bool::False";  # in quotes lest gimme5 translate them
 
+my @typenames;
 my %typenames;
-%typenames{@typenames} = (1 xx @typenames);
+
+sub init_types {
+    @PKGS = ();
+    @typenames = @basetypenames;
+    %typenames = ();
+    %typenames{@typenames} = (1 xx @typenames);
+}
 
 method is_type ($name) {
     return True if %typenames{$name};
@@ -123,7 +131,7 @@ method add_type ($longname) {
 
 # XXX likewise for routine defs
 
-my @routinenames = qw[
+my @baseroutinenames = qw[
     WHAT WHICH VAR
     any all none one
 
@@ -171,12 +179,19 @@ my @routinenames = qw[
     run runinstead
     fork wait kill sleep
 ];
-push @routinenames, "HOW", "fail", "temp", "let";
+push @baseroutinenames, "HOW", "fail", "temp", "let";
 
 # please don't add: ref length bless delete exists
 
+my @routinenames;
 my %routinenames;
-%routinenames{@routinenames} = (1 xx @routinenames);
+
+sub init_routines {
+    %ROUTINES = ();
+    @routinenames = @baseroutinenames;
+    %routinenames = ();
+    %routinenames{@routinenames} = (1 xx @routinenames);
+}
 
 method is_routine ($name) {
     return True if %routinenames{$name};
@@ -557,6 +572,15 @@ token pod_comment {
 rule comp_unit {
     :my $begin_compunit is context = 1;
     :my $endargs        is context<rw> = -1;
+
+    :my $LANG is context;
+    :my $PKGDECL is context = "";
+    :my $PKG is context = "";
+    :my $GOAL is context = "(eof)";
+    :my $PARSER is context<rw>;
+    :my $IN_DECL is context<rw>;
+
+    { init_types(); init_routines() }
 
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
@@ -3420,10 +3444,10 @@ method EXPR ($preclvl)
                 push @chain, $op;
                 while @opstack {
                     last if $op<O><prec> ne @opstack[*-1]<O><prec>;
-                    push @chain, pop(@termstack).cleanup;
+                    push @chain, pop(@termstack);
                     push @chain, pop(@opstack);
                 }
-                push @chain, pop(@termstack).cleanup;
+                push @chain, pop(@termstack);
                 @chain = reverse @chain if @chain > 1;
                 my $startpos = @chain[0].pos;
                 my $nop = $op.cursor_fresh();
@@ -3440,7 +3464,7 @@ method EXPR ($preclvl)
                     self.deb($sym ~ " vs " ~ @opstack[*-1]<sym>) if $*DEBUG +& DEBUG::EXPR;
                     last if $sym ne @opstack[*-1]<sym>;
 		    if @termstack and defined @termstack[0] {
-			push @list, pop(@termstack).cleanup;
+			push @list, pop(@termstack);
 		    }
 		    else {
 			self.worry("Missing term in " ~ $sym ~ " list");
@@ -3448,7 +3472,7 @@ method EXPR ($preclvl)
                     push @delims, pop(@opstack);
                 }
 		if @termstack and defined @termstack[0] {
-		    push @list, pop(@termstack).cleanup;
+		    push @list, pop(@termstack);
 		}
 		elsif $sym ne ',' {
 		    self.worry("Missing final term in '" ~ $sym ~ "' list");
@@ -3470,7 +3494,7 @@ method EXPR ($preclvl)
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-		$op<arg> = (pop @termstack).cleanup;
+		$op<arg> = (pop @termstack);
                 if ($op<arg><_from> < $op<_from>) {
                     $op<_from> = $op<arg><_from>;
                 }
@@ -3485,8 +3509,8 @@ method EXPR ($preclvl)
                 my @list;
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
-		$op<right> = (pop @termstack).cleanup;
-		$op<left> = (pop @termstack).cleanup;
+		$op<right> = (pop @termstack);
+		$op<left> = (pop @termstack);
 		$op<_from> = $op<left><_from>;
 		$op<_pos> = $op<right><_pos>;
                 $op<_arity> = 'BINARY';

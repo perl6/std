@@ -1,11 +1,14 @@
 #!/usr/local/bin/perl
 
-my $file = shift;
-
 use STD;
 use utf8;
 use YAML::XS;
 use Encode;
 
-my $r = STD->parsefile($file);
-print Dump($r);
+for my $file (@ARGV) {
+    warn $file,"\n";
+    eval {
+	STD->parsefile($file);
+    };
+    warn $@ if $@;
+}
