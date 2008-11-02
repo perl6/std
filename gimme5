@@ -1759,13 +1759,16 @@ sub unbalanced {
 { package RE_string; use base "REbase";
     sub walk {
         my $self = shift;
-        my $text = quotemeta($$self{text});
-	$text = "(?<=$text)" if $REV;
 	if ($$self{i}) {
+            my $text = quotemeta($$self{text});
+            $text = "(?<=$text)" if $REV;
 	    '$C->_PATTERN(qr/\\G(?i:' . $text . ')/)';
 	}
 	else {
-	    "\$C->_PATTERN(qr/\\G$text/)";
+            my $text = $$self{text};
+            $text =~ s/([\\'])/\\$1/g;
+            "\$C->_EXACT$REV('$text')";
+    #	    "\$C->_PATTERN(qr/\\G$text/)";
 #	    my $l = length($text);
 #	    "(substr(\$\$buf, \$C->{_pos}, $l) eq '" . $text .  "' ? \$C->cursor(\$C->{_pos} + $l) : ())"
 	}

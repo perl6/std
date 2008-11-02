@@ -6,7 +6,7 @@ use YAML::XS;
 use Encode;
 
 for my $file (@ARGV) {
-    warn $file,"\n";
+    warn $file,"\n" if @ARGV > 1;
     eval {
 	STD->parsefile($file);
     };

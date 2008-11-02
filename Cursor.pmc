@@ -18,6 +18,7 @@ sub ::init_globals {
     $::CTX = '';
     $::DEPTH = 0;
     $::ORIG = '';
+    @::ORIG = ();
     @::MEMOS = ();
     %::LEXERS = ();
 
@@ -102,7 +103,8 @@ BEGIN {
 sub new {
     my $class = shift;
     $::ORIG = shift() . "\n";		# original string
-    $::MEMOS[length $::ORIG] = undef;	# memos kept by position
+    @::ORIG = unpack("U*", $::ORIG);
+    $::MEMOS[@::ORIG] = undef;	# memos kept by position
     my %args = ('_pos' => 0, '_from' => 0);
     while (@_) {
 	my $name = shift;
@@ -241,7 +243,13 @@ sub _AUTOLEXgen { my $self = shift;
     (my $file = $key) =~ s/::/-/g;
     $file =~ s/:\*$//;
     my $name = $key;
-    $name =~ s/_01//;
+    my $dba = $retree->{$key}{dba};
+    if (not $dba) {
+	$dba = $name;
+	$dba =~ s/_0[01]$//;
+	$dba =~ s/_(\d\d)$/ (alt $1)/;
+	$dba =~ s/:\*$//;
+    }
 
     if (open(LEX, "$dir/$file")) {
 	binmode(LEX, ":utf8");
@@ -253,7 +261,7 @@ sub _AUTOLEXgen { my $self = shift;
 	close LEX;
 	my %lexer;
 	$lexer{NAME} = $name;
-	$lexer{DBA} = $retree->{$key}{dba} // $name;
+	$lexer{DBA} = $dba;
 	$lexer{FILE} = "$dir/$file";
 	$lexer{PATS} = \@pat;
 
@@ -306,7 +314,7 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
-	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "DBA" => $retree->{$key}{dba} // $name};
+	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "DBA" => $dba};
 
 	return $lexer if $lang =~ /ANON/;
 
@@ -430,9 +438,17 @@ sub _AUTOLEXnow { my $self = shift;
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($key,$retree);
     };
-    $self->highwater($lexer->{DBA}) if $self->{_pos} >= $::HIGHWATER;
+    if ($self->{_pos} >= $::HIGHWATER) {
+	if ($self->{_pos} > $::HIGHWATER) {
+	    %$::HIGHEXPECT = ();
+	    $::HIGHMESS = '';
+	}
+	$::HIGHEXPECT->{$lexer->{DBA}}++;
+	$::HIGHWATER = $self->{_pos};
+    }
+
     my $P = $self->{_pos};
-    if ($P == length($::ORIG)) {
+    if ($P >= @::ORIG) {
 	return sub { return };
     }
     pos($::ORIG) = $P;
@@ -529,8 +545,6 @@ sub _AUTOLEXnow { my $self = shift;
 	    # generate match closure at the last moment
 	    sub {
 		my $C = shift;
-
-		# die "orig disappeared!!!" unless length($::ORIG);
 
 		return unless $lexer;
 
@@ -671,22 +685,6 @@ END
 	    }
 	}
     };
-}
-
-sub highwater {
-    my $self = shift;
-    if ($self->{_pos} > $::HIGHWATER) {
-	%$::HIGHEXPECT = ();
-	$::HIGHMESS = '';
-    }
-    for (@_) {
-	my $name = $_;
-	$name =~ s/_0[01]$//;
-	$name =~ s/_(\d\d)$/ (alt $1)/;
-	$name =~ s/:\*$//;
-	$::HIGHEXPECT->{$name}++;
-    }
-    $::HIGHWATER = $self->{_pos};
 }
 
 sub delete {
@@ -1112,7 +1110,7 @@ sub _SCANf { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $pos = $self->{_pos};
-    my $eos = length(${\$::ORIG});
+    my $eos = @::ORIG;
 
     lazymap( sub { $self->cursor($_[0])->retm() }, LazyRange->new($pos,$eos) );
 }
@@ -1121,7 +1119,7 @@ sub _SCANg { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $pos = $self->{_pos};
-    my $eos = length(${\$::ORIG});
+    my $eos = @::ORIG;
 
     lazymap( sub { $self->cursor($_[0])->retm() }, LazyRangeRev->new($eos,$pos) );
 }
@@ -1155,7 +1153,7 @@ sub _STARr { my $self = shift;
     my $pos = $self;
     my $prev_pos = $pos->{_pos} // 0;
     my @all;
-    my $eos = length(${\$::ORIG});
+    my $eos = @::ORIG;
     for (;;) {
       last if $pos->{_pos} == $eos;
 	my @matches = $block->($pos);  # XXX shouldn't read whole list
@@ -1177,7 +1175,7 @@ sub _PLUSf { my $self = shift;
     my $x = $self;
 
     # don't go beyond end of string
-    return () if $self->{_pos} == length(${\$::ORIG});
+    return () if $self->{_pos} == @::ORIG;
     lazymap(
 	sub {
 	    my $x = $_[0];
@@ -1204,7 +1202,7 @@ sub _PLUSr { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
     my @all;
-    my $eos = length(${\$::ORIG});
+    my $eos = @::ORIG;
     for (;;) {
       last if $to->{_pos} == $eos;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
@@ -1228,7 +1226,7 @@ sub _REPSEPf { my $self = shift;
 
     my @result;
     # don't go beyond end of string
-    return () if $self->{_pos} == length(${\$::ORIG});
+    return () if $self->{_pos} == @::ORIG;
     do {
 	for my $x ($block->($self)) {
 	    for my $s ($sep->($x)) {
@@ -1255,7 +1253,7 @@ sub _REPSEPr { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
     my @all;
-    my $eos = length(${\$::ORIG});
+    my $eos = @::ORIG;
     for (;;) {
       last if $to->{_pos} == $eos;
 	my @matches = $block->($to);  # XXX shouldn't read whole list
@@ -1455,21 +1453,37 @@ sub _SUBSUMEr { my $self = shift;
     $self->cursor_bind($names, $var)->retm();
 }
 
-sub _EXACT { my $self = shift;
+sub _EXACT_rev { my $self = shift;
     my $s = shift() // '';
+    my @ints = unpack("U*", $s);
 
     local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
-    my $len = length($s);
-    if (substr($::ORIG, $P, $len) eq $s) {
-        $self->deb("EXACT $s matched @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
-        my $r = $self->cursor($P+$len);
-        $r->retm();
+    while (@ints) {
+	return () unless ($::ORIG[--$P]//-1) == pop @ints;
     }
-    else {
-        $self->deb("EXACT $s didn't match @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
-        return ();
+    return $self->cursor($P)->retm();
+}
+
+sub _EXACT { my $self = shift;
+    my $s = shift() // '';
+    my @ints = unpack("U*", $s);
+
+    local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    while (@ints) {
+	return () unless ($::ORIG[$P++]//-1) == shift @ints;
     }
+    return $self->cursor($P)->retm();
+#    if (substr($::ORIG, $P, $len) eq $s) {
+#        $self->deb("EXACT $s matched @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+#        my $r = $self->cursor($P+$len);
+#        $r->retm();
+#    }
+#    else {
+#        $self->deb("EXACT $s didn't match @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+#        return ();
+#    }
 }
 
 sub _PATTERN { my $self = shift;
@@ -1532,21 +1546,21 @@ sub _SYM { my $self = shift;
     }
 }
 
-sub _EXACT_rev { my $self = shift;
-    my $s = shift;
-
-    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $len = length($s);
-    my $from = $self->{_pos} - $len;
-    if ($from >= 0 and substr($::ORIG, $from, $len) eq $s) {
-        my $r = $self->cursor_rev($from);
-        $r->retm();
-    }
-    else {
-#        say "EXACT_rev $s didn't match @{[substr($!orig,$from,$len)]} at $from $len";
-        return ();
-    }
-}
+#sub _EXACT_rev { my $self = shift;
+#    my $s = shift;
+#
+#    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+#    my $len = length($s);
+#    my $from = $self->{_pos} - $len;
+#    if ($from >= 0 and substr($::ORIG, $from, $len) eq $s) {
+#        my $r = $self->cursor_rev($from);
+#        $r->retm();
+#    }
+#    else {
+##        say "EXACT_rev $s didn't match @{[substr($!orig,$from,$len)]} at $from $len";
+#        return ();
+#    }
+#}
 
 sub _ARRAY { my $self = shift;
     local $CTX = $self->callm(0+@_) if $DEBUG & DEBUG::trace_call;
@@ -1809,7 +1823,7 @@ sub _CCLASS_rev { my $self = shift;
 sub _ANY { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    if ($P < length($::ORIG)) {
+    if ($P < @::ORIG) {
         $self->cursor($P+1)->retm();
     }
     else {
@@ -1854,7 +1868,7 @@ sub _BOL_rev { $_[0]->_BOL }
 sub _EOS { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    if ($P == length($::ORIG)) {
+    if ($P == @::ORIG) {
         $self->cursor($P)->retm();
     }
     else {
@@ -1866,7 +1880,7 @@ sub _EOS_rev { $_[0]->_EOS }
 sub _EOL { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    if ($P == length($::ORIG) or substr($::ORIG, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
+    if ($P == @::ORIG or substr($::ORIG, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
         $self->cursor($P)->retm();
     }
     else {
