@@ -213,8 +213,10 @@ HTML
     for my $i (0 .. @loc-1) {
         next unless defined $loc[$i];
         my $c = substr($src_text,$i,1);
-        my $tree = "@{$loc[$i]}";
-
+        my $tree = "";
+        for my $action_ref (@{$loc[$i]}) {
+            $tree .= ${$action_ref} . " ";
+        }
         if($tree ne $last_tree) {
             $str .= qq{<span id="tree_$i" style="display:none;">$last_tree</span>};
             my $rule;
@@ -308,7 +310,10 @@ HTML
     for my $i (0 .. @loc-1) {
         next unless defined $loc[$i];
         my $c = substr($src_text,$i,1);
-        my $tree = "@{$loc[$i]}";
+        my $tree = "";
+        for my $action_ref (@{$loc[$i]}) {
+            $tree .= ${$action_ref} . " ";
+        }
         if($tree ne $last_tree) {
             my $rule;
             my $rule_to_color = 0;
@@ -379,7 +384,10 @@ sub highlight_perl6_ansi {
     for my $i (0 .. @loc-1) {
         next unless defined $loc[$i];
         my $c = substr($src_text,$i,1);
-        my $tree = "@{$loc[$i]}";
+        my $tree = "";
+        for my $action_ref (@{$loc[$i]}) {
+            $tree .= ${$action_ref} . " ";
+        }
         if($tree ne $last_tree) {
             my $rule;
             my $rule_to_color = 0;
@@ -427,6 +435,8 @@ sub highlight_perl6_ansi {
 
     our $AUTOLOAD;
 
+    my %action_refs = ();
+
     sub AUTOLOAD {
         my $self = shift;
         my $C = shift;
@@ -434,8 +444,13 @@ sub highlight_perl6_ansi {
         my $P = $C->{_pos};
         $AUTOLOAD =~ s/^Actions:://;
         $loc[$P] = [] if $loc[$P];	# in case we backtracked to here
+        my $action = $AUTOLOAD;
+        my $action_ref = $action_refs{$action};
+        if(!$action_ref) {
+            $action_refs{$action} = $action_ref = \$action;
+        }
         for ($F..$P-1) {
-            unshift @{$loc[$_]}, $AUTOLOAD;
+            unshift @{$loc[$_]}, $action_ref;
         }
     }
 
