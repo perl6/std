@@ -510,7 +510,6 @@ token unsp {
 token vws {
     :dba('vertical whitespace')
     \v
-    { $COMPILING::LINE++ } # XXX wrong several ways, use self.lineof($¢.pos)
     [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
 }
 
@@ -1973,7 +1972,6 @@ token nibbler {
                             $text ~= $ch;
                             if $ch ~~ "\n" {
                                 $multiline++;
-                                $COMPILING::LINE++; # bypasses <vws>
                             }
                         }}
         ]

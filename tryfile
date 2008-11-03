@@ -5,6 +5,11 @@ use utf8;
 use YAML::XS;
 use Encode;
 
+if (not @ARGV) {
+    @ARGV = <STDIN>;
+    s/^[AU]+\s+// for @ARGV;
+}
+
 for my $file (@ARGV) {
     warn $file,"\n" if @ARGV > 1;
     eval {
