@@ -111,7 +111,7 @@ HELP
     highlight_match();
 }
 
-=item write_html_file
+=item write_output
 
 Writes the output to a file or STDOUT
 =cut
@@ -130,8 +130,7 @@ sub write_output {
 =item highlight_match
 
 Returns the generated Perl6 highlighted HTML from C<highlight_perl6_*>
-subroutine after traversing the STD parse tree using 
-DumpMatch.pm C<traverse_match>.
+subroutine using redspans.
 =cut
 sub highlight_match {
     if($full_html) {
