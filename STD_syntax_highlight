@@ -120,6 +120,7 @@ sub write_output {
     if($file eq '-') {
         say $output;
     } else {
+        use open OUT => ':utf8';
         open FILE, ">$file" or
             die "Cannot open $file for writing: $OS_ERROR\n";
         say FILE $output;
