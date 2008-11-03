@@ -27,7 +27,10 @@ sub MAIN {
     for my $i (0 .. @loc-1) {
         say("Undefined $i"),next unless defined $loc[$i];
         my $c = substr($txt,$i,1);
-        my $tree = "@{$loc[$i]}";
+        my $tree = "";
+        for my $action_ref (@{$loc[$i]}) {
+            $tree .= ${$action_ref} . " ";
+        }
         if($tree ne $last_tree) {
             say "\n'$buffer'\n$last_tree" if $buffer ne '';
             $buffer = $c;
@@ -43,17 +46,22 @@ sub MAIN {
 { package Actions;
 
     our $AUTOLOAD;
-
+    my %actions = ();
     sub AUTOLOAD {
-	my $self = shift;
-	my $C = shift;
-	my $F = $C->{_from};
-	my $P = $C->{_pos};
-	$AUTOLOAD =~ s/^Actions:://;
-	$loc[$P] = [] if $loc[$P];	# in case we backtracked to here
-	for ($F..$P-1) {
-	    unshift @{$loc[$_]}, $AUTOLOAD;
-	}
+        my $self = shift;
+        my $C = shift;
+        my $F = $C->{_from};
+        my $P = $C->{_pos};
+        $AUTOLOAD =~ s/^Actions:://;
+        $loc[$P] = [] if $loc[$P];	# in case we backtracked to here
+        my $action = $AUTOLOAD;
+        my $action_ref = $actions{$action};
+        if(!$action_ref) {
+            $actions{$action} = $action_ref = \$action;
+        }
+        for ($F..$P-1) {
+            unshift @{$loc[$_]}, $action_ref;
+        }
     }
 
     sub stdstopper { }
