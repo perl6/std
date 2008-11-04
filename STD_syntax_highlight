@@ -386,6 +386,7 @@ sub highlight_perl6_ansi {
 }
 
 =item redspans_traverse
+
     Walk the path that no one wanted to travel ;)
 =cut
 sub redspans_traverse($%) {
@@ -495,6 +496,8 @@ See http://www.nntp.perl.org/group/perl.perl6.users/2008/07/msg788.html
 The initial STD tree traversal code was written by Paweł Murias (pmurias).
 
 The redspans traversal code was written by Larry Wall (TimToady).
+redspans stands for "...'red' for "reductions", and 'spans' from the 
+from/to span calculations"
 
 The browser code was written by Ahmad M. Zawawi (azawawi)
 =cut
