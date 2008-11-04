@@ -33,6 +33,9 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     # write simple html output to foo.pl.html
     STD_syntax_highlight --simple-html=foo.pl.html foo.pl
 
+    # write simple snippet html output to foo.pl.html
+    STD_syntax_highlight --snippet-html=foo.pl.html foo.pl
+
     # write simple ansi-colored output to STDOUT
     STD_syntax_highlight --ansi-text=- foo.pl
 
@@ -43,7 +46,7 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 =cut
 
 my ($clean_html,$help) = (0,0);
-my ($full_html,$simple_html,$ansi_text) = (0,0,0);
+my ($full_html,$simple_html,$snippet_html,$ansi_text) = (0,0,0,0);
 my ($file, $parser, $src_text); 
 
 # These are needed for redspans
@@ -60,6 +63,7 @@ sub main {
         "clean-html"=>\$clean_html,
         "full-html=s"=>\$full_html,
         "simple-html=s"=>\$simple_html,
+        "snippet-html=s"=>\$snippet_html,
         "ansi-text=s"=>\$ansi_text,
         "help"=>\$help
     );
@@ -81,6 +85,10 @@ USAGE:
         write simple-mode html to filename (defaults to STDOUT if no other 
         option is selected, - for STDOUT)
 
+    --snippet-html=filename
+        same as --simple-html but with only the body section. 
+        This is typically ideal for inline html code.
+
     --ansi-text=filename   
         write simple-mode ansi color text to filename (- for STDOUT)
 
@@ -88,7 +96,7 @@ HELP
     }
 
     #default is --simple-html=- if no option is selected
-    if(!($ansi_text || $full_html) && !$simple_html) {
+    if(!($ansi_text || $full_html || $snippet_html) && !$simple_html) {
         $simple_html = '-';    
     }
 
@@ -141,6 +149,10 @@ sub highlight_match {
     if($simple_html) {
         my $html = highlight_perl6_simple();
         write_output $simple_html, $html;
+    }
+    if($snippet_html) {
+        my $html = highlight_perl6_snippet_html();
+        write_output $snippet_html, $html;
     }
     if($ansi_text) {
         my $text = highlight_perl6_ansi();
@@ -295,6 +307,47 @@ HTML
    $str;
 }
 
+=item highlight_perl6_snippet_html
+
+This is same as C<highlight_perl6_full> when --snippet-html is used.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
+=cut
+sub highlight_perl6_snippet_html {
+    my $str = "";
+    my %colors = ();
+
+    my $CSS = "STD_syntax_highlight.css";
+    open CSS_FILE, $CSS
+        or die "Could not open $CSS: $OS_ERROR\n";
+    my $line;
+    while($line = <CSS_FILE>) {
+        if($line =~ /^\s*\.(\w+)\s*{\s*(.+?)\s*}/) {
+            $colors{$1} = $2;
+        }
+    }
+    close CSS_FILE;
+
+    $str .= "<pre>";
+
+    local *spit_snippet_html = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        $buffer = escape_html($buffer);
+        my $style = $colors{$rule};
+        if($rule) {
+            $str .= qq{<span style="$style">$buffer</span>};
+        } else {
+            $str .= $buffer;
+        }
+    };
+
+    redspans_traverse(\&spit_snippet_html,%colors); 
+
+    $str .= "</pre>";
+
+    $str;
+}
+
 
 =item highlight_perl6_ansi
 
@@ -328,7 +381,7 @@ sub highlight_perl6_ansi {
     };
 
     redspans_traverse(\&spit_ansi_text,%colors); 
-   
+
     $str;
 }
 
