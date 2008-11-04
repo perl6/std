@@ -11,6 +11,7 @@ use Getopt::Long;
 # CPAN modules
 use File::Slurp;
 use Term::ANSIColor;
+use YAML::Dumper;
 
 # And finally our modules
 use STD;
@@ -39,6 +40,8 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     # write simple ansi-colored output to STDOUT
     STD_syntax_highlight --ansi-text=- foo.pl
 
+    # write yaml output to STDOUT (can be useful to build filters)
+    STD_syntax_highlight --yaml=- foo.pl
 =head1 SUBROUTINES
 
 =over
@@ -46,7 +49,7 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 =cut
 
 my ($clean_html,$help) = (0,0);
-my ($full_html,$simple_html,$snippet_html,$ansi_text) = (0,0,0,0);
+my ($full_html,$simple_html,$snippet_html,$ansi_text,$yaml) = (0,0,0,0,0);
 my ($file, $parser, $src_text); 
 
 # These are needed for redspans
@@ -65,6 +68,7 @@ sub main {
         "simple-html=s"=>\$simple_html,
         "snippet-html=s"=>\$snippet_html,
         "ansi-text=s"=>\$ansi_text,
+        "yaml=s"=>\$yaml,
         "help"=>\$help
     );
 
@@ -92,11 +96,13 @@ USAGE:
     --ansi-text=filename   
         write simple-mode ansi color text to filename (- for STDOUT)
 
+    --yaml=filename
+        writes a dump of redspans to filename (- for STDOUT)
 HELP
     }
 
     #default is --simple-html=- if no option is selected
-    if(!($ansi_text || $full_html || $snippet_html) && !$simple_html) {
+    if(!($ansi_text || $full_html || $snippet_html || $yaml) && !$simple_html) {
         $simple_html = '-';    
     }
 
@@ -157,6 +163,10 @@ sub highlight_match {
     if($ansi_text) {
         my $text = highlight_perl6_ansi();
         write_output $ansi_text, $text;
+    }
+    if($yaml) {
+        my $text = highlight_perl6_yaml();
+        write_output $yaml, $text;
     }
 }
 
@@ -384,6 +394,41 @@ sub highlight_perl6_ansi {
 
     $str;
 }
+
+
+=item highlight_perl6_yaml
+
+Spits out YAML that can be useful for the future
+=cut
+sub highlight_perl6_yaml {
+    my $str = "";
+    my %colors = ();
+
+    my $ANSI = "STD_syntax_highlight.ansi";
+    open ANSI_FILE, $ANSI
+        or die "Could not open $ANSI: $OS_ERROR\n";
+    my $line;
+    while($line = <ANSI_FILE>) {
+        if($line =~ /^(\w+)=(.+)$/) {
+            $colors{$1} = $2;
+        }
+    }
+    close ANSI_FILE;
+
+    my @yaml = ();
+    local *spit_yaml = sub {
+        push @yaml, @ARG;
+    };
+
+    redspans_traverse(\&spit_yaml,%colors); 
+
+    my $dumper = YAML::Dumper->new;
+    $dumper->indent_width(4);
+    $str .= $dumper->dump(@yaml);
+
+    $str;
+}
+
 
 =item redspans_traverse
 
