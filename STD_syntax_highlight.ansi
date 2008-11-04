@@ -14,6 +14,7 @@ number=magenta
 infix=blue
 methodop=bold white
 pod_comment=bold green 
+param_var=bold cyan
 
 _routine=bold red
 _type=bold blue
