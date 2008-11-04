@@ -306,6 +306,32 @@ sub highlight_perl6_simple {
     <pre>
 HTML
 
+    local *spit_simple_html = sub {
+        my ($buffer, $rule) = @ARG;
+        if($rule) {
+            $str .= qq{<span class="$rule">$buffer</span>};
+        } else {
+            $str .= $buffer;
+        }
+    };
+
+    redspans_traverse(\&spit_simple_html,%colors); 
+
+    $str .= <<"HTML";
+    </pre>
+</body>
+</html>
+HTML
+
+   $str;
+}
+
+=item redspans_traverse
+    XXX- document
+=cut
+sub redspans_traverse($%) {
+    my ($process_buffer,%colors) = @ARG;
+
     my ($last_tree,$buffer) = ("","");
     for my $i (0 .. @loc-1) {
         next unless defined $loc[$i];
@@ -317,7 +343,7 @@ HTML
         if($tree ne $last_tree) {
             my $rule;
             my $rule_to_color = 0;
-            $buffer = escape_html($buffer);
+            $buffer = $buffer;
             my @rules = ();
             @rules = reverse(split / /,$last_tree) if $last_tree ne '';
             for $rule (@rules) {
@@ -332,31 +358,20 @@ HTML
             if($rule_to_color) {
                 if($last_tree =~ /identifier/) {
                     if($parser->is_type($buffer)) {
-                        $str .= qq{<span class="_type">$buffer</span>};
+                        $rule_to_color = '_type';
                     } elsif($parser->is_routine($buffer)) {
-                        $str .= qq{<span class="_routine">$buffer</span>};
-                    } else {
-                        $str .= qq{<span class="$rule_to_color">$buffer</span>};
-                    }
-                } else {              
-                    $str .= qq{<span class="$rule_to_color">$buffer</span>};
-                }
-            } else {
-                $str .= qq{$buffer};
+                        $rule_to_color = '_routine';
+                    } 
+                }              
             }
+            #now delegate printing to a callback
+            $process_buffer->($buffer, $rule_to_color); 
             $buffer = $c;
         } else {
             $buffer .= $c;
         }
         $last_tree = $tree;
     }
-    $str .= <<"HTML";
-    </pre>
-</body>
-</html>
-HTML
-
-   $str;
 }
 
 =item highlight_perl6_ansi
