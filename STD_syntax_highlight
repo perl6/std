@@ -364,52 +364,19 @@ sub highlight_perl6_ansi {
     }
     close ANSI_FILE;
 
-    my ($last_tree,$buffer) = ("","");
-    for my $i (0 .. @loc-1) {
-        next unless defined $loc[$i];
-        my $c = substr($src_text,$i,1);
-        my $tree = "";
-        for my $action_ref (@{$loc[$i]}) {
-            $tree .= ${$action_ref} . " ";
-        }
-        if($tree ne $last_tree) {
-            my $rule;
-            my $rule_to_color = 0;
-            my @rules = ();
-            @rules = reverse(split / /,$last_tree) if $last_tree ne '';
-            for $rule (@rules) {
-                if($rule eq 'unv') {
-                    $rule_to_color = '_comment';
-                    last;
-                } elsif($colors{$rule} && $buffer ne '') {
-                    $rule_to_color = $rule;
-                    last;
-                }
-            }
-            if($rule_to_color) {
-                my $color = $colors{$rule_to_color};
-                if($last_tree =~ /identifier/) {
-                    if($parser->is_type($buffer)) {
-                        $str .= (color $color) . $buffer. (color 'reset');
-                    } elsif($parser->is_routine($buffer)) {
-                        $str .= (color $color) . $buffer . (color 'reset');
-                    } else {
-                        $str .= (color $color) . $buffer . (color 'reset');
-                    }
-                } else {              
-                    $str .= (color $color) . $buffer . (color 'reset');
-                }
-            } else {
-                $str .= qq{$buffer};
-            }
-            $buffer = $c;
+    local *spit_ansi_text = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        if($rule) {
+            my $color = $colors{$rule};
+            $str .= (color $color) . $buffer. (color 'reset');
         } else {
-            $buffer .= $c;
+            $str .= $buffer;
         }
-        $last_tree = $tree;
-    }
+    };
 
-   $str;
+    redspans_traverse(\&spit_ansi_text,%colors); 
+   
+    $str;
 }
 
 ###################################################################
