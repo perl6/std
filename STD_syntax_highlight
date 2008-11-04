@@ -209,51 +209,19 @@ sub highlight_perl6_full {
     <pre>
 HTML
 
-    my ($last_tree,$buffer) = ("","");
-    for my $i (0 .. @loc-1) {
-        next unless defined $loc[$i];
-        my $c = substr($src_text,$i,1);
-        my $tree = "";
-        for my $action_ref (@{$loc[$i]}) {
-            $tree .= ${$action_ref} . " ";
-        }
-        if($tree ne $last_tree) {
-            $str .= qq{<span id="tree_$i" style="display:none;">$last_tree</span>};
-            my $rule;
-            my $rule_to_color = 0;
-            $buffer = escape_html($buffer);
-            my @rules = ();
-            @rules = reverse(split / /,$last_tree) if $last_tree ne '';
-            for $rule (@rules) {
-                if($rule eq 'unv') {
-                    $rule_to_color = '_comment';
-                    last;
-                } elsif($colors{$rule} && $buffer ne '') {
-                    $rule_to_color = $rule;
-                    last;
-                }
-            }
-            if($rule_to_color) {
-                if($last_tree =~ /identifier/) {
-                    if($parser->is_type($buffer)) {
-                        $str .= qq{<span id="node_$i" class="_type">$buffer</span>};
-                    } elsif($parser->is_routine($buffer)) {
-                        $str .= qq{<span id="node_$i" class="_routine">$buffer</span>};
-                    } else {
-                        $str .= qq{<span id="node_$i" class="$rule_to_color">$buffer</span>};
-                    }
-                } else {              
-                    $str .= qq{<span id="node_$i" class="$rule_to_color">$buffer</span>};
-                }
-            } else {
-                $str .= qq{<span id="node_$i">$buffer</span>};
-            }
-            $buffer = $c;
+    local *spit_full_html = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        $buffer = escape_html($buffer);
+        $str .= qq{<span id="tree_$i" style="display:none;">$tree</span>};
+        if($rule) {
+            $str .= qq{<span id="node_$i" class="$rule">$buffer</span>};
         } else {
-            $buffer .= $c;
+            $str .= $buffer;
         }
-        $last_tree = $tree;
-    }
+    };
+
+    redspans_traverse(\&spit_full_html,%colors); 
+
     $str .= <<"HTML";
     </pre>
 </body>
@@ -307,7 +275,8 @@ sub highlight_perl6_simple {
 HTML
 
     local *spit_simple_html = sub {
-        my ($buffer, $rule) = @ARG;
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        $buffer = escape_html($buffer);
         if($rule) {
             $str .= qq{<span class="$rule">$buffer</span>};
         } else {
@@ -365,7 +334,7 @@ sub redspans_traverse($%) {
                 }              
             }
             #now delegate printing to a callback
-            $process_buffer->($buffer, $rule_to_color); 
+            $process_buffer->($i, $buffer, $rule_to_color, $last_tree); 
             $buffer = $c;
         } else {
             $buffer .= $c;
