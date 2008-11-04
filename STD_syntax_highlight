@@ -295,8 +295,45 @@ HTML
    $str;
 }
 
+
+=item highlight_perl6_ansi
+
+This is same as C<highlight_perl6_full> when --ansi-text is used.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
+=cut
+sub highlight_perl6_ansi {
+    my $str = "";
+    my %colors = ();
+
+    my $ANSI = "STD_syntax_highlight.ansi";
+    open ANSI_FILE, $ANSI
+        or die "Could not open $ANSI: $OS_ERROR\n";
+    my $line;
+    while($line = <ANSI_FILE>) {
+        if($line =~ /^(\w+)=(.+)$/) {
+            $colors{$1} = $2;
+        }
+    }
+    close ANSI_FILE;
+
+    local *spit_ansi_text = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        if($rule) {
+            my $color = $colors{$rule};
+            $str .= (color $color) . $buffer. (color 'reset');
+        } else {
+            $str .= $buffer;
+        }
+    };
+
+    redspans_traverse(\&spit_ansi_text,%colors); 
+   
+    $str;
+}
+
 =item redspans_traverse
-    XXX- document
+    Walk the path that no one wanted to travel ;)
 =cut
 sub redspans_traverse($%) {
     my ($process_buffer,%colors) = @ARG;
@@ -341,42 +378,6 @@ sub redspans_traverse($%) {
         }
         $last_tree = $tree;
     }
-}
-
-=item highlight_perl6_ansi
-
-This is same as C<highlight_perl6_full> when --ansi-text is used.
-No more javascript tree viewer or anything fancy. 
-Only nodes that have a color are printed. Not optimal but works ;-)
-=cut
-sub highlight_perl6_ansi {
-    my $str = "";
-    my %colors = ();
-
-    my $ANSI = "STD_syntax_highlight.ansi";
-    open ANSI_FILE, $ANSI
-        or die "Could not open $ANSI: $OS_ERROR\n";
-    my $line;
-    while($line = <ANSI_FILE>) {
-        if($line =~ /^(\w+)=(.+)$/) {
-            $colors{$1} = $2;
-        }
-    }
-    close ANSI_FILE;
-
-    local *spit_ansi_text = sub {
-        my ($i, $buffer, $rule, $tree) = @ARG;
-        if($rule) {
-            my $color = $colors{$rule};
-            $str .= (color $color) . $buffer. (color 'reset');
-        } else {
-            $str .= $buffer;
-        }
-    };
-
-    redspans_traverse(\&spit_ansi_text,%colors); 
-   
-    $str;
 }
 
 ###################################################################
