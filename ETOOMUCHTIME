@@ -24,12 +24,18 @@ You can press CTRL-C when you feel bored.
 
 WARNING
 
-#add a sanity check to make sure STD.pm is correctly built
+#sanity check: make sure STD.pm is correctly built
 unless(-r 'lex') {
     die "Could not find 'lex' directory. Maybe you forgot to 'make'\n";
 }
 unless(-r 'STD.pmc') {
     die "Could not find 'STD.pmc'. Maybe your forgot to 'make'\n";
+}
+
+#sanity check: make sure unicode will work with your locale
+unless($ENV{LANG} =~ /\.UTF-8$/) {
+    die "Unicode will not work. Please set your LANG environment variable.\n" .
+        "(e.g. 'export LANG=en_US.UTF-8' in your ~/.bashrc)";
 }
 
 my $dir_to_test = shift @ARGV || '../../t/spec/';
