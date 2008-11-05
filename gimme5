@@ -330,9 +330,21 @@ sub $name {
 
     my \@result = eval {
 	my \$trystate;
-	my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$retree, \$trystate);
-	my \@try = \$tag eq '$name' ? (\$try,\$relex) : ();
-    
+	my (\$tag, \$try, \$relex);
+        my \@try;
+        if (my \$fate = \$C->{_fate}) {
+            if (\$fate->[0] eq '$name') {
+                \$C->deb("Fate passed to $name: \$\$fate[3]") if \$DEBUG & DEBUG::fates;
+                (\$tag, \$try, \$fate) = \@\$fate;
+                \$C->{_fate} = \$fate;
+                \@try = (\$try);
+            }
+        }
+        else {
+            (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$retree, \$trystate);
+            \@try = (\$try,\$relex) if \$tag;
+        }
+
 	my \@gather = ();
 	while (\@try and not \@gather) {
 	    my \$try = shift(\@try) // next;
@@ -2460,23 +2472,35 @@ END
             for (@result) { $_ = "sub { my \$C=shift;\n" . ::indent($_) . "\n}," }
             my $policy;
             if ($failover) {
+                die "failover no longer implemented";
                 $policy = <<"END"
-    my \@try = @{[ '0..' . ($alt-1) ]};
-    unshift \@try, splice(\@try,\$try,1) if \$tag eq '$altname';
-    splice(\@try,1,0,\$relex) if \$relex;
+        \@try = @{[ '0..' . ($alt-1) ]};
+        unshift \@try, splice(\@try,\$try,1) if \$tag eq '$altname';
+        splice(\@try,1,0,\$relex) if \$relex;
 END
             }
             else {
                 $policy = <<"END"
-    my \@try = \$tag eq '$altname' ? (\$try,\$relex) : ();
+        \@try = \$tag eq '$altname' ? (\$try,\$relex) : ();
 END
             }
             my $result = <<"END";
 do {
   my \@result = eval {
     my \$trystate;
-    my (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$retree, \$trystate);
+    my (\$tag, \$try, \$relex);
+    my \@try;
+    my \$fate;
+    if (\$fate = \$C->{_fate} and \$fate->[0] eq '$altname') {
+        \$C->deb("Fate passed to $altname: \$\$fate[3]") if \$DEBUG & DEBUG::fates;
+        (\$tag, \$try, \$fate) = \@\$fate;
+        \$C->{_fate} = \$fate;
+        \@try = (\$try);
+    }
+    else {
+        (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$retree, \$trystate);
 $policy
+    }
 END
 
             $result .= <<'END';
