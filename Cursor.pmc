@@ -110,7 +110,7 @@ sub new {
 	my $name = shift;
 	$args{'_' . $name} = shift;
     }
-    my $self = CORE::bless \%args, ref $class || $class;
+    my $self = bless \%args, ref $class || $class;
     $self->BUILD;
     $self;
 }
@@ -188,7 +188,6 @@ sub text { exists $_[0]->{_from} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos}
 sub peek { $_[0]->{_peek} }
 sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
-sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 sub item { exists $_[0]->{''} ? $_[0]->{''} : $_[0]->text }
 
@@ -229,7 +228,7 @@ sub _AUTOLEXpeek { my $self = shift;
 	return { PATS => ['(?#::)'] };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
-    return $self->lexers->{$key} //= $self->_AUTOLEXgen($key, $retree);
+    return $::LEXERS{ref $self}->{$key} //= $self->_AUTOLEXgen($key, $retree);
 }
 
 sub _AUTOLEXgen { my $self = shift;
@@ -437,7 +436,7 @@ sub delete {
 { package Match;
     sub new { my $self = shift;
 	my %args = @_;
-	CORE::bless \%args, $self;
+	bless \%args, $self;
     }
 
     sub from { my $self = shift;
@@ -453,7 +452,7 @@ sub cursor_peek { my $self = shift;
     $self->deb("cursor_peek") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_peek} = 1;
-    CORE::bless \%r, ref $self;
+    bless \%r, ref $self;
 }
 
 sub cursor_fresh { my $self = shift;
@@ -464,14 +463,14 @@ sub cursor_fresh { my $self = shift;
     $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
     $r{_herelang} = $self->{_herelang} if $self->{_herelang};
-    CORE::bless \%r, ref $lang || $lang;
+    bless \%r, ref $lang || $lang;
 }
 
 sub cursor_herelang { my $self = shift;
     $self->deb("cursor_herelang") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_herelang} = $self;
-    CORE::bless \%r, 'STD::Q';
+    bless \%r, 'STD::Q';
 }
 
 # remove consistent leading whitespace (mutates text nibbles in place)
@@ -564,7 +563,7 @@ sub cursor_bind { my $self = shift;	# this is parent's match cursor
     }
     $submatch->{_from} = $r{_from} = $r{_pos};
     $r{_pos} = $submatch->{_pos};
-    CORE::bless \%r, ref $self;		# return new match cursor for parent
+    bless \%r, ref $self;		# return new match cursor for parent
 }
 
 sub cursor_fate { my $self = shift;
@@ -577,7 +576,7 @@ sub cursor_fate { my $self = shift;
     my $tag;
     my $try;
     
-    my $lexer = $self->lexers->{$name} // do {
+    my $lexer = $::LEXERS{ref $self}->{$name} // do {
 	local %AUTOLEXED;
 	$self->_AUTOLEXpeek($name,$retree);
     };
@@ -840,7 +839,7 @@ sub cursor_all { my $self = shift;
 #    $r{_from} = $fpos;
     $r{_pos} = $tpos;
 
-    CORE::bless \%r, ref $self;
+    bless \%r, ref $self;
 }
 
 sub cursor_tweak { my $self = shift;
@@ -870,7 +869,7 @@ sub cursor { my $self = shift;
 #    $r{_from} = $self->{_pos} // 0;
     $r{_pos} = $tpos;
 
-    CORE::bless \%r, ref $self;
+    bless \%r, ref $self;
 }
 
 sub cursor_rev { my $self = shift;
@@ -886,7 +885,7 @@ sub cursor_rev { my $self = shift;
     $r{_pos} = $fpos;
 #    $r{_from} = $self->{_from};
 
-    CORE::bless \%r, ref $self;
+    bless \%r, ref $self;
 }
 
 sub add_macro { my $lang = shift;
@@ -1265,7 +1264,7 @@ sub _BRACKET { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    lazymap(sub { CORE::bless($_[0],ref($self))->retm() },
+    lazymap(sub { bless($_[0],ref($self))->retm() },
         $block->($self));
 }
 
@@ -1274,7 +1273,7 @@ sub _BRACKETr { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my ($val) = $block->($self) or return ();
-    CORE::bless($val,ref($self))->retm();
+    bless($val,ref($self))->retm();
 }
 
 sub _PAREN { my $self = shift;
@@ -1929,6 +1928,8 @@ sub fail { my $self = shift;
     my $m = shift;
     return ();
 }
+
+sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 #############################################################3
 
