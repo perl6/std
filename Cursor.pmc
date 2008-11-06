@@ -338,8 +338,8 @@ sub _AUTOLEXgen { my $self = shift;
 
 
 # Can the current pattern match the current position according to 1st N chars?
-# (Where N is currently 2). Occasional false positives are okay as long as we
-# can trim it down enough for TRE to handle.  False negatives are bad.
+# Occasional false positives are okay as long as we can trim it down enough
+# for LTM to handle.  False negatives are bad.
 
 sub canmatch {
     my ($p,$s) = @_;
@@ -664,32 +664,18 @@ sub cursor_fate { my $self = shift;
 		$i++;
 	    }
 
-	    if ($DEBUG & DEBUG::autolexer) {
-		my $tmp = "^(?:\n(" . join(")\n|(",@pats) . '))';
-		$self->deb("LEXER: ", $tmp);
-	    }
-
-	    # remove stuff that will confuse TRE greatly
 	    for my $pat (@pats) {
 		$pat =~ s/\(\?#.*?\)//g;
 		$pat =~ s/\s+//g;
 		$pat =~ s/:://g;
-
-		$pat =~ s/\\x(\w\w)/chr(hex($1))/eg;
-		$pat =~ s/\\x\{(\w+)\}/chr(hex($1))/eg;
 	    }
 
-	    my $pat = "^(?:(" . join(")|(",@pats) . '))';
-	    1 while $pat =~ s/\(\?:\)\??//;
-	    1 while $pat =~ s/([^\\])\(((\?:)?)\)/$1($2 !!!OOPS!!! )/;
-	    1 while $pat =~ s/\[\]/[ !!!OOPS!!! ]/;
+	    if ($DEBUG & DEBUG::autolexer) {
+		$self->deb("#FATES: ", 0+@$fates);
 
-	    $self->deb("TRE: ", $pat) if $DEBUG & DEBUG::autolexer;
-
-	    $self->deb("#FATES: ", 0+@$fates) if $DEBUG & DEBUG::autolexer;
-
-	    for my $i (0..@$fates-1) {
-		$self->deb("\t", $i, ': ', $fates->[$i][3]) if $DEBUG & DEBUG::autolexer;
+		for my $i (0..@$fates-1) {
+		    $self->deb("\t", $i, ': ', $fates->[$i][3]);
+		}
 	    }
 
 	    # generate match closure at the last moment
@@ -714,7 +700,6 @@ sub cursor_fate { my $self = shift;
 		}
 
 		{
-		    # if trystate is defined, the "obvious" LTM failed, so must back off
 		    # a parallel nfa matcher might or might not do better here...
 		    # this has the advantage of being fairly compact
 		    if (defined $_[0]) {
@@ -786,65 +771,6 @@ sub cursor_fate { my $self = shift;
 			return @result;
 		    }
 
-		    ##########################################
-		    # No normal p5 match/subst below here!!! #
-		    ##########################################
-		    use re::engine::TRE;
-
-
-		    $self->deb("/ running tre match at @{[ pos($::ORIG) ]} /") if $DEBUG & DEBUG::lexer;
-		    $pat =~ s/\$\.\?/\$(?:.?)/;   # XXX egregious hack to not interpolate $.
-
-		    # Try Real Hard to prevent TRE from recompiling $pat
-		    state $matcher = eval(do { my $prog = <<"END" .
-		    sub {
-			my \$C = shift;
-			my \$P = \$C->{_pos};
-			pos(\$::ORIG) = \$P;
-
-			my \$result;
-			if (\$::ORIG =~ m\0$pat\0xgc) {
-END
-<<'END'; $prog; });
-			    my $max = @+ - 1;
-			    my $last = @- - 1;	# ignore '$0'
-		            $C->deb("LAST: $last\n") if $DEBUG & DEBUG::lexer;
-			    $result = $fates->[$last-1];
-			    if ($DEBUG) {
-				for my $x (1 .. $max) {
-				    my $beg = $-[$x];
-				    next unless defined $beg;
-				    my $end = $+[$x];
-    #			        return if $stoplen >= $end - $beg;
-				    my $f = $fates->[$x-1][3];
-				    no strict 'refs';
-				    if ($DEBUG & DEBUG::fates or ($DEBUG & DEBUG::lexer and $x == $last)) {
-					my $p = $pats[$x-1] // '<nopat>';
-					$self->deb("\$$x: $beg..$end\t$$x\t ",
-					    $x == $last ? "====>" : "---->",
-					    " $f\t/$p/");
-				    }
-				}
-				$C->deb("success at '", substr($::ORIG,$C->{_pos},10), "'") if $DEBUG & DEBUG::lexer;
-			    }
-			    my $tried = "";
-			    vec($tried,$last-1,1) = 1 if $last;
-			    $_[0] = [$tried, pos($::ORIG) - $P, []];
-			}
-			$result;
-		    };
-END
-                    if ($@) {
-                        die;
-                    }
-		    my $result = $matcher->($C, @_);
-		    if ($result) {
-			return $result;
-		    }
-		    else {
-			$self->deb("NO LEXER MATCH") if $DEBUG & DEBUG::lexer;
-			return;
-		    }
 		}
 	    };
 	}
@@ -2067,7 +1993,7 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
         $cc =~ s/^\+\[/[/;
         $cc =~ s/\s*\.\.\s*/-/g;
         $cc =~ s/\s*//g;
-	$cc = "(?i:$cc)" if $self->{i};   # does TRE grok this?
+	$cc = "(?i:$cc)" if $self->{i};
         $cc;
     }
 }
