@@ -576,7 +576,6 @@ sub cursor_fate { my $self = shift;
     $self->deb("cursor_fate $pkg $name") if $DEBUG & DEBUG::cursors;
     my $tag;
     my $try;
-    my $relex;
     
     my $lexer = $self->lexers->{$name} // do {
 	local %AUTOLEXED;
@@ -599,7 +598,7 @@ sub cursor_fate { my $self = shift;
     $::ORIG =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[ -~].|.)/smgc;
     my $ch2 = $1;
 
-    $relex = $lexer->{$ch2} //= do {
+    return $lexer->{$ch2} //= do {
 	my @pats;
 	my $file = $lexer->{FILE} . '__' . ::mangle($ch2);
 	if (open PATS, '<', $file) {
@@ -830,16 +829,6 @@ END
 	}
     };
 
-    if (my $fate = $relex->($self,$_[0])) {
-	$self->deb("FATE OF ${pkg}::$name: $$fate[3]") if $DEBUG & DEBUG::fates;
-	($tag, $try, $fate) = @$fate;
-	$self->{_fate} = $fate;
-    }
-    else {
-	$self->deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
-	$tag = '';
-    }
-    return $tag, $try, $relex;
 }
 
 sub cursor_all { my $self = shift;

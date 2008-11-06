@@ -330,8 +330,9 @@ sub $name {
 
     my \@result = eval {
 	my \$trystate;
-	my (\$tag, \$try, \$relex);
+	my (\$tag, \$try);
         my \@try;
+        my \$relex;
         if (my \$fate = \$C->{_fate}) {
             if (\$fate->[0] eq '$name') {
                 \$C->deb("Fate passed to $name: \$\$fate[3]") if \$DEBUG & DEBUG::fates;
@@ -340,29 +341,19 @@ sub $name {
                 \@try = (\$try);
             }
         }
-        else {
-            (\$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$retree, \$trystate);
-            \@try = (\$try,\$relex) if \$tag;
-        }
 
 	my \@gather = ();
-	while (\@try) {
-	    my \$try = shift(\@try) // next;
+        for (;;) {
+            if (not \@try) {
+                \$relex //= \$C->cursor_fate('$PKG', '$name:*', \$retree);
+                \@try = \$relex->(\$C, \$trystate);
+            }
+            last unless \@try;
+	    \$try = shift(\@try) // next;
     
-	    # if first try failed, interrogate lexer for shorter answers
-	    if (ref \$try) {
-		if (ref \$try eq 'ARRAY') {
-		    (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
-		    \$C->deb("Retrying with \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
-		}
-		elsif (ref \$try eq 'CODE') {
-		    my \@more = \$relex->(\$C, \$trystate);
-		    if (\@more) {
-			unshift \@try, \@more, \$relex;   # ask relex for more
-		    }
-		    next;
-		}
-	    }
+            if (ref \$try eq 'ARRAY') {
+                (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
+            }
     
 	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 	    push \@gather, \$C->\$try(\@_);
@@ -2489,8 +2480,10 @@ END
 do {
   my \@result = eval {
     my \$trystate;
-    my (\$tag, \$try, \$relex);
+    my (\$tag, \$try);
     my \@try;
+    my \$relex;
+
     my \$fate;
     if (\$fate = \$C->{_fate} and \$fate->[0] eq '$altname') {
         \$C->deb("Fate passed to $altname: \$\$fate[3]") if \$DEBUG & DEBUG::fates;
@@ -2498,35 +2491,20 @@ do {
         \$C->{_fate} = \$fate;
         \@try = (\$try);
     }
-    else {
-        (\$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$retree, \$trystate);
-$policy
-    }
-END
 
-            $result .= <<'END';
-    my @gather = ();
-    while (@try) {
-        my $try = shift(@try) // next;
+    my \@gather = ();
+    for (;;) {
+        if (not \@try) {
+            \$relex //= \$C->cursor_fate('$PKG', '$altname', \$retree);
+            \@try = \$relex->(\$C, \$trystate);
+        }
+        last unless \@try;
+        \$try = shift(\@try) // next;
 
-        # if first try failed, interrogate lexer for shorter answers
-        if (ref $try) {
-            if (ref $try eq 'ARRAY') {
-                ($tag, $try, $C->{_fate}) = @$try;	# next candidate fate
-                $C->deb("Retrying with $tag $try") if $::DEBUG & DEBUG::try_processing;
-            }
-            elsif (ref $try eq 'CODE') {
-                my @more = $relex->($C, $trystate);
-                if (@more) {
-                    unshift @try, @more, $relex;   # ask relex for more
-                }
-                next;
-            }
+        if (ref \$try eq 'ARRAY') {
+            (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
         }
 
-END
-
-            $result .= <<"END";
         \$C->deb("$altname trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
         push \@gather, ((
 @{[ ::indent(join("\n", @result),3) ]}
