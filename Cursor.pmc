@@ -699,6 +699,11 @@ sub cursor_fate { my $self = shift;
 		    $peek =~ s/\t/\\t/g;
 		    $self->deb("looking for $name at --------->$GREEN$peek$CLEAR");
 		}
+		if (not defined $_[0]) {
+		    my $tried = "";
+		    vec($tried,@pats-1,1) = 0;
+		    $_[0] = [$tried, 1_000_000, []];
+		}
 
 		{
 		    # if trystate is defined, the "obvious" LTM failed, so must back off
@@ -758,7 +763,14 @@ sub cursor_fate { my $self = shift;
 				    vec($$tried,$px,1) = 1;	# mark this one tried
 				}
 			    }
-			    --$$trylen;
+			    if ($$trylen == 1_000_000) {
+				my $max = 0;
+				for my $x (@$rxlens) { $max = $x if $x > $max }
+				$$trylen = $max;
+			    }
+			    else {
+				--$$trylen;
+			    }
 			}
 
 			return @result;
