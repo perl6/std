@@ -363,6 +363,17 @@ sub canmatch {
 			    $f .= $1;
 			}
 		    }
+		    elsif ($1 eq 'p') {
+			if ($p =~ s/^(\w{1,2})//) {
+			    $f .= $1;
+			}
+			elsif ($p =~ s/^(\{\w+\})//) {
+			    $f .= $1;
+			}
+		    }
+		    elsif ($1 eq 'b') {
+			return 1;
+		    }
 		    return 1 if $p =~ s/^[*?]//;
 		    return 0 unless $c =~ /^$f/;
 		}
@@ -411,7 +422,7 @@ sub canmatch {
 sub rxlen {
     my $p = shift;
     my $len = 0;
-    while ($p ne '' and $p ne '.?') {
+    while ($p ne '') {
 	return -1 if $p =~ /^[*+?(|]/;
 	return -1 if $p =~ /^\{[\d,]+\}/;
 	$len++, next if $p =~ s/^\[\^?.[^\]]*?\]//;
@@ -421,6 +432,7 @@ sub rxlen {
 	    $len++, next if $p =~ s/^[ntfrdswDSW]//;
 	    $len++, next if $p =~ s/^\d+//;
 	    $len++, next if $p =~ s/^x[\da-fA-F]{1,4}//;
+	    $len++, next if $p =~ s/^p[a-zA-Z]{1,2}//;
 	    return -1;
 	}
 	$len++, next if $p =~ s/^.//s;
@@ -612,7 +624,7 @@ sub cursor_fate { my $self = shift;
 	    $self->deb("Selecting $name patterns starting with '$ch2'") if $DEBUG & DEBUG::autolexer;
 	    @pats = grep { canmatch($_, $ch2) } @{
 		$lexer->{FASTPATS} //= [
-		    map { my $x = $_; $x =~ s/\(\?#::\)//g; $x =~ s/\t/.?\t/; $x } @{$lexer->{PATS}}
+		    map { my $x = $_; $x =~ s/\(\?#::\)//g; $x } @{$lexer->{PATS}}
 		]
 	    };
 #	    if (@pats > 10) {
@@ -679,10 +691,6 @@ sub cursor_fate { my $self = shift;
 	    for my $i (0..@$fates-1) {
 		$self->deb("\t", $i, ': ', $fates->[$i][3]) if $DEBUG & DEBUG::autolexer;
 	    }
-	    for my $pat (@pats) {
-		$pat =~ s/\.\?$//;	# ltm backoff doesn't need tre workaround
-		$pat =~ s/\\>/\\b/g;	# perl regex doesn't use \>
-	    }
 
 	    # generate match closure at the last moment
 	    sub {
@@ -734,8 +742,10 @@ sub cursor_fate { my $self = shift;
 				my $l = $$rxlens[$px];
 				if ($l == -1) {
 				    my $p = $pats[$px];
+				    $self->deb("Trying $p at $P\n") if $DEBUG & DEBUG::fixed_length;
 				    pos($::ORIG) = $P;
-				    if (($::ORIG =~ m/\G$p/gc)) {
+				    if (($::ORIG =~ m/\G($p)/msgc)) {
+					$self->deb("Got $1\n") if $DEBUG & DEBUG::fixed_length;
 					$$rxlens[$px] = $l = pos($::ORIG) - $P;
 					if ($l == $$trylen) {
 					    push @result, $fates->[$px];
@@ -1634,7 +1644,7 @@ sub alpha { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
     my $char = substr($::ORIG, $P, 1);
-    if ($char =~ /^[[:alpha:]_]$/) {
+    if ($char =~ /^[_[:alpha:]\pL]$/) {
         my $r = $self->cursor($P+1);
         return $r->retm();
     }
@@ -1651,7 +1661,7 @@ sub alpha_rev { my $self = shift;
         return ();
     }
     my $char = substr($::ORIG, $from, 1);
-    if ($char =~ /^[_[:alpha:]]$/) {
+    if ($char =~ /^[_[:alpha:]\pL]$/) {
         my $r = $self->cursor_rev($from);
         return $r->retm();
     }
@@ -2083,7 +2093,7 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 	    $fakepos++;
 	    ::qm($fixed);
 	}
-	$fixed =~ s/([[:alpha:]])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
+	$fixed =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
         $fixed;
     }
 }
@@ -2119,10 +2129,10 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 		return;
 	    }
             elsif ($_ eq '»' or $_ eq '>>') {
-		return '\>';
+		return '\b';
 	    }
             elsif ($_ eq '«' or $_ eq '<<') {
-		return '\<';
+		return '\b';
 	    }
             elsif ($_ eq '::' or $_ eq ':::' or $_ eq '.*?') {
                 return $IMP;
@@ -2155,12 +2165,12 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 		my $sym = $self->{'sym'};
 		Encode::_utf8_on($sym);
 		my $text = ::qm($sym);
-		$text =~ s/([[:alpha:]])/'[' . lc($1) . uc($1) . ']'/eg if $self->{i};
+		$text =~ s/(\pL)/'[' . lc($1) . uc($1) . ']'/eg if $self->{i};
                 return $text;
             }
             elsif ($_ eq 'alpha') {
                 $fakepos++;
-                return '[_[:alpha:]]';	# XXX not unicodey
+                return '[_[:alpha:]\pL]';
             }
 	    my $lexer;
 	    {

@@ -5,6 +5,8 @@ use utf8;
 use YAML::XS;
 use Encode;
 
+my $failures = 0;
+
 if (not @ARGV) {
     @ARGV = <STDIN>;
     s/^[AU]+\s+// for @ARGV;
@@ -15,5 +17,10 @@ for my $file (@ARGV) {
     eval {
 	STD->parsefile($file);
     };
-    warn $@ if $@;
+    if ($@) {
+	warn $@;
+	$failures++;
+    }
 }
+
+exit $failures;
