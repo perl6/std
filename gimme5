@@ -341,12 +341,12 @@ sub $name {
             }
         }
         else {
-            (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$retree, \$trystate);
+            (\$tag, \$try, \$relex) = \$C->cursor_fate('$PKG', '$name:*', \$retree, \$trystate);
             \@try = (\$try,\$relex) if \$tag;
         }
 
 	my \@gather = ();
-	while (\@try and not \@gather) {
+	while (\@try) {
 	    my \$try = shift(\@try) // next;
     
 	    # if first try failed, interrogate lexer for shorter answers
@@ -366,6 +366,7 @@ sub $name {
     
 	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 	    push \@gather, \$C->\$try(\@_);
+            last if \@gather;
 	}
 	\$self->_MATCHIFY(\$S, "$name", \@gather);
     };
@@ -2498,14 +2499,14 @@ do {
         \@try = (\$try);
     }
     else {
-        (\$C, \$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$retree, \$trystate);
+        (\$tag, \$try, \$relex) = \$C->cursor_fate('${PKG}', '$altname', \$retree, \$trystate);
 $policy
     }
 END
 
             $result .= <<'END';
     my @gather = ();
-    while (@try and not @gather) {
+    while (@try) {
         my $try = shift(@try) // next;
 
         # if first try failed, interrogate lexer for shorter answers
@@ -2533,6 +2534,7 @@ END
 
             $result .= <<'END';
         )[$try])->($C);
+        last if @gather;
     }
     @gather;
   };

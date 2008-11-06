@@ -593,7 +593,7 @@ sub cursor_fate { my $self = shift;
 
     my $P = $self->{_pos};
     if ($P >= @::ORIG) {
-	return $self,'', 0, sub {};
+	return '', 0, sub {};
     }
     pos($::ORIG) = $P;
     $::ORIG =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[ -~].|.)/smgc;
@@ -839,7 +839,7 @@ END
 	$self->deb("NO FATE FOR ${pkg}::$name (will probe)") if $DEBUG & DEBUG::fates;
 	$tag = '';
     }
-    return $self, $tag, $try, $relex;
+    return $tag, $try, $relex;
 }
 
 sub cursor_all { my $self = shift;

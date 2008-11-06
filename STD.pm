@@ -3522,6 +3522,7 @@ method EXPR ($preclvl)
     loop {
         self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
+        $here = $here.cursor_fresh();
         my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
@@ -3560,7 +3561,7 @@ method EXPR ($preclvl)
         loop {     # while we see adverbs
             $oldpos = $here.pos;
             last TERM if (@+MEMOS[$oldpos]<endstmt> // 0) == 2;
-            $here = $here.ws;
+            $here = $here.cursor_fresh.ws;
             my @infix = $here.cursor_fresh.infixish();
             last TERM unless @infix;
             my $infix = @infix[0];
@@ -3581,7 +3582,6 @@ method EXPR ($preclvl)
             last TERM unless $inprec gt $preclim;
 
             $here = $infix.cursor_fresh.ws();
-
 
             # substitute precedence for listops
             $inO<prec> = $inO<sub> if $inO<sub>;
