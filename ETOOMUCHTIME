@@ -53,7 +53,10 @@ my @failed;
 for my $file (@files) {
     my $myfile = $file;
     $myfile =~ s/^\.\.\/\.\.\/t\/spec/html/;   
-    my ($simple_html,$full_html) = ("$myfile.simple.html", "$myfile.html");
+    my ($simple_html,$snippet_html, $full_html) = (
+        "$myfile.simple.html", 
+        "$myfile.snippet.html",
+        "$myfile.html");
     my ($html_filename,$html_path,$html_suffix) = fileparse($full_html);
     mkpath $html_path;
    
@@ -63,10 +66,12 @@ for my $file (@files) {
 $file
     -> $full_html
     -> $simple_html
+    -> $snippet_html
 OUT
     my $t0 = new Benchmark;
     my $cmd = "./$HILITE --clean-html " .
             "--simple-html=$simple_html " .
+            "--snippet-html=$snippet_html " .
             "--full-html=$full_html $file";
     my $log = `$cmd 2>&1`;
     say "It took " . 
