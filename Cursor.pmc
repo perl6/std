@@ -291,7 +291,8 @@ sub _AUTOLEXgen { my $self = shift;
 		for my $class ($self->meta->linearized_isa) {
 		    for my $method (sort $class->meta->get_method_list) {
 			if (substr($method,0,$protolen) eq $protopat) {
-			    my $callname = $class . '::' . $method;
+			    next if substr($method,-6,6) eq '__PEEK';
+			    my $callname = $class . '::' . $method . '__PEEK';
 			    my $peeklex = $peek->$callname();
 			    if ($peeklex and $peeklex->{PATS}) {
 				my @alts = @{$peeklex->{PATS}};
@@ -917,12 +918,10 @@ my \$retree = {
     }, 'RE'),
 };
 
+sub ${mangle}__PEEK { \$_[0]->_AUTOLEXpeek('$mangle',\$retree) }
 sub $mangle {
     my \$self = shift;
     local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
-    if (\$self->{_peek}) {
-        return \$self->_AUTOLEXpeek('$mangle',\$retree)
-    }
     my %args = \@_;
     my \$sym = \$args{sym} // q$sym;
 
@@ -1284,12 +1283,10 @@ sub null { my $self = shift;
     return $self->cursor($self->{_pos})->retm();
 }
 
+sub ws__PEEK { ''; }
 sub ws {
     my $self = shift;
 
-    if ($self->{_peek}) {
-        return;
-    }
     local $CTX = $self->callm() if $DEBUG & DEBUG::trace_call;
     my @stub = return $self if exists $::MEMOS[$self->{_pos}]{ws};
 
@@ -1355,7 +1352,7 @@ sub _SUBSUME { my $self = shift;
 
     local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
     lazymap(sub { $self->cursor_bind($names, $_[0])->retm() },
-        $block->($self));
+        $block->($self->cursor_fresh()));
 }
 
 sub _SUBSUMEr { my $self = shift;
@@ -1363,7 +1360,7 @@ sub _SUBSUMEr { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
-    my ($var) = $block->($self) or return ();
+    my ($var) = $block->($self->cursor_fresh()) or return ();
     $self->cursor_bind($names, $var)->retm();
 }
 
@@ -2107,6 +2104,7 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 	    my $lexer;
 	    {
 		local $PREFIX = "";
+		$name .= '__PEEK';
 		$lexer = eval { $C->cursor_peek->$name() };
 	    }
 	    return $IMP unless $lexer and exists $lexer->{PATS};
@@ -2146,6 +2144,7 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
                 return map { $_ . $IMP } @result;
             }
             else {
+		$name .= '__PEEK';
                 my $lexer = $C->cursor_peek->$name($re);
 		my @pat = @{$lexer->{PATS}};
 		return unless @pat;

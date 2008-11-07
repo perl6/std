@@ -89,8 +89,8 @@ sub un6 {
         $f =~ s!^('.*?')!!              	and $t .= $1, next;
         $f =~ s!^(".*?")!!              	and $t .= $1, next;
 	$f =~ s!^ self\.WHAT!!			and $t .= ' (ref($self)||$self)', next;
-	$f =~ s!^self\.pos!!			and $t .= '$self->{_pos}', next;
-	$f =~ s!^\$¢\.pos!!			and $t .= '$C->{_pos}', next;
+	$f =~ s!^ self\.pos\b!!	        	and $t .= ' $self->{_pos}', next;
+	$f =~ s!^\$¢\.pos\b!!			and $t .= '$C->{_pos}', next;
         $f =~ s!^//!!              		and $t .= "//", next;	# default operator
 	$f =~ s!^m:p5(\W)(.+?)\1/!!		and $t .= "m$1$2$1", next;
 	$f =~ s!^s:p5(\W)(.+?)\1(.*?)\1/!!	and $t .= "s$1$2$1$3$1", next;
@@ -137,6 +137,8 @@ sub un6 {
         $f =~ s/^(\w+)((«[^»]*»)+)//    	and $t .= ($1 . '->' . unangle($2)), next;
         $f =~ s/^\.pos\b//         	        and $t .= qq/->{_pos}/, next;
         $f =~ s/^self\.orig\b//         	and $t .= qq/\$::ORIG/, next;
+	$f =~ s!^\.pos\b!!			and $t .= '->{_pos}', next;
+        $f =~ s/^(\$\w+)\.pos//            	and $t .= $1 . '->{_pos}', next;
         $f =~ s/^(\$\w+)\.//            	and $t .= qq/$1->/, next;
         $f =~ s/^(\$\w+)\(/(/            	and $t .= qq/$1->/, next;
         $f =~ s/^\(\$s:\)//            	        and $t .= qq/(\$s)/, next;
@@ -168,8 +170,9 @@ sub un6 {
         $f =~ s/^\blet\b //             	and $t .= qq//, next;
         $f =~ s/^\bTrue\b//             	and $t .= qq/1/, next;
         $f =~ s/^\bFalse\b//             	and $t .= qq/0/, next;
-        $f =~ s/^([^\$])self\.//             	and $t .= qq/$1\$self->/, next;
-        $f =~ s/^([^\$])self\b//             	and $t .= qq/$1\$self/, next;
+        $f =~ s/^\$?self\.pos\b//             	and $t .= qq/\$self->{_pos}/, next;
+        $f =~ s/^\$?self\.//             	and $t .= qq/\$self->/, next;
+        $f =~ s/^\$?self\b//             	and $t .= qq/\$self/, next;
         $f =~ s/^\.panic//              	and $t .= qq/->panic/, next;
         $f =~ s/^(\s)\+&(\s)/$2/            	and $t .= qq/$1&/, next;
         $f =~ s/^(\s)!~~(\s)/$2/            	and $t .= qq/$1!~/, next;
@@ -316,14 +319,12 @@ END
 	    $proto{$name}++;
 	    $protosig{$name} = $5;
 	    $out .= <<"END";
+sub ${name}__PEEK { \$_[0]->_AUTOLEXpeek('$name:*',\$retree); }
 sub $name {
     my \$self = shift;
     my \$subs;
 
     local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
-    if (\$self->{_peek}) {
-        return \$self->_AUTOLEXpeek('$name:*',\$retree);
-    }
 
     my \$C = \$self;
     my \$S = \$C->{_pos};
@@ -585,18 +586,16 @@ END
             $RETREE->{$NAME} = $re;
             $re->remember_alts();
 
-            $out .= <<"END";
+            my $body = <<"END";
+sub$ws${NAME}__PEEK { <<PEEK>> }
 sub$ws$NAME {
     my \$self = shift;
 END
             if ($NEEDORIGARGS) {
-                $out .= "    my \@origargs = \@_;\n";
+                $body .= "    my \@origargs = \@_;\n";
             }
-            my $body = <<'END';
+            $body .= <<'END';
     local $CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
-    if ($self->{_peek}) {
-        return <<PEEK>>
-    }
 <<DECL>>
 
     my $C = $self;
@@ -645,7 +644,7 @@ END
                 $body =~ s/<<PEEK>>/''/;
             }
             else {
-                $body =~ s/<<PEEK>>/\$self->_AUTOLEXpeek('<<NAME>>',\$retree)/;
+                $body =~ s/<<PEEK>>/\$_[0]->_AUTOLEXpeek('<<NAME>>',\$retree)/;
             }
             $body =~ s/<<PKG>>/$PKG/g;
             $body =~ s/<<NAME>>/$NAME/g;
@@ -1556,7 +1555,7 @@ sub unbalanced {
 	my $ratchet = $MAYBACKTRACK ? '' : 'r';
 	$re = "\$C->_SUBSUME$ratchet([" .
 	    join(',', map {"'$_'"} @BINDINGS) .
-	    "], sub {\n" . ::indent("my \$C = shift()->cursor_fresh;\n" . $re) . "\n})";
+	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re) . "\n})";
 	@BINDINGS = ();
 	$re;
     }
@@ -1928,6 +1927,7 @@ sub unbalanced {
 { package RE_method; use base "REbase";
     sub walk {
         my $self = shift;
+        local $NEEDMATCH = 0;
         my $rest = ::un6($$self{rest}) // '';
         my $name = $$self{name};
 	warn ::Dump(%adverbs) if $REV;
