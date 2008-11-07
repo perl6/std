@@ -8,7 +8,7 @@ use Encode;
 my $failures = 0;
 
 if (not @ARGV) {
-    @ARGV = <STDIN>;
+    chomp(@ARGV = <STDIN>);
     s/^[AU]+\s+// for @ARGV;
 }
 
