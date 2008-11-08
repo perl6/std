@@ -85,16 +85,30 @@ OUT
         push(@failed,$file);
         $fail++;
     
-        # catch those pesky CTRL-Cs
-        if($CHILD_ERROR &= 127) {
-            say "CTRL-C detected... bye bye";
-            last;
-        }
-        
         # let us write something useful into those htmls
         # when an error occurs
-        my $error_html = <<"ERROR";
-<html><title>Error</title><body><pre>
+        write_error_html($simple_html, $file, $log, 1);
+        write_error_html($snippet_html, $file, $log, 0);
+        write_error_html($full_html, $file, $log, 1);
+
+        say "error";
+    } else {
+	    $success++;
+	    say "ok";
+    }
+}
+
+# write the error log in the html file provied
+sub write_error_html {
+    my ($html_file, $file, $log, $is_full) = @ARG;
+
+    my $error_html = "";
+    if($is_full) {
+        $error_html = "<html><title>Error</title><body>";
+    }
+
+    $error_html .= <<"ERROR";
+<pre>
 
 An error has occured while processing this file:
 
@@ -102,21 +116,17 @@ filename:
     $file
 Reason:
     $log
-</pre></body></html>
+</pre>
 ERROR
-        open SIMPLE_HTML, ">$simple_html"
-            or die "Could not open $simple_html for writing: $OS_ERROR\n";
-        print SIMPLE_HTML $error_html;       
-        close SIMPLE_HTML;
-        open FULL_HTML, ">$full_html"
-            or die "Could not open $full_html for writing: $OS_ERROR\n";
-        print FULL_HTML $error_html;
-        close FULL_HTML;
-        say "error";
-    } else {
-	    $success++;
-	    say "ok";
+
+    if($is_full) {
+        $error_html .= "<body></html>";
     }
+
+    open FILE, ">$html_file"
+        or die "Could not open $html_file for writing: $OS_ERROR\n";
+    print FILE $error_html;       
+    close FILE;
 }
 
 printf "\nPassed $success/$total, %6.2f%%\n", $success/$total * 100;
