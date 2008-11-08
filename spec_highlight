@@ -8,6 +8,7 @@ use Benchmark;
 use File::Path;
 use File::Basename;
 use File::Copy;
+use Cwd;
 use POSIX qw(nice); 
 
 #let us play nice with others
@@ -20,6 +21,12 @@ My job is to run STD_syntax_highlight over all the tests in t/spec.
 You can press CTRL-C when you feel bored.
 
 WARNING
+
+#sanity check: working directory should end with src/perl6
+my $cwd = getcwd();
+unless($cwd =~ m{src/perl6$}) {
+    die "Please run $PROGRAM_NAME in src/perl6\n";
+}
 
 #sanity check: make sure STD.pm is correctly built
 unless(-r 'STD.pmc') {
