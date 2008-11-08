@@ -1,0 +1,39 @@
+#!/usr/local/bin/perl
+
+use strict;
+use warnings;
+use English;
+use feature qw(say);
+
+# act nice
+use POSIX qw(nice);
+nice 19;
+
+my $WEB_ROOT='~/public_html';
+
+print <<"INTRO";
+
+Hi my name is $PROGRAM_NAME. 
+I am usually run as a cron job to generate Perl6 syntax highlighted htmls.
+
+INTRO
+
+my $status;
+
+say "\n--Running 'svn update'";
+$status = system('svn update'); 
+die "Could not svn update\n" if $status != 0;
+
+say "\n--Running 'make' STD.pm";
+$status = system('make'); 
+die "Could not make STD.pm\n" if $status != 0;
+
+say "\n-- Running t/spec syntax highlighter";
+$status = system("./spec_highlight");
+#die "Could not run spec_highlight\n" if $status != 0;
+
+say "\n-- Copying the result to $WEB_ROOT/html";
+$status = system("/bin/cp -R html $WEB_ROOT/"); 
+die "Could not copy the output\n" if $status != 0;
+
+say "\n-- I am done... Thanks for your valuable time";
