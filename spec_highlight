@@ -16,10 +16,7 @@ nice(19);
 print <<"WARNING";
 
 My job is to run STD_syntax_highlight over all the tests in t/spec.
-And since STD.pm is slow at the moment, this is going to take 
-too much time.
 
-You have been warned ;-)
 You can press CTRL-C when you feel bored.
 
 WARNING
