@@ -610,13 +610,13 @@ sub cursor_fate { my $self = shift;
 
     my $P = $self->{_pos};
     if ($P >= @::ORIG) {
-	return '', 0, sub {};
+	return sub {};
     }
     pos($::ORIG) = $P;
-    $::ORIG =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[ -~].|.)/smgc;
+    $::ORIG =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[$@%]?\w+|['"]|[ -~].|.)/smgc;
     my $ch2 = $1;
 
-    return $lexer->{$ch2} //= do {
+    return $lexer->{X}{$ch2} //= do {
 	my @pats;
 	my $file = $lexer->{FILE} . '__' . ::mangle($ch2);
 	if (open PATS, '<', $file) {
@@ -1569,11 +1569,21 @@ sub _ALNUM_rev { my $self = shift;
     }
 }
 
+my $alpha;
+BEGIN {
+    $alpha = "";
+    for my $ch (0..255) {
+	my $char = chr($ch);
+	vec($alpha,$ch,1) = 1 if $char =~ /\w/ and $char !~ /\d/;
+    }
+}
 sub alpha { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    my $char = substr($::ORIG, $P, 1);
-    if ($char =~ /^[_[:alpha:]\pL]$/) {
+#    my $char = substr($::ORIG, $P, 1);
+    my $ch = $::ORIG[$P];
+    if (vec($alpha,$ch,1) or ($ch > 255 and chr($ch) =~ /\pL/)) {
+#    if ($char =~ /^[_[:alpha:]\pL]$/) {
         my $r = $self->cursor($P+1);
         return $r->retm();
     }

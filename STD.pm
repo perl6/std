@@ -120,13 +120,12 @@ method is_type ($name) {
     return False;
 }
 
-method add_type ($longname) {
-    my $shortname = $longname.<name>.text;
-    my $typename = main::mangle($shortname);
+method add_type ($name) {
+    my $typename = main::mangle($name);
     my $qualname = ($+PKG // 'GLOBAL') ~ '::' ~ $typename;
     %typenames{$typename} = $qualname;
     %typenames{$qualname} = $qualname;
-    %typenames{$shortname} = $qualname;
+    %typenames{$name} = $qualname;
 }
 
 # XXX likewise for routine defs
@@ -746,7 +745,7 @@ token statement_control:use {
     | <module_name><arglist>?
         {{
             my $longname = $<module_name><longname>;
-            $¢.add_type($longname);
+            $¢.add_type($longname.text);
         }}
     ]
 }
@@ -1298,7 +1297,7 @@ rule package_def {
     [
 	<module_name>{
             $longname = $<module_name>[0]<longname>;
-            $¢.add_type($longname);
+            $¢.add_type($longname.text);
         }
     ]?
     <trait>*
@@ -1741,10 +1740,15 @@ token typename {
     [
     | '::?'<identifier>			# parse ::?CLASS as special case
     | <longname>
-      <?{
+      <?{{
         my $longname = $<longname>.text;
-        substr($longname, 0, 2) eq '::' or $¢.is_type($longname)
-      }>
+        if substr($longname, 0, 2) eq '::' {
+            $¢.add_type(substr($longname, 2));
+        }
+        else {
+            $¢.is_type($longname)
+        }
+      }}>
     ]
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -2615,7 +2619,7 @@ token signature {
 
 token type_declarator:subset {
     <sym> :s
-    <longname> { $¢.add_type($<longname>); }
+    <longname> { $¢.add_type($<longname>.text); }
     [ of <fulltypename> ]?
     [where <EXPR(item %chaining)> ]?	# (EXPR can parse multiple where clauses)
 }
@@ -2623,7 +2627,7 @@ token type_declarator:subset {
 token type_declarator:enum {
     :my $l;
     <sym> <.ws>
-    [ $l = <longname> :: { $¢.add_type($l); } <.ws> ]?
+    [ $l = <longname> :: { $¢.add_type($l.text); } <.ws> ]?
     <EXPR> <.ws>
 }
 
