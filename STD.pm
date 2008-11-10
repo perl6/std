@@ -13,6 +13,7 @@ my %ROUTINES;
 my $ORIG is context;
 my @MEMOS is context;
 my $VOID is context<rw>;
+my @PADS;
 
 # random rule for debugging, please ignore
 token foo {
@@ -104,28 +105,19 @@ my @basetypenames = qw[
 ];
 push @basetypenames, "True", "False", "Bool::True", "Bool::False";  # in quotes lest gimme5 translate them
 
-my @typenames;
-my %typenames;
-
-sub init_types {
-    @PKGS = ();
-    @typenames = @basetypenames;
-    %typenames = ();
-    %typenames{@typenames} = (1 xx @typenames);
-}
-
 method is_type ($name) {
-    return True if %typenames{$name};
-    #return True if GLOBAL::{$name} :exists;
+    for reverse @PADS {
+        return True if $_.{$name};
+    }
     return False;
 }
 
 method add_type ($name) {
     my $typename = main::mangle($name);
     my $qualname = ($+PKG // 'GLOBAL') ~ '::' ~ $typename;
-    %typenames{$typename} = $qualname;
-    %typenames{$qualname} = $qualname;
-    %typenames{$name} = $qualname;
+    @PADS[*-1]{$typename} = 'TYPE';
+    @PADS[*-1]{$qualname} = 'TYPE';
+    @PADS[*-1]{$name} = 'TYPE';
 }
 
 # XXX likewise for routine defs
@@ -185,22 +177,38 @@ push @baseroutinenames, "HOW", "fail", "temp", "let";
 my @routinenames;
 my %routinenames;
 
-sub init_routines {
+sub init_pads {
+    @PKGS = ();
     %ROUTINES = ();
-    @routinenames = @baseroutinenames;
-    %routinenames = ();
-    %routinenames{@routinenames} = (1 xx @routinenames);
+
+    @PADS = ();
+    @PADS[0] = {};
+    for @basetypenames {
+        @PADS[0]{$_} = 'TYPE';
+        @PADS[0]{'&' ~ $_} = 'CODE';
+    }
+    for @baseroutinenames {
+        @PADS[0]{'&' ~ $_} = 'CODE';
+    }
 }
 
 method is_routine ($name) {
-    return True if %routinenames{$name};
-    return True if %typenames{$name};
-    #return True if GLOBAL::{$name} :exists;
+    my $aname;
+    if substr($name,0,1) eq '&' {
+        $aname = $name;
+    }
+    else {
+        $aname = '&' ~ $name;
+    }
+    for reverse @PADS {
+        return True if $_.{$aname};
+        return True if $_.{$name}; # type as routine?
+    }
     return False;
 }
 
 method add_routine ($name) {
-    %routinenames{$name} = 1;
+    @PADS[*-1]{'&' ~ $name} = 'CODE';
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -578,7 +586,7 @@ rule comp_unit {
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
 
-    { init_types(); init_routines() }
+    { init_pads(); }
 
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
@@ -689,7 +697,7 @@ token label {
     ]?
 
     # add label as a pseudo type
-    {{ %typenames{$<identifier>.text} = 'LABEL'; }}
+    {{ $¢.add_type($<identifier>.text); }}
 
 }
 
@@ -3257,9 +3265,13 @@ token term:sigil ( --> List_prefix)
 # force identifier(), identifier.(), etc. to be a function call always
 token term:identifier ( --> Term )
 {
-    :my $i;
-    $i = <identifier> <args( $¢.is_type($i.text) )>
-    {{ $<identifier> = $i; %ROUTINES{$i.text} ~= $¢.lineof($¢.pos) ~ ' ' }}
+    :my $t;
+    <identifier>
+    {{ $t = $<identifier>.text; }}
+    <args( $¢.is_type($t) )>
+    {{
+        %ROUTINES{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $¢.is_routine($t);
+    }}
 }
 
 token term:opfunc ( --> Term )
