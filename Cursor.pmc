@@ -1269,8 +1269,8 @@ sub _NOTBEFORE { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my @all = $block->($self->cursor_fresh);
-    return () if @all;  # XXX loses continuation
+    my @all = $block->($self);
+    return () if @all;
     return $self->cursor($self->{_pos})->retm();
 }
 
@@ -1279,7 +1279,7 @@ sub _NOTCHAR { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @all = $block->($self);
-    return () if @all;  # XXX loses continuation
+    return () if @all;
     return $self->cursor($self->{_pos}+1)->retm();
 }
 
