@@ -13,6 +13,8 @@ our $DEBUG = $ENV{STD5DEBUG} // 0;
 our $DEPTH = 0;
 our %LEXERS;       # per language, the cache of lexers, keyed by rule name
 
+my %HIST;
+
 sub ::init_globals {
     $::DEBUG = $DEBUG;
     $::CTX = '';
@@ -140,6 +142,9 @@ sub parsefile {
 	close FILE;
     }
     $class->new($text)->$rule();
+#    for my $key (sort {$HIST{$a} <=> $HIST{$b}} keys(%HIST)) {
+#	warn "$HIST{$key}\t$key\n";
+#    }
 }
 
 sub mixin {
@@ -590,6 +595,7 @@ sub cursor_fate { my $self = shift;
     my $name = shift;
     my $retree = shift;
     # $_[0] is now ref to a $trystate;
+#    $HIST{$name}++;
 
     $self->deb("cursor_fate $pkg $name") if $DEBUG & DEBUG::cursors;
     my $tag;
@@ -612,6 +618,28 @@ sub cursor_fate { my $self = shift;
     if ($P >= @::ORIG) {
 	return sub {};
     }
+
+    # A rudimentary trie walker, unused so far.  It assumes a prebuilt trie;
+    # it will need some revisions to build it on the fly.  Also, it's currently
+    # written for clarity rather than speed, and that will also change later.
+    # There is an arbitrary cutoff between characters we look up by array
+    # vs characters we look up by hash. ->{T}[0] is the array, [1] is the hash.
+    # and [2] contains actual results generator closure.  At the moment we just
+    # drop through if we don't get a result, which is always.
+
+    if (my $state = $lexer->{T}) {
+	my $p = $P;
+	my $ch = $::ORIG[$p];
+	my $next;
+	while ($next = $state->[0][$ch] // $state->[1]{chr $ch}) {
+	    $ch = $::ORIG[++$p];
+	    $state = $next;
+	}
+	if ($state->[2]) {
+	    return $state->[2];
+	}
+    }
+
     pos($::ORIG) = $P;
     $::ORIG =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[$@%]?\w+|['"]|[ -~].|.)/smgc;
     my $ch2 = $1;
@@ -1241,7 +1269,7 @@ sub _NOTBEFORE { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my @all = $block->($self);
+    my @all = $block->($self->cursor_fresh);
     return () if @all;  # XXX loses continuation
     return $self->cursor($self->{_pos})->retm();
 }
