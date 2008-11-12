@@ -265,15 +265,34 @@ sub _AUTOLEXgen { my $self = shift;
 	binmode(LEX, ":utf8");
 	$self->deb("using cached $dir/$file") if $DEBUG & DEBUG::autolexer;
 
-	my @pat = <LEX>;
-	chomp(@pat);
-	$name = shift @pat;
+	chomp($name = <LEX>);
+	local $/ = "";
+	my @para = <LEX>;
 	close LEX;
 	my %lexer;
 	$lexer{NAME} = $name;
 	$lexer{DBA} = $dba;
 	$lexer{FILE} = "$dir/$file";
+	my @pat = split(/\n/, $para[0]);
 	$lexer{PATS} = \@pat;
+	my $fates;
+	my $i = 0;
+	for (@pat) {
+	    s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/;
+	    my $fstr = $1;
+	    my $fate = $fates->[$i] = [0,0,0,$fstr];
+	    while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+		$fate->[0] = $1;
+		$fate->[1] = $2;
+		$fate = $fate->[2] = [0,0,0,$fstr] if $fstr ne '';
+	    }
+	    $i++;
+	}
+	$lexer{FATES} = $fates;
+
+#	if (@para > 0 and $para[1]) {
+#	    for (split(/\n/, $para[1])) {}
+#	}
 
 	return \%lexer;
     }
@@ -303,7 +322,7 @@ sub _AUTOLEXgen { my $self = shift;
 				my @alts = @{$peeklex->{PATS}};
 				for my $alt (@alts) {
 				    $alt .= "\t(?#FATE)" unless $alt =~ /FATE/;
-				    $alt =~ s/\(\?#FATE/(?#FATE $proto ${class}::$method/;
+				    $alt =~ s/\(\?#FATE\d*/(?#FATE $proto ${class}::$method/;
 				    $altnum++;
 				}
 				push @pat, @alts;
@@ -320,12 +339,31 @@ sub _AUTOLEXgen { my $self = shift;
 	    s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
 	    s/(\(\?#::\))+/(?#::)/;
 	}
+	my $fates;
+	my $i = 0;
+	for (@pat) {
+	    my $fstr;
+	    if ( s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/) {
+		$fstr = $1;
+	    }
+	    else {
+		$_ .= "\t(?#FATE$i )";
+		$fstr = "";
+	    }
+	    my $fate = $fates->[$i] = [0,0,0,$fstr];
+	    while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+		$fate->[0] = $1;
+		$fate->[1] = $2;
+		$fate = $fate->[2] = [0,0,0,$fstr] if $fstr ne '';
+	    }
+	    $i++;
+	}
 	warn "(null pattern for $key)" unless @pat;
 	my $pat = join("\n", @pat);
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
-	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "DBA" => $dba};
+	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "FATES" => $fates, "DBA" => $dba};
 
 	return $lexer if $lang =~ /ANON/;
 
@@ -684,25 +722,11 @@ sub cursor_fate { my $self = shift;
 	    # extract fate comments before they are deleted
 	    my $i = 0;
 	    my $fates = [];
-	    if (@pats > 500) {
-		print "Too many patterns for $ch2 file $file\n";
-	    }
-	    for (@pats) {
-		s/\(\?#FATE +(.*?)\)/(?#$i FATE $1)/;
-		my $fstr = $1;
-		my $fate = $fates->[$i] = [0,0,0,$fstr];
-		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-		    $fate->[0] = $1;
-		    $fate->[1] = $2;
-		    $fate = $fate->[2] = [0,0,0,$fstr] if $fstr ne '';
-		}
-		$i++;
-	    }
+	    my $FATES = $lexer->{FATES};
 
 	    for my $pat (@pats) {
-		$pat =~ s/\(\?#.*?\)//g;
-		$pat =~ s/\s+//g;
-		$pat =~ s/:://g;
+		$pat =~ s/\t\(\?#FATE(\d+).*?\)// or die "Malformed fate";
+		$fates->[$i++] = $FATES->[$1];
 	    }
 
 	    if ($DEBUG & DEBUG::autolexer) {
@@ -2150,7 +2174,7 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 	    return unless @pat;
 	    if ($PREFIX) {
 		for (@pat) {
-		    s/(\t\(\?#FATE) *(.*?\))(.*)/$3$1$PREFIX $2/g;
+		    s/(\t\(\?#FATE)\d* *(.*?\))(.*)/$3$1$PREFIX $2/g;
 		}
 	    }
 	    return @pat;
@@ -2315,7 +2339,7 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 		    if ($oldalt =~ /FATE/ and $newalt =~ /FATE/) {
 			my $newold = $oldalt;
 			my $newnew = $newalt;
-			$newnew =~ s/\t\(\?#FATE *(.*?)\)//;
+			$newnew =~ s/\t\(\?#FATE\d* *(.*?)\)//;
 			my $morefate = $1;
 			$newold =~ s/(FATE.*?)\)/$1 $morefate)/;
 			push(@$newresult, $newold . $newnew);
