@@ -21,11 +21,11 @@ INTRO
 my $status;
 
 say "\n--Running 'svn update'";
-$status = system('svn update'); 
-die "Could not svn update\n" if $status != 0;
+$status = system('cd ../..; svn update'); 
+die "Could not svn update pugs\n" if $status != 0;
 
-say "\n--Running 'make' STD.pm";
-$status = system('make'); 
+say "\n--Running 'make clean all' for STD.pm";
+$status = system('make clean all'); 
 die "Could not make STD.pm\n" if $status != 0;
 
 say "\n-- Running t/spec syntax highlighter";
