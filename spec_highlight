@@ -19,7 +19,7 @@ sub MAIN {
 
     print <<"WARNING";
 
-My job is to run STD_syntax_highlight over all the tests in t/spec.
+My job is to run STD_syntax_highlight over all the tests in t/.
 
 You can press CTRL-C when you feel bored.
 
@@ -42,7 +42,7 @@ WARNING
             "(e.g. 'export LANG=en_US.UTF-8' in your ~/.bashrc)";
     }
 
-    my $dir_to_test = '../../t/spec/';
+    my $dir_to_test = '../../t/';
     my $fail = 0;
     my $success = 0;
     say "Finding *.t in $dir_to_test... Please wait";
@@ -59,7 +59,7 @@ WARNING
     my @failed;
     for my $file (@files) {
         my $myfile = $file;
-        $myfile =~ s/^\.\.\/\.\.\/t\/spec/html/;   
+        $myfile =~ s/^\.\.\/\.\.\/t/html/;   
         my ($simple_html,$snippet_html, $full_html) = (
             "$myfile.simple.html", 
             "$myfile.snippet.html",
