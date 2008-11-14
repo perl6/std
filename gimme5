@@ -277,7 +277,6 @@ END
 
 	$out .= <<'END' if $TOP eq 'STD';
     $self->_AUTOLEXpeek('termish',$retree);
-    system('cp','lex/'.ref($self).'/termish','lex/'.ref($self).'/EXPR');
 END
 
 	$out .= <<'END';
@@ -336,7 +335,7 @@ sub $name {
         my \$relex;
         if (my \$fate = \$C->{_fate}) {
             if (\$fate->[0] eq '$name') {
-                \$C->deb("Fate passed to $name: \$\$fate[3]") if \$DEBUG & DEBUG::fates;
+                \$C->deb("Fate passed to $name: ", ::fatestr(\$fate)) if \$DEBUG & DEBUG::fates;
                 (\$tag, \$try, \$fate) = \@\$fate;
                 \$C->{_fate} = \$fate;
                 \@try = (\$try);
@@ -2486,7 +2485,7 @@ do {
 
     my \$fate;
     if (\$fate = \$C->{_fate} and \$fate->[0] eq '$altname') {
-        \$C->deb("Fate passed to $altname: \$\$fate[3]") if \$DEBUG & DEBUG::fates;
+        \$C->deb("Fate passed to $altname: ", ::fatestr(\$fate)) if \$DEBUG & DEBUG::fates;
         (\$tag, \$try, \$fate) = \@\$fate;
         \$C->{_fate} = \$fate;
         \@try = (\$try);

@@ -4,6 +4,9 @@ use warnings;
 no warnings 'recursion';
 use utf8;
 
+my $TRIE = 1;
+my $STORABLE = 1;
+
 use feature 'say', 'state';
 
 require 'mangle.pl';
@@ -33,6 +36,15 @@ sub ::init_globals {
     $::COMPILING::LINE = 1;
     $::COMPILING::FILE = '(eval)';
     $::GOAL = "(eof)";
+}
+
+sub ::fatestr { my $f = shift;
+    my $text = '';
+    while ($f) {
+	$text .= $f->[0] . " " . $f->[1];
+	$text .= ' ' if $f = $f->[2];
+    }
+    $text;
 }
 
 { package DEBUG;
@@ -190,6 +202,7 @@ sub tweak {
 sub _PARAMS {}	# overridden in parametric role packages
 
 use YAML::XS;
+use Storable;
 
 sub from { $_[0]->{_from} // $_[0]->{_pos} }
 sub to { $_[0]->{_pos} }
@@ -242,6 +255,8 @@ sub _AUTOLEXpeek { my $self = shift;
     return $::LEXERS{ref $self}->{$key} //= $self->_AUTOLEXgen($key, $retree);
 }
 
+our %FATECACHE;
+
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
     my $retree = shift;
@@ -261,7 +276,41 @@ sub _AUTOLEXgen { my $self = shift;
 	$dba =~ s/:\*$//;
     }
 
-    if (open(LEX, "$dir/$file")) {
+    if ($STORABLE and -e "$dir/$file.store") {
+	my $lexer = retrieve("$dir/$file.store");
+	my $pat = $lexer->{PATS};
+	my $fates;
+	my $i = 0;
+	for (@$pat) {
+	    my $fstr;
+	    if ( m/\(\?#FATE(\d+) +(.*?)\)/) {
+		warn "MISMATCH $i $1" unless $i == $1;
+		$fstr = $2;
+	    }
+	    else {
+		die "Whoops, no fate in storage";
+	    }
+	    my $fate;
+	    if ($fate = $FATECACHE{$fstr}) {
+		$fates->[$i] = $fate;
+	    }
+	    else {
+		$FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
+		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+		    $fate->[0] = $1;
+		    $fate->[1] = $2;
+		    if ($fate->[2] = $FATECACHE{$fstr}) {
+			last;
+		    }
+		    $fate = $fate->[2] //= [0,0,0] if $fstr ne '';
+		}
+	    }
+	    $i++;
+	}
+	$lexer->{FATES} = $fates;
+	return $lexer;
+    }
+    elsif (open(LEX, "$dir/$file")) {
 	binmode(LEX, ":utf8");
 	$self->deb("using cached $dir/$file") if $DEBUG & DEBUG::autolexer;
 
@@ -280,19 +329,18 @@ sub _AUTOLEXgen { my $self = shift;
 	for (@pat) {
 	    s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/;
 	    my $fstr = $1;
-	    my $fate = $fates->[$i] = [0,0,0,$fstr];
+	    my $fate = $fates->[$i] = [0,0,0];
 	    while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
 		$fate->[0] = $1;
 		$fate->[1] = $2;
-		$fate = $fate->[2] = [0,0,0,$fstr] if $fstr ne '';
+		$fate = $fate->[2] = [0,0,0] if $fstr ne '';
 	    }
 	    $i++;
 	}
 	$lexer{FATES} = $fates;
-
-#	if (@para > 0 and $para[1]) {
-#	    for (split(/\n/, $para[1])) {}
-#	}
+	eval {
+	    $lexer{T} = Load($para[1]) if $TRIE and @para > 1;
+	};
 
 	return \%lexer;
     }
@@ -350,11 +398,20 @@ sub _AUTOLEXgen { my $self = shift;
 		$_ .= "\t(?#FATE$i )";
 		$fstr = "";
 	    }
-	    my $fate = $fates->[$i] = [0,0,0,$fstr];
-	    while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-		$fate->[0] = $1;
-		$fate->[1] = $2;
-		$fate = $fate->[2] = [0,0,0,$fstr] if $fstr ne '';
+	    my $fate;
+	    if ($fate = $FATECACHE{$fstr}) {
+		$fates->[$i] = $fate;
+	    }
+	    else {
+		$FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
+		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+		    $fate->[0] = $1;
+		    $fate->[1] = $2;
+		    if ($fate->[2] = $FATECACHE{$fstr}) {
+			last;
+		    }
+		    $fate = $fate->[2] //= [0,0,0] if $fstr ne '';
+		}
 	    }
 	    $i++;
 	}
@@ -363,7 +420,62 @@ sub _AUTOLEXgen { my $self = shift;
 
 	$AUTOLEXED{$key} = $oldfakepos;
 
-	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "FATES" => $fates, "DBA" => $dba};
+	my $T;
+	if ($TRIE) {
+	    $T = {};
+	  PAT:
+	    for my $fnum (0..@pat-1) {
+		my ($chars) = $pat[$fnum];
+		$chars =~ s/\(\?#::\)//g;
+		my @chars;
+		my $final = '';
+		while ($chars ne '') {
+		    last if $chars =~ m/^\t/;
+		    if ($chars =~ s/^\\(\W)([*+?{]?)//) {
+			if ($2) {
+			    $final = "\\$1$2$chars";
+			    last;
+			}
+			push(@chars, ord($1));
+			next;
+		    }
+		    if ($chars =~ s/^(\\\w.*)//) {
+			$final = $1;
+			last;
+		    }
+		    if ($chars =~ /^(\[\S+)/) {
+			$final = $1;
+			last;
+		    }
+		    if ($chars =~ /^(\.\S+)/) {
+			$final = $1;
+			last;
+		    }
+		    if ($chars =~ s/^(.)([*+?{]?)//) {
+			if ($2) {
+			    $final = "$1$2$chars";
+			    last;
+			}
+			push(@chars, unpack('U',$1));
+			next;
+		    }
+		}
+		my $state = $T;
+		for my $ch (@chars) {
+		    my $char = chr($ch);
+		    if (my $next = $state->{$char}) {
+			$state = $next;
+		    }
+		    else {
+			$state = $state->{$char} = {};
+		    }
+		}
+		push @{$state->{'~~'}}, $final, $fnum;
+	    }
+	}
+
+
+	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "FATES" => $fates, "T" => $T, "DBA" => $dba};
 
 	return $lexer if $lang =~ /ANON/;
 
@@ -371,11 +483,20 @@ sub _AUTOLEXgen { my $self = shift;
 	    use File::Path 'mkpath';
 	    mkpath($dir);
 	}
+	if ($STORABLE) {
+	    delete $lexer->{FATES};
+	    store($lexer, "$dir/$file.store");
+	    $lexer->{FATES} = $fates;
+	    if ($file eq 'termish') {
+		system "cp $dir/termish.store $dir/EXPR.store";
+	    }
+	    return $lexer;
+	}
 
-	open(my $cache, '>', "$dir/$file") // die "Can't print: $!";
-	binmode($cache, ":utf8");
+	open(my $cache, '>:utf8', "$dir/$file") // die "Can't print: $!";
 	print $cache $name,"\n";
-	print $cache join("\n",@pat),"\n" or die "Can't print: $!";
+	print $cache join("\n",@pat),"\n\n" or die "Can't print: $!";
+	print $cache Dump($T) if $T;
 	close($cache) or die "Can't close: $!";
 	$self->deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
 	# force operator precedence method to look like a term
@@ -657,26 +778,58 @@ sub cursor_fate { my $self = shift;
 	return sub {};
     }
 
-    # A rudimentary trie walker, unused so far.  It assumes a prebuilt trie;
-    # it will need some revisions to build it on the fly.  Also, it's currently
-    # written for clarity rather than speed, and that will also change later.
-    # There is an arbitrary cutoff between characters we look up by array
-    # vs characters we look up by hash. ->{T}[0] is the array, [1] is the hash.
-    # and [2] contains actual results generator closure.  At the moment we just
-    # drop through if we don't get a result, which is always.
+    # A rudimentary trie walker.
 
     if (my $state = $lexer->{T}) {
+	my @candidates;
 	my $p = $P;
 	my $ch = $::ORIG[$p];
 	my $next;
-	while ($next = $state->[0][$ch] // $state->[1]{chr $ch}) {
+	print STDERR "=" x 10,"\n$p TRIE for ${pkg}::$name in ", ref $self, "\n",
+		$p," ", pack("U",$ch), "\n" if $DEBUG & DEBUG::autolexer;
+	for (;;) {
+	    if ($state->{'~~'}) {
+		if (not $state->{''}++) {
+		    for (@{$state->{'~~'}}) {
+			next if /^\d/;
+			next unless $_;
+			next if ref $_ eq 'CODE';
+			our %RXCACHE;
+			$_ = $RXCACHE{$_} //= eval "sub { \$::ORIG =~ /\\G$_/xsgc }";
+		    }
+		}
+		my @x = @{$state->{'~~'}};
+		while (my ($final,$fnum) = splice(@x,0,2)) {
+		    my $pend = $p;
+		    if ($final) {
+			print STDERR $p,"     probing $fnum\n" if $DEBUG & DEBUG::autolexer;
+			pos($::ORIG) = $p;
+			next unless &$final;
+			$pend = pos($::ORIG);
+		    }
+		    push(@{$candidates[$pend - $P][$p - $P]}, $fnum);
+		    print STDERR $pend," FNUM $fnum @",$pend - $P,"\n" if $DEBUG & DEBUG::autolexer;
+		}
+	    }
+	    last unless $next = $state->{chr $ch};
+	    if ($DEBUG & DEBUG::autolexer) {
+		print STDERR substr($::ORIG, $P, $p - $P), "\n";
+		print STDERR $p," ", pack("U",$ch), "\n";
+	    }
 	    $ch = $::ORIG[++$p];
 	    $state = $next;
 	}
-	if ($state->[2]) {
-	    return $state->[2];
+	my @fnums = map { $_ ? map({ $_ ? @$_ : () } reverse @$_) : () } reverse @candidates;
+	print STDERR $p," FNUMS @fnums\n" if $DEBUG & DEBUG::autolexer;
+	for my $fnum (@fnums) {
+	    my $f = $lexer->{FATES};
+	    print STDERR "$fnum ",::fatestr($f->[$fnum]),"\n" if $DEBUG & DEBUG::autolexer;
 	}
+
+	my @FATES = @{$lexer->{FATES}}[@fnums];
+	return sub { splice(@FATES,0) };
     }
+    print STDERR "FAILED trie at $P\n" if $DEBUG & DEBUG::autolexer;
 
     pos($::ORIG) = $P;
     $::ORIG =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[$@%]?\w+|['"]|[ -~].|.)/smgc;
@@ -987,6 +1140,7 @@ sub $mangle {
 }
 1;
 END
+	$lang->deb("derive $genpkg from $WHAT adding $mangle") if $DEBUG & DEBUG::mixins;
 	eval $e or die "Can't create $name: $@\n";
 	$::PARSER = $lang->cursor_fresh($genpkg);
     }
@@ -2114,7 +2268,7 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
                 return '[^\\x0a]';
             }
             elsif ($_ eq '$$') {
-		return '(?:$|\\x0a)';
+		return '(?:\\x0a|$)';
 	    }
             elsif ($_ eq ':' or $_ eq '^^') {
 		return;

@@ -2,8 +2,6 @@
 
 use STD;
 use utf8;
-use YAML::XS;
-use Encode;
 
 my $failures = 0;
 
@@ -15,12 +13,16 @@ if (not @ARGV) {
 for my $file (@ARGV) {
     warn $file,"\n" if @ARGV > 1;
     eval {
-	STD->parsefile($file);
+	warn "Undefined\n" unless defined STD->parsefile($file);
     };
     if ($@) {
 	warn $@;
 	$failures++;
     }
 }
+my ($time, $vsz) = split(' ', `ps -o "time= vsz=" $$`);
+$time =~ s/^00://;
+$vsz =~ s/\d\d\d$/m/;
+warn "$time $vsz\n" if $vsz;
 
 exit $failures;
