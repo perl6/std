@@ -28,7 +28,7 @@ say "\n--Running 'make clean all' for STD.pm";
 $status = system('make clean all'); 
 die "Could not make STD.pm\n" if $status != 0;
 
-say "\n-- Running t/spec syntax highlighter";
+say "\n-- Running syntax highlighter";
 $status = system("./spec_highlight");
 #die "Could not run spec_highlight\n" if $status != 0;
 
