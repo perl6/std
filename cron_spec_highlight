@@ -37,3 +37,13 @@ $status = system("/bin/cp -R html $WEB_ROOT/");
 die "Could not copy the output\n" if $status != 0;
 
 say "\n-- I am done... Thanks for your valuable time";
+
+=head1 sample usage in cron
+
+PATH=/bin:/usr/bin:/usr/local/bin
+LANG=en_US.UTF-8
+
+# m h  dom mon dow   command
+1 */3 * * *   (cd ~/pugs/src/perl6; ./cron_spec_highlight 2>&1 | tee html/log.txt)
+
+=cut
