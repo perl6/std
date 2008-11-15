@@ -15,8 +15,10 @@ our $CTX = '';
 our $DEBUG = $ENV{STD5DEBUG} // 0;
 our $DEPTH = 0;
 our %LEXERS;       # per language, the cache of lexers, keyed by rule name
+our %FATECACHE;	# fates we've already turned into linked lists
+our %ANON;	# knowledge about what can be borrowed from supergrammar
 
-my %HIST;
+#my %HIST;
 
 sub ::init_globals {
     $::DEBUG = $DEBUG;
@@ -153,10 +155,26 @@ sub parsefile {
 	$text = <FILE>;
 	close FILE;
     }
-    $class->new($text)->$rule();
+
+    my $result;
+    if ($STORABLE) {
+	my $store = "lex/STD.pm.store";
+	if (-f $store and -M $file > -M $store) {
+	    *::LEXERS = retrieve($store);
+	}
+	$result = $class->new($text)->$rule();
+	if (defined $result and $file eq 'STD.pm') {
+	    store(\%::LEXERS, $store);
+	}
+    }
+    else {
+	$result = $class->new($text)->$rule();
+    }
+
 #    for my $key (sort {$HIST{$a} <=> $HIST{$b}} keys(%HIST)) {
 #	warn "$HIST{$key}\t$key\n";
 #    }
+    $result;
 }
 
 sub mixin {
@@ -255,13 +273,28 @@ sub _AUTOLEXpeek { my $self = shift;
     return $::LEXERS{ref $self}->{$key} //= $self->_AUTOLEXgen($key, $retree);
 }
 
-our %FATECACHE;
-
 sub _AUTOLEXgen { my $self = shift;
     my $key = shift;
     my $retree = shift;
 
     my $lang = ref $self;
+    if ($lang =~ /^ANON/) {
+	my $anon = $ANON{$lang};
+	my $super = $anon->{SUP};
+	my $category = $anon->{CAT};
+	print STDERR "AUTOLEXgen $key in $lang from $super without $category\n" if $DEBUG & DEBUG::mixins;
+	my $superlexer = $self->cursor_fresh($super)->_AUTOLEXpeek($key,$retree);
+	my $same = 1;
+	for my $pat (@{$superlexer->{PATS}}) {
+	    if ($pat =~ / $category /) {
+		print STDERR "\tNope: $pat\n" if $DEBUG & DEBUG::mixins;
+		$same = 0;
+		last;
+	    }
+	}
+	# no need to regen a sublexer that will turn out the same
+	return $superlexer if $same;
+    }
     $self->deb("AUTOLEXgen $key in $lang") if $DEBUG & DEBUG::autolexer;
     my $lexer = {};
     (my $dir = 'lex::' . $lang) =~ s/::/\//g;
@@ -490,13 +523,12 @@ sub _AUTOLEXgen { my $self = shift;
 	    if ($file eq 'termish') {
 		system "cp $dir/termish.store $dir/EXPR.store";
 	    }
-	    return $lexer;
 	}
 
 	open(my $cache, '>:utf8', "$dir/$file") // die "Can't print: $!";
 	print $cache $name,"\n";
 	print $cache join("\n",@pat),"\n\n" or die "Can't print: $!";
-	print $cache Dump($T) if $T;
+	print $cache Dump($T) if $T and not $STORABLE;
 	close($cache) or die "Can't close: $!";
 	$self->deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
 	# force operator precedence method to look like a term
@@ -789,22 +821,14 @@ sub cursor_fate { my $self = shift;
 		$p," ", pack("U",$ch), "\n" if $DEBUG & DEBUG::autolexer;
 	for (;;) {
 	    if ($state->{'~~'}) {
-		if (not $state->{''}++) {
-		    for (@{$state->{'~~'}}) {
-			next if /^\d/;
-			next unless $_;
-			next if ref $_ eq 'CODE';
-			our %RXCACHE;
-			$_ = $RXCACHE{$_} //= eval "sub { \$::ORIG =~ /\\G$_/xsgc }";
-		    }
-		}
+		our %RXCACHE;
 		my @x = @{$state->{'~~'}};
 		while (my ($final,$fnum) = splice(@x,0,2)) {
 		    my $pend = $p;
 		    if ($final) {
 			print STDERR $p,"     probing $fnum\n" if $DEBUG & DEBUG::autolexer;
 			pos($::ORIG) = $p;
-			next unless &$final;
+			next unless &{$RXCACHE{$final} //= eval "sub { \$::ORIG =~ /\\G$final/xsgc }"};
 			$pend = pos($::ORIG);
 		    }
 		    push(@{$candidates[$pend - $P][$p - $P]}, $fnum);
@@ -1056,6 +1080,8 @@ sub add_macro { my $lang = shift;
     my $WHAT = ref $lang;
     if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
 	my ($sym) = $name =~ /:sym(.*)/;
+
+	# unfortunately p5 doesn't understand q«...»
 	if ($sym =~ s/^«(.*)»$/$1/) {
 	    my $ok = "'";
 	    for my $try (qw( ' / ! : ; | + - = )) {
@@ -1066,6 +1092,7 @@ sub add_macro { my $lang = shift;
 
 	my $rule = "token $name { <sym> }";
 
+	# produce p5 method name
 	my $mangle = $name;
 	$mangle =~ s/^(\w*):(sym)?//;
 	my $category = $1;
@@ -1085,7 +1112,7 @@ sub add_macro { my $lang = shift;
 	$mangle = ::mangle(@list);
 	$mangle = $category . '__S_' . sprintf("%03d",$GEN++) . $mangle;
 
-	# XXX assuming no equiv
+	# XXX assuming no equiv specified
 	my $coercion = 'Additive';
 	if ($name =~ /^prefix:/) {
 	    if ($sym =~ /^\W/) {
@@ -1143,6 +1170,24 @@ END
 	$lang->deb("derive $genpkg from $WHAT adding $mangle") if $DEBUG & DEBUG::mixins;
 	eval $e or die "Can't create $name: $@\n";
 	$::PARSER = $lang->cursor_fresh($genpkg);
+	my $oldlexer = $::LEXERS{$WHAT};
+	my $newlexer = $::LEXERS{$genpkg} //= {};
+	$ANON{$genpkg}{SUP} = $WHAT;
+	$ANON{$genpkg}{CAT} = $category;
+	print STDERR "=====================================\nADD $rule => $mangle\n" if $DEBUG & DEBUG::mixins;;
+	for my $name (sort keys %{$oldlexer}) {
+	    print STDERR "  $name:\n" if $DEBUG & DEBUG::mixins;
+	    my $same = 1;
+	    for my $pat (@{$oldlexer->{$name}->{PATS}}) {
+		if ($pat =~ / $category /) {
+		    print STDERR "\t$pat\n" if $DEBUG & DEBUG::mixins;
+		    $same = 0;
+		    last;
+		}
+	    }
+	    # no need to regen a sublexer that will turn out the same
+	    $newlexer->{$name} = $oldlexer->{$name} if $same;
+	}
     }
     $lang;
 }
