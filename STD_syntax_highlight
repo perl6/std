@@ -22,13 +22,16 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 
 =head1 SYNOPSIS
 
-    # print html output with inlined resources for 'comp_unit'
+    # read from standard input
+    STD_syntax_highlight
+
+    # print ansi-escaped text for 'comp_unit'
     STD_syntax_highlight foo.pl
 
     # print separate html, css and javascript files
-    STD_syntax_highlight --clean-html foo.pl
+    STD_syntax_highlight --full-html=foo.full.html --clean-html foo.pl
 
-    # print html for with 'statementlist' as the top-level rule
+    # print ansi-escaped text for with 'statementlist' as the top-level rule
     STD_syntax_highlight foo.pl statementlist
 
     # write simple html output to foo.pl.html
@@ -72,12 +75,13 @@ sub main {
         "help"=>\$help
     );
 
-    if ($#ARGV < 0 || $help) {
+    if ($help) {
         die <<"HELP";
 USAGE: 
-    $PROGRAM_NAME [options] filename [rule]
+    $PROGRAM_NAME [options] [file] [rule]
 
-    where options can be one of the following:
+    where 'file' is optional; if omitted or is '-' then 
+    STDIN will be used. And 'options' can be one of the following:
 
     --clean-html    
         generates separate html,css and javascript
@@ -86,12 +90,10 @@ USAGE:
         write full-mode html to filename (- for STDOUT)
 
     --simple-html=filename   
-        write simple-mode html to filename (defaults to STDOUT if no other 
-        option is selected, - for STDOUT)
+        write simple-mode html to filename (- for STDOUT)
 
     --snippet-html=filename
-        same as --simple-html but with only the body section. 
-        This is typically ideal for inline html code.
+        This is typically ideal for inline html code. (- for STDOUT)
 
     --ansi-text=filename   
         write simple-mode ansi color text to filename (- for STDOUT)
@@ -102,24 +104,29 @@ HELP
     }
 
     #default is --simple-html=- if no option is selected
-    if(!($ansi_text || $full_html || $snippet_html || $yaml) && !$simple_html) {
-        $simple_html = '-';    
+    if(!($simple_html || $full_html || $snippet_html || $yaml) && !$ansi_text) {
+        $ansi_text = '-';    
     }
 
     #start parsing...
     $file = shift @ARGV;
     my $what = shift @ARGV // 'comp_unit';
 
-    unless(-r $file) {
-        die "Could not open '$file' for reading\n";
+    #what is the meaning of your input file?
+    if(!$file || $file eq '-') {
+        # i think you mean standard input
+        $file = \*STDIN;        
+    } else {
+        # no it is should be a file, let me check
+        unless(-r $file) {
+            die "Could not open '$file' for reading\n";
+        }
     }
 
-    # slurp the file for redspans
+    # slurp the file for parsing and redspans
     $src_text = Encode::decode('utf8', read_file($file) );
-
     $loc[length($src_text) - 1] = [];
-
-    $parser = STD->parsefile($file,$what);
+    $parser = STD->parse($src_text,$what);
 
     # and finally print out the html code
     highlight_match();
