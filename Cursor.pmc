@@ -43,8 +43,8 @@ sub ::init_globals {
 sub ::fatestr { my $f = shift;
     my $text = '';
     while ($f) {
-	$text .= $f->[0] . " " . $f->[1];
-	$text .= ' ' if $f = $f->[2];
+	$text .= $f->[1] . " " . $f->[2];
+	$text .= ' ' if $f = $f->[0];
     }
     $text;
 }
@@ -330,12 +330,12 @@ sub _AUTOLEXgen { my $self = shift;
 	    else {
 		$FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
 		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-		    $fate->[0] = $1;
-		    $fate->[1] = $2;
-		    if ($fate->[2] = $FATECACHE{$fstr}) {
+		    $fate->[1] = $1;
+		    $fate->[2] = $2;
+		    if ($fate->[0] = $FATECACHE{$fstr}) {
 			last;
 		    }
-		    $fate = $fate->[2] //= [0,0,0] if $fstr ne '';
+		    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
 		}
 	    }
 	    $i++;
@@ -364,9 +364,9 @@ sub _AUTOLEXgen { my $self = shift;
 	    my $fstr = $1;
 	    my $fate = $fates->[$i] = [0,0,0];
 	    while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-		$fate->[0] = $1;
-		$fate->[1] = $2;
-		$fate = $fate->[2] = [0,0,0] if $fstr ne '';
+		$fate->[1] = $1;
+		$fate->[2] = $2;
+		$fate = $fate->[0] = [0,0,0] if $fstr ne '';
 	    }
 	    $i++;
 	}
@@ -438,12 +438,12 @@ sub _AUTOLEXgen { my $self = shift;
 	    else {
 		$FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
 		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-		    $fate->[0] = $1;
-		    $fate->[1] = $2;
-		    if ($fate->[2] = $FATECACHE{$fstr}) {
+		    $fate->[1] = $1;
+		    $fate->[2] = $2;
+		    if ($fate->[0] = $FATECACHE{$fstr}) {
 			last;
 		    }
-		    $fate = $fate->[2] //= [0,0,0] if $fstr ne '';
+		    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
 		}
 	    }
 	    $i++;
@@ -910,7 +910,7 @@ sub cursor_fate { my $self = shift;
 		$self->deb("#FATES: ", 0+@$fates);
 
 		for my $i (0..@$fates-1) {
-		    $self->deb("\t", $i, ': ', $fates->[$i][3]);
+		    $self->deb("\t", $i, ': ', fatestr($fates->[$i]));
 		}
 	    }
 

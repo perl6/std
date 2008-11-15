@@ -334,10 +334,9 @@ sub $name {
         my \@try;
         my \$relex;
         if (my \$fate = \$C->{_fate}) {
-            if (\$fate->[0] eq '$name') {
+            if (\$fate->[1] eq '$name') {
                 \$C->deb("Fate passed to $name: ", ::fatestr(\$fate)) if \$DEBUG & DEBUG::fates;
-                (\$tag, \$try, \$fate) = \@\$fate;
-                \$C->{_fate} = \$fate;
+                (\$C->{_fate}, \$tag, \$try) = \@\$fate;
                 \@try = (\$try);
             }
         }
@@ -352,7 +351,7 @@ sub $name {
 	    \$try = shift(\@try) // next;
     
             if (ref \$try eq 'ARRAY') {
-                (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
+                (\$C->{_fate}, \$tag, \$try) = \@\$try;	# next candidate fate
             }
     
 	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
@@ -2484,10 +2483,9 @@ do {
     my \$relex;
 
     my \$fate;
-    if (\$fate = \$C->{_fate} and \$fate->[0] eq '$altname') {
+    if (\$fate = \$C->{_fate} and \$fate->[1] eq '$altname') {
         \$C->deb("Fate passed to $altname: ", ::fatestr(\$fate)) if \$DEBUG & DEBUG::fates;
-        (\$tag, \$try, \$fate) = \@\$fate;
-        \$C->{_fate} = \$fate;
+        (\$C->{_fate}, \$tag, \$try) = \@\$fate;
         \@try = (\$try);
     }
 
@@ -2501,7 +2499,7 @@ do {
         \$try = shift(\@try) // next;
 
         if (ref \$try eq 'ARRAY') {
-            (\$tag, \$try, \$C->{_fate}) = \@\$try;	# next candidate fate
+            (\$C->{_fate}, \$tag, \$try) = \@\$try;	# next candidate fate
         }
 
         \$C->deb("$altname trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
