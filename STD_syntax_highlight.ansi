@@ -18,4 +18,7 @@ param_var=bold cyan
 
 _routine=bold red
 _type=bold blue
+_scalar=bold blue
+_array=bold magenta
+_hash=bold yellow
 _comment=bold green

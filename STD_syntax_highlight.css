@@ -18,6 +18,9 @@
 
 ._routine { color: DarkRed; font-weight: bold; }
 ._type { color: DarkBlue; font-weight: bold; }
+._scalar { color: DarkBlue; font-weight: bold; }
+._array { color: Brown; font-weight: bold; }
+._hash { color: DarkOrange; font-weight: bold; }
 ._comment { color: DarkGreen; font-weight: bold; }
 
 #parse_tree { position: absolute; right: 10px; top: 10px; font: 14px Verdana; }

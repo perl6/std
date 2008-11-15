@@ -4,7 +4,7 @@
 use strict;
 use warnings;
 use utf8;
-use feature qw(say);
+use feature qw(say switch);
 use English;
 use Getopt::Long;
 
@@ -444,7 +444,7 @@ sub highlight_perl6_yaml {
 sub redspans_traverse($%) {
     my ($process_buffer,%colors) = @ARG;
 
-    my ($last_tree,$buffer) = ("","");
+    my ($last_tree,$buffer, $last_type) = ("","","");
     for my $i (0 .. @loc-1) {
         next unless defined $loc[$i];
         my $c = substr($src_text,$i,1);
@@ -473,8 +473,19 @@ sub redspans_traverse($%) {
                         $rule_to_color = '_type';
                     } elsif($parser->is_routine($buffer)) {
                         $rule_to_color = '_routine';
-                    } 
-                }              
+                    } elsif($last_type ne '') {
+                        $rule_to_color = $last_type;
+                        $last_type = '';
+                    }
+                } elsif($last_tree =~ /sigil/) {
+                    given($buffer) {
+                        when ('$') { $last_type = '_scalar'; }
+                        when ('@') { $last_type = '_array'; }
+                        when ('%') { $last_type = '_hash'; }
+                        default { $last_type = ''; }
+                    }      
+                    $rule_to_color = $last_type if $last_type ne ''; 
+                }             
             }
             #now delegate printing to a callback
             $process_buffer->($i, $buffer, $rule_to_color, $last_tree); 
