@@ -2,6 +2,7 @@ comp_unit=blue
 scope_declarator=bold red
 routine_declarator=bold red
 regex_declarator=bold red
+package_declarator=bold red
 statement_control=bold red
 block=white
 regex_block=white
