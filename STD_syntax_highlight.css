@@ -2,6 +2,7 @@
 .scope_declarator { color: DarkRed; }
 .routine_declarator { color: DarkRed; }
 .regex_declarator { color: DarkRed; }
+.package_declarator { color DarkRed; }
 .statement_control { color: DarkRed; }
 .block { color: Black; }
 .regex_block { color: Black; }
@@ -9,7 +10,7 @@
 .sigil { color: DarkGreen; }
 .variable { color: DarkGreen; } 
 .assertion { color: Darkgreen; }
-.quote { color: Brown; }   
+.quote { color: DarkMagenta; }   
 .number { color: DarkOrange; }
 .infix { color: DimGray; }
 .methodop { color: black; font-weight: bold; }
