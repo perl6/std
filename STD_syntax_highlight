@@ -469,14 +469,14 @@ sub redspans_traverse($%) {
             }
             if($rule_to_color) {
                 if($last_tree =~ /\sidentifier/) {
-                    if($parser->is_type($buffer)) {
-                        $rule_to_color = '_type';
-                    } elsif($parser->is_routine($buffer)) {
-                        $rule_to_color = '_routine';
-                    } elsif($last_type ne '') {
+                    if($last_type ne '') {
                         $rule_to_color = $last_type;
                         $last_type = '';
-                    }
+                    } #elsif($parser->is_type($buffer)) {
+                        #$rule_to_color = '_type';
+                    #} elsif($parser->is_routine($buffer)) {
+                        #$rule_to_color = '_routine';
+                    #} 
                 } elsif($last_tree =~ /\ssigil/) {
                     given($buffer) {
                         when ('$') { $last_type = '_scalar'; }
