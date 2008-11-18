@@ -3563,7 +3563,6 @@ method EXPR ($preclvl)
             }
         }
         push @opstack, @pre,@post;
-        push @opstack, @post;
 
         push @termstack, $here;
         self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
