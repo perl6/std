@@ -3553,23 +3553,17 @@ method EXPR ($preclvl)
 	my $tmp;
         @pre = @$tmp if $tmp = ( $M<PRE> :delete );
         my @post;
-        @post = @$tmp if $tmp = ( $M<POST> :delete );
-        loop {
-            if @pre {
-                if @post and @post[0]<O><prec> gt @pre[0]<O><prec> {
-                    push @opstack, shift @post;
-                }
-                else {
-                    push @opstack, pop @pre;
-                }
-            }
-            elsif @post {
+        @post = reverse @$tmp if $tmp = ( $M<POST> :delete );
+        while @pre and @post {
+            if @post[0]<O><prec> gt @pre[0]<O><prec> {
                 push @opstack, shift @post;
             }
             else {
-                last;
+                push @opstack, shift @pre;
             }
         }
+        push @opstack, @pre,@post;
+        push @opstack, @post;
 
         push @termstack, $here;
         self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
