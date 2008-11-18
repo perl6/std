@@ -3549,13 +3549,15 @@ method EXPR ($preclvl)
 
         # interleave prefix and postfix, pretend they're infixish
         my $M = $here;
+
+        # note that we push loose stuff onto opstack before tight stuff
         my @pre;
 	my $tmp;
         @pre = @$tmp if $tmp = ( $M<PRE> :delete );
         my @post;
         @post = reverse @$tmp if $tmp = ( $M<POST> :delete );
         while @pre and @post {
-            if @post[0]<O><prec> gt @pre[0]<O><prec> {
+            if @post[0]<O><prec> le @pre[0]<O><prec> {
                 push @opstack, shift @post;
             }
             else {
