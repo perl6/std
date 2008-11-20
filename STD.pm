@@ -592,6 +592,10 @@ rule comp_unit {
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
     # "CHECK" time...
     {{
+        if @COMPILING::WORRIES {
+            warn "Potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES) ~ "\n";
+        }
+
         my %UNKNOWN;
         for keys(%ROUTINES) {
             next if $¢.is_routine($_);

@@ -61,8 +61,19 @@ sub MAIN {
 	    USAGE();
 	}
     }
-    USAGE() unless -r $_[0];
-    my $r = STD->parsefile($_[0])->item;
+#    USAGE() unless -r $_[0];
+    my $r;
+    if (@_ and -f $_[0]) {
+	$r = STD->parsefile($_[0])->item;
+    }
+    else {
+	my $prog;
+	{
+	    local $/;
+	    $prog = <>;
+	}
+	$r = STD->parse($prog)->item;
+    }
     if ($output eq 'ast') {
 	print Dump($r);
     }

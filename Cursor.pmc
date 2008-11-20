@@ -219,7 +219,7 @@ sub tweak {
 
 sub _PARAMS {}	# overridden in parametric role packages
 
-use YAML::XS;
+use YAML::Syck;
 use Storable;
 
 sub from { $_[0]->{_from} // $_[0]->{_pos} }
