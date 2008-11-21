@@ -2513,7 +2513,7 @@ grammar Quasi is STD {
 
 } # end grammar
 
-# Note, backtracks!  So POST mustn't commit to anything permanent.
+# Note, backtracks!  So POST must not commit to anything permanent.
 regex extrapost {
     :my $inquote is context = 1;
     <POST>*
