@@ -2005,7 +2005,8 @@ END
         my $self = shift;
         my $re = $$self{re};
         my $name = $$self{name};
-        ::panic("Can't reverse $name") if $REV;
+        ::panic("Can't reverse $name") if $REV and $name ne 'before';
+        local $REV = '';
         $PURE = 0 if $impure{$name};
         local $REV = '_rev' if $name eq 'after';
 	{

@@ -421,7 +421,7 @@ token category:type_declarator { <sym> }
 proto token type_declarator () { <...> }
 
 token category:scope_declarator { <sym> }
-proto token scope_declarator () { <...> }
+proto token scope_declarator (:$endsym is context = 'nofun') { <...> }
 
 token category:package_declarator { <sym> }
 proto token package_declarator () { <...> }
@@ -470,6 +470,7 @@ proto token terminator { <...> }
 
 token unspacey { <.unsp>? }
 token spacey { <?before \s | '#'> }
+token nofun { <!before '(' | '.(' | '\\' > }
 
 # Lexical routines
 
@@ -3209,7 +3210,7 @@ token infix:sym<::=> ( --> Item_assignment)
 
 token infix:sym<.=> ( --> Item_assignment) {
     <sym> <.ws>
-    [ <?before \w+';' | 'new' | 'sort' | 'subst' | 'trans' > || <worryobs('.= as append operator', '~=')> ]
+    [ <?before \w+';' | < new sort subst trans reverse uniq map samecase > > || <worryobs('.= as append operator', '~=')> ]
     { $<O><nextterm> = 'dottyop' }
 }
 
@@ -3271,7 +3272,7 @@ token term:identifier ( --> Term )
 {
     :my $t;
     <identifier>
-    {{ $t = $<identifier>.text; }}
+    { $t = $<identifier>.text; }
     <args( $¢.is_type($t) )>
     {{
         %ROUTINES{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $¢.is_routine($t);
