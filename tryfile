@@ -7,7 +7,7 @@ my $failures = 0;
 
 if (not @ARGV) {
     chomp(@ARGV = <STDIN>);
-    s/^[AU]+\s+// for @ARGV;
+    s/^\s*[AU]*\s+// for @ARGV;
 }
 
 for my $file (@ARGV) {

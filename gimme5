@@ -913,7 +913,7 @@ use utf8;
 END
 
     print $out;
-    print "# vim: sw=4 ft=perl\n";
+    print "\n1;\n# vim: sw=4 ft=perl\n";
 }
 
 sub dumpretree {
