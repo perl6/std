@@ -1653,7 +1653,7 @@ token variable {
     || '$:' <name>? # XXX
     || [
         | <sigil> <twigil>? <desigilname> {*}                                    #= desigilname
-            [ <?{ $<twigil> eq '.' }>
+            [ <?{ my $t = $<twigil>; @$t and $t.[0].text eq '.' }>
                 <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
             ]?
         | <special_variable> {*}                                    #= special
