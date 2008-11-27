@@ -3271,7 +3271,7 @@ token term:sigil ( --> List_prefix)
 token term:identifier ( --> Term )
 {
     :my $t;
-    <identifier>
+    <identifier> <?before ['.'?'(']?>
     { $t = $<identifier>.text; }
     <args( $¢.is_type($t) )>
     {{
