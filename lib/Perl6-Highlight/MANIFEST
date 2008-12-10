@@ -1,0 +1,6 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/Perl6-Highlight.t
+lib/Perl6/Highlight.pm

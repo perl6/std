@@ -1,0 +1,2625 @@
+#!perl
+use strict;
+use warnings;
+no warnings 'recursion';
+use utf8;
+
+my $TRIE = 1;
+my $STORABLE = 1;
+
+use feature 'say', 'state';
+
+require 'mangle.pl';
+
+our $CTX = '';
+our $DEBUG = $ENV{STD5DEBUG} // 0;
+our $DEPTH = 0;
+our %LEXERS;       # per language, the cache of lexers, keyed by rule name
+our %FATECACHE;	# fates we've already turned into linked lists
+our %ANON;	# knowledge about what can be borrowed from supergrammar
+
+#my %HIST;
+
+sub ::init_globals {
+    $::DEBUG = $DEBUG;
+    $::CTX = '';
+    $::DEPTH = 0;
+    $::ORIG = '';
+    @::ORIG = ();
+    @::MEMOS = ();
+    %::LEXERS = ();
+
+    # various bits of info useful for error messages
+    $::HIGHWATER = 0;
+    $::HIGHMESS = '';
+    $::HIGHEXPECT = {};
+    $::COMPILING::LAST_NIBBLE = { firstline => 0, lastline => 0 };
+    $::COMPILING::LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
+    $::COMPILING::LINE = 1;
+    $::COMPILING::FILE = '(eval)';
+    $::GOAL = "(eof)";
+}
+
+sub ::fatestr { my $f = shift;
+    my $text = '';
+    while ($f) {
+	$text .= $f->[1] . " " . $f->[2];
+	$text .= ' ' if $f = $f->[0];
+    }
+    $text;
+}
+
+{ package DEBUG;
+    use constant {
+        autolexer => 1,
+        lexer => 2,
+        fixed_length => 4,
+        fates => 8,
+        longest_token_pattern_generation => 16,
+        EXPR => 32,
+        matchers => 64,
+        trace_call=> 128,
+        cursors => 256,
+        try_processing => 1024,
+        mixins => 2048,
+        callm_show_subnames => 16384,
+        use_color => 32768
+    };
+}
+
+sub ::deb {
+    print ::LOG @_, "\n";
+}
+
+package Cursor;
+
+use Carp;
+
+# $SIG{__DIE__} = sub { confess(@_) };
+
+use LazyMap qw(lazymap eager);
+
+use Term::ANSIColor;
+our $BLUE = color 'blue';
+our $GREEN = color 'green';
+our $YELLOW = color 'yellow';
+our $RED = color 'red';
+our $CLEAR = color 'clear';
+
+sub deb { my $self = shift;
+    my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
+    print ::LOG $pos,'/',$self->lineof($pos), "\t", $CTX, ' ', @_, "\n";
+}
+
+$::DEBUG //= 0;
+
+use Moose ':all' => { -prefix => 'moose_' };
+
+use Encode;
+
+our %AUTOLEXED;
+our $ALT;
+our $PREFIX = "";
+my $IMP = '(?#::)';
+our $PURIFY = 0;	# ignore {*} IMPs?
+
+binmode(STDIN, ":utf8");
+binmode(STDERR, ":utf8");
+binmode(STDOUT, ":utf8");
+BEGIN {
+    if ($^P) {
+	open(::LOG, ">&1") or die "Can't create $0.log: $!";
+    }
+    else {
+	open(::LOG, ">$0.log") or die "Can't create $0.log: $!";
+    }
+    binmode(::LOG, ":utf8");
+}
+
+sub new {
+    my $class = shift;
+    $::ORIG = shift() . "\n";		# original string
+    @::ORIG = unpack("U*", $::ORIG);
+    $::MEMOS[@::ORIG] = undef;	# memos kept by position
+    my %args = ('_pos' => 0, '_from' => 0);
+    while (@_) {
+	my $name = shift;
+	$args{'_' . $name} = shift;
+    }
+    my $self = bless \%args, ref $class || $class;
+    $self->BUILD;
+    $self;
+}
+
+sub parse {
+    my $class = shift;
+    my $text = shift;
+    my $rule = shift() // 'comp_unit';
+    ::init_globals();
+    local $::VOID = 1 if not defined wantarray;
+    local $::COMPILING::FILE = '(eval)';
+    $class->new($text)->$rule();
+}
+
+sub parsefile {
+    my $class = shift;
+    my $file = shift;
+    my $rule = shift() // 'comp_unit';
+    ::init_globals();
+    local $::VOID = 1 if not defined wantarray;
+    local $::COMPILING::FILE = $file;
+    open(FILE, '<:utf8', $file) or die "Can't open $file: $!\n";
+    my $text;
+    {
+	local $/;
+	$text = <FILE>;
+	close FILE;
+    }
+
+    my $result;
+    if ($STORABLE) {
+	my $store = "lex/STD.pm.store";
+	if (-f $store and -M $file > -M $store) {
+	    *::LEXERS = retrieve($store);
+	}
+	$result = $class->new($text)->$rule();
+	if (defined $result and $file eq 'STD.pm') {
+	    store(\%::LEXERS, $store);
+	}
+    }
+    else {
+	$result = $class->new($text)->$rule();
+    }
+
+#    for my $key (sort {$HIST{$a} <=> $HIST{$b}} keys(%HIST)) {
+#	warn "$HIST{$key}\t$key\n";
+#    }
+    $result;
+}
+
+sub mixin {
+    my $self = shift;
+    my $WHAT = ref($self)||$self;
+    my @mixins = @_;
+
+    my $NEWWHAT = $WHAT . '::';
+    my @newmix;
+    for my $mixin (@mixins) {
+	my $ext = ref($mixin) || $mixin;
+	push @newmix, $ext;
+	$ext =~ s/(\w)\w*::/$1/g;	# just looking for a "cache" key, really
+	$NEWWHAT .= '_X_' . $ext;
+    }
+    $self->deb("mixin $NEWWHAT from $WHAT @newmix") if $DEBUG & DEBUG::mixins;
+    no strict 'refs';
+    if (not exists &{$NEWWHAT.'::meta'}) {		# never composed this one yet?
+	# fake up mixin with MI, being sure to put "roles" in front
+	my $eval = "package $NEWWHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$WHAT'); moose_with(" . join(',', map {"'$_'"} @newmix) . ");\n";
+	$self->deb($eval) if $DEBUG & DEBUG::mixins;
+	eval $eval;
+	warn $@ if $@;
+    }
+    return $self->cursor_fresh($NEWWHAT);
+}
+
+sub tweak {
+    my $self = shift;
+    my $class = ref $self;
+    no strict 'refs';
+    for (;;) {
+	my $retval = eval {
+	    $self->deb("Calling $class" . '::multitweak') if $DEBUG & DEBUG::mixins;
+	    &{$class . '::multitweak'}($self,@_);
+	}; 
+	return $retval if $retval;
+	die $@ unless $@ =~ /^NOMATCH|^Undefined subroutine/;
+	last unless $class =~ s/(.*)::.*/$1/;
+    }
+}
+
+sub _PARAMS {}	# overridden in parametric role packages
+
+use YAML::Syck;
+use Storable;
+
+sub from { $_[0]->{_from} // $_[0]->{_pos} }
+sub to { $_[0]->{_pos} }
+sub pos { $_[0]->{_pos} }
+sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
+sub text { exists $_[0]->{_from} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from}) : '' }
+sub peek { $_[0]->{_peek} }
+sub orig { \$::ORIG }
+sub WHAT { ref $_[0] || $_[0] }
+
+sub item { exists $_[0]->{''} ? $_[0]->{''} : $_[0]->text }
+
+sub list { my $self = shift;
+    my @result;
+    # can't just do this in numerical order because some might be missing
+    # and we don't know the max
+    for my $k (keys %$self) {
+	$result[$k] = $self->{$k} if $k =~ /^\d/;
+    }
+    \@result;
+}
+sub hash { my $self = shift;
+    my %result;
+    for my $k (keys %$self) {
+	$result{$k} = $self->{$k} if $k !~ /^[_\d]/;
+    }
+    \%result;
+}
+
+sub lexers { my $self = shift;
+    my $lang = ref $self;
+    $self->deb("LANG = $lang") if $DEBUG & DEBUG::autolexer;
+    $::LEXERS{$lang} //= {};
+}
+
+my $fakepos = 1;
+
+sub _AUTOLEXpeek { my $self = shift;
+    my $key = shift;
+    my $retree = shift;
+
+    $self->deb("AUTOLEXpeek $key") if $DEBUG & DEBUG::autolexer;
+    die "Null key" if $key eq '';
+    if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
+	die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
+	$self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
+	return { PATS => ['(?#::)'] };  # (but if we advanced just assume a :: here)
+    }
+    $key = 'termish' if $key eq 'EXPR';
+    return $::LEXERS{ref $self}->{$key} //= $self->_AUTOLEXgen($key, $retree);
+}
+
+sub _AUTOLEXgen { my $self = shift;
+    my $key = shift;
+    my $retree = shift;
+
+    my $lang = ref $self;
+    if ($lang =~ /^ANON/) {
+	my $anon = $ANON{$lang};
+	my $super = $anon->{SUP};
+	my $category = $anon->{CAT};
+	print STDERR "AUTOLEXgen $key in $lang from $super without $category\n" if $DEBUG & DEBUG::mixins;
+	my $superlexer = $self->cursor_fresh($super)->_AUTOLEXpeek($key,$retree);
+	my $same = 1;
+	for my $pat (@{$superlexer->{PATS}}) {
+	    if ($pat =~ / $category /) {
+		print STDERR "\tNope: $pat\n" if $DEBUG & DEBUG::mixins;
+		$same = 0;
+		last;
+	    }
+	}
+	# no need to regen a sublexer that will turn out the same
+	return $superlexer if $same;
+    }
+    $self->deb("AUTOLEXgen $key in $lang") if $DEBUG & DEBUG::autolexer;
+    my $lexer = {};
+    (my $dir = 'lex::' . $lang) =~ s/::/\//g;
+    (my $file = $key) =~ s/::/-/g;
+    $file =~ s/:\*$//;
+    my $name = $key;
+    my $dba = $retree->{$key}{dba};
+    if (not $dba) {
+	$dba = $name;
+	$dba =~ s/_0[01]$//;
+	$dba =~ s/_(\d\d)$/ (alt $1)/;
+	$dba =~ s/:\*$//;
+    }
+
+    if ($STORABLE and -e "$dir/$file.store") {
+	my $lexer = retrieve("$dir/$file.store");
+	my $pat = $lexer->{PATS};
+	my $fates;
+	my $i = 0;
+	for (@$pat) {
+	    my $fstr;
+	    if ( m/\(\?#FATE(\d+) +(.*?)\)/) {
+		warn "MISMATCH $i $1" unless $i == $1;
+		$fstr = $2;
+	    }
+	    else {
+		die "Whoops, no fate in storage";
+	    }
+	    my $fate;
+	    if ($fate = $FATECACHE{$fstr}) {
+		$fates->[$i] = $fate;
+	    }
+	    else {
+		$FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
+		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+		    $fate->[1] = $1;
+		    $fate->[2] = $2;
+		    if ($fate->[0] = $FATECACHE{$fstr}) {
+			last;
+		    }
+		    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
+		}
+	    }
+	    $i++;
+	}
+	$lexer->{FATES} = $fates;
+	return $lexer;
+    }
+    elsif (open(LEX, "$dir/$file")) {
+	binmode(LEX, ":utf8");
+	$self->deb("using cached $dir/$file") if $DEBUG & DEBUG::autolexer;
+
+	chomp($name = <LEX>);
+	local $/ = "";
+	my @para = <LEX>;
+	close LEX;
+	my %lexer;
+	$lexer{NAME} = $name;
+	$lexer{DBA} = $dba;
+	$lexer{FILE} = "$dir/$file";
+	my @pat = split(/\n/, $para[0]);
+	$lexer{PATS} = \@pat;
+	my $fates;
+	my $i = 0;
+	for (@pat) {
+	    s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/;
+	    my $fstr = $1;
+	    my $fate = $fates->[$i] = [0,0,0];
+	    while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+		$fate->[1] = $1;
+		$fate->[2] = $2;
+		$fate = $fate->[0] = [0,0,0] if $fstr ne '';
+	    }
+	    $i++;
+	}
+	$lexer{FATES} = $fates;
+	eval {
+	    $lexer{T} = Load($para[1]) if $TRIE and @para > 1;
+	};
+
+	return \%lexer;
+    }
+    else {
+	{ package RE_base; 1; }
+	my @pat;
+	my $oldfakepos = $AUTOLEXED{$key} // 0;
+	$AUTOLEXED{$key} = $fakepos;
+	my $ast = $retree->{$key};
+	if ($ast and ref $ast ne 'HASH') {
+	    @pat = $ast->longest($self->cursor_peek());
+	}
+	else {	# a protomethod, look up all methods it can call
+	    my $proto = $key;
+	    if ($proto =~ s/:\*$//) {
+		my $protopat = $proto . '__S_';
+		my $protolen = length($protopat);
+		my $altnum = 0;
+		my $peek = $self->cursor_peek();
+		for my $class ($self->meta->linearized_isa) {
+		    for my $method (sort $class->meta->get_method_list) {
+			if (substr($method,0,$protolen) eq $protopat) {
+			    next if substr($method,-6,6) eq '__PEEK';
+			    my $callname = $class . '::' . $method . '__PEEK';
+			    my $peeklex = $peek->$callname();
+			    if ($peeklex and $peeklex->{PATS}) {
+				my @alts = @{$peeklex->{PATS}};
+				for my $alt (@alts) {
+				    $alt .= "\t(?#FATE)" unless $alt =~ /FATE/;
+				    $alt =~ s/\(\?#FATE\d*/(?#FATE $proto ${class}::$method/;
+				    $altnum++;
+				}
+				push @pat, @alts;
+			    }
+			}
+		    }
+		}
+	    }
+	    else {
+		die "BAD KEY $key";
+	    }
+	}
+	for (@pat) {
+	    s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
+	    s/(\(\?#::\))+/(?#::)/;
+	}
+	my $fates;
+	my $i = 0;
+	for (@pat) {
+	    my $fstr;
+	    if ( s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/) {
+		$fstr = $1;
+	    }
+	    else {
+		$_ .= "\t(?#FATE$i )";
+		$fstr = "";
+	    }
+	    my $fate;
+	    if ($fate = $FATECACHE{$fstr}) {
+		$fates->[$i] = $fate;
+	    }
+	    else {
+		$FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
+		while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+		    $fate->[1] = $1;
+		    $fate->[2] = $2;
+		    if ($fate->[0] = $FATECACHE{$fstr}) {
+			last;
+		    }
+		    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
+		}
+	    }
+	    $i++;
+	}
+	warn "(null pattern for $key)" unless @pat;
+	my $pat = join("\n", @pat);
+
+	$AUTOLEXED{$key} = $oldfakepos;
+
+	my $T;
+	if ($TRIE) {
+	    $T = {};
+	  PAT:
+	    for my $fnum (0..@pat-1) {
+		my ($chars) = $pat[$fnum];
+		$chars =~ s/\(\?#::\)//g;
+		my @chars;
+		my $final = '';
+		while ($chars ne '') {
+		    last if $chars =~ m/^\t/;
+		    if ($chars =~ s/^\\(\W)([*+?{]?)//) {
+			if ($2) {
+			    $final = "\\$1$2$chars";
+			    last;
+			}
+			push(@chars, ord($1));
+			next;
+		    }
+		    if ($chars =~ s/^(\\\w.*)//) {
+			$final = $1;
+			last;
+		    }
+		    if ($chars =~ /^(\[\S+)/) {
+			$final = $1;
+			last;
+		    }
+		    if ($chars =~ /^(\.\S+)/) {
+			$final = $1;
+			last;
+		    }
+		    if ($chars =~ s/^(.)([*+?{]?)//) {
+			if ($2) {
+			    $final = "$1$2$chars";
+			    last;
+			}
+			push(@chars, unpack('U',$1));
+			next;
+		    }
+		}
+		my $state = $T;
+		for my $ch (@chars) {
+		    my $char = chr($ch);
+		    if (my $next = $state->{$char}) {
+			$state = $next;
+		    }
+		    else {
+			$state = $state->{$char} = {};
+		    }
+		}
+		push @{$state->{'~~'}}, $final, $fnum;
+	    }
+	}
+
+
+	$lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "FATES" => $fates, "T" => $T, "DBA" => $dba};
+
+	return $lexer if $lang =~ /ANON/;
+
+	if (not -d $dir) {
+	    use File::Path 'mkpath';
+	    mkpath($dir);
+	}
+	if ($STORABLE) {
+	    delete $lexer->{FATES};
+	    store($lexer, "$dir/$file.store");
+	    $lexer->{FATES} = $fates;
+	    if ($file eq 'termish') {
+		system "cp $dir/termish.store $dir/EXPR.store";
+	    }
+	}
+
+	open(my $cache, '>:utf8', "$dir/$file") // die "Can't print: $!";
+	print $cache $name,"\n";
+	print $cache join("\n",@pat),"\n\n" or die "Can't print: $!";
+	print $cache Dump($T) if $T and not $STORABLE;
+	close($cache) or die "Can't close: $!";
+	$self->deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
+	# force operator precedence method to look like a term
+	if ($file eq 'termish') {
+	    system "cp $dir/termish $dir/EXPR";
+	}
+    }
+    $lexer;
+}
+
+
+# Can the current pattern match the current position according to 1st N chars?
+# Occasional false positives are okay as long as we can trim it down enough
+# for LTM to handle.  False negatives are bad.
+
+sub canmatch {
+    my ($p,$s) = @_;
+    while ($p ne '' and $s ne '') {
+	my $f = substr($p,0,1,'');
+	my $c = substr($s,0,1,'');
+	if ($f =~ /[\[\\\$.()\t]/) {
+	    if ($f eq '\\') {
+		if ($p =~ s/^(\W)//) {
+		    return 1 if $p =~ s/^[*?]//;
+		    return 1 if $1 eq '>';
+		    return 0 unless $c eq $1;
+		}
+		elsif ($p =~ s/^(\w)//) {
+		    $f .= $1;
+		    if ($1 eq 'x') {
+			if ($p =~ s/^([[:digit:][:alpha:]]{2,4})//) {
+			    $f .= $1;
+			}
+			elsif ($p =~ s/^(\[\w+\])//) {
+			    $f .= $1;
+			}
+		    }
+		    elsif ($1 eq 'p') {
+			if ($p =~ s/^(\w{1,2})//) {
+			    $f .= $1;
+			}
+			elsif ($p =~ s/^(\{\w+\})//) {
+			    $f .= $1;
+			}
+		    }
+		    elsif ($1 eq 'b') {
+			return 1;
+		    }
+		    return 1 if $p =~ s/^[*?]//;
+		    return 0 unless $c =~ /^$f/;
+		}
+	    }
+	    elsif ($f eq '[') {
+		if ($p =~ s/^(\^?\]?(?:\:\]|\\\]|.)*?\])//) {
+		    $f .= $1;
+		    return 1 if $p =~ s/^[*?]//;
+		    return 0 unless $c =~ /^$f/;
+		}
+		else {
+		    return 1;	# guess positive
+		}
+	    }
+	    elsif ($f eq '(') {
+		return 1 if $p =~ /\|/; #guess positive on alternation
+		$p =~ s/^\?://;
+		substr($s,0,0,$c);
+		next;	# ignore left paren
+	    }
+	    elsif ($f eq ')') {
+		return 1;		# guess positive
+	    }
+	    elsif ($f eq '.') {
+		return 1 if $p =~ s/^[*?]//;
+	    }
+	    elsif ($f eq '$') {
+		return 1;
+	    }
+	    else { # \t
+		return 1;
+	    }
+	}
+	elsif ($f eq $c) {
+	    return 1 if $p =~ s/^[*?]//;
+	}
+	else {
+	    return 0;
+	}
+	return 1 if $p =~ /^[+{]/;	# guess positive
+    }
+    # null pattern or null string, assume matches
+    return 1;
+}
+
+sub rxlen {
+    my $p = shift;
+    my $len = 0;
+    while ($p ne '') {
+	return -1 if $p =~ /^[*+?(|]/;
+	return -1 if $p =~ /^\{[\d,]+\}/;
+	$len++, next if $p =~ s/^\[\^?.[^\]]*?\]//;
+	if ($p =~ s/^\\//) {
+	    next if $p =~ s/^>//;
+	    $len++, next if $p =~ s/^\W//;
+	    $len++, next if $p =~ s/^[ntfrdswDSW]//;
+	    $len++, next if $p =~ s/^\d+//;
+	    $len++, next if $p =~ s/^x[\da-fA-F]{1,4}//;
+	    $len++, next if $p =~ s/^p[a-zA-Z]{1,2}//;
+	    return -1;
+	}
+	$len++, next if $p =~ s/^.//s;
+    }
+    return $len;
+}
+
+sub delete {
+    my $self = shift;
+    delete $self->{@_};
+}
+
+{ package Match;
+    sub new { my $self = shift;
+	my %args = @_;
+	bless \%args, $self;
+    }
+
+    sub from { my $self = shift;
+	$self->{_f};
+    }
+
+    sub to { my $self = shift;
+	$self->{_t};
+    }
+}
+
+sub cursor_peek { my $self = shift;
+    $self->deb("cursor_peek") if $DEBUG & DEBUG::cursors;
+    my %r = %$self;
+    $r{_peek} = 1;
+    bless \%r, ref $self;
+}
+
+sub cursor_fresh { my $self = shift;
+    my %r;
+    my $lang = @_ && $_[0] ? shift() : ref $self;
+    $self->deb("cursor_fresh lang $lang") if $DEBUG & DEBUG::cursors;
+   # $r{_from} =
+    $r{_pos} = $self->{_pos};
+    $r{_fate} = $self->{_fate};
+    $r{_herelang} = $self->{_herelang} if $self->{_herelang};
+    bless \%r, ref $lang || $lang;
+}
+
+sub cursor_herelang { my $self = shift;
+    $self->deb("cursor_herelang") if $DEBUG & DEBUG::cursors;
+    my %r = %$self;
+    $r{_herelang} = $self;
+    bless \%r, 'STD::Q';
+}
+
+# remove consistent leading whitespace (mutates text nibbles in place)
+
+sub trim_heredoc { my $doc = shift;
+    my ($stopper) = $doc->{stopper}[0] or
+	$doc->panic("Couldn't find delimiter for heredoc\n");
+    my $ws = $stopper->{ws}->text;
+    return $stopper if $ws eq '';
+
+    my $wsequiv = $ws;
+    $wsequiv =~ s{^(\t+)}[' ' x (length($1) * ($::TABSTOP // 8))]xe;
+
+    # We can't use ^^ after escapes, since the escape may be mid-line
+    # and we'd get false positives.  Use a fake newline instead.
+    $doc->{nibbles}[0] =~ s/^/\n/;
+
+    for (@{$doc->{nibbles}}) {
+	next if ref $_;   # next unless $_ =~ Str;
+
+	# prefer exact match over any ws
+	s{(?<=\n)(\Q$ws\E|[ \t]+)}{
+	    my $white = $1;
+	    if ($white eq $ws) {
+		'';
+	    }
+	    else {
+		$white =~ s[^ (\t+) ][ ' ' x (length($1) * ($::TABSTOP // 8)) ]xe;
+		if ($white =~ s/^\Q$wsequiv\E//) {
+		    $white;
+		}
+		else {
+		    '';
+		}
+	    }
+	}eg;
+    }
+    $doc->{nibbles}[0] =~ s/^\n//;  # undo fake newline
+    $stopper;
+}
+
+sub clean {
+    my $self = shift;
+    delete $self->{_fate};
+    delete $self->{_pos};	# EXPR blows up without this for some reason
+    delete $self->{_reduced};
+    for my $k (values %$self) {
+	next unless ref $k;
+	if (ref $k eq 'ARRAY') {
+	    for my $k2 (@$k) {
+		eval {
+		    $k2->clean if ref $k2;
+		}
+	    }
+	}
+	else {
+	    eval {
+		$k->clean;
+	    }
+	}
+    }
+    $self;
+}
+
+sub dump {
+    my $self = shift;
+    my %copy = %$self;
+    delete $copy{_reduced};
+    delete $copy{_fate};
+    my $text = STD::Dump(\%copy);
+    $text;
+}
+
+sub cursor_bind { my $self = shift;	# this is parent's match cursor
+    my $bindings = shift;
+    my $submatch = shift;		# this is the submatch's cursor
+    delete $self->{_fate};
+
+    $self->deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
+    my %r = %$self;
+    if ($bindings) {
+	for my $binding (@$bindings) {
+	    if (ref $r{$binding} eq 'ARRAY') {
+		push(@{$r{$binding}}, $submatch);
+	    }
+	    else {
+		$r{$binding} = $submatch;
+	    }
+	}
+    }
+    $submatch->{_from} = $r{_from} = $r{_pos};
+    $r{_pos} = $submatch->{_pos};
+    bless \%r, ref $self;		# return new match cursor for parent
+}
+
+sub cursor_fate { my $self = shift;
+    my $pkg = shift;
+    my $name = shift;
+    my $retree = shift;
+    # $_[0] is now ref to a $trystate;
+#    $HIST{$name}++;
+
+    $self->deb("cursor_fate $pkg $name") if $DEBUG & DEBUG::cursors;
+    my $tag;
+    my $try;
+    
+    my $lexer = $::LEXERS{ref $self}->{$name} // do {
+	local %AUTOLEXED;
+	$self->_AUTOLEXpeek($name,$retree);
+    };
+    if ($self->{_pos} >= $::HIGHWATER) {
+	if ($self->{_pos} > $::HIGHWATER) {
+	    %$::HIGHEXPECT = ();
+	    $::HIGHMESS = '';
+	}
+	$::HIGHEXPECT->{$lexer->{DBA}}++;
+	$::HIGHWATER = $self->{_pos};
+    }
+
+    my $P = $self->{_pos};
+    if ($P >= @::ORIG) {
+	return sub {};
+    }
+
+    # A rudimentary trie walker.
+
+    if (my $state = $lexer->{T}) {
+	my @candidates;
+	my $p = $P;
+	my $ch = $::ORIG[$p];
+	my $next;
+	print STDERR "=" x 10,"\n$p TRIE for ${pkg}::$name in ", ref $self, "\n",
+		$p," ", pack("U",$ch), "\n" if $DEBUG & DEBUG::autolexer;
+	for (;;) {
+	    if ($state->{'~~'}) {
+		our %RXCACHE;
+		my @x = @{$state->{'~~'}};
+		while (my ($final,$fnum) = splice(@x,0,2)) {
+		    my $pend = $p;
+		    if ($final) {
+			print STDERR $p,"     probing $fnum\n" if $DEBUG & DEBUG::autolexer;
+			pos($::ORIG) = $p;
+			next unless &{$RXCACHE{$final} //= eval "sub { \$::ORIG =~ /\\G$final/xsgc }"};
+			$pend = pos($::ORIG);
+		    }
+		    push(@{$candidates[$pend - $P][$p - $P]}, $fnum);
+		    print STDERR $pend," FNUM $fnum @",$pend - $P,"\n" if $DEBUG & DEBUG::autolexer;
+		}
+	    }
+	    last unless $next = $state->{chr $ch};
+	    if ($DEBUG & DEBUG::autolexer) {
+		print STDERR substr($::ORIG, $P, $p - $P), "\n";
+		print STDERR $p," ", pack("U",$ch), "\n";
+	    }
+	    $ch = $::ORIG[++$p];
+	    $state = $next;
+	}
+	my @fnums = map { $_ ? map({ $_ ? @$_ : () } reverse @$_) : () } reverse @candidates;
+	print STDERR $p," FNUMS @fnums\n" if $DEBUG & DEBUG::autolexer;
+	for my $fnum (@fnums) {
+	    my $f = $lexer->{FATES};
+	    print STDERR "$fnum ",::fatestr($f->[$fnum]),"\n" if $DEBUG & DEBUG::autolexer;
+	}
+
+	my @FATES = @{$lexer->{FATES}}[@fnums];
+	return sub { splice(@FATES,0) };
+    }
+    print STDERR "FAILED trie at $P\n" if $DEBUG & DEBUG::autolexer;
+
+    pos($::ORIG) = $P;
+    $::ORIG =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[$@%]?\w+|['"]|[ -~].|.)/smgc;
+    my $ch2 = $1;
+
+    return $lexer->{X}{$ch2} //= do {
+	my @pats;
+	my $file = $lexer->{FILE} . '__' . ::mangle($ch2);
+	if (open PATS, '<', $file) {
+	    binmode(PATS, ":utf8");
+#	    print STDERR "<$file\n";
+	    $self->deb("Using cached $name patterns starting with '$ch2'") if $DEBUG & DEBUG::autolexer;
+	    chomp(@pats = <PATS>);
+	    close PATS;
+	}
+	else {
+#	    print STDERR ">$file\n";
+	    $self->deb("Selecting $name patterns starting with '$ch2'") if $DEBUG & DEBUG::autolexer;
+	    @pats = grep { canmatch($_, $ch2) } @{
+		$lexer->{FASTPATS} //= [
+		    map { my $x = $_; $x =~ s/\(\?#::\)//g; $x } @{$lexer->{PATS}}
+		]
+	    };
+#	    if (@pats > 10) {
+#		print STDERR "PATS: ",0+@pats," $ch2 ", substr($::ORIG,$P+length($ch2), 5), "\n";
+#		print "PATS: ",0+@pats," $ch2 ", substr($::ORIG,$P+length($ch2), 5), "\n";
+#		print join "\n", @pats, '';
+#	    }
+	    # XXX this could be greatly compactified by just storing offsets into @pats
+	    # and just appending a single line to a single digraph cache file.
+	    if ($file !~ /ANON/ and open PATS, '>', $file) {
+		binmode(PATS, ":utf8");
+		print PATS join("\n", @pats, '');
+		close PATS;
+	    }
+	}
+	my @rxlenmemo;
+	if (!@pats) {
+	    $self->deb("No $name patterns start with '$ch2'") if $DEBUG & DEBUG::autolexer;
+	    sub { return };
+	}
+	else {
+	    # extract fate comments before they are deleted
+	    my $i = 0;
+	    my $fates = [];
+	    my $FATES = $lexer->{FATES};
+
+	    for my $pat (@pats) {
+		$pat =~ s/\t\(\?#FATE(\d+).*?\)// or die "Malformed fate";
+		$fates->[$i++] = $FATES->[$1];
+	    }
+
+	    if ($DEBUG & DEBUG::autolexer) {
+		$self->deb("#FATES: ", 0+@$fates);
+
+		for my $i (0..@$fates-1) {
+		    $self->deb("\t", $i, ': ', fatestr($fates->[$i]));
+		}
+	    }
+
+	    # generate match closure at the last moment
+	    sub {
+		my $C = shift;
+
+		return unless $lexer;
+
+		my $P = $C->{_pos};
+		pos($::ORIG) = $P;
+
+		if ($DEBUG & DEBUG::lexer) {
+		    my $peek = substr($::ORIG,$C->{_pos},20);
+		    $peek =~ s/\n/\\n/g;
+		    $peek =~ s/\t/\\t/g;
+		    $self->deb("looking for $name at --------->$GREEN$peek$CLEAR");
+		}
+		if (not defined $_[0]) {
+		    my $tried = "";
+		    vec($tried,@pats-1,1) = 0;
+		    $_[0] = [$tried, 1_000_000, []];
+		}
+
+		{
+		    # a parallel nfa matcher might or might not do better here...
+		    # this has the advantage of being fairly compact
+		    if (defined $_[0]) {
+			my $tried = \${$_[0]}[0];   # vec of tried pats
+			my $trylen = \${$_[0]}[1];  # next len to try
+			my $rxlens = ${$_[0]}[2];   # our state's idea of rx lengths
+			return if $$trylen < 0;
+			if (not @$rxlens) {
+			    if (@rxlenmemo) {
+				@$rxlens = @rxlenmemo;
+			    }
+			    else {
+				for my $px (0..@pats-1) {
+				    $$rxlens[$px] = rxlen($pats[$px]);
+				    $self->deb("Fixed len $$rxlens[$px] for $pats[$px]") if $DEBUG & DEBUG::fixed_length;
+				}
+				@rxlenmemo = @$rxlens;
+			    }
+			}
+			my @result;
+			while (not @result and $$trylen >= 0) {
+			    $self->deb("Trying at length $$trylen\n") if $DEBUG & DEBUG::fixed_length;
+			    for my $px (0..@pats-1) {
+				next if vec($$tried,$px,1);	# already tried this one
+				my $l = $$rxlens[$px];
+				if ($l == -1) {
+				    my $p = $pats[$px];
+				    $self->deb("Trying $p at $P\n") if $DEBUG & DEBUG::fixed_length;
+				    pos($::ORIG) = $P;
+				    if (($::ORIG =~ m/\G($p)/msgc)) {
+					$self->deb("Got $1\n") if $DEBUG & DEBUG::fixed_length;
+					$$rxlens[$px] = $l = pos($::ORIG) - $P;
+					if ($l == $$trylen) {
+					    push @result, $fates->[$px];
+					    vec($$tried,$px,1) = 1;
+					}
+					next;
+				    }
+				    else {	# pattern doesn't match at all, invalidate
+					vec($$tried,$px,1) = 1;
+					next;
+				    }
+				}
+				if ($l == $$trylen) {
+				    # already known to match if null or variable length
+				    if (not $l or $rxlenmemo[$px] < 0) {
+					push @result, $fates->[$px];
+				    }
+				    else {
+					my $p = $pats[$px];
+					pos($::ORIG) = $P;
+					if ($::ORIG =~ m/\G$p/gc) {
+					    push @result, $fates->[$px];
+					}
+				    }
+				    vec($$tried,$px,1) = 1;	# mark this one tried
+				}
+			    }
+			    if ($$trylen == 1_000_000) {
+				my $max = 0;
+				for my $x (@$rxlens) { $max = $x if $x > $max }
+				$$trylen = $max;
+			    }
+			    else {
+				--$$trylen;
+			    }
+			}
+
+			return @result;
+		    }
+
+		}
+	    };
+	}
+    };
+
+}
+
+sub cursor_all { my $self = shift;
+    my $fpos = shift;
+    my $tpos = shift;
+
+    $self->deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
+    my %r = %$self;
+#    $r{_from} = $fpos;
+    $r{_pos} = $tpos;
+
+    bless \%r, ref $self;
+}
+
+sub cursor_tweak { my $self = shift;
+    my $tpos = shift;
+
+    if ($DEBUG & DEBUG::cursors) {
+	my $peek = substr($::ORIG,$tpos,20);
+	$peek =~ s/\n/\\n/g;
+	$peek =~ s/\t/\\t/g;
+	$self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
+    }
+    $self->{_pos} = $tpos;
+
+    $self;
+}
+
+sub cursor { my $self = shift;
+    my $tpos = shift;
+
+    if ($DEBUG & DEBUG::cursors) {
+	my $peek = substr($::ORIG,$tpos,20);
+	$peek =~ s/\n/\\n/g;
+	$peek =~ s/\t/\\t/g;
+	$self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
+    }
+    my %r = %$self;
+#    $r{_from} = $self->{_pos} // 0;
+    $r{_pos} = $tpos;
+
+    bless \%r, ref $self;
+}
+
+sub cursor_rev { my $self = shift;
+    my $fpos = shift;
+
+    if ($DEBUG & DEBUG::cursors) {
+	my $peek = substr($::ORIG,$fpos,20);
+	$peek =~ s/\n/\\n/g;
+	$peek =~ s/\t/\\t/g;
+	$self->deb("cursor_ref to $fpos --------->$GREEN$peek$CLEAR");
+    }
+    my %r = %$self;
+    $r{_pos} = $fpos;
+#    $r{_from} = $self->{_from};
+
+    bless \%r, ref $self;
+}
+
+sub add_macro { my $lang = shift;
+    my $start = shift;
+    state $GEN = "500";
+    $lang->{_from} = $start->{_from};
+    my $name = $lang->text;
+    my $WHAT = ref $lang;
+    if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
+	my ($sym) = $name =~ /:sym(.*)/;
+
+	# unfortunately p5 doesn't understand q«...»
+	if ($sym =~ s/^«(.*)»$/$1/) {
+	    my $ok = "'";
+	    for my $try (qw( ' / ! : ; | + - = )) {
+		$ok = $try, last if index($sym,$try) < 0;
+	    }
+	    $sym = $ok . $sym . $ok;
+	}
+
+	my $rule = "token $name { <sym> }";
+
+	# produce p5 method name
+	my $mangle = $name;
+	$mangle =~ s/^(\w*):(sym)?//;
+	my $category = $1;
+	my @list;
+	if ($mangle =~ s/^<(.*)>$/$1/ or
+	    $mangle =~ s/^«(.*)»$/$1/) {
+	    $mangle =~ s/\\(.)/$1/g;
+	    @list = $mangle =~ /(\S+)/g;
+	}
+	elsif ($mangle =~ s/^\[(.*)\]$/$1/ or
+	    $mangle =~ s/^\{(.*)\}$/$1/) {
+	    @list = eval $mangle;
+	}
+	else {
+	    @list = $mangle;
+	}
+	$mangle = ::mangle(@list);
+	$mangle = $category . '__S_' . sprintf("%03d",$GEN++) . $mangle;
+
+	# XXX assuming no equiv specified
+	my $coercion = 'Additive';
+	if ($name =~ /^prefix:/) {
+	    if ($sym =~ /^\W/) {
+		$coercion = 'Symbolic_unary';
+	    }
+	    else {
+		$coercion = 'Named_unary';
+	    }
+	}
+	elsif ($name =~ /^postfix:/) {
+	    $coercion = 'Methodcall';
+	}
+
+	state $genpkg = 'ANON000';
+	$genpkg++;
+	my $e = <<"END";
+package $genpkg;
+use Moose ':all' => { -prefix => 'moose_' };
+moose_extends('$WHAT');
+
+# $rule
+
+my \$retree = {
+    '$mangle' => bless({
+	'kind' => 'token',
+	'min' => 12345,
+	're' => bless({
+	    'a' => 0,
+	    'i' => 0,
+	    'min' => 12345,
+	    'name' => 'sym',
+	    'rest' => '',
+	    'sym' => q$sym,
+	}, 'RE_method'),
+    }, 'RE'),
+};
+
+sub ${mangle}__PEEK { \$_[0]->_AUTOLEXpeek('$mangle',\$retree) }
+sub $mangle {
+    my \$self = shift;
+    local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+    my %args = \@_;
+    my \$sym = \$args{sym} // q$sym;
+
+    my \$C = \$self;
+    my \$S = \$self->{_pos};
+    \$C->{'sym'} = \$sym;
+
+    \$self->_MATCHIFY(\$S, '$mangle', Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
+        \$C->_SYM(\$sym, 0)
+    );
+}
+1;
+END
+	$lang->deb("derive $genpkg from $WHAT adding $mangle") if $DEBUG & DEBUG::mixins;
+	eval $e or die "Can't create $name: $@\n";
+	$::PARSER = $lang->cursor_fresh($genpkg);
+	my $oldlexer = $::LEXERS{$WHAT};
+	my $newlexer = $::LEXERS{$genpkg} //= {};
+	$ANON{$genpkg}{SUP} = $WHAT;
+	$ANON{$genpkg}{CAT} = $category;
+	print STDERR "=====================================\nADD $rule => $mangle\n" if $DEBUG & DEBUG::mixins;;
+	for my $name (sort keys %{$oldlexer}) {
+	    print STDERR "  $name:\n" if $DEBUG & DEBUG::mixins;
+	    my $same = 1;
+	    for my $pat (@{$oldlexer->{$name}->{PATS}}) {
+		if ($pat =~ / $category /) {
+		    print STDERR "\t$pat\n" if $DEBUG & DEBUG::mixins;
+		    $same = 0;
+		    last;
+		}
+	    }
+	    # no need to regen a sublexer that will turn out the same
+	    $newlexer->{$name} = $oldlexer->{$name} if $same;
+	}
+    }
+    $lang;
+}
+
+sub callm { my $self = shift;
+    my $arg = shift;
+    my $class = ref($self) || $self;
+
+    my $lvl = 0;
+    my $extralvl = 0;
+    my @subs;
+    if ($DEBUG & DEBUG::callm_show_subnames) {
+	while (my @c = caller($lvl)) {
+	    $lvl++;
+	    my $s = $c[3];
+	    if ($s =~ /::_/) {
+		next;
+	    }
+	    elsif ($s =~ /^Cursor::/) {
+		next;
+	    }
+	    elsif ($s =~ /^LazyMap::/) {
+		next;
+	    }
+	    elsif ($s =~ /^\(eval\)/) {
+		next;
+	    }
+	    else {
+		$extralvl = $lvl unless $extralvl;
+		$s =~ s/.*:://;
+		push @subs, $s;
+	    }
+	}
+    }
+    else {
+	while (my @c = caller($lvl)) { $lvl++; }
+    }
+    my ($package, $file, $line, $subname, $hasargs) = caller(1);
+    my $name = $subname;
+    if (defined $arg) { 
+        $name .= " " . $arg;
+    }
+    my $pos = '?';
+    $self->deb($name, " [", $file, ":", $line, "] $class") if $DEBUG & DEBUG::trace_call;
+    if ($DEBUG & DEBUG::callm_show_subnames) {
+	$RED . join(' ', reverse @subs) . $CLEAR . ':' x $extralvl;
+    }
+    else {
+	':' x $lvl;
+    }
+}
+
+sub retm { my $self = shift;
+    return $self unless $DEBUG & DEBUG::trace_call;
+    warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
+    my ($package, $file, $line, $subname, $hasargs) = caller(1);
+    $self->deb($subname, " returning @{[$self->{_pos}]}");
+    $self;
+}
+
+sub _MATCHIFY { my $self = shift;
+    my $S = shift;
+    my $name = shift;
+    return () unless @_;
+    my @result = lazymap( sub { my $x = shift; $x->_REDUCE($S, $name)->retm() }, @_);
+    if (wantarray) {
+	@result;
+    }
+    else {
+	$result[0];
+    }
+}
+
+sub _MATCHIFYr { my $self = shift;
+    my $S = shift;
+    my $name = shift;
+    return () unless @_;
+    my $var = shift;
+#    $var->{_from} = $self->{_from};
+    $var->_REDUCE($S, $name)->retm();
+}
+
+sub _SCANf { my $self = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $pos = $self->{_pos};
+    my $eos = @::ORIG;
+
+    lazymap( sub { $self->cursor($_[0])->retm() }, LazyRange->new($pos,$eos) );
+}
+
+sub _SCANg { my $self = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $pos = $self->{_pos};
+    my $eos = @::ORIG;
+
+    lazymap( sub { $self->cursor($_[0])->retm() }, LazyRangeRev->new($eos,$pos) );
+}
+
+sub _STARf { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+
+    lazymap(sub { $_[0]->retm() }, 
+        $self->cursor($self->{_pos}),
+        LazyMap->new(sub { $self->_PLUSf($_[0]) }, $block));
+}
+
+sub _STARg { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+
+    lazymap(sub { $_[0]->retm() }, reverse
+	eager(
+            $self->cursor($self->{_pos}),
+            $self->_PLUSf($block))
+	);
+}
+
+sub _STARr { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $pos = $self;
+    my $prev_pos = $pos->{_pos} // 0;
+    my @all;
+    my $eos = @::ORIG;
+    for (;;) {
+      last if $pos->{_pos} == $eos;
+	my @matches = $block->($pos);  # XXX shouldn't read whole list
+#            say @matches.perl;
+      last unless @matches;
+	my $first = $matches[0];  # no backtracking into block on ratchet
+	last if $first->{_pos} == $prev_pos;
+	$prev_pos = $first->{_pos};
+	push @all, $first;
+	$pos = $first;
+    }
+    $self->cursor_tweak($pos->{_pos})->retm();
+}
+
+sub _PLUSf { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $x = $self;
+
+    # don't go beyond end of string
+    return () if $self->{_pos} == @::ORIG;
+    lazymap(
+	sub {
+	    my $x = $_[0];
+	    lazymap(
+		sub {
+		    $self->cursor($_[0]->{_pos})->retm()
+		}, $x, LazyMap->new(sub { $x->_PLUSf($_[0]) }, $block)
+	    );
+	}, $block->($self)
+    );
+}
+
+sub _PLUSg { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+
+    reverse eager($self->_PLUSf($block, @_));
+}
+
+sub _PLUSr { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $to = $self;
+    my @all;
+    my $eos = @::ORIG;
+    for (;;) {
+      last if $to->{_pos} == $eos;
+	my @matches = $block->($to);  # XXX shouldn't read whole list
+      last unless @matches;
+	my $first = $matches[0];  # no backtracking into block on ratchet
+	#$first->deb($matches->perl) if $DEBUG;
+	push @all, $first;
+	$to = $first;
+    }
+    return () unless @all;
+    my $r = $self->cursor_tweak($to->{_pos});
+    $r->retm();
+}
+
+sub _REPSEPf { my $self = shift;
+    my $sep = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $x = $self;
+
+    my @result;
+    # don't go beyond end of string
+    return () if $self->{_pos} == @::ORIG;
+    do {
+	for my $x ($block->($self)) {
+	    for my $s ($sep->($x)) {
+		push @result, lazymap(sub { $self->cursor($_[0]->{_pos}) }, $x, $s->_REPSEPf($sep,$block));
+	    }
+	}
+    };
+    lazymap(sub { $_[0]->retm() }, @result);
+}
+
+sub _REPSEPg { my $self = shift;
+    my $sep = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+
+    reverse eager($self->_REPSEPf($sep, $block, @_));
+}
+
+sub _REPSEPr { my $self = shift;
+    my $sep = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $to = $self;
+    my @all;
+    my $eos = @::ORIG;
+    for (;;) {
+      last if $to->{_pos} == $eos;
+	my @matches = $block->($to);  # XXX shouldn't read whole list
+      last unless @matches;
+	my $first = $matches[0];  # no backtracking into block on ratchet
+	#$first->deb($matches->perl) if $DEBUG;
+	push @all, $first;
+	my @seps = $sep->($first);
+      last unless @seps;
+	my $sep = $seps[0];
+	$to = $sep;
+    }
+    return () unless @all;
+    my $r = $self->cursor_tweak($all[-1]->{_pos});
+    $r->retm();
+}
+
+sub _OPTr { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+
+    my $x = ($block->($self))[0];
+    my $r = $x // $self->cursor_tweak($self->{_pos});
+    $r->retm();
+}
+
+sub _OPTg { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my @x = $block->($self);
+    lazymap(sub { $_[0]->retm() },
+        $block->($self),
+        $self->cursor($self->{_pos}));
+}
+
+sub _OPTf { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    lazymap(sub { $_[0]->retm() },
+        $self->cursor($self->{_pos}),
+        $block->($self));
+}
+
+sub _BRACKET { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    lazymap(sub { bless($_[0],ref($self))->retm() },
+        $block->($self));
+}
+
+sub _BRACKETr { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my ($val) = $block->($self) or return ();
+    bless($val,ref($self))->retm();
+}
+
+sub _PAREN { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    lazymap(sub { $_[0]->retm() },
+        $block->($self));
+}
+
+sub _NOTBEFORE { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my @all = $block->($self);
+    return () if @all;
+    return $self->cursor($self->{_pos})->retm();
+}
+
+sub _NOTCHAR { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my @all = $block->($self);
+    return () if @all;
+    return $self->cursor($self->{_pos}+1)->retm();
+}
+
+sub before { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my @all = $block->($self);
+    if (@all and $all[0]) {
+        return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
+    }
+    return ();
+}
+
+sub after { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $end = $self->cursor($self->{_pos});
+    my @all = $block->($end);          # Make sure $_->{_from} == $_->{_pos}
+    if (@all and $all[0]) {
+        return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
+    }
+    return ();
+}
+
+sub null { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    return $self->cursor($self->{_pos})->retm();
+}
+
+sub ws__PEEK { ''; }
+sub ws {
+    my $self = shift;
+
+    local $CTX = $self->callm() if $DEBUG & DEBUG::trace_call;
+    my @stub = return $self if exists $::MEMOS[$self->{_pos}]{ws};
+
+    my $C = $self;
+    my $S = $C->pos;
+    $::MEMOS[$S]{ws} = undef;	# exists means we know, undef means no ws  before here
+
+    $self->_MATCHIFY($S, 'ws',
+        $C->_BRACKET( sub { my $C=shift;
+            do { my @gather;
+                    push @gather, (map { my $C=$_;
+                        (map { my $C=$_;
+                            (map { my $C=$_;
+                                $C->_NOTBEFORE( sub { my $C=shift;
+                                    $C
+                                })
+                            } $C->_COMMITRULE())
+                        } $C->before(sub { my $C=shift;
+                            $C->_ALNUM()
+                        }))
+                    } $C->before( sub { my $C=shift;
+                        $C->after(sub { my $C=shift;
+                            $C->_ALNUM_rev()
+                        })
+                    }))
+                    or
+                    push @gather, (map { my $C=$_;
+                        (map { my $C=$_;
+                            scalar(do { $::MEMOS[$C->{_pos}]{ws} = $S unless $C->{_pos} == $S }, $C)
+                        } $C->_STARr(sub { my $C=shift;
+                            $C->_SPACE()
+                        }))
+                    } $C);
+              @gather;
+            }
+        })
+    );
+}
+
+sub _ASSERT { my $self = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my @all = $block->($self);
+    if ((@all and $all[0]->{_bool})) {
+        return $self->cursor($self->{_pos})->retm();
+    }
+    return ();
+}
+
+sub _BINDVAR { my $self = shift;
+    my $var = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    lazymap(sub { $$var = $_[0]; $_[0]->retm() },
+        $block->($self));
+}
+
+sub _SUBSUME { my $self = shift;
+    my $names = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
+    lazymap(sub { $self->cursor_bind($names, $_[0])->retm() },
+        $block->($self->cursor_fresh()));
+}
+
+sub _SUBSUMEr { my $self = shift;
+    my $names = shift;
+    my $block = shift;
+
+    local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
+    my ($var) = $block->($self->cursor_fresh()) or return ();
+    $self->cursor_bind($names, $var)->retm();
+}
+
+sub _EXACT_rev { my $self = shift;
+    my $s = shift() // '';
+    my @ints = unpack("U*", $s);
+
+    local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    while (@ints) {
+	return () unless ($::ORIG[--$P]//-1) == pop @ints;
+    }
+    return $self->cursor($P)->retm();
+}
+
+sub _EXACT { my $self = shift;
+    my $s = shift() // '';
+    my @ints = unpack("U*", $s);
+
+    local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    while (@ints) {
+	return () unless ($::ORIG[$P++]//-1) == shift @ints;
+    }
+    return $self->cursor($P)->retm();
+#    if (substr($::ORIG, $P, $len) eq $s) {
+#        $self->deb("EXACT $s matched @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+#        my $r = $self->cursor($P+$len);
+#        $r->retm();
+#    }
+#    else {
+#        $self->deb("EXACT $s didn't match @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+#        return ();
+#    }
+}
+
+sub _PATTERN { my $self = shift;
+    my $qr = shift;
+
+    local $CTX = $self->callm($qr) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    pos($::ORIG) = $P;
+    if ($::ORIG =~ /$qr/gc) {
+	my $len = pos($::ORIG) - $P;
+        $self->deb("PATTERN $qr matched @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        my $r = $self->cursor($P+$len);
+        $r->retm();
+    }
+    else {
+        $self->deb("PATTERN $qr didn't match at $P") if $DEBUG & DEBUG::matchers;
+        return ();
+    }
+}
+
+sub _BACKREFn { my $self = shift;
+    my $n = shift;
+
+    local $CTX = $self->callm($n) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    my $s = $self->{$n}->text;
+    my $len = length($s);
+    if (substr($::ORIG, $P, $len) eq $s) {
+        $self->deb("EXACT $s matched @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        my $r = $self->cursor($P+$len);
+        $r->retm();
+    }
+    else {
+        $self->deb("EXACT $s didn't match @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        return ();
+    }
+}
+
+sub _SYM { my $self = shift;
+    my $s = shift;
+    my $i = shift;
+
+    $s = $s->[0] if ref $s eq 'ARRAY';
+
+    local $CTX = $self->callm($s) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    my $len = length($s);
+    if ($i
+	? lc substr($::ORIG, $P, $len) eq lc $s
+	: substr($::ORIG, $P, $len) eq $s
+    ) {
+        $self->deb("SYM $s matched @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        my $r = $self->cursor($P+$len);
+	$r->{sym} = $s;
+        $r->retm();
+    }
+    else {
+        $self->deb("SYM $s didn't match @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+        return ();
+    }
+}
+
+#sub _EXACT_rev { my $self = shift;
+#    my $s = shift;
+#
+#    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+#    my $len = length($s);
+#    my $from = $self->{_pos} - $len;
+#    if ($from >= 0 and substr($::ORIG, $from, $len) eq $s) {
+#        my $r = $self->cursor_rev($from);
+#        $r->retm();
+#    }
+#    else {
+##        say "EXACT_rev $s didn't match @{[substr($!orig,$from,$len)]} at $from $len";
+#        return ();
+#    }
+#}
+
+sub _ARRAY { my $self = shift;
+    local $CTX = $self->callm(0+@_) if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos} // 0;
+    my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
+    my @result = ();
+    for my $s (@array) {
+	my $len = length($s);
+	if (substr($::ORIG, $P, $len) eq $s) {
+	    $self->deb("ARRAY elem $s matched @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
+	    my $r = $self->cursor($P+$len);
+	    push @result, $r->retm('');
+	}
+    }
+    return @result;
+}
+
+sub _ARRAY_rev { my $self = shift;
+    local $CTX = $self->callm(0+@_) if $DEBUG & DEBUG::trace_call;
+    my @array = sort { length($b) <=> length($a) } @_;	# XXX suboptimal
+    my @result = ();
+    for my $s (@array) {
+	my $len = length($s);
+	my $from = $self->{_pos} = $len;
+	if (substr($::ORIG, $from, $len) eq $s) {
+	    $self->deb("ARRAY_rev elem $s matched @{[substr($::ORIG,$from,$len)]} at $from $len") if $DEBUG & DEBUG::matchers;
+	    my $r = $self->cursor_rev($from);
+	    push @result, $r->retm('');
+	}
+    }
+    return @result;
+}
+
+sub _DIGIT { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    my $char = substr($::ORIG, $P, 1);
+    if ($char =~ /^\d$/) {
+        my $r = $self->cursor($P+1);
+        return $r->retm();
+    }
+    else {
+#        say "DIGIT didn't match $char at $P";
+        return ();
+    }
+}
+
+sub _DIGIT_rev { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+#        say "DIGIT_rev didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($::ORIG, $from, 1);
+    if ($char =~ /^\d$/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+#        say "DIGIT_rev didn't match $char at $from";
+        return ();
+    }
+}
+
+sub _ALNUM { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    my $char = substr($::ORIG, $P, 1);
+    if ($char =~ /^\w$/) {
+        my $r = $self->cursor($P+1);
+        return $r->retm();
+    }
+    else {
+#        say "ALNUM didn't match $char at $P";
+        return ();
+    }
+}
+
+sub _ALNUM_rev { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+#        say "ALNUM_rev didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($::ORIG, $from, 1);
+    if ($char =~ /^\w$/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+#        say "ALNUM_rev didn't match $char at $from";
+        return ();
+    }
+}
+
+my $alpha;
+BEGIN {
+    $alpha = "";
+    for my $ch (0..255) {
+	my $char = chr($ch);
+	vec($alpha,$ch,1) = 1 if $char =~ /\w/ and $char !~ /\d/;
+    }
+}
+sub alpha { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+#    my $char = substr($::ORIG, $P, 1);
+    my $ch = $::ORIG[$P];
+    if (vec($alpha,$ch,1) or ($ch > 255 and chr($ch) =~ /\pL/)) {
+#    if ($char =~ /^[_[:alpha:]\pL]$/) {
+        my $r = $self->cursor($P+1);
+        return $r->retm();
+    }
+    else {
+#        say "alpha didn't match $char at $P";
+        return ();
+    }
+}
+
+sub alpha_rev { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+        return ();
+    }
+    my $char = substr($::ORIG, $from, 1);
+    if ($char =~ /^[_[:alpha:]\pL]$/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+        return ();
+    }
+}
+
+sub _SPACE { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    my $char = substr($::ORIG, $P, 1);
+    if ($char =~ /^\s$/) {
+        my $r = $self->cursor($P+1);
+        return $r->retm();
+    }
+    else {
+#        say "SPACE didn't match $char at $P";
+        return ();
+    }
+}
+
+sub _SPACE_rev { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+#        say "SPACE_rev didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($::ORIG, $from, 1);
+    if ($char =~ /^\s$/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+#        say "SPACE_rev didn't match $char at $from";
+        return ();
+    }
+}
+
+sub _HSPACE { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    my $char = substr($::ORIG, $P, 1);
+    if ($char =~ /^[ \t\r]$/ or ($char =~ /^\s$/ and $char !~ /^[\n\f\0x0b\x{2028}\x{2029}]$/)) {
+        my $r = $self->cursor($P+1);
+        return $r->retm();
+    }
+    else {
+#        say "HSPACE didn't match $char at $P";
+        return ();
+    }
+}
+
+sub _HSPACE_rev { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+#        say "HSPACE_rev didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($::ORIG, $from, 1);
+    if ($char =~ /^[ \t\r]$/ or ($char =~ /^\s$/ and $char !~ /^[\n\f\0x0b\x{2028}\x{2029}]$/)) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+#        say "HSPACE_rev didn't match $char at $from";
+        return ();
+    }
+}
+
+sub _VSPACE { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    my $char = substr($::ORIG, $P, 1);
+    if ($char =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
+        my $r = $self->cursor($P+1);
+        return $r->retm();
+    }
+    else {
+#        say "VSPACE didn't match $char at $P";
+        return ();
+    }
+}
+
+sub _VSPACE_rev { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+#        say "VSPACE_rev didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($::ORIG, $from, 1);
+    if ($char =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+#        say "VSPACE_rev didn't match $char at $from";
+        return ();
+    }
+}
+
+sub _CCLASS { my $self = shift;
+    my $cc = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    my $char = substr($::ORIG, $P, 1);
+    if ($char =~ /$cc/) {
+        my $r = $self->cursor($P+1);
+        return $r->retm();
+    }
+    else {
+#        say "CCLASS didn't match $char at $P";
+        return ();
+    }
+}
+
+sub _CCLASS_rev { my $self = shift;
+    my $cc = shift;
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+#        say "CCLASS didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($::ORIG, $from, 1);
+    if ($char =~ /$cc/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+#        say "CCLASS didn't match $char at $from";
+        return ();
+    }
+}
+
+sub _ANY { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    if ($P < @::ORIG) {
+        $self->cursor($P+1)->retm();
+    }
+    else {
+#        say "ANY didn't match anything at $P";
+        return ();
+    }
+}
+
+sub _ANY_rev { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+        return ();
+    }
+    return $self->cursor_rev($from)->retm();
+}
+
+sub _BOS { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    if ($P == 0) {
+        $self->cursor($P)->retm();
+    }
+    else {
+        return ();
+    }
+}
+sub _BOS_rev { $_[0]->_BOS }
+
+sub _BOL { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    if ($P == 0 or substr($::ORIG, $P-1, 1) =~ /^[\n\f\x0b\x{2028}\x{2029}]$/) {
+        $self->cursor($P)->retm();
+    }
+    else {
+        return ();
+    }
+}
+sub _BOL_rev { $_[0]->_BOL }
+
+sub _EOS { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    if ($P == @::ORIG) {
+        $self->cursor($P)->retm();
+    }
+    else {
+        return ();
+    }
+}
+sub _EOS_rev { $_[0]->_EOS }
+
+sub _EOL { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    if ($P == @::ORIG or substr($::ORIG, $P, 1) =~ /^(?:\r\n|[\n\f\x0b\x{2028}\x{2029}])$/) {
+        $self->cursor($P)->retm();
+    }
+    else {
+        return ();
+    }
+}
+sub _EOL_rev { $_[0]->_EOL }
+
+sub _RIGHTWB { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    pos($::ORIG) = $P - 1;
+    if ($::ORIG =~ /\w\b/) {
+        $self->cursor($P)->retm();
+    }
+    else {
+        return ();
+    }
+}
+sub _RIGHTWB_rev { $_[0]->_RIGHTWB }
+
+sub _LEFTWB { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    pos($::ORIG) = $P;
+    if ($::ORIG =~ /\b(?=\w)/) {
+        $self->cursor($P)->retm();
+    }
+    else {
+        return ();
+    }
+}
+sub _LEFTWB_rev { $_[0]->_LEFTWB }
+
+sub _LEFTRESULT { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    pos($::ORIG) = $P;
+    if ($::ORIG =~ /\b(?=\w)/) {
+        $self->cursor($P)->retm();
+    }
+    else {
+        return ();
+    }
+}
+sub _LEFTRESULT_rev { $_[0]->_LEFTWB }
+
+sub _REDUCE { my $self = shift;
+    my $S = shift;
+    my $tag = shift;
+
+    $self->{_reduced} = $tag;
+    $self->{_from} = $S;
+    if ($::ACTIONS) {
+	eval { $::ACTIONS->$tag($self) };
+	warn $@ if $@ and not $@ =~ /locate/;
+    }
+    $self->deb("REDUCE $tag from " . $S . " to " . $self->{_pos}) if $DEBUG & DEBUG::matchers;
+    $self;
+}
+
+sub _COMMITBRANCH { my $self = shift;
+    $self->{LAST} = shift() if @_;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    $self->deb("Commit branch to $P") if $DEBUG & DEBUG::matchers;
+    $self, LazyMap->new(sub { $self->deb("ABORTBRANCH") if $DEBUG & DEBUG::trace_call; die "ABORTBRANCH" }, $self);
+}
+
+sub _COMMITRULE { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    $self->deb("Commit rule to $P") if $DEBUG & DEBUG::matchers;
+    $self, LazyMap->new(sub { $self->deb("ABORTRULE") if $DEBUG & DEBUG::trace_call; die "ABORTRULE" }, $self);
+}
+
+sub commit { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    $self->deb("Commit match to $P") if $DEBUG & DEBUG::matchers;
+    $self, LazyMap->new(sub { $self->deb("ABORTMATCH") if $DEBUG & DEBUG::trace_call; die "ABORTMATCH" }, 1);
+}
+
+sub fail { my $self = shift;
+    my $m = shift;
+    return ();
+}
+
+sub bless { CORE::bless $_[1], $_[0]->WHAT }
+
+#############################################################3
+
+{ package main;
+    sub indent { my $s = shift;
+	$s =~ s/^/\n  /mg;
+	$s;
+    }
+
+    sub qm { my $s = shift;
+	my $r = '';
+	for (split(//,$s)) {
+	    if ($_ eq " ") { $r .= '\x20' }
+	    elsif ($_ eq "\t") { $r .= '\t' }
+	    elsif ($_ eq "\n") { $r .= '\n' }
+	    elsif ($_ =~ m/^\w$/) { $r .= $_ }
+	    elsif ($_ eq '<' | $_ eq '>') { $r .= $_ }
+	    else { $r .= '\\' . $_ }
+	}
+	$r;
+    }
+
+    sub here {
+	return unless $DEBUG & DEBUG::longest_token_pattern_generation;
+	my $arg = shift;
+	my $lvl = 0;
+	while (caller($lvl)) { $lvl++ }
+        my ($package, $file, $line, $subname, $hasargs) = caller(0);
+
+	my $name = $package;   # . '::' . substr($subname,1);
+	if (defined $arg) { 
+	    $name .= " " . $arg;
+	}
+	::deb("\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]") if $DEBUG & DEBUG::longest_token_pattern_generation;
+    }
+}
+
+{ package REbase;
+    sub longest { my $self = shift; my ($C) = @_;  ::here("UNIMPL @{[ref $self]}"); "$self" }
+}
+
+{ package RE; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        ::here();
+	local $ALT = '';
+        $self->{'re'}->longest($C);
+    }
+}
+
+{ package RE_adverb; our @ISA = 'RE_base';
+    #method longest ($C) { ... }
+}
+
+{ package RE_assertion; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        for (scalar($self->{'assert'})) { if ((0)) {}
+            elsif ($_ eq '?') {
+                my $re = $self->{'re'};
+#		$C->deb("\n",::Dump($self)) unless $re;
+                if (ref($re) eq 'RE_method_re' and $re->{'name'} eq 'before') {
+                    my @result = $re->longest($C);
+                    return map { $_ . $IMP } @result;
+                }
+            }
+        }
+        return '';
+    }
+}
+
+{ package RE_assertvar; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        return $IMP;
+    }
+}
+
+{ package RE_block; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+	return '' if $PURIFY;
+        return $IMP;
+    }
+}
+
+{ package RE_bindvar; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; ::here();
+	$self->{'atom'}->longest($C);
+    }
+}
+
+{ package RE_bindnamed; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; ::here();
+	$self->{'atom'}->longest($C);
+    }
+}
+
+{ package RE_bindpos; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; ::here();
+	$self->{'atom'}->longest($C);
+    }
+}
+
+{ package RE_bracket; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; ::here();
+	$self->{'re'}->longest($C);
+    }
+}
+
+{ package RE_cclass; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; ::here($self->{'text'});
+        $fakepos++;
+        my $cc = $self->{'text'};
+	Encode::_utf8_on($cc);
+        $cc =~ s/^\-\[/[^/;
+        $cc =~ s/^\+\[/[/;
+        $cc =~ s/\s*\.\.\s*/-/g;
+        $cc =~ s/\s*//g;
+	$cc = "(?i:$cc)" if $self->{i};
+        $cc;
+    }
+}
+
+{ package RE_decl; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_;  return; }
+}
+
+{ package RE_double; our @ISA = 'RE_base';
+    # XXX inadequate for "\n" without interpolation
+    sub longest { my $self = shift; my ($C) = @_; 
+        my $text = $self->{'text'};
+	Encode::_utf8_on($text);
+        ::here($text);
+	my $fixed = '';
+	if ( $text =~ /^(.*?)[\$\@\%\&\{]/ ) {
+	    $fixed = $1 . $IMP;
+	}
+	else {
+	    $fixed = $text;
+	}
+	if ($fixed ne '') {
+	    $fakepos++;
+	    ::qm($fixed);
+	}
+	$fixed =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
+        $fixed;
+    }
+}
+
+{ package RE_meta; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        my $text = $self->{'text'};
+	Encode::_utf8_on($text);
+        ::here($text);
+        for (scalar($text)) { if ((0)) {}
+            elsif ($_ eq '^' or
+		   $_ eq '$' or
+		   $_ eq '.' or
+		   $_ eq '\\w' or
+		   $_ eq '\\s' or
+		   $_ eq '\\d')
+	    {
+                return $text;
+            }
+            elsif ($_ eq '\\h') {
+                return '[\\x20\\x09\\x0d]';
+	    }
+            elsif ($_ eq '\\v') {
+                return '[\\x0a\\x0c]';
+            }
+            elsif ($_ eq '\\N') {
+                return '[^\\x0a]';
+            }
+            elsif ($_ eq '$$') {
+		return '(?:\\x0a|$)';
+	    }
+            elsif ($_ eq ':' or $_ eq '^^') {
+		return;
+	    }
+            elsif ($_ eq '»' or $_ eq '>>') {
+		return '\b';
+	    }
+            elsif ($_ eq '«' or $_ eq '<<') {
+		return '\b';
+	    }
+            elsif ($_ eq '::' or $_ eq ':::' or $_ eq '.*?') {
+                return $IMP;
+            }
+            else {
+                return $text;
+            }
+        }
+    }
+}
+
+{ package RE_method; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        my $name = $self->{'name'};
+	return $IMP if $self->{'rest'};
+	Encode::_utf8_on($name);
+        ::here($name);
+        for (scalar($name)) { if ((0)) {}
+            elsif ($_ eq 'null') {
+                return;
+            }
+            elsif ($_ eq '') {
+                return $IMP;
+            }
+            elsif ($_ eq 'ws') {
+                return $IMP;
+            }
+            elsif ($_ eq 'sym') {
+                $fakepos++;
+		my $sym = $self->{'sym'};
+		Encode::_utf8_on($sym);
+		my $text = ::qm($sym);
+		$text =~ s/(\pL)/'[' . lc($1) . uc($1) . ']'/eg if $self->{i};
+                return $text;
+            }
+            elsif ($_ eq 'alpha') {
+                $fakepos++;
+                return '[_[:alpha:]\pL]';
+            }
+	    my $lexer;
+	    {
+		local $PREFIX = "";
+		$name .= '__PEEK';
+		$lexer = eval { $C->cursor_peek->$name() };
+	    }
+	    return $IMP unless $lexer and exists $lexer->{PATS};
+	    my @pat = @{$lexer->{PATS}};
+	    return unless @pat;
+	    if ($PREFIX) {
+		for (@pat) {
+		    s/(\t\(\?#FATE)\d* *(.*?\))(.*)/$3$1$PREFIX $2/g;
+		}
+	    }
+	    return @pat;
+        }
+    }
+}
+
+{ package RE_method_internal; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        return $IMP;
+    }
+}
+
+{ package RE_method_re; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        my $name = $self->{'name'};
+	Encode::_utf8_on($name);
+        ::here($name);
+        my $re = $self->{'re'};
+        for (scalar($name)) { if ((0)) {}
+            elsif ($_ eq '') {
+                return $IMP;
+            }
+            elsif ($_ eq 'after') {
+                return;
+            }
+            elsif ($_ eq 'before') {
+                my @result = $re->longest($C);
+                return map { $_ . $IMP } @result;
+            }
+            else {
+		$name .= '__PEEK';
+                my $lexer = $C->cursor_peek->$name($re);
+		my @pat = @{$lexer->{PATS}};
+		return unless @pat;
+		return @pat;
+            }
+        }
+    }
+}
+
+{ package RE_noop; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        return $IMP;
+    }
+}
+
+{ package RE_every; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        return $IMP;
+    }
+}
+
+{ package RE_first; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        my $alts = $self->{'zyg'};
+        ::here(0+@$alts);
+        my @result;
+        for my $alt (@$alts) {
+            my @pat = $alt->longest($C);
+            push @result, @pat;
+            last;
+        }
+        $C->deb(join("\n",@result)) if $DEBUG & DEBUG::longest_token_pattern_generation;
+        @result;
+    }
+}
+
+{ package RE_paren; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; ::here();
+	$self->{'re'}->longest($C);
+    }
+}
+
+{ package RE_quantified_atom; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        ::here();
+        my $oldfakepos = $fakepos++;
+	my $a = $self->{atom};
+        my @atom = $a->longest($C);
+	return unless @atom;
+	my $atom = join('|',@atom);
+	return if $atom eq '';
+	$atom = "(?:" . $atom . ')' unless $a->{min} == 1 and ref($a) =~ /^RE_(?:meta|cclass|string)/;
+        if ($self->{'quant'}[0] eq '+') {
+	    if (@atom > 1) {
+		return map { $_ . $IMP } @atom;
+	    }
+            return "$atom+";
+        }
+        elsif ($self->{'quant'}[0] eq '*') {
+            $fakepos = $oldfakepos;
+	    if (@atom > 1) {
+		return map { $_ . $IMP } @atom,'';
+	    }
+            return "$atom*";
+        }
+        elsif ($self->{'quant'}[0] eq '?') {
+            $fakepos = $oldfakepos;
+	    if (@atom > 1) {
+		return @atom,'';
+	    }
+            return "$atom?";
+        }
+        elsif ($self->{'quant'}[0] eq '**') {
+            my $x = $self->{'quant'}[2];
+	    if ($x =~ /^\d/) {
+		$x =~ s/\.\./,/;
+		$x =~ s/\*//;
+		$fakepos = $oldfakepos if $x =~ m/^0/;
+		return $atom . "{$x}";
+	    }
+	    else {
+		return $atom . $IMP;
+	    }
+        }
+	return $IMP;
+    }
+}
+
+{ package RE_qw; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        my $text = $self->{'text'};
+	Encode::_utf8_on($text);
+        ::here($text);
+        $fakepos++;
+        $text =~ s/^<\s*//;
+        $text =~ s/\s*>$//;
+        $text =~ s/\s+/|/;
+        '(?: ' . $text . ')';
+    }
+}
+
+{ package RE_sequence; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+	my $result = [''];
+	my $c = $self->{'zyg'};
+	my @chunks = @$c;
+	::here(0+@chunks);
+	local $PREFIX = $PREFIX;
+
+	for my $chunk (@chunks) {
+	    # ignore negative lookahead
+	    next if ref($chunk) eq 'RE_assertion' and $chunk->{assert} eq '!';
+	    $C->deb("NULLABLE ".ref($chunk)) if $DEBUG & DEBUG::longest_token_pattern_generation and not $chunk->{min};
+	    my @newalts = $chunk->longest($C);
+	    last unless @newalts;
+#	    if (not $chunk->{min} and $next[-1] ne '') {
+#		push(@next, '');	# install bypass around nullable atom
+#	    }
+	    my $newresult = [];
+	    my $pure = 0;
+	    for my $oldalt (@$result) {
+		if ($oldalt =~ /\(\?#::\)/) {
+		    push(@$newresult, $oldalt);
+		    next;
+		}
+
+		for my $newalt (@newalts) {
+		    $pure = 1 unless $newalt =~ /\(\?#::\)/;
+#		    $PREFIX = '' if $newalt =~ /FATE/;;
+		    if ($oldalt =~ /FATE/ and $newalt =~ /FATE/) {
+			my $newold = $oldalt;
+			my $newnew = $newalt;
+			$newnew =~ s/\t\(\?#FATE\d* *(.*?)\)//;
+			my $morefate = $1;
+			$newold =~ s/(FATE.*?)\)/$1 $morefate)/;
+			push(@$newresult, $newold . $newnew);
+		    }
+		    else {
+			push(@$newresult, $oldalt . $newalt);
+		    }
+		}
+	    }
+	    $result = $newresult;
+	    last unless $pure;	# at least one alternative was pure
+	    # ignore everything after positive lookahead
+	    last if ref($chunk) eq 'RE_assertion';
+	}
+	@$result;
+    }
+}
+
+{ package RE_string; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        my $text = $self->{'text'};
+	Encode::_utf8_on($text);
+        ::here($text);
+        $fakepos++ if $self->{'min'};
+        $text = ::qm($text);
+	$text =~ s/([[:alpha:]])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
+	$text;
+    }
+}
+
+{ package RE_submatch; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        return $IMP;
+    }
+}
+
+{ package RE_all; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        return $IMP;
+    }
+}
+
+{ package RE_any; our @ISA = 'RE_base';
+    sub longest { my $self = shift; my ($C) = @_; 
+        my $alts = $self->{'zyg'};
+        ::here(0+@$alts);
+        my @result;
+        my $oldfakepos = $fakepos;
+        my $minfakepos = $fakepos + 1;
+	my $base = $ALT // '';
+	$base .= ' ' if $base;
+	my %autolexbase = %AUTOLEXED;
+        for my $alt (@$alts) {
+	    local %AUTOLEXED = %autolexbase;	# alts are independent
+            $fakepos = $oldfakepos;
+	    local $ALT = $base . $alt->{alt};
+	    {
+		local $PREFIX = $PREFIX . ' ' . $ALT;
+		my @pat = ($alt->longest($C));
+		push @result, map { /#FATE/ or s/$/\t(?#FATE $PREFIX)/; $_ } @pat;
+	    }
+            $minfakepos = $oldfakepos if $fakepos == $oldfakepos;
+        }
+        $C->deb(join("\n", @result)) if $DEBUG & DEBUG::longest_token_pattern_generation;
+        $fakepos = $minfakepos;  # Did all branches advance?
+        @result;
+    }
+}
+
+{ package RE_var; our @ISA = 'RE_base';
+    #method longest ($C) { ... }
+    sub longest { my $self = shift; my ($C) = @_; 
+	my $var = $self->{var};
+	if (my $p = $C->_PARAMS) {
+	    my $text = $p->{$var} || return $IMP;
+	    $fakepos++ if length($text);
+	    $text = ::qm($text);
+	    return $text;
+	}
+        return $IMP;
+    }
+}
+
+

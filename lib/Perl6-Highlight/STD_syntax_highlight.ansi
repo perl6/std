@@ -1,0 +1,25 @@
+comp_unit=blue
+scope_declarator=bold red
+routine_declarator=bold red
+regex_declarator=bold red
+package_declarator=bold red
+statement_control=bold red
+block=white
+regex_block=white
+noun=white
+sigil=bold green
+variable=bold green 
+assertion=bold green
+quote=yellow   
+number=magenta
+infix=blue
+methodop=bold white
+pod_comment=bold green 
+param_var=bold cyan
+
+_routine=bold red
+_type=bold blue
+_scalar=bold blue
+_array=bold magenta
+_hash=bold yellow
+_comment=bold green

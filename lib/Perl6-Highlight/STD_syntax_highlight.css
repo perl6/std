@@ -1,0 +1,28 @@
+.comp_unit { color: Blue; }
+.scope_declarator { color: DarkRed; }
+.routine_declarator { color: DarkRed; }
+.regex_declarator { color: DarkRed; }
+.package_declarator { color DarkRed; }
+.statement_control { color: DarkRed; }
+.block { color: Black; }
+.regex_block { color: Black; }
+.noun { color: Black; }
+.sigil { color: DarkGreen; }
+.variable { color: DarkGreen; } 
+.assertion { color: Darkgreen; }
+.quote { color: DarkMagenta; }   
+.number { color: DarkOrange; }
+.infix { color: DimGray; }
+.methodop { color: black; font-weight: bold; }
+.pod_comment { color: DarkGreen; font-weight: bold; } 
+.param_var { color: Crimson; }
+
+._routine { color: DarkRed; font-weight: bold; }
+._type { color: DarkBlue; font-weight: bold; }
+._scalar { color: DarkBlue; font-weight: bold; }
+._array { color: Brown; font-weight: bold; }
+._hash { color: DarkOrange; font-weight: bold; }
+._comment { color: DarkGreen; font-weight: bold; }
+
+#parse_tree { position: absolute; right: 10px; top: 10px; font: 14px Verdana; }
+#parse_tree_output { color: black; background-color: #FFF5DF; border: 1px solid Orange; }

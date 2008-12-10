@@ -1,0 +1,568 @@
+#!/usr/local/bin/perl
+
+# Core modules
+use strict;
+use warnings;
+use utf8;
+use feature qw(say switch);
+use English;
+use Getopt::Long;
+
+# CPAN modules
+use File::Slurp;
+use Term::ANSIColor;
+use YAML::Dumper;
+
+# And finally our modules
+use STD;
+
+=head1 NAME
+
+STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
+
+=head1 SYNOPSIS
+
+    # read from standard input
+    STD_syntax_highlight
+
+    # print ansi-escaped text for 'comp_unit'
+    STD_syntax_highlight foo.pl
+
+    # print separate html, css and javascript files
+    STD_syntax_highlight --full-html=foo.full.html --clean-html foo.pl
+
+    # print ansi-escaped text for with 'statementlist' as the top-level rule
+    STD_syntax_highlight foo.pl statementlist
+
+    # write simple html output to foo.pl.html
+    STD_syntax_highlight --simple-html=foo.pl.html foo.pl
+
+    # write simple snippet html output to foo.pl.html
+    STD_syntax_highlight --snippet-html=foo.pl.html foo.pl
+
+    # write simple ansi-colored output to STDOUT
+    STD_syntax_highlight --ansi-text=- foo.pl
+
+    # write yaml output to STDOUT (can be useful to build filters)
+    STD_syntax_highlight --yaml=- foo.pl
+=head1 SUBROUTINES
+
+=over
+
+=cut
+
+my ($clean_html,$help) = (0,0);
+my ($full_html,$simple_html,$snippet_html,$ansi_text,$yaml) = (0,0,0,0,0);
+my ($file, $parser, $src_text); 
+
+# These are needed for redspans
+$::ACTIONS = 'Actions';
+my @loc;
+
+=item main
+
+Your standard main method
+=cut
+sub main {
+    #process the command line
+    GetOptions(
+        "clean-html"=>\$clean_html,
+        "full-html=s"=>\$full_html,
+        "simple-html=s"=>\$simple_html,
+        "snippet-html=s"=>\$snippet_html,
+        "ansi-text=s"=>\$ansi_text,
+        "yaml=s"=>\$yaml,
+        "help"=>\$help
+    );
+
+    if ($help) {
+        die <<"HELP";
+USAGE: 
+    $PROGRAM_NAME [options] [file] [rule]
+
+    where 'file' is optional; if omitted or is '-' then 
+    STDIN will be used. And 'options' can be one of the following:
+
+    --clean-html    
+        generates separate html,css and javascript
+
+    --full-html=filename   
+        write full-mode html to filename (- for STDOUT)
+
+    --simple-html=filename   
+        write simple-mode html to filename (- for STDOUT)
+
+    --snippet-html=filename
+        This is typically ideal for inline html code. (- for STDOUT)
+
+    --ansi-text=filename   
+        write simple-mode ansi color text to filename (- for STDOUT)
+
+    --yaml=filename
+        writes a dump of redspans to filename (- for STDOUT)
+HELP
+    }
+
+    #default is --simple-html=- if no option is selected
+    if(!($simple_html || $full_html || $snippet_html || $yaml) && !$ansi_text) {
+        $ansi_text = '-';    
+    }
+
+    #start parsing...
+    $file = shift @ARGV;
+    my $what = shift @ARGV // 'comp_unit';
+
+    #what is the meaning of your input file?
+    if(!$file || $file eq '-') {
+        # i think you mean standard input
+        $file = \*STDIN;        
+    } else {
+        # no it is should be a file, let me check
+        unless(-r $file) {
+            die "Could not open '$file' for reading\n";
+        }
+    }
+
+    # slurp the file for parsing and redspans
+    $src_text = Encode::decode('utf8', read_file($file) );
+    $loc[length($src_text) - 1] = [];
+    $parser = STD->parse($src_text,$what);
+
+    # and finally print out the html code
+    highlight_match();
+}
+
+=item write_output
+
+Writes the output to a file or STDOUT
+=cut
+sub write_output {
+    my ($file, $output) = @ARG;
+    if($file eq '-') {
+        say $output;
+    } else {
+        use open OUT => ':utf8';
+        open FILE, ">$file" or
+            die "Cannot open $file for writing: $OS_ERROR\n";
+        say FILE $output;
+        close FILE;
+    }
+}
+
+=item highlight_match
+
+Returns the generated Perl6 highlighted HTML from C<highlight_perl6_*>
+subroutine using redspans.
+=cut
+sub highlight_match {
+    if($full_html) {
+        my $html = highlight_perl6_full();
+        write_output $full_html, $html;
+    }
+    if($simple_html) {
+        my $html = highlight_perl6_simple();
+        write_output $simple_html, $html;
+    }
+    if($snippet_html) {
+        my $html = highlight_perl6_snippet_html();
+        write_output $snippet_html, $html;
+    }
+    if($ansi_text) {
+        my $text = highlight_perl6_ansi();
+        write_output $ansi_text, $text;
+    }
+    if($yaml) {
+        my $text = highlight_perl6_yaml();
+        write_output $yaml, $text;
+    }
+}
+
+=item highlight_perl6_full
+
+Generates the Perl6 highlighted HTML string for STD parse tree provided. 
+The resources can be inlined (by default) or externalized (--clean-html). 
+=cut
+sub highlight_perl6_full {
+    my $str = "";
+
+    # slurp libraries and javascript to inline them
+    my ($JQUERY_JS,$JS,$CSS) = (
+        'jquery-1.2.6.pack.js', 
+        'STD_syntax_highlight.js',
+        'STD_syntax_highlight.css');
+    my %colors = ();
+    my $line;
+    open CSS_FILE, $CSS
+        or die "Could not open $CSS: $OS_ERROR\n";
+    while($line = <CSS_FILE>) {
+        if($line =~ /^\s*\.(\w+)\s*{\s*color\s*:\s*(\w+)/) {
+            $colors{$1} = $2;
+        }
+    }
+    close CSS_FILE;
+
+    my $jquery_js = qq{<script type="text/javascript" src="../$JQUERY_JS"></script>};
+    my $js = qq{<script type="text/javascript" src="../$JS"></script>};
+    my $css = qq{<link href="../$CSS" rel="stylesheet" type="text/css">};
+    if(!$clean_html) {
+        $jquery_js = read_file($JQUERY_JS) 
+            or die "Error while slurping file: $OS_ERROR\n";    
+        $js = read_file($JS) 
+            or die "Error while slurping file: $OS_ERROR\n";
+        $css = read_file($CSS)
+            or die "Error while slurping file: $OS_ERROR\n";
+        $jquery_js = qq{<script type="text/javascript">\n$jquery_js\n</script>};
+        $js = qq{<script type="text/javascript">\n$js\n</script>};
+        $css = qq{<style type="text/css">\n$css\n</style>};
+    }
+
+    my $timestamp = localtime;
+    $str .= <<"HTML";
+<html>
+<head>
+    <title>$file</title>
+<!--
+    Generated by $PROGRAM_NAME at $timestamp
+-->
+    $css
+    $jquery_js
+    $js
+</head>
+<body>
+    <div id="parse_tree">
+        <button id="parse_tree_expand">Show Syntax Tree</button>
+        <button id="parse_tree_collapse">Hide it</button>
+        <button id="parse_tree_help">Help</button>
+        <div id="parse_tree_output"></div>
+    </div>
+    <pre>
+HTML
+
+    local *spit_full_html = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        $buffer = escape_html($buffer);
+        $str .= qq{<span id="tree_$i" style="display:none;">$tree</span>};
+        if($rule) {
+            $str .= qq{<span id="node_$i" class="$rule">$buffer</span>};
+        } else {
+            $str .= $buffer;
+        }
+    };
+
+    redspans_traverse(\&spit_full_html,%colors); 
+
+    $str .= <<"HTML";
+    </pre>
+</body>
+</html>
+HTML
+
+    $str;
+}
+
+=item highlight_perl6_simple
+
+This is same as C<highlight_perl6_full> when --simple-html is used.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
+=cut
+sub highlight_perl6_simple {
+    my $str = "";
+    my %colors = ();
+
+    my $CSS = "STD_syntax_highlight.css";
+    open CSS_FILE, $CSS
+        or die "Could not open $CSS: $OS_ERROR\n";
+    my $line;
+    while($line = <CSS_FILE>) {
+        if($line =~ /^\s*\.(\w+)\s*{\s*color\s*:\s*(\w+)/) {
+            $colors{$1} = $2;
+        }
+    }
+    close CSS_FILE;
+
+    # slurp css inline it
+    my $css = qq{<link href="../$CSS" rel="stylesheet" type="text/css">};
+    if(!$clean_html) {
+        $css = read_file($CSS)
+            or die "Error while slurping file: $OS_ERROR\n";
+        $css = qq{<style type="text/css">\n$css\n</style>};
+    }
+
+    my $timestamp = localtime;
+    $str .= <<"HTML";
+<html>
+<head>
+    <title>$file</title>
+<!--
+     Generated by $PROGRAM_NAME at $timestamp
+-->
+    $css
+</head>
+<body>
+    <pre>
+HTML
+
+    local *spit_simple_html = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        $buffer = escape_html($buffer);
+        if($rule) {
+            $str .= qq{<span class="$rule">$buffer</span>};
+        } else {
+            $str .= $buffer;
+        }
+    };
+
+    redspans_traverse(\&spit_simple_html,%colors); 
+
+    $str .= <<"HTML";
+    </pre>
+</body>
+</html>
+HTML
+
+   $str;
+}
+
+=item highlight_perl6_snippet_html
+
+This is same as C<highlight_perl6_full> when --snippet-html is used.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
+=cut
+sub highlight_perl6_snippet_html {
+    my $str = "";
+    my %colors = ();
+
+    my $CSS = "STD_syntax_highlight.css";
+    open CSS_FILE, $CSS
+        or die "Could not open $CSS: $OS_ERROR\n";
+    my $line;
+    while($line = <CSS_FILE>) {
+        if($line =~ /^\s*\.(\w+)\s*{\s*(.+?)\s*}/) {
+            $colors{$1} = $2;
+        }
+    }
+    close CSS_FILE;
+
+    $str .= "<pre>";
+
+    local *spit_snippet_html = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        $buffer = escape_html($buffer);
+        my $style = $colors{$rule};
+        if($rule) {
+            $str .= qq{<span style="$style">$buffer</span>};
+        } else {
+            $str .= $buffer;
+        }
+    };
+
+    redspans_traverse(\&spit_snippet_html,%colors); 
+
+    $str .= "</pre>";
+
+    $str;
+}
+
+
+=item highlight_perl6_ansi
+
+This is same as C<highlight_perl6_full> when --ansi-text is used.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
+=cut
+sub highlight_perl6_ansi {
+    my $str = "";
+    my %colors = ();
+
+    my $ANSI = "STD_syntax_highlight.ansi";
+    open ANSI_FILE, $ANSI
+        or die "Could not open $ANSI: $OS_ERROR\n";
+    my $line;
+    while($line = <ANSI_FILE>) {
+        if($line =~ /^(\w+)=(.+)$/) {
+            $colors{$1} = $2;
+        }
+    }
+    close ANSI_FILE;
+
+    local *spit_ansi_text = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        if($rule) {
+            my $color = $colors{$rule};
+            $str .= (color $color) . $buffer. (color 'reset');
+        } else {
+            $str .= $buffer;
+        }
+    };
+
+    redspans_traverse(\&spit_ansi_text,%colors); 
+
+    $str;
+}
+
+
+=item highlight_perl6_yaml
+
+Spits out YAML that can be useful for the future
+=cut
+sub highlight_perl6_yaml {
+    my $str = "";
+    my %colors = ();
+
+    my $ANSI = "STD_syntax_highlight.ansi";
+    open ANSI_FILE, $ANSI
+        or die "Could not open $ANSI: $OS_ERROR\n";
+    my $line;
+    while($line = <ANSI_FILE>) {
+        if($line =~ /^(\w+)=(.+)$/) {
+            $colors{$1} = $2;
+        }
+    }
+    close ANSI_FILE;
+
+    my @yaml = ();
+    local *spit_yaml = sub {
+        push @yaml, @ARG;
+    };
+
+    redspans_traverse(\&spit_yaml,%colors); 
+
+    my $dumper = YAML::Dumper->new;
+    $dumper->indent_width(4);
+    $str .= $dumper->dump(@yaml);
+
+    $str;
+}
+
+
+=item redspans_traverse
+
+    Walk the path that no one wanted to travel ;)
+=cut
+sub redspans_traverse($%) {
+    my ($process_buffer,%colors) = @ARG;
+
+    my ($last_tree,$buffer, $last_type) = ("","","");
+    for my $i (0 .. @loc-1) {
+        next unless defined $loc[$i];
+        my $c = substr($src_text,$i,1);
+        my $tree = "";
+        for my $action_ref (@{$loc[$i]}) {
+            $tree .= ${$action_ref} . " ";
+        }
+        if($tree ne $last_tree) {
+            my $rule;
+            my $rule_to_color = 0;
+            $buffer = $buffer;
+            my @rules = ();
+            @rules = reverse(split / /,$last_tree) if $last_tree ne '';
+            for $rule (@rules) {
+                if($rule eq 'unv') {
+                    $rule_to_color = '_comment';
+                    last;
+                } elsif($colors{$rule} && $buffer ne '') {
+                    $rule_to_color = $rule;
+                    last;
+                }
+            }
+            if($rule_to_color) {
+                if($last_tree =~ /\sidentifier/) {
+                    if($last_type ne '') {
+                        $rule_to_color = $last_type;
+                        $last_type = '';
+                    } #elsif($parser->is_type($buffer)) {
+                        #$rule_to_color = '_type';
+                    #} elsif($parser->is_routine($buffer)) {
+                        #$rule_to_color = '_routine';
+                    #} 
+                } elsif($last_tree =~ /\ssigil/) {
+                    given($buffer) {
+                        when ('$') { $last_type = '_scalar'; }
+                        when ('@') { $last_type = '_array'; }
+                        when ('%') { $last_type = '_hash'; }
+                        default { $last_type = ''; }
+                    }      
+                    $rule_to_color = $last_type if $last_type ne ''; 
+                }             
+            }
+            #now delegate printing to a callback
+            $process_buffer->($i, $buffer, $rule_to_color, $last_tree); 
+            $buffer = $c;
+        } else {
+            $buffer .= $c;
+        }
+        $last_tree = $tree;
+    }
+}
+
+###################################################################
+# R E D S P A N S
+{ 
+    package Actions;
+
+    our $AUTOLOAD;
+
+    my %action_refs = ();
+
+    sub AUTOLOAD {
+        my $self = shift;
+        my $C = shift;
+        my $F = $C->{_from};
+        my $P = $C->{_pos};
+        $AUTOLOAD =~ s/^Actions:://;
+        $loc[$P] = [] if $loc[$P];	# in case we backtracked to here
+        my $action = $AUTOLOAD;
+        my $action_ref = $action_refs{$action};
+        if(!$action_ref) {
+            $action_refs{$action} = $action_ref = \$action;
+        }
+        for ($F..$P-1) {
+            unshift @{$loc[$_]}, $action_ref;
+        }
+    }
+
+    sub stdstopper { }
+    sub terminator { }
+    sub unitstopper { }
+    sub comp_unit { }
+}
+
+
+=item escape_html
+
+Converts some characters to their equivalent html entities 
+=cut
+sub escape_html {
+    my $str = shift;
+    my %esc = (
+        '<'     => '&lt;',
+        '>'     => '&gt;',
+        '"'     => '&quot;',
+        '&'     => '&amp;'
+    );
+    my $re = join '|', map quotemeta, keys %esc;
+    $str =~ s/($re)/$esc{$1}/g;
+    return $str;
+}
+
+=back
+
+=head1 AUTHOR
+
+Written by Ahmad M. Zawawi (azawawi), Moritz Lenz and Paweł Murias (pmurias)
+
+The project idea was inspired by Moritz Lenz (moritz)
+See http://www.nntp.perl.org/group/perl.perl6.users/2008/07/msg788.html
+
+The initial STD tree traversal code was written by Paweł Murias (pmurias).
+
+The redspans traversal code was written by Larry Wall (TimToady).
+redspans stands for "...'red' for "reductions", and 'spans' from the 
+from/to span calculations"
+
+The browser code was written by Ahmad M. Zawawi (azawawi)
+=cut
+
+main @ARGV;

@@ -1,0 +1,6 @@
+Revision history for Perl extension Perl6::Highlight.
+
+0.01  Wed Dec 10 16:54:22 2008
+	- original version; created by h2xs 1.23 with options
+		-AXc -n Perl6::Highlight
+
