@@ -330,7 +330,7 @@ sub $name {
         my \$relex;
         if (my \$fate = \$C->{_fate}) {
             if (\$fate->[1] eq '$name') {
-                \$C->deb("Fate passed to $name: ", ::fatestr(\$fate)) if \$DEBUG & DEBUG::fates;
+                \$C->deb("Fate passed to $name: ", ::fatestr(\$fate)) if \$::DEBUG & DEBUG::fates;
                 (\$C->{_fate}, \$tag, \$try) = \@\$fate;
                 \@try = (\$try);
             }
@@ -2480,7 +2480,7 @@ do {
 
     my \$fate;
     if (\$fate = \$C->{_fate} and \$fate->[1] eq '$altname') {
-        \$C->deb("Fate passed to $altname: ", ::fatestr(\$fate)) if \$DEBUG & DEBUG::fates;
+        \$C->deb("Fate passed to $altname: ", ::fatestr(\$fate)) if \$::DEBUG & DEBUG::fates;
         (\$C->{_fate}, \$tag, \$try) = \@\$fate;
         \@try = (\$try);
     }

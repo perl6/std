@@ -3613,7 +3613,7 @@ method EXPR ($preclvl)
             # Equal precedence, so use associativity to decide.
             if @opstack[*-1]<O><prec> eq $inprec {
                 given $inO<assoc> {
-                    when 'non'   { $here.panic("\"$infix\" is not associative") }
+                    when 'non'   { $here.panic('"' ~ $infix.text ~ '" is not associative') }
                     when 'left'  { reduce() }   # reduce immediately
                     when 'right' { }            # just shift
                     when 'chain' { }            # just shift

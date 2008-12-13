@@ -282,12 +282,12 @@ sub _AUTOLEXgen { my $self = shift;
 	my $anon = $ANON{$lang};
 	my $super = $anon->{SUP};
 	my $category = $anon->{CAT};
-	print STDERR "AUTOLEXgen $key in $lang from $super without $category\n" if $DEBUG & DEBUG::mixins;
+	print ::LOG "AUTOLEXgen $key in $lang from $super without $category\n" if $DEBUG & DEBUG::mixins;
 	my $superlexer = $self->cursor_fresh($super)->_AUTOLEXpeek($key,$retree);
 	my $same = 1;
 	for my $pat (@{$superlexer->{PATS}}) {
 	    if ($pat =~ / $category /) {
-		print STDERR "\tNope: $pat\n" if $DEBUG & DEBUG::mixins;
+		print ::LOG "\tNope: $pat\n" if $DEBUG & DEBUG::mixins;
 		$same = 0;
 		last;
 	    }
@@ -817,7 +817,7 @@ sub cursor_fate { my $self = shift;
 	my $p = $P;
 	my $ch = $::ORIG[$p];
 	my $next;
-	print STDERR "=" x 10,"\n$p TRIE for ${pkg}::$name in ", ref $self, "\n",
+	print ::LOG "=" x 10,"\n$p TRIE for ${pkg}::$name in ", ref $self, "\n",
 		$p," ", pack("U",$ch), "\n" if $DEBUG & DEBUG::autolexer;
 	for (;;) {
 	    if ($state->{'~~'}) {
@@ -826,34 +826,36 @@ sub cursor_fate { my $self = shift;
 		while (my ($final,$fnum) = splice(@x,0,2)) {
 		    my $pend = $p;
 		    if ($final) {
-			print STDERR $p,"     probing $fnum\n" if $DEBUG & DEBUG::autolexer;
+			print ::LOG $p,"     probing $fnum\n" if $DEBUG & DEBUG::autolexer;
 			pos($::ORIG) = $p;
 			next unless &{$RXCACHE{$final} //= eval "sub { \$::ORIG =~ /\\G$final/xsgc }"};
 			$pend = pos($::ORIG);
 		    }
 		    push(@{$candidates[$pend - $P][$p - $P]}, $fnum);
-		    print STDERR $pend," FNUM $fnum @",$pend - $P,"\n" if $DEBUG & DEBUG::autolexer;
+		    print ::LOG $pend," FNUM $fnum @",$pend - $P,"\n" if $DEBUG & DEBUG::autolexer;
 		}
 	    }
 	    last unless $next = $state->{chr $ch};
 	    if ($DEBUG & DEBUG::autolexer) {
-		print STDERR substr($::ORIG, $P, $p - $P), "\n";
-		print STDERR $p," ", pack("U",$ch), "\n";
+		print ::LOG substr($::ORIG, $P, $p - $P), "\n";
+		print ::LOG $p," ", pack("U",$ch), "\n";
 	    }
 	    $ch = $::ORIG[++$p];
 	    $state = $next;
 	}
 	my @fnums = map { $_ ? map({ $_ ? @$_ : () } reverse @$_) : () } reverse @candidates;
-	print STDERR $p," FNUMS @fnums\n" if $DEBUG & DEBUG::autolexer;
-	for my $fnum (@fnums) {
+	if ($DEBUG & DEBUG::autolexer) {
+	    print ::LOG $p," FNUMS @fnums\n" if $DEBUG & DEBUG::autolexer;
 	    my $f = $lexer->{FATES};
-	    print STDERR "$fnum ",::fatestr($f->[$fnum]),"\n" if $DEBUG & DEBUG::autolexer;
+	    for my $fnum (@fnums) {
+		print ::LOG "$fnum ",::fatestr($f->[$fnum]),"\n";
+	    }
 	}
 
 	my @FATES = @{$lexer->{FATES}}[@fnums];
 	return sub { splice(@FATES,0) };
     }
-    print STDERR "FAILED trie at $P\n" if $DEBUG & DEBUG::autolexer;
+    print ::LOG "FAILED trie at $P\n" if $DEBUG & DEBUG::autolexer;
 
     pos($::ORIG) = $P;
     $::ORIG =~ m/\G(\[[\\<>«»]*..|[<>][<>]..|[$@%]?\w+|['"]|[ -~].|.)/smgc;
@@ -864,13 +866,13 @@ sub cursor_fate { my $self = shift;
 	my $file = $lexer->{FILE} . '__' . ::mangle($ch2);
 	if (open PATS, '<', $file) {
 	    binmode(PATS, ":utf8");
-#	    print STDERR "<$file\n";
+#	    print ::LOG "<$file\n";
 	    $self->deb("Using cached $name patterns starting with '$ch2'") if $DEBUG & DEBUG::autolexer;
 	    chomp(@pats = <PATS>);
 	    close PATS;
 	}
 	else {
-#	    print STDERR ">$file\n";
+#	    print ::LOG ">$file\n";
 	    $self->deb("Selecting $name patterns starting with '$ch2'") if $DEBUG & DEBUG::autolexer;
 	    @pats = grep { canmatch($_, $ch2) } @{
 		$lexer->{FASTPATS} //= [
@@ -878,7 +880,7 @@ sub cursor_fate { my $self = shift;
 		]
 	    };
 #	    if (@pats > 10) {
-#		print STDERR "PATS: ",0+@pats," $ch2 ", substr($::ORIG,$P+length($ch2), 5), "\n";
+#		print ::LOG "PATS: ",0+@pats," $ch2 ", substr($::ORIG,$P+length($ch2), 5), "\n";
 #		print "PATS: ",0+@pats," $ch2 ", substr($::ORIG,$P+length($ch2), 5), "\n";
 #		print join "\n", @pats, '';
 #	    }
@@ -1174,13 +1176,13 @@ END
 	my $newlexer = $::LEXERS{$genpkg} //= {};
 	$ANON{$genpkg}{SUP} = $WHAT;
 	$ANON{$genpkg}{CAT} = $category;
-	print STDERR "=====================================\nADD $rule => $mangle\n" if $DEBUG & DEBUG::mixins;;
+	print ::LOG "=====================================\nADD $rule => $mangle\n" if $DEBUG & DEBUG::mixins;;
 	for my $name (sort keys %{$oldlexer}) {
-	    print STDERR "  $name:\n" if $DEBUG & DEBUG::mixins;
+	    print ::LOG "  $name:\n" if $DEBUG & DEBUG::mixins;
 	    my $same = 1;
 	    for my $pat (@{$oldlexer->{$name}->{PATS}}) {
 		if ($pat =~ / $category /) {
-		    print STDERR "\t$pat\n" if $DEBUG & DEBUG::mixins;
+		    print ::LOG "\t$pat\n" if $DEBUG & DEBUG::mixins;
 		    $same = 0;
 		    last;
 		}
