@@ -4135,6 +4135,7 @@ grammar P5Regex is STD {
     token backslash:l { :i <sym> }
     token backslash:n { :i <sym> }
     token backslash:o { '0' [ <octint> | '{'<octint>[','<octint>]*'}' ]? }
+    token backslash:p { :i <sym> '{' <ident> '}' }
     token backslash:Q { <sym> }
     token backslash:r { :i <sym> }
     token backslash:s { :i <sym> }
