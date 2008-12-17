@@ -4105,7 +4105,7 @@ grammar P5Regex is STD {
     }
 
     token metachar:sym<( )> {
-        '(' {} [:lang(self.unbalanced(')')) <nibbler>]
+        '(' {} [:lang(self.unbalanced(')')) <nibbler>]?
         [ ')' || <.panic: "Unable to parse Perl 5 regex; couldn't find right parenthesis"> ]
         { $/<sym> := <( )> }
     }
@@ -4153,12 +4153,12 @@ grammar P5Regex is STD {
 
     token assertion:sym«<» { <sym> <?before '=' | '!'> <assertion> }
     token assertion:sym<=> { <sym> [ <?before ')'> | <rx> ] }
-    token assertion:sym<!=> { <sym> [ <?before ')'> | <rx> ] }
+    token assertion:sym<!> { <sym> [ <?before ')'> | <rx> ] }
     token assertion:sym«>» { <sym> <rx> }
 
     token rx {
         [:lang(self.unbalanced(')')) <nibbler>]
-        [ ')' || <.panic: "Unable to parse Perl 5 regex; couldn't find right parenthesis"> ]
+        [ <?before ')'> || <.panic: "Unable to parse Perl 5 regex; couldn't find right parenthesis"> ]
     }
 
     token assertion:identifier { <identifier> [               # is qq right here?
