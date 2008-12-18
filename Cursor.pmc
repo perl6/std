@@ -74,6 +74,7 @@ sub ::deb {
 package Cursor;
 
 use Carp;
+use File::Copy;
 
 # $SIG{__DIE__} = sub { confess(@_) };
 
@@ -525,13 +526,14 @@ sub _AUTOLEXgen { my $self = shift;
 	    use File::Path 'mkpath';
 	    mkpath($dir);
 	}
-	if ($STORABLE) {
+       if ($STORABLE) {
 	    delete $lexer->{FATES};
 	    store($lexer, "$dir/$file.store");
 	    $lexer->{FATES} = $fates;
 	    if ($file eq 'termish') {
-		system "cp $dir/termish.store $dir/EXPR.store";
-	    }
+		copy("$dir/termish.store","$dir/EXPR.store")
+	        or croak "Could not copy $dir/termish.store";
+        }
 	}
 
 	open(my $cache, '>:utf8', "$dir/$file") // die "Can't print: $!";
@@ -542,7 +544,8 @@ sub _AUTOLEXgen { my $self = shift;
 	$self->deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
 	# force operator precedence method to look like a term
 	if ($file eq 'termish') {
-	    system "cp $dir/termish $dir/EXPR";
+	    copy("$dir/termish","$dir/EXPR")
+            or croak "Could not copy $dir/termish";
 	}
     }
     $lexer;
