@@ -17,7 +17,7 @@ our $DEPTH = 0;
 our %LEXERS;       # per language, the cache of lexers, keyed by rule name
 our %FATECACHE;	# fates we've already turned into linked lists
 our %ANON;	# knowledge about what can be borrowed from supergrammar
-
+my %lexer_cache= ();
 #my %HIST;
 
 sub ::init_globals {
@@ -309,8 +309,17 @@ sub _AUTOLEXgen { my $self = shift;
 	$dba =~ s/:\*$//;
     }
 
-    if ($STORABLE and -e "$dir/$file.store") {
-	my $lexer = retrieve("$dir/$file.store");
+    my $cache_key = "$dir/$file.store";
+    my $cached_lexer = $lexer_cache{$cache_key};
+    if ($STORABLE and -e $cache_key) {
+    my $lexer;
+    if($cached_lexer) {
+    #Cache hit, Keep them coming ;-)
+    $lexer = $cached_lexer;
+    } else {
+    # Cache miss
+    $lexer_cache{$cache_key} = $lexer = retrieve($cache_key);
+    }
 	my $pat = $lexer->{PATS};
 	my $fates;
 	my $i = 0;
