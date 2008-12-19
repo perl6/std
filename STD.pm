@@ -1123,7 +1123,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     <!!lex1: 'negation'>
 
     [
-    || <!!{ say $<O><assoc>; $<O><assoc> eq 'chain'}>
+    || <!!{ $<O><assoc> eq 'chain'}>
     || <!!{ $<O><assoc> and $<O><bool> }>
     || <.panic: "Only boolean infix operators may be negated">
     ]
