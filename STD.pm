@@ -1123,7 +1123,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
     <!!lex1: 'negation'>
 
     [
-    || <!!{ $<O><assoc> eq 'chain'}>
+    || <!!{ say $<O><assoc>; $<O><assoc> eq 'chain'}>
     || <!!{ $<O><assoc> and $<O><bool> }>
     || <.panic: "Only boolean infix operators may be negated">
     ]
@@ -1138,7 +1138,11 @@ method lex1 (Str $s) {
 }
 
 token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
-    X <infix> X
+    X [
+    | <infix> X
+    | <infix=infix_prefix_meta_operator> X
+    | <infix=infix_curcumfix_meta_operator> X
+    ]
     <!!{ $<O> = $<infix><O>; }>
     <!!lex1: 'cross'>
 }
