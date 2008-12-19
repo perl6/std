@@ -3375,25 +3375,25 @@ token terminator:sym<;> ( --> Terminator)
     { ';' }
 
 token terminator:sym<if> ( --> Terminator)
-    { 'if' » <nofun> }
+    { 'if' » <.nofun> }
 
 token terminator:sym<unless> ( --> Terminator)
-    { 'unless' » <nofun> }
+    { 'unless' » <.nofun> }
 
 token terminator:sym<while> ( --> Terminator)
-    { 'while' » <nofun> }
+    { 'while' » <.nofun> }
 
 token terminator:sym<until> ( --> Terminator)
-    { 'until' » <nofun> }
+    { 'until' » <.nofun> }
 
 token terminator:sym<for> ( --> Terminator)
-    { 'for' » <nofun> }
+    { 'for' » <.nofun> }
 
 token terminator:sym<given> ( --> Terminator)
-    { 'given' » <nofun> }
+    { 'given' » <.nofun> }
 
 token terminator:sym<when> ( --> Terminator)
-    { 'when' » <nofun> }
+    { 'when' » <.nofun> }
 
 token terminator:sym« --> » ( --> Terminator)
     { '-->' {*} }              #'
