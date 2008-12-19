@@ -163,8 +163,8 @@ sub un6 {
         $f =~ s/^item %//                	and $t .= qq/\\%/, next;
         $f =~ s/^ \+@//                        	and $t .= qq/ 0+@/, next;
         $f =~ s/^ is rw//               	and $t .= qq//, next;
-        $f =~ s/^my\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s+rw)?\s*;//
-                                        	and $t .= qq/local $1;/, $OUR{$1}++, next;
+        $f =~ s/^my\s+(?:[A-Z]\w+)?\s*([\$\@%])(\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s+rw)?\s*;//
+                                        	and $t .= qq/local $1::$2;/, $OUR{"$1$2"}++, next;
         $f =~ s/^\borelse\b//           	and $t .= qq/or/, next;
         $f =~ s/^\bfail\b//             	and $t .= qq/die/, next;
         $f =~ s/^\blet\b //             	and $t .= qq//, next;
@@ -197,8 +197,8 @@ sub un6 {
         $f =~ s/^\belsif\s+(.*?) \{/($1) {/     and $t .= qq/elsif /, next;
         $f =~ s/^\bwhile\s+(.*?) \{/($1) {/     and $t .= qq/while /, next;
         $f =~ s/^\bfor\s+(.*?) \{/($1) {/       and $t .= qq/for /, next;
-        $f =~ s/^\bmy\s+(?:[A-Z]\w+)?\s*([\$\@%]\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s*rw)?\s*=(\s*.*);/$2;/s
-                                        	and $t .= qq/local $1 = /, $OUR{$1}++, next;
+        $f =~ s/^\bmy\s+(?:[A-Z]\w+)?\s*([\$\@%])(\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s*rw)?\s*=(\s*.*);/$3;/s
+                                        	and $t .= qq/local $1::$2 = /, $OUR{"$1$2"}++, next;
         $f =~ s/^\bdo given\s+(.*?\S)\s+\{/$1; if (0) {}/
                                                 and $t .= qq/do { my \$_ = /, next;
         $f =~ s/^\bgiven\s+(.*?\S)\s+\{/$1; if (0) {}/
