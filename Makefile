@@ -2,7 +2,7 @@
 
 FIXINS=Cursor.pmc LazyMap.pm mangle.pl
 
-all: $(FIXINS) check try
+all: $(FIXINS) check lex/STD/termish
 
 STD.pmc: STD.pm gimme5
 	./gimme5 $< >STD.pm5
@@ -12,13 +12,10 @@ STD.pmc: STD.pm gimme5
 check: STD.pmc
 	/usr/local/bin/perl -c $<
 
-try: try5.out
-	@echo "View $< to see output"
-	@echo "or run: make try cat"
-
 # pre-generate common sublexers
-try5.out: try5 
-	./try5 comp_unit -e 'say "howdy" ~ "";' > $@
+lex/STD/termish: STD.pmc
+	@echo 'Generating STD lexers...'
+	./tryfile STD.pm
 
 cat:
 	cat try5.out
@@ -30,8 +27,6 @@ distclean purge: clean
 	rm -rf STD.pmc*
 
 test: all
-	./tryfile STD.pm >STD.out
 	./teststd
 testt: all
-	./tryfile STD.pm >STD.out
 	./teststd ../../t

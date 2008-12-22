@@ -883,7 +883,7 @@ rule statement_mod_loop:given {<sym> <modifier_expr> {*} }      #= given
 
 token module_name:normal {
     <longname>
-    [ <?{ ($+PKGDECL//'') eq 'role' }> <?before '['> <postcircumfix> ]?
+    [ :dba('generic role') <?{ ($+PKGDECL//'') eq 'role' }> '[' ~ ']' <signature> ]?
 }
 
 token module_name:deprecated { 'v6-alpha' }
@@ -2546,6 +2546,7 @@ rule routine_def {
 rule method_def {
     [
     | '!'?<longname> [ <multisig> | <trait> ]*
+    | <multisig> <trait>*
     | <sigil> '.'
         :dba('subscript signature')
         [
@@ -2626,7 +2627,7 @@ token signature {
     :my $zone is context<rw> = 'posreq';
     <.ws>
     [
-    | <?before '-->' | ')' | '{' >
+    | <?before '-->' | ')' | '{' | ':' >
     | <parameter>
     ] ** <param_sep>
     <.ws>
