@@ -2627,7 +2627,7 @@ token signature {
     :my $zone is context<rw> = 'posreq';
     <.ws>
     [
-    | <?before '-->' | ')' | '{' | ':' >
+    | <?before '-->' | ')' | '{' | ':'<!before ':' > >
     | <parameter>
     ] ** <param_sep>
     <.ws>
@@ -2937,6 +2937,9 @@ token infix:sym<*> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym</> ( --> Multiplicative)
+    { <sym> }
+
+token infix:sym<div> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym<%> ( --> Multiplicative)
