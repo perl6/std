@@ -2545,7 +2545,7 @@ rule routine_def {
 
 rule method_def {
     [
-    | '!'?<longname> [ <multisig> | <trait> ]*
+    | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
     | <multisig> <trait>*
     | <sigil> '.'
         :dba('subscript signature')
@@ -2627,7 +2627,7 @@ token signature {
     :my $zone is context<rw> = 'posreq';
     <.ws>
     [
-    | <?before '-->' | ')' | '{' | ':'<!before ':' > >
+    | <?before '-->' | ')' | ']' | '{' | ':'<!before ':' > >
     | <parameter>
     ] ** <param_sep>
     <.ws>
