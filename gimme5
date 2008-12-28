@@ -904,7 +904,6 @@ END
 
 our $moreinput;
 our $DEBUG;
-our $DELIM;
 
 our %INSTANTIATED;
 require 'mangle.pl';
