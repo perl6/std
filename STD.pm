@@ -2712,6 +2712,7 @@ token parameter {
         | <param_var>
         | '*' <param_var>
         | '|' <param_var>
+        | '\\' <param_var>
         | <named_param>
         ]
     >
@@ -2720,6 +2721,7 @@ token parameter {
     [
     | '*' <param_var>   { $quant = '*'; $kind = '*'; }
     | '|' <param_var>   { $quant = '|'; $kind = '*'; }
+    | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
     |   [
         | <param_var>   { $quant = ''; $kind = '!'; }
 	| <named_param> { $quant = ''; $kind = '*'; }
@@ -2741,7 +2743,8 @@ token parameter {
             given $quant {
               when '!' { $¢.panic("Can't put a default on a required parameter") }
               when '*' { $¢.panic("Can't put a default on a slurpy parameter") }
-              when '|' { $¢.panic("Can't put a default on a capture parameter") }
+              when '|' { $¢.panic("Can't put a default on an slurpy capture parameter") }
+              when '\\' { $¢.panic("Can't put a default on a capture parameter") }
             }
             $kind = '?';
         }}
