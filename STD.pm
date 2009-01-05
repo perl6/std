@@ -4156,7 +4156,7 @@ grammar P5Regex is STD {
     token backslash:w { :i <sym> }
     token backslash:x { :i <sym> [ <hexint> | '{' [<.ws><hexint><.ws> ] ** ',' '}' ] }
     token backslash:z { :i <sym> }
-    token backslash:misc { $<litchar>=(\W) }
+    token backslash:misc { $<litchar>=(\W) | $<number>=(\d+) }
     token backslash:oops { <.panic: "Unrecognized Perl 5 regex backslash sequence"> }
 
     token assertion:sym<?> { <sym> <codeblock> }
@@ -4168,15 +4168,23 @@ grammar P5Regex is STD {
     token assertion:sym«>» { <sym> <rx> }
 
     token rx {
-        [:lang(self.unbalanced(')')) <nibbler>]
+        #[:lang(self.unbalanced(')')) <nibbler>]
+        <nibbler>
         [ <?before ')'> || <.panic: "Unable to parse Perl 5 regex; couldn't find right parenthesis"> ]
     }
 
-    token assertion:identifier { <identifier> [               # is qq right here?
-                                    | <?before ')' >
-                                    | <.ws> <nibbler>
-				    ]
-				    [ ':' <rx> ]?
+    #token assertion:identifier { <identifier> [               # is qq right here?
+    #                                | <?before ')' >
+    #                                | <.ws> <nibbler>
+    #				    ]
+    #				    [ ':' <rx> ]?
+    #}
+    token p5mod { <[imox]>* }
+    token p5mods { <on=p5mod> [ '-' <off=p5mod> ]? }
+    token assertion:mod { <p5mods> [               # is qq right here?
+			           | ':' <rx>?
+                                   | <?before ')' >
+                                   ]
     }
 
     token assertion:bogus { <.panic: "Unrecognized Perl 5 regex assertion"> }
