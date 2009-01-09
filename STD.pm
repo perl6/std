@@ -9,6 +9,7 @@ my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
+my $SIGIL is context<rw>;
 my %ROUTINES;
 my $ORIG is context;
 my @MEMOS is context;
@@ -247,6 +248,7 @@ constant %terminator      = (:prec<a=>, :assoc<list>);
 # "epsilon" tighter than terminator
 #constant $LOOSEST = %LOOSEST<prec>;
 constant $LOOSEST = "a=!"; # XXX preceding line is busted
+constant $item_assignment_prec = 'i=';
 
 
 role PrecOp {
@@ -944,7 +946,7 @@ token termish {
 token noun {
     [
     | <fatarrow>
-    | <variable> { $<SIGIL> = $<variable><sigil> }
+    | <variable>
     | <package_declarator>
     | <scope_declarator>
     | <?before 'multi'|'proto'|'only'> <multi_declarator>
@@ -1085,6 +1087,7 @@ token POST {
     | <privop> { $<O> = $<privop><O> }
     | <postop> { $<O> = $<postop><O> }
     ]
+    { $+SIGIL = '@' }
 }
 
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
@@ -1222,7 +1225,7 @@ token circumfix:sym<{ }> ( --> Term) {
 
 token variable_declarator {
     :my $IN_DECL is context<rw> = 1;
-    <variable> { $<SIGIL> = $<variable><sigil> }
+    <variable>
     { $IN_DECL = 0; }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
@@ -1244,21 +1247,21 @@ token variable_declarator {
 rule scoped {
     :dba('scoped declarator')
     [
-    | <declarator> { $<SIGIL> = $<declarator><SIGIL> }
+    | <declarator>
     | <regex_declarator>
     | <package_declarator>
     | <fulltypename>+ <multi_declarator>
-    | <multi_declarator> { $<SIGIL> = $<multi_declarator><SIGIL> }
+    | <multi_declarator>
 #    | <?before <[A..Z]> > <name> <.panic("Apparent type name " ~ $<name>.text ~ " is not declared yet")>
     ]
 }
 
 
-token scope_declarator:my       { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
-token scope_declarator:our      { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
-token scope_declarator:state    { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
-token scope_declarator:constant { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
-token scope_declarator:has      { <sym> <scoped> { $<SIGIL> = $<scoped><SIGIL> } }
+token scope_declarator:my       { <sym> <scoped> }
+token scope_declarator:our      { <sym> <scoped> }
+token scope_declarator:state    { <sym> <scoped> }
+token scope_declarator:constant { <sym> <scoped> }
+token scope_declarator:has      { <sym> <scoped> }
 
 
 token package_declarator:class {
@@ -1351,7 +1354,7 @@ rule package_def {
 
 token declarator {
     [
-    | <variable_declarator> { $<SIGIL> = $<variable_declarator><SIGIL> }
+    | <variable_declarator>
     | '(' ~ ')' <signature> <trait>*
     | <routine_declarator>
     | <regex_declarator>
@@ -1359,10 +1362,10 @@ token declarator {
     ]
 }
 
-token multi_declarator:multi { <sym> <.ws> [ <declarator> { $<SIGIL> = $<declarator><SIGIL> } || <routine_def> ] }
-token multi_declarator:proto { <sym> <.ws> [ <declarator> { $<SIGIL> = $<declarator><SIGIL> } || <routine_def> ] }
-token multi_declarator:only  { <sym> <.ws> [ <declarator> { $<SIGIL> = $<declarator><SIGIL> } || <routine_def> ] }
-token multi_declarator:null  { <declarator> { $<SIGIL> = $<declarator><SIGIL> } }
+token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> ] }
+token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> ] }
+token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> ] }
+token multi_declarator:null  { <declarator> }
 
 token routine_declarator:sub       { <sym> <routine_def> }
 token routine_declarator:method    { <sym> <method_def> }
@@ -1649,7 +1652,7 @@ token desigilname {
 }
 
 token variable {
-    <?before <sigil> > {}
+    <?before <sigil> { $+SIGIL ||= $<sigil>.text } > {}
     [
     || '&' <twigil>?  <sublongname> {*}                                   #= subnoun
     || <?before '$::('> '$' <name>?
@@ -2861,7 +2864,7 @@ token term:sym<**> ( --> Term)
     { <sym> }
 
 token circumfix:sigil ( --> Term)
-    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> }
+    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $+SIGIL ||= $<sigil>.text } }
 
 #token circumfix:typecast ( --> Term)
 #    { <typename> '(' ~ ')' <semilist> }
@@ -3207,7 +3210,7 @@ token infix:sym<?> ( --> Conditional)
 token infix:sym<=> ()
 {
     <sym>
-    { $¢ = (self.<SIGIL> // self.<sigil> // '') eq '$' 
+    { $¢ = $+SIGIL eq '$' 
         ?? STD::Item_assignment.coerce($¢)
         !! STD::List_assignment.coerce($¢);
     }
@@ -3452,6 +3455,8 @@ method EXPR ($preclvl)
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $inquote is context = 0;
+    $+SIGIL = '@';
+    my $SIGIL is context<rw> = '';
     my @termstack;
     my @opstack;
     my $termish = 'termish';
@@ -3555,6 +3560,7 @@ method EXPR ($preclvl)
         self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
+        $SIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';
         my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
