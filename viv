@@ -88,6 +88,14 @@ sub MAIN {
     }
 }
 
+# viv should likely be abstracted into a module instead of doing this hack... - pmurias
+sub VIV::SET_OPT {
+    my %opt = @_;
+    $OPT_pos = $opt{pos};
+    $OPT_match = $opt{match};
+    $OPT_log = $opt{log};
+}
+
 ###################################################################
 
 { package Actions;
