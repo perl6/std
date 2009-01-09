@@ -2635,7 +2635,7 @@ token signature {
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
-    { $IN_DECL = 0; }
+    { $IN_DECL = 0; $+SIGIL = '@' }
 }
 
 token type_declarator:subset {
@@ -3455,7 +3455,6 @@ method EXPR ($preclvl)
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $inquote is context = 0;
-    $+SIGIL = '@';
     my $SIGIL is context<rw> = '';
     my @termstack;
     my @opstack;
