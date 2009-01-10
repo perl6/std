@@ -2504,7 +2504,7 @@ grammar Q is STD {
 
 grammar Quasi is STD {
     token term:unquote {
-        <starter><starter><starter> <statementlist> <stopper><stopper><stopper>
+        <starter><starter><starter> <EXPR> <stopper><stopper><stopper>
     }
 
     # begin tweaks (DO NOT ERASE)
