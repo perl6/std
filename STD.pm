@@ -2103,7 +2103,7 @@ token quote:tr {
 }
 
 token old_rx_mods {
-    (< i g s m x c e ] >+) 
+    (< i g s m x c e >+) 
     {{
         given $0.text {
             $_ ~~ /i/ and $¢.worryobs('/i',':i');
