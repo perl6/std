@@ -97,7 +97,7 @@ my @basetypenames = qw[
     bit bool
 
     Order Increasing Decreasing
-    Ordered Callable Positional Associatve
+    Ordered Callable Positional Associative Abstraction
     Ordering KeyExtractor Comparator OrderingPair
 
     IO
@@ -124,8 +124,9 @@ method add_type ($name) {
 # XXX likewise for routine defs
 
 my @baseroutinenames = qw[
-    WHAT WHICH VAR
+    WHAT WHERE HOW WHICH VAR WHO WHENCE new
     any all none one
+    not true
 
     die exit warn
     caller want
@@ -136,7 +137,7 @@ my @baseroutinenames = qw[
     cat classify
     quotemeta
     chr ord
-    p5chop chop p5chomp chomp
+    p5chop chop p5chomp chomp trim
     index rindex substr
     join split comb pack unpack
     uc ucfirst lc lcfirst
@@ -148,6 +149,7 @@ my @baseroutinenames = qw[
 
     say print open close printf sprintf slurp unlink link symlink
     elems grep map first reduce sort uniq push reverse take splice
+    lines getc
 
     zip each roundrobin caller
     return leave pop shift unshift reduce
@@ -224,14 +226,14 @@ constant %symbolic_unary  = (:prec<v=>);
 constant %multiplicative  = (:prec<u=>, :assoc<left>,  :assign);
 constant %additive        = (:prec<t=>, :assoc<left>,  :assign);
 constant %replication     = (:prec<s=>, :assoc<left>,  :assign);
-constant %concatenation   = (:prec<r=>, :assoc<left>,  :assign);
+constant %concatenation   = (:prec<r=>, :assoc<list>,  :assign);
 constant %junctive_and    = (:prec<q=>, :assoc<list>,  :assign);
 constant %junctive_or     = (:prec<p=>, :assoc<list>,  :assign);
 constant %named_unary     = (:prec<o=>);
 constant %nonchaining     = (:prec<n=>, :assoc<non>);
 constant %chaining        = (:prec<m=>, :assoc<chain>, :bool);
-constant %tight_and       = (:prec<l=>, :assoc<left>,  :assign);
-constant %tight_or        = (:prec<k=>, :assoc<left>,  :assign);
+constant %tight_and       = (:prec<l=>, :assoc<list>,  :assign);
+constant %tight_or        = (:prec<k=>, :assoc<list>,  :assign);
 constant %conditional     = (:prec<j=>, :assoc<right>);
 constant %item_assignment = (:prec<i=>, :assoc<right>);
 constant %loose_unary     = (:prec<h=>);
@@ -239,8 +241,8 @@ constant %comma           = (:prec<g=>, :assoc<list>, :nextterm<nulltermish>);
 constant %list_infix      = (:prec<f=>, :assoc<list>,  :assign);
 constant %list_assignment = (:prec<i=>, :sub<e=>, :assoc<right>);
 constant %list_prefix     = (:prec<e=>);
-constant %loose_and       = (:prec<d=>, :assoc<left>,  :assign);
-constant %loose_or        = (:prec<c=>, :assoc<left>,  :assign);
+constant %loose_and       = (:prec<d=>, :assoc<list>,  :assign);
+constant %loose_or        = (:prec<c=>, :assoc<list>,  :assign);
 constant %sequencer      = (:prec<b=>, :assoc<left>, :nextterm<statement>);
 constant %LOOSEST         = (:prec<a=!>);
 constant %terminator      = (:prec<a=>, :assoc<list>);
