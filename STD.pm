@@ -1063,8 +1063,8 @@ token privop ( --> Methodcall) {
 token dottyop {
     :dba('dotty method or postfix')
     [
-    | <methodop>
     | <postop>     # forcing postop's precedence to methodcall here
+    | <methodop>
     ]
 }
 
@@ -1077,7 +1077,7 @@ token POST {
     # last whitespace didn't end here
     <!{ @+MEMOS[$¢.pos]<ws> }>
 
-    [ <.unsp> | '\\' <?before '.'> ]?
+    [ <.unsp> | '\\' ]?
 
     [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
 
@@ -2877,6 +2877,9 @@ token circumfix:sym<[ ]> ( --> Term)
 
 ## methodcall
 
+token postfix:sym<i> ( --> Methodcall)
+    { <sym> » }
+
 token infix:sym<.> ()
     { '.' <[\]\)\},:\s\$"']> <obs('. to concatenate strings', '~')> }
 
@@ -2895,9 +2898,6 @@ token prefix:sym<++> ( --> Autoincrement)
 
 token prefix:sym<--> ( --> Autoincrement)
     { <sym> }
-
-token postfix:sym<i> ( --> Autoincrement)
-    { <sym> » }
 
 ## exponentiation
 token infix:sym<**> ( --> Exponentiation)
@@ -4260,6 +4260,7 @@ method panic (Str $s) {
             $m ~= "\n    expecting @keys";
         }
     }
+    $m ~~ s|Syntax error|Syntax error (two terms in a row?)| if $m ~~ /infix/;
 
     if @COMPILING::WORRIES {
         $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES);
