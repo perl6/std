@@ -4,6 +4,8 @@ FIXINS=Cursor.pmc LazyMap.pm mangle.pl
 
 all: $(FIXINS) check lex/STD/termish
 
+fast: $(FIXINS) check
+
 STD.pmc: STD.pm gimme5
 	./gimme5 $< >STD.pm5
 	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD.pm5 >$@
