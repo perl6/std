@@ -444,10 +444,10 @@ token category:statement_control { <sym> }
 proto rule  statement_control (:$endsym is context = 'spacey') { <...> }
 
 token category:statement_mod_cond { <sym> }
-proto rule  statement_mod_cond () { <...> }
+proto rule  statement_mod_cond (:$endsym is context = 'nofun') { <...> }
 
 token category:statement_mod_loop { <sym> }
-proto rule  statement_mod_loop () { <...> }
+proto rule  statement_mod_loop (:$endsym is context = 'nofun') { <...> }
 
 token category:infix_prefix_meta_operator { <sym> }
 proto token infix_prefix_meta_operator is binary { <...> }
@@ -4261,7 +4261,7 @@ method panic (Str $s) {
             $m ~= "\n    expecting @keys";
         }
     }
-    $m ~~ s|Syntax error|Syntax error (two terms in a row?)| if $m ~~ /infix/;
+    $m ~~ s|Syntax error|Syntax error (two terms in a row?)| if $m ~~ /infix|nofun/;
 
     if @COMPILING::WORRIES {
         $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES);
