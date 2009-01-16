@@ -2697,6 +2697,7 @@ token param_var {
 
             # ordinary parameter name
         || <identifier>
+        || <[/!]>
 
             # bare sigil?
         ]?
