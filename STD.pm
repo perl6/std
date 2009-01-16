@@ -1063,8 +1063,8 @@ token privop ( --> Methodcall) {
 token dottyop {
     :dba('dotty method or postfix')
     [
-    | <postop>     # forcing postop's precedence to methodcall here
     | <methodop>
+    | <!alpha> <postop> # only non-alpha postfixes have dotty form
     ]
 }
 
