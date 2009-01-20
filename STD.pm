@@ -484,10 +484,10 @@ token ws {
 
     :dba('whitespace')
     [
-	| \h+ <![#\s\\]> { @+MEMOS[$¢.pos]<ws> = $startpos; }	# common case
-	| <?before \w> <?after \w> :::
-	    { @+MEMOS[$startpos]<ws> = undef; }
-	    <!>        # must \s+ between words
+        | \h+ <![#\s\\]> { @+MEMOS[$¢.pos]<ws> = $startpos; }   # common case
+        | <?before \w> <?after \w> :::
+            { @+MEMOS[$startpos]<ws> = undef; }
+            <!>        # must \s+ between words
     ]
     ||
     [
@@ -641,11 +641,11 @@ token block {
     '{' ~ '}' <statementlist>
 
     [
-    | <?before \h* $$> 	# (usual case without comments)
-	{ @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
+    | <?before \h* $$>  # (usual case without comments)
+        { @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$
-	{ @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
+        { @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
     | <.unsp>? { @+MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
     ]
 }
@@ -655,11 +655,11 @@ token regex_block {
     :my $GOAL is context = '}';
 
     [ <quotepair> <.ws>
-	{
-	    my $kv = $<quotepair>[*-1];
-	    $lang = $lang.tweak($kv.<k>, $kv.<v>)
+        {
+            my $kv = $<quotepair>[*-1];
+            $lang = $lang.tweak($kv.<k>, $kv.<v>)
                 or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-	}
+        }
     ]*
 
     '{'
@@ -667,11 +667,11 @@ token regex_block {
     [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
 
     [
-    | <?before \h* $$> 	# (usual case without comments)
-	{ @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
+    | <?before \h* $$>  # (usual case without comments)
+        { @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$
-	{ @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
+        { @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
     | <.unsp>? { @+MEMOS[$¢.pos]<endargs> = 1; }   {*}           #= endargs
     ]
 }
@@ -941,7 +941,7 @@ token termish {
     # also queue up any postfixes
     :dba('postfix')
     [ <?stdstopper> ||
-	<POST>*
+        <POST>*
     ]
 }
 
@@ -1317,7 +1317,7 @@ token package_declarator:does {
 rule package_def {
     :my $longname;
     [
-	<module_name>{
+        <module_name>{
             $longname = $<module_name>[0]<longname>;
             $¢.add_type($longname.text);
         }
@@ -1326,27 +1326,27 @@ rule package_def {
     [
        <?before '{'>
        {{
-	   # figure out the actual full package name (nested in outer package)
+           # figure out the actual full package name (nested in outer package)
             my $pkg = $+PKG // "GLOBAL";
-	    push @PKGS, $pkg;
-	    if $longname {
-		my $shortname = $longname.<name>.text;
-		$+PKG = $pkg ~ '::' ~ $shortname;
-	    }
-	    else {
-		$+PKG = $pkg ~ '::_anon_';
-	    }
-	}}
+            push @PKGS, $pkg;
+            if $longname {
+                my $shortname = $longname.<name>.text;
+                $+PKG = $pkg ~ '::' ~ $shortname;
+            }
+            else {
+                $+PKG = $pkg ~ '::_anon_';
+            }
+        }}
         <block>
-	{{
-	    $+PKG = pop(@PKGS);
-	}}
-	{*}                                                     #= block
+        {{
+            $+PKG = pop(@PKGS);
+        }}
+        {*}                                                     #= block
     || <?{ $+begin_compunit }> {} <?before ';'>
         {
             $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-	    my $shortname = $longname.<name>.text;
-	    $+PKG = $shortname;
+            my $shortname = $longname.<name>.text;
+            $+PKG = $shortname;
             $+begin_compunit = 0;
         }
         {*}                                                     #= semi
@@ -1669,7 +1669,7 @@ token variable {
         | <sigil> \d+ {*}                                           #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
         | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
-	| <sigil> <?{ $+IN_DECL }> {*}				    #= anondecl
+        | <sigil> <?{ $+IN_DECL }> {*}                              #= anondecl
         ]
     ]
 }
@@ -1760,7 +1760,7 @@ token value {
 
 token typename {
     [
-    | '::?'<identifier>			# parse ::?CLASS as special case
+    | '::?'<identifier>                 # parse ::?CLASS as special case
     | <longname>
       <?{{
         my $longname = $<longname>.text;
@@ -1895,11 +1895,11 @@ token babble ($l) {
 
     <.ws>
     [ <quotepair> <.ws>
-	{
-	    my $kv = $<quotepair>[*-1];
-	    $lang = $lang.tweak($kv.<k>, $kv.<v>)
+        {
+            my $kv = $<quotepair>[*-1];
+            $lang = $lang.tweak($kv.<k>, $kv.<v>)
                 or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-	}
+        }
     ]*
 
     {
@@ -1936,13 +1936,13 @@ token sibble ($l, $lang2) {
 
     $start <left=nibble($lang)> $stop 
     [ <?{ $start ne $stop }>
-	<.ws>
+        <.ws>
         [ '=' || <.panic: "Missing '='"> ]
         <.ws>
         <right=EXPR(item %item_assignment)>
     || 
-	{ $lang = $lang2.unbalanced($stop); }
-	<right=nibble($lang)> $stop
+        { $lang = $lang2.unbalanced($stop); }
+        <right=nibble($lang)> $stop
     ]
 }
 
@@ -1953,10 +1953,10 @@ token tribble ($l, $lang2 = $l) {
 
     $start <left=nibble($lang)> $stop 
     [ <?{ $start ne $stop }>
-	<.ws> <quibble($lang2)>
+        <.ws> <quibble($lang2)>
     || 
-	{ $lang = $lang2.unbalanced($stop); }
-	<right=nibble($lang)> $stop
+        { $lang = $lang2.unbalanced($stop); }
+        <right=nibble($lang)> $stop
     ]
 }
 
@@ -2275,7 +2275,7 @@ method peek_delimiters {
     my $startpos = $pos;
     my $char = substr($ORIG,$pos++,1);
     if $char ~~ /^\s$/ {
-	self.panic("Whitespace not allowed as delimiter");
+        self.panic("Whitespace not allowed as delimiter");
     }
 
 # XXX not defined yet
@@ -2285,10 +2285,10 @@ method peek_delimiters {
 
     my $rightbrack = %open2close{$char};
     if not defined $rightbrack {
-	return $char, $char;
+        return $char, $char;
     }
     while substr($ORIG,$pos,1) eq $char {
-	$pos++;
+        $pos++;
     }
     my $len = $pos - $startpos;
     my $start = $char x $len;
@@ -2533,7 +2533,7 @@ regex extrapost {
 
 rule multisig {
     [
-	':'?'(' ~ ')' <signature>
+        ':'?'(' ~ ')' <signature>
     ]
     ** '|'
 }
@@ -2644,7 +2644,7 @@ token type_declarator:subset {
     <sym> :s
     <longname> { $¢.add_type($<longname>.text); }
     [ of <fulltypename> ]?
-    [where <EXPR(item %chaining)> ]?	# (EXPR can parse multiple where clauses)
+    [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
 }
 
 token type_declarator:enum {
@@ -2675,8 +2675,8 @@ token named_param {
     ':'
     [
     | <name=identifier> '(' <.ws>
-	[ <named_param> | <param_var> <.ws> ]
-	[ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
+        [ <named_param> | <param_var> <.ws> ]
+        [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
     | <param_var>
     ]
 }
@@ -2730,7 +2730,7 @@ token parameter {
     | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
     |   [
         | <param_var>   { $quant = ''; $kind = '!'; }
-	| <named_param> { $quant = ''; $kind = '*'; }
+        | <named_param> { $quant = ''; $kind = '*'; }
         ]
         [
         | '?'           { $quant = '?'; $kind = '?' }
@@ -3443,7 +3443,7 @@ regex stdstopper {
     [
     | <?terminator>
     | <?unitstopper>
-    | $					# unlikely, check last (normal LTM behavior)
+    | $                                 # unlikely, check last (normal LTM behavior)
     ]
     { @+MEMOS[$¢.pos]<endstmt> ||= 1; }
 }
@@ -3472,7 +3472,7 @@ method EXPR ($preclvl)
     my &reduce := -> {
         self.deb("entering reduce, termstack == ", +@termstack, " opstack == ", +@opstack) if $*DEBUG +& DEBUG::EXPR;
         my $op = pop @opstack;
-	my $sym = $op<sym>;
+        my $sym = $op<sym>;
         given $op<O><assoc> // 'unary' {
             when 'chain' {
                 self.deb("reducing chain") if $*DEBUG +& DEBUG::EXPR;
@@ -3500,20 +3500,20 @@ method EXPR ($preclvl)
                 while @opstack {
                     self.deb($sym ~ " vs " ~ @opstack[*-1]<sym>) if $*DEBUG +& DEBUG::EXPR;
                     last if $sym ne @opstack[*-1]<sym>;
-		    if @termstack and defined @termstack[0] {
-			push @list, pop(@termstack);
-		    }
-		    else {
-			self.worry("Missing term in " ~ $sym ~ " list");
-		    }
+                    if @termstack and defined @termstack[0] {
+                        push @list, pop(@termstack);
+                    }
+                    else {
+                        self.worry("Missing term in " ~ $sym ~ " list");
+                    }
                     push @delims, pop(@opstack);
                 }
-		if @termstack and defined @termstack[0] {
-		    push @list, pop(@termstack);
-		}
-		elsif $sym ne ',' {
-		    self.worry("Missing final term in '" ~ $sym ~ "' list");
-		}
+                if @termstack and defined @termstack[0] {
+                    push @list, pop(@termstack);
+                }
+                elsif $sym ne ',' {
+                    self.worry("Missing final term in '" ~ $sym ~ "' list");
+                }
                 @list = reverse @list if @list > 1;
                 my $startpos = @list[0].pos;
                 @delims = reverse @delims if @delims > 1;
@@ -3531,7 +3531,7 @@ method EXPR ($preclvl)
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-		$op<arg> = (pop @termstack);
+                $op<arg> = (pop @termstack);
                 if ($op<arg><_from> < $op<_from>) {
                     $op<_from> = $op<arg><_from>;
                 }
@@ -3546,10 +3546,10 @@ method EXPR ($preclvl)
                 my @list;
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
-		$op<right> = (pop @termstack);
-		$op<left> = (pop @termstack);
-		$op<_from> = $op<left><_from>;
-		$op<_pos> = $op<right><_pos>;
+                $op<right> = (pop @termstack);
+                $op<left> = (pop @termstack);
+                $op<_from> = $op<left><_from>;
+                $op<_pos> = $op<right><_pos>;
                 $op<_arity> = 'BINARY';
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
                 push @termstack, $op._REDUCE($op<_from>, 'EXPR');
@@ -3576,7 +3576,7 @@ method EXPR ($preclvl)
 
         # note that we push loose stuff onto opstack before tight stuff
         my @pre;
-	my $tmp;
+        my $tmp;
         @pre = @$tmp if $tmp = ( $M<PRE> :delete );
         my @post;
         @post = reverse @$tmp if $tmp = ( $M<POST> :delete );
@@ -3714,11 +3714,11 @@ grammar Regex is STD {
 
     token ws {
         <?{ $+sigspace }>
-	|| [ <?before \s | '#'> <nextsame> ]?   # still get all the pod goodness, hopefully
+        || [ <?before \s | '#'> <nextsame> ]?   # still get all the pod goodness, hopefully
     }
 
     token sigspace {
-	<?before \s | '#'> [ :lang($¢.cursor_fresh($+LANG)) <.ws> ]
+        <?before \s | '#'> [ :lang($¢.cursor_fresh($+LANG)) <.ws> ]
     }
 
     # suppress fancy end-of-line checking
@@ -3738,7 +3738,7 @@ grammar Regex is STD {
     }
 
     token termish {
-	<.ws>
+        <.ws>
         <quantified_atom>+
     }
     token infixish {
@@ -3765,7 +3765,7 @@ grammar Regex is STD {
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Can't quantify zero-width atom">
         ]?
-	<.ws>
+        <.ws>
     }
 
     token atom {
@@ -3791,7 +3791,7 @@ grammar Regex is STD {
     # "normal" metachars
 
     token metachar:sigwhite {
-	<sigspace>
+        <sigspace>
     }
 
     token metachar:sym<{ }> {
@@ -3865,7 +3865,7 @@ grammar Regex is STD {
         | ']'
         | '>'
         | $
-	| <stopper>
+        | <stopper>
         >
     }
 
@@ -3941,8 +3941,8 @@ grammar Regex is STD {
                                     | ':' <.ws>
                                         [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]
                                     | '(' {}
-					[ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
-					[ ')' || <.panic: "Assertion call missing right parenthesis"> ]
+                                        [ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
+                                        [ ')' || <.panic: "Assertion call missing right parenthesis"> ]
                                     ]?
     }
 
@@ -3955,8 +3955,8 @@ grammar Regex is STD {
                                     | ':' <.ws>
                                         [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]
                                     | '(' {}
-					[ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
-					[ ')' || <.panic: "Assertion call missing right parenthesis"> ]
+                                        [ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
+                                        [ ')' || <.panic: "Assertion call missing right parenthesis"> ]
                                     ]?
     }
 
@@ -3970,13 +3970,13 @@ grammar Regex is STD {
     token assertion:bogus { <.panic: "Unrecognized regex assertion"> }
 
     token cclass_elem {
-	<.ws>
+        <.ws>
         :dba('character class element')
         [
         | <name>
         | <before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
         ]
-	<.ws>
+        <.ws>
     }
 
     token mod_arg { :dba('modifier argument') '(' ~ ')' <semilist> }
@@ -4072,7 +4072,7 @@ grammar P5Regex is STD {
     }
 
     token termish {
-	<.ws>  # XXX assuming old /x here?
+        <.ws>  # XXX assuming old /x here?
         <quantified_atom>+
     }
     token infixish {
@@ -4095,14 +4095,14 @@ grammar P5Regex is STD {
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Can't quantify zero-width atom">
         ]?
-	<.ws>
+        <.ws>
     }
 
     token atom {
         [
         | \w
         | <metachar>
-	| '\\' :: .
+        | '\\' :: .
         ]
     }
 
@@ -4115,7 +4115,7 @@ grammar P5Regex is STD {
     # "normal" metachars
 
     token metachar:sym<[ ]> {
-	<before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
+        <before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
     }
 
     token metachar:sym«(? )» {
@@ -4138,7 +4138,7 @@ grammar P5Regex is STD {
 
     token metachar:var {
         <?before <sigil>\w>
-	<.panic: "Can't interpolate variable in Perl 5 regex">
+        <.panic: "Can't interpolate variable in Perl 5 regex">
     }
 
     token backslash:A { <sym> }
@@ -4184,13 +4184,13 @@ grammar P5Regex is STD {
     #token assertion:identifier { <identifier> [               # is qq right here?
     #                                | <?before ')' >
     #                                | <.ws> <nibbler>
-    #				    ]
-    #				    [ ':' <rx> ]?
+    #                               ]
+    #                               [ ':' <rx> ]?
     #}
     token p5mod { <[imox]>* }
     token p5mods { <on=p5mod> [ '-' <off=p5mod> ]? }
     token assertion:mod { <p5mods> [               # is qq right here?
-			           | ':' <rx>?
+                                   | ':' <rx>?
                                    | <?before ')' >
                                    ]
     }
