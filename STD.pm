@@ -702,7 +702,6 @@ token label {
 
     [ <?{ $¢.is_type($<identifier>.text) }>
       <.panic("You tried to use an existing typename as a label")>
-#      <suppose("You tried to use an existing name $/{'identifier'} as a label")>
     ]?
 
     # add label as a pseudo type
@@ -835,6 +834,8 @@ token statement_control:for {
     <sym> :s
     [ <?before 'my'? '$'\w+ '(' >
         <.panic: "This appears to be Perl 5 code"> ]?
+    [ <?before '(' <EXPR>? ';' <EXPR>? ';' <EXPR>? ')' >
+        <.obs('C-style "for (;;)" loop', '"loop (;;)"')> ]?
     <xblock>
 }
 
@@ -1387,143 +1388,143 @@ token special_variable:sym<$!> { <sym> <!before \w> }
 token special_variable:sym<$!{ }> {
     # XXX the backslashes are necessary here for bootstrapping, not for P6...
     ( '$!{' :: (.*?) '}' )
-    <obs($0.text ~ " variable", 'smart match against $!')>
+    <.obs($0.text ~ " variable", 'smart match against $!')>
 }
 
 token special_variable:sym<$/> {
     <sym>
     # XXX assuming nobody ever wants to assign $/ directly anymore...
     [ <?before \h* '=' <![=]> >
-        <obs('$/ variable as input record separator',
+        <.obs('$/ variable as input record separator',
              "filehandle's :irs attribute")>
     ]?
 }
 
 token special_variable:sym<$~> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$~ variable', 'Form module')>
+    <.obs('$~ variable', 'Form module')>
 }
 
 token special_variable:sym<$`> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$` variable', 'explicit pattern before <(')>
+    <.obs('$` variable', 'explicit pattern before <(')>
 }
 
 token special_variable:sym<$@> {
     <sym> ::
-    <obs('$@ variable as eval error', '$!')>
+    <.obs('$@ variable as eval error', '$!')>
 }
 
 token special_variable:sym<$#> {
     <sym> ::
     [
-    || (\w+) <obs("\$#" ~ $0.text ~ " variable", "\@{" ~ $0.text ~ "}.end")>
-    || <obs('$# variable', '.fmt')>
+    || (\w+) <.obs("\$#" ~ $0.text ~ " variable", "\@{" ~ $0.text ~ "}.end")>
+    || <.obs('$# variable', '.fmt')>
     ]
 }
 token special_variable:sym<$$> {
     <sym> <!alpha> :: <?before \s | ',' | <terminator> >
-    <obs('$$ variable', '$*PID')>
+    <.obs('$$ variable', '$*PID')>
 }
 token special_variable:sym<$%> {
     <sym> ::
-    <obs('$% variable', 'Form module')>
+    <.obs('$% variable', 'Form module')>
 }
 
 # Note: this works because placeholders are restricted to lowercase
 token special_variable:sym<$^X> {
     <sigil> '^' $<letter> = [<[A..Z]>] \W
-    <obscaret($<sigil>.text ~ '^' ~ $<letter>.text, $<sigil>, $<letter>.text)>
+    <.obscaret($<sigil>.text ~ '^' ~ $<letter>.text, $<sigil>, $<letter>.text)>
 }
 
 token special_variable:sym<$^> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$^ variable', 'Form module')>
+    <.obs('$^ variable', 'Form module')>
 }
 
 token special_variable:sym<$&> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$& variable', '$/ or $()')>
+    <.obs('$& variable', '$/ or $()')>
 }
 
 token special_variable:sym<$*> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$* variable', '^^ and $$')>
+    <.obs('$* variable', '^^ and $$')>
 }
 
 token special_variable:sym<$)> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$) variable', '$*EGID')>
+    <.obs('$) variable', '$*EGID')>
 }
 
 token special_variable:sym<$-> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$- variable', 'Form module')>
+    <.obs('$- variable', 'Form module')>
 }
 
 token special_variable:sym<$=> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$= variable', 'Form module')>
+    <.obs('$= variable', 'Form module')>
 }
 
 token special_variable:sym<@+> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('@+ variable', '.to method')>
+    <.obs('@+ variable', '.to method')>
 }
 
 token special_variable:sym<%+> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('%+ variable', '.to method')>
+    <.obs('%+ variable', '.to method')>
 }
 
 token special_variable:sym<$+[ ]> {
     '$+['
-    <obs('@+ variable', '.to method')>
+    <.obs('@+ variable', '.to method')>
 }
 
 token special_variable:sym<@+[ ]> {
     '@+['
-    <obs('@+ variable', '.to method')>
+    <.obs('@+ variable', '.to method')>
 }
 
 token special_variable:sym<@+{ }> {
     '@+{'
-    <obs('%+ variable', '.to method')>
+    <.obs('%+ variable', '.to method')>
 }
 
 token special_variable:sym<@-> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('@- variable', '.from method')>
+    <.obs('@- variable', '.from method')>
 }
 
 token special_variable:sym<%-> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('%- variable', '.from method')>
+    <.obs('%- variable', '.from method')>
 }
 
 token special_variable:sym<$-[ ]> {
     '$-['
-    <obs('@- variable', '.from method')>
+    <.obs('@- variable', '.from method')>
 }
 
 token special_variable:sym<@-[ ]> {
     '@-['
-    <obs('@- variable', '.from method')>
+    <.obs('@- variable', '.from method')>
 }
 
 token special_variable:sym<%-{ }> {
     '@-{'
-    <obs('%- variable', '.from method')>
+    <.obs('%- variable', '.from method')>
 }
 
 token special_variable:sym<$+> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$+ variable', 'Form module')>
+    <.obs('$+ variable', 'Form module')>
 }
 
 token special_variable:sym<${^ }> {
     ( <sigil> '{^' :: (.*?) '}' )
-    <obscaret($0.text, $<sigil>, $0.{0}.text)>
+    <.obscaret($0.text, $<sigil>, $0.{0}.text)>
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
@@ -1576,72 +1577,72 @@ token special_variable:sym<::{ }> {
 
 token special_variable:sym<${ }> {
     ( <[$@%]> '{' :: (.*?) '}' )
-    <obs("" ~ $0.text ~ " variable", "{" ~ $<sigil>.text ~ "}(" ~ $0.{0}.text ~ ")")>
+    <.obs("" ~ $0.text ~ " variable", "{" ~ $<sigil>.text ~ "}(" ~ $0.{0}.text ~ ")")>
 }
 
 token special_variable:sym<$[> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$[ variable', 'user-defined array indices')>
+    <.obs('$[ variable', 'user-defined array indices')>
 }
 
 token special_variable:sym<$]> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$] variable', '$*PERL_VERSION')>
+    <.obs('$] variable', '$*PERL_VERSION')>
 }
 
 token special_variable:sym<$\\> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$\\ variable', "the filehandle's :ors attribute")>
+    <.obs('$\\ variable', "the filehandle's :ors attribute")>
 }
 
 token special_variable:sym<$|> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$| variable', 'Form module')>
+    <.obs('$| variable', 'Form module')>
 }
 
 token special_variable:sym<$:> {
     <sym> <?before <[\x20\t\n\],=)}]> >
-    <obs('$: variable', 'Form module')>
+    <.obs('$: variable', 'Form module')>
 }
 
 token special_variable:sym<$;> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$; variable', 'real multidimensional hashes')>
+    <.obs('$; variable', 'real multidimensional hashes')>
 }
 
 token special_variable:sym<$'> { #'
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
+    <.obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
 }
 
 token special_variable:sym<$"> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <obs('$" variable', '.join() method')>
+    <.obs('$" variable', '.join() method')>
 }
 
 token special_variable:sym<$,> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$, variable', ".join() method")>
+    <.obs('$, variable', ".join() method")>
 }
 
 token special_variable:sym['$<'] {
     <sym> :: <!before \s* \w+ \s* '>' >
-    <obs('$< variable', '$*UID')>
+    <.obs('$< variable', '$*UID')>
 }
 
 token special_variable:sym«\$>» {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs("$() variable", '$*EUID')>
+    <.obs("$() variable", '$*EUID')>
 }
 
 token special_variable:sym<$.> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$. variable', "filehandle's .line method")>
+    <.obs('$. variable', "filehandle's .line method")>
 }
 
 token special_variable:sym<$?> {
     <sym> :: <?before \s | ',' | <terminator> >
-    <obs('$? variable as child error', '$!')>
+    <.obs('$? variable as child error', '$!')>
 }
 
 # desigilname should only follow a sigil/twigil
@@ -2810,11 +2811,11 @@ token term:sym<::?IDENT> ( --> Term) {
 token term:sym<undef> ( --> Term) {
     <sym> »
     [ <?before \h*'$/' >
-        <obs('$/ variable as input record separator',
+        <.obs('$/ variable as input record separator',
              "the filehandle's .slurp method")>
     ]?
     [ <?before \h*<variable> >
-        <obs('undef as a verb', 'undefine function')>
+        <.obs('undef as a verb', 'undefine function')>
     ]?
 }
 
@@ -2884,10 +2885,10 @@ token postfix:sym<i> ( --> Methodcall)
     { <sym> » }
 
 token infix:sym<.> ()
-    { '.' <[\]\)\},:\s\$"']> <obs('. to concatenate strings', '~')> }
+    { '.' <[\]\)\},:\s\$"']> <.obs('. to concatenate strings', '~')> }
 
 token postfix:sym['->'] ()
-    { '->' <obs('-> to call a method', '.')> }
+    { '->' <.obs('-> to call a method', '.')> }
 
 ## autoincrement
 token postfix:sym<++> ( --> Autoincrement)
@@ -2961,10 +2962,10 @@ token infix:sym« +< » ( --> Multiplicative)
     { <sym> }
 
 token infix:sym« << » ( --> Multiplicative)
-    { <sym> <obs('<< to do left shift', '+< or ~<')> }
+    { <sym> <.obs('<< to do left shift', '+< or ~<')> }
 
 token infix:sym« >> » ( --> Multiplicative)
-    { <sym> <obs('>> to do right shift', '+> or ~>')> }
+    { <sym> <.obs('>> to do right shift', '+> or ~>')> }
 
 token infix:sym« +> » ( --> Multiplicative)
     { <sym> }
@@ -3129,10 +3130,10 @@ token infix:sym<~~> ( --> Chaining)
     { <sym> }
 
 token infix:sym<!~> ( --> Chaining)
-    { <sym> <obs('!~ to do negated pattern matching', '!~~')> }
+    { <sym> <.obs('!~ to do negated pattern matching', '!~~')> }
 
 token infix:sym<=~> ( --> Chaining)
-    { <sym> <obs('=~ to do pattern matching', '~~')> }
+    { <sym> <.obs('=~ to do pattern matching', '~~')> }
 
 token infix:sym<eq> ( --> Chaining)
     { <sym> }
@@ -3204,7 +3205,7 @@ token infix:sym<?? !!> ( --> Conditional) {
 }
 
 token infix:sym<?> ( --> Conditional)
-    { <sym> <obs('?: for the conditional operator', '??!!')> }
+    { <sym> <.obs('?: for the conditional operator', '??!!')> }
 
 ## assignment
 # There is no "--> type" because assignment may be coerced to either
@@ -3853,7 +3854,7 @@ grammar Regex is STD {
     token metachar:sym<^>  { <sym> }
     token metachar:sym<$$> {
         <sym>
-        [ (\w+) <obs("\$\$" ~ $0.text ~ " to deref var inside a regex", "\$(\$" ~ $0.text ~ ")")> ]?
+        [ (\w+) <.obs("\$\$" ~ $0.text ~ " to deref var inside a regex", "\$(\$" ~ $0.text ~ ")")> ]?
     }
     token metachar:sym<$>  {
         '$'
@@ -3900,15 +3901,15 @@ grammar Regex is STD {
     token backslash:h { :i <sym> }
     token backslash:n { :i <sym> }
     token backslash:o { :i <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
-    token backslash:Q { <sym> <obs('\\Q as quotemeta', 'quotes or literal variable match')> }
+    token backslash:Q { <sym> <.obs('\\Q as quotemeta', 'quotes or literal variable match')> }
     token backslash:r { :i <sym> }
     token backslash:s { :i <sym> }
     token backslash:t { :i <sym> }
     token backslash:v { :i <sym> }
     token backslash:w { :i <sym> }
     token backslash:x { :i <sym> [ <hexint> | '[' [<.ws><hexint><.ws> ] ** ',' ']' ] }
-    token backslash:z { <sym> <obs('\\z as end-of-string matcher', '$')> }
-    token backslash:Z { <sym> <obs('\\Z as end-of-string matcher', '\\n?$')> }
+    token backslash:z { <sym> <.obs('\\z as end-of-string matcher', '$')> }
+    token backslash:Z { <sym> <.obs('\\Z as end-of-string matcher', '\\n?$')> }
     token backslash:misc { $<litchar>=(\W) }
     token backslash:oops { <.panic: "Unrecognized regex backslash sequence"> }
 
@@ -4206,15 +4207,6 @@ grammar P5Regex is STD {
 
 } # end grammar
 
-# The <panic: "message"> rule is called for syntax errors.
-# If there are any <suppose> points, backtrack and retry parse
-# with a different supposition.  If it gets farther than the
-# panic point, print out the supposition ("Looks like you
-# used a Perl5-style shift operator (<<) at line 42.  Maybe
-# you wanted +< or |< instead.")  Or some such...
-# In any event, this is only for better diagnostics, and
-# further compilation is suppressed by the <commit><fail>.
-
 # token panic (Str $s) { <commit> <fail($s)> }
 
 method panic (Str $s) {
@@ -4309,6 +4301,7 @@ method FAILGOAL (Str $stop, Str $name) {
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
 method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
+    %$*HIGHEXPECT = ();
     self.panic("Obsolete use of $old;$when please use $new instead");
 }
 
