@@ -219,31 +219,31 @@ method add_routine ($name) {
 # Users should specify precedence only in relation to existing levels.
 
 constant %term            = (:prec<z=>);
-constant %methodcall      = (:prec<y=>);
-constant %autoincrement   = (:prec<x=>);
+constant %methodcall      = (:prec<y=>, :assoc<unary>, :uassoc<left>);
+constant %autoincrement   = (:prec<x=>, :assoc<unary>, :uassoc<non>);
 constant %exponentiation  = (:prec<w=>, :assoc<right>, :assign);
-constant %symbolic_unary  = (:prec<v=>);
+constant %symbolic_unary  = (:prec<v=>, :assoc<unary>, :uassoc<left>);
 constant %multiplicative  = (:prec<u=>, :assoc<left>,  :assign);
 constant %additive        = (:prec<t=>, :assoc<left>,  :assign);
 constant %replication     = (:prec<s=>, :assoc<left>,  :assign);
 constant %concatenation   = (:prec<r=>, :assoc<list>,  :assign);
 constant %junctive_and    = (:prec<q=>, :assoc<list>,  :assign);
 constant %junctive_or     = (:prec<p=>, :assoc<list>,  :assign);
-constant %named_unary     = (:prec<o=>);
+constant %named_unary     = (:prec<o=>, :assoc<unary>, :uassoc<left>);
 constant %nonchaining     = (:prec<n=>, :assoc<non>);
 constant %chaining        = (:prec<m=>, :assoc<chain>, :bool);
 constant %tight_and       = (:prec<l=>, :assoc<list>,  :assign);
 constant %tight_or        = (:prec<k=>, :assoc<list>,  :assign);
 constant %conditional     = (:prec<j=>, :assoc<right>);
 constant %item_assignment = (:prec<i=>, :assoc<right>);
-constant %loose_unary     = (:prec<h=>);
+constant %loose_unary     = (:prec<h=>, :assoc<unary>, :uassoc<left>);
 constant %comma           = (:prec<g=>, :assoc<list>, :nextterm<nulltermish>);
 constant %list_infix      = (:prec<f=>, :assoc<list>,  :assign);
-constant %list_assignment = (:prec<i=>, :sub<e=>, :assoc<right>);
-constant %list_prefix     = (:prec<e=>);
+constant %list_assignment = (:prec<i=>, :assoc<right>, :sub<e=>);
+constant %list_prefix     = (:prec<e=>, :assoc<unary>, :uassoc<left>);
 constant %loose_and       = (:prec<d=>, :assoc<list>,  :assign);
 constant %loose_or        = (:prec<c=>, :assoc<list>,  :assign);
-constant %sequencer      = (:prec<b=>, :assoc<left>, :nextterm<statement>);
+constant %sequencer       = (:prec<b=>, :assoc<list>, :nextterm<statement>);
 constant %LOOSEST         = (:prec<a=!>);
 constant %terminator      = (:prec<a=>, :assoc<list>);
 
@@ -1034,7 +1034,8 @@ token infixish {
             $<fake> = 1;
             $<sym> = ':';
             %<O><prec> = %loose_unary<prec>;
-            %<O><assoc> = 'left';
+            %<O><assoc> = 'unary';
+            %<O><uassoc> = 'left';
         }
     | <infix>
            { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
@@ -1067,7 +1068,7 @@ token dottyop {
     :dba('dotty method or postfix')
     [
     | <methodop>
-    | <!alpha> <postop> # only non-alpha postfixes have dotty form
+    | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
     ]
 }
 
@@ -1086,9 +1087,9 @@ token POST {
 
     :dba('postfix')
     [
-    | <dotty>  { $<O> = $<dotty><O> }
-    | <privop> { $<O> = $<privop><O> }
-    | <postop> { $<O> = $<postop><O> }
+    | <dotty>  { $<O> = $<dotty><O>; $<sym> = $<dotty><sym>; }
+    | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; }
+    | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }
     ]
     { $+SIGIL = '@' }
 }
@@ -1114,7 +1115,7 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     [ <!{ $<O><prec> eq %conditional<prec> }>
         || <.panic: "Can't reduce a conditional operator"> ]
 
-    { $<O><assoc> = 'unary'; }
+    { $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
 
 }
 
@@ -1192,8 +1193,8 @@ token postcircumfix:sym<« »> ( --> Methodcall)
     { '«' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
 
 token postop {
-    | <postfix>         { $<O> := $<postfix><O> }
-    | <postcircumfix>   { $<O> := $<postcircumfix><O> }
+    | <postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
+    | <postcircumfix>   { $<O> := $<postcircumfix><O>; $<sym> := $<postcircumfix><sym>; }
 }
 
 token methodop {
@@ -3172,10 +3173,8 @@ token infix:sym<&&> ( --> Tight_and)
 token infix:sym<||> ( --> Tight_or)
     { <sym> }
 
-token infix:sym<^^> ( --> Tight_or)  {
-    <sym>
-    { $<O><assoc> := 'list' }  # override Tight_or's 'left' associativity
-}
+token infix:sym<^^> ( --> Tight_or)
+    { <sym> }
 
 token infix:sym<//> ( --> Tight_or)
     { <sym> }
@@ -3582,11 +3581,22 @@ method EXPR ($preclvl)
         my @post;
         @post = reverse @$tmp if $tmp = ( $M<POST> :delete );
         while @pre and @post {
-            if @post[0]<O><prec> le @pre[0]<O><prec> {
+            my $postO = @post[0]<O>;
+            my $preO = @pre[0]<O>;
+            if $postO<prec> lt $preO<prec> {
                 push @opstack, shift @post;
             }
-            else {
+            elsif $postO<prec> gt $preO<prec> {
                 push @opstack, shift @pre;
+            }
+            elsif $postO<uassoc> eq 'left' {
+                push @opstack, shift @post;
+            }
+            elsif $postO<uassoc> eq 'right' {
+                push @opstack, shift @pre;
+            }
+            else {
+                $here.panic('"' ~ @pre[0]<sym> ~ '" and "' ~ @post[0]<sym> ~ '" are not associative');
             }
         }
         push @opstack, @pre,@post;
