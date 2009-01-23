@@ -1033,7 +1033,7 @@ token infixish {
     | <colonpair> {
             $<fake> = 1;
             $<sym> = ':';
-            %<O><prec> = %loose_unary<prec>;
+            %<O><prec> = %comma<prec>;
             %<O><assoc> = 'unary';
             %<O><uassoc> = 'left';
         }
@@ -3640,6 +3640,12 @@ method EXPR ($preclvl)
             # Not much point in reducing the sentinels...
             last if $inprec lt $LOOSEST;
 
+        if $infix<fake> {
+            my $adverbs = @termstack[*-1]<ADV> ||= [];
+            push @$adverbs, $infix<colonpair>;
+            next;  # not really an infix, so keep trying
+        }
+
             # Equal precedence, so use associativity to decide.
             if @opstack[*-1]<O><prec> eq $inprec {
                 given $inO<assoc> {
@@ -3647,22 +3653,17 @@ method EXPR ($preclvl)
                     when 'left'  { reduce() }   # reduce immediately
                     when 'right' { }            # just shift
                     when 'chain' { }            # just shift
+                    when 'unary' { }            # just shift
                     when 'list'  {              # if op differs reduce else shift
                         reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
                     }
-                    default { $here.panic("Unknown associativity \"$_\" for \"$infix\"") }
+                    default { $here.panic('Unknown associativity "' ~ $_ ~ '" for "' ~ $infix<sym> ~ '"') }
                 }
             }
-            if $infix<fake> {
-                my $adverbs = @termstack[*-1]<ADV> ||= [];
-                push @$adverbs, $infix<colonpair>;
-                next;  # not really an infix, so keep trying
-            }
-            else {
-                $termish = $inO<nextterm> if $inO<nextterm>;
-                push @opstack, $infix;
-                last;
-            }
+
+            $termish = $inO<nextterm> if $inO<nextterm>;
+            push @opstack, $infix;              # The Shift
+            last;
         }
     }
     reduce() while +@opstack > 1;
