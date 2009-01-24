@@ -137,7 +137,7 @@ my @baseroutinenames = qw[
     cat classify
     quotemeta
     chr ord
-    p5chop chop p5chomp chomp trim
+    p5chop chop p5chomp chomp trim trim_start trim_end
     index rindex substr
     join split comb pack unpack
     uc ucfirst lc lcfirst
@@ -679,6 +679,7 @@ token regex_block {
 # statement semantics
 rule statementlist {
     :my $PARSER is context<rw> = self;
+    :my $SEMILIST is context = 0;
     :dba('statement list')
     [
     | $
@@ -689,6 +690,7 @@ rule statementlist {
 
 # embedded semis, context-dependent semantics
 rule semilist {
+    :my $SEMILIST is context = 1;
     :dba('semicolon list')
     [
     | <?before <[\)\]\}]> >
@@ -698,14 +700,15 @@ rule semilist {
 
 
 token label {
+    :my $label;
     <identifier> ':' <?before \s> <.ws>
 
-    [ <?{ $¢.is_type($<identifier>.text) }>
-      <.panic("You tried to use an existing typename as a label")>
+    [ <?{ $¢.is_type($label = $<identifier>.text) }>
+      <.panic("Illegal redeclaration of '$label'")>
     ]?
 
     # add label as a pseudo type
-    {{ $¢.add_type($<identifier>.text); }}
+    {{ $¢.add_type($label); }}
 
 }
 
@@ -3365,9 +3368,6 @@ token infix:sym<xor> ( --> Loose_or)
 
 token infix:sym<orelse> ( --> Loose_or)
      { <sym> }
-
-token infix:sym<;> ( --> Sequencer)
-    { <sym> }
 
 token infix:sym« <== » ( --> Sequencer)
     { <sym> }
