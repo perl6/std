@@ -1151,7 +1151,7 @@ token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
     X [
     | <infix> X
     | <infix=infix_prefix_meta_operator> X
-    | <infix=infix_curcumfix_meta_operator> X
+    | <infix=infix_circumfix_meta_operator> X
     ]
     <!!{ $<O> = $<infix><O>; }>
     <!!lex1: 'cross'>
