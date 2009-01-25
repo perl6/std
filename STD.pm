@@ -1422,7 +1422,7 @@ token special_variable:sym<$@> {
 token special_variable:sym<$#> {
     <sym> ::
     [
-    || (\w+) <.obs("\$#" ~ $0.text ~ " variable", "\@{" ~ $0.text ~ "}.end")>
+    || (\w+) <.obs("\$#" ~ $0.text ~ " variable", "\@\{" ~ $0.text ~ "}.end")>
     || <.obs('$# variable', '.fmt')>
     ]
 }
@@ -1581,7 +1581,7 @@ token special_variable:sym<::{ }> {
 
 token special_variable:sym<${ }> {
     ( <[$@%]> '{' :: (.*?) '}' )
-    <.obs("" ~ $0.text ~ " variable", "{" ~ $<sigil>.text ~ "}(" ~ $0.{0}.text ~ ")")>
+    <.obs("" ~ $0.text ~ " variable", "\{" ~ $<sigil>.text ~ "}(" ~ $0.{0}.text ~ ")")>
 }
 
 token special_variable:sym<$[> {
