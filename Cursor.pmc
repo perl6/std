@@ -12,7 +12,7 @@ use feature 'say', 'state';
 require 'mangle.pl';
 
 our $CTX = '';
-our $DEBUG = defined($ENV{STD5DEBUG}) ? 1 : 0;
+our $DEBUG = 0 + ($ENV{STD5DEBUG} // 0);
 our $DEPTH = 0;
 our %LEXERS;       # per language, the cache of lexers, keyed by rule name
 our %FATECACHE; # fates we've already turned into linked lists

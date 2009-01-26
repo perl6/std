@@ -14,6 +14,8 @@ my %ROUTINES;
 my $ORIG is context;
 my @MEMOS is context;
 my $VOID is context<rw>;
+my $INVOCANT_OK is context<rw>;
+my $INVOCANT_IS is context<rw>;
 my @PADS;
 
 # random rule for debugging, please ignore
@@ -1036,7 +1038,7 @@ token infixish {
     | <colonpair> {
             $<fake> = 1;
             $<sym> = ':';
-            %<O><prec> = %comma<prec>;
+            %<O><prec> = %comma<prec>;  # actual test is non-inclusive of comma!
             %<O><assoc> = 'unary';
             %<O><uassoc> = 'left';
         }
@@ -1055,7 +1057,7 @@ token infixish {
 
 # doing fancy as one rule simplifies LTM
 token dotty:sym<.*> ( --> Methodcall) {
-    ('.' [ <[+*?=:]> | '^' '!'? ]) :: <.unspacey> <dottyop>
+    ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
     { $<sym> = $0.item; }
 }
 
@@ -1071,6 +1073,7 @@ token dottyop {
     :dba('dotty method or postfix')
     [
     | <methodop>
+    | <colonpair>
     | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
     ]
 }
@@ -1215,6 +1218,10 @@ token methodop {
     ]?
 }
 
+token semiarglist {
+    <arglist> ** ';'
+}
+
 token arglist {
     :my StrPos $endargs is context<rw> = 0;
     :my $GOAL is context = 'endargs';
@@ -1222,7 +1229,20 @@ token arglist {
     :dba('argument list')
     [
     | <?stdstopper>
-    | <EXPR(item %list_prefix)>
+    | <EXPR(item %list_prefix)> {{
+            my $delims = $<EXPR><delims>;
+            for @$delims {
+                if ($_.<sym> // '') eq ':' {
+                    if $+INVOCANT_OK {
+                        $+INVOCANT_IS = $<EXPR><list>[0];
+                    }
+                    else {
+                        $¢.panic("Illegal use of colon as invocant marker");
+                    }
+                }
+                $+INVOCANT_OK = 0;
+            }
+        }}
     ]
 }
 
@@ -2959,6 +2979,9 @@ token infix:sym<div> ( --> Multiplicative)
 token infix:sym<%> ( --> Multiplicative)
     { <sym> }
 
+token infix:sym<mod> ( --> Multiplicative)
+    { <sym> }
+
 token infix:sym<+&> ( --> Multiplicative)
     { <sym> }
 
@@ -3086,30 +3109,6 @@ token infix:sym<..^> ( --> Nonchaining)
 token infix:sym<^..^> ( --> Nonchaining)
     { <sym> }
 
-token infix:sym<ff> ( --> Nonchaining)
-    { <sym> }
-
-token infix:sym<^ff> ( --> Nonchaining)
-    { <sym> }
-
-token infix:sym<ff^> ( --> Nonchaining)
-    { <sym> }
-
-token infix:sym<^ff^> ( --> Nonchaining)
-    { <sym> }
-
-token infix:sym<fff> ( --> Nonchaining)
-    { <sym> }
-
-token infix:sym<^fff> ( --> Nonchaining)
-    { <sym> }
-
-token infix:sym<fff^> ( --> Nonchaining)
-    { <sym> }
-
-token infix:sym<^fff^> ( --> Nonchaining)
-    { <sym> }
-
 
 ## chaining binary
 token infix:sym<==> ( --> Chaining)
@@ -3209,6 +3208,30 @@ token infix:sym<?? !!> ( --> Conditional) {
 token infix:sym<?> ( --> Conditional)
     { <sym> <.obs('?: for the conditional operator', '??!!')> }
 
+token infix:sym<ff> ( --> Conditional)
+    { <sym> }
+
+token infix:sym<^ff> ( --> Conditional)
+    { <sym> }
+
+token infix:sym<ff^> ( --> Conditional)
+    { <sym> }
+
+token infix:sym<^ff^> ( --> Conditional)
+    { <sym> }
+
+token infix:sym<fff> ( --> Conditional)
+    { <sym> }
+
+token infix:sym<^fff> ( --> Conditional)
+    { <sym> }
+
+token infix:sym<fff^> ( --> Conditional)
+    { <sym> }
+
+token infix:sym<^fff^> ( --> Conditional)
+    { <sym> }
+
 ## assignment
 # There is no "--> type" because assignment may be coerced to either
 # item assignment or list assignment at "make" time.
@@ -3251,7 +3274,7 @@ token infix:sym<,> ( --> Comma)
     { <sym> }
 
 token infix:sym<:> ( --> Comma)
-    { <sym> }
+    { <sym> <?before \s | <terminator> > }
 
 token infix:sym« p5=> » ( --> Comma)
     { <sym> }
@@ -3295,7 +3318,7 @@ token term:identifier ( --> Term )
     { $t = $<identifier>.text; }
     <args( $¢.is_type($t) )>
     {{
-        %ROUTINES{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $¢.is_routine($t);
+        %ROUTINES{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $<args><invocant> or $¢.is_routine($t);
     }}
 }
 
@@ -3307,17 +3330,20 @@ token term:opfunc ( --> Term )
 token args ($istype = 0) {
     :my $listopish = 0;
     :my $GOAL is context = '';
+    :my $INVOCANT_OK is context<rw> = 1;
+    :my $INVOCANT_IS is context<rw>;
     [
-    | :dba('argument list') '.(' ~ ')' <semilist> {*}             #= func args
-    | :dba('argument list') '(' ~ ')' <semilist> {*}              #= func args
-    | :dba('argument list') <.unsp> '.'? '(' ~ ')' <semilist> {*} #= func args
-    | {} [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <listopargs=arglist> { $listopish = 1 }]?
+    | :dba('argument list') '.(' ~ ')' <semiarglist> {*}             #= func args
+    | :dba('argument list') '(' ~ ')' <semiarglist> {*}              #= func args
+    | :dba('argument list') <.unsp> '.'? '(' ~ ')' <semiarglist> {*} #= func args
+    |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
     ]
+    { $<invocant> = $INVOCANT_IS; }
 
     :dba('extra arglist after (...):')
     [
     || <?{ $listopish }>
-    || ':' <?before \s> <listopargs=arglist>    # either switch to listopiness
+    || ':' <?before \s> <moreargs=arglist>    # either switch to listopiness
     || {{ $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
     ]
 }
@@ -3353,9 +3379,6 @@ token infix:sym<and> ( --> Loose_and)
 token infix:sym<andthen> ( --> Loose_and)
     { <sym> }
 
-token infix:sym<andthen> ( --> Loose_and)
-    { <sym> }
-
 ## loose or
 token infix:sym<or> ( --> Loose_or)
     { <sym> }
@@ -3366,9 +3389,7 @@ token infix:sym<orelse> ( --> Loose_or)
 token infix:sym<xor> ( --> Loose_or)
     { <sym> }
 
-token infix:sym<orelse> ( --> Loose_or)
-     { <sym> }
-
+## sequencer
 token infix:sym« <== » ( --> Sequencer)
     { <sym> }
 
@@ -3655,7 +3676,7 @@ method EXPR ($preclvl)
                     when 'chain' { }            # just shift
                     when 'unary' { }            # just shift
                     when 'list'  {              # if op differs reduce else shift
-                        reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
+                       # reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
                     }
                     default { $here.panic('Unknown associativity "' ~ $_ ~ '" for "' ~ $infix<sym> ~ '"') }
                 }
@@ -3946,7 +3967,7 @@ grammar Regex is STD {
             ]
     }
 
-    token assertion:identifier { <identifier> [               # is qq right here?
+    token assertion:identifier { <longname> [               # is qq right here?
                                     | <?before '>' >
                                     | <.ws> <nibbler>
                                     | '=' <assertion>
@@ -4193,7 +4214,7 @@ grammar P5Regex is STD {
         [ <?before ')'> || <.panic: "Unable to parse Perl 5 regex; couldn't find right parenthesis"> ]
     }
 
-    #token assertion:identifier { <identifier> [               # is qq right here?
+    #token assertion:identifier { <longname> [               # is qq right here?
     #                                | <?before ')' >
     #                                | <.ws> <nibbler>
     #                               ]
