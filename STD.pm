@@ -1220,6 +1220,7 @@ token methodop {
 
 token semiarglist {
     <arglist> ** ';'
+    <.ws>
 }
 
 token arglist {
