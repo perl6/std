@@ -220,34 +220,34 @@ method add_routine ($name) {
 # The current values are mere implementation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
 
-constant %term            = (:prec<z=>);
-constant %methodcall      = (:prec<y=>, :assoc<unary>, :uassoc<left>);
-constant %autoincrement   = (:prec<x=>, :assoc<unary>, :uassoc<non>);
-constant %exponentiation  = (:prec<w=>, :assoc<right>, :assign);
-constant %symbolic_unary  = (:prec<v=>, :assoc<unary>, :uassoc<left>);
-constant %multiplicative  = (:prec<u=>, :assoc<left>,  :assign);
-constant %additive        = (:prec<t=>, :assoc<left>,  :assign);
-constant %replication     = (:prec<s=>, :assoc<left>,  :assign);
-constant %concatenation   = (:prec<r=>, :assoc<list>,  :assign);
-constant %junctive_and    = (:prec<q=>, :assoc<list>,  :assign);
-constant %junctive_or     = (:prec<p=>, :assoc<list>,  :assign);
-constant %named_unary     = (:prec<o=>, :assoc<unary>, :uassoc<left>);
-constant %nonchaining     = (:prec<n=>, :assoc<non>);
-constant %chaining        = (:prec<m=>, :assoc<chain>, :bool);
-constant %tight_and       = (:prec<l=>, :assoc<list>,  :assign);
-constant %tight_or        = (:prec<k=>, :assoc<list>,  :assign);
-constant %conditional     = (:prec<j=>, :assoc<right>);
-constant %item_assignment = (:prec<i=>, :assoc<right>);
-constant %loose_unary     = (:prec<h=>, :assoc<unary>, :uassoc<left>);
-constant %comma           = (:prec<g=>, :assoc<list>, :nextterm<nulltermish>);
-constant %list_infix      = (:prec<f=>, :assoc<list>,  :assign);
-constant %list_assignment = (:prec<i=>, :assoc<right>, :sub<e=>);
-constant %list_prefix     = (:prec<e=>, :assoc<unary>, :uassoc<left>);
-constant %loose_and       = (:prec<d=>, :assoc<list>,  :assign);
-constant %loose_or        = (:prec<c=>, :assoc<list>,  :assign);
-constant %sequencer       = (:prec<b=>, :assoc<list>, :nextterm<statement>);
-constant %LOOSEST         = (:prec<a=!>);
-constant %terminator      = (:prec<a=>, :assoc<list>);
+constant %term            = (:dba('term')            , :prec<z=>);
+constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>);
+constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>);
+constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>, :assign);
+constant %symbolic_unary  = (:dba('symbolic_unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>);
+constant %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>,  :assign);
+constant %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>,  :assign);
+constant %replication     = (:dba('replication')     , :prec<s=>, :assoc<left>,  :assign);
+constant %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>,  :assign);
+constant %junctive_and    = (:dba('junctive_and')    , :prec<q=>, :assoc<list>,  :assign);
+constant %junctive_or     = (:dba('junctive_or')     , :prec<p=>, :assoc<list>,  :assign);
+constant %named_unary     = (:dba('named_unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>);
+constant %nonchaining     = (:dba('nonchaining')     , :prec<n=>, :assoc<non>);
+constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :bool);
+constant %tight_and       = (:dba('tight_and')       , :prec<l=>, :assoc<list>,  :assign);
+constant %tight_or        = (:dba('tight_or')        , :prec<k=>, :assoc<list>,  :assign);
+constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>);
+constant %item_assignment = (:dba('item_assignment') , :prec<i=>, :assoc<right>);
+constant %loose_unary     = (:dba('loose_unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>);
+constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>);
+constant %list_infix      = (:dba('list_infix')      , :prec<f=>, :assoc<list>,  :assign);
+constant %list_assignment = (:dba('list_assignment') , :prec<i=>, :assoc<right>, :sub<e=>);
+constant %list_prefix     = (:dba('list_prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
+constant %loose_and       = (:dba('loose_and')       , :prec<d=>, :assoc<list>,  :assign);
+constant %loose_or        = (:dba('loose_or')        , :prec<c=>, :assoc<list>,  :assign);
+constant %sequencer       = (:dba('sequencer')       , :prec<b=>, :assoc<list>, :nextterm<statement>);
+constant %LOOSEST         = (:dba('LOOSEST')         , :prec<a=!>);
+constant %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
 
 # "epsilon" tighter than terminator
 #constant $LOOSEST = %LOOSEST<prec>;
@@ -681,7 +681,7 @@ token regex_block {
 # statement semantics
 rule statementlist {
     :my $PARSER is context<rw> = self;
-    :my $SEMILIST is context = 0;
+    :my $INVOCANT_OK is context<rw> = 0;
     :dba('statement list')
     [
     | $
@@ -692,7 +692,7 @@ rule statementlist {
 
 # embedded semis, context-dependent semantics
 rule semilist {
-    :my $SEMILIST is context = 1;
+    :my $INVOCANT_OK is context<rw> = 0;
     :dba('semicolon list')
     [
     | <?before <[\)\]\}]> >
@@ -1213,8 +1213,8 @@ token methodop {
 
     :dba('method arguments')
     [
-    | '.'? <.unsp>? '(' ~ ')' <semilist>
     | ':' <?before \s> <!{ $+inquote }> <arglist>
+    | <?[.(]> <args>
     ]?
 }
 
@@ -1223,24 +1223,21 @@ token semiarglist {
 }
 
 token arglist {
+    :my $inv_ok = $+INVOCANT_OK;
     :my StrPos $endargs is context<rw> = 0;
     :my $GOAL is context = 'endargs';
     <.ws>
     :dba('argument list')
     [
     | <?stdstopper>
-    | <EXPR(item %list_prefix)> {{
+    | <EXPR(item %list_infix)> {{
             my $delims = $<EXPR><delims>;
             for @$delims {
                 if ($_.<sym> // '') eq ':' {
-                    if $+INVOCANT_OK {
+                    if $inv_ok {
                         $+INVOCANT_IS = $<EXPR><list>[0];
                     }
-                    else {
-                        $¢.panic("Illegal use of colon as invocant marker");
-                    }
                 }
-                $+INVOCANT_OK = 0;
             }
         }}
     ]
@@ -2642,6 +2639,7 @@ token capterm {
 }
 
 rule capture {
+    :my $INVOCANT_OK is context<rw> = 1;
     <EXPR>
 }
 
@@ -3274,7 +3272,9 @@ token infix:sym<,> ( --> Comma)
     { <sym> }
 
 token infix:sym<:> ( --> Comma)
-    { <sym> <?before \s | <terminator> > }
+    { <sym> <?before \s | <terminator> >
+        { $¢.panic("Illegal use of colon as invocant marker") unless $+INVOCANT_OK--; }
+    }
 
 token infix:sym« p5=> » ( --> Comma)
     { <sym> }
@@ -3646,7 +3646,14 @@ method EXPR ($preclvl)
                 $inprec = %terminator<prec>;
             }
 
-            last TERM unless $inprec gt $preclim;
+            if $inprec le $preclim {
+                my $dba = $preclvl.<dba>;
+                my $h = $*HIGHEXPECT;
+                my $k = 'infix or meta-infix';
+                $h.{$k}:delete;
+                $h.{"infix or meta-infix (with precedence tighter than $dba)"} = 1;
+                last TERM;
+            }
 
             $here = $infix.cursor_fresh.ws();
 
