@@ -3974,20 +3974,7 @@ grammar Regex is STD {
             ]
     }
 
-    token assertion:identifier { <longname> [               # is qq right here?
-                                    | <?before '>' >
-                                    | <.ws> <nibbler>
-                                    | '=' <assertion>
-                                    | ':' <.ws>
-                                        [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]
-                                    | '(' {}
-                                        [ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
-                                        [ ')' || <.panic: "Assertion call missing right parenthesis"> ]
-                                    ]?
-    }
-
-    # stupid special case
-    token assertion:name { <?before \w*'::('> [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <name> ]
+    token assertion:name { [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <longname> ]
                                     [
                                     | <?before '>' >
                                     | <.ws> <nibbler>
