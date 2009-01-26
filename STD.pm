@@ -1689,7 +1689,7 @@ token variable {
                 <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
             ]?
         | <special_variable> {*}                                    #= special
-        | <sigil> \d+ {*}                                           #= $0
+        | <sigil> $<index>=[\d+] {*}                                #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
         | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
         | <sigil> <?{ $+IN_DECL }> {*}                              #= anondecl
