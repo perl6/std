@@ -3758,7 +3758,7 @@ grammar Regex is STD {
         || [ <?before \s | '#'> <nextsame> ]?   # still get all the pod goodness, hopefully
     }
 
-    token sigspace {
+    token normspace {
         <?before \s | '#'> [ :lang($¢.cursor_fresh($+LANG)) <.ws> ]
     }
 
@@ -3832,7 +3832,7 @@ grammar Regex is STD {
     # "normal" metachars
 
     token metachar:sigwhite {
-        <sigspace>
+        <normspace>
     }
 
     token metachar:sym<{ }> {
@@ -3988,23 +3988,25 @@ grammar Regex is STD {
                                     ]?
     }
 
-    token assertion:sym<[> { <before '[' > <cclass_elem> ** < + - > }
-    token assertion:sym<+> { <sym> <cclass_elem> ** < + - > }
-    token assertion:sym<-> { <sym> <cclass_elem> ** < + - > }
+    token assertion:sym<[> { <?before '['> <cclass_elem>+ }
+    token assertion:sym<+> { <?before '+'> <cclass_elem>+ }
+    token assertion:sym<-> { <?before '-'> <cclass_elem>+ }
     token assertion:sym<.> { <sym> }
     token assertion:sym<,> { <sym> }
     token assertion:sym<~~> { <sym> [ <?before '>'> | \d+ | <desigilname> ] }
 
     token assertion:bogus { <.panic: "Unrecognized regex assertion"> }
 
+    token sign { '+' | '-' | <?> }
     token cclass_elem {
-        <.ws>
         :dba('character class element')
+        <sign>
+        <.normspace>?
         [
         | <name>
         | <before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
         ]
-        <.ws>
+        <.normspace>?
     }
 
     token mod_arg { :dba('modifier argument') '(' ~ ')' <semilist> }
@@ -4044,7 +4046,7 @@ grammar Regex is STD {
     token quantifier:sym<*>  { <sym> <quantmod> }
     token quantifier:sym<+>  { <sym> <quantmod> }
     token quantifier:sym<?>  { <sym> <quantmod> }
-    token quantifier:sym<**> { <sym> :: <sigspace>? <quantmod> <sigspace>?
+    token quantifier:sym<**> { <sym> :: <normspace>? <quantmod> <normspace>?
         [
         | \d+ [ '..' [ \d+ | '*' ] ]?
         | <codeblock>
@@ -4057,7 +4059,7 @@ grammar Regex is STD {
         | '!' <sym>
         | <sym>
         ]
-        <sigspace> <quantified_atom> }
+        <normspace> <quantified_atom> }
 
     token quantmod { ':'? [ '?' | '!' | '+' ]? }
 
