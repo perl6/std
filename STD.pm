@@ -1138,7 +1138,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
 
     [
     || <!!{ ($<O><returns> // '') eq 'Bool' }>
-    || <.worry: "Only boolean infix operators may be negated"> <!>
+    || <.panic: "Only boolean infix operators may be negated">
     ]
 
     <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
@@ -1152,7 +1152,7 @@ token infix_prefix_meta_operator:sym<-> ( --> Transparent) {
 
     [
     || <!!{ ($<O><returns> // '') eq 'Order' }>
-    || <.worry: "Only comparison infix operators may be negated"> <!>
+    || <.panic: "Only comparison infix operators may be negated">
     ]
 
     <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
@@ -2990,7 +2990,7 @@ token infix:sym<div> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym<%> ( --> Multiplicative)
-    { <sym> }
+    { <sym> { $<O><returns> = 'Bool'; } }   # Allow !% operator
 
 token infix:sym<mod> ( --> Multiplicative)
     { <sym> }
@@ -3178,6 +3178,12 @@ token infix:sym<===> ( --> Chaining)
 token infix:sym<eqv> ( --> Chaining)
     { <sym> }
 
+token infix:sym<before> ( --> Chaining)
+    { <sym> }
+
+token infix:sym<after> ( --> Chaining)
+    { <sym> }
+
 
 ## tight and
 token infix:sym<&&> ( --> Tight_and)
@@ -3284,7 +3290,7 @@ token prefix:sym<not> ( --> Loose_unary)
 
 ## list item separator
 token infix:sym<,> ( --> Comma)
-    { <sym> }
+    { <sym> { $<O><assign> = 1 } }
 
 token infix:sym<:> ( --> Comma)
     { <sym> <?before \s | <terminator> >
