@@ -150,7 +150,7 @@ my @baseroutinenames = qw[
     chars graphs codes bytes
 
     say print open close printf sprintf slurp unlink link symlink
-    elems grep map first reduce sort uniq push reverse take splice
+    elems grep map first reduce sort min max uniq push reverse take splice
     lines getc
 
     zip each roundrobin caller
@@ -233,7 +233,7 @@ constant %junctive_and    = (:dba('junctive_and')    , :prec<q=>, :assoc<list>, 
 constant %junctive_or     = (:dba('junctive_or')     , :prec<p=>, :assoc<list>,  :assign);
 constant %named_unary     = (:dba('named_unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>);
 constant %nonchaining     = (:dba('nonchaining')     , :prec<n=>, :assoc<non>);
-constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :bool);
+constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :returns<Bool>); # XXX Bool string, not type
 constant %tight_and       = (:dba('tight_and')       , :prec<l=>, :assoc<list>,  :assign);
 constant %tight_or        = (:dba('tight_or')        , :prec<k=>, :assoc<list>,  :assign);
 constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>);
@@ -272,7 +272,7 @@ role PrecOp {
 
 } # end role
 
-class Hyper does PrecOp {
+class Transparent does PrecOp {
  our %o = (:transparent);
 } # end class
 
@@ -1031,6 +1031,7 @@ token quotepair {
 }
 
 token infixish {
+    :my $infix;
     <!stdstopper>
     <!infixstopper>
     :dba('infix or meta-infix')
@@ -1050,7 +1051,7 @@ token infixish {
     | <infix_circumfix_meta_operator>
         { $<O> = $<infix_circumfix_meta_operator><O>;
           $<sym> = $<infix_circumfix_meta_operator><sym>; }
-    | <infix> <?before '='> <infix_postfix_meta_operator($<infix>)>
+    | <infix> <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
            { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
     ]
 }
@@ -1129,20 +1130,32 @@ token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
 
 token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' }
 
-token infix_prefix_meta_operator:sym<!> ( --> Chaining) {
+token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
     <sym> <!before '!'> <infix>
 
     <!!{ $<O> = $<infix><O>; }>
     <!!lex1: 'negation'>
 
     [
-    || <!!{ $<O><assoc> eq 'chain'}>
-    || <!!{ $<O><assoc> and $<O><bool> }>
-    || <.panic: "Only boolean infix operators may be negated">
+    || <!!{ ($<O><returns> // '') eq 'Bool' }>
+    || <.worry: "Only boolean infix operators may be negated"> <!>
     ]
 
     <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
+}
 
+token infix_prefix_meta_operator:sym<-> ( --> Transparent) {
+    <sym> <!before '='> <infix>
+
+    <!!{ $<O> = $<infix><O>; }>
+    <!!lex1: 'negation'>
+
+    [
+    || <!!{ ($<O><returns> // '') eq 'Order' }>
+    || <.worry: "Only comparison infix operators may be negated"> <!>
+    ]
+
+    <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
 }
 
 method lex1 (Str $s) {
@@ -1160,7 +1173,7 @@ token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
     <!!lex1: 'cross'>
 }
 
-token infix_circumfix_meta_operator:sym<« »> ( --> Hyper) {
+token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
     [
     | '«' <infix> [ '«' | '»' ]
     | '»' <infix> [ '«' | '»' ]
@@ -1176,8 +1189,9 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     { $<O> = $op<O>; }
     <?lex1: 'assignment'>
 
-    [ <?{ ($<O><assoc> // '') eq 'chain' }> <.panic: "Can't make assignment op of boolean operator"> ]?
+    [ <?{ ($<O><returns> // '') eq 'Bool' }> <.panic: "Can't make assignment op of boolean operator"> ]?
     [ <?{ ($<O><assoc> // '') eq 'non'   }> <.panic: "Can't make assignment op of non-associative operator"> ]?
+    [ <!{ $<O><assign> }> <.panic("Can't make assignment of " ~ $<O><dba> ~ " operator")> ]?
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
@@ -3082,13 +3096,13 @@ token prefix:temp ( --> Named_unary)
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
-    { <sym> }
+    { <sym> { $<O><returns> = "Order"; } }
 
 token infix:cmp ( --> Nonchaining)
-    { <sym> }
+    { <sym> { $<O><returns> = "Order"; } }
 
 token infix:leg ( --> Nonchaining)
-    { <sym> }
+    { <sym> { $<O><returns> = "Order"; } }
 
 token infix:but ( --> Nonchaining)
     { <sym> }
