@@ -75,7 +75,7 @@ method TOP ($STOP = undef) {
 # XXX shouldn't need this, it should all be defined/imported by the prelude
 
 my @basetypenames = qw[
-    Object Any Junction Whatever
+    Object Any Junction Whatever HyperWhatever
     Capture Match Signature Proxy Matcher
     Package Module Class Role Grammar
     Scalar Array Hash KeyHash KeySet KeyBag
