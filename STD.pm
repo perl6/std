@@ -1043,7 +1043,7 @@ token infixish {
             %<O><assoc> = 'unary';
             %<O><uassoc> = 'left';
         }
-    | <infix>
+    | <infix> <!before '='>
            { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
     | <infix_prefix_meta_operator>
         { $<O> = $<infix_prefix_meta_operator><O>;
@@ -1189,8 +1189,8 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     { $<O> = $op<O>; }
     <?lex1: 'assignment'>
 
-    [ <?{ ($<O><assoc> // '') eq 'non'   }> <.panic: "Can't make assignment op of non-associative operator"> ]?
-    [ <!{ $<O><assign> }> <.panic("Can't make assignment of " ~ $<O><dba> ~ " operator")> ]?
+    [ <?{ ($<O><assoc> // '') eq 'non'   }> <.panic: "Can't make assignment op out of non-associative operator"> ]?
+    [ <!{ $<O><assign> }> <.panic("Can't make assignment out of " ~ $<O><dba> ~ " operator")> ]?
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
