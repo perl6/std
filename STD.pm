@@ -10,7 +10,7 @@ my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
 my $SIGIL is context<rw>;
-my %ROUTINES;
+my %MYSTERY;
 my $ORIG is context;
 my @MEMOS is context;
 my $VOID is context<rw>;
@@ -184,7 +184,7 @@ my %routinenames;
 
 sub init_pads {
     @PKGS = ();
-    %ROUTINES = ();
+    %MYSTERY = ();
 
     @PADS = ();
     @PADS[0] = {};
@@ -197,7 +197,7 @@ sub init_pads {
     }
 }
 
-method is_routine ($name) {
+method is_known ($name) {
     my $aname;
     if substr($name,0,1) eq '&' {
         $aname = $name;
@@ -603,15 +603,45 @@ rule comp_unit {
             warn "Potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES) ~ "\n";
         }
 
-        my %UNKNOWN;
-        for keys(%ROUTINES) {
-            next if $¢.is_routine($_);
-            %UNKNOWN{$_} = %ROUTINES{$_};
+        my %post_types;
+        my %unk_types;
+        my %unk_routines;
+        for keys(%MYSTERY) {
+            if $¢.is_type($_) {
+                # types may not be post-declared
+                %post_types{$_} = %MYSTERY{$_};
+                next;
+            }
+
+            next if $¢.is_known($_);
+
+            # just a guess, but good enough to improve error reporting
+            if $_ lt 'a' {
+                %unk_types{$_} = %MYSTERY{$_};
+            }
+            else {
+                %unk_routines{$_} = %MYSTERY{$_};
+            }
         }
-        if %UNKNOWN {
-            warn "Unknown routines:\n";
-            for sort keys(%UNKNOWN) {
-                warn "\t$_ called at ", %UNKNOWN{$_}, "\n";
+        if %post_types {
+            my @tmp = sort keys(%post_types);
+            warn "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
+            for @tmp {
+                warn "\t$_ used at ", %post_types{$_}, "\n";
+            }
+        }
+        if %unk_types {
+            my @tmp = sort keys(%unk_types);
+            warn "Undeclared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
+            for @tmp {
+                warn "\t$_ used at ", %unk_types{$_}, "\n";
+            }
+        }
+        if %unk_routines {
+            my @tmp = sort keys(%unk_routines);
+            warn "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
+            for @tmp {
+                warn "\t$_ used at ", %unk_routines{$_}, "\n";
             }
         }
     }}
@@ -3338,7 +3368,7 @@ token term:identifier ( --> Term )
     { $t = $<identifier>.text; }
     <args( $¢.is_type($t) )>
     {{
-        %ROUTINES{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $<args><invocant> or $¢.is_routine($t);
+        %MYSTERY{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $<args><invocant> or $¢.is_known($t);
     }}
 }
 
