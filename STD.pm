@@ -1112,7 +1112,7 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
         | \\<op=infix_prefix_meta_operator> ']' ['«'|<?>]
         | \\<op=infix_circumfix_meta_operator> ']' ['«'|<?>]
         ]
-    ) <?before \s | '(' >
+    ) <?before <[ \s ( ]> >
 
     { $<O> = $<s><op><O>; $<sym> = $<s>.text; }
 
@@ -2990,7 +2990,7 @@ token infix:sym<div> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym<%> ( --> Multiplicative)
-    { <sym> { $<O><returns> = 'Bool'; } }   # Allow !% operator
+    { <sym> <!!{ $<O><returns> = 'Bool'; }> }   # Allow !% operator
 
 token infix:sym<mod> ( --> Multiplicative)
     { <sym> }
@@ -3096,13 +3096,13 @@ token prefix:temp ( --> Named_unary)
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
-    { <sym> { $<O><returns> = "Order"; } }
+    { <sym> <!!{ $<O><returns> = "Order"; }> }
 
 token infix:cmp ( --> Nonchaining)
-    { <sym> { $<O><returns> = "Order"; } }
+    { <sym> <!!{ $<O><returns> = "Order"; }> }
 
 token infix:leg ( --> Nonchaining)
-    { <sym> { $<O><returns> = "Order"; } }
+    { <sym> <!!{ $<O><returns> = "Order"; }> }
 
 token infix:but ( --> Nonchaining)
     { <sym> }
