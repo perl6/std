@@ -224,27 +224,27 @@ constant %term            = (:dba('term')            , :prec<z=>);
 constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>);
 constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>);
 constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>, :assign);
-constant %symbolic_unary  = (:dba('symbolic_unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>);
+constant %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>);
 constant %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>,  :assign);
 constant %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>,  :assign);
 constant %replication     = (:dba('replication')     , :prec<s=>, :assoc<left>,  :assign);
 constant %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>,  :assign);
-constant %junctive_and    = (:dba('junctive_and')    , :prec<q=>, :assoc<list>,  :assign);
-constant %junctive_or     = (:dba('junctive_or')     , :prec<p=>, :assoc<list>,  :assign);
-constant %named_unary     = (:dba('named_unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>);
+constant %junctive_and    = (:dba('junctive and')    , :prec<q=>, :assoc<list>,  :assign);
+constant %junctive_or     = (:dba('junctive or')     , :prec<p=>, :assoc<list>,  :assign);
+constant %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>);
 constant %nonchaining     = (:dba('nonchaining')     , :prec<n=>, :assoc<non>);
 constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :returns<Bool>); # XXX Bool string, not type
-constant %tight_and       = (:dba('tight_and')       , :prec<l=>, :assoc<list>,  :assign);
-constant %tight_or        = (:dba('tight_or')        , :prec<k=>, :assoc<list>,  :assign);
+constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>,  :assign);
+constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>,  :assign);
 constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>);
-constant %item_assignment = (:dba('item_assignment') , :prec<i=>, :assoc<right>);
-constant %loose_unary     = (:dba('loose_unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>);
+constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>);
+constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>);
 constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>);
-constant %list_infix      = (:dba('list_infix')      , :prec<f=>, :assoc<list>,  :assign);
-constant %list_assignment = (:dba('list_assignment') , :prec<i=>, :assoc<right>, :sub<e=>);
-constant %list_prefix     = (:dba('list_prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
-constant %loose_and       = (:dba('loose_and')       , :prec<d=>, :assoc<list>,  :assign);
-constant %loose_or        = (:dba('loose_or')        , :prec<c=>, :assoc<list>,  :assign);
+constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>,  :assign);
+constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>);
+constant %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
+constant %loose_and       = (:dba('loose and')       , :prec<d=>, :assoc<list>,  :assign);
+constant %loose_or        = (:dba('loose or')        , :prec<c=>, :assoc<list>,  :assign);
 constant %sequencer       = (:dba('sequencer')       , :prec<b=>, :assoc<list>, :nextterm<statement>);
 constant %LOOSEST         = (:dba('LOOSEST')         , :prec<a=!>);
 constant %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
@@ -1189,7 +1189,6 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     { $<O> = $op<O>; }
     <?lex1: 'assignment'>
 
-    [ <?{ ($<O><returns> // '') eq 'Bool' }> <.panic: "Can't make assignment op of boolean operator"> ]?
     [ <?{ ($<O><assoc> // '') eq 'non'   }> <.panic: "Can't make assignment op of non-associative operator"> ]?
     [ <!{ $<O><assign> }> <.panic("Can't make assignment of " ~ $<O><dba> ~ " operator")> ]?
 }
