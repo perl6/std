@@ -1173,8 +1173,6 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
     || <?{ $<infixish>.text eq '=' }>
     || <.panic: "Only boolean infix operators may be negated">
     ]
-
-    <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
 }
 
 token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
@@ -1182,12 +1180,6 @@ token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
 
     <?{ $<O> = $<infixish><O>; }>
 
-    [
-    || <?{ ($<O><returns> // '') eq 'Order' }>
-    || <.panic: "Only comparison infix operators may be negated">
-    ]
-
-    <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
 }
 
 #method lex1 (Str $s) {
