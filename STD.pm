@@ -1074,6 +1074,7 @@ token infixish {
             %<O><assoc> = 'unary';
             %<O><uassoc> = 'left';
         }
+    | '[' ~ ']' <infixish> { $<O> = $<infixish><O> }
     | <infix> <!before '='>
            { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
     | <infix_prefix_meta_operator>
@@ -1133,6 +1134,7 @@ token POST {
 }
 
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
+    <?before '['\S+']'>
     $<s> = (
         '['
         [
@@ -1162,63 +1164,57 @@ token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
 token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' }
 
 token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
-    <sym> <!before '!'> <infix>
+    <sym> <!before '!'> {} <infixish>
 
-    <!!{ $<O> = $<infix><O>; }>
-    <!!lex1: 'negation'>
+    <?{ $<O> = $<infixish><O>; }>
 
     [
-    || <!!{ ($<O><returns> // '') eq 'Bool' }>
+    || <?{ ($<O><returns> // '') eq 'Bool' }>
+    || <?{ $<infixish>.text eq '=' }>
     || <.panic: "Only boolean infix operators may be negated">
     ]
 
     <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
 }
 
-token infix_prefix_meta_operator:sym<-> ( --> Transparent) {
-    <sym> <!before '='> <infix>
+token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
+    <sym> <!before '='> {} <infixish>
 
-    <!!{ $<O> = $<infix><O>; }>
-    <!!lex1: 'negation'>
+    <?{ $<O> = $<infixish><O>; }>
 
     [
-    || <!!{ ($<O><returns> // '') eq 'Order' }>
+    || <?{ ($<O><returns> // '') eq 'Order' }>
     || <.panic: "Only comparison infix operators may be negated">
     ]
 
     <!{ $<O><hyper> and $¢.panic("Negation of hyper operator not allowed") }>
 }
 
-method lex1 (Str $s) {
-    self.<O>{$s}++ and self.panic("Nested $s metaoperators not allowed");
-    self;
-}
+#method lex1 (Str $s) {
+#    self.<O>{$s}++ and self.panic("Nested $s metaoperators not allowed");
+#    self;
+#}
 
-token infix_circumfix_meta_operator:sym<X X> ( --> List_infix) {
-    X [
-    | <infix> X
-    | <infix=infix_prefix_meta_operator> X
-    | <infix=infix_circumfix_meta_operator> X
-    ]
-    <!!{ $<O> = $<infix><O>; }>
-    <!!lex1: 'cross'>
+token infix_circumfix_meta_operator:sym<X> ( --> List_infix) {
+    X {}
+    [ <infixish> X?  # XXX temporarily
+        <?{ $<O> = $<infixish><O>; }>
+    ]?
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
     [
-    | '«' <infix> [ '«' | '»' ]
-    | '»' <infix> [ '«' | '»' ]
-    | '<<' <infix> [ '<<' | '>>' ]
-    | '>>' <infix> [ '<<' | '>>' ]
+    | '«' {} <infixish> [ '«' | '»' ]
+    | '»' {} <infixish> [ '«' | '»' ]
+    | '<<' {} <infixish> [ '<<' | '>>' ]
+    | '>>' {} <infixish> [ '<<' | '>>' ]
     ]
-    <!!{ $<O> := $<infix><O>; }>
-    <!!lex1: 'hyper'>
+    <?{ $<O> := $<infixish><O>; }>
 }
 
 token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     '='
     { $<O> = $op<O>; }
-    <?lex1: 'assignment'>
 
     [ <?{ ($<O><assoc> // '') eq 'non'   }> <.panic: "Can't make assignment op out of non-associative operator"> ]?
     [ <!{ $<O><assign> }> <.panic("Can't make assignment out of " ~ $<O><dba> ~ " operator")> ]?
@@ -1723,7 +1719,11 @@ token desigilname {
 token variable {
     <?before <sigil> { $+SIGIL ||= $<sigil>.text } > {}
     [
-    || '&' <twigil>?  <sublongname> {*}                                   #= subnoun
+    || '&'
+        [
+        | <twigil>?  <sublongname> {*}                                   #= subnoun
+        | '[' ~ ']' <infixish>
+        ]
     || <?before '$::('> '$' <name>?
     || '$::' <name>? # XXX
     || '$:' <name>? # XXX
@@ -3005,7 +3005,7 @@ token infix:sym<div> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym<%> ( --> Multiplicative)
-    { <sym> <!!{ $<O><returns> = 'Bool'; }> }   # Allow !% operator
+    { <sym> <?{ $<O><returns> = 'Bool'; }> }   # Allow !% operator
 
 token infix:sym<mod> ( --> Multiplicative)
     { <sym> }
@@ -3014,16 +3014,16 @@ token infix:sym<+&> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym« +< » ( --> Multiplicative)
-    { <sym> }
+    { <sym> <!before '<'> }
 
 token infix:sym« << » ( --> Multiplicative)
-    { <sym> <.obs('<< to do left shift', '+< or ~<')> }
+    { <sym> \s <.obs('<< to do left shift', '+< or ~<')> }
 
 token infix:sym« >> » ( --> Multiplicative)
-    { <sym> <.obs('>> to do right shift', '+> or ~>')> }
+    { <sym> \s <.obs('>> to do right shift', '+> or ~>')> }
 
 token infix:sym« +> » ( --> Multiplicative)
-    { <sym> }
+    { <sym> <!before '>'> }
 
 token infix:sym<~&> ( --> Multiplicative)
     { <sym> }
@@ -3032,10 +3032,10 @@ token infix:sym<?&> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym« ~< » ( --> Multiplicative)
-    { <sym> }
+    { <sym> <!before '<'> }
 
 token infix:sym« ~> » ( --> Multiplicative)
-    { <sym> }
+    { <sym> <!before '>'> }
 
 
 ## additive
@@ -3112,13 +3112,13 @@ token prefix:temp ( --> Named_unary)
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
-    { <sym> <!!{ $<O><returns> = "Order"; }> }
+    { <sym> <?{ $<O><returns> = "Order"; }> }
 
 token infix:cmp ( --> Nonchaining)
-    { <sym> <!!{ $<O><returns> = "Order"; }> }
+    { <sym> <?{ $<O><returns> = "Order"; }> }
 
 token infix:leg ( --> Nonchaining)
-    { <sym> <!!{ $<O><returns> = "Order"; }> }
+    { <sym> <?{ $<O><returns> = "Order"; }> }
 
 token infix:but ( --> Nonchaining)
     { <sym> }
@@ -3141,10 +3141,10 @@ token infix:sym<^..^> ( --> Nonchaining)
 
 ## chaining binary
 token infix:sym<==> ( --> Chaining)
-    { <sym> }
+    { <sym> <!before '=' > }
 
 token infix:sym<!=> ( --> Chaining)
-    { <sym> }
+    { <sym> <?before \s> }
 
 token infix:sym« < » ( --> Chaining)
     { <sym> }
@@ -3161,8 +3161,9 @@ token infix:sym« >= » ( --> Chaining)
 token infix:sym<~~> ( --> Chaining)
     { <sym> }
 
+# XXX should move to inside meta !
 token infix:sym<!~> ( --> Chaining)
-    { <sym> <.obs('!~ to do negated pattern matching', '!~~')> }
+    { <sym> \s <.obs('!~ to do negated pattern matching', '!~~')> }
 
 token infix:sym<=~> ( --> Chaining)
     { <sym> <.obs('=~ to do pattern matching', '~~')> }
@@ -3233,7 +3234,7 @@ token infix:sym<?? !!> ( --> Conditional) {
         [
         || <?before '='> <.panic: "Assignment not allowed within ??!!">
         || <?before '::'> <.panic: "Please use !! rather than ::">
-        || <?before <infix>>    # Note: a tight infix would have parsed right
+        || <?before <infixish>>    # Note: a tight infix would have parsed right
             <.panic: "Precedence too loose within ??!!; use ??()!! instead ">
         || <.panic: "Found ?? but no !!; possible precedence problem">
         ]
@@ -3314,10 +3315,6 @@ token infix:sym<:> ( --> Comma)
     }
 
 token infix:sym« p5=> » ( --> Comma)
-    { <sym> }
-
-## list infix
-token infix:sym<X> ( --> List_infix)
     { <sym> }
 
 token infix:sym<Z> ( --> List_infix)
@@ -3480,6 +3477,10 @@ token terminator:sym<}> ( --> Terminator)
 
 token terminator:sym<!!> ( --> Terminator)
     { '!!' <?{ $+GOAL eq '!!' }> }
+
+# disallow &[] and such as infix
+# token infix:sigil ( --> Term )
+#     { <sigil><-[&]> <.worry: "Sigiled form not allowed where infix expected"> <!> }
 
 regex infixstopper {
     :dba('infix stopper')
