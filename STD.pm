@@ -129,6 +129,7 @@ my @baseroutinenames = qw[
     WHAT WHERE HOW WHICH VAR WHO WHENCE new
     any all none one
     not true
+    next last redo break goto
 
     die exit warn
     caller want
@@ -2885,23 +2886,8 @@ token term:sym<undef> ( --> Term) {
     ]?
 }
 
-token term:sym<next> ( --> Term)
-    { <sym> » <.ws> [<!stdstopper> <termish>]? }
-
-token term:sym<last> ( --> Term)
-    { <sym> » <.ws> [<!stdstopper> <termish>]? }
-
-token term:sym<redo> ( --> Term)
-    { <sym> » <.ws> [<!stdstopper> <termish>]? }
-
-token term:sym<break> ( --> Term)
-    { <sym> » <.ws> [<!stdstopper> <termish>]? }
-
 token term:sym<continue> ( --> Term)
     { <sym> » }
-
-token term:sym<goto> ( --> Term)
-    { <sym> » <.ws> <termish> }
 
 token term:sym<self> ( --> Term)
     { <sym> » }
@@ -3122,6 +3108,7 @@ token prefix:let ( --> Named_unary)
 
 token prefix:temp ( --> Named_unary)
     { <sym> » <?before \s*> }
+
 
 ## nonchaining binary
 token infix:sym« <=> » ( --> Nonchaining)
