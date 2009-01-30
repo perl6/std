@@ -1204,7 +1204,7 @@ token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
     | '<<'
     | '>>'
     ]
-    {} <infixish> [ '<< | '>> ]
+    {} <infixish> [ '<<' | '>>' ]
     <?{ $<O> := $<infixish><O>; }>
 }
 
