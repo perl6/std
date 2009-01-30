@@ -1185,7 +1185,8 @@ token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
 
 token infix_circumfix_meta_operator:sym<X> ( --> List_infix) {
     X {}
-    [ <infixish> X?  # XXX temporarily
+    [ <infixish>
+        [X <.panic: "Old form of XopX found">]?
         <?{ $<O> = $<infixish>[0]<O>; }>
     ]?
 }
