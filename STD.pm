@@ -1075,14 +1075,14 @@ token infixish {
             %<O><uassoc> = 'left';
         }
     | '[' ~ ']' <infixish> { $<O> = $<infixish><O> }
-    | <infix> <!before '='>
-           { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
-    | <infix_prefix_meta_operator>
-        { $<O> = $<infix_prefix_meta_operator><O>;
-          $<sym> = $<infix_prefix_meta_operator><sym>; }
     | <infix_circumfix_meta_operator>
         { $<O> = $<infix_circumfix_meta_operator><O>;
           $<sym> = $<infix_circumfix_meta_operator><sym>; }
+    | <infix_prefix_meta_operator>
+        { $<O> = $<infix_prefix_meta_operator><O>;
+          $<sym> = $<infix_prefix_meta_operator><sym>; }
+    | <infix> <!before '='>
+           { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
     | <infix> <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
            { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
     ]
@@ -1138,12 +1138,8 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     $<s> = (
         '['
         [
-        | <op=infix> ']' ['«'|<?>]
-        | <op=infix_prefix_meta_operator> ']' ['«'|<?>]
-        | <op=infix_circumfix_meta_operator> ']' ['«'|<?>]
-        | \\<op=infix> ']' ['«'|<?>]
-        | \\<op=infix_prefix_meta_operator> ']' ['«'|<?>]
-        | \\<op=infix_circumfix_meta_operator> ']' ['«'|<?>]
+        | <op=infixish> ']' ['«'|<?>]
+        | \\<op=infixish> ']' ['«'|<?>]
         ]
     ) <?before <[ \s ( ]> >
 
@@ -1190,17 +1186,25 @@ token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
 token infix_circumfix_meta_operator:sym<X> ( --> List_infix) {
     X {}
     [ <infixish> X?  # XXX temporarily
-        <?{ $<O> = $<infixish><O>; }>
+        <?{ $<O> = $<infixish>[0]<O>; }>
     ]?
 }
 
 token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
     [
-    | '«' {} <infixish> [ '«' | '»' ]
-    | '»' {} <infixish> [ '«' | '»' ]
-    | '<<' {} <infixish> [ '<<' | '>>' ]
-    | '>>' {} <infixish> [ '<<' | '>>' ]
+    | '«'
+    | '»'
     ]
+    {} <infixish> [ '«' | '»' ]
+    <?{ $<O> := $<infixish><O>; }>
+}
+
+token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
+    [
+    | '<<'
+    | '>>'
+    ]
+    {} <infixish> [ '<< | '>> ]
     <?{ $<O> := $<infixish><O>; }>
 }
 
