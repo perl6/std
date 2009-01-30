@@ -1172,7 +1172,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
 }
 
 token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
-    <sym> <!before '='> {} <infixish>
+    <sym> {} <infixish>
 
     <?{ $<O> = $<infixish><O>; }>
 
