@@ -2799,7 +2799,7 @@ token parameter {
         ]
         [
         | '?'           { $quant = '?'; $kind = '?' }
-        | '!'           { $quant = '!'; $kind = '!' }
+        | '!'           { $quant = '!'; $kind //= '!' }
         | <?>
         ]
     | <?>               { $quant = ''; $kind = '!'; }
