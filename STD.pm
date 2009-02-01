@@ -223,29 +223,29 @@ method add_routine ($name) {
 
 constant %term            = (:dba('term')            , :prec<z=>);
 constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>);
-constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>);
-constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>, :assign);
-constant %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>);
-constant %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>,  :assign);
-constant %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>,  :assign);
-constant %replication     = (:dba('replication')     , :prec<s=>, :assoc<left>,  :assign);
-constant %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>,  :assign);
-constant %junctive_and    = (:dba('junctive and')    , :prec<q=>, :assoc<list>,  :assign);
-constant %junctive_or     = (:dba('junctive or')     , :prec<p=>, :assoc<list>,  :assign);
-constant %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>);
-constant %nonchaining     = (:dba('nonchaining')     , :prec<n=>, :assoc<non>);
-constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :returns<Bool>); # XXX Bool string, not type
-constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>,  :assign);
-constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>,  :assign);
+constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>, :direct);
+constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>, :direct, :iso);
+constant %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>, :direct);
+constant %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>, :direct, :iso);
+constant %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>, :direct, :iso);
+constant %replication     = (:dba('replication')     , :prec<s=>, :assoc<left>, :direct, :iso);
+constant %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>, :direct, :iso);
+constant %junctive_and    = (:dba('junctive and')    , :prec<q=>, :assoc<list>, :direct, :iso);
+constant %junctive_or     = (:dba('junctive or')     , :prec<p=>, :assoc<list>, :direct, :iso);
+constant %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>, :direct);
+constant %nonchaining     = (:dba('nonchaining')     , :prec<n=>, :assoc<non>, :direct);
+constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :direct, :iffy);
+constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>, :direct, :iso);
+constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>, :direct, :iso);
 constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>);
 constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>);
-constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>);
+constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>, :direct);
 constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>);
-constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>,  :assign);
+constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>, :direct, :iso);
 constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>);
 constant %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
-constant %loose_and       = (:dba('loose and')       , :prec<d=>, :assoc<list>,  :assign);
-constant %loose_or        = (:dba('loose or')        , :prec<c=>, :assoc<list>,  :assign);
+constant %loose_and       = (:dba('loose and')       , :prec<d=>, :assoc<list>, :direct, :iso);
+constant %loose_or        = (:dba('loose or')        , :prec<c=>, :assoc<list>, :direct, :iso);
 constant %sequencer       = (:dba('sequencer')       , :prec<b=>, :assoc<list>, :nextterm<statement>);
 constant %LOOSEST         = (:dba('LOOSEST')         , :prec<a=!>);
 constant %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
@@ -1145,11 +1145,11 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
 
     { $<O> = $<s><op><O>; $<sym> = $<s>.text; }
 
-    [ <!{ $<O><assoc> eq 'non' }>
-        || <.panic: "Can't reduce a non-associative operator"> ]
-
-    [ <!{ $<O><prec> eq %conditional<prec> }>
-        || <.panic: "Can't reduce a conditional operator"> ]
+    [
+    || <?{ $<O><iso> }>
+    || <?{ $<O><direct> }> <?{ $<O><assoc> eq 'chain' }>
+    || <.panic("Can't reduce a " ~ $<O><dba> ~ " operator because it's not isomorphic or chaining")>
+    ]
 
     { $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
 
@@ -1165,9 +1165,9 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
     <?{ $<O> = $<infixish><O>; }>
 
     [
-    || <?{ ($<O><returns> // '') eq 'Bool' }>
-    || <?{ $<infixish>.text eq '=' }>
-    || <.panic: "Only boolean infix operators may be negated">
+    || <?{ $<O><iffy> }>
+    || <?{ $<infixish>.text eq '=' }> { $¢ = STD::Chaining.coerce($¢); }
+    || <.panic("Can't negate a " ~ $<O><dba> ~ " operator because it's not iffy")>
     ]
 }
 
@@ -1175,7 +1175,7 @@ token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
     <sym> {} <infixish>
 
     <?{ $<O> = $<infixish><O>; }>
-
+    [ <?{ $<O><direct> }> || <.panic("Can't reverse a " ~ $<O><dba> ~ " operator because it's not direct")> ]
 }
 
 #method lex1 (Str $s) {
@@ -1188,6 +1188,7 @@ token infix_circumfix_meta_operator:sym<X> ( --> List_infix) {
     [ <infixish>
         [X <.panic: "Old form of XopX found">]?
         <?{ $<O> = $<infixish>[0]<O>; }>
+        [ <?{ $<O><direct> }> || <.panic("Can't cross a " ~ $<O><dba> ~ " operator because it's not direct")> ]
     ]?
 }
 
@@ -1198,6 +1199,7 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
     ]
     {} <infixish> [ '«' | '»' ]
     <?{ $<O> := $<infixish><O>; }>
+    [ <?{ $<O><direct> }> || <.panic("Can't hyper a " ~ $<O><dba> ~ " operator because it's not direct")> ]
 }
 
 token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
@@ -1207,14 +1209,13 @@ token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
     ]
     {} <infixish> [ '<<' | '>>' ]
     <?{ $<O> := $<infixish><O>; }>
+    [ <?{ $<O><direct> }> || <.panic("Can't hyper a " ~ $<O><dba> ~ " operator because it's not direct")> ]
 }
 
 token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     '='
-    { $<O> = $op<O>; }
-
-    [ <?{ ($<O><assoc> // '') eq 'non'   }> <.panic: "Can't make assignment op out of non-associative operator"> ]?
-    [ <!{ $<O><assign> }> <.panic("Can't make assignment out of " ~ $<O><dba> ~ " operator")> ]?
+    [ <?{ $op<O><iso> }> || <.panic("Can't make assignment out of a " ~ $<O><dba> ~ " operator because it's not isomorphic")> ]
+    { $<O> = $op<O>; $<O><iso> = 0; }
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
@@ -3002,7 +3003,7 @@ token infix:sym<div> ( --> Multiplicative)
     { <sym> }
 
 token infix:sym<%> ( --> Multiplicative)
-    { <sym> <?{ $<O><returns> = 'Bool'; }> }   # Allow !% operator
+    { <sym> <?{ $<O><iffy> = 1; }> }   # Allow !% operator
 
 token infix:sym<mod> ( --> Multiplicative)
     { <sym> }
@@ -3291,7 +3292,7 @@ token infix:sym<.=> ( --> Item_assignment) {
 }
 
 token infix:sym« => » ( --> Item_assignment)
-    { <sym> }
+    { <sym> { $<O><direct> = 1; $<O><iso> = 1; } }
 
 # Note, other assignment ops generated by infix_postfix_meta_operator rule
 
@@ -3304,7 +3305,7 @@ token prefix:sym<not> ( --> Loose_unary)
 
 ## list item separator
 token infix:sym<,> ( --> Comma)
-    { <sym> { $<O><assign> = 1 } }
+    { <sym> { $<O><direct> = 1; $<O><iso> = 1; } }
 
 token infix:sym<:> ( --> Comma)
     { <sym> <?before \s | <terminator> >
