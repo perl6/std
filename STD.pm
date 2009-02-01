@@ -1138,8 +1138,9 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     $<s> = (
         '['
         [
-        | <op=infixish> ']' ['«'|<?>]
-        | \\<op=infixish> ']' ['«'|<?>]
+        || <op=infixish> ']' ['«'|<?>]
+        || \\<op=infixish> ']' ['«'|<?>]
+        || <!>
         ]
     ) <?before <[ \s ( ]> >
 
@@ -2671,7 +2672,7 @@ token trait_auxiliary:will {
 rule trait_verb:of      {<sym> <fulltypename> }
 rule trait_verb:as      {<sym> <fulltypename> }
 rule trait_verb:returns {<sym> <fulltypename> }
-rule trait_verb:handles {<sym> <EXPR> }
+rule trait_verb:handles {<sym> <noun> }
 
 token capterm {
     '\\'
@@ -2916,6 +2917,9 @@ token term:sym<*> ( --> Term)
 
 token term:sym<**> ( --> Term)
     { <sym> }
+
+token infix:lambda ( --> Term)
+    { <?before '{' | '->' > <.panic: "Unexpected block in infix position (previous statement missing semicolon?)"> }
 
 token circumfix:sigil ( --> Term)
     { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $+SIGIL ||= $<sigil>.text } }
