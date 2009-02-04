@@ -1,0 +1,85 @@
+for (qw<
+    True False Bool::True Bool::False
+    Object Any Junction Whatever HyperWhatever
+    Capture Match Signature Proxy Matcher
+    Package Module Class Role Grammar
+    Scalar Array Hash KeyHash KeySet KeyBag
+    Pair List Seq Range Set Bag Mapping
+    Void Undef Failure Exception
+    Code Block Routine Sub Macro
+    Method Submethod Regex
+
+    Str Blob
+    Char Byte Codepoint Grapheme StrPos StrLen Version
+
+    Num Complex
+    num complex
+
+    Int  int   int1  int2  int4 int8  int16  int32  int64
+    Rat  rat   rat1  rat2  rat4 rat8  rat16  rat32  rat64
+    UInt uint uint1 uint2 uint4 uint8 uint16 uint32 uint64
+    Buf  buf   buf1  buf2  buf4 buf8  buf16  buf32  buf64
+
+    Bit Bool
+    bit bool
+
+    Order Increasing Decreasing
+    Ordered Callable Positional Associative Abstraction
+    Ordering KeyExtractor Comparator OrderingPair
+
+    IO
+
+    KitchenSink
+
+    &WHAT &WHERE &HOW &WHICH &VAR &WHO &WHENCE &new
+    &HOW &fail &temp &let
+    &any &all &none &one
+    &not &true
+    &next &last &redo &break &goto
+
+    &die &exit &warn
+    &caller &want
+    &eval &evalfile
+    &callsame &callwith &nextsame &nextwith &lastcall
+    &defined &undefine &item &list &slice &eager &hyper
+
+    &cat &classify
+    &quotemeta
+    &chr &ord
+    &p5chop &chop &p5chomp &chomp &trim &trim_start &trim_end
+    &index &rindex &substr
+    &join &split &comb &pack &unpack
+    &uc &ucfirst &lc &lcfirst
+    &normalize
+    &nfc &nfd &nfkc &nfkd
+    &samecase &sameaccent
+    &capitalize
+    &chars &graphs &codes &bytes
+
+    &say &print &open &close &printf &sprintf &slurp &unlink &link &symlink
+    &elems &grep &map &first &reduce &sort &min &max &uniq &push &reverse &take &splice
+    &lines &getc
+
+    &zip &each &roundrobin &caller
+    &return &leave &pop &shift &unshift &reduce
+    &keys &values &hash &kv &key &value &pairs &pair
+
+    &sign &abs &floor &ceiling &round &truncate
+    &exp &log &log10 &sqrt &roots
+    &rand &srand &pick
+    &cis &unpolar
+
+    &sin &cos &tan &asin &acos &atan &sec &cosec &cotan &asec &acosec
+    &acotan &sinh &cosh &tanh &asinh &acosh &atanh &sech &cosech &cotanh
+    &asech &acosech &acotanh &atan2
+
+    &plan &is &ok &dies_ok &lives_ok &skip &todo &pass &flunk &force_todo &use_ok
+    &isa_ok &cmp_ok &diag &is_deeply &isnt &like &skip_rest &unlike &nonce
+    &skip_rest &eval_dies_ok &eval_lives_ok &approx &is_approx &throws_ok &version_lt
+
+    &gmtime &localtime &time &times
+    &gethost &getpw &chroot &getlogin
+    &run &runinstead
+    &fork &wait &kill &sleep
+>) { $::PERLpad{$_} = 1 }
+1;

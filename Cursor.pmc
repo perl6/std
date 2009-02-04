@@ -179,6 +179,20 @@ sub parsefile {
     $result;
 }
 
+sub load_pad {
+    return \%::PERLpad if %::PERLpad;
+    my $file = "PERL.pad";
+    my $store = "PERL.pad.store";
+    if (-f $store and -M $file > -M $store) {
+        *::PERLpad = retrieve($store);
+    }
+    else {
+        require $file;
+        store(\%::PERLpad, $store);
+    }
+    \%::PERLpad;
+}
+
 sub mixin {
     my $self = shift;
     my $WHAT = ref($self)||$self;

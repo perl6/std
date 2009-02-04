@@ -9,6 +9,7 @@ my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
+my $SCOPE is context;
 my $SIGIL is context<rw>;
 my %MYSTERY;
 my $ORIG is context;
@@ -17,6 +18,7 @@ my $VOID is context<rw>;
 my $INVOCANT_OK is context<rw>;
 my $INVOCANT_IS is context<rw>;
 my @PADS;
+my %GLOBAL;
 
 # random rule for debugging, please ignore
 token foo {
@@ -72,130 +74,48 @@ method TOP ($STOP = undef) {
 }
 
 
-# XXX shouldn't need this, it should all be defined/imported by the prelude
-
-my @basetypenames = qw[
-    Object Any Junction Whatever HyperWhatever
-    Capture Match Signature Proxy Matcher
-    Package Module Class Role Grammar
-    Scalar Array Hash KeyHash KeySet KeyBag
-    Pair List Seq Range Set Bag Mapping
-    Void Undef Failure Exception
-    Code Block Routine Sub Macro
-    Method Submethod Regex
-
-    Str Blob
-    Char Byte Codepoint Grapheme StrPos StrLen Version
-
-    Num Complex
-    num complex
-
-    Int  int   int1  int2  int4 int8  int16  int32  int64
-    Rat  rat   rat1  rat2  rat4 rat8  rat16  rat32  rat64
-    UInt uint uint1 uint2 uint4 uint8 uint16 uint32 uint64
-    Buf  buf   buf1  buf2  buf4 buf8  buf16  buf32  buf64
-
-    Bit Bool
-    bit bool
-
-    Order Increasing Decreasing
-    Ordered Callable Positional Associative Abstraction
-    Ordering KeyExtractor Comparator OrderingPair
-
-    IO
-
-    KitchenSink
-];
-push @basetypenames, "True", "False", "Bool::True", "Bool::False";  # in quotes lest gimme5 translate them
-
-method is_type ($name) {
+method is_bareword ($name) {
+    $name = substr($name,2) while substr($name,0,2) eq '::';
     for reverse @PADS {
+        return True if $_.{$name};
+    }
+    given %GLOBAL{$+PKG} {
         return True if $_.{$name};
     }
     return False;
 }
 
-method add_type ($name) {
-    my $typename = main::mangle($name);
-    my $qualname = ($+PKG // 'GLOBAL') ~ '::' ~ $typename;
-    @PADS[*-1]{$typename} = 'TYPE';
-    @PADS[*-1]{$qualname} = 'TYPE';
+method add_bareword ($name) {
+    if $+SCOPE eq 'our' {
+        self.add_our_bareword($name);
+    }
+    else {
+        self.add_my_bareword($name);
+    }
+}
+
+method add_my_bareword ($name) {
+    $name = substr($name,2) while substr($name,0,2) eq '::';
     @PADS[*-1]{$name} = 'TYPE';
 }
 
-# XXX likewise for routine defs
-
-my @baseroutinenames = qw[
-    WHAT WHERE HOW WHICH VAR WHO WHENCE new
-    any all none one
-    not true
-    next last redo break goto
-
-    die exit warn
-    caller want
-    eval evalfile
-    callsame callwith nextsame nextwith lastcall
-    defined undefine item list slice eager hyper
-
-    cat classify
-    quotemeta
-    chr ord
-    p5chop chop p5chomp chomp trim trim_start trim_end
-    index rindex substr
-    join split comb pack unpack
-    uc ucfirst lc lcfirst
-    normalize
-    nfc nfd nfkc nfkd
-    samecase sameaccent
-    capitalize
-    chars graphs codes bytes
-
-    say print open close printf sprintf slurp unlink link symlink
-    elems grep map first reduce sort min max uniq push reverse take splice
-    lines getc
-
-    zip each roundrobin caller
-    return leave pop shift unshift reduce
-    keys values hash kv key value pairs pair
-
-    sign abs floor ceiling round truncate
-    exp log log10 sqrt roots
-    rand srand pick
-    cis unpolar
-
-    sin cos tan asin acos atan sec cosec cotan asec acosec
-    acotan sinh cosh tanh asinh acosh atanh sech cosech cotanh
-    asech acosech acotanh atan2
-
-    plan is ok dies_ok lives_ok skip todo pass flunk force_todo use_ok
-    isa_ok cmp_ok diag is_deeply isnt like skip_rest unlike nonce
-    skip_rest eval_dies_ok eval_lives_ok approx is_approx throws_ok version_lt
-
-    gmtime localtime time times
-    gethost getpw chroot getlogin
-    run runinstead
-    fork wait kill sleep
-];
-push @baseroutinenames, "HOW", "fail", "temp", "let";
-
-# please don't add: ref length bless delete exists
+method add_our_bareword ($name) {
+    $name = substr($name,2) while substr($name,0,2) eq '::';
+    %GLOBAL{$+PKG}{$name} = 'TYPE';
+    @PADS[*-1]{$name} = 'TYPE';  # the lexical alias
+}
 
 my @routinenames;
 my %routinenames;
 
-sub init_pads {
+method load_setting {
     @PKGS = ();
+    %GLOBAL = ();
     %MYSTERY = ();
 
     @PADS = ();
     @PADS[0] = {};
-    for @basetypenames {
-        @PADS[0]{$_} = 'TYPE';
-        @PADS[0]{'&' ~ $_} = 'CODE';
-    }
-    for @baseroutinenames {
-        @PADS[0]{'&' ~ $_} = 'CODE';
-    }
+    @PADS[0] = %GLOBAL<PERL::> = self.load_pad;
 }
 
 method is_known ($name) {
@@ -210,11 +130,29 @@ method is_known ($name) {
         return True if $_.{$aname};
         return True if $_.{$name}; # type as routine?
     }
+    given %GLOBAL{$+PKG} {
+        return True if $_.{$name};
+        return True if $_.{$aname};
+    }
     return False;
 }
 
 method add_routine ($name) {
+    if $+SCOPE eq 'our' {
+        self.add_our_routine($name);
+    }
+    else {
+        self.add_my_routine($name);
+    }
+}
+
+method add_my_routine ($name) {
     @PADS[*-1]{'&' ~ $name} = 'CODE';
+}
+
+method add_our_routine ($name) {
+    %GLOBAL{$+PKG}{'&' ~ $name} = 'CODE';
+    @PADS[*-1]{'&' ~ $name} = 'CODE';  # the lexical alias
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -594,7 +532,7 @@ rule comp_unit {
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
 
-    { init_pads(); }
+    { self.load_setting(); }
 
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
@@ -608,7 +546,7 @@ rule comp_unit {
         my %unk_types;
         my %unk_routines;
         for keys(%MYSTERY) {
-            if $¢.is_type($_) {
+            if $¢.is_bareword($_) {
                 # types may not be post-declared
                 %post_types{$_} = %MYSTERY{$_};
                 next;
@@ -736,12 +674,12 @@ token label {
     :my $label;
     <identifier> ':' <?before \s> <.ws>
 
-    [ <?{ $¢.is_type($label = $<identifier>.text) }>
+    [ <?{ $¢.is_bareword($label = $<identifier>.text) }>
       <.panic("Illegal redeclaration of '$label'")>
     ]?
 
     # add label as a pseudo type
-    {{ $¢.add_type($label); }}
+    {{ $¢.add_my_bareword($label); }}
 
 }
 
@@ -797,7 +735,7 @@ token statement_control:use {
     | <module_name><arglist>?
         {{
             my $longname = $<module_name><longname>;
-            $¢.add_type($longname.text);
+            $¢.add_our_bareword($longname.text);
         }}
     ]
 }
@@ -983,6 +921,7 @@ token termish {
 }
 
 token noun {
+    :my $SCOPE is context<rw> = "our";
     [
     | <fatarrow>
     | <variable>
@@ -1330,11 +1269,11 @@ rule scoped {
 }
 
 
-token scope_declarator:my       { <sym> <scoped> }
-token scope_declarator:our      { <sym> <scoped> }
-token scope_declarator:state    { <sym> <scoped> }
-token scope_declarator:constant { <sym> <scoped> }
-token scope_declarator:has      { <sym> <scoped> }
+token scope_declarator:my       { <sym> { $+SCOPE = $<sym> } <scoped> }
+token scope_declarator:our      { <sym> { $+SCOPE = $<sym> } <scoped> }
+token scope_declarator:state    { <sym> { $+SCOPE = $<sym> } <scoped> }
+token scope_declarator:constant { <sym> { $+SCOPE = $<sym> } <scoped> }
+token scope_declarator:has      { <sym> { $+SCOPE = $<sym> } <scoped> }
 
 
 token package_declarator:class {
@@ -1390,7 +1329,7 @@ rule package_def {
     [
         <module_name>{
             $longname = $<module_name>[0]<longname>;
-            $¢.add_type($longname.text);
+            $¢.add_bareword($longname.text);
         }
     ]?
     <trait>*
@@ -1840,10 +1779,10 @@ token typename {
       <?{{
         my $longname = $<longname>.text;
         if substr($longname, 0, 2) eq '::' {
-            $¢.add_type(substr($longname, 2));
+            $¢.add_my_bareword(substr($longname, 2));
         }
         else {
-            $¢.is_type($longname)
+            $¢.is_bareword($longname)
         }
       }}>
     ]
@@ -2718,7 +2657,7 @@ token signature {
 
 token type_declarator:subset {
     <sym> :s
-    <longname> { $¢.add_type($<longname>.text); }
+    <longname> { $¢.add_bareword($<longname>.text); }
     [ of <fulltypename> ]?
     [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
 }
@@ -2726,7 +2665,7 @@ token type_declarator:subset {
 token type_declarator:enum {
     :my $l;
     <sym> <.ws>
-    [ $l = <longname> :: { $¢.add_type($l.text); } <.ws> ]?
+    [ $l = <longname> :: { $¢.add_bareword($l.text); } <.ws> ]?
     <EXPR> <.ws>
 }
 
@@ -3361,7 +3300,7 @@ token term:identifier ( --> Term )
     :my $t;
     <identifier> <?before ['.'?'(']?>
     { $t = $<identifier>.text; }
-    <args( $¢.is_type($t) )>
+    <args( $¢.is_bareword($t) )>
     {{
         %MYSTERY{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $<args><invocant> or $¢.is_known($t);
     }}
@@ -3400,7 +3339,7 @@ token term:name ( --> Term)
     <longname>
     [
     ||  <?{
-            $¢.is_type($<longname>.text) or substr($<longname>.text,0,2) eq '::'
+            $¢.is_bareword($<longname>.text) or substr($<longname>.text,0,2) eq '::'
         }>
         # parametric type?
         <.unsp>? [ <?before '['> <postcircumfix> ]?
