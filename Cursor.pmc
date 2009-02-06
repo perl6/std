@@ -180,17 +180,20 @@ sub parsefile {
 }
 
 sub load_pad {
-    return \%::PERLpad if %::PERLpad;
-    my $file = "PERL.pad";
-    my $store = "PERL.pad.store";
+    my $self = shift;
+    my $setting = shift;
+    state %PADS;
+    return $PADS{$setting} if $PADS{$setting};
+    my $file = "$setting.pad";
+    my $store = "$setting.pad.store";
     if (-f $store and -M $file > -M $store) {
-        *::PERLpad = retrieve($store);
+        $PADS{$setting} = retrieve($store);
     }
     else {
-        require $file;
-        store(\%::PERLpad, $store);
+        $PADS{$setting} = require $file;
+        store($PADS{$setting}, $store);
     }
-    \%::PERLpad;
+    $PADS{$setting};
 }
 
 sub mixin {

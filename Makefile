@@ -9,7 +9,7 @@ fast: $(FIXINS) check
 STD.pmc: STD.pm gimme5
 	./gimme5 $< >STD.pm5
 	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD.pm5 >$@
-	rm -rf lex
+	rm -rf lex *.pad.store
 
 check: STD.pmc
 	/usr/local/bin/perl -c $<
@@ -23,10 +23,10 @@ cat:
 	cat try5.out
 
 clean:
-	rm -rf lex try5.*
+	rm -rf lex try5.* *.pad.store
 
 distclean purge: clean
-	rm -rf STD.pmc*
+	rm -rf STD.pmc STD.pm5
 
 test: all
 	./teststd

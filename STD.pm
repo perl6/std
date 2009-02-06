@@ -17,6 +17,9 @@ my @MEMOS is context;
 my $VOID is context<rw>;
 my $INVOCANT_OK is context<rw>;
 my $INVOCANT_IS is context<rw>;
+
+my $CORE = {};
+my $SETTING = "CORE";
 my @PADS;
 my %GLOBAL;
 
@@ -73,8 +76,25 @@ method TOP ($STOP = undef) {
     }
 }
 
+#  Absolute:
+#    MY          # $stash = mypad()
+#    OUR         # $stash = $?PACKAGE;
+#    CORE        # $stash = $::CORE
+#    GLOBAL      # $stash = CORE::<GLOBAL::>
+#    PROCESS     # $stash = CORE::<PROCESS::>
+#    COMPILING   # $stash = compiling($rest) # compiler's run time
+#    CALLER      # ctx = ctx.caller # user's run time
+#    CONTEXT     # ctx = ctx.context # user's run time
+#
+#  Relative:
+#    OUTER       # $stash = $stash<OUTER::>
+#    UNIT        # $stash = $stash.scanouter(:unit)
+#    SETTING     # $stash = UNIT::<OUTER::>
+#    PARENT      # $stash = $stash<PARENT::>
+#
+#    SUPER       # (give up, pass to dispatcher?)
 
-method is_bareword ($name) {
+method is_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
     for reverse @PADS {
         return True if $_.{$name};
@@ -85,21 +105,21 @@ method is_bareword ($name) {
     return False;
 }
 
-method add_bareword ($name) {
+method add_name ($name) {
     if $+SCOPE eq 'our' {
-        self.add_our_bareword($name);
+        self.add_our_name($name);
     }
     else {
-        self.add_my_bareword($name);
+        self.add_my_name($name);
     }
 }
 
-method add_my_bareword ($name) {
+method add_my_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
     @PADS[*-1]{$name} = 'TYPE';
 }
 
-method add_our_bareword ($name) {
+method add_our_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
     %GLOBAL{$+PKG}{$name} = 'TYPE';
     @PADS[*-1]{$name} = 'TYPE';  # the lexical alias
@@ -108,14 +128,15 @@ method add_our_bareword ($name) {
 my @routinenames;
 my %routinenames;
 
-method load_setting {
+method load_setting ($setting) {
     @PKGS = ();
     %GLOBAL = ();
     %MYSTERY = ();
 
     @PADS = ();
     @PADS[0] = {};
-    @PADS[0] = %GLOBAL<PERL::> = self.load_pad;
+    # XXX CORE   === SETTING for now
+    @PADS[0] = %GLOBAL{"CORE::"} = %GLOBAL{"SETTING::"} = self.load_pad($setting);
 }
 
 method is_known ($name) {
@@ -532,7 +553,7 @@ rule comp_unit {
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
 
-    { self.load_setting(); }
+    { self.load_setting($SETTING); }
 
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
@@ -546,7 +567,7 @@ rule comp_unit {
         my %unk_types;
         my %unk_routines;
         for keys(%MYSTERY) {
-            if $¢.is_bareword($_) {
+            if $¢.is_name($_) {
                 # types may not be post-declared
                 %post_types{$_} = %MYSTERY{$_};
                 next;
@@ -674,12 +695,12 @@ token label {
     :my $label;
     <identifier> ':' <?before \s> <.ws>
 
-    [ <?{ $¢.is_bareword($label = $<identifier>.text) }>
+    [ <?{ $¢.is_name($label = $<identifier>.text) }>
       <.panic("Illegal redeclaration of '$label'")>
     ]?
 
     # add label as a pseudo type
-    {{ $¢.add_my_bareword($label); }}
+    {{ $¢.add_my_name($label); }}
 
 }
 
@@ -735,7 +756,7 @@ token statement_control:use {
     | <module_name><arglist>?
         {{
             my $longname = $<module_name><longname>;
-            $¢.add_our_bareword($longname.text);
+            $¢.add_our_name($longname.text);
         }}
     ]
 }
@@ -1329,7 +1350,7 @@ rule package_def {
     [
         <module_name>{
             $longname = $<module_name>[0]<longname>;
-            $¢.add_bareword($longname.text);
+            $¢.add_name($longname.text);
         }
     ]?
     <trait>*
@@ -1779,10 +1800,10 @@ token typename {
       <?{{
         my $longname = $<longname>.text;
         if substr($longname, 0, 2) eq '::' {
-            $¢.add_my_bareword(substr($longname, 2));
+            $¢.add_my_name(substr($longname, 2));
         }
         else {
-            $¢.is_bareword($longname)
+            $¢.is_name($longname)
         }
       }}>
     ]
@@ -2657,7 +2678,7 @@ token signature {
 
 token type_declarator:subset {
     <sym> :s
-    <longname> { $¢.add_bareword($<longname>.text); }
+    <longname> { $¢.add_name($<longname>.text); }
     [ of <fulltypename> ]?
     [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
 }
@@ -2665,7 +2686,7 @@ token type_declarator:subset {
 token type_declarator:enum {
     :my $l;
     <sym> <.ws>
-    [ $l = <longname> :: { $¢.add_bareword($l.text); } <.ws> ]?
+    [ $l = <longname> :: { $¢.add_name($l.text); } <.ws> ]?
     <EXPR> <.ws>
 }
 
@@ -3300,7 +3321,7 @@ token term:identifier ( --> Term )
     :my $t;
     <identifier> <?before ['.'?'(']?>
     { $t = $<identifier>.text; }
-    <args( $¢.is_bareword($t) )>
+    <args( $¢.is_name($t) )>
     {{
         %MYSTERY{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $<args><invocant> or $¢.is_known($t);
     }}
@@ -3339,7 +3360,7 @@ token term:name ( --> Term)
     <longname>
     [
     ||  <?{
-            $¢.is_bareword($<longname>.text) or substr($<longname>.text,0,2) eq '::'
+            $¢.is_name($<longname>.text) or substr($<longname>.text,0,2) eq '::'
         }>
         # parametric type?
         <.unsp>? [ <?before '['> <postcircumfix> ]?

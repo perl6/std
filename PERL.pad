@@ -1,3 +1,4 @@
+my %pad;
 for (qw<
     True False Bool::True Bool::False
     Object Any Junction Whatever HyperWhatever
@@ -81,5 +82,5 @@ for (qw<
     &gethost &getpw &chroot &getlogin
     &run &runinstead
     &fork &wait &kill &sleep
->) { $::PERLpad{$_} = 1 }
-1;
+>) { $pad{$_} = 1 }
+\%pad;
