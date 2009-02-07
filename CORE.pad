@@ -1,86 +1,338 @@
-my %pad;
-for (qw<
-    True False Bool::True Bool::False
-    Object Any Junction Whatever HyperWhatever
-    Capture Match Signature Proxy Matcher
-    Package Module Class Role Grammar
-    Scalar Array Hash KeyHash KeySet KeyBag
-    Pair List Seq Range Set Bag Mapping
-    Void Undef Failure Exception
-    Code Block Routine Sub Macro
-    Method Submethod Regex
+{
+    'Bool::' => {
+	True => 1,
+	False => 1
+    },
+    True => 1,
+    False => 1,
+    Object => 1,
+    Any => 1,
+    Junction => 1,
+    Whatever => 1,
+    HyperWhatever => 1,
+    Capture => 1,
+    Match => 1,
+    Signature => 1,
+    Proxy => 1,
+    Matcher => 1,
+    Package => 1,
+    Module => 1,
+    Class => 1,
+    Role => 1,
+    Grammar => 1,
+    Scalar => 1,
+    Array => 1,
+    Hash => 1,
+    KeyHash => 1,
+    KeySet => 1,
+    KeyBag => 1,
+    Pair => 1,
+    List => 1,
+    Seq => 1,
+    Range => 1,
+    Set => 1,
+    Bag => 1,
+    Mapping => 1,
+    Void => 1,
+    Undef => 1,
+    Failure => 1,
+    Exception => 1,
+    Code => 1,
+    Block => 1,
+    Routine => 1,
+    Sub => 1,
+    Macro => 1,
+    Method => 1,
+    Submethod => 1,
+    Regex => 1,
 
-    Str Blob
-    Char Byte Codepoint Grapheme StrPos StrLen Version
+    Str => 1,
+    Blob => 1,
+    Char => 1,
+    Byte => 1,
+    Codepoint => 1,
+    Grapheme => 1,
+    StrPos => 1,
+    StrLen => 1,
+    Version => 1,
 
-    Num Complex
-    num complex
+    Num => 1,
+    Complex => 1,
+    num => 1,
+    complex => 1,
 
-    Int  int   int1  int2  int4 int8  int16  int32  int64
-    Rat  rat   rat1  rat2  rat4 rat8  rat16  rat32  rat64
-    UInt uint uint1 uint2 uint4 uint8 uint16 uint32 uint64
-    Buf  buf   buf1  buf2  buf4 buf8  buf16  buf32  buf64
+    Int => 1,
+    int => 1,
 
-    Bit Bool
-    bit bool
+    int1 => 1,
+    int2 => 1,
+    int4 => 1,
+    int8 => 1,
+    int16 => 1,
+    int32 => 1,
+    int64 => 1,
 
-    Order Increasing Decreasing
-    Ordered Callable Positional Associative Abstraction
-    Ordering KeyExtractor Comparator OrderingPair
+    Rat => 1,
+    rat => 1,
+    rat1 => 1,
+    rat2 => 1,
+    rat4 => 1,
+    rat8 => 1,
+    rat16 => 1,
+    rat32 => 1,
+    rat64 => 1,
 
-    IO
+    UInt => 1,
+    uint => 1,
+    uint1 => 1,
+    uint2 => 1,
+    uint4 => 1,
+    uint8 => 1,
+    uint16 => 1,
+    uint32 => 1,
+    uint64 => 1,
 
-    KitchenSink
+    Buf => 1,
+    buf => 1,
+    buf1 => 1,
+    buf2 => 1,
+    buf4 => 1,
+    buf8 => 1,
+    buf16 => 1,
+    buf32 => 1,
+    buf64 => 1,
 
-    &WHAT &WHERE &HOW &WHICH &VAR &WHO &WHENCE &new
-    &HOW &fail &temp &let
-    &any &all &none &one
-    &not &true
-    &next &last &redo &break &goto
+    Bit => 1,
+    Bool => 1,
+    bit => 1,
+    bool => 1,
 
-    &die &exit &warn
-    &caller &want
-    &eval &evalfile
-    &callsame &callwith &nextsame &nextwith &lastcall
-    &defined &undefine &item &list &slice &eager &hyper
+    Order => 1,
+    Increasing => 1,
+    Decreasing => 1,
+    Ordered => 1,
+    Callable => 1,
+    Positional => 1,
+    Associative => 1,
+    Abstraction => 1,
+    Ordering => 1,
+    KeyExtractor => 1,
+    Comparator => 1,
+    OrderingPair => 1,
 
-    &cat &classify
-    &quotemeta
-    &chr &ord
-    &p5chop &chop &p5chomp &chomp &trim &trim_start &trim_end
-    &index &rindex &substr
-    &join &split &comb &pack &unpack
-    &uc &ucfirst &lc &lcfirst
-    &normalize
-    &nfc &nfd &nfkc &nfkd
-    &samecase &sameaccent
-    &capitalize
-    &chars &graphs &codes &bytes
+    IO => 1,
 
-    &say &print &open &close &printf &sprintf &slurp &unlink &link &symlink
-    &elems &grep &map &first &reduce &sort &min &max &uniq &push &reverse &take &splice
-    &lines &getc
+    KitchenSink => 1,
 
-    &zip &each &roundrobin &caller
-    &return &leave &pop &shift &unshift &reduce
-    &keys &values &hash &kv &key &value &pairs &pair
+    '&WHAT' => 1,
+    '&WHERE' => 1,
+    '&HOW' => 1,
+    '&WHICH' => 1,
+    '&VAR' => 1,
+    '&WHO' => 1,
+    '&WHENCE' => 1,
+    '&new' => 1,
+    '&HOW' => 1,
+    '&fail' => 1,
+    '&temp' => 1,
+    '&let' => 1,
+    '&any' => 1,
+    '&all' => 1,
+    '&none' => 1,
+    '&one' => 1,
+    '&not' => 1,
+    '&true' => 1,
+    '&next' => 1,
+    '&last' => 1,
+    '&redo' => 1,
+    '&break' => 1,
+    '&goto' => 1,
 
-    &sign &abs &floor &ceiling &round &truncate
-    &exp &log &log10 &sqrt &roots
-    &rand &srand &pick
-    &cis &unpolar
+    '&die' => 1,
+    '&exit' => 1,
+    '&warn' => 1,
+    '&caller' => 1,
+    '&want' => 1,
+    '&eval' => 1,
+    '&evalfile' => 1,
+    '&callsame' => 1,
+    '&callwith' => 1,
+    '&nextsame' => 1,
+    '&nextwith' => 1,
+    '&lastcall' => 1,
+    '&defined' => 1,
+    '&undefine' => 1,
+    '&item' => 1,
+    '&list' => 1,
+    '&slice' => 1,
+    '&eager' => 1,
+    '&hyper' => 1,
 
-    &sin &cos &tan &asin &acos &atan &sec &cosec &cotan &asec &acosec
-    &acotan &sinh &cosh &tanh &asinh &acosh &atanh &sech &cosech &cotanh
-    &asech &acosech &acotanh &atan2
+    '&cat' => 1,
+    '&classify' => 1,
+    '&quotemeta' => 1,
+    '&chr' => 1,
+    '&ord' => 1,
+    '&p5chop' => 1,
+    '&chop' => 1,
+    '&p5chomp' => 1,
+    '&chomp' => 1,
+    '&trim' => 1,
+    '&trim_start' => 1,
+    '&trim_end' => 1,
+    '&index' => 1,
+    '&rindex' => 1,
+    '&substr' => 1,
+    '&join' => 1,
+    '&split' => 1,
+    '&comb' => 1,
+    '&pack' => 1,
+    '&unpack' => 1,
+    '&uc' => 1,
+    '&ucfirst' => 1,
+    '&lc' => 1,
+    '&lcfirst' => 1,
+    '&normalize' => 1,
+    '&nfc' => 1,
+    '&nfd' => 1,
+    '&nfkc' => 1,
+    '&nfkd' => 1,
+    '&samecase' => 1,
+    '&sameaccent' => 1,
+    '&capitalize' => 1,
+    '&chars' => 1,
+    '&graphs' => 1,
+    '&codes' => 1,
+    '&bytes' => 1,
 
-    &plan &is &ok &dies_ok &lives_ok &skip &todo &pass &flunk &force_todo &use_ok
-    &isa_ok &cmp_ok &diag &is_deeply &isnt &like &skip_rest &unlike &nonce
-    &skip_rest &eval_dies_ok &eval_lives_ok &approx &is_approx &throws_ok &version_lt
+    '&say' => 1,
+    '&print' => 1,
+    '&open' => 1,
+    '&close' => 1,
+    '&printf' => 1,
+    '&sprintf' => 1,
+    '&slurp' => 1,
+    '&unlink' => 1,
+    '&link' => 1,
+    '&symlink' => 1,
+    '&elems' => 1,
+    '&grep' => 1,
+    '&map' => 1,
+    '&first' => 1,
+    '&reduce' => 1,
+    '&sort' => 1,
+    '&min' => 1,
+    '&max' => 1,
+    '&uniq' => 1,
+    '&push' => 1,
+    '&reverse' => 1,
+    '&take' => 1,
+    '&splice' => 1,
+    '&lines' => 1,
+    '&getc' => 1,
 
-    &gmtime &localtime &time &times
-    &gethost &getpw &chroot &getlogin
-    &run &runinstead
-    &fork &wait &kill &sleep
->) { $pad{$_} = 1 }
-\%pad;
+    '&zip' => 1,
+    '&each' => 1,
+    '&roundrobin' => 1,
+    '&caller' => 1,
+    '&return' => 1,
+    '&leave' => 1,
+    '&pop' => 1,
+    '&shift' => 1,
+    '&unshift' => 1,
+    '&reduce' => 1,
+    '&keys' => 1,
+    '&values' => 1,
+    '&hash' => 1,
+    '&kv' => 1,
+    '&key' => 1,
+    '&value' => 1,
+    '&pairs' => 1,
+    '&pair' => 1,
+
+    '&sign' => 1,
+    '&abs' => 1,
+    '&floor' => 1,
+    '&ceiling' => 1,
+    '&round' => 1,
+    '&truncate' => 1,
+    '&exp' => 1,
+    '&log' => 1,
+    '&log10' => 1,
+    '&sqrt' => 1,
+    '&roots' => 1,
+    '&rand' => 1,
+    '&srand' => 1,
+    '&pick' => 1,
+    '&cis' => 1,
+    '&unpolar' => 1,
+
+    '&sin' => 1,
+    '&cos' => 1,
+    '&tan' => 1,
+    '&asin' => 1,
+    '&acos' => 1,
+    '&atan' => 1,
+    '&sec' => 1,
+    '&cosec' => 1,
+    '&cotan' => 1,
+    '&asec' => 1,
+    '&acosec' => 1,
+    '&acotan' => 1,
+    '&sinh' => 1,
+    '&cosh' => 1,
+    '&tanh' => 1,
+    '&asinh' => 1,
+    '&acosh' => 1,
+    '&atanh' => 1,
+    '&sech' => 1,
+    '&cosech' => 1,
+    '&cotanh' => 1,
+    '&asech' => 1,
+    '&acosech' => 1,
+    '&acotanh' => 1,
+    '&atan2' => 1,
+
+    '&plan' => 1,
+    '&is' => 1,
+    '&ok' => 1,
+    '&dies_ok' => 1,
+    '&lives_ok' => 1,
+    '&skip' => 1,
+    '&todo' => 1,
+    '&pass' => 1,
+    '&flunk' => 1,
+    '&force_todo' => 1,
+    '&use_ok' => 1,
+    '&isa_ok' => 1,
+    '&cmp_ok' => 1,
+    '&diag' => 1,
+    '&is_deeply' => 1,
+    '&isnt' => 1,
+    '&like' => 1,
+    '&skip_rest' => 1,
+    '&unlike' => 1,
+    '&nonce' => 1,
+    '&skip_rest' => 1,
+    '&eval_dies_ok' => 1,
+    '&eval_lives_ok' => 1,
+    '&approx' => 1,
+    '&is_approx' => 1,
+    '&throws_ok' => 1,
+    '&version_lt' => 1,
+
+    '&gmtime' => 1,
+    '&localtime' => 1,
+    '&time' => 1,
+    '&times' => 1,
+    '&gethost' => 1,
+    '&getpw' => 1,
+    '&chroot' => 1,
+    '&getlogin' => 1,
+    '&run' => 1,
+    '&runinstead' => 1,
+    '&fork' => 1,
+    '&wait' => 1,
+    '&kill' => 1,
+    '&sleep' => 1,
+};

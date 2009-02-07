@@ -3,7 +3,7 @@ grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 # should some of these be parser instance attributes?
 my $LANG is context;
 my $PKGDECL is context = "";
-my $PKG is context = "";
+my $PKGNAME is context = "";
 my @PKGS;
 my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
@@ -18,10 +18,12 @@ my $VOID is context<rw>;
 my $INVOCANT_OK is context<rw>;
 my $INVOCANT_IS is context<rw>;
 
-my $CORE = {};
-my $SETTING = "CORE";
-my @PADS;
-my %GLOBAL;
+my $CORE;
+my $CORESETTING = "CORE";
+my $CURPAD;
+my $GLOBAL;
+my $CURPKG;
+my $UNIT;
 
 # random rule for debugging, please ignore
 token foo {
@@ -96,17 +98,63 @@ method TOP ($STOP = undef) {
 
 method is_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    for reverse @PADS {
-        return True if $_.{$name};
+
+    my $curpkg = $CURPKG;
+    if $name ~~ /::/ {
+        my @components = split(/::/,$name);
+        if $curpkg = self.find_pkg(@components[0] ~ '::') {
+            # say "Found lexical package " ~ @components[0] ~ join(' ', keys(%$curpkg));
+            shift @components;
+        }
+        else {
+            # say "Looking for GLOBAL::<$name>";
+            $curpkg = $GLOBAL;
+        }
+        while @components > 1 {
+            my $pkg = shift @components;
+            $curpkg = $curpkg.{$pkg ~ '::'};
+            return False unless $curpkg;
+        }
+        $name = shift @components;
+        $name ~~ s/^\<//;
+        $name ~~ s/\>$//;
     }
-    given %GLOBAL{$+PKG} {
-        return True if $_.{$name};
+    else {
+        my $pad = $CURPAD;
+        while $pad {
+            return True if $pad.{$name};
+            $pad = $pad.<OUTER::>
+        }
     }
+    return True if $curpkg.{$name};
     return False;
 }
 
+method find_pkg ($name) {
+    if $name eq 'OUR::' {
+        return $CURPKG;
+    }
+    elsif $name eq 'MY::' {
+        return $CURPAD;
+    }
+    elsif $name eq 'CORE::' {
+        return $CORE;
+    }
+    elsif $name eq 'UNIT::' {
+        return $UNIT;
+    }
+    # everything is somewhere in lexical scope (we hope)
+    my $pad = $CURPAD;
+    while $pad {
+        return $pad.{$name} if $pad.{$name};
+        $pad = $pad.<OUTER::> // 0;
+    }
+    return 0;
+}
+
 method add_name ($name) {
-    if $+SCOPE eq 'our' {
+    # say "Adding $+SCOPE $name";
+    if $+SCOPE eq 'our' or $name ~~ /::/ {
         self.add_our_name($name);
     }
     else {
@@ -116,13 +164,30 @@ method add_name ($name) {
 
 method add_my_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    @PADS[*-1]{$name} = 'TYPE';
+    $CURPAD.{$name} = 'TYPE';
 }
 
 method add_our_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    %GLOBAL{$+PKG}{$name} = 'TYPE';
-    @PADS[*-1]{$name} = 'TYPE';  # the lexical alias
+    my $curpkg = $CURPKG;
+    $name ~~ s/\:ver\<.*?\>//;
+    $name ~~ s/\:auth\<.*?\>//;
+    if $name ~~ /::/ {
+        $curpkg = $GLOBAL;
+        my @components = split(/::/,$name);
+        my $first = @components[0];
+        # say "Adding to $first";
+        while @components > 1 {
+            my $pkg = shift @components;
+            $curpkg.{$pkg ~ '::'} = {} unless $curpkg.{$pkg ~ '::'};
+            $curpkg = $curpkg.{$pkg ~ '::'};
+        }
+        $name = shift @components;
+    }
+    $name ~~ s/^\<//;
+    $name ~~ s/\>$//;
+    $curpkg.{$name}  = 'TYPE';
+    $CURPAD.{$name} = 'TYPE';  # the lexical alias
 }
 
 my @routinenames;
@@ -130,13 +195,12 @@ my %routinenames;
 
 method load_setting ($setting) {
     @PKGS = ();
-    %GLOBAL = ();
     %MYSTERY = ();
 
-    @PADS = ();
-    @PADS[0] = {};
     # XXX CORE   === SETTING for now
-    @PADS[0] = %GLOBAL{"CORE::"} = %GLOBAL{"SETTING::"} = self.load_pad($setting);
+    $CORE = $CURPAD = $GLOBAL.{"CORE::"} = $GLOBAL.{"SETTING::"} = self.load_pad($setting);
+    $GLOBAL = $CORE.<GLOBAL::> = {};
+    $CURPKG = $GLOBAL;
 }
 
 method is_known ($name) {
@@ -147,14 +211,15 @@ method is_known ($name) {
     else {
         $aname = '&' ~ $name;
     }
-    for reverse @PADS {
-        return True if $_.{$aname};
-        return True if $_.{$name}; # type as routine?
+    my $pad = $CURPAD;
+    while $pad {
+        return True if $pad.{$aname};
+        return True if $pad.{$name}; # type as routine?
+        $pad = $pad.<OUTER::>
     }
-    given %GLOBAL{$+PKG} {
-        return True if $_.{$name};
-        return True if $_.{$aname};
-    }
+    return True if $CURPKG.{$name};
+    return True if $CURPKG.{$name};
+    return True if $CURPKG.{$aname};
     return False;
 }
 
@@ -168,12 +233,13 @@ method add_routine ($name) {
 }
 
 method add_my_routine ($name) {
-    @PADS[*-1]{'&' ~ $name} = 'CODE';
+    $CURPAD.{'&' ~ $name} = 'CODE';
 }
 
 method add_our_routine ($name) {
-    %GLOBAL{$+PKG}{'&' ~ $name} = 'CODE';
-    @PADS[*-1]{'&' ~ $name} = 'CODE';  # the lexical alias
+    # XXX need to allow package names?
+    $CURPKG.{'&' ~ $name} = 'CODE';
+    $CURPAD.{'&' ~ $name} = 'CODE';  # the lexical alias
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -548,12 +614,12 @@ rule comp_unit {
 
     :my $LANG is context;
     :my $PKGDECL is context = "";
-    :my $PKG is context = "";
+    :my $PKGNAME is context = "";
     :my $GOAL is context = "(eof)";
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
 
-    { self.load_setting($SETTING); }
+    { self.load_setting($CORESETTING); }
 
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
@@ -592,7 +658,7 @@ rule comp_unit {
         }
         if %unk_types {
             my @tmp = sort keys(%unk_types);
-            warn "Undeclared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
+            warn "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
             for @tmp {
                 warn "\t$_ used at ", %unk_types{$_}, "\n";
             }
@@ -683,11 +749,22 @@ rule statementlist {
 # embedded semis, context-dependent semantics
 rule semilist {
     :my $INVOCANT_OK is context<rw> = 0;
+    :my $oldcurpad = $CURPAD;
     :dba('semicolon list')
+    {{
+        my $newpad = { 'OUTER::' => $CURPAD };
+        if not $UNIT {
+            $UNIT = $newpad;
+            $newpad.<UNIT::> = $newpad;     # XXX circular ref in p5!!!
+            $newpad.<SETTING::> = $CURPAD;
+        }
+        $CURPAD = $newpad;
+    }}
     [
     | <?before <[\)\]\}]> >
     | [<statement><eat_terminator> ]*
     ]
+    { $CURPAD = $oldcurpad }
 }
 
 
@@ -1358,28 +1435,35 @@ rule package_def {
        <?before '{'>
        {{
            # figure out the actual full package name (nested in outer package)
-            my $pkg = $+PKG // "GLOBAL";
+            my $pkg = $+PKGNAME // "GLOBAL";
+            my $newpkg = $CURPKG.{$pkg ~ '::'} = {};
+            $newpkg.<PARENT::> = $CURPKG;
+            $CURPKG = $newpkg;
             push @PKGS, $pkg;
             if $longname {
                 my $shortname = $longname.<name>.text;
-                $+PKG = $pkg ~ '::' ~ $shortname;
+                $+PKGNAME = $pkg ~ '::' ~ $shortname;
             }
             else {
-                $+PKG = $pkg ~ '::_anon_';
+                $+PKGNAME = $pkg ~ '::_anon_';
             }
         }}
         <block>
         {{
-            $+PKG = pop(@PKGS);
+            $+PKGNAME = pop(@PKGS);
+            $CURPKG = $CURPKG.<PARENT::>;
         }}
         {*}                                                     #= block
     || <?{ $+begin_compunit }> {} <?before ';'>
-        {
+        {{
             $longname orelse $¢.panic("Compilation unit cannot be anonymous");
             my $shortname = $longname.<name>.text;
-            $+PKG = $shortname;
+            $+PKGNAME = $shortname;
+            my $newpkg = $CURPKG.{$shortname ~ '::'} = {};
+            $newpkg.<PARENT::> = $CURPKG;
+            $CURPKG = $newpkg;
             $+begin_compunit = 0;
-        }
+        }}
         {*}                                                     #= semi
     || <.panic: "Unable to parse " ~ $+PKGDECL ~ " definition">
     ]
@@ -3357,7 +3441,9 @@ token args ($istype = 0) {
 # bare identifier without parens also handled here if no other rule parses it
 token term:name ( --> Term)
 {
+    :my $t;
     <longname>
+    { $t = $<longname>.text; }
     [
     ||  <?{
             $¢.is_name($<longname>.text) or substr($<longname>.text,0,2) eq '::'
@@ -3373,7 +3459,10 @@ token term:name ( --> Term)
         {*}                                                     #= typename
 
     # unrecognized names are assumed to be post-declared listops.
-    || <args>?
+    || <args>
+        {{
+            %MYSTERY{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $<args><invocant> or $¢.is_known($t);
+        }}
     ]
 }
 
