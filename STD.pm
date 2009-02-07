@@ -153,7 +153,7 @@ method find_pkg ($name) {
 }
 
 method add_name ($name) {
-    # say "Adding $+SCOPE $name";
+    # say "Adding $+SCOPE $name in $+PKGNAME";
     if $+SCOPE eq 'our' or $name ~~ /::/ {
         self.add_our_name($name);
     }
@@ -173,10 +173,14 @@ method add_our_name ($name) {
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
     if $name ~~ /::/ {
-        $curpkg = $GLOBAL;
         my @components = split(/::/,$name);
-        my $first = @components[0];
-        # say "Adding to $first";
+        my $first = @components[0] ~ '::';
+        if $curpkg = self.find_pkg($first) {
+            shift @components;
+        }
+        else {
+            $curpkg = $CURPKG;
+        }
         while @components > 1 {
             my $pkg = shift @components;
             $curpkg.{$pkg ~ '::'} = {} unless $curpkg.{$pkg ~ '::'};
@@ -187,7 +191,8 @@ method add_our_name ($name) {
     $name ~~ s/^\<//;
     $name ~~ s/\>$//;
     $curpkg.{$name}  = 'TYPE';
-    $CURPAD.{$name} = 'TYPE';  # the lexical alias
+    $CURPAD.{$name} = 'ALIAS ' ~ $CURPAD;  # the lexical alias
+    $CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = {};
 }
 
 my @routinenames;
@@ -199,7 +204,7 @@ method load_setting ($setting) {
 
     # XXX CORE   === SETTING for now
     $CORE = $CURPAD = $GLOBAL.{"CORE::"} = $GLOBAL.{"SETTING::"} = self.load_pad($setting);
-    $GLOBAL = $CORE.<GLOBAL::> = {};
+    $GLOBAL = $CORE.<GLOBAL::>;
     $CURPKG = $GLOBAL;
 }
 
@@ -239,7 +244,8 @@ method add_my_routine ($name) {
 method add_our_routine ($name) {
     # XXX need to allow package names?
     $CURPKG.{'&' ~ $name} = 'CODE';
-    $CURPAD.{'&' ~ $name} = 'CODE';  # the lexical alias
+    # say "CORE $CORE adding name $name to CURPAD $CURPAD in $+PKGNAME";
+    $CURPAD.{'&' ~ $name} = 'ALIAS ' ~ $CURPAD;  # the lexical alias
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -623,6 +629,7 @@ rule comp_unit {
 
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
+    { $<CORE> = $CORE; }
     # "CHECK" time...
     {{
         if @COMPILING::WORRIES {
@@ -737,20 +744,9 @@ token regex_block {
 # statement semantics
 rule statementlist {
     :my $PARSER is context<rw> = self;
+    :my $oldcurpad = $CURPAD;
     :my $INVOCANT_OK is context<rw> = 0;
     :dba('statement list')
-    [
-    | $
-    | <?before <[\)\]\}]> >
-    | [<statement><eat_terminator> ]*
-    ]
-}
-
-# embedded semis, context-dependent semantics
-rule semilist {
-    :my $INVOCANT_OK is context<rw> = 0;
-    :my $oldcurpad = $CURPAD;
-    :dba('semicolon list')
     {{
         my $newpad = { 'OUTER::' => $CURPAD };
         if not $UNIT {
@@ -759,12 +755,27 @@ rule semilist {
             $newpad.<SETTING::> = $CURPAD;
         }
         $CURPAD = $newpad;
+        # say "setting CURPAD to $newpad";
     }}
+    [
+    | $
+    | <?before <[\)\]\}]> >
+    | [<statement><eat_terminator> ]*
+    ]
+    {{
+        # say "restoring CURPAD to $oldcurpad";
+        $CURPAD = $oldcurpad;
+    }}
+}
+
+# embedded semis, context-dependent semantics
+rule semilist {
+    :my $INVOCANT_OK is context<rw> = 0;
+    :dba('semicolon list')
     [
     | <?before <[\)\]\}]> >
     | [<statement><eat_terminator> ]*
     ]
-    { $CURPAD = $oldcurpad }
 }
 
 
@@ -1208,7 +1219,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
 
     [
     || <?{ $<infixish>.text eq '=' }>
-       { $¢ = STD::Chaining.coerce($¢); }
+       { $¢ = ::Chaining.coerce($¢); }
        
     || <.can_meta($<infixish>, "negate")>    
        <?{ $<infixish><O><iffy> }>
@@ -2039,7 +2050,7 @@ token quibble ($l) {
     {{
         if $lang<_herelang> {
             push @herestub_queue,
-                STD::Herestub.new(
+                ::Herestub.new(
                     delim => $<nibble><nibbles>[0],
                     orignode => $¢,
                     lang => $lang<_herelang>,
@@ -3331,8 +3342,8 @@ token infix:sym<=> ()
 {
     <sym>
     { $¢ = $+SIGIL eq '$' 
-        ?? STD::Item_assignment.coerce($¢)
-        !! STD::List_assignment.coerce($¢);
+        ?? ::Item_assignment.coerce($¢)
+        !! ::List_assignment.coerce($¢);
     }
 }
 

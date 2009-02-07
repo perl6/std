@@ -8,6 +8,7 @@
 	Same => 1,
 	Decrease => 1,
     },
+    'GLOBAL::' => {},
     True => 1,
     False => 1,
     Object => 1,
