@@ -1,7 +1,12 @@
 {
     'Bool::' => {
 	True => 1,
-	False => 1
+	False => 1,
+    },
+    'Order::' => {
+	Increase => 1,
+	Same => 1,
+	Decrease => 1,
     },
     True => 1,
     False => 1,
