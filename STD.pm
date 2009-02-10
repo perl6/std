@@ -165,7 +165,7 @@ method add_name ($name) {
 
 method add_my_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    $+CURPAD.{$name} = 'VAL_TBD';
+    $+CURPAD.{$name} = { name => $name };
 }
 
 method add_our_name ($name) {
@@ -191,9 +191,9 @@ method add_our_name ($name) {
     }
     $name ~~ s/^\<//;
     $name ~~ s/\>$//;
-    $curpkg.{$name}  = 'VAL_TBD';
-    $+CURPAD.{$name} = 'ALIAS ' ~ $+CURPAD;  # the lexical alias
-    $+CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = {};
+    $curpkg.{$name}  = { name => $name, file => $COMPILING::FILE, line => self.line };
+    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    $+CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
 }
 
 my @routinenames;
@@ -229,23 +229,24 @@ method is_known ($name) {
 }
 
 method add_routine ($name) {
+    my $vname = '&' ~ $name;
     if ($+SCOPE//'') eq 'our' {
-        self.add_our_routine($name);
+        self.add_our_routine($vname);
     }
     else {
-        self.add_my_routine($name);
+        self.add_my_routine($vname);
     }
 }
 
 method add_my_routine ($name) {
-    $+CURPAD.{'&' ~ $name} = 'CODE_TBD';
+    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
 }
 
 method add_our_routine ($name) {
     # XXX need to allow package names?
-    $CURPKG.{'&' ~ $name} = 'CODE_TBD';
+    $CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
     # say "CORE $CORE adding name $name to CURPAD $+CURPAD in $+PKGNAME";
-    $+CURPAD.{'&' ~ $name} = 'ALIAS ' ~ $+CURPAD;  # the lexical alias
+    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
 }
 
 method add_variable ($name) {
@@ -261,17 +262,29 @@ method add_my_variable ($name) {
     if $name eq '$_' or substr($name, 0, 1) eq '&' or $name ~~ s/\^// {   # XXX hack
         ;
     }
-    elsif $+CURPAD.{$name} {
-        self.worry("Redeclaration of $name");
+    elsif my $old = $+CURPAD.{$name} {
+        my $ofile = $old.<file> // '';
+        my $oline = $old.<line> // '???';
+        if $ofile {
+            if $ofile ne $COMPILING::FILE {
+                self.worry("Variable $name declared at $ofile line $oline is redeclared");
+            }
+            else {
+                self.worry("Variable $name declared at line $oline is redeclared");
+            }
+        }
+        else {
+            self.worry("Variable $name redeclared");
+        }
     }
-    $+CURPAD.{$name} = 'VAR_TBD';
+    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
 }
 
 method add_our_variable ($name) {
     # XXX need to allow package names?
-    $CURPKG.{$name} = 'VAR_TBD';
+    $CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
     # say "CORE $CORE adding variable $name to CURPAD $+CURPAD in $+PKGNAME";
-    $+CURPAD.{$name} = 'ALIAS ' ~ $+CURPAD;  # the lexical alias
+    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -4480,6 +4493,10 @@ method locmess () {
     1 while $post ~~ s!(\n.*)!!;
     " at " ~ $COMPILING::FILE ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR";
+}
+
+method line {
+    self.lineof(self.pos);
 }
 
 method lineof ($p) {
