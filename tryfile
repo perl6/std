@@ -23,6 +23,18 @@ for my $file (@ARGV) {
 my ($time, $vsz) = split(' ', `ps -o "time= vsz=" $$`);
 $time =~ s/^00://;
 $vsz =~ s/\d\d\d$/m/;
-warn "$time $vsz\n" if $vsz;
-
-exit $failures;
+if ($failures) {
+    if ($vsz) {
+	warn "FAILED $time $vsz\n";
+    }
+    else {
+	warn "FAILED\n";
+    }
+    exit $failures;
+}
+elsif ($vsz) {
+    warn "ok $time $vsz\n";
+}
+else {
+    warn "ok\n";
+}

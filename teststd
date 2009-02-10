@@ -38,7 +38,6 @@ for my $file (@files) {
     }
     else {
 	    $success++;
-	    print "ok\n";
     }
 }
 
