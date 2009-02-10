@@ -224,7 +224,6 @@ method is_known ($name) {
         $pad = $pad.<OUTER::>
     }
     return True if $CURPKG.{$name};
-    return True if $CURPKG.{$name};  # FIXME twice?
     return True if $CURPKG.{$vname};
     return False;
 }
