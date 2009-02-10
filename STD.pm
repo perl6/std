@@ -1406,7 +1406,6 @@ rule scoped {
     | <package_declarator>
     | <fulltypename>+ <multi_declarator>
     | <multi_declarator>
-#    | <?before <[A..Z]> > <name> <.panic("Apparent type name " ~ $<name>.text ~ " is not declared yet")>
     ]
 }
 
@@ -1843,7 +1842,7 @@ token variable {
                             $ok ||= self.is_known($vname);
                             $ok ||= substr($<desigilname>.text,0,1) eq '$';
                             if not $ok {
-                                self.worry("Variable $vname not declared");
+                                self.worry("Variable $vname is not predeclared");
                             }
                         }
                         when '^' {
