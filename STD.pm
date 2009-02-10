@@ -124,7 +124,7 @@ method is_name ($name) {
         my $pad = $+CURPAD;
         while $pad {
             return True if $pad.{$name};
-            $pad = $pad.<OUTER::>
+            $pad = $pad.<OUTER::>;
         }
     }
     return True if $curpkg.{$name};
@@ -224,7 +224,7 @@ method is_known ($name) {
         $pad = $pad.<OUTER::>
     }
     return True if $CURPKG.{$name};
-    return True if $CURPKG.{$name};
+    return True if $CURPKG.{$name};  # FIXME twice?
     return True if $CURPKG.{$vname};
     return False;
 }
