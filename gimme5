@@ -83,6 +83,7 @@ sub un6 {
     $f =~ s/(\S+)\s*:(exists|delete)/$2 $1/g if $f =~ /:(exists|delete)/;
     while ($f ne "") {
 	#print "$f\n" if $trace;
+        $f =~ s/^\$\+(\w+)\.?([\[{<])//         	and $t .= qq/\$$1->$2/, next;
         $f =~ s/^\)</.</                  	and $t .= ')', next;
         $f =~ s/^\.\(/(/                  	and $t .= '->', next;
 	$f =~ s/^\[\*-1\]//			and $t .= '[-1]';

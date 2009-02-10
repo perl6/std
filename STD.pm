@@ -9,7 +9,7 @@ my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
-my $SCOPE is context;
+my $SCOPE is context = "";
 my $SIGIL is context<rw>;
 my %MYSTERY;
 my $ORIG is context;
@@ -17,10 +17,11 @@ my @MEMOS is context;
 my $VOID is context<rw>;
 my $INVOCANT_OK is context<rw>;
 my $INVOCANT_IS is context<rw>;
+my $CURPAD is context<rw>;
+my $REALLYADD is context<rw> = 0;
 
 my $CORE;
 my $CORESETTING = "CORE";
-my $CURPAD;
 my $GLOBAL;
 my $CURPKG;
 my $UNIT;
@@ -120,7 +121,7 @@ method is_name ($name) {
         $name ~~ s/\>$//;
     }
     else {
-        my $pad = $CURPAD;
+        my $pad = $+CURPAD;
         while $pad {
             return True if $pad.{$name};
             $pad = $pad.<OUTER::>
@@ -135,7 +136,7 @@ method find_pkg ($name) {
         return $CURPKG;
     }
     elsif $name eq 'MY::' {
-        return $CURPAD;
+        return $+CURPAD;
     }
     elsif $name eq 'CORE::' {
         return $CORE;
@@ -144,7 +145,7 @@ method find_pkg ($name) {
         return $UNIT;
     }
     # everything is somewhere in lexical scope (we hope)
-    my $pad = $CURPAD;
+    my $pad = $+CURPAD;
     while $pad {
         return $pad.{$name} if $pad.{$name};
         $pad = $pad.<OUTER::> // 0;
@@ -154,7 +155,7 @@ method find_pkg ($name) {
 
 method add_name ($name) {
     # say "Adding $+SCOPE $name in $+PKGNAME";
-    if $+SCOPE eq 'our' or $name ~~ /::/ {
+    if ($+SCOPE//'') eq 'our' or $name ~~ /::/ {
         self.add_our_name($name);
     }
     else {
@@ -164,7 +165,7 @@ method add_name ($name) {
 
 method add_my_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    $CURPAD.{$name} = 'TYPE';
+    $+CURPAD.{$name} = 'VAL_TBD';
 }
 
 method add_our_name ($name) {
@@ -190,9 +191,9 @@ method add_our_name ($name) {
     }
     $name ~~ s/^\<//;
     $name ~~ s/\>$//;
-    $curpkg.{$name}  = 'TYPE';
-    $CURPAD.{$name} = 'ALIAS ' ~ $CURPAD;  # the lexical alias
-    $CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = {};
+    $curpkg.{$name}  = 'VAL_TBD';
+    $+CURPAD.{$name} = 'ALIAS ' ~ $+CURPAD;  # the lexical alias
+    $+CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = {};
 }
 
 my @routinenames;
@@ -203,33 +204,33 @@ method load_setting ($setting) {
     %MYSTERY = ();
 
     # XXX CORE   === SETTING for now
-    $CORE = $CURPAD = $GLOBAL.{"CORE::"} = $GLOBAL.{"SETTING::"} = self.load_pad($setting);
+    $CORE = $+CURPAD = $GLOBAL.{"CORE::"} = $GLOBAL.{"SETTING::"} = self.load_pad($setting);
     $GLOBAL = $CORE.<GLOBAL::>;
     $CURPKG = $GLOBAL;
 }
 
 method is_known ($name) {
-    my $aname;
-    if substr($name,0,1) eq '&' {
-        $aname = $name;
+    my $vname;
+    if substr($name,0,1) lt 'A' {
+        $vname = $name;
     }
     else {
-        $aname = '&' ~ $name;
+        $vname = '&' ~ $name;
     }
-    my $pad = $CURPAD;
+    my $pad = $+CURPAD;
     while $pad {
-        return True if $pad.{$aname};
+        return True if $pad.{$vname};
         return True if $pad.{$name}; # type as routine?
         $pad = $pad.<OUTER::>
     }
     return True if $CURPKG.{$name};
     return True if $CURPKG.{$name};
-    return True if $CURPKG.{$aname};
+    return True if $CURPKG.{$vname};
     return False;
 }
 
 method add_routine ($name) {
-    if $+SCOPE eq 'our' {
+    if ($+SCOPE//'') eq 'our' {
         self.add_our_routine($name);
     }
     else {
@@ -238,14 +239,40 @@ method add_routine ($name) {
 }
 
 method add_my_routine ($name) {
-    $CURPAD.{'&' ~ $name} = 'CODE';
+    $+CURPAD.{'&' ~ $name} = 'CODE_TBD';
 }
 
 method add_our_routine ($name) {
     # XXX need to allow package names?
-    $CURPKG.{'&' ~ $name} = 'CODE';
-    # say "CORE $CORE adding name $name to CURPAD $CURPAD in $+PKGNAME";
-    $CURPAD.{'&' ~ $name} = 'ALIAS ' ~ $CURPAD;  # the lexical alias
+    $CURPKG.{'&' ~ $name} = 'CODE_TBD';
+    # say "CORE $CORE adding name $name to CURPAD $+CURPAD in $+PKGNAME";
+    $+CURPAD.{'&' ~ $name} = 'ALIAS ' ~ $+CURPAD;  # the lexical alias
+}
+
+method add_variable ($name) {
+    if ($+SCOPE//'') eq 'our' {
+        self.add_our_variable($name);
+    }
+    else {
+        self.add_my_variable($name);
+    }
+}
+
+method add_my_variable ($name) {
+    if $name eq '$_' or substr($name, 0, 1) eq '&' or $name ~~ s/\^// {   # XXX hack
+        ;
+    }
+    elsif $+CURPAD.{$name} {
+        self.worry("Redeclaration of $name");
+    }
+    $+CURPAD.{$name} = 'VAR_TBD';
+}
+
+method add_our_variable ($name) {
+    # XXX need to allow package names?
+    $CURPKG.{$name} = 'VAR_TBD';
+    # say "CORE $CORE adding variable $name to CURPAD $+CURPAD in $+PKGNAME";
+    $+CURPAD.{$name} = 'ALIAS ' ~ $+CURPAD;  # the lexical alias
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -626,7 +653,7 @@ rule comp_unit {
     :my $IN_DECL is context<rw>;
 
     { self.load_setting($CORESETTING); }
-
+    {{ $UNIT = $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
     { $<CORE> = $CORE; }
@@ -687,9 +714,11 @@ rule comp_unit {
 # possible place to check arity is not here but in the rule that calls this
 # rule.  (Could also be done in a later pass.)
 
-token pblock {
+token pblock ($CURPAD is context<rw> = $+CURPAD) {
     :dba('parameterized block')
-    [ <lambda> <signature> ]? <block>
+    <?before <lambda> | '{' >
+    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+    [ <lambda> <signature> ]? <blockoid>
 }
 
 token lambda { '->' | '<->' }
@@ -702,7 +731,14 @@ token xblock {
     <pblock>
 }
 
-token block {
+token block ($CURPAD is context<rw> = $+CURPAD) {
+    :dba('scoped block')
+    <?before '{' >
+    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+    <blockoid>
+}
+
+token blockoid {
     '{' ~ '}' <statementlist>
 
     [
@@ -744,28 +780,13 @@ token regex_block {
 # statement semantics
 rule statementlist {
     :my $PARSER is context<rw> = self;
-    :my $oldcurpad = $CURPAD;
     :my $INVOCANT_OK is context<rw> = 0;
     :dba('statement list')
-    {{
-        my $newpad = { 'OUTER::' => $CURPAD };
-        if not $UNIT {
-            $UNIT = $newpad;
-            $newpad.<UNIT::> = $newpad;     # XXX circular ref in p5!!!
-            $newpad.<SETTING::> = $CURPAD;
-        }
-        $CURPAD = $newpad;
-        # say "setting CURPAD to $newpad";
-    }}
     [
     | $
     | <?before <[\)\]\}]> >
     | [<statement><eat_terminator> ]*
     ]
-    {{
-        # say "restoring CURPAD to $oldcurpad";
-        $CURPAD = $oldcurpad;
-    }}
 }
 
 # embedded semis, context-dependent semantics
@@ -1347,7 +1368,7 @@ token circumfix:sym<{ }> ( --> Term) {
 token variable_declarator {
     :my $IN_DECL is context<rw> = 1;
     <variable>
-    { $IN_DECL = 0; }
+    { $IN_DECL = 0; self.add_variable($<variable>.text) }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
@@ -1794,7 +1815,32 @@ token variable {
         | <sigil> <twigil>? <desigilname> {*}                                    #= desigilname
             [ <?{ my $t = $<twigil>; @$t and $t.[0].text eq '.' }>
                 <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
-            ]?
+            ||
+                {{
+                    my $vname = $<sigil>.text;
+                    my $t = $<twigil>;
+                    my $twigil = '';
+                    $twigil = $t.[0].text if @$t;
+                    $vname ~= $twigil;
+                    $vname ~= $<desigilname>.text;
+                    given $twigil {
+                        when '' {
+                            my $ok = 0;
+                            $ok = 1 if $vname ~~ /::/;
+                            $ok ||= $IN_DECL;
+                            $ok ||= self.is_known($vname);
+                            $ok ||= substr($<desigilname>.text,0,1) eq '$';
+                            if not $ok {
+                                self.worry("Variable $vname not declared");
+                            }
+                        }
+                        when '^' {
+                            self.add_variable($vname);
+                        }
+
+                    }
+                }}
+            ]
         | <special_variable> {*}                                    #= special
         | <sigil> $<index>=[\d+] {*}                                #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
@@ -1995,7 +2041,7 @@ role herestop {
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
 method heredoc () {
-    temp $CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
+    temp $*CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
     return if self.peek;
     my $here = self;
     while my $herestub = shift @herestub_queue {
@@ -2668,17 +2714,20 @@ rule multisig {
     ** '|'
 }
 
-rule routine_def {
+rule routine_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    [ '&'<deflongname>? | <deflongname> ]? [ <multisig> | <trait> ]*
+    [ '&'<deflongname>? | <deflongname> ]?
+    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+    [ <multisig> | <trait> ]*
     <!{
         $¢ = $+PARSER.bless($¢);
         $IN_DECL = 0;
     }>
-    <block>:!s
+    <blockoid>:!s
 }
 
-rule method_def {
+rule method_def ($CURPAD is context<rw> = $+CURPAD) {
+    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
     [
     | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
     | <multisig> <trait>*
@@ -2693,25 +2742,28 @@ rule method_def {
         <trait>*
     | <?>
     ]
-    <block>:!s
+    <blockoid>:!s
 }
 
-rule regex_def {
+rule regex_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
     [ '&'<deflongname>? | <deflongname> ]?
+    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
     [ [ ':'?'(' <signature> ')'] | <trait> ]*
     { $IN_DECL = 0; }
     <regex_block>:!s
 }
 
-rule macro_def {
+rule macro_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    [ '&'<deflongname>? | <deflongname> ]? [ <multisig> | <trait> ]*
+    [ '&'<deflongname>? | <deflongname> ]?
+    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+    [ <multisig> | <trait> ]*
     <!{
         $¢ = $+PARSER.bless($¢);
         $IN_DECL = 0;
     }>
-    <block>:!s
+    <blockoid>:!s
 }
 
 rule trait {
@@ -2820,7 +2872,7 @@ token param_var {
         [
             # Is it a longname declaration?
         || <?{ $<sigil>.text eq '&' }> <?ident> {}
-            <identifier=sublongname>
+            <identifier=sublongname> {{ $+REALLYADD = 0 }} # sublongname adds symbol
 
         ||  # Is it a shaped array or hash declaration?
             <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
@@ -2834,6 +2886,19 @@ token param_var {
 
             # bare sigil?
         ]?
+        {{
+            my $vname = $<sigil>.text;
+            my $t = $<twigil>;
+            my $twigil = '';
+            $twigil = $t.[0].text if @$t;
+            $vname ~= $twigil;
+            $vname ~= $<identifier>[0].text;
+            given $twigil {
+                when '' {
+                    self.add_variable($vname) if $+REALLYADD;
+                }
+            }
+        }}
     ]
 }
 
@@ -2841,6 +2906,7 @@ token parameter {
     :my $kind;
     :my $quant = '';
     :my $q;
+    :my $REALLYADD is context<rw> = 0;
 
     # XXX fake out LTM till we get * working right
     <?before
@@ -2853,6 +2919,7 @@ token parameter {
         | <named_param>
         ]
     >
+    {{ $REALLYADD = 1 }}
 
     <type_constraint>*
     [
@@ -3582,9 +3649,9 @@ regex stdstopper {
 
 method EXPR ($preclvl)
 {
-    temp $CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
+    temp $*CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
     if self.peek {
-        return self._AUTOLEXpeek('EXPR', $retree);
+        return self._AUTOLEXpeek('EXPR');
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $inquote is context = 0;
