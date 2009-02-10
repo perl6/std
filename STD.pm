@@ -1395,7 +1395,7 @@ token variable_declarator {
 
     <trait>*
 
-    <post_constraint>*
+#    <post_constraint>*
 }
 
 rule scoped {
