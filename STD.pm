@@ -2903,10 +2903,11 @@ token param_var {
             my $twigil = '';
             $twigil = $t.[0].text if @$t;
             $vname ~= $twigil;
-            $vname ~= $<identifier>[0].text;
+            my $id = try { $<identifier>[0].text } // '';
+            $vname ~= $id;
             given $twigil {
                 when '' {
-                    self.add_variable($vname) if $+REALLYADD;
+                    self.add_variable($vname) if $+REALLYADD and $id ne '';
                 }
             }
         }}
