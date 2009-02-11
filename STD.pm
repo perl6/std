@@ -1458,7 +1458,15 @@ rule scoped {
     | <package_declarator>
     | <fulltypename>+ <multi_declarator>
     | <multi_declarator>
-    ] || <.panic: "Malformed \"$+SCOPE\" declaration">
+    ]
+    || <?before <[A..Z]> > <longname> {{
+            my $t = $<longname>.text;
+            if not $¢.is_known($t) {
+                $¢.panic("In \"$+SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
+            }
+        }}
+        <!> # drop through
+    || <.panic: "Malformed \"$+SCOPE\" declaration">
 }
 
 
@@ -4536,7 +4544,7 @@ method panic (Str $s) {
             $m ~= "\n    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT);
         }
         else {
-            $m ~= "\n    expecting @keys";
+            $m ~= "\n    expecting @keys" unless @keys[0] eq 'whitespace';
         }
     }
     $m ~~ s|Syntax error|Syntax error (two terms in a row?)| if $m ~~ /infix|nofun/;
