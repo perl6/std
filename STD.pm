@@ -150,6 +150,7 @@ method is_name ($name) {
         }
     }
     return True if $curpkg.{$name};
+    return True if $GLOBAL.{$name};
     return False;
 }
 
@@ -208,8 +209,8 @@ method add_our_name ($name) {
         }
         while @components > 1 {
             my $pkg = shift @components;
-            $curpkg.{$pkg ~ '::'} = {} unless $curpkg.{$pkg ~ '::'};
-            $curpkg = $curpkg.{$pkg ~ '::'};
+            $curpkg.{$pkg} //= { name => $pkg, file => $COMPILING::FILE, line => self.line };
+            $curpkg = $curpkg.{$pkg ~ '::'} //= {};
         }
         $name = shift @components;
     }
