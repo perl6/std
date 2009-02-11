@@ -2957,21 +2957,21 @@ token param_var {
     [
     | '[' ~ ']' <signature>
     | '(' ~ ')' <signature>
-    | <sigil> <twigil>?
+    | <sigil> [<?before <.twigil>\w> <twigil>]?
         [
             # Is it a longname declaration?
         || <?{ $<sigil>.text eq '&' }> <?ident> {}
-            <identifier=sublongname> {{ $*REALLYADD = 0 }} # sublongname adds symbol
+            <name=sublongname> {{ $*REALLYADD = 0 }} # sublongname adds symbol
 
         ||  # Is it a shaped array or hash declaration?
             <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
-            <identifier>?
+            <name=identifier>?
             <?before <[ \< \( \[ \{ ]> >
             <postcircumfix>
 
             # ordinary parameter name
-        || <identifier>
-        || <[/!]>
+        || <name=identifier>
+        || $<name> = [<[/!]>]
 
             # bare sigil?
         ]?
@@ -2981,11 +2981,20 @@ token param_var {
             my $twigil = '';
             $twigil = $t.[0].text if @$t;
             $vname ~= $twigil;
-            my $id = try { $<identifier>[0].text } // '';
-            $vname ~= $id;
-            given $twigil {
-                when '' {
-                    self.add_variable($vname) if $*REALLYADD and $id ne '';
+            my $n = try { $<name>[0].text } // '';
+            $vname ~= $n;
+            if $REALLYADD {
+                given $twigil {
+                    when '' {
+                        self.add_variable($vname) if $n ne '';
+                    }
+                    when '.' {
+                    }
+                    when '!' {
+                    }
+                    default {
+                        self.worry("Illegal to use $twigil twigil in signature");
+                    }
                 }
             }
         }}
