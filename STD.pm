@@ -99,21 +99,21 @@ method TOP ($STOP = undef) {
 #    SUPER       # (give up, pass to dispatcher?)
 
 method newpad {
-    $+CURPAD = {
+    $*CURPAD = {
         'OUTER::' => $CURPAD,
     };
     self;
 }
 
-method finishpad($siggy = $+CURPAD.{'$?GOTSIG'}//0) {
+method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
     my $line = self.lineof(self.pos);
-    $+CURPAD.{'$_'} //= { name => '$_', file => $COMPILING::FILE, line => $line };
-    $+CURPAD.{'$/'} //= { name => '$/', file => $COMPILING::FILE, line => $line };
-    $+CURPAD.{'$!'} //= { name => '$!', file => $COMPILING::FILE, line => $line };
+    $*CURPAD.{'$_'} //= { name => '$_', file => $COMPILING::FILE, line => $line };
+    $*CURPAD.{'$/'} //= { name => '$/', file => $COMPILING::FILE, line => $line };
+    $*CURPAD.{'$!'} //= { name => '$!', file => $COMPILING::FILE, line => $line };
     if not $siggy {
-        $+CURPAD.{'@_'} = { name => '@_', file => $COMPILING::FILE, line => $line };
-        $+CURPAD.{'%_'} = { name => '%_', file => $COMPILING::FILE, line => $line };
-        $+CURPAD.{'$?GOTSIG'} = 0;
+        $*CURPAD.{'@_'} = { name => '@_', file => $COMPILING::FILE, line => $line };
+        $*CURPAD.{'%_'} = { name => '%_', file => $COMPILING::FILE, line => $line };
+        $*CURPAD.{'$?GOTSIG'} = 0;
     }
     self;
 }
@@ -137,12 +137,13 @@ method is_name ($name) {
             $curpkg = $curpkg.{$pkg ~ '::'};
             return False unless $curpkg;
         }
-        $name = shift @components;
+        $name = shift(@components)//'';
+        return True if $name eq '';
         $name ~~ s/^\<//;
         $name ~~ s/\>$//;
     }
     else {
-        my $pad = $+CURPAD;
+        my $pad = $*CURPAD;
         while $pad {
             return True if $pad.{$name};
             $pad = $pad.<OUTER::>;
@@ -157,7 +158,7 @@ method find_pkg ($name) {
         return $CURPKG;
     }
     elsif $name eq 'MY::' {
-        return $+CURPAD;
+        return $*CURPAD;
     }
     elsif $name eq 'CORE::' {
         return $CORE;
@@ -166,7 +167,7 @@ method find_pkg ($name) {
         return $UNIT;
     }
     # everything is somewhere in lexical scope (we hope)
-    my $pad = $+CURPAD;
+    my $pad = $*CURPAD;
     while $pad {
         return $pad.{$name} if $pad.{$name};
         $pad = $pad.<OUTER::> // 0;
@@ -175,8 +176,8 @@ method find_pkg ($name) {
 }
 
 method add_name ($name) {
-    # say "Adding $+SCOPE $name in $+PKGNAME";
-    if ($+SCOPE//'') eq 'our' or $name ~~ /::/ {
+    # say "Adding $*SCOPE $name in $*PKGNAME";
+    if ($*SCOPE//'') eq 'our' or $name ~~ /::/ {
         self.add_our_name($name);
     }
     else {
@@ -187,7 +188,7 @@ method add_name ($name) {
 
 method add_my_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    $+CURPAD.{$name} = { name => $name };
+    $*CURPAD.{$name} = { name => $name };
     self;
 }
 
@@ -215,8 +216,8 @@ method add_our_name ($name) {
     $name ~~ s/^\<//;
     $name ~~ s/\>$//;
     $curpkg.{$name}  = { name => $name, file => $COMPILING::FILE, line => self.line };
-    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
-    $+CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
+    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    $*CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
     self;
 }
 
@@ -228,7 +229,7 @@ method load_setting ($setting) {
     %MYSTERY = ();
 
     # XXX CORE   === SETTING for now
-    $CORE = $+CURPAD = $GLOBAL.{"CORE::"} = $GLOBAL.{"SETTING::"} = self.load_pad($setting);
+    $CORE = $*CURPAD = $GLOBAL.{"CORE::"} = $GLOBAL.{"SETTING::"} = self.load_pad($setting);
     $GLOBAL = $CORE.<GLOBAL::>;
     $CURPKG = $GLOBAL;
 }
@@ -241,7 +242,7 @@ method is_known ($name) {
     else {
         $vname = '&' ~ $name;
     }
-    my $pad = $+CURPAD;
+    my $pad = $*CURPAD;
     while $pad {
         return True if $pad.{$vname};
         return True if $pad.{$name}; # type as routine?
@@ -254,7 +255,7 @@ method is_known ($name) {
 
 method add_routine ($name) {
     my $vname = '&' ~ $name;
-    if ($+SCOPE//'') eq 'our' {
+    if ($*SCOPE//'') eq 'our' {
         self.add_our_routine($vname);
     }
     else {
@@ -264,20 +265,20 @@ method add_routine ($name) {
 }
 
 method add_my_routine ($name) {
-    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
     self;
 }
 
 method add_our_routine ($name) {
     # XXX need to allow package names?
     $CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
-    # say "CORE $CORE adding name $name to CURPAD $+CURPAD in $+PKGNAME";
-    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    # say "CORE $CORE adding name $name to CURPAD $*CURPAD in $*PKGNAME";
+    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
     self;
 }
 
 method add_variable ($name) {
-    if ($+SCOPE//'') eq 'our' {
+    if ($*SCOPE//'') eq 'our' {
         self.add_our_variable($name);
     }
     else {
@@ -290,7 +291,7 @@ method add_my_variable ($name) {
     if $name eq '$_' or substr($name, 0, 1) eq '&' or $name ~~ s/\^// {   # XXX hack
         ;
     }
-    elsif my $old = $+CURPAD.{$name} {
+    elsif my $old = $*CURPAD.{$name} {
         my $ofile = $old.<file> // '';
         my $oline = $old.<line> // '???';
         if $ofile {
@@ -305,15 +306,15 @@ method add_my_variable ($name) {
             self.worry("Variable $name redeclared");
         }
     }
-    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
     self;
 }
 
 method add_our_variable ($name) {
     # XXX need to allow package names?
     $CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
-    # say "CORE $CORE adding variable $name to CURPAD $+CURPAD in $+PKGNAME";
-    $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    # say "CORE $CORE adding variable $name to CURPAD $*CURPAD in $*PKGNAME";
+    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
     self;
 }
 
@@ -595,14 +596,14 @@ token nofun { <!before '(' | '.(' | '\\' > }
 # Lexical routines
 
 token ws {
-    :my @stub = return self if @+MEMOS[self.pos]<ws> :exists;
+    :my @stub = return self if @*MEMOS[self.pos]<ws> :exists;
     :my $startpos = self.pos;
 
     :dba('whitespace')
     [
-        | \h+ <![#\s\\]> { @+MEMOS[$¢.pos]<ws> = $startpos; }   # common case
+        | \h+ <![#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
         | <?before \w> <?after \w> :::
-            { @+MEMOS[$startpos]<ws> = undef; }
+            { @*MEMOS[$startpos]<ws> = undef; }
             <!>        # must \s+ between words
     ]
     ||
@@ -615,12 +616,12 @@ token ws {
 
     {{
         if ($¢.pos == $startpos) {
-            @+MEMOS[$¢.pos]<ws> = undef;
+            @*MEMOS[$¢.pos]<ws> = undef;
         }
         else {
-            @+MEMOS[$¢.pos]<ws> = $startpos;
-            @+MEMOS[$¢.pos]<endstmt> = @+MEMOS[$startpos]<endstmt>
-                if @+MEMOS[$startpos]<endstmt> :exists;
+            @*MEMOS[$¢.pos]<ws> = $startpos;
+            @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
+                if @*MEMOS[$startpos]<endstmt> :exists;
         }
     }}
 }
@@ -642,10 +643,10 @@ token vws {
 }
 
 # We provide two mechanisms here:
-# 1) define $+moreinput, or
+# 1) define $*moreinput, or
 # 2) override moreinput method
 method moreinput () {
-    $+moreinput.() if $+moreinput;
+    $*moreinput.() if $*moreinput;
 }
 
 token unv {
@@ -772,7 +773,7 @@ rule comp_unit {
 # possible place to check arity is not here but in the rule that calls this
 # rule.  (Could also be done in a later pass.)
 
-token pblock ($CURPAD is context<rw> = $+CURPAD) {
+token pblock ($CURPAD is context<rw> = $*CURPAD) {
     :dba('parameterized block')
     <?before <lambda> | '{' >
     [
@@ -796,7 +797,7 @@ token xblock {
     <pblock>
 }
 
-token block ($CURPAD is context<rw> = $+CURPAD) {
+token block ($CURPAD is context<rw> = $*CURPAD) {
     :dba('scoped block')
     <?before '{' >
     <.newpad>
@@ -809,11 +810,11 @@ token blockoid {
 
     [
     | <?before \h* $$>  # (usual case without comments)
-        { @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
+        { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$
-        { @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | <.unsp>? { @+MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
+        { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
+    | <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
     ]
 }
 
@@ -835,11 +836,11 @@ token regex_block {
 
     [
     | <?before \h* $$>  # (usual case without comments)
-        { @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
+        { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
     | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
     | <.unv>? $$
-        { @+MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | <.unsp>? { @+MEMOS[$¢.pos]<endargs> = 1; }   {*}           #= endargs
+        { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
+    | <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }   {*}           #= endargs
     ]
 }
 
@@ -885,7 +886,7 @@ token statement {
 
     # this could either be a statement that follows a declaration
     # or a statement that is within the block of a code declaration
-    <!!{ $¢ = $+PARSER.bless($¢); }>
+    <!!{ $¢ = $*PARSER.bless($¢); }>
 
     [
     | <label> <statement>                        {*}            #= label
@@ -893,7 +894,7 @@ token statement {
     | <EXPR> {*}                                                #= expr
         :dba('statement end')
         [
-        || <?{ (@+MEMOS[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
+        || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
         ||
             :dba('statement modifier')
             <.ws>
@@ -902,7 +903,7 @@ token statement {
             | <statement_mod_cond> {*}                              #= mod cond
                 :dba('statement modifier loop')
                 [
-                || <?{ (@+MEMOS[$¢.pos]<endstmt> // 0) == 2 }>
+                || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>
                 || <.ws> <statement_mod_loop>? {*}                  #= mod condloop
                 ]
             ]?
@@ -916,10 +917,10 @@ token statement {
 token eat_terminator {
     [
     || ';'
-    || <?{ @+MEMOS[$¢.pos]<endstmt> }> <.ws>
+    || <?{ @*MEMOS[$¢.pos]<endstmt> }> <.ws>
     || <?terminator>
     || $
-    || {{ if @+MEMOS[$¢.pos]<ws> { $¢.pos = @+MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
+    || {{ if @*MEMOS[$¢.pos]<ws> { $¢.pos = @*MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
         <.panic: "Syntax error">
     ]
 }
@@ -1058,7 +1059,7 @@ rule statement_mod_loop:given {<sym> <modifier_expr> {*} }      #= given
 
 token module_name:normal {
     <longname>
-    [ :dba('generic role') <?{ ($+PKGDECL//'') eq 'role' }> '[' ~ ']' <signature> ]?
+    [ :dba('generic role') <?{ ($*PKGDECL//'') eq 'role' }> '[' ~ ']' <signature> ]?
 }
 
 token module_name:deprecated { 'v6-alpha' }
@@ -1253,7 +1254,7 @@ token POST {
     <!stdstopper>
 
     # last whitespace didn't end here
-    <!{ @+MEMOS[$¢.pos]<ws> }>
+    <!{ @*MEMOS[$¢.pos]<ws> }>
 
     [ <.unsp> | '\\' ]?
 
@@ -1265,7 +1266,7 @@ token POST {
     | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; }
     | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }
     ]
-    { $+SIGIL = '@' }
+    { $*SIGIL = '@' }
 }
 
 method can_meta ($op, $meta) {
@@ -1396,7 +1397,7 @@ token methodop {
 
     :dba('method arguments')
     [
-    | ':' <?before \s> <!{ $+inquote }> <arglist>
+    | ':' <?before \s> <!{ $*inquote }> <arglist>
     | <?[.(]> <args>
     ]?
 }
@@ -1407,7 +1408,7 @@ token semiarglist {
 }
 
 token arglist {
-    :my $inv_ok = $+INVOCANT_OK;
+    :my $inv_ok = $*INVOCANT_OK;
     :my StrPos $endargs is context<rw> = 0;
     :my $GOAL is context = 'endargs';
     <.ws>
@@ -1419,7 +1420,7 @@ token arglist {
             for @$delims {
                 if ($_.<sym> // '') eq ':' {
                     if $inv_ok {
-                        $+INVOCANT_IS = $<EXPR><list>[0];
+                        $*INVOCANT_IS = $<EXPR><list>[0];
                     }
                 }
             }
@@ -1462,19 +1463,19 @@ rule scoped {
     || <?before <[A..Z]> > <longname> {{
             my $t = $<longname>.text;
             if not $¢.is_known($t) {
-                $¢.panic("In \"$+SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
+                $¢.panic("In \"$*SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
             }
         }}
         <!> # drop through
-    || <.panic: "Malformed \"$+SCOPE\" declaration">
+    || <.panic: "Malformed \"$*SCOPE\" declaration">
 }
 
 
-token scope_declarator:my       { <sym> { $+SCOPE = $<sym> } <scoped> }
-token scope_declarator:our      { <sym> { $+SCOPE = $<sym> } <scoped> }
-token scope_declarator:state    { <sym> { $+SCOPE = $<sym> } <scoped> }
-token scope_declarator:constant { <sym> { $+SCOPE = $<sym> } <scoped> }
-token scope_declarator:has      { <sym> { $+SCOPE = $<sym> } <scoped> }
+token scope_declarator:my       { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:our      { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:state    { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:constant { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:has      { <sym> { $*SCOPE = $<sym> } <scoped> }
 
 
 token package_declarator:class {
@@ -1539,39 +1540,39 @@ rule package_def {
         <?before '{'>
         {{
             # figure out the actual full package name (nested in outer package)
-                my $pkg = $+PKGNAME // "GLOBAL";
+                my $pkg = $*PKGNAME // "GLOBAL";
                 my $newpkg = $CURPKG.{$pkg ~ '::'} = {};
                 $newpkg.<PARENT::> = $CURPKG;
                 $CURPKG = $newpkg;
                 push @PKGS, $pkg;
                 if $longname {
                     my $shortname = $longname.<name>.text;
-                    $+PKGNAME = $pkg ~ '::' ~ $shortname;
+                    $*PKGNAME = $pkg ~ '::' ~ $shortname;
                 }
                 else {
-                    $+PKGNAME = $pkg ~ '::_anon_';
+                    $*PKGNAME = $pkg ~ '::_anon_';
                 }
             }}
             <block>
             {{
-                $+PKGNAME = pop(@PKGS);
+                $*PKGNAME = pop(@PKGS);
                 $CURPKG = $CURPKG.<PARENT::>;
             }}
             {*}                                                     #= block
-        || <?{ $+begin_compunit }> {} <?before ';'>
+        || <?{ $*begin_compunit }> {} <?before ';'>
             {{
                 $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                 my $shortname = $longname.<name>.text;
-                $+PKGNAME = $shortname;
+                $*PKGNAME = $shortname;
                 my $newpkg = $CURPKG.{$shortname ~ '::'} = {};
                 $newpkg.<PARENT::> = $CURPKG;
                 $CURPKG = $newpkg;
-                $+begin_compunit = 0;
+                $*begin_compunit = 0;
             }}
             {*}                                                     #= semi
-        || <.panic: "Unable to parse " ~ $+PKGDECL ~ " definition">
+        || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
         ]
-    ] || <.panic: "Malformed \"$+PKGDECL\" declaration">
+    ] || <.panic: "Malformed \"$*PKGDECL\" declaration">
 }
 
 token declarator {
@@ -1874,7 +1875,7 @@ token desigilname {
 }
 
 token variable {
-    <?before <sigil> { $+SIGIL ||= $<sigil>.text } > {}
+    <?before <sigil> { $*SIGIL ||= $<sigil>.text } > {}
     [
     || '&'
         [
@@ -1919,7 +1920,7 @@ token variable {
         | <sigil> $<index>=[\d+] {*}                                #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
         | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
-        | <sigil> <?{ $+IN_DECL }> {*}                              #= anondecl
+        | <sigil> <?{ $*IN_DECL }> {*}                              #= anondecl
         ]
     ]
 }
@@ -1938,7 +1939,7 @@ token twigil:sym<!> { <sym> }
 token twigil:sym<^> { <sym> }
 token twigil:sym<:> { <sym> <!before ':'> }
 token twigil:sym<*> { <sym> }
-token twigil:sym<+> { <sym> }
+token twigil:sym<+> { <sym> <!!worry: "The + twigil is deprecated, use the * twigil instead"> }
 token twigil:sym<?> { <sym> }
 token twigil:sym<=> { <sym> }
 
@@ -1946,8 +1947,8 @@ token deflongname {
     :dba('name to be defined')
     <name>
     # XXX too soon
-    [ <colonpair>+ { $¢.add_macro($<name>) if $+IN_DECL; } ]?
-    { $¢.add_routine($<name>.text) if $+IN_DECL; }
+    [ <colonpair>+ { $¢.add_macro($<name>) if $*IN_DECL; } ]?
+    { $¢.add_routine($<name>.text) if $*IN_DECL; }
 }
 
 token longname {
@@ -1975,8 +1976,8 @@ token morename {
 token subshortname {
     [
     | <category>
-        [ <colonpair>+ { $¢.add_macro($<category>) if $+IN_DECL; } ]?
-    | <desigilname> { $¢.add_routine($<desigilname>.text) if $+IN_DECL; }
+        [ <colonpair>+ { $¢.add_macro($<category>) if $*IN_DECL; } ]?
+    | <desigilname> { $¢.add_routine($<desigilname>.text) if $*IN_DECL; }
     ]
 }
 
@@ -2109,7 +2110,7 @@ class Herestub {
 } # end class
 
 role herestop {
-    token stopper { ^^ {*} $<ws>=(\h*?) $+DELIM \h* <.unv>?? $$ \v? }
+    token stopper { ^^ {*} $<ws>=(\h*?) $*DELIM \h* <.unv>?? $$ \v? }
 } # end role
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
@@ -2579,7 +2580,7 @@ grammar Q is STD {
 
     role b1 {
         token escape:sym<\\> { <sym> <item=backslash> }
-        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh($+LANG).quote(); } }
+        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh($*LANG).quote(); } }
         token backslash:sym<\\> { <text=sym> }
         token backslash:stopper { <text=stopper> }
         token backslash:a { <sym> }
@@ -2606,7 +2607,7 @@ grammar Q is STD {
     } # end role
 
     role c1 {
-        token escape:sym<{ }> { <?before '{'> [ :lang($+LANG) <block> ] }
+        token escape:sym<{ }> { <?before '{'> [ :lang($*LANG) <block> ] }
     } # end role
 
     role c0 {
@@ -2614,7 +2615,7 @@ grammar Q is STD {
     } # end role
 
     role s1 {
-        token escape:sym<$> { <?before '$'> [ :lang($+LANG) <variable> <extrapost>? ] || <.panic: "Non-variable \$ must be backslashed"> }
+        token escape:sym<$> { <?before '$'> [ :lang($*LANG) <variable> <extrapost>? ] || <.panic: "Non-variable \$ must be backslashed"> }
         token special_variable:sym<$"> {
             '$' <stopper>
             <.panic: "Can't use a \$ in the last position of an interpolating string">
@@ -2628,7 +2629,7 @@ grammar Q is STD {
     } # end role
 
     role a1 {
-        token escape:sym<@> { :my $IN_QUOTE is context<rw> = 1; <?before '@'> [ :lang($+LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] } # trap ABORTBRANCH from variable's ::
+        token escape:sym<@> { :my $IN_QUOTE is context<rw> = 1; <?before '@'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] } # trap ABORTBRANCH from variable's ::
     } # end role
 
     role a0 {
@@ -2636,7 +2637,7 @@ grammar Q is STD {
     } # end role
 
     role h1 {
-        token escape:sym<%> { :my $IN_QUOTE is context<rw> = 1; <?before '%'> [ :lang($+LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] }
+        token escape:sym<%> { :my $IN_QUOTE is context<rw> = 1; <?before '%'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] }
     } # end role
 
     role h0 {
@@ -2644,7 +2645,7 @@ grammar Q is STD {
     } # end role
 
     role f1 {
-        token escape:sym<&> { :my $IN_QUOTE is context<rw> = 1; <?before '&'> [ :lang($+LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] }
+        token escape:sym<&> { :my $IN_QUOTE is context<rw> = 1; <?before '&'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] }
     } # end role
 
     role f0 {
@@ -2680,7 +2681,7 @@ grammar Q is STD {
 
         token escape:sym<\\> { <sym> <item=backslash> }
 
-        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh($+LANG).quote(); } }
+        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh($*LANG).quote(); } }
         token backslash:sym<\\> { <text=sym> }
         token backslash:stopper { <text=stopper> }
 
@@ -2788,21 +2789,21 @@ rule multisig {
     ** '|'
 }
 
-rule routine_def ($CURPAD is context<rw> = $+CURPAD) {
+rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
         [ <multisig> | <trait> ]*
         <!{
-            $¢ = $+PARSER.bless($¢);
+            $¢ = $*PARSER.bless($¢);
             $IN_DECL = 0;
         }>
         <blockoid>:!s
     ] || <.panic: "Malformed routine definition">
 }
 
-rule method_def ($CURPAD is context<rw> = $+CURPAD) {
+rule method_def ($CURPAD is context<rw> = $*CURPAD) {
     <.newpad>
     [
         [
@@ -2823,7 +2824,7 @@ rule method_def ($CURPAD is context<rw> = $+CURPAD) {
     ] || <.panic: "Malformed method definition">
 }
 
-rule regex_def ($CURPAD is context<rw> = $+CURPAD) {
+rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
     [
         [ '&'<deflongname>? | <deflongname> ]?
@@ -2835,14 +2836,14 @@ rule regex_def ($CURPAD is context<rw> = $+CURPAD) {
     ] || <.panic: "Malformed regex definition">
 }
 
-rule macro_def ($CURPAD is context<rw> = $+CURPAD) {
+rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
         [ <multisig> | <trait> ]*
         <!{
-            $¢ = $+PARSER.bless($¢);
+            $¢ = $*PARSER.bless($¢);
             $IN_DECL = 0;
         }>
         <blockoid>:!s
@@ -2903,7 +2904,7 @@ token signature {
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
-    {{ $IN_DECL = 0; $+SIGIL = '@'; $+CURPAD.{'$?GOTSIG'} //= 1; }}
+    {{ $IN_DECL = 0; $*SIGIL = '@'; $*CURPAD.{'$?GOTSIG'} //= 1; }}
 }
 
 token type_declarator:subset {
@@ -2959,7 +2960,7 @@ token param_var {
         [
             # Is it a longname declaration?
         || <?{ $<sigil>.text eq '&' }> <?ident> {}
-            <identifier=sublongname> {{ $+REALLYADD = 0 }} # sublongname adds symbol
+            <identifier=sublongname> {{ $*REALLYADD = 0 }} # sublongname adds symbol
 
         ||  # Is it a shaped array or hash declaration?
             <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
@@ -2983,7 +2984,7 @@ token param_var {
             $vname ~= $id;
             given $twigil {
                 when '' {
-                    self.add_variable($vname) if $+REALLYADD and $id ne '';
+                    self.add_variable($vname) if $*REALLYADD and $id ne '';
                 }
             }
         }}
@@ -3051,7 +3052,7 @@ token parameter {
     {{
         given $kind {
             when '!' {
-                given $+zone {
+                given $*zone {
                     when 'posopt' {
 $¢.panic("Can't put required parameter after optional parameters");
                     }
@@ -3061,15 +3062,15 @@ $¢.panic("Can't put required parameter after variadic parameters");
                 }
             }
             when '?' {
-                given $+zone {
-                    when 'posreq' { $+zone = 'posopt' }
+                given $*zone {
+                    when 'posreq' { $*zone = 'posopt' }
                     when 'var' {
 $¢.panic("Can't put optional positional parameter after variadic parameters");
                     }
                 }
             }
             when '*' {
-                $+zone = 'var';
+                $*zone = 'var';
             }
         }
     }}
@@ -3141,7 +3142,7 @@ token infix:lambda ( --> Term)
     { <?before '{' | '->' > <.panic: "Unexpected block in infix position (previous statement missing semicolon?)"> }
 
 token circumfix:sigil ( --> Term)
-    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $+SIGIL ||= $<sigil>.text } }
+    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*SIGIL ||= $<sigil>.text } }
 
 #token circumfix:typecast ( --> Term)
 #    { <typename> '(' ~ ')' <semilist> }
@@ -3496,7 +3497,7 @@ token infix:sym<^fff^> ( --> Conditional)
 token infix:sym<=> ()
 {
     <sym>
-    { $¢ = $+SIGIL eq '$' 
+    { $¢ = $*SIGIL eq '$' 
         ?? ::Item_assignment.coerce($¢)
         !! ::List_assignment.coerce($¢);
     }
@@ -3532,7 +3533,7 @@ token infix:sym<,> ( --> Comma)
 
 token infix:sym<:> ( --> Comma)
     { <sym> <?before \s | <terminator> >
-        { $¢.panic("Illegal use of colon as invocant marker") unless $+INVOCANT_OK--; }
+        { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK--; }
     }
 
 token infix:sym« p5=> » ( --> Comma)
@@ -3702,7 +3703,7 @@ token terminator:sym<}> ( --> Terminator)
     { '}' }
 
 token terminator:sym<!!> ( --> Terminator)
-    { '!!' <?{ $+GOAL eq '!!' }> }
+    { '!!' <?{ $*GOAL eq '!!' }> }
 
 # disallow &[] and such as infix
 # token infix:sigil ( --> Term )
@@ -3712,9 +3713,9 @@ regex infixstopper {
     :dba('infix stopper')
     [
     | <?before <stopper> >
-    | <?before '!!' > <?{ $+GOAL eq '!!' }>
-    | <?before '{' | <lambda> > <?{ ($+GOAL eq '{' or $+GOAL eq 'endargs') and @+MEMOS[$¢.pos]<ws> }>
-    | <?{ $+GOAL eq 'endargs' and @+MEMOS[$¢.pos]<endargs> }>
+    | <?before '!!' > <?{ $*GOAL eq '!!' }>
+    | <?before '{' | <lambda> > <?{ ($*GOAL eq '{' or $*GOAL eq 'endargs') and @*MEMOS[$¢.pos]<ws> }>
+    | <?{ $*GOAL eq 'endargs' and @*MEMOS[$¢.pos]<endargs> }>
     ]
 }
 
@@ -3723,14 +3724,14 @@ token stopper { <!> }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    :my @stub = return self if @+MEMOS[self.pos]<endstmt> :exists;
+    :my @stub = return self if @*MEMOS[self.pos]<endstmt> :exists;
     :dba('standard stopper')
     [
     | <?terminator>
     | <?unitstopper>
     | $                                 # unlikely, check last (normal LTM behavior)
     ]
-    { @+MEMOS[$¢.pos]<endstmt> ||= 1; }
+    { @*MEMOS[$¢.pos]<endstmt> ||= 1; }
 }
 
 # A fairly complete operator precedence parser
@@ -3891,7 +3892,7 @@ method EXPR ($preclvl)
 
         loop {     # while we see adverbs
             $oldpos = $here.pos;
-            last TERM if (@+MEMOS[$oldpos]<endstmt> // 0) == 2;
+            last TERM if (@*MEMOS[$oldpos]<endstmt> // 0) == 2;
             $here = $here.cursor_fresh.ws;
             my @infix = $here.cursor_fresh.infixish();
             last TERM unless @infix;
@@ -4017,26 +4018,26 @@ grammar Regex is STD {
     proto token rxinfix { <...> }
 
     token ws {
-        <?{ $+sigspace }>
+        <?{ $*sigspace }>
         || [ <?before \s | '#'> <nextsame> ]?   # still get all the pod goodness, hopefully
     }
 
     token normspace {
-        <?before \s | '#'> [ :lang($¢.cursor_fresh($+LANG)) <.ws> ]
+        <?before \s | '#'> [ :lang($¢.cursor_fresh($*LANG)) <.ws> ]
     }
 
     # suppress fancy end-of-line checking
     token codeblock {
         :my $GOAL is context = '}';
-        '{' :: [ :lang($¢.cursor_fresh($+LANG)) <statementlist> ]
+        '{' :: [ :lang($¢.cursor_fresh($*LANG)) <statementlist> ]
         [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
     }
 
     rule nibbler {
-        :my $sigspace    is context<rw> = $+sigspace    // 0;
-        :my $ratchet     is context<rw> = $+ratchet     // 0;
-        :my $ignorecase is context<rw> = $+ignorecase // 0;
-        :my $ignoreaccent    is context<rw> = $+ignoreaccent    // 0;
+        :my $sigspace    is context<rw> = $*sigspace    // 0;
+        :my $ratchet     is context<rw> = $*ratchet     // 0;
+        :my $ignorecase is context<rw> = $*ignorecase // 0;
+        :my $ignoreaccent    is context<rw> = $*ignoreaccent    // 0;
         [ \s* < || | && & > ]?
         <EXPR>
     }
@@ -4173,13 +4174,13 @@ grammar Regex is STD {
         >
     }
 
-    token metachar:sym<' '> { <?before "'"> [:lang($¢.cursor_fresh($+LANG)) <quote>] }
-    token metachar:sym<" "> { <?before '"'> [:lang($¢.cursor_fresh($+LANG)) <quote>] }
+    token metachar:sym<' '> { <?before "'"> [:lang($¢.cursor_fresh($*LANG)) <quote>] }
+    token metachar:sym<" "> { <?before '"'> [:lang($¢.cursor_fresh($*LANG)) <quote>] }
 
     token metachar:var {
         <!before '$$'>
         <?before <sigil>>
-        [:lang($¢.cursor_fresh($+LANG)) <variable> <.ws> ]
+        [:lang($¢.cursor_fresh($*LANG)) <variable> <.ws> ]
         $<binding> = ( <.ws> '=' <.ws> <quantified_atom> )?
         { $<sym> = $<variable>.item; }
     }
@@ -4228,25 +4229,25 @@ grammar Regex is STD {
 
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        [:lang($¢.cursor_fresh($+LANG).unbalanced('>')) <variable=EXPR(item %LOOSEST)>]
+        [:lang($¢.cursor_fresh($*LANG).unbalanced('>')) <variable=EXPR(item %LOOSEST)>]
     }
 
     token assertion:method {
         '.' [
             | <?before <alpha> > <assertion>
-            | [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <dottyop> ]
+            | [ :lang($¢.cursor_fresh($*LANG).unbalanced('>')) <dottyop> ]
             ]
     }
 
-    token assertion:name { [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <longname> ]
+    token assertion:name { [ :lang($¢.cursor_fresh($*LANG).unbalanced('>')) <longname> ]
                                     [
                                     | <?before '>' >
                                     | <.ws> <nibbler>
                                     | '=' <assertion>
                                     | ':' <.ws>
-                                        [ :lang($¢.cursor_fresh($+LANG).unbalanced('>')) <arglist> ]
+                                        [ :lang($¢.cursor_fresh($*LANG).unbalanced('>')) <arglist> ]
                                     | '(' {}
-                                        [ :lang($¢.cursor_fresh($+LANG)) <arglist> ]
+                                        [ :lang($¢.cursor_fresh($*LANG)) <arglist> ]
                                         [ ')' || <.panic: "Assertion call missing right parenthesis"> ]
                                     ]?
     }
@@ -4274,34 +4275,34 @@ grammar Regex is STD {
 
     token mod_arg { :dba('modifier argument') '(' ~ ')' <semilist> }
 
-    token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($+LANG)) <statement> <eat_terminator> ] }
+    token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($*LANG)) <statement> <eat_terminator> ] }
 
     # XXX needs some generalization
 
-    token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $+ignorecase = 1 } }
-    token mod_internal:sym<:!i>   { $<sym>=[':!i'|':!ignorecase'] » { $+ignorecase = 0 } }
-    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { $+ignorecase = eval $<mod_arg>.text } }
-    token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { $+ignorecase = $0 } }
+    token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $*ignorecase = 1 } }
+    token mod_internal:sym<:!i>   { $<sym>=[':!i'|':!ignorecase'] » { $*ignorecase = 0 } }
+    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { $*ignorecase = eval $<mod_arg>.text } }
+    token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { $*ignorecase = $0 } }
 
-    token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { $+ignoreaccent = 1 } }
-    token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { $+ignoreaccent = 0 } }
-    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { $+ignoreaccent = eval $<mod_arg>.text } }
-    token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { $+ignoreaccent = $0 } }
+    token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { $*ignoreaccent = 1 } }
+    token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { $*ignoreaccent = 0 } }
+    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { $*ignoreaccent = eval $<mod_arg>.text } }
+    token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { $*ignoreaccent = $0 } }
 
-    token mod_internal:sym<:s>    { ':s' 'igspace'? » { $+sigspace = 1 } }
-    token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { $+sigspace = 0 } }
-    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { $+sigspace = eval $<mod_arg>.text } }
-    token mod_internal:sym<:0s>   { ':' (\d+) 's' 'igspace'? » { $+sigspace = $0 } }
+    token mod_internal:sym<:s>    { ':s' 'igspace'? » { $*sigspace = 1 } }
+    token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { $*sigspace = 0 } }
+    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { $*sigspace = eval $<mod_arg>.text } }
+    token mod_internal:sym<:0s>   { ':' (\d+) 's' 'igspace'? » { $*sigspace = $0 } }
 
-    token mod_internal:sym<:r>    { ':r' 'atchet'? » { $+ratchet = 1 } }
-    token mod_internal:sym<:!r>   { ':!r' 'atchet'? » { $+ratchet = 0 } }
-    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $+ratchet = eval $<mod_arg>.text } }
-    token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { $+ratchet = $0 } }
+    token mod_internal:sym<:r>    { ':r' 'atchet'? » { $*ratchet = 1 } }
+    token mod_internal:sym<:!r>   { ':!r' 'atchet'? » { $*ratchet = 0 } }
+    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $*ratchet = eval $<mod_arg>.text } }
+    token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { $*ratchet = $0 } }
  
-    token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] [ :lang( $¢.cursor_fresh( ::STD::P5Regex ).unbalanced($+GOAL) ) <nibbler> ] }
+    token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] [ :lang( $¢.cursor_fresh( ::STD::P5Regex ).unbalanced($*GOAL) ) <nibbler> ] }
 
     token mod_internal:adv {
-        <?before ':' <identifier> > [ :lang($¢.cursor_fresh($+LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
+        <?before ':' <identifier> > [ :lang($¢.cursor_fresh($*LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
     }
 
     token mod_internal:oops { ':'\w+ <.panic: "Unrecognized regex modifier"> }
@@ -4355,12 +4356,12 @@ grammar P5Regex is STD {
     # suppress fancy end-of-line checking
     token codeblock {
         :my $GOAL is context = '}';
-        '{' :: [ :lang($¢.cursor_fresh($+LANG)) <statementlist> ]
+        '{' :: [ :lang($¢.cursor_fresh($*LANG)) <statementlist> ]
         [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
     }
 
     rule nibbler {
-        :my $ignorecase is context<rw> = $+ignorecase // 0;
+        :my $ignorecase is context<rw> = $*ignorecase // 0;
         <EXPR>
     }
 
@@ -4558,14 +4559,15 @@ method panic (Str $s) {
 
 method worry (Str $s) {
     push @COMPILING::WORRIES, $s ~ self.locmess;
+    self;
 }
 
 method locmess () {
-    my $pre = substr($+ORIG, 0, self.pos);
+    my $pre = substr($*ORIG, 0, self.pos);
     my $line = self.lineof(self.pos);
     $pre = substr($pre, -40, 40);
     1 while $pre ~~ s!.*\n!!;
-    my $post = substr($+ORIG, self.pos, 40);
+    my $post = substr($*ORIG, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
     " at " ~ $COMPILING::FILE ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR";
@@ -4577,17 +4579,17 @@ method line {
 
 method lineof ($p) {
     return 1 unless defined $p;
-    my $line = @+MEMOS[$p]<L>;
+    my $line = @*MEMOS[$p]<L>;
     return $line if $line;
     $line = 1;
     my $pos = 0;
-    my @text = split(/^/,$+ORIG);
+    my @text = split(/^/,$*ORIG);
     for @text {
-        @+MEMOS[$pos++]<L> = $line
+        @*MEMOS[$pos++]<L> = $line
             for 1 .. chars($_);
         $line++;
     }
-    return @+MEMOS[$p]<L> // 0;
+    return @*MEMOS[$p]<L> // 0;
 }
 
 method SETGOAL { }

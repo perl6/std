@@ -83,7 +83,7 @@ sub un6 {
     $f =~ s/(\S+)\s*:(exists|delete)/$2 $1/g if $f =~ /:(exists|delete)/;
     while ($f ne "") {
 	#print "$f\n" if $trace;
-        $f =~ s/^\$\+(\w+)\.?([\[{<])//         	and $t .= qq/\$$1->$2/, next;
+        $f =~ s/^\$\*(\w+)\.?([\[{<])//         	and $t .= qq/\$$1->$2/, next;
         $f =~ s/^\)</.</                  	and $t .= ')', next;
         $f =~ s/^\.\(/(/                  	and $t .= '->', next;
 	$f =~ s/^\[\*-1\]//			and $t .= '[-1]';
@@ -113,10 +113,10 @@ sub un6 {
         $f =~ s/^([^:]):(\w+)//         	and $t .= qq/$1'$2' => 1/, next;
         $f =~ s/^([^:]):!(\w+)//        	and $t .= qq/$1'$2' => 0/, next;
         $f =~ s/^\%::\((.*?)\)// 		and $t .= ("do { no strict 'refs'; \\%{$1}}"), next;
-        $f =~ s/^\%\+?(\w+)((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
-        $f =~ s/^\%\+?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
-        $f =~ s/^\%\+?(\w+)\{//         	and $t .= qq/\$$1\{/, next;
-        $f =~ s/^\@\+(\w+)\[//         	and $t .= qq/\$$1\[/, next;
+        $f =~ s/^\%\*?(\w+)((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
+        $f =~ s/^\%\*?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
+        $f =~ s/^\%\*?(\w+)\{//         	and $t .= qq/\$$1\{/, next;
+        $f =~ s/^\@\*(\w+)\[//         	and $t .= qq/\$$1\[/, next;
         $f =~ s/^\$(\w+)((<[^>]*>)+)//  	and $t .= ('$' . $1 . '->' . unangle($2)), next;
         $f =~ s/^[\$\@%]((<[^>]*>)+)//       	and $t .= ('$M->' . unangle($1)), $NEEDMATCH++, next;
         $f =~ s/^ \.((<[^>]*>)+)//      	and $t .= (' $_->' . unangle($1)), next;
@@ -646,7 +646,7 @@ END
             $body =~ s/<<PROTONAME>>/$PROTONAME/g;
             $body =~ s/<<DECL>>/$sym@DECL/;
             $body =~ s/<<MEAT>>/$meat/;
-            $body =~ s/\$\+(\w+)/\$::$1/g;
+            $body =~ s/\$\*(\w+)/\$::$1/g;
             $out .= $body;
             next;
         }
@@ -719,7 +719,7 @@ END
             $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
             $line =~ s/ -> {/sub {/;
             $line =~ s/\breduce\(\)/\$reduce->()/;
-            $line =~ s/([\$\@%])\+(\w+)/${1}::$2/g;       # assume localized
+            $line =~ s/([\$\@%])\*(\w+)/${1}::$2/g;       # assume localized
             if ($line =~ s/^constant %/our %/) {
                 $line =~ tr/{}/()/;
                 $line = ::un6($line);
