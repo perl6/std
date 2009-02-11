@@ -1394,8 +1394,6 @@ token variable_declarator {
     <.ws>
 
     <trait>*
-
-#    <post_constraint>*
 }
 
 rule scoped {
@@ -1406,7 +1404,7 @@ rule scoped {
     | <package_declarator>
     | <fulltypename>+ <multi_declarator>
     | <multi_declarator>
-    ]
+    ] || <.panic: "Malformed \"$+SCOPE\" declaration">
 }
 
 
@@ -1468,48 +1466,50 @@ token package_declarator:does {
 rule package_def {
     :my $longname;
     [
-        <module_name>{
-            $longname = $<module_name>[0]<longname>;
-            $¢.add_name($longname.text);
-        }
-    ]?
-    <trait>*
-    [
-       <?before '{'>
-       {{
-           # figure out the actual full package name (nested in outer package)
-            my $pkg = $+PKGNAME // "GLOBAL";
-            my $newpkg = $CURPKG.{$pkg ~ '::'} = {};
-            $newpkg.<PARENT::> = $CURPKG;
-            $CURPKG = $newpkg;
-            push @PKGS, $pkg;
-            if $longname {
+        [
+            <module_name>{
+                $longname = $<module_name>[0]<longname>;
+                $¢.add_name($longname.text);
+            }
+        ]?
+        <trait>*
+        [
+        <?before '{'>
+        {{
+            # figure out the actual full package name (nested in outer package)
+                my $pkg = $+PKGNAME // "GLOBAL";
+                my $newpkg = $CURPKG.{$pkg ~ '::'} = {};
+                $newpkg.<PARENT::> = $CURPKG;
+                $CURPKG = $newpkg;
+                push @PKGS, $pkg;
+                if $longname {
+                    my $shortname = $longname.<name>.text;
+                    $+PKGNAME = $pkg ~ '::' ~ $shortname;
+                }
+                else {
+                    $+PKGNAME = $pkg ~ '::_anon_';
+                }
+            }}
+            <block>
+            {{
+                $+PKGNAME = pop(@PKGS);
+                $CURPKG = $CURPKG.<PARENT::>;
+            }}
+            {*}                                                     #= block
+        || <?{ $+begin_compunit }> {} <?before ';'>
+            {{
+                $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                 my $shortname = $longname.<name>.text;
-                $+PKGNAME = $pkg ~ '::' ~ $shortname;
-            }
-            else {
-                $+PKGNAME = $pkg ~ '::_anon_';
-            }
-        }}
-        <block>
-        {{
-            $+PKGNAME = pop(@PKGS);
-            $CURPKG = $CURPKG.<PARENT::>;
-        }}
-        {*}                                                     #= block
-    || <?{ $+begin_compunit }> {} <?before ';'>
-        {{
-            $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-            my $shortname = $longname.<name>.text;
-            $+PKGNAME = $shortname;
-            my $newpkg = $CURPKG.{$shortname ~ '::'} = {};
-            $newpkg.<PARENT::> = $CURPKG;
-            $CURPKG = $newpkg;
-            $+begin_compunit = 0;
-        }}
-        {*}                                                     #= semi
-    || <.panic: "Unable to parse " ~ $+PKGDECL ~ " definition">
-    ]
+                $+PKGNAME = $shortname;
+                my $newpkg = $CURPKG.{$shortname ~ '::'} = {};
+                $newpkg.<PARENT::> = $CURPKG;
+                $CURPKG = $newpkg;
+                $+begin_compunit = 0;
+            }}
+            {*}                                                     #= semi
+        || <.panic: "Unable to parse " ~ $+PKGDECL ~ " definition">
+        ]
+    ] || <.panic: "Malformed \"$+PKGDECL\" declaration">
 }
 
 token declarator {
@@ -1522,9 +1522,9 @@ token declarator {
     ]
 }
 
-token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> ] }
-token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> ] }
-token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> ] }
+token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed "multi" definition'> ] }
+token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed "proto" definition'> ] }
+token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed "only" definition'> ] }
 token multi_declarator:null  { <declarator> }
 
 token routine_declarator:sub       { <sym> <routine_def> }
@@ -2727,54 +2727,62 @@ rule multisig {
 
 rule routine_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    [ '&'<deflongname>? | <deflongname> ]?
-    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
-    [ <multisig> | <trait> ]*
-    <!{
-        $¢ = $+PARSER.bless($¢);
-        $IN_DECL = 0;
-    }>
-    <blockoid>:!s
+    [
+        [ '&'<deflongname>? | <deflongname> ]?
+        {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+        [ <multisig> | <trait> ]*
+        <!{
+            $¢ = $+PARSER.bless($¢);
+            $IN_DECL = 0;
+        }>
+        <blockoid>:!s
+    ] || <.panic: "Malformed routine definition">
 }
 
 rule method_def ($CURPAD is context<rw> = $+CURPAD) {
     {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
     [
-    | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
-    | <multisig> <trait>*
-    | <sigil> '.'
-        :dba('subscript signature')
         [
-        | '(' ~ ')' <signature>
-        | '[' ~ ']' <signature>
-        | '{' ~ '}' <signature>
-        | <?before '<'> <postcircumfix>
+        | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
+        | <multisig> <trait>*
+        | <sigil> '.'
+            :dba('subscript signature')
+            [
+            | '(' ~ ')' <signature>
+            | '[' ~ ']' <signature>
+            | '{' ~ '}' <signature>
+            | <?before '<'> <postcircumfix>
+            ]
+            <trait>*
+        | <?>
         ]
-        <trait>*
-    | <?>
-    ]
-    <blockoid>:!s
+        <blockoid>:!s
+    ] || <.panic: "Malformed method definition">
 }
 
 rule regex_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    [ '&'<deflongname>? | <deflongname> ]?
-    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
-    [ [ ':'?'(' <signature> ')'] | <trait> ]*
-    { $IN_DECL = 0; }
-    <regex_block>:!s
+    [
+        [ '&'<deflongname>? | <deflongname> ]?
+        {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+        [ [ ':'?'(' <signature> ')'] | <trait> ]*
+        { $IN_DECL = 0; }
+        <regex_block>:!s
+    ] || <.panic: "Malformed regex definition">
 }
 
 rule macro_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    [ '&'<deflongname>? | <deflongname> ]?
-    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
-    [ <multisig> | <trait> ]*
-    <!{
-        $¢ = $+PARSER.bless($¢);
-        $IN_DECL = 0;
-    }>
-    <blockoid>:!s
+    [
+        [ '&'<deflongname>? | <deflongname> ]?
+        {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+        [ <multisig> | <trait> ]*
+        <!{
+            $¢ = $+PARSER.bless($¢);
+            $IN_DECL = 0;
+        }>
+        <blockoid>:!s
+    ] || <.panic: "Malformed macro definition">
 }
 
 rule trait {
@@ -2836,16 +2844,20 @@ token signature {
 
 token type_declarator:subset {
     <sym> :s
-    <longname> { $¢.add_name($<longname>.text); }
-    [ of <fulltypename> ]?
-    [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
+    [
+        <longname> { $¢.add_name($<longname>.text); }
+        [ of <fulltypename> ]?
+        [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
+    ] || <.panic: "Malformed subset definition">
 }
 
 token type_declarator:enum {
     :my $l;
     <sym> <.ws>
-    [ $l = <longname> :: { $¢.add_name($l.text); } <.ws> ]?
-    <EXPR> <.ws>
+    [
+        [ $l = <longname> :: { $¢.add_name($l.text); } <.ws> ]?
+        <EXPR> <.ws>
+    ] || <.panic: "Malformed enum definition">
 }
 
 rule type_constraint {
