@@ -9,6 +9,7 @@ my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
+my $IN_QUOTE is context<rw>;
 my $SCOPE is context = "";
 my $SIGIL is context<rw>;
 my %MYSTERY;
@@ -97,6 +98,26 @@ method TOP ($STOP = undef) {
 #
 #    SUPER       # (give up, pass to dispatcher?)
 
+method newpad {
+    $+CURPAD = {
+        'OUTER::' => $CURPAD,
+    };
+    self;
+}
+
+method finishpad($siggy = $+CURPAD.{'$?GOTSIG'}//0) {
+    my $line = self.lineof(self.pos);
+    $+CURPAD.{'$_'} //= { name => '$_', file => $COMPILING::FILE, line => $line };
+    $+CURPAD.{'$/'} //= { name => '$/', file => $COMPILING::FILE, line => $line };
+    $+CURPAD.{'$!'} //= { name => '$!', file => $COMPILING::FILE, line => $line };
+    if not $siggy {
+        $+CURPAD.{'@_'} = { name => '@_', file => $COMPILING::FILE, line => $line };
+        $+CURPAD.{'%_'} = { name => '%_', file => $COMPILING::FILE, line => $line };
+        $+CURPAD.{'$?GOTSIG'} = 0;
+    }
+    self;
+}
+
 method is_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
 
@@ -161,11 +182,13 @@ method add_name ($name) {
     else {
         self.add_my_name($name);
     }
+    self;
 }
 
 method add_my_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
     $+CURPAD.{$name} = { name => $name };
+    self;
 }
 
 method add_our_name ($name) {
@@ -194,6 +217,7 @@ method add_our_name ($name) {
     $curpkg.{$name}  = { name => $name, file => $COMPILING::FILE, line => self.line };
     $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
     $+CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
+    self;
 }
 
 my @routinenames;
@@ -236,10 +260,12 @@ method add_routine ($name) {
     else {
         self.add_my_routine($vname);
     }
+    self;
 }
 
 method add_my_routine ($name) {
     $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    self;
 }
 
 method add_our_routine ($name) {
@@ -247,6 +273,7 @@ method add_our_routine ($name) {
     $CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
     # say "CORE $CORE adding name $name to CURPAD $+CURPAD in $+PKGNAME";
     $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    self;
 }
 
 method add_variable ($name) {
@@ -256,6 +283,7 @@ method add_variable ($name) {
     else {
         self.add_my_variable($name);
     }
+    self;
 }
 
 method add_my_variable ($name) {
@@ -278,6 +306,7 @@ method add_my_variable ($name) {
         }
     }
     $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    self;
 }
 
 method add_our_variable ($name) {
@@ -285,6 +314,20 @@ method add_our_variable ($name) {
     $CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
     # say "CORE $CORE adding variable $name to CURPAD $+CURPAD in $+PKGNAME";
     $+CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    self;
+}
+
+method check_variable ($name) {
+    say $name;
+    my $ok = 0;
+    $ok = 1 if $name ~~ /::/;
+    $ok ||= $IN_DECL;
+    $ok ||= self.is_known($name);
+    $ok ||= substr($name,1,1) lt 'A';
+    if not $ok {
+        self.worry("Variable $name is not predeclared");
+    }
+    self;
 }
 
 # The internal precedence levels are *not* part of the public interface.
@@ -664,8 +707,11 @@ rule comp_unit {
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
 
-    { self.load_setting($CORESETTING); }
-    {{ $UNIT = $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+    {{
+        self.load_setting($CORESETTING);
+        $UNIT = self.newpad;
+        self.finishpad(1);
+    }}
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
     { $<CORE> = $CORE; }
@@ -729,8 +775,15 @@ rule comp_unit {
 token pblock ($CURPAD is context<rw> = $+CURPAD) {
     :dba('parameterized block')
     <?before <lambda> | '{' >
-    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
-    [ <lambda> <signature> ]? <blockoid>
+    [
+    | <lambda>
+        <.newpad>
+        <signature>
+        <blockoid>
+    | <?before '{'>
+        <.newpad>
+        <blockoid>
+    ] || <.panic: "Malformed block">
 }
 
 token lambda { '->' | '<->' }
@@ -746,11 +799,12 @@ token xblock {
 token block ($CURPAD is context<rw> = $+CURPAD) {
     :dba('scoped block')
     <?before '{' >
-    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+    <.newpad>
     <blockoid>
 }
 
 token blockoid {
+    <.finishpad>
     '{' ~ '}' <statementlist>
 
     [
@@ -1839,6 +1893,7 @@ token variable {
                             my $ok = 0;
                             $ok = 1 if $vname ~~ /::/;
                             $ok ||= $IN_DECL;
+                            $ok ||= $IN_QUOTE;
                             $ok ||= self.is_known($vname);
                             $ok ||= substr($<desigilname>.text,0,1) eq '$';
                             if not $ok {
@@ -2565,7 +2620,7 @@ grammar Q is STD {
     } # end role
 
     role a1 {
-        token escape:sym<@> { <?before '@'> [ :lang($+LANG) <variable> <extrapost> | <!> ] } # trap ABORTBRANCH from variable's ::
+        token escape:sym<@> { :my $IN_QUOTE is context<rw> = 1; <?before '@'> [ :lang($+LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] } # trap ABORTBRANCH from variable's ::
     } # end role
 
     role a0 {
@@ -2573,7 +2628,7 @@ grammar Q is STD {
     } # end role
 
     role h1 {
-        token escape:sym<%> { <?before '%'> [ :lang($+LANG) <variable> <extrapost> | <!> ] }
+        token escape:sym<%> { :my $IN_QUOTE is context<rw> = 1; <?before '%'> [ :lang($+LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] }
     } # end role
 
     role h0 {
@@ -2581,7 +2636,7 @@ grammar Q is STD {
     } # end role
 
     role f1 {
-        token escape:sym<&> { <?before '&'> [ :lang($+LANG) <variable> <extrapost> | <!> ] }
+        token escape:sym<&> { :my $IN_QUOTE is context<rw> = 1; <?before '&'> [ :lang($+LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] }
     } # end role
 
     role f0 {
@@ -2729,7 +2784,7 @@ rule routine_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
     [
         [ '&'<deflongname>? | <deflongname> ]?
-        {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+        <.newpad>
         [ <multisig> | <trait> ]*
         <!{
             $¢ = $+PARSER.bless($¢);
@@ -2740,7 +2795,7 @@ rule routine_def ($CURPAD is context<rw> = $+CURPAD) {
 }
 
 rule method_def ($CURPAD is context<rw> = $+CURPAD) {
-    {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+    <.newpad>
     [
         [
         | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
@@ -2764,9 +2819,10 @@ rule regex_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
     [
         [ '&'<deflongname>? | <deflongname> ]?
-        {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+        <.newpad>
         [ [ ':'?'(' <signature> ')'] | <trait> ]*
         { $IN_DECL = 0; }
+        <.finishpad>
         <regex_block>:!s
     ] || <.panic: "Malformed regex definition">
 }
@@ -2775,7 +2831,7 @@ rule macro_def ($CURPAD is context<rw> = $+CURPAD) {
     :my $IN_DECL is context<rw> = 1;
     [
         [ '&'<deflongname>? | <deflongname> ]?
-        {{ $CURPAD = { 'OUTER::' => $CURPAD, '$_' => 1, '$/' => 1, '$!' => 1 }; }}
+        <.newpad>
         [ <multisig> | <trait> ]*
         <!{
             $¢ = $+PARSER.bless($¢);
@@ -2839,7 +2895,7 @@ token signature {
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
-    { $IN_DECL = 0; $+SIGIL = '@' }
+    {{ $IN_DECL = 0; $+SIGIL = '@'; $+CURPAD.{'$?GOTSIG'} //= 1; }}
 }
 
 token type_declarator:subset {
