@@ -9,6 +9,7 @@
 	Decrease => { name => '	Decrease', file => 'CORE.pad', line => __LINE__ },
    , file => 'CORE.pad', line => __LINE__ },
     'GLOBAL::' => {},
+    'PROCESS::' => {},
     True => { name => 'True', file => 'CORE.pad', line => __LINE__ },
     False => { name => 'False', file => 'CORE.pad', line => __LINE__ },
     Object => { name => 'Object', file => 'CORE.pad', line => __LINE__ },
