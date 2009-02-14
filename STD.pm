@@ -3090,13 +3090,19 @@ rule default_value {
     '=' <EXPR(item %item_assignment)>
 }
 
-token statement_prefix:do      { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:try     { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:gather  { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:contend { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:async   { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:maybe   { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:lazy    { <sym> <?before \s> <.ws> <statement> }
+token statement_prefix:do      { <sym> <?before \s> <.ws> <statement> {{
+        my $loop = $<statement><statement_mod_loop>;
+        if $loop and @$loop and (my $s = $loop.[0].<sym>) ~~ /while|until/ {
+            $¢.obs("do...$s" ,"repeat...$s");
+        }
+    }}
+}
 
 ## term
 
@@ -4523,15 +4529,17 @@ method panic (Str $s) {
 
     my $first = $here.lineof($COMPILING::LAST_NIBBLE.<firstpos>);
     my $last = $here.lineof($COMPILING::LAST_NIBBLE.<lastpos>);
-    if $here.lineof($here.pos) == $last and $first != $last {
-        $m ~= "\n(Possible runaway string from line $first)";
-    }
-    else {
-        $first = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<firstpos>);
-        $last = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<lastpos>);
-        # the bigger the string (in lines), the further back we suspect it
-        if $here.lineof($here.pos) - $last < $last - $first  {
-            $m ~= "\n(Possible runaway string from line $first to line $last)";
+    if $first != $last {
+        if $here.lineof($here.pos) == $last {
+            $m ~= "\n(Possible runaway string from line $first)";
+        }
+        else {
+            $first = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<firstpos>);
+            $last = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<lastpos>);
+            # the bigger the string (in lines), the further back we suspect it
+            if $here.lineof($here.pos) - $last < $last - $first  {
+                $m ~= "\n(Possible runaway string from line $first to line $last)";
+            }
         }
     }
 
