@@ -297,14 +297,14 @@ method add_my_variable ($name) {
         my $oline = $old.<line> // '???';
         if $ofile {
             if $ofile ne $COMPILING::FILE {
-                self.worry("Variable $name declared at $ofile line $oline is redeclared");
+                self.worry("Redeclaration of $name (from $ofile line $oline)");
             }
             else {
-                self.worry("Variable $name declared at line $oline is redeclared");
+                self.worry("Redeclaration of $name (from line $oline)");
             }
         }
         else {
-            self.worry("Variable $name redeclared");
+            self.worry("Redeclaration of $name");
         }
     }
     $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
