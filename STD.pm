@@ -3365,7 +3365,7 @@ token infix:does ( --> Nonchaining)
     { <sym> }
 
 token infix:sym<..> ( --> Nonchaining)
-    { <sym> }
+    { <sym> [<?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
 
 token infix:sym<^..> ( --> Nonchaining)
     { <sym> }
