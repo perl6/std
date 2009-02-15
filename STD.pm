@@ -3154,8 +3154,18 @@ token term:sym<*> ( --> Term)
 token term:sym<**> ( --> Term)
     { <sym> }
 
-token infix:lambda ( --> Term)
-    { <?before '{' | '->' > <.panic: "Unexpected block in infix position (previous statement missing semicolon?)"> }
+token infix:lambda ( --> Term) {
+    <?before '{' | '->' > {{
+        my $line = $¢.lineof($¢.pos);
+        for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when' {
+            if $line - (%MYSTERY{$_}//-123) < 5 {
+                $¢.panic("$_() interpreted as function call at line " ~ %MYSTERY{$_} ~
+                "; please use whitespace after keyword\nUnexpected block in infix position (two terms in a row)");
+            }
+        }
+        $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
+    }}
+}
 
 token circumfix:sigil ( --> Term)
     { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*SIGIL ||= $<sigil>.text } }
