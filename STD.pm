@@ -1366,7 +1366,7 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
-    { :dba('argument list') '(' ~ ')' <semilist> }
+    { :dba('argument list') '(' ~ ')' <semiarglist> }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
     { :dba('subscript') '[' ~ ']' <semilist> }
