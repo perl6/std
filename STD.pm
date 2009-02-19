@@ -2852,6 +2852,7 @@ rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
 }
 
 rule trait {
+    :my $IN_DECL is context<rw> = 0;
     [
     | <trait_verb>
     | <trait_auxiliary>
