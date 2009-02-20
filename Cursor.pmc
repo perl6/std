@@ -989,9 +989,13 @@ sub add_macro { my $lang = shift;
         $mangle = ::mangle(@list);
         $mangle = $category . '__S_' . sprintf("%03d",$GEN++) . $mangle;
 
-        # XXX assuming no equiv specified
-        my $coercion = 'Additive';
-        if ($name =~ /^prefix:/) {
+        # XXX assuming no equiv specified, but to do that right,
+        # this should be delayed till the block start is seen
+        my $coercion = '';
+        if ($name =~ /^infix:/) {
+            $coercion = 'Additive';
+        }
+        elsif ($name =~ /^prefix:/) {
             if ($sym =~ /^\W/) {
                 $coercion = 'Symbolic_unary';
             }
@@ -1002,6 +1006,11 @@ sub add_macro { my $lang = shift;
         elsif ($name =~ /^postfix:/) {
             $coercion = 'Methodcall';
         }
+        elsif ($name =~ /^term:/) {
+            $coercion = 'Term';
+        }
+        my $COERCE = '';
+        $COERCE = " Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) }," if $coercion;
 
         state $genpkg = 'ANON000';
         $genpkg++;
@@ -1038,7 +1047,7 @@ sub $mangle {
     my \$S = \$self->{_pos};
     \$C->{'sym'} = \$sym;
 
-    \$self->_MATCHIFY(\$S, '$mangle', Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) },
+    \$self->_MATCHIFY(\$S, '$mangle',$COERCE
         \$C->_SYM(\$sym, 0)
     );
 }
