@@ -127,6 +127,9 @@
     Comparator => { name => 'Comparator', file => 'CORE.pad', line => __LINE__ },
     OrderingPair => { name => 'OrderingPair', file => 'CORE.pad', line => __LINE__ },
 
+    Instant => { name => 'Instant', file => 'CORE.pad', line => __LINE__ },
+    Duration => { name => 'Duration', file => 'CORE.pad', line => __LINE__ },
+
     IO => { name => 'IO', file => 'CORE.pad', line => __LINE__ },
 
     KitchenSink => { name => 'KitchenSink', file => 'CORE.pad', line => __LINE__ },
