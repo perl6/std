@@ -2930,10 +2930,10 @@ token type_declarator:enum {
     :my $l;
     <sym> <.ws>
     [
-        [ $l = <longname> :: { $¢.add_name($l.text); } <.ws> ]?
-        <EXPR> <.ws>
-        {{ $¢.add_enum($l.text, $<EXPR>.text); }}
-    ] || <.panic: "Malformed enum definition">
+    || $l = <longname>  <.ws> <arglist> <.ws>
+        { $¢.add_name($l.text); $¢.add_enum($l.text, $<arglist>.text); }
+    || <arglist> <.ws>
+    ]
 }
 
 rule type_constraint {
