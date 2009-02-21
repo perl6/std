@@ -247,6 +247,7 @@
     '&caller' => { name => '&caller', file => 'CORE.pad', line => __LINE__ },
     '&return' => { name => '&return', file => 'CORE.pad', line => __LINE__ },
     '&leave' => { name => '&leave', file => 'CORE.pad', line => __LINE__ },
+    '&make' => { name => '&return', file => 'CORE.pad', line => __LINE__ },
     '&pop' => { name => '&pop', file => 'CORE.pad', line => __LINE__ },
     '&shift' => { name => '&shift', file => 'CORE.pad', line => __LINE__ },
     '&unshift' => { name => '&unshift', file => 'CORE.pad', line => __LINE__ },
