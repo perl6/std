@@ -2932,6 +2932,7 @@ token type_declarator:enum {
     [
         [ $l = <longname> :: { $¢.add_name($l.text); } <.ws> ]?
         <EXPR> <.ws>
+        {{ $¢.add_enum($l.text, $<EXPR>.text); }}
     ] || <.panic: "Malformed enum definition">
 }
 

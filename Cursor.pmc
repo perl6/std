@@ -1078,6 +1078,21 @@ END
     $lang;
 }
 
+sub add_enum { my $self = shift;
+    my $type = shift;
+    my $expr = shift;
+    return unless $expr;
+    # XXX complete kludge, really need to eval EXPR
+    while ($expr =~ s/^\s*[<'](.*?)[>'],?//) {
+        for (split ' ', $1) {
+            next unless /^\w/; 
+            $self->add_name($_);
+            $self->add_name($type . "::$_");
+        }
+    }
+    $self;
+}
+
 sub do_imports { my $self = shift;
     my $args = shift;
     return unless $args;
