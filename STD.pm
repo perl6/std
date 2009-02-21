@@ -125,6 +125,8 @@ method is_name ($name) {
     my $curpkg = $CURPKG;
     if $name ~~ /::/ {
         my @components = split(/::/,$name);
+        return True if @components[0] eq 'CALLER';
+        return True if @components[0] eq 'CONTEXT';
         if $curpkg = self.find_pkg(@components[0] ~ '::') {
             # say "Found lexical package " ~ @components[0] ~ join(' ', keys(%$curpkg));
             shift @components;
@@ -936,6 +938,8 @@ token statement_control:use {
         {{
             my $longname = $<module_name><longname>;
             $¢.add_our_name($longname.text);
+            # XXX cheat on import list for now
+            $¢.do_imports($<arglist>[0]);
         }}
     ]
 }

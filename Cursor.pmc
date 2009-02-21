@@ -1078,6 +1078,32 @@ END
     $lang;
 }
 
+sub do_imports { my $self = shift;
+    my $args = shift;
+    return unless $args;
+    my $text = $args->text;
+    return unless $text;
+    while ($text =~ s/^\s*:?(OUR|MY|STATE)?<(.*?)>,?//) {
+        my $scope = lc($1) || 'my';
+        my $imports = $2;
+        local $::SCOPE = 'my';
+        for (split ' ', $imports) {
+            if (/^\w/) {
+                if (/::/) {
+                    $self->add_name($_);
+                }
+                else {
+                    $self->add_routine($_);
+                }
+            }
+            else {
+                $self->add_variable($_);
+            }
+        }
+    }
+    $self;
+}
+
 sub callm { my $self = shift;
     my $arg = shift;
     my $class = ref($self) || $self;
