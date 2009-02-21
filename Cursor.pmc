@@ -121,7 +121,7 @@ BEGIN {
 sub new {
     my $class = shift;
     $::ORIG = shift() . "\n";           # original string
-    @::ORIG = unpack("U*", $::ORIG);
+    { no warnings; @::ORIG = unpack("U*", $::ORIG); }
     $::MEMOS[@::ORIG] = undef;  # memos kept by position
     my %args = ('_pos' => 0, '_from' => 0);
     while (@_) {
@@ -851,6 +851,7 @@ sub cursor_fate { my $self = shift;
         my $next;
         print ::LOG "=" x 10,"\n$p TRIE for ${pkg}::$name in ", ref $self, "\n",
                 $p," ", pack("U",$ch), "\n" if $DEBUG & DEBUG::autolexer;
+        STATE:
         for (;;) {
             if ($state->{'~~'}) {
                 our %RXCACHE;
@@ -867,7 +868,7 @@ sub cursor_fate { my $self = shift;
                     print ::LOG $pend," FNUM $fnum @",$pend - $P,"\n" if $DEBUG & DEBUG::autolexer;
                 }
             }
-            last unless $next = $state->{chr $ch};
+            { no warnings; last STATE unless $next = $state->{chr $ch}; };
             if ($DEBUG & DEBUG::autolexer) {
                 print ::LOG substr($::ORIG, $P, $p - $P), "\n";
                 print ::LOG $p," ", pack("U",$ch), "\n";
