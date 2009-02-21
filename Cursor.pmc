@@ -186,7 +186,7 @@ sub load_pad {
     return $PADS{$setting} if $PADS{$setting};
     my $file = "$setting.pad";
     my $store = "$setting.pad.store";
-    if (-f $store and -M $file > -M $store) {
+    if (-f $store and -M $file and -M $file > -M $store) {
         $PADS{$setting} = retrieve($store);
     }
     else {
