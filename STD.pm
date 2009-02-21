@@ -10,6 +10,7 @@ my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
 my $IN_QUOTE is context<rw>;
+my $QUASI_QUASH is context<rw>;
 my $SCOPE is context = "";
 my $SIGIL is context<rw>;
 my %MYSTERY;
@@ -237,6 +238,7 @@ method load_setting ($setting) {
 
 method is_known ($name) {
     my $vname;
+    return True if $*QUASI_QUASH;
     if substr($name,0,1) lt 'A' {
         $vname = $name;
     }
@@ -2214,6 +2216,7 @@ token tribble ($l, $lang2 = $l) {
 
 token quasiquibble ($l) {
     :my ($lang, $start, $stop);
+    :my $QUASI_QUASH is context = 0; # :COMPILING sets true
     <babble($l)>
     { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
@@ -2758,6 +2761,7 @@ grammar Q is STD {
 
 grammar Quasi is STD {
     token term:unquote {
+        :my $QUASI_QUASH is context = 0;
         <starter><starter><starter> <EXPR> <stopper><stopper><stopper>
     }
 
@@ -2765,7 +2769,7 @@ grammar Quasi is STD {
     multi method tweak (:$ast) { self; } # XXX some transformer operating on the normal AST?
     multi method tweak (:$lang) { self.cursor_fresh( $lang ); }
     multi method tweak (:$unquote) { self; } # XXX needs to override unquote
-    multi method tweak (:$COMPILING) { self; } # XXX needs to lazify the lexical lookups somehow
+    multi method tweak (:$COMPILING) { $*QUASI_QUASH = 1; self; } # XXX needs to lazify the lexical lookups somehow
 
     multi method tweak (*%x) {
         my @k = keys(%x);
