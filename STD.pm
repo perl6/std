@@ -1,4 +1,4 @@
-grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
+grammar STD:ver<5.0.0.alpha>:auth<http://perl.org>;
 
 # should some of these be parser instance attributes?
 my $LANG is context;
@@ -10,6 +10,7 @@ my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
 my $IN_QUOTE is context<rw>;
+my $IN_REDUCE is context<rw>;
 my $QUASI_QUASH is context<rw>;
 my $SCOPE is context = "";
 my $SIGIL is context<rw>;
@@ -1282,6 +1283,7 @@ method can_meta ($op, $meta) {
 }
 
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
+    :my $IN_REDUCE is context = 1;
     <?before '['\S+']'>
     $<s> = (
         '['
@@ -3385,7 +3387,7 @@ token infix:does ( --> Nonchaining)
     { <sym> }
 
 token infix:sym<..> ( --> Nonchaining)
-    { <sym> [<?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
+    { <sym> [<!{ $IN_REDUCE }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
 
 token infix:sym<^..> ( --> Nonchaining)
     { <sym> }
