@@ -3170,7 +3170,7 @@ token infix:lambda ( --> Term) {
         for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when' {
             if $line - (%MYSTERY{$_}//-123) < 5 {
                 $¢.panic("$_() interpreted as function call at line " ~ %MYSTERY{$_} ~
-                "; please use whitespace after keyword\nUnexpected block in infix position (two terms in a row)");
+                "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
             }
         }
         $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
