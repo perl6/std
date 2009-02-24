@@ -10,7 +10,7 @@ my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
 my $IN_QUOTE is context<rw>;
-my $IN_REDUCE is context<rw>;
+my $IN_META is context<rw> = 0;
 my $QUASI_QUASH is context<rw>;
 my $SCOPE is context = "";
 my $SIGIL is context<rw>;
@@ -1205,8 +1205,9 @@ token quotepair {
     { $<k> = $key; $<v> = $value; }
 }
 
-token infixish {
+token infixish ($in_meta = $*IN_META) {
     :my $infix;
+    :my $IN_META is context<rw> = $in_meta;
     <!stdstopper>
     <!infixstopper>
     :dba('infix or meta-infix')
@@ -1218,7 +1219,7 @@ token infixish {
             %<O><assoc> = 'unary';
             %<O><uassoc> = 'left';
         }
-    | '[' ~ ']' <infixish> { $<O> = $<infixish><O> }
+    | '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O> }
     | <infix_circumfix_meta_operator>
         { $<O> = $<infix_circumfix_meta_operator><O>;
           $<sym> = $<infix_circumfix_meta_operator><sym>; }
@@ -1283,13 +1284,12 @@ method can_meta ($op, $meta) {
 }
 
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
-    :my $IN_REDUCE is context = 1;
     <?before '['\S+']'>
     $<s> = (
         '['
         [
-        || <op=infixish> ']' ['«'|<?>]
-        || \\<op=infixish> ']' ['«'|<?>]
+        || <op=infixish(1)> ']' ['«'|<?>]
+        || \\<op=infixish(1)> ']' ['«'|<?>]
         || <!>
         ]
     ) <?before <[ \s ( ]> >
@@ -1312,7 +1312,7 @@ token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
 token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' }
 
 token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
-    <sym> <!before '!'> {} <infixish>
+    <sym> <!before '!'> {} <infixish(1)>
 
     [
     || <?{ $<infixish>.text eq '=' }>
@@ -1327,7 +1327,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
 }
 
 token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
-    <sym> {} <infixish>
+    <sym> {} <infixish(1)>
     <.can_meta($<infixish>, "reverse")>
     <?{ $<O> = $<infixish><O>; }>
 }
@@ -1339,7 +1339,7 @@ token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
 
 token infix_circumfix_meta_operator:sym<X> ( --> List_infix) {
     X {}
-    [ <infixish>
+    [ <infixish(1)>
         [X <.panic: "Old form of XopX found">]?
         <.can_meta($<infixish>[0], "cross")>
         <?{ $<O> = $<infixish>[0]<O>; $<O><diffy> = 1; }>
@@ -1351,7 +1351,7 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
     | '«'
     | '»'
     ]
-    {} <infixish> [ '«' | '»' ]
+    {} <infixish(1)> [ '«' | '»' ]
     <.can_meta($<infixish>, "hyper")>
     <?{ $<O> := $<infixish><O>; }>
 }
@@ -1361,7 +1361,7 @@ token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
     | '<<'
     | '>>'
     ]
-    {} <infixish> [ '<<' | '>>' ]
+    {} <infixish(1)> [ '<<' | '>>' ]
     <.can_meta($<infixish>, "hyper")>
     <?{ $<O> := $<infixish><O>; }>
 }
@@ -1884,12 +1884,13 @@ token desigilname {
 }
 
 token variable {
+    :my $IN_META is context<rw> = 0;
     <?before <sigil> { $*SIGIL ||= $<sigil>.text } > {}
     [
     || '&'
         [
         | <twigil>?  <sublongname> {*}                                   #= subnoun
-        | '[' ~ ']' <infixish>
+        | '[' ~ ']' <infixish(1)>
         ]
     || <?before '$::('> '$' <name>?
     || '$::' <name>? # XXX
@@ -3387,7 +3388,7 @@ token infix:does ( --> Nonchaining)
     { <sym> }
 
 token infix:sym<..> ( --> Nonchaining)
-    { <sym> [<!{ $IN_REDUCE }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
+    { <sym> [<!{ $IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
 
 token infix:sym<^..> ( --> Nonchaining)
     { <sym> }
