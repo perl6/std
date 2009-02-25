@@ -3119,6 +3119,10 @@ token statement_prefix:do      { <sym> <?before \s> <.ws> <statement> {{
 
 ## term
 
+token term:new ( --> Term) {
+    'new' \h+ <longname> '(' <.obs("C++ constructor syntax", "method call syntax")>
+}
+
 token term:sym<::?IDENT> ( --> Term) {
     $<sym> = [ '::?' <identifier> ] »
 }
