@@ -1399,7 +1399,7 @@ token postcircumfix:sym<( )> ( --> Methodcall)
     { :dba('argument list') '(' ~ ')' <semiarglist> }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { :dba('subscript') '[' ~ ']' <semilist> }
+    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.text eq '-1' and $¢.obs("[-1] subscript to access final element","[*-1]") } }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
     { :dba('subscript') '{' ~ '}' <semilist> }
@@ -3171,8 +3171,10 @@ token infix:lambda ( --> Term) {
     <?before '{' | '->' > {{
         my $line = $¢.lineof($¢.pos);
         for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when' {
-            if $line - (%MYSTERY{$_}.<line>//-123) < 5 {
-                $¢.panic("$_() interpreted as function call at line " ~ %MYSTERY{$_}.<line> ~
+            my $m = %MYSTERY{$_};
+            next unless $m;
+            if $line - ($m.<line>//-123) < 5 {
+                $¢.panic("$_() interpreted as function call at line " ~ $m.<line> ~
                 "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
             }
         }
