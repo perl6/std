@@ -294,7 +294,8 @@ method add_variable ($name) {
 }
 
 method add_my_variable ($name) {
-    if $name eq '$_' or substr($name, 0, 1) eq '&' or $name ~~ s/\^// {   # XXX hack
+    # say "Adding $name";
+    if $name eq '$_' or substr($name, 0, 1) eq '&' or $name ~~ s/\^|\:// {   # XXX hack
         ;
     }
     elsif my $old = $*CURPAD.{$name} {
@@ -325,14 +326,26 @@ method add_our_variable ($name) {
 }
 
 method check_variable ($name) {
-    say $name;
-    my $ok = 0;
-    $ok = 1 if $name ~~ /::/;
-    $ok ||= $IN_DECL;
-    $ok ||= self.is_known($name);
-    $ok ||= substr($name,1,1) lt 'A';
-    if not $ok {
-        self.worry("Variable $name is not predeclared");
+    my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W?)(.?)/;
+    # say "Checking $name";
+    given $twigil {
+        when '' {
+            my $ok = 0;
+            $ok = 1 if $name ~~ /::/;
+            $ok ||= $IN_DECL;
+            $ok ||= self.is_known($name);
+            $ok ||= $first lt 'A';
+            if not $ok {
+                self.worry("Variable $name is not predeclared");
+            }
+        }
+        when '^' {
+            self.add_my_variable($name);
+        }
+        when ':' {
+            self.add_my_variable($name);
+        }
+
     }
     self;
 }
@@ -1129,7 +1142,7 @@ token noun {
     :my $SCOPE is context<rw> = "our";
     [
     | <fatarrow>
-    | <variable>
+    | <variable> <.check_variable($<variable>.text)>
     | <package_declarator>
     | <scope_declarator>
     | <?before 'multi'|'proto'|'only'> <multi_declarator>
@@ -1399,7 +1412,7 @@ token postop {
 token methodop {
     [
     | <longname>
-    | <?before '$' | '@' > <variable>
+    | <?before '$' | '@' > <variable> <.check_variable($<variable>.text)>
     | <?before <[ ' " ]> > <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
@@ -1878,7 +1891,7 @@ token special_variable:sym<$?> {
 
 token desigilname {
     [
-    | <?before '$' > <variable>
+    | <?before '$' > <variable> <.check_variable($<variable>.text)>
     | <longname>
     ]
 }
@@ -1899,33 +1912,7 @@ token variable {
         | <sigil> <twigil>? <desigilname> {*}                                    #= desigilname
             [ <?{ my $t = $<twigil>; @$t and $t.[0].text eq '.' }>
                 <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
-            ||
-                {{
-                    my $vname = $<sigil>.text;
-                    my $t = $<twigil>;
-                    my $twigil = '';
-                    $twigil = $t.[0].text if @$t;
-                    $vname ~= $twigil;
-                    $vname ~= $<desigilname>.text;
-                    given $twigil {
-                        when '' {
-                            my $ok = 0;
-                            $ok = 1 if $vname ~~ /::/;
-                            $ok ||= $IN_DECL;
-                            $ok ||= $IN_QUOTE;
-                            $ok ||= self.is_known($vname);
-                            $ok ||= substr($<desigilname>.text,0,1) eq '$';
-                            if not $ok {
-                                self.worry("Variable $vname is not predeclared");
-                            }
-                        }
-                        when '^' {
-                            self.add_variable($vname);
-                        }
-
-                    }
-                }}
-            ]
+            ]?
         | <special_variable> {*}                                    #= special
         | <sigil> $<index>=[\d+] {*}                                #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
@@ -2626,7 +2613,7 @@ grammar Q is STD {
     } # end role
 
     role s1 {
-        token escape:sym<$> { <?before '$'> [ :lang($*LANG) <variable> <extrapost>? ] || <.panic: "Non-variable \$ must be backslashed"> }
+        token escape:sym<$> { <?before '$'> [ :lang($*LANG) <variable> <extrapost>? <.check_variable($<variable>.text)> ] || <.panic: "Non-variable \$ must be backslashed"> }
         token special_variable:sym<$"> {
             '$' <stopper>
             <.panic: "Can't use a \$ in the last position of an interpolating string">
@@ -4223,7 +4210,7 @@ grammar Regex is STD {
     token metachar:var {
         <!before '$$'>
         <?before <sigil>>
-        [:lang($¢.cursor_fresh($*LANG)) <variable> <.ws> ]
+        [:lang($¢.cursor_fresh($*LANG)) <variable> <.ws> <.check_variable($<variable>.text)> ]
         $<binding> = ( <.ws> '=' <.ws> <quantified_atom> )?
         { $<sym> = $<variable>.item; }
     }
