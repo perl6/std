@@ -120,8 +120,9 @@ method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
     self;
 }
 
-method is_name ($name) {
+method is_name ($name, $curpad = $*CURPAD) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
+    # say "Looking for $name in $curpad";
 
     my $curpkg = $CURPKG;
     if $name ~~ /::/ {
@@ -147,7 +148,7 @@ method is_name ($name) {
         $name ~~ s/\>$//;
     }
     else {
-        my $pad = $*CURPAD;
+        my $pad = $curpad;
         while $pad {
             return True if $pad.{$name};
             $pad = $pad.<OUTER::>;
@@ -226,8 +227,14 @@ method add_our_name ($name) {
     self;
 }
 
-my @routinenames;
-my %routinenames;
+method add_mystery ($name,$pos) {
+    if not self.is_known($name) {
+        # say "Mystery $name $*CURPAD";
+        %MYSTERY{$name}.<pad> = $*CURPAD;
+        %MYSTERY{$name}.<line> ~= self.lineof($pos) ~ ' ';
+    }
+    self;
+}
 
 method load_setting ($setting) {
     @PKGS = ();
@@ -239,7 +246,7 @@ method load_setting ($setting) {
     $CURPKG = $GLOBAL;
 }
 
-method is_known ($name) {
+method is_known ($name, $curpad = $*CURPAD) {
     my $vname;
     return True if $*QUASI_QUASH;
     if substr($name,0,1) lt 'A' {
@@ -248,7 +255,7 @@ method is_known ($name) {
     else {
         $vname = '&' ~ $name;
     }
-    my $pad = $*CURPAD;
+    my $pad = $curpad;
     while $pad {
         return True if $pad.{$vname};
         return True if $pad.{$name}; # type as routine?
@@ -746,13 +753,14 @@ rule comp_unit {
         my %unk_types;
         my %unk_routines;
         for keys(%MYSTERY) {
-            if $¢.is_name($_) {
+            my $p = %MYSTERY{$_}.<pad>;
+            if $¢.is_name($_, $p) {
                 # types may not be post-declared
                 %post_types{$_} = %MYSTERY{$_};
                 next;
             }
 
-            next if $¢.is_known($_);
+            next if $¢.is_known($_, $p);
 
             # just a guess, but good enough to improve error reporting
             if $_ lt 'a' {
@@ -766,21 +774,21 @@ rule comp_unit {
             my @tmp = sort keys(%post_types);
             warn "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
             for @tmp {
-                warn "\t$_ used at ", %post_types{$_}, "\n";
+                warn "\t$_ used at ", %post_types{$_}.<line>, "\n";
             }
         }
         if %unk_types {
             my @tmp = sort keys(%unk_types);
             warn "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
             for @tmp {
-                warn "\t$_ used at ", %unk_types{$_}, "\n";
+                warn "\t$_ used at ", %unk_types{$_}.<line>, "\n";
             }
         }
         if %unk_routines {
             my @tmp = sort keys(%unk_routines);
             warn "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
             for @tmp {
-                warn "\t$_ used at ", %unk_routines{$_}, "\n";
+                warn "\t$_ used at ", %unk_routines{$_}.<line>, "\n";
             }
         }
     }}
@@ -3163,8 +3171,8 @@ token infix:lambda ( --> Term) {
     <?before '{' | '->' > {{
         my $line = $¢.lineof($¢.pos);
         for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when' {
-            if $line - (%MYSTERY{$_}//-123) < 5 {
-                $¢.panic("$_() interpreted as function call at line " ~ %MYSTERY{$_} ~
+            if $line - (%MYSTERY{$_}.<line>//-123) < 5 {
+                $¢.panic("$_() interpreted as function call at line " ~ %MYSTERY{$_}.<line> ~
                 "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
             }
         }
@@ -3600,13 +3608,12 @@ token term:sigil ( --> List_prefix)
 # force identifier(), identifier.(), etc. to be a function call always
 token term:identifier ( --> Term )
 {
-    :my $t;
+    :my $name;
+    :my $pos;
     <identifier> <?before ['.'?'(']?>
-    { $t = $<identifier>.text; }
-    <args( $¢.is_name($t) )>
-    {{
-        %MYSTERY{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $<args><invocant> or $¢.is_known($t);
-    }}
+    { $name = $<identifier>.text; $pos = $¢.pos; }
+    <args( $¢.is_name($name) )>
+    { self.add_mystery($name,$pos) unless $<args><invocant>; }
 }
 
 token term:opfunc ( --> Term )
@@ -3639,9 +3646,13 @@ token args ($istype = 0) {
 # bare identifier without parens also handled here if no other rule parses it
 token term:name ( --> Term)
 {
-    :my $t;
+    :my $name;
+    :my $pos;
     <longname>
-    { $t = $<longname>.text; }
+    {
+        $name = $<longname>.text;
+        $pos = $¢.pos;
+    }
     [
     ||  <?{
             $¢.is_name($<longname>.text) or substr($<longname>.text,0,2) eq '::'
@@ -3657,10 +3668,7 @@ token term:name ( --> Term)
         {*}                                                     #= typename
 
     # unrecognized names are assumed to be post-declared listops.
-    || <args>
-        {{
-            %MYSTERY{$t} ~= $¢.lineof($¢.pos) ~ ' ' unless $<args><invocant> or $¢.is_known($t);
-        }}
+    || <args> { self.add_mystery($name,$pos) unless $<args><invocant>; }
     ]
 }
 
