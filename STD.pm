@@ -333,8 +333,9 @@ method check_variable ($name) {
             my $ok = 0;
             $ok = 1 if $name ~~ /::/;
             $ok ||= $IN_DECL;
-            $ok ||= self.is_known($name);
+            $ok ||= $sigil eq '&';
             $ok ||= $first lt 'A';
+            $ok ||= self.is_known($name);
             if not $ok {
                 self.worry("Variable $name is not predeclared");
             }
