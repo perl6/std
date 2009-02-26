@@ -4,7 +4,7 @@ grammar STD:ver<5.0.0.alpha>:auth<http://perl.org>;
 my $LANG is context;
 my $PKGDECL is context = "";
 my $PKGNAME is context = "";
-my @PKGS;
+my @PKGS is context<rw> = ();
 my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
@@ -14,7 +14,7 @@ my $IN_META is context<rw> = 0;
 my $QUASI_QUASH is context<rw>;
 my $SCOPE is context = "";
 my $SIGIL is context<rw>;
-my %MYSTERY;
+my %MYSTERY is context<rw>;
 my $ORIG is context;
 my @MEMOS is context;
 my $VOID is context<rw>;
@@ -23,11 +23,11 @@ my $INVOCANT_IS is context<rw>;
 my $CURPAD is context<rw>;
 my $REALLYADD is context<rw> = 0;
 
-my $CORE;
-my $CORESETTING = "CORE";
-my $GLOBAL;
-my $CURPKG;
-my $UNIT;
+my $CORE is context;
+my $CORESETTING is context = "CORE";
+my $GLOBAL is context;
+my $CURPKG is context;
+my $UNIT is context;
 
 # random rule for debugging, please ignore
 token foo {
@@ -102,7 +102,7 @@ method TOP ($STOP = undef) {
 
 method newpad {
     $*CURPAD = {
-        'OUTER::' => $CURPAD,
+        'OUTER::' => $*CURPAD,
     };
     self;
 }
@@ -124,7 +124,7 @@ method is_name ($name, $curpad = $*CURPAD) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
     # say "Looking for $name in $curpad";
 
-    my $curpkg = $CURPKG;
+    my $curpkg = $*CURPKG;
     if $name ~~ /::/ {
         my @components = split(/::/,$name);
         return True if @components[0] eq 'CALLER';
@@ -135,7 +135,7 @@ method is_name ($name, $curpad = $*CURPAD) {
         }
         else {
             # say "Looking for GLOBAL::<$name>";
-            $curpkg = $GLOBAL;
+            $curpkg = $*GLOBAL;
         }
         while @components > 1 {
             my $pkg = shift @components;
@@ -155,22 +155,22 @@ method is_name ($name, $curpad = $*CURPAD) {
         }
     }
     return True if $curpkg.{$name};
-    return True if $GLOBAL.{$name};
+    return True if $*GLOBAL.{$name};
     return False;
 }
 
 method find_pkg ($name) {
     if $name eq 'OUR::' {
-        return $CURPKG;
+        return $*CURPKG;
     }
     elsif $name eq 'MY::' {
         return $*CURPAD;
     }
     elsif $name eq 'CORE::' {
-        return $CORE;
+        return $*CORE;
     }
     elsif $name eq 'UNIT::' {
-        return $UNIT;
+        return $*UNIT;
     }
     # everything is somewhere in lexical scope (we hope)
     my $pad = $*CURPAD;
@@ -200,7 +200,7 @@ method add_my_name ($name) {
 
 method add_our_name ($name) {
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    my $curpkg = $CURPKG;
+    my $curpkg = $*CURPKG;
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
     if $name ~~ /::/ {
@@ -210,7 +210,7 @@ method add_our_name ($name) {
             shift @components;
         }
         else {
-            $curpkg = $CURPKG;
+            $curpkg = $*CURPKG;
         }
         while @components > 1 {
             my $pkg = shift @components;
@@ -222,7 +222,7 @@ method add_our_name ($name) {
     $name ~~ s/^\<//;
     $name ~~ s/\>$//;
     $curpkg.{$name}  = { name => $name, file => $COMPILING::FILE, line => self.line };
-    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $*CURPKG };  # the lexical alias
     $*CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
     self;
 }
@@ -230,20 +230,19 @@ method add_our_name ($name) {
 method add_mystery ($name,$pos) {
     if not self.is_known($name) {
         # say "Mystery $name $*CURPAD";
-        %MYSTERY{$name}.<pad> = $*CURPAD;
-        %MYSTERY{$name}.<line> ~= self.lineof($pos) ~ ' ';
+        %*MYSTERY{$name}.<pad> = $*CURPAD;
+        %*MYSTERY{$name}.<line> ~= self.lineof($pos) ~ ' ';
     }
     self;
 }
 
 method load_setting ($setting) {
     @PKGS = ();
-    %MYSTERY = ();
 
     # XXX CORE   === SETTING for now
-    $CORE = $*CURPAD = $GLOBAL.{"CORE::"} = $GLOBAL.{"SETTING::"} = self.load_pad($setting);
-    $GLOBAL = $CORE.<GLOBAL::>;
-    $CURPKG = $GLOBAL;
+    $*CORE = $*CURPAD = $*GLOBAL.{"CORE::"} = $*GLOBAL.{"SETTING::"} = self.load_pad($setting);
+    $*GLOBAL = $*CORE.{'GLOBAL::'};
+    $*CURPKG = $*GLOBAL;
 }
 
 method is_known ($name, $curpad = $*CURPAD) {
@@ -261,8 +260,8 @@ method is_known ($name, $curpad = $*CURPAD) {
         return True if $pad.{$name}; # type as routine?
         $pad = $pad.<OUTER::>
     }
-    return True if $CURPKG.{$name};
-    return True if $CURPKG.{$vname};
+    return True if $*CURPKG.{$name};
+    return True if $*CURPKG.{$vname};
     return False;
 }
 
@@ -284,9 +283,9 @@ method add_my_routine ($name) {
 
 method add_our_routine ($name) {
     # XXX need to allow package names?
-    $CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
-    # say "CORE $CORE adding name $name to CURPAD $*CURPAD in $*PKGNAME";
-    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    $*CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    # say "CORE $*CORE adding name $name to CURPAD $*CURPAD in $*PKGNAME";
+    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $*CURPKG };  # the lexical alias
     self;
 }
 
@@ -326,9 +325,9 @@ method add_my_variable ($name) {
 
 method add_our_variable ($name) {
     # XXX need to allow package names?
-    $CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
-    # say "CORE $CORE adding variable $name to CURPAD $*CURPAD in $*PKGNAME";
-    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $CURPKG };  # the lexical alias
+    $*CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    # say "CORE $*CORE adding variable $name to CURPAD $*CURPAD in $*PKGNAME";
+    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $*CURPKG };  # the lexical alias
     self;
 }
 
@@ -339,7 +338,7 @@ method check_variable ($name) {
         when '' {
             my $ok = 0;
             $ok = 1 if $name ~~ /::/;
-            $ok ||= $IN_DECL;
+            $ok ||= $*IN_DECL;
             $ok ||= $sigil eq '&';
             $ok ||= $first lt 'A';
             $ok ||= self.is_known($name);
@@ -731,18 +730,36 @@ rule comp_unit {
     :my $LANG is context;
     :my $PKGDECL is context = "";
     :my $PKGNAME is context = "";
-    :my $GOAL is context = "(eof)";
+    :my @PKGS is context<rw> = ();
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
+    :my $ACTIONS is context<rw>;
+    :my $IN_QUOTE is context<rw>;
+    :my $IN_META is context<rw> = 0;
+    :my $QUASI_QUASH is context<rw>;
+    :my $SCOPE is context = "";
+    :my $SIGIL is context<rw>;
+    :my %MYSTERY is context<rw> = ();
+    :my @MEMOS is context;
+    :my $VOID is context<rw>;
+    :my $INVOCANT_OK is context<rw>;
+    :my $INVOCANT_IS is context<rw>;
+    :my $CURPAD is context<rw>;
+    :my $REALLYADD is context<rw> = 0;
 
+    :my $CORE is context;
+    :my $CORESETTING is context = "CORE";
+    :my $GLOBAL is context;
+    :my $CURPKG is context;
+    :my $UNIT is context;
     {{
-        self.load_setting($CORESETTING);
-        $UNIT = self.newpad;
+        self.load_setting($*CORESETTING);
+        $*UNIT = self.newpad;
         self.finishpad(1);
     }}
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
-    { $<CORE> = $CORE; }
+    { $<CORE> = $*CORE; }
     # "CHECK" time...
     {{
         if @COMPILING::WORRIES {
@@ -752,11 +769,11 @@ rule comp_unit {
         my %post_types;
         my %unk_types;
         my %unk_routines;
-        for keys(%MYSTERY) {
-            my $p = %MYSTERY{$_}.<pad>;
+        for keys(%*MYSTERY) {
+            my $p = %*MYSTERY{$_}.<pad>;
             if $¢.is_name($_, $p) {
                 # types may not be post-declared
-                %post_types{$_} = %MYSTERY{$_};
+                %post_types{$_} = %*MYSTERY{$_};
                 next;
             }
 
@@ -764,10 +781,10 @@ rule comp_unit {
 
             # just a guess, but good enough to improve error reporting
             if $_ lt 'a' {
-                %unk_types{$_} = %MYSTERY{$_};
+                %unk_types{$_} = %*MYSTERY{$_};
             }
             else {
-                %unk_routines{$_} = %MYSTERY{$_};
+                %unk_routines{$_} = %*MYSTERY{$_};
             }
         }
         if %post_types {
@@ -1466,7 +1483,7 @@ token circumfix:sym<{ }> ( --> Term) {
 token variable_declarator {
     :my $IN_DECL is context<rw> = 1;
     <variable>
-    { $IN_DECL = 0; self.add_variable($<variable>.text) }
+    { $*IN_DECL = 0; self.add_variable($<variable>.text) }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
@@ -1572,9 +1589,9 @@ rule package_def {
         {{
             # figure out the actual full package name (nested in outer package)
                 my $pkg = $*PKGNAME // "GLOBAL";
-                my $newpkg = $CURPKG.{$pkg ~ '::'} = {};
-                $newpkg.<PARENT::> = $CURPKG;
-                $CURPKG = $newpkg;
+                my $newpkg = $*CURPKG.{$pkg ~ '::'} = {};
+                $newpkg.<PARENT::> = $*CURPKG;
+                $*CURPKG = $newpkg;
                 push @PKGS, $pkg;
                 if $longname {
                     my $shortname = $longname.<name>.text;
@@ -1587,7 +1604,7 @@ rule package_def {
             <block>
             {{
                 $*PKGNAME = pop(@PKGS);
-                $CURPKG = $CURPKG.<PARENT::>;
+                $*CURPKG = $*CURPKG.{'PARENT::'};
             }}
             {*}                                                     #= block
         || <?{ $*begin_compunit }> {} <?before ';'>
@@ -1595,9 +1612,9 @@ rule package_def {
                 $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                 my $shortname = $longname.<name>.text;
                 $*PKGNAME = $shortname;
-                my $newpkg = $CURPKG.{$shortname ~ '::'} = {};
-                $newpkg.<PARENT::> = $CURPKG;
-                $CURPKG = $newpkg;
+                my $newpkg = $*CURPKG.{$shortname ~ '::'} = {};
+                $newpkg.<PARENT::> = $*CURPKG;
+                $*CURPKG = $newpkg;
                 $*begin_compunit = 0;
             }}
             {*}                                                     #= semi
@@ -2134,7 +2151,7 @@ method heredoc () {
             $herestub.orignode<doc> = $doc;
         }
         else {
-            self.panic("Ending delimiter $DELIM not found");
+            self.panic("Ending delimiter $*DELIM not found");
         }
     }
     return self.cursor($here.pos);  # return to initial type
@@ -2252,7 +2269,7 @@ token nibbler {
                         }
         || .
                         {{
-                            my $ch = substr($ORIG, $¢.pos-1, 1);
+                            my $ch = substr($*ORIG, $¢.pos-1, 1);
                             $text ~= $ch;
                             if $ch ~~ "\n" {
                                 $multiline++;
@@ -2531,7 +2548,7 @@ token opener {
 method peek_delimiters {
     my $pos = self.pos;
     my $startpos = $pos;
-    my $char = substr($ORIG,$pos++,1);
+    my $char = substr($*ORIG,$pos++,1);
     if $char ~~ /^\s$/ {
         self.panic("Whitespace not allowed as delimiter");
     }
@@ -2545,7 +2562,7 @@ method peek_delimiters {
     if not defined $rightbrack {
         return $char, $char;
     }
-    while substr($ORIG,$pos,1) eq $char {
+    while substr($*ORIG,$pos,1) eq $char {
         $pos++;
     }
     my $len = $pos - $startpos;
@@ -2805,7 +2822,7 @@ rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
         [ <multisig> | <trait> ]*
         <!{
             $¢ = $*PARSER.bless($¢);
-            $IN_DECL = 0;
+            $*IN_DECL = 0;
         }>
         <blockoid>:!s
     ] || <.panic: "Malformed routine definition">
@@ -2838,7 +2855,7 @@ rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
         [ [ ':'?'(' <signature> ')'] | <trait> ]*
-        { $IN_DECL = 0; }
+        { $*IN_DECL = 0; }
         <.finishpad>
         <regex_block>:!s
     ] || <.panic: "Malformed regex definition">
@@ -2852,7 +2869,7 @@ rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
         [ <multisig> | <trait> ]*
         <!{
             $¢ = $*PARSER.bless($¢);
-            $IN_DECL = 0;
+            $*IN_DECL = 0;
         }>
         <blockoid>:!s
     ] || <.panic: "Malformed macro definition">
@@ -2913,7 +2930,7 @@ token signature {
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
-    {{ $IN_DECL = 0; $*SIGIL = '@'; $*CURPAD.{'$?GOTSIG'} //= 1; }}
+    {{ $*IN_DECL = 0; $*SIGIL = '@'; $*CURPAD.{'$?GOTSIG'} //= 1; }}
 }
 
 token type_declarator:subset {
@@ -2992,7 +3009,7 @@ token param_var {
             $vname ~= $twigil;
             my $n = try { $<name>[0].text } // '';
             $vname ~= $n;
-            if $REALLYADD {
+            if $*REALLYADD {
                 given $twigil {
                     when '' {
                         self.add_variable($vname) if $n ne '';
@@ -3027,7 +3044,7 @@ token parameter {
         | <named_param>
         ]
     >
-    {{ $REALLYADD = 1 }}
+    {{ $*REALLYADD = 1 }}
 
     <type_constraint>*
     [
@@ -3171,7 +3188,7 @@ token infix:lambda ( --> Term) {
     <?before '{' | '->' > {{
         my $line = $¢.lineof($¢.pos);
         for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when' {
-            my $m = %MYSTERY{$_};
+            my $m = %*MYSTERY{$_};
             next unless $m;
             if $line - ($m.<line>//-123) < 5 {
                 $¢.panic("$_() interpreted as function call at line " ~ $m.<line> ~
@@ -3390,7 +3407,7 @@ token infix:does ( --> Nonchaining)
     { <sym> }
 
 token infix:sym<..> ( --> Nonchaining)
-    { <sym> [<!{ $IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
+    { <sym> [<!{ $*IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
 
 token infix:sym<^..> ( --> Nonchaining)
     { <sym> }
@@ -3634,7 +3651,7 @@ token args ($istype = 0) {
     | :dba('argument list') <.unsp> '.'? '(' ~ ')' <semiarglist> {*} #= func args
     |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
     ]
-    { $<invocant> = $INVOCANT_IS; }
+    { $<invocant> = $*INVOCANT_IS; }
 
     :dba('extra arglist after (...):')
     [
@@ -3889,7 +3906,7 @@ method EXPR ($preclvl)
         self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
-        $SIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';
+        $*SIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';
         my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {

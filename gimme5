@@ -113,10 +113,11 @@ sub un6 {
         $f =~ s/^([^:]):(\w+)//         	and $t .= qq/$1'$2' => 1/, next;
         $f =~ s/^([^:]):!(\w+)//        	and $t .= qq/$1'$2' => 0/, next;
         $f =~ s/^\%::\((.*?)\)// 		and $t .= ("do { no strict 'refs'; \\%{$1}}"), next;
-        $f =~ s/^\%\*?(\w+)((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
+        $f =~ s/^\%\*?(\w+)\.?((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
         $f =~ s/^\%\*?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
-        $f =~ s/^\%\*?(\w+)\{//         	and $t .= qq/\$$1\{/, next;
-        $f =~ s/^\@\*(\w+)\[//         	and $t .= qq/\$$1\[/, next;
+        $f =~ s/^\%\*?(\w+)\.?\{//         	and $t .= qq/\$$1\{/, next;
+        $f =~ s/^\%\*?(\w+)//           	and $t .= qq/%$1/, next;
+        $f =~ s/^\@\*(\w+)\.?\[//          	and $t .= qq/\$$1\[/, next;
         $f =~ s/^\$(\w+)((<[^>]*>)+)//  	and $t .= ('$' . $1 . '->' . unangle($2)), next;
         $f =~ s/^[\$\@%]((<[^>]*>)+)//       	and $t .= ('$M->' . unangle($1)), $NEEDMATCH++, next;
         $f =~ s/^ \.((<[^>]*>)+)//      	and $t .= (' $_->' . unangle($1)), next;
