@@ -3137,6 +3137,7 @@ token statement_prefix:contend { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:async   { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:maybe   { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:lazy    { <sym> <?before \s> <.ws> <statement> }
+token statement_prefix:lift    { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:do      { <sym> <?before \s> <.ws> <statement> {{
         my $loop = $<statement><statement_mod_loop>;
         if $loop and @$loop and (my $s = $loop.[0].<sym>) ~~ /while|until/ {
