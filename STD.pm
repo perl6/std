@@ -269,9 +269,15 @@ method add_routine ($name) {
     my $vname = '&' ~ $name;
     if ($*SCOPE//'') eq 'our' {
         self.add_our_routine($vname);
+        if $vname ~~ s/\:\(.*// {
+            self.add_our_routine($vname);
+        }
     }
     else {
         self.add_my_routine($vname);
+        if $vname ~~ s/\:\(.*// {
+            self.add_my_routine($vname);
+        }
     }
     self;
 }
@@ -301,7 +307,14 @@ method add_variable ($name) {
 
 method add_my_variable ($name) {
     # say "Adding $name";
-    if $name eq '$_' or substr($name, 0, 1) eq '&' or $name ~~ s/\^|\:// {   # XXX hack
+    if substr($name, 0, 1) eq '&' {
+        $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+        if $name ~~ s/\:\(.*// {
+            $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+        }
+        return self;
+    }
+    if $name eq '$_' or $name ~~ s/\^|\:// {   # XXX hack
         ;
     }
     elsif my $old = $*CURPAD.{$name} {
@@ -1519,11 +1532,13 @@ rule scoped {
 }
 
 
-token scope_declarator:my       { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:our      { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:state    { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:constant { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:has      { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:my        { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:our       { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:state     { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:constant  { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:has       { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:augment   { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:supersede { <sym> { $*SCOPE = $<sym> } <scoped> }
 
 
 token package_declarator:class {
