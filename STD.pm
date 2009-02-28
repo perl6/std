@@ -595,6 +595,9 @@ proto token module_name { <...> }
 token category:term { <sym> }
 proto token term { <...> }
 
+token category:number { <sym> }
+proto token number { <...> }
+
 token category:quote { <sym> }
 proto token quote () { <...> }
 
@@ -2121,13 +2124,21 @@ rule fulltypename {<typename>['|'<typename>]*
     [ of <fulltypename> ]?
 }
 
-token number {
+token numish {
     [
-    | <dec_number>
     | <integer>
+    | <dec_number>
     | <rad_number>
+    | 'NaN' »
+    | 'Inf' »
+    | '+Inf' »
+    | '-Inf' »
     ]
 }
+
+token number:rational { <nu=integer>'/'<de=integer> }
+token number:complex { <re=numish>'+'<im=numish>'i' }
+token number:numish { <numish> }
 
 token integer {
     [
@@ -2136,7 +2147,7 @@ token integer {
         | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
         | d \d+               [ _ \d+]*
         | \d+[_\d+]*
-            { $¢.worry("Leading 0 does not indicate octal in Perl 6") }
+            <!!{ $¢.worry("Leading 0 does not indicate octal in Perl 6") }>
         ]
     | \d+[_\d+]*
     ]
