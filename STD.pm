@@ -121,6 +121,7 @@ method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
 }
 
 method is_name ($name, $curpad = $*CURPAD) {
+    # say "is_name $name";
     $name = substr($name,2) while substr($name,0,2) eq '::';
     # say "Looking for $name in $curpad";
 
@@ -130,7 +131,7 @@ method is_name ($name, $curpad = $*CURPAD) {
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
         if $curpkg = self.find_pkg(@components[0] ~ '::') {
-            # say "Found lexical package " ~ @components[0] ~ join(' ', keys(%$curpkg));
+            # say "Found lexical package " ~ @components[0];
             shift @components;
         }
         else {
@@ -141,6 +142,7 @@ method is_name ($name, $curpad = $*CURPAD) {
             my $pkg = shift @components;
             $curpkg = $curpkg.{$pkg ~ '::'};
             return False unless $curpkg;
+            # say "Found $pkg okay, now in " ~ $curpkg,<$?PACKAGENAME>;
         }
         $name = shift(@components)//'';
         return True if $name eq '';
@@ -160,6 +162,7 @@ method is_name ($name, $curpad = $*CURPAD) {
 }
 
 method find_pkg ($name) {
+    # say "find_pkg $name";
     if $name eq 'OUR::' {
         return $*CURPKG;
     }
@@ -193,45 +196,56 @@ method add_name ($name) {
 }
 
 method add_my_name ($name) {
+    # say "add_my_name $name";
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    $*CURPAD.{$name} = { name => $name };
+    $*CURPAD.{$name} //= { name => $name };
     self;
 }
 
 method add_our_name ($name) {
+    # say "add_our_name $name " ~ $*PKGNAME;
     $name = substr($name,2) while substr($name,0,2) eq '::';
     my $curpkg = $*CURPKG;
+    # say "curpkg $curpkg global $GLOBAL ", join ' ', %$*GLOBAL;
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
     if $name ~~ /::/ {
         my @components = split(/::/,$name);
         my $first = @components[0] ~ '::';
         if $curpkg = self.find_pkg($first) {
+            # say "Found $first package $curpkg";
             shift @components;
         }
         else {
             $curpkg = $*CURPKG;
+            # say "Assuming current package $curpkg " ~ $curpkg.<$?PACKAGENAME>;
         }
         while @components > 1 {
             my $pkg = shift @components;
             $curpkg.{$pkg} //= { name => $pkg, file => $COMPILING::FILE, line => self.line };
-            $curpkg = $curpkg.{$pkg ~ '::'} //= {};
+            $curpkg = $curpkg.{$pkg ~ '::'} //= { '$?PACKAGENAME' => $pkg };
+            # say "Adding new package $pkg in $curpkg " ~ $curpkg.<$?PACKAGENAME>;
         }
         $name = shift @components;
     }
     $name ~~ s/^\<//;
     $name ~~ s/\>$//;
-    $curpkg.{$name}  = { name => $name, file => $COMPILING::FILE, line => self.line };
-    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $*CURPKG };  # the lexical alias
-    $*CURPAD.{$name ~ '::'} = $curpkg.{$name ~ '::'}  = { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
+    $curpkg.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
+    $*CURPAD.{$name} //= $curpkg.{$name};  # the lexical alias
+    my $n = $*CURPAD.{$name ~ '::'} //= $curpkg.{$name ~ '::'} //= { name => $name ~ '::', file => $COMPILING::FILE, line => self.line, '$?PACKAGENAME' => $name  };
+    # say "Added package $name $n to $curpkg " ~ $curpkg.<$?PACKAGENAME>;
     self;
 }
 
 method add_mystery ($name,$pos) {
     if not self.is_known($name) {
+        # say "add_mystery $name";
         # say "Mystery $name $*CURPAD";
         %*MYSTERY{$name}.<pad> = $*CURPAD;
         %*MYSTERY{$name}.<line> ~= self.lineof($pos) ~ ' ';
+    }
+    else {
+        # say "$name is known";
     }
     self;
 }
@@ -246,24 +260,55 @@ method load_setting ($setting) {
 }
 
 method is_known ($name, $curpad = $*CURPAD) {
-    my $vname;
+    # say "is_known $name";
     return True if $*QUASI_QUASH;
-    if substr($name,0,1) lt 'A' {
-        $vname = $name;
+    return True if $*CURPKG.{$name};
+    my $st;
+    ($st,$name) = $name ~~ /^(\W*)(.*)/;
+    $st ~~ s/\:\://;
+    $st ||= '&';
+    # say "is_known sigiltwigil $st $name";
+    my $curpkg = $*CURPKG;
+    if $name ~~ /::/ {
+        my @components = split(/::/,$name);
+        return True if @components[0] eq 'CALLER';
+        return True if @components[0] eq 'CONTEXT';
+        if $curpkg = self.find_pkg(@components[0] ~ '::') {
+            # say "Found lexical package " ~ @components[0];
+            shift @components;
+        }
+        else {
+            # say "Looking for GLOBAL::<$name>";
+            $curpkg = $*GLOBAL;
+        }
+        while @components > 1 {
+            my $pkg = shift @components;
+            # say "Looking for $pkg in $curpkg " ~ ($curpkg.<$?PACKAGENAME>//'???') ~ ' ' ~ join ' ', keys(%$curpkg);
+            $curpkg = $curpkg.{$pkg ~ '::'};
+            return False unless $curpkg;
+            # say "Found $pkg okay, now in $curpkg " ~ ($curpkg.<$?PACKAGENAME>//'???');
+        }
+        $name = shift(@components)//'';
+        # say "Final component is $name";
+        return True if $name eq '';
+        $name ~~ s/^\<//;
+        $name ~~ s/\>$//;
+        return True if $curpkg.{$name};
+        return True if $curpkg.{$st ~ $name};
     }
     else {
-        $vname = '&' ~ $name;
+        my $vname = $st ~ $name;
+        return True if $*CURPKG.{$vname};
+        my $pad = $curpad;
+        while $pad {
+            return True if $pad.{$name};
+            return True if $pad.{$vname};
+            $pad = $pad.<OUTER::>;
+        }
     }
-    my $pad = $curpad;
-    while $pad {
-        return True if $pad.{$vname};
-        return True if $pad.{$name}; # type as routine?
-        $pad = $pad.<OUTER::>
-    }
-    return True if $*CURPKG.{$name};
-    return True if $*CURPKG.{$vname};
     return False;
 }
+
 
 method add_routine ($name) {
     my $vname = '&' ~ $name;
@@ -283,15 +328,17 @@ method add_routine ($name) {
 }
 
 method add_my_routine ($name) {
-    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    # say "add_my_routine $name";
+    $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
     self;
 }
 
 method add_our_routine ($name) {
-    # XXX need to allow package names?
-    $*CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    # say "add_our_routine $name " ~ $*PKGNAME;
+    say "panic: unexpected package name $name" if $name ~~ /\:\:/;
+    $*CURPKG.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
     # say "CORE $*CORE adding name $name to CURPAD $*CURPAD in $*PKGNAME";
-    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $*CURPKG };  # the lexical alias
+    $*CURPAD.{$name} //= $*CURPKG.{$name};  # the lexical alias
     self;
 }
 
@@ -306,11 +353,11 @@ method add_variable ($name) {
 }
 
 method add_my_variable ($name) {
-    # say "Adding $name";
+    # say "add_my_variable $name";
     if substr($name, 0, 1) eq '&' {
-        $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+        $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
         if $name ~~ s/\:\(.*// {
-            $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+            $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
         }
         return self;
     }
@@ -332,21 +379,22 @@ method add_my_variable ($name) {
             self.worry("Redeclaration of $name");
         }
     }
-    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
     self;
 }
 
 method add_our_variable ($name) {
-    # XXX need to allow package names?
-    $*CURPKG.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    # say "add_our_variable $name " ~ $*PKGNAME;
+    say "panic: unexpected package name $name" if $name ~~ /\:\:/;
+    $*CURPKG.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
     # say "CORE $*CORE adding variable $name to CURPAD $*CURPAD in $*PKGNAME";
-    $*CURPAD.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line, alias => $*CURPKG };  # the lexical alias
+    $*CURPAD.{$name} //= $*CURPKG.{$name};  # the lexical alias
     self;
 }
 
 method check_variable ($name) {
+    # say "check_variable $name";
     my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W?)(.?)/;
-    # say "Checking $name";
     given $twigil {
         when '' {
             my $ok = 0;
@@ -1603,18 +1651,21 @@ rule package_def {
         <?before '{'>
         {{
             # figure out the actual full package name (nested in outer package)
-                my $pkg = $*PKGNAME // "GLOBAL";
-                my $newpkg = $*CURPKG.{$pkg ~ '::'} = {};
+                my $pkg = $*PKGNAME || "GLOBAL";
+                my $shortname;
+                if $longname {
+                     $shortname = $longname.<name>.text;
+                }
+                else {
+                    $shortname = '_anon_';
+                }
+                $*PKGNAME = $pkg ~ '::' ~ $shortname;
+                my $newpkg = $*CURPKG.{$shortname ~ '::'} //= {};
                 $newpkg.<PARENT::> = $*CURPKG;
                 $*CURPKG = $newpkg;
                 push @PKGS, $pkg;
-                if $longname {
-                    my $shortname = $longname.<name>.text;
-                    $*PKGNAME = $pkg ~ '::' ~ $shortname;
-                }
-                else {
-                    $*PKGNAME = $pkg ~ '::_anon_';
-                }
+                $newpkg.<$?PACKAGENAME> = $*PKGNAME;
+                # say "adding $newpkg " ~ $*PKGNAME;
             }}
             <block>
             {{
@@ -1627,9 +1678,10 @@ rule package_def {
                 $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                 my $shortname = $longname.<name>.text;
                 $*PKGNAME = $shortname;
-                my $newpkg = $*CURPKG.{$shortname ~ '::'} = {};
+                my $newpkg = $*CURPKG.{$shortname ~ '::'} //= {};
                 $newpkg.<PARENT::> = $*CURPKG;
                 $*CURPKG = $newpkg;
+                $newpkg.<$?PACKAGENAME> = $*PKGNAME;
                 $*begin_compunit = 0;
             }}
             {*}                                                     #= semi
@@ -3137,13 +3189,16 @@ token statement_prefix:contend { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:async   { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:maybe   { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:lazy    { <sym> <?before \s> <.ws> <statement> }
-token statement_prefix:lift    { <sym> <?before \s> <.ws> <statement> }
 token statement_prefix:do      { <sym> <?before \s> <.ws> <statement> {{
         my $loop = $<statement><statement_mod_loop>;
         if $loop and @$loop and (my $s = $loop.[0].<sym>) ~~ /while|until/ {
             $¢.obs("do...$s" ,"repeat...$s");
         }
     }}
+}
+token statement_prefix:lift    {
+    :my $QUASI_QUASH is context = 1;
+    <sym> <?before \s> <.ws> <statement>
 }
 
 ## term
