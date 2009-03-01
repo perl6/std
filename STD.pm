@@ -838,7 +838,7 @@ rule comp_unit {
 
     :my $LANG is context;
     :my $PKGDECL is context = "";
-    :my $PKGNAME is context = "";
+    :my $PKGNAME is context = "GLOBAL";
     :my @PKGS is context<rw> = ();
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
@@ -2039,18 +2039,19 @@ token variable {
     :my $IN_META is context<rw> = 0;
     :my $sigil = '';
     :my $twigil = '';
+    :my $name;
     <?before <sigil> { $*SIGIL ||= $sigil = $<sigil>.text } > {}
     [
     || '&'
         [
-        | <twigil>?  <sublongname> {*}                                   #= subnoun
+        | <twigil>?  <sublongname> { $name = $<sublongname>.text } {*}                                   #= subnoun
         | '[' ~ ']' <infixish(1)>
         ]
     || <?before '$::('> '$' <name>?
     || '$::' <name>? # XXX
     || '$:' <name>? # XXX
     || [
-        | <sigil> <twigil>? <desigilname> {*}                                    #= desigilname
+        | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.text } {*}                                    #= desigilname
         | <special_variable> {*}                                    #= special
         | <sigil> $<index>=[\d+] {*}                                #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
@@ -2064,12 +2065,50 @@ token variable {
         <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
     || <?{ $twigil eq '?' }>
         {{
-            my $name = $<desigilname>.text;
-            given $name {
-                when 'PACKAGENAME' { $<value> = $*PKGNAME; }
-                when 'LINE' { $<value> = $¢.lineof($¢.pos); }
-                when 'FILE' { $<value> = $COMPILING::FILE; }
-                default { $¢.worry("Unrecognized variable: $sigil?$name"); }
+            $name //= $<name>[0].text if $<name>;
+            given $sigil {
+                when '$' {
+                    given $name {
+                        when 'FILE'     { $<value> = $COMPILING::FILE; }
+                        when 'LINE'     { $<value> = $¢.lineof($¢.pos); }
+                        when 'POSITION' { $<value> = $¢.pos; }
+
+                        when 'PARSER'   { $<value> = $*PARSER; }
+                        when 'LANG'     { $<value> = $*LANG; }
+
+                        when 'SCOPE'    { $<value> = $*CURPAD; }
+
+                        when 'PACKAGE'  { $<value> = $*CURPKG; }
+                        when 'MODULE'   { $<value> = $*CURPKG; } #  XXX should scan
+                        when 'CLASS'    { $<value> = $*CURPKG; } #  XXX should scan
+                        when 'ROLE'     { $<value> = $*CURPKG; } #  XXX should scan
+                        when 'GRAMMAR'  { $<value> = $*CURPKG; } #  XXX should scan
+
+                        when 'PACKAGENAME' { $<value> = $*PKGNAME; }
+
+                        when 'OS'       { $<value> = 'unimpl'; }
+                        when 'DISTRO'   { $<value> = 'unimpl'; }
+                        when 'VM'       { $<value> = 'unimpl'; }
+                        when 'XVM'      { $<value> = 'unimpl'; }
+                        when 'PERL'     { $<value> = 'unimpl'; }
+
+                        when 'USAGE'    { $<value> = 'unimpl'; }
+
+                        default { $¢.worry("Unrecognized variable: $sigil?$name"); }
+                    }
+                }
+                when '&' {
+                    given $name {
+                        when 'ROUTINE' { $<value> = 'unimpl'; }
+                        when 'BLOCK'   { $<value> = 'unimpl'; }
+                    }
+                }
+                when '%' {
+                    given $name {
+                        when 'CONFIG'  { $<value> = 'unimpl'; }
+                        when 'DEEPMAGIC' { $<value> = 'unimpl'; }
+                    }
+                }
             }
         }}
     ]?
