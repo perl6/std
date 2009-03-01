@@ -1095,26 +1095,34 @@ sub add_enum { my $self = shift;
 }
 
 sub do_imports { my $self = shift;
+    my $module = shift;
     my $args = shift;
-    return unless $args;
+    my @imports;
     my $text = $args->text;
-    return unless $text;
-    while ($text =~ s/^\s*:?(OUR|MY|STATE)?<(.*?)>,?//) {
-        my $scope = lc($1) || 'my';
-        my $imports = $2;
-        local $::SCOPE = 'my';
-        for (split ' ', $imports) {
-            if (/^\w/) {
-                if (/::/) {
-                    $self->add_name($_);
-                }
-                else {
-                    $self->add_routine($_);
-                }
+    if ($text ne '') {
+        return unless $text;
+        while ($text =~ s/^\s*:?(OUR|MY|STATE)?<(.*?)>,?//) {
+            my $scope = lc($1) || 'my';
+            my $imports = $2;
+            local $::SCOPE = 'my';
+            @imports = split ' ', $imports;
+        }
+    }
+    else {
+        my $pkg = $self->find_stab($module . '::');
+        @imports = keys %$pkg;
+    }
+    for (@imports) {
+        if (/^\w/) {
+            if (/::/) {
+                $self->add_name($_);
             }
             else {
-                $self->add_variable($_);
+                $self->add_routine($_);
             }
+        }
+        else {
+            $self->add_variable($_);
         }
     }
     $self;

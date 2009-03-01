@@ -127,10 +127,10 @@ method is_name ($name, $curpad = $*CURPAD) {
 
     my $curpkg = $*CURPKG;
     if $name ~~ /::/ {
-        my @components = split(/::/,$name);
+        my @components = split(/\:\:/,$name);
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
-        if $curpkg = self.find_pkg(@components[0] ~ '::') {
+        if $curpkg = self.find_top_pkg(@components[0] ~ '::') {
             # say "Found lexical package " ~ @components[0];
             shift @components;
         }
@@ -142,7 +142,7 @@ method is_name ($name, $curpad = $*CURPAD) {
             my $pkg = shift @components;
             $curpkg = $curpkg.{$pkg ~ '::'};
             return False unless $curpkg;
-            # say "Found $pkg okay, now in " ~ $curpkg,<$?PACKAGENAME>;
+            # say "Found $pkg okay, now in ";
         }
         $name = shift(@components)//'';
         return True if $name eq '';
@@ -161,8 +161,53 @@ method is_name ($name, $curpad = $*CURPAD) {
     return False;
 }
 
-method find_pkg ($name) {
-    # say "find_pkg $name";
+method find_stab ($name, $curpad = $*CURPAD) {
+    # say "is_name $name";
+    $name = substr($name,2) while substr($name,0,2) eq '::';
+    # say "Looking for $name in $curpad";
+
+    my $curpkg = $*CURPKG;
+    if $name ~~ /::/ {
+        my @components = split(/\:\:/,$name); 
+        if @components[*-1] eq '' or $name ~~ /\:\:$/ {
+            pop(@components) if @components[*-1] eq ''; # work around p5 problems
+            @components[*-1] ~= '::';
+        }
+        return () if @components[0] eq 'CALLER';
+        return () if @components[0] eq 'CONTEXT';
+        if $curpkg = self.find_top_pkg(@components[0] ~ '::') {
+            # say "Found lexical package " ~ @components[0];
+            shift @components;
+        }
+        else {
+            # say "Looking for GLOBAL::<$name>";
+            $curpkg = $*GLOBAL;
+        }
+        while @components > 1 {
+            my $pkg = shift @components;
+            $curpkg = $curpkg.{$pkg ~ '::'};
+            return () unless $curpkg;
+            # say "Found $pkg okay, now in ";
+        }
+        $name = shift(@components)//'';
+        return () if $name eq '';
+        $name ~~ s/^\<//;
+        $name ~~ s/\>$//;
+    }
+    else {
+        my $pad = $curpad;
+        while $pad {
+            return $_ if $_ = $pad.{$name};
+            $pad = $pad.<OUTER::>;
+        }
+    }
+    return $_ if $_ = $curpkg.{$name};
+    return $_ if $_ = $*GLOBAL.{$name};
+    return ();
+}
+
+method find_top_pkg ($name) {
+    # say "find_top_pkg $name";
     if $name eq 'OUR::' {
         return $*CURPKG;
     }
@@ -210,21 +255,21 @@ method add_our_name ($name) {
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
     if $name ~~ /::/ {
-        my @components = split(/::/,$name);
+        my @components = split(/\:\:/,$name);
         my $first = @components[0] ~ '::';
-        if $curpkg = self.find_pkg($first) {
+        if $curpkg = self.find_top_pkg($first) {
             # say "Found $first package $curpkg";
             shift @components;
         }
         else {
             $curpkg = $*CURPKG;
-            # say "Assuming current package $curpkg " ~ $curpkg.<$?PACKAGENAME>;
+            # say "Assuming current package $curpkg ";
         }
         while @components > 1 {
             my $pkg = shift @components;
             $curpkg.{$pkg} //= { name => $pkg, file => $COMPILING::FILE, line => self.line };
-            $curpkg = $curpkg.{$pkg ~ '::'} //= { '$?PACKAGENAME' => $pkg };
-            # say "Adding new package $pkg in $curpkg " ~ $curpkg.<$?PACKAGENAME>;
+            $curpkg = $curpkg.{$pkg ~ '::'} //= { };
+            # say "Adding new package $pkg in $curpkg ";
         }
         $name = shift @components;
     }
@@ -232,8 +277,8 @@ method add_our_name ($name) {
     $name ~~ s/\>$//;
     $curpkg.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
     $*CURPAD.{$name} //= $curpkg.{$name};  # the lexical alias
-    my $n = $*CURPAD.{$name ~ '::'} //= $curpkg.{$name ~ '::'} //= { name => $name ~ '::', file => $COMPILING::FILE, line => self.line, '$?PACKAGENAME' => $name  };
-    # say "Added package $name $n to $curpkg " ~ $curpkg.<$?PACKAGENAME>;
+    my $n = $*CURPAD.{$name ~ '::'} //= $curpkg.{$name ~ '::'} //= { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
+    # say "Added package $name $n to $curpkg ";
     self;
 }
 
@@ -270,10 +315,10 @@ method is_known ($name, $curpad = $*CURPAD) {
     # say "is_known sigiltwigil $st $name";
     my $curpkg = $*CURPKG;
     if $name ~~ /::/ {
-        my @components = split(/::/,$name);
+        my @components = split(/\:\:/,$name);
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
-        if $curpkg = self.find_pkg(@components[0] ~ '::') {
+        if $curpkg = self.find_top_pkg(@components[0] ~ '::') {
             # say "Found lexical package " ~ @components[0];
             shift @components;
         }
@@ -283,10 +328,10 @@ method is_known ($name, $curpad = $*CURPAD) {
         }
         while @components > 1 {
             my $pkg = shift @components;
-            # say "Looking for $pkg in $curpkg " ~ ($curpkg.<$?PACKAGENAME>//'???') ~ ' ' ~ join ' ', keys(%$curpkg);
+            # say "Looking for $pkg in $curpkg " join ' ', keys(%$curpkg);
             $curpkg = $curpkg.{$pkg ~ '::'};
             return False unless $curpkg;
-            # say "Found $pkg okay, now in $curpkg " ~ ($curpkg.<$?PACKAGENAME>//'???');
+            # say "Found $pkg okay, now in $curpkg ";
         }
         $name = shift(@components)//'';
         # say "Final component is $name";
@@ -773,7 +818,7 @@ token pod_comment {
     | 'begin' \h+ <identifier> ::
         [
         ||  .*? "\n=" <.unsp>? 'end' \h+ $<identifier> » \N*          {*} #= tagged
-        ||  .*?                                                       {*} #= end
+        ||  .*? { say "HERE" }                                                      {*} #= end
         ]
     | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
         [ .*?  "\n=" <.unsp>? 'end' » \N* || <.panic: "=begin without =end"> ]   {*}       #= anon
@@ -1040,10 +1085,10 @@ token statement_control:use {
     | <version>
     | <module_name><arglist>?
         {{
-            my $longname = $<module_name><longname>;
-            $¢.add_our_name($longname.text);
+            my $longname = $<module_name><longname>.text;
+            $¢.add_our_name($longname);
             # XXX cheat on import list for now
-            $¢.do_imports($<arglist>[0]);
+            $¢.do_imports($longname, $<arglist>[0]);
         }}
     ]
 }
@@ -1667,7 +1712,6 @@ rule package_def {
                 $newpkg.<PARENT::> = $*CURPKG;
                 $*CURPKG = $newpkg;
                 push @PKGS, $pkg;
-                $newpkg.<$?PACKAGENAME> = $*PKGNAME;
                 # say "adding $newpkg " ~ $*PKGNAME;
             }}
             <block>
@@ -1684,7 +1728,6 @@ rule package_def {
                 my $newpkg = $*CURPKG.{$shortname ~ '::'} //= {};
                 $newpkg.<PARENT::> = $*CURPKG;
                 $*CURPKG = $newpkg;
-                $newpkg.<$?PACKAGENAME> = $*PKGNAME;
                 $*begin_compunit = 0;
             }}
             {*}                                                     #= semi
@@ -1994,7 +2037,9 @@ token desigilname {
 
 token variable {
     :my $IN_META is context<rw> = 0;
-    <?before <sigil> { $*SIGIL ||= $<sigil>.text } > {}
+    :my $sigil = '';
+    :my $twigil = '';
+    <?before <sigil> { $*SIGIL ||= $sigil = $<sigil>.text } > {}
     [
     || '&'
         [
@@ -2006,9 +2051,6 @@ token variable {
     || '$:' <name>? # XXX
     || [
         | <sigil> <twigil>? <desigilname> {*}                                    #= desigilname
-            [ <?{ my $t = $<twigil>; @$t and $t.[0].text eq '.' }>
-                <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
-            ]?
         | <special_variable> {*}                                    #= special
         | <sigil> $<index>=[\d+] {*}                                #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
@@ -2016,6 +2058,21 @@ token variable {
         | <sigil> <?{ $*IN_DECL }> {*}                              #= anondecl
         ]
     ]
+
+    { my $t = $<twigil>; $twigil = $t.[0].text if @$t; }
+    [ <?{ $twigil eq '.' }>
+        <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
+    || <?{ $twigil eq '?' }>
+        {{
+            my $name = $<desigilname>.text;
+            given $name {
+                when 'PACKAGENAME' { $<value> = $*PKGNAME; }
+                when 'LINE' { $<value> = $¢.lineof($¢.pos); }
+                when 'FILE' { $<value> = $COMPILING::FILE; }
+                default { $¢.worry("Unrecognized variable: $sigil?$name"); }
+            }
+        }}
+    ]?
 }
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
@@ -4725,7 +4782,7 @@ method lineof ($p) {
     return $line if $line;
     $line = 1;
     my $pos = 0;
-    my @text = split(/^/,$*ORIG);
+    my @text = split(/^/,$*ORIG);   # XXX p5ism, should be ^^
     for @text {
         @*MEMOS[$pos++]<L> = $line
             for 1 .. chars($_);
