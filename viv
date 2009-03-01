@@ -49,6 +49,7 @@ sub MAIN {
 	    $OPT_pos = 1;
 	}
 	elsif ($switch eq '--log') {
+	    say @_;
 	    $OPT_log = 1;
 	}
 	elsif ($switch eq '--pos') {
@@ -70,6 +71,7 @@ sub MAIN {
 	my $prog;
 	{
 	    local $/;
+	    @ARGV = @_;
 	    $prog = <>;
 	}
 	$r = STD->parse($prog)->item;

@@ -842,7 +842,6 @@ rule comp_unit {
     :my @PKGS is context<rw> = ();
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
-    :my $ACTIONS is context<rw>;
     :my $IN_QUOTE is context<rw>;
     :my $IN_META is context<rw> = 0;
     :my $QUASI_QUASH is context<rw>;
