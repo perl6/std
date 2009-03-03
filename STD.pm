@@ -818,7 +818,7 @@ token pod_comment {
     | 'begin' \h+ <identifier> ::
         [
         ||  .*? "\n=" <.unsp>? 'end' \h+ $<identifier> » \N*          {*} #= tagged
-        ||  .*? { say "HERE" }                                                      {*} #= end
+        ||  .*                                                        {*} #= end
         ]
     | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
         [ .*?  "\n=" <.unsp>? 'end' » \N* || <.panic: "=begin without =end"> ]   {*}       #= anon
