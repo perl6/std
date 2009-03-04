@@ -239,7 +239,7 @@ sub VIV::SET_OPT {
 		}
 	    }
 	    elsif ($sym eq 'identifier') {
-		$text .= join('', reverse @zyg);
+		$text .= join('', @zyg);
 	    }
 	    else {
 		$text .= join('', @zyg);
@@ -250,6 +250,9 @@ sub VIV::SET_OPT {
 	}
 	elsif (@sym) {
 	    $text .= join('', @sym);
+	}
+	else {
+	    $text .= ref $self;
 	}
 	$self->ret($text);
     }
@@ -324,9 +327,9 @@ sub VIV::SET_OPT {
 { package VAST::CircumSym; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
 	my $text = $self->get_ws;
-	$text .= $self->{sym}[0];
+	$text .= $self->{sym}[0]//'';
 	$text .= $self->SUPER::emit_p6(@_);
-	$text .= $self->{sym}[1];
+	$text .= $self->{sym}[1]//'';
 	$text;
     }
 }
@@ -334,9 +337,9 @@ sub VIV::SET_OPT {
 { package VAST::FirstLast; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
 	my $text = $self->get_ws;
-	$text .= $self->{FIRST};
+	$text .= $self->{FIRST}//'';
 	$text .= $self->SUPER::emit_p6(@_);
-	$text .= $self->{LAST};
+	$text .= $self->{LAST}//'';
 	$text;
     }
 }
@@ -350,6 +353,10 @@ sub VIV::SET_OPT {
 	}
 	$self->ret($text);
     }
+}
+
+{ package VAST::CORE; our @ISA = 'VAST::Base';
+    sub emit_p6 { '' }
 }
 
 { package VAST::Comma; our @ISA = 'VAST::Base';

@@ -12,6 +12,7 @@ if (not @ARGV) {
 
 for my $file (@ARGV) {
     warn $file,"\n" if @ARGV > 1;
+    next unless -f $file;
     eval {
 	warn "Undefined\n" unless defined STD->parsefile($file);
     };

@@ -1024,7 +1024,7 @@ token label {
     :my $label;
     <identifier> ':' <?before \s> <.ws>
 
-    [ <?{ $¢.is_name($label = $<identifier>.text) }>
+    [ <?{ $¢.is_name($label = $<identifier>.Str) }>
       <.panic("Illegal redeclaration of '$label'")>
     ]?
 
@@ -1084,7 +1084,7 @@ token statement_control:use {
     | <version>
     | <module_name><arglist>?
         {{
-            my $longname = $<module_name><longname>.text;
+            my $longname = $<module_name><longname>.Str;
             $¢.add_our_name($longname);
             # XXX cheat on import list for now
             $¢.do_imports($longname, $<arglist>[0]);
@@ -1236,7 +1236,7 @@ token PRE {
         { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
                                                     {*}         #= prefix
     | <prefix_circumfix_meta_operator>
-        { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.text }
+        { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.Str }
                                                     {*}         #= precircum
     ]
     # XXX assuming no precedence change
@@ -1276,7 +1276,7 @@ token noun {
     :my $SCOPE is context<rw> = "our";
     [
     | <fatarrow>
-    | <variable> <.check_variable($<variable>.text)>
+    | <variable> <.check_variable($<variable>.Str)>
     | <package_declarator>
     | <scope_declarator>
     | <?before 'multi'|'proto'|'only'> <multi_declarator>
@@ -1307,11 +1307,11 @@ token colonpair {
     :dba('colon pair')
     [
     | '!' <identifier>
-        { $key = $<identifier>.text; $value = 0; }
+        { $key = $<identifier>.Str; $value = 0; }
         {*}                                                     #= false
     | $<num> = [\d+] <identifier>
     | <identifier>
-        { $key = $<identifier>.text; }
+        { $key = $<identifier>.Str; }
         [
         || <.unsp>? '.'? <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
@@ -1322,7 +1322,7 @@ token colonpair {
         { $key = ""; $value = $<postcircumfix>; }
         {*}                                                     #= structural
     | $<var> = (<sigil> {} <twigil>? <desigilname>)
-        { $key = $<var><desigilname>.text; $value = $<var>; }
+        { $key = $<var><desigilname>.Str; $value = $<var>; }
         {*}                                                     #= varname
     ]
     { $<k> = $key; $<v> = $value; }
@@ -1336,17 +1336,17 @@ token quotepair {
     :dba('colon pair (restricted)')
     [
     | '!' <identifier>
-        { $key = $<identifier>.text; $value = 0; }
+        { $key = $<identifier>.Str; $value = 0; }
         {*}                                                     #= false
     | <identifier>
-        { $key = $<identifier>.text; }
+        { $key = $<identifier>.Str; }
         [
         || <.unsp>? '.'? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
         ]
         {*}                                                     #= value
     | $<n>=(\d+) $<id>=(<[a..z]>+)
-        { $key = $<id>.text; $value = $<n>.text; }
+        { $key = $<id>.Str; $value = $<n>.Str; }
         {*}                                                     #= nth
     ]
     { $<k> = $key; $<v> = $value; }
@@ -1383,7 +1383,7 @@ token infixish ($in_meta = $*IN_META) {
 # doing fancy as one rule simplifies LTM
 token dotty:sym<.*> ( --> Methodcall) {
     ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
-    { $<sym> = $0.item; }
+    { $<sym> = $0.Str; }
 }
 
 token dotty:sym<.> ( --> Methodcall) {
@@ -1450,7 +1450,7 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     ]
 
     { $<O> = $<s><op><O>; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
-    { $<sym> = $<s>.text; }
+    { $<sym> = $<s>.Str; }
 
 }
 
@@ -1462,7 +1462,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
     <sym> <!before '!'> {} <infixish(1)>
 
     [
-    || <?{ $<infixish>.text eq '=' }>
+    || <?{ $<infixish>.Str eq '=' }>
        { $¢ = ::Chaining.coerce($¢); }
        
     || <.can_meta($<infixish>, "negate")>    
@@ -1524,7 +1524,7 @@ token postcircumfix:sym<( )> ( --> Methodcall)
     { :dba('argument list') '(' ~ ')' <semiarglist> }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.text eq '-1' and $¢.obs("[-1] subscript to access final element","[*-1]") } }
+    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str eq '-1' and $¢.obs("[-1] subscript to access final element","[*-1]") } }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
     { :dba('subscript') '{' ~ '}' <semilist> }
@@ -1546,7 +1546,7 @@ token postop {
 token methodop {
     [
     | <longname>
-    | <?before '$' | '@' > <variable> <.check_variable($<variable>.text)>
+    | <?before '$' | '@' > <variable> <.check_variable($<variable>.Str)>
     | <?before <[ ' " ]> > <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
@@ -1591,7 +1591,7 @@ token circumfix:sym<{ }> ( --> Term) {
 token variable_declarator {
     :my $IN_DECL is context<rw> = 1;
     <variable>
-    { $*IN_DECL = 0; self.add_variable($<variable>.text) }
+    { $*IN_DECL = 0; self.add_variable($<variable>.Str) }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
@@ -1617,7 +1617,7 @@ rule scoped {
     | <multi_declarator>
     ]
     || <?before <[A..Z]> > <longname> {{
-            my $t = $<longname>.text;
+            my $t = $<longname>.Str;
             if not $¢.is_known($t) {
                 $¢.panic("In \"$*SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
             }
@@ -1690,7 +1690,7 @@ rule package_def {
         [
             <module_name>{
                 $longname = $<module_name>[0]<longname>;
-                $¢.add_name($longname.text);
+                $¢.add_name($longname.Str);
             }
         ]?
         <trait>*
@@ -1701,7 +1701,7 @@ rule package_def {
                 my $pkg = $*PKGNAME || "GLOBAL";
                 my $shortname;
                 if $longname {
-                     $shortname = $longname.<name>.text;
+                     $shortname = $longname.<name>.Str;
                 }
                 else {
                     $shortname = '_anon_';
@@ -1722,7 +1722,7 @@ rule package_def {
         || <?{ $*begin_compunit }> {} <?before ';'>
             {{
                 $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-                my $shortname = $longname.<name>.text;
+                my $shortname = $longname.<name>.Str;
                 $*PKGNAME = $shortname;
                 my $newpkg = $*CURPKG.{$shortname ~ '::'} //= {};
                 $newpkg.<PARENT::> = $*CURPKG;
@@ -1768,7 +1768,7 @@ token special_variable:sym<$!> { <sym> <!before \w> }
 token special_variable:sym<$!{ }> {
     # XXX the backslashes are necessary here for bootstrapping, not for P6...
     ( '$!{' :: (.*?) '}' )
-    <.obs($0.text ~ " variable", 'smart match against $!')>
+    <.obs($0.Str ~ " variable", 'smart match against $!')>
 }
 
 token special_variable:sym<$/> {
@@ -1798,7 +1798,7 @@ token special_variable:sym<$@> {
 token special_variable:sym<$#> {
     <sym> ::
     [
-    || (\w+) <.obs("\$#" ~ $0.text ~ " variable", "\@\{" ~ $0.text ~ "}.end")>
+    || (\w+) <.obs("\$#" ~ $0.Str ~ " variable", "\@\{" ~ $0.Str ~ "}.end")>
     || <.obs('$# variable', '.fmt')>
     ]
 }
@@ -1814,7 +1814,7 @@ token special_variable:sym<$%> {
 # Note: this works because placeholders are restricted to lowercase
 token special_variable:sym<$^X> {
     <sigil> '^' $<letter> = [<[A..Z]>] \W
-    <.obscaret($<sigil>.text ~ '^' ~ $<letter>.text, $<sigil>, $<letter>.text)>
+    <.obscaret($<sigil>.Str ~ '^' ~ $<letter>.Str, $<sigil>, $<letter>.Str)>
 }
 
 token special_variable:sym<$^> {
@@ -1904,7 +1904,7 @@ token special_variable:sym<$+> {
 
 token special_variable:sym<${^ }> {
     ( <sigil> '{^' :: (.*?) '}' )
-    <.obscaret($0.text, $<sigil>, $0.{0}.text)>
+    <.obscaret($0.Str, $<sigil>, $0.{0}.Str)>
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
@@ -1957,7 +1957,7 @@ token special_variable:sym<::{ }> {
 
 token special_variable:sym<${ }> {
     ( <[$@%]> '{' :: (.*?) '}' )
-    <.obs("" ~ $0.text ~ " variable", "\{" ~ $<sigil>.text ~ "}(" ~ $0.{0}.text ~ ")")>
+    <.obs("" ~ $0.Str ~ " variable", "\{" ~ $<sigil>.Str ~ "}(" ~ $0.{0}.Str ~ ")")>
 }
 
 token special_variable:sym<$[> {
@@ -2029,7 +2029,7 @@ token special_variable:sym<$?> {
 
 token desigilname {
     [
-    | <?before '$' > <variable> <.check_variable($<variable>.text)>
+    | <?before '$' > <variable> <.check_variable($<variable>.Str)>
     | <longname>
     ]
 }
@@ -2039,18 +2039,18 @@ token variable {
     :my $sigil = '';
     :my $twigil = '';
     :my $name;
-    <?before <sigil> { $*SIGIL ||= $sigil = $<sigil>.text } > {}
+    <?before <sigil> { $*SIGIL ||= $sigil = $<sigil>.Str } > {}
     [
     || '&'
         [
-        | <twigil>?  <sublongname> { $name = $<sublongname>.text } {*}                                   #= subnoun
+        | <twigil>?  <sublongname> { $name = $<sublongname>.Str } {*}                                   #= subnoun
         | '[' ~ ']' <infixish(1)>
         ]
     || <?before '$::('> '$' <name>?
     || '$::' <name>? # XXX
     || '$:' <name>? # XXX
     || [
-        | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.text } {*}                                    #= desigilname
+        | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str } {*}                                    #= desigilname
         | <special_variable> {*}                                    #= special
         | <sigil> $<index>=[\d+] {*}                                #= $0
         # Note: $() can also parse as contextualizer in an expression; should have same effect
@@ -2059,12 +2059,12 @@ token variable {
         ]
     ]
 
-    { my $t = $<twigil>; $twigil = $t.[0].text if @$t; }
+    { my $t = $<twigil>; $twigil = $t.[0].Str if @$t; }
     [ <?{ $twigil eq '.' }>
         <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
     || <?{ $twigil eq '?' }>
         {{
-            $name //= $<name>[0].text if $<name>;
+            $name //= $<name>[0].Str if $<name>;
             given $sigil {
                 when '$' {
                     given $name {
@@ -2136,7 +2136,7 @@ token deflongname {
     <name>
     # XXX too soon
     [ <colonpair>+ { $¢.add_macro($<name>) if $*IN_DECL; } ]?
-    { $¢.add_routine($<name>.text) if $*IN_DECL; }
+    { $¢.add_routine($<name>.Str) if $*IN_DECL; }
 }
 
 token longname {
@@ -2165,7 +2165,7 @@ token subshortname {
     [
     | <category>
         [ <colonpair>+ { $¢.add_macro($<category>) if $*IN_DECL; } ]?
-    | <desigilname> { $¢.add_routine($<desigilname>.text) if $*IN_DECL; }
+    | <desigilname> { $¢.add_routine($<desigilname>.Str) if $*IN_DECL; }
     ]
 }
 
@@ -2202,7 +2202,7 @@ token typename {
     | '::?'<identifier>                 # parse ::?CLASS as special case
     | <longname>
       <?{{
-        my $longname = $<longname>.text;
+        my $longname = $<longname>.Str;
         if substr($longname, 0, 2) eq '::' {
             $¢.add_my_name(substr($longname, 2));
         }
@@ -2432,8 +2432,8 @@ token nibbler {
                         {
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
-                            $text ~= $<starter>[*-1].text ~ shift(@n);
-                            $text = (@n ?? pop(@n) !! '') ~ $<stopper>[*-1].text;
+                            $text ~= $<starter>[*-1].Str ~ shift(@n);
+                            $text = (@n ?? pop(@n) !! '') ~ $<stopper>[*-1].Str;
                             push @nibbles, @n;
                         }
         || <escape>   {
@@ -2485,7 +2485,7 @@ token quote:qq {
     :my $qm;
     'qq'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak($qm => 1))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak($qm => 1))>
     | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
     ]
 }
@@ -2493,7 +2493,7 @@ token quote:q {
     :my $qm;
     'q'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak($qm => 1))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak($qm => 1))>
     | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))>
     ]
 }
@@ -2502,7 +2502,7 @@ token quote:Q {
     :my $qm;
     'Q'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.text } <quibble($¢.cursor_fresh( ::STD::Q ).tweak($qm => 1))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( ::STD::Q ).tweak($qm => 1))>
     | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ))>
     ]
 }
@@ -2555,7 +2555,7 @@ token quote:tr {
 token old_rx_mods {
     (< i g s m x c e >+) 
     {{
-        given $0.text {
+        given $0.Str {
             $_ ~~ /i/ and $¢.worryobs('/i',':i');
             $_ ~~ /g/ and $¢.worryobs('/g',':g');
             $_ ~~ /s/ and $¢.worryobs('/s','^^ and $$ anchors');
@@ -2571,7 +2571,7 @@ token old_rx_mods {
 token old_tr_mods {
     (< c d s ] >+) 
     {{
-        given $0.text {
+        given $0.Str {
             $_ ~~ /c/ and $¢.worryobs('/c',':c');
             $_ ~~ /d/ and $¢.worryobs('/g',':d');
             $_ ~~ /s/ and $¢.worryobs('/s',':s');
@@ -2812,7 +2812,7 @@ grammar Q is STD {
     } # end role
 
     role s1 {
-        token escape:sym<$> { <?before '$'> [ :lang($*LANG) <variable> <extrapost>? <.check_variable($<variable>.text)> ] || <.panic: "Non-variable \$ must be backslashed"> }
+        token escape:sym<$> { <?before '$'> [ :lang($*LANG) <variable> <extrapost>? <.check_variable($<variable>.Str)> ] || <.panic: "Non-variable \$ must be backslashed"> }
         token special_variable:sym<$"> {
             '$' <stopper>
             <.panic: "Can't use a \$ in the last position of an interpolating string">
@@ -2826,7 +2826,7 @@ grammar Q is STD {
     } # end role
 
     role a1 {
-        token escape:sym<@> { :my $IN_QUOTE is context<rw> = 1; <?before '@'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] } # trap ABORTBRANCH from variable's ::
+        token escape:sym<@> { :my $IN_QUOTE is context<rw> = 1; <?before '@'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.Str)> | <!> ] } # trap ABORTBRANCH from variable's ::
     } # end role
 
     role a0 {
@@ -2834,7 +2834,7 @@ grammar Q is STD {
     } # end role
 
     role h1 {
-        token escape:sym<%> { :my $IN_QUOTE is context<rw> = 1; <?before '%'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] }
+        token escape:sym<%> { :my $IN_QUOTE is context<rw> = 1; <?before '%'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.Str)> | <!> ] }
     } # end role
 
     role h0 {
@@ -2842,7 +2842,7 @@ grammar Q is STD {
     } # end role
 
     role f1 {
-        token escape:sym<&> { :my $IN_QUOTE is context<rw> = 1; <?before '&'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.text)> | <!> ] }
+        token escape:sym<&> { :my $IN_QUOTE is context<rw> = 1; <?before '&'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.Str)> | <!> ] }
     } # end role
 
     role f0 {
@@ -2883,7 +2883,7 @@ grammar Q is STD {
         token backslash:stopper { <text=stopper> }
 
         # in single quotes, keep backslash on random character by default
-        token backslash:misc { {} (.) { $<text> = "\\" ~ $0.text; } }
+        token backslash:misc { {} (.) { $<text> = "\\" ~ $0.Str; } }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
@@ -2895,7 +2895,7 @@ grammar Q is STD {
     role qq does b1 does c1 does s1 does a1 does h1 does f1 {
         token stopper { \" }
         # in double quotes, omit backslash on random \W backslash by default
-        token backslash:misc { {} [ (\W) { $<text> = $0.text; } | $<x>=(\w) <.panic("Unrecognized backslash sequence: '\\" ~ $<x>.text ~ "'")> ] }
+        token backslash:misc { {} [ (\W) { $<text> = $0.Str; } | $<x>=(\w) <.panic("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
@@ -3109,7 +3109,7 @@ token signature {
 token type_declarator:subset {
     <sym> :s
     [
-        <longname> { $¢.add_name($<longname>.text); }
+        <longname> { $¢.add_name($<longname>.Str); }
         [ of <fulltypename> ]?
         [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
     ] || <.panic: "Malformed subset definition">
@@ -3120,7 +3120,7 @@ token type_declarator:enum {
     <sym> <.ws>
     [
     || $l = <longname>  <.ws> <arglist> <.ws>
-        { $¢.add_name($l.text); $¢.add_enum($l.text, $<arglist>.text); }
+        { $¢.add_name($l.Str); $¢.add_enum($l.Str, $<arglist>.Str); }
     || <arglist> <.ws>
     ]
 }
@@ -3159,11 +3159,11 @@ token param_var {
     | <sigil> [<?before <.twigil>\w> <twigil>]?
         [
             # Is it a longname declaration?
-        || <?{ $<sigil>.text eq '&' }> <?ident> {}
+        || <?{ $<sigil>.Str eq '&' }> <?ident> {}
             <name=sublongname> {{ $*REALLYADD = 0 }} # sublongname adds symbol
 
         ||  # Is it a shaped array or hash declaration?
-            <?{ $<sigil>.text eq '@' || $<sigil>.text eq '%' }>
+            <?{ $<sigil>.Str eq '@' || $<sigil>.Str eq '%' }>
             <name=identifier>?
             <?before <[ \< \( \[ \{ ]> >
             <postcircumfix>
@@ -3175,12 +3175,12 @@ token param_var {
             # bare sigil?
         ]?
         {{
-            my $vname = $<sigil>.text;
+            my $vname = $<sigil>.Str;
             my $t = $<twigil>;
             my $twigil = '';
-            $twigil = $t.[0].text if @$t;
+            $twigil = $t.[0].Str if @$t;
             $vname ~= $twigil;
-            my $n = try { $<name>[0].text } // '';
+            my $n = try { $<name>[0].Str } // '';
             $vname ~= $n;
             if $*REALLYADD {
                 given $twigil {
@@ -3377,7 +3377,7 @@ token infix:lambda ( --> Term) {
 }
 
 token circumfix:sigil ( --> Term)
-    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*SIGIL ||= $<sigil>.text } }
+    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*SIGIL ||= $<sigil>.Str } }
 
 #token circumfix:typecast ( --> Term)
 #    { <typename> '(' ~ ')' <semilist> }
@@ -3795,11 +3795,11 @@ token term:sym<!!!> ( --> List_prefix)
 token term:sigil ( --> List_prefix)
 {
     <sigil> <?before \s> <arglist>
-    { $<sym> = $<sigil>.item; }
+    { $<sym> = $<sigil>.Str; }
 }
 
 # token term:typecast ( --> List_prefix)
-#     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.item; } }
+#     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.Str; } }
 
 # force identifier(), identifier.(), etc. to be a function call always
 token term:identifier ( --> Term )
@@ -3807,7 +3807,7 @@ token term:identifier ( --> Term )
     :my $name;
     :my $pos;
     <identifier> <?before ['.'?'(']?>
-    { $name = $<identifier>.text; $pos = $¢.pos; }
+    { $name = $<identifier>.Str; $pos = $¢.pos; }
     <args( $¢.is_name($name) )>
     { self.add_mystery($name,$pos) unless $<args><invocant>; }
 }
@@ -3846,12 +3846,12 @@ token term:name ( --> Term)
     :my $pos;
     <longname>
     {
-        $name = $<longname>.text;
+        $name = $<longname>.Str;
         $pos = $¢.pos;
     }
     [
     ||  <?{
-            $¢.is_name($<longname>.text) or substr($<longname>.text,0,2) eq '::'
+            $¢.is_name($<longname>.Str) or substr($<longname>.Str,0,2) eq '::'
         }>
         # parametric type?
         <.unsp>? [ <?before '['> <postcircumfix> ]?
@@ -4177,7 +4177,7 @@ method EXPR ($preclvl)
             # Equal precedence, so use associativity to decide.
             if @opstack[*-1]<O><prec> eq $inprec {
                 given $inO<assoc> {
-                    when 'non'   { $here.panic('"' ~ $infix.text ~ '" is not associative') }
+                    when 'non'   { $here.panic('"' ~ $infix.Str ~ '" is not associative') }
                     when 'left'  { reduce() }   # reduce immediately
                     when 'right' { }            # just shift
                     when 'chain' { }            # just shift
@@ -4393,7 +4393,7 @@ grammar Regex is STD {
     token metachar:sym<^>  { <sym> }
     token metachar:sym<$$> {
         <sym>
-        [ (\w+) <.obs("\$\$" ~ $0.text ~ " to deref var inside a regex", "\$(\$" ~ $0.text ~ ")")> ]?
+        [ (\w+) <.obs("\$\$" ~ $0.Str ~ " to deref var inside a regex", "\$(\$" ~ $0.Str ~ ")")> ]?
     }
     token metachar:sym<$>  {
         '$'
@@ -4415,9 +4415,9 @@ grammar Regex is STD {
     token metachar:var {
         <!before '$$'>
         <?before <sigil>>
-        [:lang($¢.cursor_fresh($*LANG)) <variable> <.ws> <.check_variable($<variable>.text)> ]
+        [:lang($¢.cursor_fresh($*LANG)) <variable> <.ws> <.check_variable($<variable>.Str)> ]
         $<binding> = ( <.ws> '=' <.ws> <quantified_atom> )?
-        { $<sym> = $<variable>.item; }
+        { $<sym> = $<variable>.Str; }
     }
 
     token backslash:unspace { <?before \s> <.SUPER::ws> }
@@ -4516,22 +4516,22 @@ grammar Regex is STD {
 
     token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $*ignorecase = 1 } }
     token mod_internal:sym<:!i>   { $<sym>=[':!i'|':!ignorecase'] » { $*ignorecase = 0 } }
-    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { $*ignorecase = eval $<mod_arg>.text } }
+    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { $*ignorecase = eval $<mod_arg>.Str } }
     token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { $*ignorecase = $0 } }
 
     token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { $*ignoreaccent = 1 } }
     token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { $*ignoreaccent = 0 } }
-    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { $*ignoreaccent = eval $<mod_arg>.text } }
+    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { $*ignoreaccent = eval $<mod_arg>.Str } }
     token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { $*ignoreaccent = $0 } }
 
     token mod_internal:sym<:s>    { ':s' 'igspace'? » { $*sigspace = 1 } }
     token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { $*sigspace = 0 } }
-    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { $*sigspace = eval $<mod_arg>.text } }
+    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { $*sigspace = eval $<mod_arg>.Str } }
     token mod_internal:sym<:0s>   { ':' (\d+) 's' 'igspace'? » { $*sigspace = $0 } }
 
     token mod_internal:sym<:r>    { ':r' 'atchet'? » { $*ratchet = 1 } }
     token mod_internal:sym<:!r>   { ':!r' 'atchet'? » { $*ratchet = 0 } }
-    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $*ratchet = eval $<mod_arg>.text } }
+    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $*ratchet = eval $<mod_arg>.Str } }
     token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { $*ratchet = $0 } }
  
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] [ :lang( $¢.cursor_fresh( ::STD::P5Regex ).unbalanced($*GOAL) ) <nibbler> ] }

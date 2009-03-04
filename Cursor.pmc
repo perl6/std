@@ -245,12 +245,13 @@ sub from { $_[0]->{_from} // $_[0]->{_pos} }
 sub to { $_[0]->{_pos} }
 sub pos { $_[0]->{_pos} }
 sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
-sub text { exists $_[0]->{_from} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from}) : '' }
+sub Str { exists $_[0]->{_from} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from}) : '' }
 sub peek { $_[0]->{_peek} }
 sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
 
-sub item { exists $_[0]->{''} ? $_[0]->{''} : $_[0]->text }
+sub item { $_[0] }
+sub result { exists $_[0]->{''} ? $_[0]->{''} : $_[0]->Str }
 
 sub list { my $self = shift;
     my @result;
@@ -725,7 +726,7 @@ sub cursor_herelang { my $self = shift;
 sub trim_heredoc { my $doc = shift;
     my ($stopper) = $doc->{stopper}[0] or
         $doc->panic("Couldn't find delimiter for heredoc\n");
-    my $ws = $stopper->{ws}->text;
+    my $ws = $stopper->{ws}->Str;
     return $stopper if $ws eq '';
 
     my $wsequiv = $ws;
@@ -954,7 +955,7 @@ sub add_macro { my $lang = shift;
     my $start = shift;
     state $GEN = "500";
     $lang->{_from} = $start->{_from};
-    my $name = $lang->text;
+    my $name = $lang->Str;
     my $WHAT = ref $lang;
     if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
         my ($sym) = $name =~ /:sym(.*)/;
@@ -1098,7 +1099,7 @@ sub do_imports { my $self = shift;
     my $module = shift;
     my $args = shift;
     my @imports;
-    my $text = $args->text;
+    my $text = $args->Str;
     if ($text ne '') {
         return unless $text;
         while ($text =~ s/^\s*:?(OUR|MY|STATE)?<(.*?)>,?//) {
@@ -1607,7 +1608,7 @@ sub _BACKREFn { my $self = shift;
 
     local $CTX = $self->callm($n) if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos} // 0;
-    my $s = $self->{$n}->text;
+    my $s = $self->{$n}->Str;
     my $len = length($s);
     if (substr($::ORIG, $P, $len) eq $s) {
         $self->deb("EXACT $s matched @{[substr($::ORIG,$P,$len)]} at $P $len") if $DEBUG & DEBUG::matchers;
