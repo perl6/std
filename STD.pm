@@ -4048,7 +4048,6 @@ method EXPR ($preclvl)
             }
             when 'unary' {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
-                my @list;
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
@@ -4064,7 +4063,6 @@ method EXPR ($preclvl)
             }
             default {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
-                my @list;
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 $op<right> = (pop @termstack);
