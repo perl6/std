@@ -65,7 +65,7 @@ sub MAIN {
 #    USAGE() unless -r $_[0];
     my $r;
     if (@_ and -f $_[0]) {
-	$r = STD->parsefile($_[0])->item;
+	$r = STD->parsefile($_[0])->{'?'};
     }
     else {
 	my $prog;
@@ -74,7 +74,7 @@ sub MAIN {
 	    @ARGV = @_;
 	    $prog = <>;
 	}
-	$r = STD->parse($prog)->item;
+	$r = STD->parse($prog)->{'?'};
     }
     if ($output eq 'ast') {
 	print Dump($r);
@@ -115,15 +115,15 @@ sub VIV::SET_OPT {
 	gen_class($class);
 	bless $r, $class unless ref($r) =~ /^VAST/;
 	$r->{MATCH} = $match if $OPT_match;
-	$match->{''} = $r;
+	$match->{'?'} = $r;
     }
 
-    # propagate ->{''} nodes upward
+    # propagate ->{'?'} nodes upward
     # (untransformed STD nodes in output indicate bugs)
 
     sub hoist {
 	my $node = shift;
-	my $text = $node->text;
+	my $text = $node->Str;
 	my %r;
 	for my $k (keys %$node) {
 	    my $v = $node->{$k};
@@ -153,8 +153,8 @@ sub VIV::SET_OPT {
 			    if (ref $z eq 'ARRAY') {
 				push @$zyg, $z;
 			    }
-			    elsif (exists $z->{''}) {
-				push @$zyg, $z->{''};
+			    elsif (exists $z->{'?'}) {
+				push @$zyg, $z->{'?'};
 			    }
 			}
 			else {
@@ -165,8 +165,8 @@ sub VIV::SET_OPT {
 		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
 		}
 		elsif (ref $v) {
-		    if (exists $v->{''}) {
-			$r{$k} = $v->{''};
+		    if (exists $v->{'?'}) {
+			$r{$k} = $v->{'?'};
 		    }
 		    else {
 			$r{$k} = $v;
@@ -193,7 +193,7 @@ sub VIV::SET_OPT {
 	my $r = hoist($match);
 	(my $class = $r->{kind} // ref $r) =~ s/^STD/VAST/;
 	gen_class($class);
-	$match->{''} = bless $r, $class;
+	$match->{'?'} = bless $r, $class;
     }
 
     sub gen_class {
