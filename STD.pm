@@ -1449,7 +1449,7 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     || <.panic("Can't reduce a " ~ $<s><op><O><dba> ~ " operator because it's diffy and not chaining")>
     ]
 
-    { $<O> = $<s><op><O>; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
+    { $<O> = $<s><op><O>; $<O><prec>:delete; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
     { $<sym> = $<s>.Str; }
 
 }
@@ -1484,12 +1484,12 @@ token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
 #    self;
 #}
 
-token infix_circumfix_meta_operator:sym<X> ( --> List_infix) {
-    X {}
+token infix_prefix_meta_operator:sym<X> ( --> List_infix) {
+    <sym> {}
     [ <infixish(1)>
         [X <.panic: "Old form of XopX found">]?
         <.can_meta($<infixish>[0], "cross")>
-        <?{ $<O> = $<infixish>[0]<O>; $<O><diffy> = 1; }>
+        <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<O><diffy> = 1; $<sym> ~= $<infixish>[0].Str }>
     ]?
 }
 
@@ -1517,7 +1517,7 @@ token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     '='
     <.can_meta($op, "make assignment out of")>
     [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of a " ~ $op<O><dba> ~ " operator because it's diffy")> ]
-    { $<O> = $op<O>; $<O><fiddly> = 1; }
+    { $<O> = $op<O>; $<O><prec>:delete; $<O><fiddly> = 1; }
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
