@@ -10,7 +10,6 @@ use utf8;
 use YAML::XS;
 use feature 'say';
 
-$::ACTIONS = 'Actions';
 my $OPT_pos = 0;
 my $OPT_match = 0;
 my $OPT_log = 0;
@@ -65,7 +64,7 @@ sub MAIN {
 #    USAGE() unless -r $_[0];
     my $r;
     if (@_ and -f $_[0]) {
-	$r = STD->parsefile($_[0])->{'?'};
+	$r = STD->parsefile($_[0], actions => 'Actions')->{'?'};
     }
     else {
 	my $prog;
@@ -74,7 +73,7 @@ sub MAIN {
 	    @ARGV = @_;
 	    $prog = <>;
 	}
-	$r = STD->parse($prog)->{'?'};
+	$r = STD->parse($prog, actions => 'Actions')->{'?'};
     }
     if ($output eq 'ast') {
 	print Dump($r);

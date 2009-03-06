@@ -136,7 +136,10 @@ sub new {
 sub parse {
     my $class = shift;
     my $text = shift;
-    my $rule = shift() // 'comp_unit';
+    my %opts = @_;
+    my $rule = $opts{rule} // 'comp_unit';
+    my $actions = $opts{actions} // '';
+    $::ACTIONS = $actions if $actions;
     ::init_globals();
     local $::VOID = 1 if not defined wantarray;
     local $::COMPILING::FILE = '(eval)';
@@ -146,7 +149,10 @@ sub parse {
 sub parsefile {
     my $class = shift;
     my $file = shift;
-    my $rule = shift() // 'comp_unit';
+    my %opts = @_;
+    my $rule = $opts{rule} // 'comp_unit';
+    my $actions = $opts{actions} // '';
+    $::ACTIONS = $actions if $actions;
     ::init_globals();
     local $::VOID = 1 if not defined wantarray;
     local $::COMPILING::FILE = $file;
