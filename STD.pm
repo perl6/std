@@ -2475,7 +2475,7 @@ token quote:sym<« »>   { '«' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).
 token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
 token quote:sym«< >»   { '<'
                               [ <?before 'STDIN>' > <.obs('<STDIN>', '=$' ~ '*IN')> ]?  # XXX fake out gimme5
-                              [ <?before '>' > <.obs('<>', '=<>')> ]?
+                              [ <?before '>' > <.obs('<>', '=<> or ()')> ]?
                               <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym</ />   {
