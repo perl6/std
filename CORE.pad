@@ -6,7 +6,7 @@
     },
     'Num' => { name => 'Num', file => 'CORE.pad', line => __LINE__ },
     'Num::' => {
-	pi => { name => 'pi', value => atan2(1,1)*4.14159265, file => 'CORE.pad', line => __LINE__ },
+	pi => { name => 'pi', value => atan2(1,1)*4, file => 'CORE.pad', line => __LINE__ },
 	e => { name => 'e', value => exp(1), file => 'CORE.pad', line => __LINE__ },
     },
     'Order' => { name => 'Order', file => 'CORE.pad', line => __LINE__ },
