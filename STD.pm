@@ -4798,7 +4798,7 @@ method panic (Str $s) {
         $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES);
     }
 
-    die "############# PARSE FAILED #############" ~ $m ~ "\n";
+    die "##### PARSE FAILED #####" ~ $m ~ "\n";
 }
 
 method worry (Str $s) {
