@@ -115,7 +115,7 @@ method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
     if not $siggy {
         $*CURPAD.{'@_'} = { name => '@_', file => $COMPILING::FILE, line => $line };
         $*CURPAD.{'%_'} = { name => '%_', file => $COMPILING::FILE, line => $line };
-        $*CURPAD.{'$?GOTSIG'} = 0;
+        $*CURPAD.{'$?GOTSIG'} = '';
     }
     self;
 }
@@ -453,6 +453,8 @@ method check_variable ($name) {
             }
         }
         when '^' {
+            my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
+            if $siggy { self.panic("Placeholder variable $name cannot override existing signature $siggy"); }
             self.add_my_variable($name);
         }
         when ':' {
@@ -2216,7 +2218,7 @@ token typename {
 }
 
 rule fulltypename {<typename>['|'<typename>]*
-    [ of <fulltypename> ]?
+    [ of <.ws> <fulltypename> ]?
 }
 
 token numish {
@@ -3099,6 +3101,7 @@ token signature {
     # XXX incorrectly scopes &infix:<x> parameters to outside following block
     :my $IN_DECL is context<rw> = 1;
     :my $zone is context<rw> = 'posreq';
+    :my $startpos = self.pos;
     <.ws>
     [
     | <?before '-->' | ')' | ']' | '{' | ':'<!before ':' > >
@@ -3106,14 +3109,14 @@ token signature {
     ] ** <param_sep>
     <.ws>
     [ '-->' <.ws> <fulltypename> ]?
-    {{ $*IN_DECL = 0; $*SIGIL = '@'; $*CURPAD.{'$?GOTSIG'} //= 1; }}
+    {{ $*IN_DECL = 0; $*SIGIL = '@'; $*CURPAD.{'$?GOTSIG'} ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')'; }}
 }
 
 token type_declarator:subset {
     <sym> :s
     [
         <longname> { $¢.add_name($<longname>.Str); }
-        [ of <fulltypename> ]?
+        [ of <.ws> <fulltypename> ]?
         [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
     ] || <.panic: "Malformed subset definition">
 }
