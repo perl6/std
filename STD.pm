@@ -168,6 +168,7 @@ method find_stab ($name, $curpad = $*CURPAD) {
 
     my $curpkg = $*CURPKG;
     if $name ~~ /::/ {
+        $name = self.canonicalize_name($name) unless $name ~~ /^\w/;
         my @components = split(/\:\:/,$name); 
         if @components[*-1] eq '' or $name ~~ /\:\:$/ {
             pop(@components) if @components[*-1] eq ''; # work around p5 problems
@@ -315,6 +316,7 @@ method is_known ($name, $curpad = $*CURPAD) {
     # say "is_known sigiltwigil $st $name";
     my $curpkg = $*CURPKG;
     if $name ~~ /::/ {
+        $name = self.canonicalize_name($name) unless $name ~~ /^\w/;
         my @components = split(/\:\:/,$name);
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
@@ -437,7 +439,8 @@ method add_our_variable ($name) {
     self;
 }
 
-method check_variable ($name) {
+method check_variable ($variable) {
+    my $name = $variable.Str;
     # say "check_variable $name";
     my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W?)(.?)/;
     given $twigil {
@@ -460,7 +463,50 @@ method check_variable ($name) {
         when ':' {
             self.add_my_variable($name);
         }
+        when '?' {
+            if $name ~~ /\:\:/ {
+                $name = self.canonicalize_name($name);
+                self.worry("Unrecognized variable: $name") unless $name ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:/;
+            }
+            else {
+                my $v;
+                given $name {
+                    when '$?FILE'     { $v = $COMPILING::FILE; }
+                    when '$?LINE'     { $v = self.lineof($variable.pos); }
+                    when '$?POSITION' { $v = $variable.pos; }
 
+                    when '$?PARSER'   { $v = $*PARSER; }
+                    when '$?LANG'     { $v = $*LANG; }
+
+                    when '$?SCOPE'    { $v = $*CURPAD; }
+
+                    when '$?PACKAGE'  { $v = $*CURPKG; }
+                    when '$?MODULE'   { $v = $*CURPKG; } #  XXX should scan
+                    when '$?CLASS'    { $v = $*CURPKG; } #  XXX should scan
+                    when '$?ROLE'     { $v = $*CURPKG; } #  XXX should scan
+                    when '$?GRAMMAR'  { $v = $*CURPKG; } #  XXX should scan
+
+                    when '$?PACKAGENAME' { $v = $*PKGNAME; }
+
+                    when '$?OS'       { $v = 'unimpl'; }
+                    when '$?DISTRO'   { $v = 'unimpl'; }
+                    when '$?VM'       { $v = 'unimpl'; }
+                    when '$?XVM'      { $v = 'unimpl'; }
+                    when '$?PERL'     { $v = 'unimpl'; }
+
+                    when '$?USAGE'    { $v = 'unimpl'; }
+
+                    when '&?ROUTINE'  { $v = 'unimpl'; }
+                    when '&?BLOCK'    { $v = 'unimpl'; }
+
+                    when '%?CONFIG'    { $v = 'unimpl'; }
+                    when '%?DEEPMAGIC' { $v = 'unimpl'; }
+
+                    default { $variable.worry("Unrecognized variable: $name"); }
+                }
+                $variable.<value> = $v if $v;
+            }
+        }
     }
     self;
 }
@@ -1278,7 +1324,7 @@ token noun {
     :my $SCOPE is context<rw> = "our";
     [
     | <fatarrow>
-    | <variable> <.check_variable($<variable>.Str)>
+    | <variable> <.check_variable($<variable>)>
     | <package_declarator>
     | <scope_declarator>
     | <?before 'multi'|'proto'|'only'> <multi_declarator>
@@ -1548,7 +1594,7 @@ token postop {
 token methodop {
     [
     | <longname>
-    | <?before '$' | '@' > <variable> <.check_variable($<variable>.Str)>
+    | <?before '$' | '@' > <variable> <.check_variable($<variable>)>
     | <?before <[ ' " ]> > <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
@@ -2031,7 +2077,7 @@ token special_variable:sym<$?> {
 
 token desigilname {
     [
-    | <?before '$' > <variable> <.check_variable($<variable>.Str)>
+    | <?before '$' > <variable> <.check_variable($<variable>)>
     | <longname>
     ]
 }
@@ -2041,7 +2087,10 @@ token variable {
     :my $sigil = '';
     :my $twigil = '';
     :my $name;
-    <?before <sigil> { $*SIGIL ||= $sigil = $<sigil>.Str } > {}
+    <?before <sigil> {
+        $sigil = $<sigil>.Str;
+        $*SIGIL ||= $sigil;
+    }> {}
     [
     || '&'
         [
@@ -2064,54 +2113,6 @@ token variable {
     { my $t = $<twigil>; $twigil = $t.[0].Str if @$t; }
     [ <?{ $twigil eq '.' }>
         <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
-    || <?{ $twigil eq '?' }>
-        {{
-            $name //= $<name>[0].Str if $<name>;
-            given $sigil {
-                when '$' {
-                    given $name {
-                        when 'FILE'     { $<value> = $COMPILING::FILE; }
-                        when 'LINE'     { $<value> = $¢.lineof($¢.pos); }
-                        when 'POSITION' { $<value> = $¢.pos; }
-
-                        when 'PARSER'   { $<value> = $*PARSER; }
-                        when 'LANG'     { $<value> = $*LANG; }
-
-                        when 'SCOPE'    { $<value> = $*CURPAD; }
-
-                        when 'PACKAGE'  { $<value> = $*CURPKG; }
-                        when 'MODULE'   { $<value> = $*CURPKG; } #  XXX should scan
-                        when 'CLASS'    { $<value> = $*CURPKG; } #  XXX should scan
-                        when 'ROLE'     { $<value> = $*CURPKG; } #  XXX should scan
-                        when 'GRAMMAR'  { $<value> = $*CURPKG; } #  XXX should scan
-
-                        when 'PACKAGENAME' { $<value> = $*PKGNAME; }
-
-                        when 'OS'       { $<value> = 'unimpl'; }
-                        when 'DISTRO'   { $<value> = 'unimpl'; }
-                        when 'VM'       { $<value> = 'unimpl'; }
-                        when 'XVM'      { $<value> = 'unimpl'; }
-                        when 'PERL'     { $<value> = 'unimpl'; }
-
-                        when 'USAGE'    { $<value> = 'unimpl'; }
-
-                        default { $¢.worry("Unrecognized variable: $sigil?$name"); }
-                    }
-                }
-                when '&' {
-                    given $name {
-                        when 'ROUTINE' { $<value> = 'unimpl'; }
-                        when 'BLOCK'   { $<value> = 'unimpl'; }
-                    }
-                }
-                when '%' {
-                    given $name {
-                        when 'CONFIG'  { $<value> = 'unimpl'; }
-                        when 'DEEPMAGIC' { $<value> = 'unimpl'; }
-                    }
-                }
-            }
-        }}
     ]?
 }
 
@@ -2817,7 +2818,7 @@ grammar Q is STD {
     } # end role
 
     role s1 {
-        token escape:sym<$> { <?before '$'> [ :lang($*LANG) <variable> <extrapost>? <.check_variable($<variable>.Str)> ] || <.panic: "Non-variable \$ must be backslashed"> }
+        token escape:sym<$> { <?before '$'> [ :lang($*LANG) <variable> <extrapost>? <.check_variable($<variable>)> ] || <.panic: "Non-variable \$ must be backslashed"> }
         token special_variable:sym<$"> {
             '$' <stopper>
             <.panic: "Can't use a \$ in the last position of an interpolating string">
@@ -2831,7 +2832,7 @@ grammar Q is STD {
     } # end role
 
     role a1 {
-        token escape:sym<@> { :my $IN_QUOTE is context<rw> = 1; <?before '@'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.Str)> | <!> ] } # trap ABORTBRANCH from variable's ::
+        token escape:sym<@> { :my $IN_QUOTE is context<rw> = 1; <?before '@'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>)> | <!> ] } # trap ABORTBRANCH from variable's ::
     } # end role
 
     role a0 {
@@ -2839,7 +2840,7 @@ grammar Q is STD {
     } # end role
 
     role h1 {
-        token escape:sym<%> { :my $IN_QUOTE is context<rw> = 1; <?before '%'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.Str)> | <!> ] }
+        token escape:sym<%> { :my $IN_QUOTE is context<rw> = 1; <?before '%'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>)> | <!> ] }
     } # end role
 
     role h0 {
@@ -2847,7 +2848,7 @@ grammar Q is STD {
     } # end role
 
     role f1 {
-        token escape:sym<&> { :my $IN_QUOTE is context<rw> = 1; <?before '&'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>.Str)> | <!> ] }
+        token escape:sym<&> { :my $IN_QUOTE is context<rw> = 1; <?before '&'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>)> | <!> ] }
     } # end role
 
     role f0 {
@@ -4422,7 +4423,7 @@ grammar Regex is STD {
     token metachar:var {
         <!before '$$'>
         <?before <sigil>>
-        [:lang($¢.cursor_fresh($*LANG)) <variable> <.ws> <.check_variable($<variable>.Str)> ]
+        [:lang($¢.cursor_fresh($*LANG)) <variable> <.ws> <.check_variable($<variable>)> ]
         $<binding> = ( <.ws> '=' <.ws> <quantified_atom> )?
         { $<sym> = $<variable>.Str; }
     }

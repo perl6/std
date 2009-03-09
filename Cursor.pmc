@@ -1135,6 +1135,13 @@ sub do_imports { my $self = shift;
     $self;
 }
 
+sub canonicalize_name { my $self = shift;
+    my $name = shift;
+    return unless $name =~ /::/;
+    $name =~ s/^([\$\@%&][!*=?:^.]?)(.*::)(.*)$/$2<$1$3>/;
+    $name;
+}
+
 sub callm { my $self = shift;
     my $arg = shift;
     my $class = ref($self) || $self;

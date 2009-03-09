@@ -14,7 +14,12 @@
 	Increase => { name => 'Increase', file => 'CORE.pad', line => __LINE__ },
 	Same => { name => 'Same', file => 'CORE.pad', line => __LINE__ },
 	Decrease => { name => 'Decrease', file => 'CORE.pad', line => __LINE__ },
-   , file => 'CORE.pad', line => __LINE__ },
+    },
+    'DEBUG' => { name => 'DEBUG', file => 'CORE.pad', line => __LINE__ },
+    'DEBUG::' => {
+	EXPR => { name => 'Increase', file => 'CORE.pad', line => __LINE__ },
+	trace_call => { name => 'Increase', file => 'CORE.pad', line => __LINE__ },
+    },
     'GLOBAL' => { name => 'GLOBAL', file => 'CORE.pad', line => __LINE__ },
     'GLOBAL::' => {
 	'Test' => { name => 'Test', file => 'CORE.pad', line => __LINE__ },
