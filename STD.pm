@@ -1112,9 +1112,15 @@ token statement {
         {*}                                                     #= modexpr
     | <?before ';'> {*}                                         #= null
     ]
-    <.checksep>
-}
 
+    # Is there more on same line after a block?
+    [ <?{ (@*MEMOS[@*MEMOS[self.pos]<ws>//self.pos]<endargs>//0) == 1 }>
+        \h*
+        <!before ';' | ')' | ']' | '}' >
+        <!infixstopper>
+        <.panic: "Statements must be separated with semicolon">
+    ]?
+}
 
 token eat_terminator {
     [
@@ -1125,14 +1131,6 @@ token eat_terminator {
     || {{ if @*MEMOS[$¢.pos]<ws> { $¢.pos = @*MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
         <.panic: "Syntax error">
     ]
-}
-
-token checksep {
-    [ <?{ (@*MEMOS[@*MEMOS[self.pos]<ws>//self.pos]<endargs>//0) == 1 }>
-        \h*
-        <!before ';' | ')' | ']' | '}'>
-        <.panic: "Statements must be separated with semicolon">
-    ]?
 }
 
 token statement_control:use {
