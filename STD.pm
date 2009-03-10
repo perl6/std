@@ -1114,7 +1114,7 @@ token statement {
     ]
 
     # Is there more on same line after a block?
-    [ <?{ (@*MEMOS[@*MEMOS[self.pos]<ws>//self.pos]<endargs>//0) == 1 }>
+    [ <?{ (@*MEMOS[@*MEMOS[$¢.pos]<ws>//$¢.pos]<endargs>//0) == 1 }>
         \h*
         <!before ';' | ')' | ']' | '}' >
         <!infixstopper>
