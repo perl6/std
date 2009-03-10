@@ -1112,6 +1112,7 @@ token statement {
         {*}                                                     #= modexpr
     | <?before ';'> {*}                                         #= null
     ]
+    <.checksep>
 }
 
 
@@ -1124,6 +1125,14 @@ token eat_terminator {
     || {{ if @*MEMOS[$¢.pos]<ws> { $¢.pos = @*MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
         <.panic: "Syntax error">
     ]
+}
+
+token checksep {
+    [ <?{ (@*MEMOS[@*MEMOS[self.pos]<ws>//self.pos]<endargs>//0) == 1 }>
+        \h*
+        <!before ';' | ')' | ']' | '}'>
+        <.panic: "Statements must be separated with semicolon">
+    ]?
 }
 
 token statement_control:use {
@@ -1189,7 +1198,6 @@ token statement_control:repeat {
           ('while'|'until') <EXPR>         {*}                      #= expr wu
     ]
 }
-
 
 token statement_control:loop {
     <sym> :s
@@ -2235,7 +2243,7 @@ token numish {
 }
 
 token number:rational { <nu=integer>'/'<de=integer> }
-token number:complex { <re=numish>'+'<im=numish>'i' }
+token number:complex { <re=numish>'+'<im=numish>'\\'?'i' | <im=numish>'\\'?'i' }
 token number:numish { <numish> }
 
 token integer {
