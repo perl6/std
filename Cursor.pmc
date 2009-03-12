@@ -272,7 +272,7 @@ sub list { my $self = shift;
 sub hash { my $self = shift;
     my %result;
     for my $k (keys %$self) {
-        $result{$k} = $self->{$k} if $k !~ /^[_\d]/;
+        $result{$k} = $self->{$k} if $k !~ /^[_\d~]/;
     }
     \%result;
 }
@@ -818,6 +818,7 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     }
     $submatch->{_from} = $r{_from} = $r{_pos};
     $r{_pos} = $submatch->{_pos};
+    push(@{$r{'~ALL'}}, $submatch);
     bless \%r, ref $self;               # return new match cursor for parent
 }
 

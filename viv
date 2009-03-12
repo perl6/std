@@ -64,7 +64,7 @@ sub MAIN {
 #    USAGE() unless -r $_[0];
     my $r;
     if (@_ and -f $_[0]) {
-	$r = STD->parsefile($_[0], actions => 'Actions')->{'?'};
+	$r = STD->parsefile($_[0], actions => 'Actions')->{'_'};
     }
     else {
 	my $prog;
@@ -73,7 +73,7 @@ sub MAIN {
 	    @ARGV = @_;
 	    $prog = <>;
 	}
-	$r = STD->parse($prog, actions => 'Actions')->{'?'};
+	$r = STD->parse($prog, actions => 'Actions')->{'_'};
     }
     if ($output eq 'ast') {
 	print Dump($r);
@@ -114,10 +114,10 @@ sub VIV::SET_OPT {
 	gen_class($class);
 	bless $r, $class unless ref($r) =~ /^VAST/;
 	$r->{MATCH} = $match if $OPT_match;
-	$match->{'?'} = $r;
+	$match->{'_'} = $r;
     }
 
-    # propagate ->{'?'} nodes upward
+    # propagate ->{'_'} nodes upward
     # (untransformed STD nodes in output indicate bugs)
 
     sub hoist {
@@ -137,8 +137,16 @@ sub VIV::SET_OPT {
 	    elsif ($k eq '_arity') {
 		$r{ARITY} = $v;
 	    }
+	    elsif ($k eq '~ALL') {
+		for (@$v) {
+		    push @{$r{'~ALL'}}, $_->{'_'};
+		}
+	    }
 	    elsif ($k eq '_from') {
-		$r{POS} = $v if $OPT_pos;
+		if ($OPT_pos) {
+		    $r{BEG} = $v;
+		    $r{END} = $node->{_pos};
+		}
 		if (exists $::MEMOS[$v]{'ws'}) {
 		    my $wsstart = $::MEMOS[$v]{'ws'};
 		    $r{WS} = $v - $wsstart if defined $wsstart and $wsstart < $v
@@ -152,8 +160,8 @@ sub VIV::SET_OPT {
 			    if (ref $z eq 'ARRAY') {
 				push @$zyg, $z;
 			    }
-			    elsif (exists $z->{'?'}) {
-				push @$zyg, $z->{'?'};
+			    elsif (exists $z->{'_'}) {
+				push @$zyg, $z->{'_'};
 			    }
 			}
 			else {
@@ -164,8 +172,8 @@ sub VIV::SET_OPT {
 		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
 		}
 		elsif (ref $v) {
-		    if (exists $v->{'?'}) {
-			$r{$k} = $v->{'?'};
+		    if (exists $v->{'_'}) {
+			$r{$k} = $v->{'_'};
 		    }
 		    else {
 			$r{$k} = $v;
@@ -192,7 +200,7 @@ sub VIV::SET_OPT {
 	my $r = hoist($match);
 	(my $class = $r->{kind} // ref $r) =~ s/^STD/VAST/;
 	gen_class($class);
-	$match->{'?'} = bless $r, $class;
+	$match->{'_'} = bless $r, $class;
     }
 
     sub gen_class {
@@ -298,7 +306,7 @@ sub VIV::SET_OPT {
 
     sub get_ws { my $self = shift;
 	my $ws = $self->{WS} // 0;
-	my $pos = $self->{POS};
+	my $pos = $self->{BEG};
 	if ($ws and not $did_ws[$pos]++) {
 	    substr($::ORIG, $pos - $ws, $ws)
 	}
