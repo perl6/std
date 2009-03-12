@@ -1608,7 +1608,7 @@ token methodop {
     :dba('method arguments')
     [
     | ':' <?before \s> <!{ $*inquote }> <arglist>
-    | <?[.(]> <args>
+    | <?[\\(]> <args>
     ]?
 }
 
@@ -2118,9 +2118,11 @@ token variable {
 
     { my $t = $<twigil>; $twigil = $t.[0].Str if @$t; }
     [ <?{ $twigil eq '.' }>
-        <.unsp>? <?before '('> <postcircumfix> {*}          #= methcall
+        [<.unsp> | '\\' | <?> ] <?before '('> <postcircumfix> {*}          #= methcall
     ]?
 }
+
+
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
 # you otherwise don't care what the longest token is.
@@ -3822,7 +3824,7 @@ token term:identifier ( --> Term )
 {
     :my $name;
     :my $pos;
-    <identifier> <?before ['.'?'(']?>
+    <identifier> <?before [<unsp>|'(']? >
     { $name = $<identifier>.Str; $pos = $¢.pos; }
     <args( $¢.is_name($name) )>
     { self.add_mystery($name,$pos) unless $<args><invocant>; }
@@ -3839,9 +3841,9 @@ token args ($istype = 0) {
     :my $INVOCANT_OK is context<rw> = 1;
     :my $INVOCANT_IS is context<rw>;
     [
-    | :dba('argument list') '.(' ~ ')' <semiarglist> {*}             #= func args
+#    | :dba('argument list') '.(' ~ ')' <semiarglist> {*}             #= func args
     | :dba('argument list') '(' ~ ')' <semiarglist> {*}              #= func args
-    | :dba('argument list') <.unsp> '.'? '(' ~ ')' <semiarglist> {*} #= func args
+    | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist> {*} #= func args
     |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
     ]
     { $<invocant> = $*INVOCANT_IS; }
