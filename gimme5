@@ -1627,7 +1627,7 @@ sub unbalanced {
         $text = ::un6($text) // '';
         my $ctx = $$self{context};
         $text = 'my $M = $C; ' . $text . ';' if $NEEDMATCH;
-        if ($text =~ s/\bmake\b/scalar/g) {  # XXX hack, avoid using $<make>
+        if ($text =~ s/\bmake\b/make \$C/g) {  # XXX hack, avoid using $<make>
             "do {\n" . ::indent($text) . "\n}";
         }
         elsif ($ctx eq 'void') {

@@ -257,7 +257,8 @@ sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
 
 sub item { $_[0] }
-sub result { exists $_[0]->{'?'} ? $_[0]->{'?'} : $_[0]->Str }
+sub rob { exists $_[0]->{'_'} ? $_[0]->{'_'} : $_[0]->Str }
+sub make { $_[0]->{'_'} = $_[1]; $_[0] }
 
 sub list { my $self = shift;
     my @result;

@@ -31,7 +31,7 @@ my $UNIT is context;
 
 # random rule for debugging, please ignore
 token foo {
-   'foo' <.ws> 'bar' <.ws> 'baz'
+   'foo' { make "I am a foo" }
 }
 
 =begin comment overview
