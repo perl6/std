@@ -579,110 +579,6 @@ sub _AUTOLEXgen { my $self = shift;
     $lexer;
 }
 
-
-# Can the current pattern match the current position according to 1st N chars?
-# Occasional false positives are okay as long as we can trim it down enough
-# for LTM to handle.  False negatives are bad.
-
-sub canmatch {
-    my ($p,$s) = @_;
-    while ($p ne '' and $s ne '') {
-        my $f = substr($p,0,1,'');
-        my $c = substr($s,0,1,'');
-        if ($f =~ /[\[\\\$.()\t]/) {
-            if ($f eq '\\') {
-                if ($p =~ s/^(\W)//) {
-                    return 1 if $p =~ s/^[*?]//;
-                    return 1 if $1 eq '>';
-                    return 0 unless $c eq $1;
-                }
-                elsif ($p =~ s/^(\w)//) {
-                    $f .= $1;
-                    if ($1 eq 'x') {
-                        if ($p =~ s/^([[:digit:][:alpha:]]{2,4})//) {
-                            $f .= $1;
-                        }
-                        elsif ($p =~ s/^(\[\w+\])//) {
-                            $f .= $1;
-                        }
-                    }
-                    elsif ($1 eq 'p') {
-                        if ($p =~ s/^(\w{1,2})//) {
-                            $f .= $1;
-                        }
-                        elsif ($p =~ s/^(\{\w+\})//) {
-                            $f .= $1;
-                        }
-                    }
-                    elsif ($1 eq 'b') {
-                        return 1;
-                    }
-                    return 1 if $p =~ s/^[*?]//;
-                    return 0 unless $c =~ /^$f/;
-                }
-            }
-            elsif ($f eq '[') {
-                if ($p =~ s/^(\^?\]?(?:\:\]|\\\]|.)*?\])//) {
-                    $f .= $1;
-                    return 1 if $p =~ s/^[*?]//;
-                    return 0 unless $c =~ /^$f/;
-                }
-                else {
-                    return 1;   # guess positive
-                }
-            }
-            elsif ($f eq '(') {
-                return 1 if $p =~ /\|/; #guess positive on alternation
-                $p =~ s/^\?://;
-                substr($s,0,0,$c);
-                next;   # ignore left paren
-            }
-            elsif ($f eq ')') {
-                return 1;               # guess positive
-            }
-            elsif ($f eq '.') {
-                return 1 if $p =~ s/^[*?]//;
-            }
-            elsif ($f eq '$') {
-                return 1;
-            }
-            else { # \t
-                return 1;
-            }
-        }
-        elsif ($f eq $c) {
-            return 1 if $p =~ s/^[*?]//;
-        }
-        else {
-            return 0;
-        }
-        return 1 if $p =~ /^[+{]/;      # guess positive
-    }
-    # null pattern or null string, assume matches
-    return 1;
-}
-
-sub rxlen {
-    my $p = shift;
-    my $len = 0;
-    while ($p ne '') {
-        return -1 if $p =~ /^[*+?(|]/;
-        return -1 if $p =~ /^\{[\d,]+\}/;
-        $len++, next if $p =~ s/^\[\^?.[^\]]*?\]//;
-        if ($p =~ s/^\\//) {
-            next if $p =~ s/^>//;
-            $len++, next if $p =~ s/^\W//;
-            $len++, next if $p =~ s/^[ntfrdswDSW]//;
-            $len++, next if $p =~ s/^\d+//;
-            $len++, next if $p =~ s/^x[\da-fA-F]{1,4}//;
-            $len++, next if $p =~ s/^p[a-zA-Z]{1,2}//;
-            return -1;
-        }
-        $len++, next if $p =~ s/^.//s;
-    }
-    return $len;
-}
-
 sub delete {
     my $self = shift;
     delete $self->{@_};
@@ -907,6 +803,7 @@ sub cursor_all { my $self = shift;
 
     $self->deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
+    delete $r{'~ALL'};
 #    $r{_from} = $fpos;
     $r{_pos} = $tpos;
 
@@ -1281,7 +1178,7 @@ sub _STARr { my $self = shift;
         push @all, $first;
         $pos = $first;
     }
-    $self->cursor_tweak($pos->{_pos})->retm();
+    $pos->retm();
 }
 
 sub _PLUSf { my $self = shift;
@@ -1329,8 +1226,7 @@ sub _PLUSr { my $self = shift;
         $to = $first;
     }
     return () unless @all;
-    my $r = $self->cursor_tweak($to->{_pos});
-    $r->retm();
+    $to->retm();
 }
 
 sub _REPSEPf { my $self = shift;
@@ -1383,8 +1279,7 @@ sub _REPSEPr { my $self = shift;
         $to = $sep;
     }
     return () unless @all;
-    my $r = $self->cursor_tweak($all[-1]->{_pos});
-    $r->retm();
+    $all[-1]->retm;
 }
 
 sub _OPTr { my $self = shift;

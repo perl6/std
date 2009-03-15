@@ -13,15 +13,19 @@ use feature 'say';
 my $OPT_pos = 0;
 my $OPT_match = 0;
 my $OPT_log = 0;
+my $OPT_stab = 0;
+my $PROG = '';
 my @did_ws;
 
 sub USAGE {
     print <<'END';
 viv [switches] filename
     where switches can be:
+    	-e	use following argument as program
     	--ast	spit out an abstract syntax tree (default)
     	--p5	spit out a Perl 5 representation (unimpl)
     	--p6	spit out a Perl 6 representation (partially impl)
+    	--stab	include the symbol table
     	--pos	include position info in AST
     	--match	include match tree info in AST
     	--log	emit debugging info to standard error
@@ -35,26 +39,32 @@ sub MAIN {
 
     USAGE() unless @_;
     while (@_) {
-	last unless $_[0] =~ /^--/;
+	last unless $_[0] =~ /^-/;
 	my $switch = shift @_;
-	if ($switch eq '--ast') {
+	if ($switch eq '--eval' or $switch eq '-e') {
+	    $PROG .= shift(@_) . "\n";
+	}
+	elsif ($switch eq '--ast' or $switch eq '-a') {
 	    $output = 'ast';
 	}
-	elsif ($switch eq '--p5') {
+	elsif ($switch eq '--p5' or $switch eq '-5') {
 	    $output = 'p5';
 	}
-	elsif ($switch eq '--p6') {
+	elsif ($switch eq '--p6' or $switch eq '-6') {
 	    $output = 'p6';
 	    $OPT_pos = 1;
 	}
-	elsif ($switch eq '--log') {
+	elsif ($switch eq '--stab' or $switch eq '-s') {
+	    $OPT_stab = 1;
+	}
+	elsif ($switch eq '--log' or $switch eq '-l') {
 	    say @_;
 	    $OPT_log = 1;
 	}
-	elsif ($switch eq '--pos') {
+	elsif ($switch eq '--pos' or $switch eq '-p') {
 	    $OPT_pos = 1;	# attach position and prior ws len
 	}
-	elsif ($switch eq '--match') {
+	elsif ($switch eq '--match' or $switch eq '-m') {
 	    $OPT_match = 1;	# attach match object
 	}
 	elsif ($switch eq '--help') {
@@ -67,14 +77,14 @@ sub MAIN {
 	$r = STD->parsefile($_[0], actions => 'Actions')->{'_'};
     }
     else {
-	my $prog;
-	{
+	if (not $PROG) {
 	    local $/;
 	    @ARGV = @_;
-	    $prog = <>;
+	    $PROG = <>;
 	}
-	$r = STD->parse($prog, actions => 'Actions')->{'_'};
+	$r = STD->parse($PROG, actions => 'Actions')->{'_'};
     }
+    delete $r->{CORE} unless $OPT_stab;
     if ($output eq 'ast') {
 	print Dump($r);
     }
@@ -124,6 +134,8 @@ sub VIV::SET_OPT {
 	my $node = shift;
 	my $text = $node->Str;
 	my %r;
+	my @all;
+	my @fake;
 	for my $k (keys %$node) {
 	    my $v = $node->{$k};
 	    if ($k eq 'O') {
@@ -139,7 +151,7 @@ sub VIV::SET_OPT {
 	    }
 	    elsif ($k eq '~ALL') {
 		for (@$v) {
-		    push @{$r{'~ALL'}}, $_->{'_'};
+		    push @all, $_->{'_'};
 		}
 	    }
 	    elsif ($k eq '_from') {
@@ -159,9 +171,12 @@ sub VIV::SET_OPT {
 			if (ref $z) {
 			    if (ref $z eq 'ARRAY') {
 				push @$zyg, $z;
+				push @fake, @$z;
 			    }
 			    elsif (exists $z->{'_'}) {
-				push @$zyg, $z->{'_'};
+				my $zy = $z->{'_'};
+				push @fake, $zy;
+				push @$zyg, $zy;
 			    }
 			}
 			else {
@@ -169,16 +184,17 @@ sub VIV::SET_OPT {
 			}
 		    }
 		    $r{$k} = $zyg;
-		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
+#		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
 		}
 		elsif (ref $v) {
 		    if (exists $v->{'_'}) {
+			push @fake, $v->{'_'};
 			$r{$k} = $v->{'_'};
 		    }
 		    else {
 			$r{$k} = $v;
 		    }
-		    $r{zygs}{$k} = $SEQ++;
+#		    $r{zygs}{$k} = $SEQ++;
 		    unless (ref($r{$k}) =~ /^VAST/) {
 			my $class = "VAST::$k";
 			gen_class($class);
@@ -190,7 +206,15 @@ sub VIV::SET_OPT {
 		}
 	    }
 	}
-	$r{TEXT} = $text unless exists $r{zygs};
+	if (@all) {
+	    $r{'ALL'} = \@all;
+	}
+	elsif (@fake) {
+	    $r{'ALL'} = \@fake;
+	}
+	else {
+	    $r{TEXT} = $text;
+	}
 	\%r;
     }
 
@@ -219,6 +243,46 @@ sub VIV::SET_OPT {
     sub emit_p5 { die "Perl 5 emitter unimplemented" }
 
     sub emit_p6 { my $self = shift;
+	my $text = '';
+	if ($self->{'ALL'}) {
+	    my $last = $self->{BEG};
+	    for my $kid (@{$self->{'ALL'}}) {
+		my $kb = $kid->{BEG};
+		if (not defined $kb) {
+		    warn ref($self) . " has no BEG!!!\n";
+		    return $self->{TEXT} // '???NOBEG???';
+		}
+		if ($kb > $last) {
+		    $text .= substr($::ORIG, $last, $kb - $last);
+		}
+		$text .= $kid->emit_p6();
+		$last = $kid->{END};
+
+	    }
+	    my $se = $self->{END};
+	    if ($se > $last) {
+		    $text .= substr($::ORIG, $last, $se - $last);
+	    }
+	    return $text;
+	}
+	else {
+	    my $text = $self->{TEXT};
+	    if ($text =~ /\s/) {
+		my $t = substr($text,0,40);
+		$t =~ tr/\n/␤/;
+		warn ref($self) . " seems bogus: $t\n";
+	    }
+	    return $text;
+	    my $last = $self->{BEG};
+	    my $se = $self->{END};
+	    if ($se > $last) {
+		    $text .= substr($::ORIG, $last, $se - $last);
+	    }
+	    return $text;
+	}
+    }
+
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	my @sym;
 	if (exists $self->{sym}) {
@@ -305,6 +369,7 @@ sub VIV::SET_OPT {
     }
 
     sub get_ws { my $self = shift;
+	return '';
 	my $ws = $self->{WS} // 0;
 	my $pos = $self->{BEG};
 	if ($ws and not $did_ws[$pos]++) {
@@ -318,12 +383,12 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::sample; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
     }
 }
 
 { package VAST::PreSym; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	$text .= $self->{sym};
 	$text .= $self->SUPER::emit_p6(@_);
@@ -332,7 +397,7 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::CircumSym; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	$text .= $self->{sym}[0]//'';
 	$text .= $self->SUPER::emit_p6(@_);
@@ -342,7 +407,7 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::FirstLast; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	$text .= $self->{FIRST}//'';
 	$text .= $self->SUPER::emit_p6(@_);
@@ -353,6 +418,10 @@ sub VIV::SET_OPT {
 
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
+	$self->{statementlist}->emit_p6;
+    }
+
+    sub old_p6 { my $self = shift;
 	my $text = $self->SUPER::emit_p6(@_);
 	if (not @did_ws[@::MEMOS-1]) {
 	    my $finalws = $::MEMOS[-1]{ws};
@@ -363,11 +432,11 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::CORE; our @ISA = 'VAST::Base';
-    sub emit_p6 { '' }
+    sub old_p6 { '' }
 }
 
 { package VAST::Comma; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	
 	my @list = $self->get_zyg('list');
@@ -380,7 +449,7 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::statementlist; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	
 	my @statement = $self->get_zyg('statement');
@@ -393,7 +462,7 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::nibbler; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = '';
 	my @nibbles = $self->get_zyg('nibbles');
 	for my $nibble (@nibbles) {
@@ -409,7 +478,7 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::quibble; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	
 	my @babble = @{$self->{babble}{B}};
@@ -420,7 +489,7 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::quote; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	
 	if ($self->{nibble}) {
@@ -436,7 +505,7 @@ sub VIV::SET_OPT {
 }
 
 { package VAST::variable_declarator; our @ISA = 'VAST::Base';
-    sub emit_p6 { my $self = shift;
+    sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	$text .= ($self->get_zyg('variable'))[0];
 	$text .= join '', $self->get_zyg('shape');

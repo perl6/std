@@ -3248,7 +3248,7 @@ token parameter {
         | '!'           { $quant = '!'; $kind //= '!' }
         | <?>
         ]
-    | <?>               { $quant = ''; $kind = '!'; }
+    | <?{ my $tc = $<type_constraint>; @$tc > 0 }> { $quant = ''; $kind = '!'; }
     ]
 
     <trait>*

@@ -2012,7 +2012,16 @@ END
         local $REV = '_rev' if $name eq 'after';
 	{
 	    local @BINDINGS;
+	    local %BINDINGS;
 	    $re = ::indent($re->walk(@_));
+	    if (%BINDINGS) {
+		for my $binding ( keys %BINDINGS ) {
+		    next unless $BINDINGS{$binding} > 1;
+		    my $re = <<"END" . $re;
+	\$C->{'$binding'} = [];
+END
+		}
+	    }
 	}
         $REV = '';
 
