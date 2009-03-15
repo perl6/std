@@ -1367,7 +1367,7 @@ token colonpair {
     | <identifier>
         { $key = $<identifier>.Str; }
         [
-        || <.unsp>? '.'? <postcircumfix> { $value = $<postcircumfix>; }
+        || <.unsp>? <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
         ]
         {*}                                                     #= value
@@ -1395,7 +1395,7 @@ token quotepair {
     | <identifier>
         { $key = $<identifier>.Str; }
         [
-        || <.unsp>? '.'? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
+        || <.unsp>? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
         || { $value = 1; }
         ]
         {*}                                                     #= value
@@ -2183,20 +2183,6 @@ token subshortname {
 token sublongname {
     <subshortname> <sigterm>?
 }
-
-#token subcall {
-#    # XXX should this be sublongname?
-#    <subshortname> <.unsp>? '.'? '(' ~ ')' <semilist>
-#    {*}
-#}
-
-#token packagevar {
-#    # Note: any ::() are handled within <name>, and subscript must be final part.
-#    # A bare ::($foo) is not considered a variable, but ::($foo)::<$bar> is.
-#    # (The point being that we want a sigil either first or last but not both.)
-#    <?before [\w+] ** '::' [ '<' | '«' | '{' ]> ::
-#    <name> '::' <postcircumfix> {*}                            #= FOO::<$x>
-#}
 
 token value {
     [
