@@ -119,6 +119,8 @@ sub VIV::SET_OPT {
     sub AUTOLOAD {
 	my $self = shift;
 	my $match = shift;
+	my $rule = shift()//0;
+	return unless $rule;
 	my $r = hoist($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
 	gen_class($class);

@@ -31,7 +31,7 @@ my $UNIT is context;
 
 # random rule for debugging, please ignore
 token foo {
-   'foo' { make "I am a foo" }
+   <?before [<ident>|<number>]> [<ident>|<number>]
 }
 
 =begin comment overview
@@ -3113,7 +3113,7 @@ token signature {
     :my $startpos = self.pos;
     <.ws>
     [
-    | <?before '-->' | ')' | ']' | '{' | ':'<!before ':' > >
+    | <?before '-->' | ')' | ']' | '{' | ':'\s >
     | <parameter>
     ] ** <param_sep>
     <.ws>
@@ -3140,12 +3140,13 @@ token type_declarator:enum {
     ]
 }
 
-rule type_constraint {
+token type_constraint {
     [
     | <value>
     | <fulltypename>
-    | where <EXPR(item %chaining)>
+    | where <.ws> <EXPR(item %chaining)>
     ]
+    <.ws>
 }
 
 rule post_constraint {
@@ -3221,21 +3222,25 @@ token parameter {
     :my $q;
     :my $REALLYADD is context<rw> = 0;
 
-    # XXX fake out LTM till we get * working right
-    <?before
-        [
-        | <type_constraint>
-        | <param_var>
-        | '*' <param_var>
-        | '|' <param_var>
-        | '\\' <param_var>
-        | <named_param>
-        ]
-    >
     {{ $*REALLYADD = 1 }}
 
-    <type_constraint>*
     [
+    | <type_constraint>+
+        [
+        | '*' <param_var>   { $quant = '*'; $kind = '*'; }
+        | '|' <param_var>   { $quant = '|'; $kind = '*'; }
+        | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
+        |   [
+            | <param_var>   { $quant = ''; $kind = '!'; }
+            | <named_param> { $quant = ''; $kind = '*'; }
+            ]
+            [
+            | '?'           { $quant = '?'; $kind = '?' }
+            | '!'           { $quant = '!'; $kind //= '!' }
+            | <?>
+            ]
+        ]?
+
     | '*' <param_var>   { $quant = '*'; $kind = '*'; }
     | '|' <param_var>   { $quant = '|'; $kind = '*'; }
     | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
@@ -3248,7 +3253,6 @@ token parameter {
         | '!'           { $quant = '!'; $kind //= '!' }
         | <?>
         ]
-    | <?{ my $tc = $<type_constraint>; @$tc > 0 }> { $quant = ''; $kind = '!'; }
     ]
 
     <trait>*
