@@ -1278,7 +1278,7 @@ token vnum {
 }
 
 token version:sym<v> {
-    'v' <?before \d> :: <vnum> ** '.' '+'?
+    'v' <?before \d+'.'> :: <vnum> ** '.' '+'?
 }
 
 ###################################################
@@ -2243,6 +2243,7 @@ token integer {
         ]
     | \d+[_\d+]*
     ]
+    [ '.' <?before \s | ',' | '=' | <terminator> > <.panic: "Decimal point must be followed by digit"> ]?
 }
 
 token radint {
@@ -2268,6 +2269,7 @@ token dec_number {
     | $<coeff> = [\d+[_\d+]* '.' \d+[_\d+]* ] <escale>?
     | $<coeff> = [\d+[_\d+]*                ] <escale>
     ]
+    [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)"> ]?
 }
 
 token rad_number {
