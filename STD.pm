@@ -1266,9 +1266,14 @@ rule statement_mod_loop:until {<sym> <modifier_expr> {*} }      #= until
 rule statement_mod_loop:for   {<sym> <modifier_expr> {*} }      #= for
 rule statement_mod_loop:given {<sym> <modifier_expr> {*} }      #= given
 
-token module_name:normal {
+token def_module_name {
     <longname>
     [ :dba('generic role') <?{ ($*PKGDECL//'') eq 'role' }> '[' ~ ']' <signature> ]?
+}
+
+token module_name:normal {
+    <longname>
+    [ <?before '['> :dba('generic role') '[' ~ ']' <arglist> ]?
 }
 
 token module_name:deprecated { 'v6-alpha' }
@@ -1742,8 +1747,8 @@ rule package_def {
     :my $longname;
     [
         [
-            <module_name>{
-                $longname = $<module_name>[0]<longname>;
+            <def_module_name>{
+                $longname = $<def_module_name>[0]<longname>;
                 $¢.add_name($longname.Str);
             }
         ]?
@@ -2243,7 +2248,7 @@ token integer {
         ]
     | \d+[_\d+]*
     ]
-    [ '.' <?before \s | ',' | '=' | <terminator> > <.panic: "Decimal point must be followed by digit"> ]?
+    <!!before ['.' <?before \s | ',' | '=' | <terminator> > <.panic: "Decimal point must be followed by digit">]? >
 }
 
 token radint {
@@ -2269,7 +2274,7 @@ token dec_number {
     | $<coeff> = [\d+[_\d+]* '.' \d+[_\d+]* ] <escale>?
     | $<coeff> = [\d+[_\d+]*                ] <escale>
     ]
-    [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)"> ]?
+    <!!before [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)">]? >
 }
 
 token rad_number {
@@ -3227,7 +3232,8 @@ token parameter {
             | '!'           { $quant = '!'; $kind //= '!' }
             | <?>
             ]
-        ]?
+        | <?> { $quant = ''; $kind = '!' }
+        ]
 
     | '*' <param_var>   { $quant = '*'; $kind = '*'; }
     | '|' <param_var>   { $quant = '|'; $kind = '*'; }
