@@ -89,7 +89,7 @@ sub MAIN {
 	print Dump($r);
     }
     elsif ($output eq 'p6') {
-	print $r->emit_p6;
+	print $r->ret($r->emit_p6);
     }
     elsif ($output eq 'p5') {
 	print $r->emit_p5;
@@ -139,6 +139,7 @@ sub VIV::SET_OPT {
 	my @all;
 	my @fake;
 	for my $k (keys %$node) {
+	    #print STDERR $node->{_reduced}, " $k\n";
 	    my $v = $node->{$k};
 	    if ($k eq 'O') {
 		for my $key (keys %$v) {
@@ -148,12 +149,46 @@ sub VIV::SET_OPT {
 	    elsif ($k eq 'SIGIL') {
 		$r{SIGIL} = $v;
 	    }
+	    elsif ($k eq 'sym') {
+		if (ref $v) {
+		    if (ref $v eq 'ARRAY') {
+			$r{SYM} = ::Dump($v);
+		    }
+		    elsif (ref $v eq 'HASH') {
+			$r{SYM} = ::Dump($v);
+		    }
+		    else {
+			$r{SYM} = $v->Str;
+		    }
+		}
+		else {
+		    $r{SYM} = $v;
+		}
+	    }
 	    elsif ($k eq '_arity') {
 		$r{ARITY} = $v;
 	    }
 	    elsif ($k eq '~ALL') {
 		for (@$v) {
 		    push @all, $_->{'_'};
+		}
+	    }
+	    elsif ($k eq 'nibbles') {
+		@all =  @$v;
+		for (@all) {
+		    if (ref($_) eq 'HASH') {
+			bless $_, 'VAST::TEXT';
+		    }
+		    elsif (exists $_->{'_'}) {
+			$_ = $_->{'_'};
+		    }
+		}
+		delete $node->{'~ALL'};
+	    }
+	    elsif ($k eq 'firstpos') {
+		if ($OPT_pos) {
+		    $r{BEG} = $v;
+		    $r{END} = $node->{lastpos};
 		}
 	    }
 	    elsif ($k eq '_from') {
@@ -208,11 +243,14 @@ sub VIV::SET_OPT {
 		}
 	    }
 	}
-	if (@all) {
-	    $r{'ALL'} = \@all;
+	if (@all == 1 and defined $all[0]) {
+	    $r{'.'} = $all[0];
+	}
+	elsif (@all) {
+	    $r{'.'} = \@all;
 	}
 	elsif (@fake) {
-	    $r{'ALL'} = \@fake;
+	    $r{'.'} = \@fake;
 	}
 	else {
 	    $r{TEXT} = $text;
@@ -246,13 +284,16 @@ sub VIV::SET_OPT {
 
     sub emit_p6 { my $self = shift;
 	my $text = '';
-	if ($self->{'ALL'}) {
+	if (exists $self->{'.'}) {
 	    my $last = $self->{BEG};
-	    for my $kid (@{$self->{'ALL'}}) {
+	    my $all = $self->{'.'};
+	    my @kids = ref $all eq 'ARRAY' ? @$all : $all;
+	    for my $kid (sort { $a->{BEG} <=> $b->{BEG} } @kids) {
 		my $kb = $kid->{BEG};
+		next unless defined $kb;
 		if (not defined $kb) {
-		    warn ref($self) . " has no BEG!!!\n";
-		    return $self->{TEXT} // '???NOBEG???';
+		    warn ref($kid) . " has no BEG!!!\n";
+		    return $self->ret($self->{TEXT} // '???NOBEG???');
 		}
 		if ($kb > $last) {
 		    $text .= substr($::ORIG, $last, $kb - $last);
@@ -265,22 +306,22 @@ sub VIV::SET_OPT {
 	    if ($se > $last) {
 		    $text .= substr($::ORIG, $last, $se - $last);
 	    }
-	    return $text;
+	    return $self->ret($text);
 	}
 	else {
 	    my $text = $self->{TEXT};
-	    if ($text =~ /\s/) {
+	    if ($text =~ /\S\s+\S/ and ref $self ne 'VAST::TEXT') {
 		my $t = substr($text,0,40);
 		$t =~ tr/\n/␤/;
 		warn ref($self) . " seems bogus: $t\n";
 	    }
-	    return $text;
+	    return $self->ret($text);
 	    my $last = $self->{BEG};
 	    my $se = $self->{END};
 	    if ($se > $last) {
 		    $text .= substr($::ORIG, $last, $se - $last);
 	    }
-	    return $text;
+	    return $self->ret($text);
 	}
     }
 
@@ -354,7 +395,7 @@ sub VIV::SET_OPT {
 	    my @kids = @$part;
 	    for my $kid (@kids) {
 		if (ref $kid) {
-		    push @zygs, $kid->emit_p6 // '';
+		    push @zygs, $kid->old_p6 // '';
 		}
 		else {
 		    push @zygs, $kid;
@@ -362,7 +403,7 @@ sub VIV::SET_OPT {
 	    }
 	}
 	elsif (ref $part) {
-	    push @zygs, $part->emit_p6 // '';
+	    push @zygs, $part->old_p6 // '';
 	}
 	else {
 	    push @zygs, $key . '=' . $part;
@@ -393,7 +434,7 @@ sub VIV::SET_OPT {
     sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	$text .= $self->{sym};
-	$text .= $self->SUPER::emit_p6(@_);
+	$text .= $self->SUPER::old_p6(@_);
 	$text;
     }
 }
@@ -402,7 +443,7 @@ sub VIV::SET_OPT {
     sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	$text .= $self->{sym}[0]//'';
-	$text .= $self->SUPER::emit_p6(@_);
+	$text .= $self->SUPER::old_p6(@_);
 	$text .= $self->{sym}[1]//'';
 	$text;
     }
@@ -412,7 +453,7 @@ sub VIV::SET_OPT {
     sub old_p6 { my $self = shift;
 	my $text = $self->get_ws;
 	$text .= $self->{FIRST}//'';
-	$text .= $self->SUPER::emit_p6(@_);
+	$text .= $self->SUPER::old_p6(@_);
 	$text .= $self->{LAST}//'';
 	$text;
     }
@@ -420,11 +461,11 @@ sub VIV::SET_OPT {
 
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
-	$self->{statementlist}->emit_p6;
+	$self->ret($self->{statementlist}->emit_p6);
     }
 
     sub old_p6 { my $self = shift;
-	my $text = $self->SUPER::emit_p6(@_);
+	my $text = $self->SUPER::old_p6(@_);
 	if (not @did_ws[@::MEMOS-1]) {
 	    my $finalws = $::MEMOS[-1]{ws};
 	    $text .= substr($::ORIG, $finalws, -1) if $finalws;
@@ -469,7 +510,7 @@ sub VIV::SET_OPT {
 	my @nibbles = $self->get_zyg('nibbles');
 	for my $nibble (@nibbles) {
 	    if (ref $nibble) {
-		$text .= $nibble->emit_p6;
+		$text .= $nibble->old_p6;
 	    }
 	    else {
 		$text .= $nibble;
@@ -516,6 +557,8 @@ sub VIV::SET_OPT {
 	$text;
     }
 }
+
+{ package VAST::TEXT; our @ISA = 'VAST::Base'; }
 
 { package VAST::scope_declarator; our @ISA = 'VAST::PreSym'; }
 { package VAST::statement_control; our @ISA = 'VAST::PreSym'; }

@@ -627,7 +627,7 @@ sub cursor_herelang { my $self = shift;
 # remove consistent leading whitespace (mutates text nibbles in place)
 
 sub trim_heredoc { my $doc = shift;
-    my ($stopper) = $doc->{stopper}[0] or
+    my ($stopper) = $doc->stopper or
         $doc->panic("Couldn't find delimiter for heredoc\n");
     my $ws = $stopper->{ws}->Str;
     return $stopper if $ws eq '';

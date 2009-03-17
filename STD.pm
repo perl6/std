@@ -909,6 +909,7 @@ rule comp_unit {
     :my $CURPKG is context;
     :my $UNIT is context;
     {{
+        @COMPILING::WORRIES = ();
         self.load_setting($*CORESETTING);
         $*UNIT = self.newpad;
         self.finishpad(1);
@@ -1157,12 +1158,12 @@ token statement_control:no {
 token statement_control:if {
     <sym> :s
     <xblock>
-    [$<elsif> = (
-        'elsif'<?spacey> <xblock>       {*}                #= elsif
-    )]*
-    [$<else> = (
-        'else'<?spacey> <pblock>       {*}             #= else
-    )]?
+    [
+        'elsif'<?spacey> <elsif=xblock>       {*}                #= elsif
+    ]*
+    [
+        'else'<?spacey> <else=pblock>       {*}             #= else
+    ]?
 }
 
 
@@ -1647,6 +1648,17 @@ token circumfix:sym<{ }> ( --> Term) {
     <?before '{' | <lambda> > <pblock>
 }
 
+token constant_declarator {
+    :my $IN_DECL is context<rw> = 1;
+    <identifier>
+    <?{ $*SCOPE eq 'constant' }>
+    <!{ $¢.is_name($<identifier>.Str) }>
+    { $*IN_DECL = 0; self.add_name($<identifier>.Str) }
+    <.ws>
+
+    <trait>*
+}
+
 token variable_declarator {
     :my $IN_DECL is context<rw> = 1;
     <variable>
@@ -1796,6 +1808,7 @@ rule package_def {
 
 token declarator {
     [
+    | <constant_declarator>
     | <variable_declarator>
     | '(' ~ ')' <signature> <trait>*
     | <routine_declarator>
@@ -2372,7 +2385,7 @@ token quibble ($l) {
         if $lang<_herelang> {
             push @herestub_queue,
                 ::Herestub.new(
-                    delim => $<nibble><nibbles>[0],
+                    delim => $<nibble><nibbles>[0]<TEXT>,
                     orignode => $¢,
                     lang => $lang<_herelang>,
                 );
@@ -2426,6 +2439,8 @@ token quasiquibble ($l) {
 # note: polymorphic over many quote languages, we hope
 token nibbler {
     :my $text = '';
+    :my $from = self.pos;
+    :my $to = $from;
     :my @nibbles = ();
     :my $multiline = 0;
     :my $nibble;
@@ -2433,35 +2448,46 @@ token nibbler {
     [ <!before <stopper> >
         [
         || <starter> <nibbler> <stopper>
-                        {
+                        {{
+                            push @nibbles, { TEXT => $text, BEG => $from, END => $to };
+
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
-                            $text ~= $<starter>[*-1].Str ~ shift(@n);
-                            $text = (@n ?? pop(@n) !! '') ~ $<stopper>[*-1].Str;
+
+                            push @nibbles, $<starter>;
                             push @nibbles, @n;
-                        }
-        || <escape>   {
-                            push @nibbles, $text, $<escape>[*-1];
+                            push @nibbles, $<stopper>;
+
                             $text = '';
-                        }
+                            $to = $from = $¢.pos;
+                        }}
+        || <escape>     {{
+                            push @nibbles, { TEXT => $text, BEG => $from, END => $to }, $<escape>[*-1];
+                            $text = '';
+                            $to = $from = $¢.pos;
+                        }}
         || .
                         {{
                             my $ch = substr($*ORIG, $¢.pos-1, 1);
                             $text ~= $ch;
+                            $to = $¢.pos;
                             if $ch ~~ "\n" {
                                 $multiline++;
                             }
                         }}
         ]
     ]*
-    {
-        push @nibbles, $text; $<nibbles> = [@nibbles];
+    {{
+        push @nibbles, { TEXT => $text, BEG => $from, END => $to };
+        $<nibbles> = \@nibbles;
         $<lastpos> = $¢.pos;
         $<nibbler> :delete;
         $<escape> :delete;
+        $<starter> :delete;
+        $<stopper> :delete;
         $COMPILING::LAST_NIBBLE = $¢;
         $COMPILING::LAST_NIBBLE_MULTILINE = $¢ if $multiline;
-    }
+    }}
 }
 
 # and this is what makes nibbler polymorphic...
@@ -4268,7 +4294,7 @@ grammar Regex is STD {
 
     token ws {
         <?{ $*sigspace }>
-        || [ <?before \s | '#'> <nextsame> ]?   # still get all the pod goodness, hopefully
+        || [ <?before \s | '#'> <.nextsame> ]?   # still get all the pod goodness, hopefully
     }
 
     token normspace {
@@ -4315,11 +4341,10 @@ grammar Regex is STD {
         <!stopper>
         <!rxinfix>
         <atom>
-        [ <.ws> <quantifier>
+        <.ws>
+        [ <quantifier> <.ws> ]?
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Can't quantify zero-width atom">
-        ]?
-        <.ws>
     }
 
     token atom {
@@ -4551,7 +4576,7 @@ grammar Regex is STD {
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] [ :lang( $¢.cursor_fresh( ::STD::P5Regex ).unbalanced($*GOAL) ) <nibbler> ] }
 
     token mod_internal:adv {
-        <?before ':' <identifier> > [ :lang($¢.cursor_fresh($*LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
+        <?before ':' <.identifier> > [ :lang($¢.cursor_fresh($*LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
     }
 
     token mod_internal:oops { ':'\w+ <.panic: "Unrecognized regex modifier"> }
