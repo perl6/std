@@ -274,7 +274,6 @@ sub VIV::SET_OPT {
 ###################################################################
 
 { package VAST::Base;
-    sub emit_p5 { die "Perl 5 emitter unimplemented" }
 
     sub emit_p6 { my $self = shift;
 	my $text = '';
@@ -322,250 +321,37 @@ sub VIV::SET_OPT {
 	}
     }
 
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	my @sym;
-	if (exists $self->{sym}) {
-	    my $sym = $self->{sym};
-	    if (ref $sym eq 'ARRAY') {
-		@sym = @$sym;
-	    }
-	    else {
-		@sym = $sym;
-	    }
-	}
-	if ($self->{zygs}) {
-	    my @zyg = $self->get_zygs;
-	    my $arity = $self->{ARITY} // '';
-	    my $sym = $self->{sym} // '';
-	    if ($arity eq 'BINARY') {
-		$text .= $zyg[0] . $zyg[2] . $zyg[1];
-	    }
-	    elsif ($arity eq 'UNARY') {
-		if ($self->{arg}{_from} > $self->{_from}) {
-		    $text .= $zyg[0] . $zyg[1];
-		}
-		else {
-		    $text .= $zyg[1] . $zyg[0];
-		}
-	    }
-	    elsif ($sym eq 'identifier') {
-		$text .= join('', @zyg);
-	    }
-	    else {
-		$text .= join('', @zyg);
-	    }
-	}
-	elsif (exists $self->{TEXT}) {
-	    $text .= $self->{TEXT};
-	}
-	elsif (@sym) {
-	    $text .= join('', @sym);
-	}
-	else {
-	    $text .= ref $self;
-	}
-	$self->ret($text);
-    }
-
     sub ret { my $self = shift;
 	warn ref $self, " returns ", $_[0], "\n" if $OPT_log;
 	$_[0];
     }
 
-    sub get_zygs { my $self = shift;
-	my @zygs;
-	if ($self->{zygs}) {
-	    my $zygs = $self->{zygs};
-	    for my $key (sort {$zygs->{$a} <=> $zygs->{$b}} keys %$zygs) {
-		push @zygs, $self->get_zyg($key);
-	    }
-	}
-	@zygs;
-    }
 
-    sub get_zyg { my $self = shift;
-	my $key = shift;
-	my $part = $self->{$key};
-	my @zygs;
-	if (ref $part eq 'ARRAY') {
-	    my @kids = @$part;
-	    for my $kid (@kids) {
-		if (ref $kid) {
-		    push @zygs, $kid->old_p6 // '';
-		}
-		else {
-		    push @zygs, $kid;
-		}
-	    }
-	}
-	elsif (ref $part) {
-	    push @zygs, $part->old_p6 // '';
-	}
-	else {
-	    push @zygs, $key . '=' . $part;
-	}
-	@zygs;
-    }
-
-    sub get_ws { my $self = shift;
-	return '';
-	my $ws = $self->{WS} // 0;
-	my $pos = $self->{BEG};
-	if ($ws and not $did_ws[$pos]++) {
-	    substr($::ORIG, $pos - $ws, $ws)
-	}
-	else {
-	    '';
-	}
-    }
+#    sub get_ws { my $self = shift;
+#	return '';
+#	my $ws = $self->{WS} // 0;
+#	my $pos = $self->{BEG};
+#	if ($ws and not $did_ws[$pos]++) {
+#	    substr($::ORIG, $pos - $ws, $ws)
+#	}
+#	else {
+#	    '';
+#	}
+#    }
 	
 }
 
 { package VAST::sample; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-    }
 }
 
-{ package VAST::PreSym; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	$text .= $self->{sym};
-	$text .= $self->SUPER::old_p6(@_);
-	$text;
-    }
-}
-
-{ package VAST::CircumSym; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	$text .= $self->{sym}[0]//'';
-	$text .= $self->SUPER::old_p6(@_);
-	$text .= $self->{sym}[1]//'';
-	$text;
-    }
-}
-
-{ package VAST::FirstLast; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	$text .= $self->{FIRST}//'';
-	$text .= $self->SUPER::old_p6(@_);
-	$text .= $self->{LAST}//'';
-	$text;
-    }
-}
+{ package VAST::TEXT; our @ISA = 'VAST::Base'; }
 
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
     sub emit_p6 { my $self = shift;
 	$self->ret($self->{statementlist}->emit_p6);
     }
 
-    sub old_p6 { my $self = shift;
-	my $text = $self->SUPER::old_p6(@_);
-	if (not @did_ws[@::MEMOS-1]) {
-	    my $finalws = $::MEMOS[-1]{ws};
-	    $text .= substr($::ORIG, $finalws, -1) if $finalws;
-	}
-	$self->ret($text);
-    }
 }
-
-{ package VAST::CORE; our @ISA = 'VAST::Base';
-    sub old_p6 { '' }
-}
-
-{ package VAST::Comma; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	
-	my @list = $self->get_zyg('list');
-	my @delims = $self->get_zyg('delims');
-	while (@list) {
-	    $text .= shift(@list) . (shift(@delims)//'');
-	}
-	$self->ret($text);
-    }
-}
-
-{ package VAST::statementlist; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	
-	my @statement = $self->get_zyg('statement');
-	my @terminator = $self->get_zyg('eat_terminator');
-	while (@statement or @terminator) {
-	    $text .= shift(@statement) . (shift(@terminator)//'');
-	}
-	$self->ret($text);
-    }
-}
-
-{ package VAST::nibbler; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = '';
-	my @nibbles = $self->get_zyg('nibbles');
-	for my $nibble (@nibbles) {
-	    if (ref $nibble) {
-		$text .= $nibble->old_p6;
-	    }
-	    else {
-		$text .= $nibble;
-	    }
-	}
-	$self->ret($text);
-    }
-}
-
-{ package VAST::quibble; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	
-	my @babble = @{$self->{babble}{B}};
-	my @nibble = $self->get_zyg('nibble');
-	$text .= $babble[0] . $nibble[0] . $babble[1];
-	$self->ret($text);
-    }
-}
-
-{ package VAST::quote; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	
-	if ($self->{nibble}) {
-	    my @nibble = $self->get_zyg('nibble');
-	    $text .= $self->{sym}[0] . $nibble[0] . $self->{sym}[1];
-	}
-	else {	
-	    my @quibble = $self->get_zyg('quibble');
-	    $text .= $self->{sym} . $quibble[0];
-	}
-	$self->ret($text);
-    }
-}
-
-{ package VAST::variable_declarator; our @ISA = 'VAST::Base';
-    sub old_p6 { my $self = shift;
-	my $text = $self->get_ws;
-	$text .= ($self->get_zyg('variable'))[0];
-	$text .= join '', $self->get_zyg('shape');
-	$text .= join '', $self->get_zyg('trait');
-	$text .= join '', $self->get_zyg('post_constraint');
-	$text;
-    }
-}
-
-{ package VAST::TEXT; our @ISA = 'VAST::Base'; }
-
-{ package VAST::scope_declarator; our @ISA = 'VAST::PreSym'; }
-{ package VAST::statement_control; our @ISA = 'VAST::PreSym'; }
-{ package VAST::statement_prefix; our @ISA = 'VAST::PreSym'; }
-{ package VAST::version; our @ISA = 'VAST::PreSym'; }
-
-{ package VAST::block; our @ISA = 'VAST::CircumSym'; }
-{ package VAST::circumfix; our @ISA = 'VAST::CircumSym'; }
-{ package VAST::postcircumfix; our @ISA = 'VAST::CircumSym'; }
-{ package VAST::args; our @ISA = 'VAST::FirstLast'; }
 
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);
