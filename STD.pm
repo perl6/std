@@ -2448,7 +2448,7 @@ token nibbler {
     :my @nibbles = ();
     :my $multiline = 0;
     :my $nibble;
-    { $<firstpos> = self.pos; }
+    { $<_from> = self.pos; }
     [ <!before <stopper> >
         [
         || <starter> <nibbler> <stopper>
@@ -2484,7 +2484,7 @@ token nibbler {
     {{
         push @nibbles, { TEXT => $text, BEG => $from, END => $to };
         $<nibbles> = \@nibbles;
-        $<lastpos> = $¢.pos;
+        $<_pos> = $¢.pos;
         $<nibbler> :delete;
         $<escape> :delete;
         $<starter> :delete;
@@ -4052,11 +4052,14 @@ method EXPR ($preclvl)
                     push @chain, pop(@opstack);
                 }
                 push @chain, pop(@termstack);
+                my $endpos = @chain[0]<_pos>;
                 @chain = reverse @chain if @chain > 1;
-                my $startpos = @chain[0].pos;
+                my $startpos = @chain[0]<_from>;
                 my $nop = $op.cursor_fresh();
                 $nop<chain> = [@chain];
                 $nop<_arity> = 'CHAIN';
+                $nop<_from> = $startpos;
+                $nop<_pos> = $endpos;
                 push @termstack, $nop._REDUCE($startpos, 'EXPR');
             }
             when 'list' {
@@ -4081,8 +4084,9 @@ method EXPR ($preclvl)
                 elsif $sym ne ',' {
                     self.worry("Missing final term in '" ~ $sym ~ "' list");
                 }
+                my $endpos = @list[0]<_pos>;
                 @list = reverse @list if @list > 1;
-                my $startpos = @list[0].pos;
+                my $startpos = @list[0]<_from>;
                 @delims = reverse @delims if @delims > 1;
                 my $nop = $op.cursor_fresh();
                 $nop<sym> = $sym;
@@ -4090,6 +4094,8 @@ method EXPR ($preclvl)
                 $nop<list> = [@list];
                 $nop<delims> = [@delims];
                 $nop<_arity> = 'LIST';
+                $nop<_from> = $startpos;
+                $nop<_pos> = $endpos;
                 push @termstack, $nop._REDUCE($startpos, 'EXPR');
             }
             when 'unary' {
@@ -4448,7 +4454,7 @@ grammar Regex is STD {
         | ']'
         | '>'
         | $
-        | <stopper>
+        | <.stopper>
         >
     }
 
@@ -4789,15 +4795,15 @@ method panic (Str $s) {
 
     $here = self.cursor($*HIGHWATER) if $highvalid;
 
-    my $first = $here.lineof($COMPILING::LAST_NIBBLE.<firstpos>);
-    my $last = $here.lineof($COMPILING::LAST_NIBBLE.<lastpos>);
+    my $first = $here.lineof($COMPILING::LAST_NIBBLE.<_from>);
+    my $last = $here.lineof($COMPILING::LAST_NIBBLE.<_pos>);
     if $first != $last {
         if $here.lineof($here.pos) == $last {
             $m ~= "\n(Possible runaway string from line $first)";
         }
         else {
-            $first = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<firstpos>);
-            $last = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<lastpos>);
+            $first = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<_from>);
+            $last = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<_pos>);
             # the bigger the string (in lines), the further back we suspect it
             if $here.lineof($here.pos) - $last < $last - $first  {
                 $m ~= "\n(Possible runaway string from line $first to line $last)";

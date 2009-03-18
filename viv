@@ -185,12 +185,6 @@ sub VIV::SET_OPT {
 		}
 		delete $node->{'~ALL'};
 	    }
-	    elsif ($k eq 'firstpos') {
-		if ($OPT_pos) {
-		    $r{BEG} = $v;
-		    $r{END} = $node->{lastpos};
-		}
-	    }
 	    elsif ($k eq '_from') {
 		if ($OPT_pos) {
 		    $r{BEG} = $v;
@@ -287,7 +281,15 @@ sub VIV::SET_OPT {
 	if (exists $self->{'.'}) {
 	    my $last = $self->{BEG};
 	    my $all = $self->{'.'};
-	    my @kids = ref $all eq 'ARRAY' ? @$all : $all;
+	    my @kids;
+	    for my $kid (ref $all eq 'ARRAY' ? @$all : $all) {
+		next unless $kid;
+		if (not defined $kid->{BEG}) {
+		    $kid->{BEG} = $kid->{_from} // next;
+		    $kid->{END} = $kid->{_pos};
+		}
+		push @kids, $kid;
+	    }
 	    for my $kid (sort { $a->{BEG} <=> $b->{BEG} } @kids) {
 		my $kb = $kid->{BEG};
 		next unless defined $kb;
@@ -310,11 +312,6 @@ sub VIV::SET_OPT {
 	}
 	else {
 	    my $text = $self->{TEXT};
-	    if ($text =~ /\S\s+\S/ and ref $self ne 'VAST::TEXT') {
-		my $t = substr($text,0,40);
-		$t =~ tr/\n/␤/;
-		warn ref($self) . " seems bogus: $t\n";
-	    }
 	    return $self->ret($text);
 	    my $last = $self->{BEG};
 	    my $se = $self->{END};
