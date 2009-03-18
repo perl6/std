@@ -1008,7 +1008,10 @@ token block ($CURPAD is context<rw> = $*CURPAD) {
 
 token blockoid {
     <.finishpad>
-    '{' ~ '}' <statementlist>
+    [
+    | '{' ~ '}' <statementlist>
+    | <?terminator> <.panic: 'Missing {...}'>
+    ]
 
     [
     | <?before \h* $$>  # (usual case without comments)
@@ -1694,7 +1697,7 @@ rule scoped {
             }
         }}
         <!> # drop through
-    || <.panic: "Malformed \"$*SCOPE\" declaration">
+    || <.panic: "Malformed $*SCOPE">
 }
 
 
@@ -1803,7 +1806,7 @@ rule package_def {
             {*}                                                     #= semi
         || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
         ]
-    ] || <.panic: "Malformed \"$*PKGDECL\" declaration">
+    ] || <.panic: "Malformed $*PKGDECL">
 }
 
 token declarator {
@@ -1817,9 +1820,9 @@ token declarator {
     ]
 }
 
-token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed "multi" definition'> ] }
-token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed "proto" definition'> ] }
-token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed "only" definition'> ] }
+token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed multi'> ] }
+token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed proto'> ] }
+token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed only'> ] }
 token multi_declarator:null  { <declarator> }
 
 token routine_declarator:sub       { <sym> <routine_def> }
@@ -3031,7 +3034,7 @@ rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
             $*IN_DECL = 0;
         }>
         <blockoid>:!s
-    ] || <.panic: "Malformed routine definition">
+    ] || <.panic: "Malformed routine">
 }
 
 rule method_def ($CURPAD is context<rw> = $*CURPAD) {
@@ -3052,7 +3055,7 @@ rule method_def ($CURPAD is context<rw> = $*CURPAD) {
         | <?>
         ]
         <blockoid>:!s
-    ] || <.panic: "Malformed method definition">
+    ] || <.panic: "Malformed method">
 }
 
 rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
@@ -3064,7 +3067,7 @@ rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
         { $*IN_DECL = 0; }
         <.finishpad>
         <regex_block>:!s
-    ] || <.panic: "Malformed regex definition">
+    ] || <.panic: "Malformed regex">
 }
 
 rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
@@ -3078,7 +3081,7 @@ rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
             $*IN_DECL = 0;
         }>
         <blockoid>:!s
-    ] || <.panic: "Malformed macro definition">
+    ] || <.panic: "Malformed macro">
 }
 
 rule trait {
@@ -3146,7 +3149,7 @@ token type_declarator:subset {
         <longname> { $¢.add_name($<longname>.Str); }
         [ of <.ws> <fulltypename> ]?
         [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
-    ] || <.panic: "Malformed subset definition">
+    ] || <.panic: "Malformed subset">
 }
 
 token type_declarator:enum {
