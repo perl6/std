@@ -128,6 +128,7 @@ method is_name ($name, $curpad = $*CURPAD) {
     my $curpkg = $*CURPKG;
     if $name ~~ /::/ {
         my @components = split(/\:\:/,$name);
+        return True if @components[0] eq 'COMPILING';
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
         if $curpkg = self.find_top_pkg(@components[0] ~ '::') {
