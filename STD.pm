@@ -686,6 +686,12 @@ proto token version { <...> }
 token category:module_name { <sym> }
 proto token module_name { <...> }
 
+token category:noun { <sym> }
+proto token noun { <...> }
+
+token category:value { <sym> }
+proto token value { <...> }
+
 token category:term { <sym> }
 proto token term { <...> }
 
@@ -1324,6 +1330,7 @@ token nulltermish {
 }
 
 token termish {
+    :my $SCOPE is context<rw> = "our";
     :dba('prefix or noun')
     [
     | <.PRE>+ <noun>
@@ -1337,27 +1344,22 @@ token termish {
     ]
 }
 
-token noun {
-    :my $SCOPE is context<rw> = "our";
-    [
-    | <fatarrow>
-    | <variable> <.check_variable($<variable>)>
-    | <package_declarator>
-    | <scope_declarator>
-    | <?before 'multi'|'proto'|'only'> <multi_declarator>
-    | <routine_declarator>
-    | <regex_declarator>
-    | <type_declarator>
-    | <circumfix>
-    | <dotty>
-    | <value>
-    | <capterm>
-    | <sigterm>
-    | <term>
-    | <statement_prefix>
-    | [ <colonpair> <.ws> ]+
-    ]
-}
+token noun:fatarrow           { <fatarrow> }
+token noun:variable           { <variable> <.check_variable($<variable>)> }
+token noun:package_declarator { <package_declarator> }
+token noun:scope_declarator   { <scope_declarator> }
+token noun:multi_declarator   { <?before 'multi'|'proto'|'only'> <multi_declarator> }
+token noun:routine_declarator { <routine_declarator> }
+token noun:regex_declarator   { <regex_declarator> }
+token noun:type_declarator    { <type_declarator> }
+token noun:circumfix          { <circumfix> }
+token noun:dotty              { <dotty> }
+token noun:value              { <value> }
+token noun:capterm            { <capterm> }
+token noun:sigterm            { <sigterm> }
+token noun:term               { <term> }
+token noun:statement_prefix   { <statement_prefix> }
+token noun:colonpair          { [ <colonpair> <.ws> ]+ }
 
 
 token fatarrow {
@@ -2207,13 +2209,9 @@ token sublongname {
     <subshortname> <sigterm>?
 }
 
-token value {
-    [
-    | <quote>
-    | <number>
-    | <version>
-    ]
-}
+token value:quote   { <quote> }
+token value:number  { <number> }
+token value:version { <version> }
 
 token typename {
     [
