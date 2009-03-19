@@ -1307,6 +1307,7 @@ token PRE {
     
     <prefix_postfix_meta_operator>*                 {*}         #= prepost
     <.ws>
+    { push @$*PRE, $¢; }
 }
 
 # (for when you want to tell EXPR that infix already parsed the term)
@@ -1318,21 +1319,21 @@ token nulltermish {
     :dba('null term')
     [
     | <?stdstopper>
-    | <termish>?
+    | <noun=termish>?
     ]
 }
 
 token termish {
     :dba('prefix or noun')
     [
-    | <PRE>+ <noun>
+    | <.PRE>+ <noun>
     | <noun>
     ]
 
     # also queue up any postfixes
     :dba('postfix')
     [ <?stdstopper> ||
-        <POST>*
+        <.POST>*
     ]
 }
 
@@ -1486,7 +1487,7 @@ token POST {
     | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; }
     | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }
     ]
-    { $*SIGIL = '@' }
+    { $*SIGIL = '@'; unshift @$*POST, $¢; }
 }
 
 method can_meta ($op, $meta) {
@@ -2211,8 +2212,6 @@ token value {
     | <quote>
     | <number>
     | <version>
-#    | <packagevar>     # XXX see term:name for now
-#    | <fulltypename>   # XXX see term:name for now
     ]
 }
 
@@ -3248,7 +3247,7 @@ token parameter {
     {{ $*REALLYADD = 1 }}
 
     [
-    | <type_constraint>+
+    | <type_constraint>
         [
         | '*' <param_var>   { $quant = '*'; $kind = '*'; }
         | '|' <param_var>   { $quant = '|'; $kind = '*'; }
@@ -3601,9 +3600,6 @@ token prefix:sleep ( --> Named_unary)
     { <sym> » <?before \s*> }
 
 token prefix:abs ( --> Named_unary)
-    { <sym> » <?before \s*> }
-
-token prefix:int ( --> Named_unary)
     { <sym> » <?before \s*> }
 
 token prefix:let ( --> Named_unary)
@@ -4134,6 +4130,8 @@ method EXPR ($preclvl)
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
         $*SIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';
+        my @PRE is context<rw> = ();
+        my @POST is context<rw> = ();
         my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
@@ -4146,33 +4144,28 @@ method EXPR ($preclvl)
         my $M = $here;
 
         # note that we push loose stuff onto opstack before tight stuff
-        my @pre;
-        my $tmp;
-        @pre = @$tmp if $tmp = ( $M<PRE> :delete );
-        my @post;
-        @post = reverse @$tmp if $tmp = ( $M<POST> :delete );
-        while @pre and @post {
-            my $postO = @post[0]<O>;
-            my $preO = @pre[0]<O>;
+        while @PRE and @POST {
+            my $postO = @POST[0]<O>;
+            my $preO = @PRE[0]<O>;
             if $postO<prec> lt $preO<prec> {
-                push @opstack, shift @post;
+                push @opstack, shift @POST;
             }
             elsif $postO<prec> gt $preO<prec> {
-                push @opstack, shift @pre;
+                push @opstack, shift @PRE;
             }
             elsif $postO<uassoc> eq 'left' {
-                push @opstack, shift @post;
+                push @opstack, shift @POST;
             }
             elsif $postO<uassoc> eq 'right' {
-                push @opstack, shift @pre;
+                push @opstack, shift @PRE;
             }
             else {
-                $here.panic('"' ~ @pre[0]<sym> ~ '" and "' ~ @post[0]<sym> ~ '" are not associative');
+                $here.panic('"' ~ @PRE[0]<sym> ~ '" and "' ~ @POST[0]<sym> ~ '" are not associative');
             }
         }
-        push @opstack, @pre,@post;
+        push @opstack, @PRE,@POST;
 
-        push @termstack, $here;
+        push @termstack, $here.<noun>;
         self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
 
         loop {     # while we see adverbs
@@ -4329,7 +4322,7 @@ grammar Regex is STD {
 
     token termish {
         <.ws>
-        <quantified_atom>+
+        <noun=quantified_atom>+
     }
     token infixish {
         <!infixstopper>
@@ -4651,7 +4644,7 @@ grammar P5Regex is STD {
 
     token termish {
         <.ws>  # XXX assuming old /x here?
-        <quantified_atom>+
+        <noun=quantified_atom>+
     }
     token infixish {
         <!infixstopper>

@@ -17,6 +17,8 @@ my $OPT_stab = 0;
 my $PROG = '';
 my @did_ws;
 
+my @context;
+
 sub USAGE {
     print <<'END';
 viv [switches] filename
@@ -49,6 +51,7 @@ sub MAIN {
 	}
 	elsif ($switch eq '--p5' or $switch eq '-5') {
 	    $output = 'p5';
+	    $OPT_pos = 1;
 	}
 	elsif ($switch eq '--p6' or $switch eq '-6') {
 	    $output = 'p6';
@@ -92,7 +95,7 @@ sub MAIN {
 	print $r->ret($r->emit_p6);
     }
     elsif ($output eq 'p5') {
-	print $r->emit_p5;
+	print $r->ret($r->emit_p5(0));
     }
     else {
 	die "Unknown output mode";
@@ -275,6 +278,11 @@ sub VIV::SET_OPT {
 
 { package VAST::Base;
 
+    sub ret { my $self = shift;
+	warn ref $self, " returns ", $_[0], "\n" if $OPT_log;
+	$_[0];
+    }
+
     sub emit_p6 { my $self = shift;
 	my $text = '';
 	if (exists $self->{'.'}) {
@@ -291,11 +299,6 @@ sub VIV::SET_OPT {
 	    }
 	    for my $kid (sort { $a->{BEG} <=> $b->{BEG} } @kids) {
 		my $kb = $kid->{BEG};
-		next unless defined $kb;
-		if (not defined $kb) {
-		    warn ref($kid) . " has no BEG!!!\n";
-		    return $self->ret($self->{TEXT} // '???NOBEG???');
-		}
 		if ($kb > $last) {
 		    $text .= substr($::ORIG, $last, $kb - $last);
 		}
@@ -312,33 +315,47 @@ sub VIV::SET_OPT {
 	else {
 	    my $text = $self->{TEXT};
 	    return $self->ret($text);
-	    my $last = $self->{BEG};
-	    my $se = $self->{END};
-	    if ($se > $last) {
-		    $text .= substr($::ORIG, $last, $se - $last);
-	    }
-	    return $self->ret($text);
 	}
     }
 
-    sub ret { my $self = shift;
-	warn ref $self, " returns ", $_[0], "\n" if $OPT_log;
-	$_[0];
+    sub emit_p5 { my $self = shift; my $lvl = shift;
+	my @text;
+	$context[$lvl] = $self;
+	warn "HERE " . ref($self) . "\n";
+	if (exists $self->{'.'}) {
+	    my $last = $self->{BEG};
+	    my $all = $self->{'.'};
+	    my @kids;
+	    for my $kid (ref $all eq 'ARRAY' ? @$all : $all) {
+		next unless $kid;
+		if (not defined $kid->{BEG}) {
+		    $kid->{BEG} = $kid->{_from} // next;
+		    $kid->{END} = $kid->{_pos};
+		}
+		push @kids, $kid;
+	    }
+	    for my $kid (sort { $a->{BEG} <=> $b->{BEG} } @kids) {
+		my $kb = $kid->{BEG};
+		if ($kb > $last) {
+		    push @text, substr($::ORIG, $last, $kb - $last);
+		}
+		push @text, scalar $kid->emit_p5($lvl+1);
+		$last = $kid->{END};
+
+	    }
+	    my $se = $self->{END};
+	    if ($se > $last) {
+		    push @text, substr($::ORIG, $last, $se - $last);
+	    }
+	}
+	else {
+	    warn "OOPS " . ref($self) . " $$self{TEXT}\n";
+	    push @text, $self->{TEXT};
+	}
+	splice(@context,$lvl);
+	return wantarray ? @text : $self->ret(join('',@text));
     }
 
-
-#    sub get_ws { my $self = shift;
-#	return '';
-#	my $ws = $self->{WS} // 0;
-#	my $pos = $self->{BEG};
-#	if ($ws and not $did_ws[$pos]++) {
-#	    substr($::ORIG, $pos - $ws, $ws)
-#	}
-#	else {
-#	    '';
-#	}
-#    }
-	
 }
 
 { package VAST::sample; our @ISA = 'VAST::Base';
@@ -347,11 +364,27 @@ sub VIV::SET_OPT {
 { package VAST::TEXT; our @ISA = 'VAST::Base'; }
 
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
+    sub emit_p5 { my $self = shift; my $lvl = shift;
+	$context[$lvl] = $self;
+	my $r = $self->ret($self->{statementlist}->emit_p5($lvl+1));
+	splice(@context,$lvl);
+	$r;
+    }
     sub emit_p6 { my $self = shift;
 	$self->ret($self->{statementlist}->emit_p6);
     }
 
 }
+
+{ package VAST::noun; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	warn "HERE " . ref($self) . "\n";
+	my $t = $self->SUPER::emit_p5($lvl);
+	warn "$t in " . ref $context[$lvl-1];
+	$self->ret($t);
+    }
+}
+
 
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);
