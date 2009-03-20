@@ -1691,7 +1691,12 @@ rule scoped {
     | <declarator>
     | <regex_declarator>
     | <package_declarator>
-    | <fulltypename>+ <multi_declarator>
+    | <fulltypename>+
+        {
+            my $t = $<fulltypename>;
+            @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
+        }
+        <multi_declarator>
     | <multi_declarator>
     ]
     || <?before <[A..Z]> > <longname> {{
@@ -3245,7 +3250,11 @@ token parameter {
     {{ $*REALLYADD = 1 }}
 
     [
-    | <type_constraint>
+    | <type_constraint>+
+        {
+            my $t = $<type_constraint>;
+            @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
+        }
         [
         | '*' <param_var>   { $quant = '*'; $kind = '*'; }
         | '|' <param_var>   { $quant = '|'; $kind = '*'; }
