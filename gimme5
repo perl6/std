@@ -101,7 +101,6 @@ sub un6 {
         $f =~ s/^\$¢\.\$parser//                and $t .= qq/\$C->\$parser/, next;
         $f =~ s/^\$¢//                  	and $t .= qq/\$C/, next;
         $f =~ s/^\$\/\.//                  	and $t .= qq/\$M->/, $NEEDMATCH++, next;
-        $f =~ s/^\$\*(\w+)//                  	and $t .= qq/\$::$1/, next;
         $f =~ s/^\$\/</.</                  	and $t .= qq/\$M/, $NEEDMATCH++, next;
         $f =~ s/^ ::(\w+(?:::\w+)*)\[(.*?)\]/$2)/ and $t .= qq/ '@{[ $pkg_really{$1} || "${PKG}::$1" ]}'->__instantiate__(/, next;
         $f =~ s/^ ::($TOP(?:::\w+)*)// 		and $t .= qq/ '$1'/, next;
@@ -113,11 +112,16 @@ sub un6 {
         $f =~ s/^([^:]):(\w+)//         	and $t .= qq/$1'$2' => 1/, next;
         $f =~ s/^([^:]):!(\w+)//        	and $t .= qq/$1'$2' => 0/, next;
         $f =~ s/^\%::\((.*?)\)// 		and $t .= ("do { no strict 'refs'; \\%{$1}}"), next;
-        $f =~ s/^\%\*?(\w+)\.?((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
-        $f =~ s/^\%\*?(\w+)\{@//         	and $t .= qq/\@$1\{@/, next;    # durn slices...
-        $f =~ s/^\%\*?(\w+)\.?\{//         	and $t .= qq/\$$1\{/, next;
-        $f =~ s/^\%\*?(\w+)//           	and $t .= qq/%$1/, next;
-        $f =~ s/^\@\*(\w+)\.?\[//          	and $t .= qq/\$$1\[/, next;
+        $f =~ s/^\%(\w+)\.?((<[^>]*>)+)// 	and $t .= ('$' . $1 . unangle($2)), next;
+        $f =~ s/^\%\*(\w+)\.?((<[^>]*>)+)// 	and $t .= ('$::' . $1 . unangle($2)), next;
+        $f =~ s/^\%(\w+)\{@//         	        and $t .= qq/\@$1\{@/, next;    # durn slices...
+        $f =~ s/^\%\*(\w+)\{@//         	and $t .= qq/\@::$1\{@/, next;    # durn slices...
+        $f =~ s/^\%(\w+)\.?\{/{/         	and $t .= qq/\$$1/, next;
+        $f =~ s/^\%\*(\w+)\.?\{/{/         	and $t .= qq/\$::$1/, next;
+        $f =~ s/^\%(\w+)//                     	and $t .= qq/%$1/, next;
+        $f =~ s/^\@(\w+)\.?\[/[/          	and $t .= qq/\$$1/, next;
+        $f =~ s/^\@\*(\w+)\.?\[/[/          	and $t .= qq/\$::$1/, next;
+        $f =~ s/^([\$\@%])\*(\w+)//             and $t .= qq/${1}::$2/, next;
         $f =~ s/^\$(\w+)((<[^>]*>)+)//  	and $t .= ('$' . $1 . '->' . unangle($2)), next;
         $f =~ s/^[\$\@%]((<[^>]*>)+)//       	and $t .= ('$M->' . unangle($1)), $NEEDMATCH++, next;
         $f =~ s/^ \.((<[^>]*>)+)//      	and $t .= (' $_->' . unangle($1)), next;

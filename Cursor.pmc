@@ -259,8 +259,8 @@ sub WHAT { ref $_[0] || $_[0] }
 sub item { $_[0] }
 sub caps { $_[0]->{'~ALL'} }
 sub chunks { die "unimpl" }
-sub ast { exists $_[0]->{'_'} ? $_[0]->{'_'} : $_[0]->Str }
-sub make { $_[0]->{'_'} = $_[1]; $_[0] }
+sub ast { exists $_[0]->{'_ast'} ? $_[0]->{'_ast'} : $_[0]->Str }
+sub make { $_[0]->{'_ast'} = $_[1]; $_[0] }
 
 sub list { my $self = shift;
     my @result;

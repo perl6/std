@@ -14,6 +14,8 @@ my $IN_META is context<rw> = 0;
 my $QUASI_QUASH is context<rw>;
 my $SCOPE is context = "";
 my $SIGIL is context<rw>;
+my @PRE is context<rw>;
+my @POST is context<rw>;
 my %MYSTERY is context<rw>;
 my $ORIG is context;
 my @MEMOS is context;
@@ -1313,7 +1315,7 @@ token PRE {
     
     <prefix_postfix_meta_operator>*                 {*}         #= prepost
     <.ws>
-    { push @$*PRE, $¢; }
+    { push @*PRE, $¢; }
 }
 
 # (for when you want to tell EXPR that infix already parsed the term)
@@ -1489,7 +1491,7 @@ token POST {
     | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; }
     | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }
     ]
-    { $*SIGIL = '@'; unshift @$*POST, $¢; }
+    { $*SIGIL = '@'; unshift @*POST, $¢; }
 }
 
 method can_meta ($op, $meta) {

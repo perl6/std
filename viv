@@ -77,7 +77,7 @@ sub MAIN {
 #    USAGE() unless -r $_[0];
     my $r;
     if (@_ and -f $_[0]) {
-	$r = STD->parsefile($_[0], actions => 'Actions')->{'_'};
+	$r = STD->parsefile($_[0], actions => 'Actions')->{'_ast'};
     }
     else {
 	if (not $PROG) {
@@ -85,9 +85,12 @@ sub MAIN {
 	    @ARGV = @_;
 	    $PROG = <>;
 	}
-	$r = STD->parse($PROG, actions => 'Actions')->{'_'};
+	$r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
     }
-    delete $r->{CORE} unless $OPT_stab;
+    unless ($OPT_stab) {
+	delete $r->{CORE};
+	delete $r->{MATCH}{CORE};
+    }
     if ($output eq 'ast') {
 	print Dump($r);
     }
@@ -129,10 +132,10 @@ sub VIV::SET_OPT {
 	gen_class($class);
 	bless $r, $class unless ref($r) =~ /^VAST/;
 	$r->{MATCH} = $match if $OPT_match;
-	$match->{'_'} = $r;
+	$match->{'_ast'} = $r;
     }
 
-    # propagate ->{'_'} nodes upward
+    # propagate ->{'_ast'} nodes upward
     # (untransformed STD nodes in output indicate bugs)
 
     sub hoist {
@@ -173,7 +176,7 @@ sub VIV::SET_OPT {
 	    }
 	    elsif ($k eq '~ALL') {
 		for (@$v) {
-		    push @all, $_->{'_'};
+		    push @all, $_->{'_ast'};
 		}
 	    }
 	    elsif ($k eq 'nibbles') {
@@ -182,8 +185,8 @@ sub VIV::SET_OPT {
 		    if (ref($_) eq 'HASH') {
 			bless $_, 'VAST::TEXT';
 		    }
-		    elsif (exists $_->{'_'}) {
-			$_ = $_->{'_'};
+		    elsif (exists $_->{'_ast'}) {
+			$_ = $_->{'_ast'};
 		    }
 		}
 		delete $node->{'~ALL'};
@@ -207,8 +210,8 @@ sub VIV::SET_OPT {
 				push @$zyg, $z;
 				push @fake, @$z;
 			    }
-			    elsif (exists $z->{'_'}) {
-				my $zy = $z->{'_'};
+			    elsif (exists $z->{'_ast'}) {
+				my $zy = $z->{'_ast'};
 				push @fake, $zy;
 				push @$zyg, $zy;
 			    }
@@ -221,9 +224,9 @@ sub VIV::SET_OPT {
 #		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
 		}
 		elsif (ref $v) {
-		    if (exists $v->{'_'}) {
-			push @fake, $v->{'_'};
-			$r{$k} = $v->{'_'};
+		    if (exists $v->{'_ast'}) {
+			push @fake, $v->{'_ast'};
+			$r{$k} = $v->{'_ast'};
 		    }
 		    else {
 			$r{$k} = $v;
@@ -261,14 +264,14 @@ sub VIV::SET_OPT {
 	my $r = hoist($match);
 	(my $class = $r->{kind} // ref $r) =~ s/^STD/VAST/;
 	gen_class($class);
-	$match->{'_'} = bless $r, $class;
+	$match->{'_ast'} = bless $r, $class;
     }
 
     sub gen_class {
 	my $class = shift;
 	no strict 'refs';
 	return if @{$class . '::ISA'};
-	warn "Creating class $class\n" if $OPT_log;
+	print STDERR "Creating class $class\n" if $OPT_log;
 	@{$class . '::ISA'} = 'VAST::Base';
     }
 
@@ -279,7 +282,7 @@ sub VIV::SET_OPT {
 { package VAST::Base;
 
     sub ret { my $self = shift;
-	warn ref $self, " returns ", $_[0], "\n" if $OPT_log;
+	print STDERR ref $self, " returns ", $_[0], "\n" if $OPT_log;
 	$_[0];
     }
 
@@ -321,7 +324,7 @@ sub VIV::SET_OPT {
     sub emit_p5 { my $self = shift; my $lvl = shift;
 	my @text;
 	$context[$lvl] = $self;
-	warn "HERE " . ref($self) . "\n";
+	print STDERR "HERE " . ref($self) . "\n";
 	if (exists $self->{'.'}) {
 	    my $last = $self->{BEG};
 	    my $all = $self->{'.'};
@@ -349,7 +352,7 @@ sub VIV::SET_OPT {
 	    }
 	}
 	else {
-	    warn "OOPS " . ref($self) . " $$self{TEXT}\n";
+	    print STDERR "OOPS " . ref($self) . " $$self{TEXT}\n";
 	    push @text, $self->{TEXT};
 	}
 	splice(@context,$lvl);
@@ -378,9 +381,9 @@ sub VIV::SET_OPT {
 
 { package VAST::noun; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-	warn "HERE " . ref($self) . "\n";
+	print STDERR "HERE " . ref($self) . "\n";
 	my $t = $self->SUPER::emit_p5($lvl);
-	warn "$t in " . ref $context[$lvl-1];
+	print STDERR "$t in " . ref $context[$lvl-1];
 	$self->ret($t);
     }
 }
