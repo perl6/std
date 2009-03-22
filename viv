@@ -163,8 +163,11 @@ sub VIV::SET_OPT {
 		    elsif (ref $v eq 'HASH') {
 			$r{SYM} = ::Dump($v);
 		    }
-		    else {
+		    elsif ($v->{_pos}) {
 			$r{SYM} = $v->Str;
+		    }
+		    else {
+			$r{SYM} = $v->TEXT;
 		    }
 		}
 		else {
@@ -174,7 +177,7 @@ sub VIV::SET_OPT {
 	    elsif ($k eq '_arity') {
 		$r{ARITY} = $v;
 	    }
-	    elsif ($k eq '~ALL') {
+	    elsif ($k eq '~CAPS') {
 		for (@$v) {
 		    push @all, $_->{'_ast'};
 		}
@@ -189,7 +192,7 @@ sub VIV::SET_OPT {
 			$_ = $_->{'_ast'};
 		    }
 		}
-		delete $node->{'~ALL'};
+		delete $node->{'~CAPS'};
 	    }
 	    elsif ($k eq '_from') {
 		if ($OPT_pos) {

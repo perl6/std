@@ -257,7 +257,7 @@ sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
 
 sub item { $_[0] }
-sub caps { $_[0]->{'~ALL'} }
+sub caps { exists $_[0]->{'~CAPS'} ? @{$_[0]->{'~CAPS'}} : () }
 sub chunks { die "unimpl" }
 sub ast { exists $_[0]->{'_ast'} ? $_[0]->{'_ast'} : $_[0]->Str }
 sub make { $_[0]->{'_ast'} = $_[1]; $_[0] }
@@ -703,6 +703,8 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     delete $self->{_fate};
 
     $self->deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
+    my @caps;
+    @caps = @{$self->{'~CAPS'}} if $self->{'~CAPS'};  # must copy elems
     my %r = %$self;
     if ($bindings) {
         for my $binding (@$bindings) {
@@ -716,7 +718,7 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     }
     $submatch->{_from} = $r{_from} = $r{_pos};
     $r{_pos} = $submatch->{_pos};
-    push(@{$r{'~ALL'}}, $submatch);
+    $r{'~CAPS'} = [@caps, $submatch];
     bless \%r, ref $self;               # return new match cursor for parent
 }
 
@@ -805,7 +807,7 @@ sub cursor_all { my $self = shift;
 
     $self->deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
-    delete $r{'~ALL'};
+    delete $r{'~CAPS'};
 #    $r{_from} = $fpos;
     $r{_pos} = $tpos;
 
@@ -1341,8 +1343,11 @@ sub _NOTBEFORE { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my @caps;
+    @caps = @{$self->{'~CAPS'}} if $self->{'~CAPS'};  # must copy elems
     my @all = $block->($self);
     return () if @all;
+    $self->{'~CAPS'} = \@caps;
     return $self->cursor($self->{_pos})->retm();
 }
 
@@ -1359,8 +1364,12 @@ sub before { my $self = shift;
     my $block = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my @caps;
+    @caps = @{$self->{'~CAPS'}} if $self->{'~CAPS'};  # must copy elems
     my @all = $block->($self);
     if (@all and $all[0]) {
+        $all[0]->{'~CAPS'} = \@caps;
+        $all[0]->{'_ast'} = $self->{_ast} if $self->{_ast};
         return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
     }
     return ();
@@ -1371,8 +1380,12 @@ sub after { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $end = $self->cursor($self->{_pos});
+    my @caps;
+    @caps = @{$self->{'~CAPS'}} if $self->{'~CAPS'};  # must copy elems
     my @all = $block->($end);          # Make sure $_->{_from} == $_->{_pos}
     if (@all and $all[0]) {
+        $all[0]->{'~CAPS'} = \@caps;
+        $all[0]->{'_ast'} = $self->{_ast} if $self->{_ast};
         return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
     }
     return ();

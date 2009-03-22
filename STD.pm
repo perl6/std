@@ -986,7 +986,7 @@ rule comp_unit {
 
 token pblock ($CURPAD is context<rw> = $*CURPAD) {
     :dba('parameterized block')
-    <?before <lambda> | '{' >
+    <?before <.lambda> | '{' >
     [
     | <lambda>
         <.newpad>
@@ -1227,7 +1227,7 @@ token statement_control:for {
     <sym> :s
     [ <?before 'my'? '$'\w+ '(' >
         <.panic: "This appears to be Perl 5 code"> ]?
-    [ <?before '(' <EXPR>? ';' <EXPR>? ';' <EXPR>? ')' >
+    [ <?before '(' <.EXPR>? ';' <.EXPR>? ';' <.EXPR>? ')' >
         <.obs('C-style "for (;;)" loop', '"loop (;;)"')> ]?
     <xblock>
 }
@@ -1463,6 +1463,10 @@ token privop ( --> Methodcall) {
     '!' <methodop>
 }
 
+token dottyopish {
+    <noun=dottyop>
+}
+
 token dottyop {
     :dba('dotty method or postfix')
     [
@@ -1654,7 +1658,7 @@ token arglist {
 }
 
 token circumfix:sym<{ }> ( --> Term) {
-    <?before '{' | <lambda> > <pblock>
+    <?before '{' | <.lambda> > <pblock>
 }
 
 token constant_declarator {
@@ -2457,7 +2461,7 @@ token nibbler {
         [
         || <starter> <nibbler> <stopper>
                         {{
-                            push @nibbles, { TEXT => $text, BEG => $from, END => $to };
+                            push @nibbles, { TEXT => $text, _from => $from, _pos => $to };
 
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
@@ -2470,7 +2474,7 @@ token nibbler {
                             $to = $from = $¢.pos;
                         }}
         || <escape>     {{
-                            push @nibbles, { TEXT => $text, BEG => $from, END => $to }, $<escape>[*-1];
+                            push @nibbles, { TEXT => $text, _from => $from, _pos => $to }, $<escape>[*-1];
                             $text = '';
                             $to = $from = $¢.pos;
                         }}
@@ -2486,7 +2490,7 @@ token nibbler {
         ]
     ]*
     {{
-        push @nibbles, { TEXT => $text, BEG => $from, END => $to };
+        push @nibbles, { TEXT => $text, _from => $from, _pos => $to };
         $<nibbles> = \@nibbles;
         $<_pos> = $¢.pos;
         $<nibbler> :delete;
@@ -3798,7 +3802,7 @@ token infix:sym<::=> ( --> Item_assignment)
 token infix:sym<.=> ( --> Item_assignment) {
     <sym> <.ws>
     [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr' > || <worryobs('.= as append operator', '~=')> ]
-    { $<O><nextterm> = 'dottyop' }
+    { $<O><nextterm> = 'dottyopish' }
 }
 
 token infix:sym« => » ( --> Item_assignment)
@@ -4108,12 +4112,21 @@ method EXPR ($preclvl)
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-                $op<arg> = (pop @termstack);
-                if ($op<arg><_from> < $op<_from>) {
-                    $op<_from> = $op<arg><_from>;
+                my $nop = $op.cursor_fresh();
+                my $arg = pop @termstack;
+                $op<arg> = $arg;
+                my $a = $op<~CAPS>;
+                if ($arg<_from> < $op<_from>) { # postfix
+                    $op<_from> = $arg<_from>;   # extend .from to include arg
+                    my @acaps = $arg.caps;
+#                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
+                    unshift @$a, @acaps;
                 }
-                if ($op<arg><_pos> > $op<_pos>) {
-                    $op<_pos> = $op<arg><_pos>;
+                if ($arg<_pos> > $op<_pos>) {   # prefix
+                    $op<_pos> = $arg<_pos>;     # extend .to to include arg
+                    my @acaps = $arg.caps;
+#                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
+                    push @$a, @acaps;
                 }
                 $op<_arity> = 'UNARY';
                 push @termstack, $op._REDUCE($op<_from>, 'EXPR');
@@ -4122,11 +4135,18 @@ method EXPR ($preclvl)
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
-                $op<right> = (pop @termstack);
-                $op<left> = (pop @termstack);
-                $op<_from> = $op<left><_from>;
-                $op<_pos> = $op<right><_pos>;
+                my $right = pop @termstack;
+                my $left = pop @termstack;
+                $op<right> = $right;
+                $op<left> = $left;
+                $op<_from> = $left<_from>;
+                $op<_pos> = $right<_pos>;
                 $op<_arity> = 'BINARY';
+
+                my $a = $op<~CAPS>;
+                unshift @$a, $left.caps;
+                push @$a, $right.caps;
+
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
                 push @termstack, $op._REDUCE($op<_from>, 'EXPR');
             }
@@ -4199,11 +4219,13 @@ method EXPR ($preclvl)
             }
 
             if $inprec le $preclim {
-                my $dba = $preclvl.<dba>;
-                my $h = $*HIGHEXPECT;
-                my $k = 'infix or meta-infix';
-                $h.{$k}:delete;
-                $h.{"infix or meta-infix (with precedence tighter than $dba)"} = 1;
+                if $preclim ne $LOOSEST {
+                    my $dba = $preclvl.<dba>;
+                    my $h = $*HIGHEXPECT;
+                    my $k = 'infix or meta-infix';
+                    $h.{$k}:delete;
+                    $h.{"infix or meta-infix (with precedence tighter than $dba)"} = 1;
+                }
                 last TERM;
             }
 
