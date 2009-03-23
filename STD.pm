@@ -1344,6 +1344,7 @@ token termish {
     [ <?stdstopper> ||
         <.POST>*
     ]
+    { $¢.<~CAPS> = $<noun><~CAPS> }
 }
 
 token noun:fatarrow           { <fatarrow> }
@@ -2461,7 +2462,7 @@ token nibbler {
         [
         || <starter> <nibbler> <stopper>
                         {{
-                            push @nibbles, { TEXT => $text, _from => $from, _pos => $to };
+                            push @nibbles, $¢.cursor_singleton(TEXT => $text, _from => $from, _pos => $to );
 
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
@@ -2474,7 +2475,7 @@ token nibbler {
                             $to = $from = $¢.pos;
                         }}
         || <escape>     {{
-                            push @nibbles, { TEXT => $text, _from => $from, _pos => $to }, $<escape>[*-1];
+                            push @nibbles, $¢.cursor_singleton(TEXT => $text, _from => $from, _pos => $to ), $<escape>[*-1];
                             $text = '';
                             $to = $from = $¢.pos;
                         }}
@@ -2490,7 +2491,7 @@ token nibbler {
         ]
     ]*
     {{
-        push @nibbles, { TEXT => $text, _from => $from, _pos => $to };
+        push @nibbles, $¢.cursor_singleton(TEXT => $text, _from => $from, _pos => $to );
         $<nibbles> = \@nibbles;
         $<_pos> = $¢.pos;
         $<nibbler> :delete;
@@ -4090,7 +4091,7 @@ method EXPR ($preclvl)
                 if @termstack and defined @termstack[0] {
                     push @list, pop(@termstack);
                 }
-                elsif $sym ne ',' {
+                else {
                     self.worry("Missing final term in '" ~ $sym ~ "' list");
                 }
                 my $endpos = @list[0]<_pos>;
@@ -4105,6 +4106,19 @@ method EXPR ($preclvl)
                 $nop<_arity> = 'LIST';
                 $nop<_from> = $startpos;
                 $nop<_pos> = $endpos;
+                if @list {
+                    my @caps;
+                    push @caps, @list[0].caps if @list[0];
+                    for 0..@delims-1 {
+                        my $d = @delims[$_];
+                        my $l = @list[$_+1];
+                        my @d = $d.caps;
+                        my @l = $l.caps if $l and $l<_pos>:exists ;
+                        push @caps, @d;
+                        push @caps, @l;  # nullterm?
+                    }
+                    $nop<~CAPS> = \@caps;
+                }
                 push @termstack, $nop._REDUCE($startpos, 'EXPR');
             }
             when 'unary' {

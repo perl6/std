@@ -157,10 +157,10 @@ sub VIV::SET_OPT {
 	    }
 	    elsif ($k eq 'sym') {
 		if (ref $v) {
-		    if (ref $v eq 'ARRAY') {
+		    if (ref($v) eq 'ARRAY') {
 			$r{SYM} = ::Dump($v);
 		    }
-		    elsif (ref $v eq 'HASH') {
+		    elsif (ref($v) eq 'HASH') {
 			$r{SYM} = ::Dump($v);
 		    }
 		    elsif ($v->{_pos}) {
@@ -178,21 +178,13 @@ sub VIV::SET_OPT {
 		$r{ARITY} = $v;
 	    }
 	    elsif ($k eq '~CAPS') {
-		for (@$v) {
-		    push @all, $_->{'_ast'};
-		}
-	    }
-	    elsif ($k eq 'nibbles') {
-		@all =  @$v;
-		for (@all) {
-		    if (ref($_) eq 'HASH') {
-			bless $_, 'VAST::TEXT';
-		    }
-		    elsif (exists $_->{'_ast'}) {
-			$_ = $_->{'_ast'};
+		# print "CAPS ref ". ref($v) . "\n";
+		if (ref $v) {
+		    for (@$v) {
+			next unless ref $_;     # XXX skip keys?
+			push @all, $_->{'_ast'};
 		    }
 		}
-		delete $node->{'~CAPS'};
 	    }
 	    elsif ($k eq '_from') {
 		if ($OPT_pos) {
@@ -205,11 +197,11 @@ sub VIV::SET_OPT {
 		}
 	    }
 	    elsif ($k =~ /^[a-zA-Z]/) {
-		if (ref $v eq 'ARRAY') {
+		if (ref($v) eq 'ARRAY') {
 		    my $zyg = [];
 		    for my $z (@$v) {
 			if (ref $z) {
-			    if (ref $z eq 'ARRAY') {
+			    if (ref($z) eq 'ARRAY') {
 				push @$zyg, $z;
 				push @fake, @$z;
 			    }
@@ -285,7 +277,7 @@ sub VIV::SET_OPT {
 { package VAST::Base;
 
     sub ret { my $self = shift;
-	print STDERR ref $self, " returns ", $_[0], "\n" if $OPT_log;
+	print STDERR ref($self), " returns ", $_[0], "\n" if $OPT_log;
 	$_[0];
     }
 
@@ -295,7 +287,7 @@ sub VIV::SET_OPT {
 	    my $last = $self->{BEG};
 	    my $all = $self->{'.'};
 	    my @kids;
-	    for my $kid (ref $all eq 'ARRAY' ? @$all : $all) {
+	    for my $kid (ref($all) eq 'ARRAY' ? @$all : $all) {
 		next unless $kid;
 		if (not defined $kid->{BEG}) {
 		    $kid->{BEG} = $kid->{_from} // next;
@@ -307,6 +299,9 @@ sub VIV::SET_OPT {
 		my $kb = $kid->{BEG};
 		if ($kb > $last) {
 		    $text .= substr($::ORIG, $last, $kb - $last);
+		}
+		if (ref($kid) =~ /STD/) {
+		    print STDERR ::Dump($self);
 		}
 		$text .= $kid->emit_p6();
 		$last = $kid->{END};
@@ -327,12 +322,12 @@ sub VIV::SET_OPT {
     sub emit_p5 { my $self = shift; my $lvl = shift;
 	my @text;
 	$context[$lvl] = $self;
-	print STDERR "HERE " . ref($self) . "\n";
+	# print STDERR "HERE " . ref($self) . "\n";
 	if (exists $self->{'.'}) {
 	    my $last = $self->{BEG};
 	    my $all = $self->{'.'};
 	    my @kids;
-	    for my $kid (ref $all eq 'ARRAY' ? @$all : $all) {
+	    for my $kid (ref($all) eq 'ARRAY' ? @$all : $all) {
 		next unless $kid;
 		if (not defined $kid->{BEG}) {
 		    $kid->{BEG} = $kid->{_from} // next;
@@ -355,7 +350,7 @@ sub VIV::SET_OPT {
 	    }
 	}
 	else {
-	    print STDERR "OOPS " . ref($self) . " $$self{TEXT}\n";
+	    # print STDERR "OOPS " . ref($self) . " $$self{TEXT}\n";
 	    push @text, $self->{TEXT};
 	}
 	splice(@context,$lvl);
@@ -384,9 +379,9 @@ sub VIV::SET_OPT {
 
 { package VAST::noun; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-	print STDERR "HERE " . ref($self) . "\n";
+	# print STDERR "HERE " . ref($self) . "\n";
 	my $t = $self->SUPER::emit_p5($lvl);
-	print STDERR "$t in " . ref $context[$lvl-1];
+	# print STDERR "$t in " . ref($context[$lvl-1]);
 	$self->ret($t);
     }
 }

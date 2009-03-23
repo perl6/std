@@ -715,10 +715,11 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
                 $r{$binding} = $submatch;
             }
         }
+        push @caps, $bindings->[0], $submatch;
+        $r{'~CAPS'} = \@caps;
     }
     $submatch->{_from} = $r{_from} = $r{_pos};
     $r{_pos} = $submatch->{_pos};
-    $r{'~CAPS'} = [@caps, $submatch];
     bless \%r, ref $self;               # return new match cursor for parent
 }
 
@@ -810,6 +811,13 @@ sub cursor_all { my $self = shift;
     delete $r{'~CAPS'};
 #    $r{_from} = $fpos;
     $r{_pos} = $tpos;
+
+    bless \%r, ref $self;
+}
+
+sub cursor_singleton { my $self = shift;
+    $self->deb("cursor_new @_") if $DEBUG & DEBUG::cursors;
+    my %r = @_;
 
     bless \%r, ref $self;
 }
