@@ -251,7 +251,7 @@ sub from { $_[0]->{_from} // $_[0]->{_pos} }
 sub to { $_[0]->{_pos} }
 sub pos { $_[0]->{_pos} }
 sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
-sub Str { exists $_[0]->{_from} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from}) : '' }
+sub Str { exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from}) : '' }
 sub peek { $_[0]->{_peek} }
 sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
@@ -1658,6 +1658,21 @@ sub _DIGIT_rev { my $self = shift;
     }
 }
 
+sub ww { my $self = shift;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    return () unless $P;
+    my $chars = substr($::ORIG, $P-1, 2);
+    if ($chars =~ /^\w\w$/) {
+        my $r = $self->cursor($P);
+        return $r->retm();
+    }
+    else {
+#        say "ww didn't match $chars at $P";
+        return ();
+    }
+}
+
 sub _ALNUM { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
@@ -2227,6 +2242,9 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
                 my $text = ::qm($sym);
                 $text =~ s/(\pL)/'[' . lc($1) . uc($1) . ']'/eg if $self->{i};
                 return $text;
+            }
+            elsif ($_ eq 'ww') {
+                return '\w' . $IMP;
             }
             elsif ($_ eq 'alpha') {
                 $fakepos++;

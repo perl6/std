@@ -3020,6 +3020,8 @@ grammar Quasi is STD {
 
 # Note, backtracks!  So POST must not commit to anything permanent.
 regex extrapost {
+    :my @PRE is context<rw> = ();
+    :my @POST is context<rw> = ();
     :my $inquote is context = 1;
     <POST>*
     # XXX Shouldn't need a backslash on anything but the right square here
