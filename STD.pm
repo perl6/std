@@ -1563,7 +1563,7 @@ token infix_prefix_meta_operator:sym<X> ( --> List_infix) {
     [ <infixish(1)>
         [X <.panic: "Old form of XopX found">]?
         <.can_meta($<infixish>[0], "cross")>
-        <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<O><diffy> = 1; $<sym> ~= $<infixish>[0].Str }>
+        <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
     ]?
 }
 
@@ -2991,7 +2991,7 @@ grammar Q is STD {
 
     multi method tweak (*%x) {
         my @k = keys(%x);
-        self.panic("Unrecognized quote modifier: " ~ @k);
+        self.panic("Unrecognized quote modifier: " ~ join('',@k));
     }
     # end tweaks (DO NOT ERASE)
 
@@ -3012,7 +3012,7 @@ grammar Quasi is STD {
 
     multi method tweak (*%x) {
         my @k = keys(%x);
-        self.panic("Unrecognized quasiquote modifier: " ~ @k);
+        self.panic("Unrecognized quasiquote modifier: " ~ join('',@k));
     }
     # end tweaks (DO NOT ERASE)
 
