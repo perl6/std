@@ -282,6 +282,7 @@
     '&uniq' => { name => '&uniq', file => 'CORE.pad', line => __LINE__ },
     '&push' => { name => '&push', file => 'CORE.pad', line => __LINE__ },
     '&reverse' => { name => '&reverse', file => 'CORE.pad', line => __LINE__ },
+    '&flip' => { name => '&flip', file => 'CORE.pad', line => __LINE__ },
     '&take' => { name => '&take', file => 'CORE.pad', line => __LINE__ },
     '&splice' => { name => '&splice', file => 'CORE.pad', line => __LINE__ },
     '&lines' => { name => '&lines', file => 'CORE.pad', line => __LINE__ },

@@ -3804,7 +3804,7 @@ token infix:sym<::=> ( --> Item_assignment)
 
 token infix:sym<.=> ( --> Item_assignment) {
     <sym> <.ws>
-    [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr' > || <worryobs('.= as append operator', '~=')> ]
+    [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip' > || <worryobs('.= as append operator', '~=')> ]
     { $<O><nextterm> = 'dottyopish' }
 }
 
