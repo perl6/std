@@ -3382,7 +3382,7 @@ token term:sym<undef> ( --> Term) {
         <.obs('$/ variable as input record separator',
              "the filehandle's .slurp method")>
     ]?
-    [ <?before \h*<variable> >
+    [ <?before \h*<sigil><twigil>?\w >
         <.obs('undef as a verb', 'undefine function')>
     ]?
 }
