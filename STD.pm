@@ -2150,6 +2150,7 @@ token variable {
         # Note: $() can also parse as contextualizer in an expression; should have same effect
         | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
         | <sigil> <?{ $*IN_DECL }> {*}                              #= anondecl
+        | <.panic: "Anonymous variable requires declarator">
         ]
     ]
 
@@ -3849,12 +3850,6 @@ token term:sym<???> ( --> List_prefix)
 
 token term:sym<!!!> ( --> List_prefix)
     { <sym> <args>? }
-
-token term:sigil ( --> List_prefix)
-{
-    <sigil> <?before \s> <arglist>
-    { $<sym> = $<sigil>.Str; }
-}
 
 # token term:typecast ( --> List_prefix)
 #     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.Str; } }
