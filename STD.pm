@@ -3517,9 +3517,6 @@ token prefix:sym<?> ( --> Symbolic_unary)
 token term:sym«=<>» ( --> Term)
     { <sym> }
 
-token prefix:sym<=> ( --> Symbolic_unary)
-    { <sym> }
-
 token prefix:sym<~^> ( --> Symbolic_unary)
     { <sym> }
 
