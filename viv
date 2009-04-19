@@ -129,6 +129,7 @@ sub VIV::SET_OPT {
 	return unless $rule;
 	my $r = hoist($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
+	$class =~ s/__S_\d\d\d/__/;
 	gen_class($class);
 	bless $r, $class unless ref($r) =~ /^VAST/;
 	$r->{MATCH} = $match if $OPT_match;
@@ -230,7 +231,7 @@ sub VIV::SET_OPT {
 		    unless (ref($r{$k}) =~ /^VAST/) {
 			my $class = "VAST::$k";
 			gen_class($class);
-			bless $r{$k}, $class;
+			bless $r{$k}, $class unless ref($r{$k}) =~ /^VAST/;
 		    }
 		}
 		else {
@@ -258,14 +259,19 @@ sub VIV::SET_OPT {
 	my $match = shift;
 	my $r = hoist($match);
 	(my $class = $r->{kind} // ref $r) =~ s/^STD/VAST/;
+#	print STDERR ::Dump($r);
 	gen_class($class);
-	$match->{'_ast'} = bless $r, $class;
+	$r = bless $r, $class unless ref($r) =~ /^VAST/;
+	$match->{'_ast'} = $r;
     }
 
     sub gen_class {
 	my $class = shift;
 	no strict 'refs';
-	return if @{$class . '::ISA'};
+	if (@{$class . '::ISA'}) {
+	    print STDERR "Existing class $class\n" if $OPT_log;
+	    return;
+	}
 	print STDERR "Creating class $class\n" if $OPT_log;
 	@{$class . '::ISA'} = 'VAST::Base';
     }
@@ -277,8 +283,9 @@ sub VIV::SET_OPT {
 { package VAST::Base;
 
     sub ret { my $self = shift;
-	print STDERR ref($self), " returns ", $_[0], "\n" if $OPT_log;
-	$_[0];
+	my $val = join '', @_;
+	print STDERR ref($self), " returns $val\n" if $OPT_log;
+	wantarray ? @_ : $val;
     }
 
     sub emit_p6 { my $self = shift;
@@ -354,7 +361,7 @@ sub VIV::SET_OPT {
 	    push @text, $self->{TEXT};
 	}
 	splice(@context,$lvl);
-	return wantarray ? @text : $self->ret(join('',@text));
+	$self->ret(@text);
     }
 
 }
@@ -383,6 +390,35 @@ sub VIV::SET_OPT {
 	my $t = $self->SUPER::emit_p5($lvl);
 	# print STDERR "$t in " . ref($context[$lvl-1]);
 	$self->ret($t);
+    }
+}
+
+{ package VAST::Methodcall; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my @t = $self->SUPER::emit_p5($lvl);
+	if ($t[0] =~ /^[@%]/) {
+	    if ($t[1] =~ s/^\.?([[{])/$1/) {
+		if ($t[1] =~ /,/) {
+		    substr($t[0],0,1) = '@';
+		}
+		else {
+		    substr($t[0],0,1) = '$';
+		}
+
+	    }
+	}
+#	print STDERR ::Dump(\@t);
+	$self->ret(@t);
+    }
+}
+
+{ package VAST::quote; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	print STDERR "HERE\n";
+	my @t = $self->SUPER::emit_p5($lvl);
+	$t[0] =~ s/</qw</;
+#	print STDERR ::Dump(\@t);
+	$self->ret(@t);
     }
 }
 

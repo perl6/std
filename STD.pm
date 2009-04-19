@@ -9,7 +9,7 @@ my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
-my $IN_QUOTE is context<rw>;
+my $INTERPOLATION is context<rw> = '';
 my $IN_META is context<rw> = 0;
 my $QUASI_QUASH is context<rw>;
 my $SCOPE is context = "";
@@ -455,12 +455,12 @@ method check_variable ($variable) {
             $ok ||= $first lt 'A';
             $ok ||= self.is_known($name);
             if not $ok {
-                self.worry("Variable $name is not predeclared");
+                $variable.worry("Variable $name is not predeclared");
             }
         }
         when '^' {
             my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
-            if $siggy { self.panic("Placeholder variable $name cannot override existing signature $siggy"); }
+            if $siggy { $variable.panic("Placeholder variable $name cannot override existing signature $siggy"); }
             self.add_my_variable($name);
         }
         when ':' {
@@ -469,13 +469,13 @@ method check_variable ($variable) {
         when '?' {
             if $name ~~ /\:\:/ {
                 $name = self.canonicalize_name($name);
-                self.worry("Unrecognized variable: $name") unless $name ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:/;
+                $variable.worry("Unrecognized variable: $name") unless $name ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:/;
             }
             else {
                 my $v;
                 given $name {
                     when '$?FILE'     { $v = $COMPILING::FILE; }
-                    when '$?LINE'     { $v = self.lineof($variable.pos); }
+                    when '$?LINE'     { $v = $variable.lineof($variable.pos); }
                     when '$?POSITION' { $v = $variable.pos; }
 
                     when '$?PARSER'   { $v = $*PARSER; }
@@ -899,7 +899,7 @@ rule comp_unit {
     :my @PKGS is context<rw> = ();
     :my $PARSER is context<rw>;
     :my $IN_DECL is context<rw>;
-    :my $IN_QUOTE is context<rw>;
+    :my $INTERPOLATION is context<rw> = '';
     :my $IN_META is context<rw> = 0;
     :my $QUASI_QUASH is context<rw>;
     :my $SCOPE is context = "";
@@ -1327,28 +1327,45 @@ token nulltermish {
     :dba('null term')
     [
     | <?stdstopper>
-    | <noun=termish>?
+    | <noun=termish>
+        {
+            $<PRE>  = $<noun><PRE>;
+            $<POST> = $<noun><POST>;
+        }
+    | <?>
     ]
 }
 
 token termish {
     :my $SCOPE is context<rw> = "our";
+    :my $VAR is context<rw>;
     :dba('prefix or noun')
     [
-    | <.PRE>+ <noun>
+    | <PRE>+ <noun>
     | <noun>
     ]
 
     # also queue up any postfixes
     :dba('postfix')
-    [ <?stdstopper> ||
-        <.POST>*
+    [
+    || <?{ $*INTERPOLATION }>
+        [
+        || <?{ $*INTERPOLATION eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
+        ||                                 <POST>+! <?after <[ \] } > ) ]> > 
+        || { $VAR = 0; }
+        ]
+    || <!{ $*INTERPOLATION }>
+        [
+        || <?stdstopper>
+        || <POST>*
+        ]
     ]
+    { self.check_variable($VAR) if $VAR; }
     { $¢.<~CAPS> = $<noun><~CAPS> }
 }
 
 token noun:fatarrow           { <fatarrow> }
-token noun:variable           { <variable> <.check_variable($<variable>)> }
+token noun:variable           { <variable> { $*VAR = $<variable> } }
 token noun:package_declarator { <package_declarator> }
 token noun:scope_declarator   { <scope_declarator> }
 token noun:multi_declarator   { <?before 'multi'|'proto'|'only'> <multi_declarator> }
@@ -1492,9 +1509,9 @@ token POST {
 
     :dba('postfix')
     [
-    | <dotty>  { $<O> = $<dotty><O>; $<sym> = $<dotty><sym>; }
-    | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; }
-    | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }
+    | <dotty>  { $<O> = $<dotty><O>;  $<sym> = $<dotty><sym>;  $<~CAPS> = $<dotty><~CAPS>; }
+    | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; $<~CAPS> = $<privop><~CAPS>; }
+    | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; $<~CAPS> = $<postop><~CAPS>; }
     ]
     { $*SIGIL = '@'; unshift @*POST, $¢; }
 }
@@ -1620,14 +1637,14 @@ token postop {
 token methodop {
     [
     | <longname>
-    | <?before '$' | '@' > <variable> <.check_variable($<variable>)>
+    | <?before '$' | '@' > <variable> { $*VAR = $<variable> }
     | <?before <[ ' " ]> > <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
 
     :dba('method arguments')
     [
-    | ':' <?before \s> <!{ $*inquote }> <arglist>
+    | ':' <?before \s> <!{ $*INTERPOLATION }> <arglist>
     | <?[\\(]> <args>
     ]?
 }
@@ -2120,7 +2137,7 @@ token special_variable:sym<$?> {
 
 token desigilname {
     [
-    | <?before '$' > <variable> <.check_variable($<variable>)>
+    | <?before '$' > <variable> { $*VAR = $<variable> }
     | <longname>
     ]
 }
@@ -2859,7 +2876,11 @@ grammar Q is STD {
     } # end role
 
     role s1 {
-        token escape:sym<$> { <?before '$'> [ :lang($*LANG) <variable> <extrapost>? <.check_variable($<variable>)> ] || <.panic: "Non-variable \$ must be backslashed"> }
+        token escape:sym<$> {
+            :my $INTERPOLATION is context = '$';
+            <?before '$'>
+            [ :lang($*LANG) <EXPR(item %methodcall)> ] || <.panic: "Non-variable \$ must be backslashed">
+        }
         token special_variable:sym<$"> {
             '$' <stopper>
             <.panic: "Can't use a \$ in the last position of an interpolating string">
@@ -2873,7 +2894,11 @@ grammar Q is STD {
     } # end role
 
     role a1 {
-        token escape:sym<@> { :my $IN_QUOTE is context<rw> = 1; <?before '@'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>)> | <!> ] } # trap ABORTBRANCH from variable's ::
+        token escape:sym<@> {
+            :my $INTERPOLATION is context<rw> = '@';
+            <?before '@'>
+            [ :lang($*LANG) <EXPR(item %methodcall)> | <!> ] # trap ABORTBRANCH from variable's ::
+        }
     } # end role
 
     role a0 {
@@ -2881,7 +2906,11 @@ grammar Q is STD {
     } # end role
 
     role h1 {
-        token escape:sym<%> { :my $IN_QUOTE is context<rw> = 1; <?before '%'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>)> | <!> ] }
+        token escape:sym<%> {
+            :my $INTERPOLATION is context<rw> = '%';
+            <?before '%'>
+            [ :lang($*LANG) <EXPR(item %methodcall)> | <!> ]
+        }
     } # end role
 
     role h0 {
@@ -2889,7 +2918,11 @@ grammar Q is STD {
     } # end role
 
     role f1 {
-        token escape:sym<&> { :my $IN_QUOTE is context<rw> = 1; <?before '&'> [ :lang($*LANG) <variable> <extrapost> <.check_variable($<variable>)> | <!> ] }
+        token escape:sym<&> {
+            :my $INTERPOLATION is context<rw> = '&';
+            <?before '&'>
+            [ :lang($*LANG) <EXPR(item %methodcall)> | <!> ]
+        }
     } # end role
 
     role f0 {
@@ -3018,16 +3051,6 @@ grammar Quasi is STD {
     # end tweaks (DO NOT ERASE)
 
 } # end grammar
-
-# Note, backtracks!  So POST must not commit to anything permanent.
-regex extrapost {
-    :my @PRE is context<rw> = ();
-    :my @POST is context<rw> = ();
-    :my $inquote is context = 1;
-    <POST>*
-    # XXX Shouldn't need a backslash on anything but the right square here
-    <?after <[ \] } > ) ]> > 
-}
 
 rule multisig {
     [
@@ -4031,7 +4054,6 @@ method EXPR ($preclvl)
         return self._AUTOLEXpeek('EXPR');
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
-    my $inquote is context = 0;
     my $SIGIL is context<rw> = '';
     my @termstack;
     my @opstack;
@@ -4170,8 +4192,6 @@ method EXPR ($preclvl)
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
         $*SIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';
-        my @PRE is context<rw> = ();
-        my @POST is context<rw> = ();
         my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
@@ -4179,6 +4199,10 @@ method EXPR ($preclvl)
             # $here.panic("Failed to parse a required term");
         }
         $termish = 'termish';
+        my $PRE = $here.<PRE>:delete // [];
+        my $POST = $here.<POST>:delete // [];
+        my @PRE = @$PRE;
+        my @POST = reverse @$POST;
 
         # interleave prefix and postfix, pretend they're infixish
         my $M = $here;
