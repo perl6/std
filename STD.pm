@@ -1436,7 +1436,7 @@ token infixish ($in_meta = $*IN_META) {
             %<O><assoc> = 'unary';
             %<O><uassoc> = 'left';
         }
-    | '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O> }
+    | '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
     | <infix_circumfix_meta_operator>
         { $<O> = $<infix_circumfix_meta_operator><O>;
           $<sym> = $<infix_circumfix_meta_operator><sym>; }
