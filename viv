@@ -153,6 +153,10 @@ sub VIV::SET_OPT {
 		    $r{$key} = $$v{$key};
 		}
 	    }
+	    elsif ($k eq 'PRE') {
+	    }
+	    elsif ($k eq 'POST') {
+	    }
 	    elsif ($k eq 'SIGIL') {
 		$r{SIGIL} = $v;
 	    }
@@ -284,7 +288,10 @@ sub VIV::SET_OPT {
 
     sub ret { my $self = shift;
 	my $val = join '', @_;
-	print STDERR ref($self), " returns $val\n" if $OPT_log;
+	my @c = map { ref $_ } @context;
+	my $c = "@c " . ref($self);
+	$c =~ s/VAST:://g;
+	print STDERR "$c returns $val\n" if $OPT_log;
 	wantarray ? @_ : $val;
     }
 
@@ -387,7 +394,7 @@ sub VIV::SET_OPT {
 { package VAST::noun; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	# print STDERR "HERE " . ref($self) . "\n";
-	my $t = $self->SUPER::emit_p5($lvl);
+	my $t = $self->SUPER::emit_p5($lvl+1);
 	# print STDERR "$t in " . ref($context[$lvl-1]);
 	$self->ret($t);
     }
@@ -395,7 +402,7 @@ sub VIV::SET_OPT {
 
 { package VAST::Methodcall; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-	my @t = $self->SUPER::emit_p5($lvl);
+	my @t = $self->SUPER::emit_p5($lvl+1);
 	if ($t[0] =~ /^[@%]/) {
 	    if ($t[1] =~ s/^\.?([[{])/$1/) {
 		if ($t[1] =~ /,/) {
@@ -415,7 +422,7 @@ sub VIV::SET_OPT {
 { package VAST::quote; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	print STDERR "HERE\n";
-	my @t = $self->SUPER::emit_p5($lvl);
+	my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/</qw</;
 #	print STDERR ::Dump(\@t);
 	$self->ret(@t);

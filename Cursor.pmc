@@ -714,8 +714,10 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
             else {
                 $r{$binding} = $submatch;
             }
+            next if $binding eq 'PRE';
+            next if $binding eq 'POST';
+            push @caps, $binding, $submatch;
         }
-        push @caps, $bindings->[0], $submatch;
         $r{'~CAPS'} = \@caps;
     }
     $submatch->{_from} = $r{_from} = $r{_pos};

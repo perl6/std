@@ -14,8 +14,6 @@ my $IN_META is context<rw> = 0;
 my $QUASI_QUASH is context<rw>;
 my $SCOPE is context = "";
 my $SIGIL is context<rw>;
-my @PRE is context<rw>;
-my @POST is context<rw>;
 my %MYSTERY is context<rw>;
 my $ORIG is context;
 my @MEMOS is context;
@@ -1315,7 +1313,6 @@ token PRE {
     
     <prefix_postfix_meta_operator>*                 {*}         #= prepost
     <.ws>
-    { push @*PRE, $¢; }
 }
 
 # (for when you want to tell EXPR that infix already parsed the term)
@@ -1329,8 +1326,8 @@ token nulltermish {
     | <?stdstopper>
     | <noun=termish>
         {
-            $<PRE>  = $<noun><PRE>;
-            $<POST> = $<noun><POST>;
+            $<PRE>  = $<noun><PRE>:delete;
+            $<POST> = $<noun><POST>:delete;
         }
     | <?>
     ]
@@ -1513,7 +1510,7 @@ token POST {
     | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; $<~CAPS> = $<privop><~CAPS>; }
     | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; $<~CAPS> = $<postop><~CAPS>; }
     ]
-    { $*SIGIL = '@'; unshift @*POST, $¢; }
+    { $*SIGIL = '@'; }
 }
 
 method can_meta ($op, $meta) {
@@ -4084,6 +4081,8 @@ method EXPR ($preclvl)
                 $nop<_from> = $startpos;
                 $nop<_pos> = $endpos;
                 push @termstack, $nop._REDUCE($startpos, 'EXPR');
+                @termstack[*-1].<PRE>:delete;
+                @termstack[*-1].<POST> :delete;
             }
             when 'list' {
                 self.deb("reducing list") if $*DEBUG +& DEBUG::EXPR;
@@ -4133,6 +4132,8 @@ method EXPR ($preclvl)
                     $nop<~CAPS> = \@caps;
                 }
                 push @termstack, $nop._REDUCE($startpos, 'EXPR');
+                @termstack[*-1].<PRE>:delete;
+                @termstack[*-1].<POST>:delete;
             }
             when 'unary' {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
@@ -4149,7 +4150,7 @@ method EXPR ($preclvl)
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     unshift @$a, @acaps;
                 }
-                if ($arg<_pos> > $op<_pos>) {   # prefix
+                elsif ($arg<_pos> > $op<_pos>) {   # prefix
                     $op<_pos> = $arg<_pos>;     # extend .to to include arg
                     my @acaps = $arg.caps;
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
@@ -4157,6 +4158,8 @@ method EXPR ($preclvl)
                 }
                 $op<_arity> = 'UNARY';
                 push @termstack, $op._REDUCE($op<_from>, 'EXPR');
+                @termstack[*-1].<PRE>:delete;
+                @termstack[*-1].<POST>:delete;
             }
             default {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
@@ -4176,6 +4179,8 @@ method EXPR ($preclvl)
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
                 push @termstack, $op._REDUCE($op<_from>, 'EXPR');
+                @termstack[*-1].<PRE>:delete;
+                @termstack[*-1].<POST>:delete;
             }
         }
     };
@@ -4224,6 +4229,7 @@ method EXPR ($preclvl)
         push @opstack, @PRE,@POST;
 
         push @termstack, $here.<noun>;
+        @termstack[*-1].<POST>:delete;
         self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
 
         loop {     # while we see adverbs
