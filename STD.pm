@@ -4080,6 +4080,7 @@ method EXPR ($preclvl)
                 $nop<_arity> = 'CHAIN';
                 $nop<_from> = $startpos;
                 $nop<_pos> = $endpos;
+                $nop<~CAPS> = \@chain;
                 push @termstack, $nop._REDUCE($startpos, 'EXPR');
                 @termstack[*-1].<PRE>:delete;
                 @termstack[*-1].<POST> :delete;
@@ -4124,10 +4125,8 @@ method EXPR ($preclvl)
                     for 0..@delims-1 {
                         my $d = @delims[$_];
                         my $l = @list[$_+1];
-                        my @d = $d.caps;
-                        my @l = $l.caps if $l and $l<_pos>:exists ;
-                        push @caps, @d;
-                        push @caps, @l;  # nullterm?
+                        push @caps, $d;
+                        push @caps, $l;  # nullterm?
                     }
                     $nop<~CAPS> = \@caps;
                 }
@@ -4146,15 +4145,13 @@ method EXPR ($preclvl)
                 my $a = $op<~CAPS>;
                 if ($arg<_from> < $op<_from>) { # postfix
                     $op<_from> = $arg<_from>;   # extend .from to include arg
-                    my @acaps = $arg.caps;
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
-                    unshift @$a, @acaps;
+                    unshift @$a, $arg;
                 }
                 elsif ($arg<_pos> > $op<_pos>) {   # prefix
                     $op<_pos> = $arg<_pos>;     # extend .to to include arg
-                    my @acaps = $arg.caps;
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
-                    push @$a, @acaps;
+                    push @$a, $arg;
                 }
                 $op<_arity> = 'UNARY';
                 push @termstack, $op._REDUCE($op<_from>, 'EXPR');
@@ -4174,8 +4171,8 @@ method EXPR ($preclvl)
                 $op<_arity> = 'BINARY';
 
                 my $a = $op<~CAPS>;
-                unshift @$a, $left.caps;
-                push @$a, $right.caps;
+                unshift @$a, $left;
+                push @$a, $right;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
                 push @termstack, $op._REDUCE($op<_from>, 'EXPR');
