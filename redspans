@@ -50,6 +50,8 @@ sub MAIN {
     sub AUTOLOAD {
         my $self = shift;
         my $C = shift;
+	my $rule = shift;
+	return unless $rule;
         my $F = $C->{_from};
         my $P = $C->{_pos};
         $AUTOLOAD =~ s/^Actions:://;
