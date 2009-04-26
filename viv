@@ -2703,83 +2703,35 @@ sub VIV::SET_OPT {
 
 
 { package VAST::terminator; our @ISA = 'VAST::Base';
+    sub emit_p6 {  my $self = shift;
+        my @t = $self->SUPER::emit_p6();
+        $self->ret('');
+    }
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
+        $self->ret('');
     }
 }
 
+{ package VAST::terminator__S_BangBang; our @ISA = 'VAST::terminator'; }
 
-{ package VAST::terminator__S_BangBang; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
+{ package VAST::terminator__S_for; our @ISA = 'VAST::terminator'; }
 
+{ package VAST::terminator__S_if; our @ISA = 'VAST::terminator'; }
 
-{ package VAST::terminator__S_for; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
+{ package VAST::terminator__S_Ket; our @ISA = 'VAST::terminator'; }
 
+{ package VAST::terminator__S_Ly; our @ISA = 'VAST::terminator'; }
 
-{ package VAST::terminator__S_if; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
+{ package VAST::terminator__S_Semi; our @ISA = 'VAST::terminator'; }
 
+{ package VAST::terminator__S_Thesis; our @ISA = 'VAST::terminator'; }
 
-{ package VAST::terminator__S_Ket; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
+{ package VAST::terminator__S_unless; our @ISA = 'VAST::terminator'; }
 
+{ package VAST::terminator__S_while; our @ISA = 'VAST::terminator'; }
 
-{ package VAST::terminator__S_Ly; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
-
-
-{ package VAST::terminator__S_Semi; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
-
-
-{ package VAST::terminator__S_Thesis; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
-
-
-{ package VAST::terminator__S_unless; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
-
-
-{ package VAST::terminator__S_while; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
-    }
-}
+{ package VAST::terminator__S_when; our @ISA = 'VAST::terminator'; }
 
 
 { package VAST::termish; our @ISA = 'VAST::Base';

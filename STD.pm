@@ -1326,8 +1326,9 @@ token nulltermish {
     | <?stdstopper>
     | <noun=termish>
         {
-            $<PRE>  = $<noun><PRE>:delete;
-            $<POST> = $<noun><POST>:delete;
+            $¢.<PRE>  = $<noun><PRE>:delete;
+            $¢.<POST> = $<noun><POST>:delete;
+            $¢.<~CAPS> = $<noun><~CAPS>;
         }
     | <?>
     ]
@@ -1352,10 +1353,7 @@ token termish {
         || { $VAR = 0; }
         ]
     || <!{ $*INTERPOLATION }>
-        [
-        || <?stdstopper>
-        || <POST>*
-        ]
+        <POST>*
     ]
     {
         self.check_variable($VAR) if $VAR;
