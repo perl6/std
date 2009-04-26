@@ -1267,15 +1267,15 @@ rule term:FIRST   {<sym> <block> }
 
 rule modifier_expr { <EXPR> }
 
-rule statement_mod_cond:if     {<sym> <modifier_expr> {*} }     #= if
-rule statement_mod_cond:unless {<sym> <modifier_expr> {*} }     #= unless
-rule statement_mod_cond:when   {<sym> <modifier_expr> {*} }     #= when
+rule statement_mod_cond:if     {<sym> <modifier_expr> }
+rule statement_mod_cond:unless {<sym> <modifier_expr> }
+rule statement_mod_cond:when   {<sym> <modifier_expr> }
 
-rule statement_mod_loop:while {<sym> <modifier_expr> {*} }      #= while
-rule statement_mod_loop:until {<sym> <modifier_expr> {*} }      #= until
+rule statement_mod_loop:while {<sym> <modifier_expr> }
+rule statement_mod_loop:until {<sym> <modifier_expr> }
 
-rule statement_mod_loop:for   {<sym> <modifier_expr> {*} }      #= for
-rule statement_mod_loop:given {<sym> <modifier_expr> {*} }      #= given
+rule statement_mod_loop:for   {<sym> <modifier_expr> }
+rule statement_mod_loop:given {<sym> <modifier_expr> }
 
 token def_module_name {
     <longname>
@@ -1357,8 +1357,10 @@ token termish {
         || <POST>*
         ]
     ]
-    { self.check_variable($VAR) if $VAR; }
-    { $¢.<~CAPS> = $<noun><~CAPS> }
+    {
+        self.check_variable($VAR) if $VAR;
+        $¢.<~CAPS> = $<noun><~CAPS>;
+    }
 }
 
 token noun:fatarrow           { <fatarrow> }
@@ -2014,44 +2016,44 @@ token special_variable:sym<${^ }> {
 
 # XXX should eventually rely on multi instead of nested cases here...
 method obscaret (Str $var, Str $sigil, Str $name) {
-    my $repl = do { given $sigil {
+    my $repl;
+    given $sigil {
         when '$' {
             given $name {
-                when 'MATCH'         { '$/' }
-                when 'PREMATCH'      { 'an explicit pattern before <(' }
-                when 'POSTMATCH'     { 'an explicit pattern after )>' }
-                when 'ENCODING'      { '$?ENCODING' }
-                when 'UNICODE'       { '$?UNICODE' }  # XXX ???
-                when 'TAINT'         { '$*TAINT' }
-                when 'OPEN'          { 'filehandle introspection' }
-                when 'N'             { '$-1' } # XXX ???
-                when 'L'             { 'Form module' }
-                when 'A'             { 'Form module' }
-                when 'E'             { '$!.extended_os_error' }
-                when 'C'             { 'COMPILING namespace' }
-                when 'D'             { '$*DEBUGGING' }
-                when 'F'             { '$*SYSTEM_FD_MAX' }
-                when 'H'             { '$?FOO variables' }
-                when 'I'             { '$*INPLACE' } # XXX ???
-                when 'O'             { '$?OS or $*OS' }
-                when 'P'             { 'whatever debugger Perl 6 comes with' }
-                when 'R'             { 'an explicit result variable' }
-                when 'S'             { 'the context function' } # XXX ???
-                when 'T'             { '$*BASETIME' }
-                when 'V'             { '$*PERL_VERSION' }
-                when 'W'             { '$*WARNING' }
-                when 'X'             { '$*EXECUTABLE_NAME' }
-                when *               { "a global form such as $sigil*$name" }
+                when 'MATCH'         { $repl = '$/' }
+                when 'PREMATCH'      { $repl = 'an explicit pattern before <(' }
+                when 'POSTMATCH'     { $repl = 'an explicit pattern after )>' }
+                when 'ENCODING'      { $repl = '$?ENCODING' }
+                when 'UNICODE'       { $repl = '$?UNICODE' }  # XXX ???
+                when 'TAINT'         { $repl = '$*TAINT' }
+                when 'OPEN'          { $repl = 'filehandle introspection' }
+                when 'N'             { $repl = '$-1' } # XXX ???
+                when 'L'             { $repl = 'Form module' }
+                when 'A'             { $repl = 'Form module' }
+                when 'E'             { $repl = '$!.extended_os_error' }
+                when 'C'             { $repl = 'COMPILING namespace' }
+                when 'D'             { $repl = '$*DEBUGGING' }
+                when 'F'             { $repl = '$*SYSTEM_FD_MAX' }
+                when 'H'             { $repl = '$?FOO variables' }
+                when 'I'             { $repl = '$*INPLACE' } # XXX ???
+                when 'O'             { $repl = '$?OS or $*OS' }
+                when 'P'             { $repl = 'whatever debugger Perl 6 comes with' }
+                when 'R'             { $repl = 'an explicit result variable' }
+                when 'S'             { $repl = 'the context function' } # XXX ???
+                when 'T'             { $repl = '$*BASETIME' }
+                when 'V'             { $repl = '$*PERL_VERSION' }
+                when 'W'             { $repl = '$*WARNING' }
+                when 'X'             { $repl = '$*EXECUTABLE_NAME' }
+                when *               { $repl = "a global form such as $sigil*$name" }
             }
         }
         when '%' {
             given $name {
-                when 'H'             { '$?FOO variables' }
-                when *               { "a global form such as $sigil*$name" }
+                when 'H'             { $repl = '$?FOO variables' }
+                when *               { $repl = "a global form such as $sigil*$name" }
             }
         }
-        when * { "a global form such as $sigil*$name" }
-    };
+        when * { $repl = "a global form such as $sigil*$name" }
     };
     return self.obs("$var variable", $repl);
 }
@@ -3679,7 +3681,7 @@ token term:sym<defer> ( --> Term)
     { <sym> » }
 
 token term:rand ( --> Term)
-    { <sym> » [ <?before \h+ [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]? }
+    { <sym> » [ <?before [ \h+ | '('] [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]? }
 
 token term:e ( --> Term)
     { <sym> » }
@@ -4405,13 +4407,13 @@ method EXPR ($preclvl)
                 my $arg = pop @termstack;
                 $op<arg> = $arg;
                 my $a = $op<~CAPS>;
-                if ($arg<_from> < $op<_from>) { # postfix
-                    $op<_from> = $arg<_from>;   # extend .from to include arg
+                if $arg<_from> < $op<_from> { # postfix
+                    $op<_from> = $arg<_from>;   # extend from to include arg
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     unshift @$a, $arg;
                 }
-                elsif ($arg<_pos> > $op<_pos>) {   # prefix
-                    $op<_pos> = $arg<_pos>;     # extend .to to include arg
+                elsif $arg<_pos> > $op<_pos> {   # prefix
+                    $op<_pos> = $arg<_pos>;     # extend pos to include arg
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     push @$a, $arg;
                 }
@@ -4530,7 +4532,7 @@ method EXPR ($preclvl)
 
             # Does new infix (or terminator) force any reductions?
             while @opstack[*-1]<O><prec> gt $inprec {
-                reduce();
+                &reduce();
             }
 
             # Not much point in reducing the sentinels...
@@ -4546,12 +4548,12 @@ method EXPR ($preclvl)
             if @opstack[*-1]<O><prec> eq $inprec {
                 given $inO<assoc> {
                     when 'non'   { $here.panic('"' ~ $infix.Str ~ '" is not associative') }
-                    when 'left'  { reduce() }   # reduce immediately
+                    when 'left'  { &reduce() }   # reduce immediately
                     when 'right' { }            # just shift
                     when 'chain' { }            # just shift
                     when 'unary' { }            # just shift
                     when 'list'  {              # if op differs reduce else shift
-                       # reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
+                       # &reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
                     }
                     default { $here.panic('Unknown associativity "' ~ $_ ~ '" for "' ~ $infix<sym> ~ '"') }
                 }
@@ -4562,7 +4564,7 @@ method EXPR ($preclvl)
             last;
         }
     }
-    reduce() while +@opstack > 1;
+    &reduce() while +@opstack > 1;
     if @termstack {
         +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
         @termstack[0]<_from> = self.pos;

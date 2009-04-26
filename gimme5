@@ -168,7 +168,7 @@ sub un6 {
         $f =~ s/^eqv//                	        and $t .= qq/eq/, next;
         $f =~ s/^item %//                	and $t .= qq/\\%/, next;
         $f =~ s/^item @//                	and $t .= qq/\\@/, next;
-        $f =~ s/^ \+@//                        	and $t .= qq/ 0+@/, next;
+        $f =~ s/^([( ])\+@//                    and $t .= qq/${1}0+@/, next;
         $f =~ s/^ is rw//               	and $t .= qq//, next;
         $f =~ s/^my\s+(?:[A-Z]\w+)?\s*([\$\@%])(\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s+rw)?\s*;//
                                         	and $t .= qq/local $1::$2;/, $OUR{"$1$2"}++, next;
@@ -191,8 +191,8 @@ sub un6 {
         $f =~ s/^(\s)!!(\s)/$2/           	and $t .= qq/$1:/, next;
         $f =~ s/^\btry \{//                     and $t .= qq/eval {/, next;
         $f =~ s/^\bloop \{//                    and $t .= qq/for (;;) {/, next;
-        $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/else {/, next;
-        $f =~ s/^\bdefault\s+\{//               and $t .= qq/else {/, next;
+        $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/default {/, next;
+#        $f =~ s/^\bdefault\s+\{//               and $t .= qq/else {/, next;
         $f =~ s/^\btemp\b//             	and $t .= qq/local/, next;
         $f =~ s/^\bchars\(//             	and $t .= qq/length(/, next;
         $f =~ s/^\$\?PACKAGE//             	and $t .= qq/__PACKAGE__/, next;
@@ -200,19 +200,22 @@ sub un6 {
         # the following must do partial rescan of final expression
 
         $f =~ s/^\@\((.*?)\)/{$1}/      	and $t .= qq/\@/, next;
-        $f =~ s/^\bif\s+(.*?) \{/($1) {/        and $t .= qq/if /, next;
-        $f =~ s/^\belsif\s+(.*?) \{/($1) {/     and $t .= qq/elsif /, next;
-        $f =~ s/^\bwhile\s+(.*?) \{/($1) {/     and $t .= qq/while /, next;
-        $f =~ s/^\bfor\s+(.*?) \{/($1) {/       and $t .= qq/for /, next;
+        $f =~ s/^\bif\s+(.*?\S)(\s+\{)/($1)$2/        and $t .= qq/if /, next;
+        $f =~ s/^\belsif\s+(.*?\S)(\s+\{)/($1)$2/     and $t .= qq/elsif /, next;
+        $f =~ s/^\bwhile\s+(.*?\S)(\s+\{)/($1)$2/     and $t .= qq/while /, next;
+        $f =~ s/^\bfor\s+(.*?\S)(\s+\{)/($1)$2/       and $t .= qq/for /, next;
+        $f =~ s/^\bgiven\s+(.*?\S)(\s+\{)/($1)$2/       and $t .= qq/given /, next;
+        $f =~ s/^\bwhen\s+(.*?\S)(\s+\{)/($1)$2/       and $t .= qq/when /, next;
         $f =~ s/^\bmy\s+(?:[A-Z]\w+)?\s*([\$\@%])(\w+)\s+is\s+context(?:<rw>)?\s*(?:is\s*rw)?\s*=(\s*.*);/$3;/s
-                                        	and $t .= qq/local $1::$2 = /, $OUR{"$1$2"}++, next;
-        $f =~ s/^\bdo given\s+(.*?\S)\s+\{/$1; if (0) {}/
-                                                and $t .= qq/do { my \$_ = /, next;
-        $f =~ s/^\bgiven\s+(.*?\S)\s+\{/$1; if (0) {}/
-                                                and $t .= qq/do { my \$_ = /, next;
-        $f =~ s/^\bwhen\s+(.*?\S)\s+\{/$1) {/
-                                                and $t .= 'elsif ($_ eq ', next;
+                                        	and $t .= qq/local $1::$2 =/, $OUR{"$1$2"}++, next;
+#        $f =~ s/^\bdo given\s+(.*?\S)\s+\{/$1; if (0) {}/
+#                                                and $t .= qq/do { my \$_ = /, next;
+#        $f =~ s/^\bgiven\s+(.*?\S)\s+\{/$1; if (0) {}/
+#                                                and $t .= qq/do { my \$_ = /, next;
+#        $f =~ s/^\bwhen\s+(.*?\S)\s+\{/$1) {/
+#                                                and $t .= 'elsif ($_ eq ', next;
 
+        $f =~ s/^(\#.*)//                 	and $t .= $1, next;
         $f =~ s/^(.)//s                 	and $t .= $1;
     }
     $t;
@@ -266,6 +269,7 @@ sub MAIN {
 	my $extends = $2 // 'Cursor';
 	$out .= "package $PKG;\n";
 	$out .= <<"END";
+use 5.010;
 use strict;
 use warnings;
 no warnings 'qw', 'recursion';
@@ -273,7 +277,6 @@ use $extends; # for base class as well as DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
 moose_extends('$extends');
 my \$retree;
-use feature 'state', 'say';
 use utf8;
 
 \$DB::deep = \$DB::deep = 1000; # suppress used-once warning
@@ -724,7 +727,7 @@ END
             $line =~ s/&reduce = ->/\$reduce = sub/;
             $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
             $line =~ s/ -> {/sub {/;
-            $line =~ s/\breduce\(\)/\$reduce->()/;
+            $line =~ s/&reduce\(\)/\$reduce->()/;
             $line =~ s/([\$\@%])\*(\w+)/${1}::$2/g;       # assume localized
             if ($line =~ s/^constant %/our %/) {
                 $line =~ tr/{}/()/;

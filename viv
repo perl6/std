@@ -126,13 +126,13 @@ sub VIV::SET_OPT {
 	my $self = shift;
 	my $match = shift;
 	my $rule = shift()//0;
-#	say " for ", $AUTOLOAD, " rule $rule";
+	# say " for ", $AUTOLOAD, " rule $rule";
 	return unless $rule;
 	return if $match->{_ast}{_specific} and ref($match->{_ast}) =~ /^VAST/;
 	my $r = hoist($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
 	$class =~ s/__S_\d\d\d/__S_/ and $r->{_specific} = 1;
-	gen_class($class, $match->{O}{kind});
+	gen_class($class);
 	bless $r, $class unless ref($r) =~ /^VAST/;
 	$r->{MATCH} = $match if $OPT_match;
 	$match->{'_ast'} = $r;
@@ -204,6 +204,12 @@ sub VIV::SET_OPT {
 		}
 	    }
 	    elsif ($k =~ /^[a-zA-Z]/) {
+		if ($k eq 'noun') {	# trim off PRE and POST
+		    if ($OPT_pos) {
+			$r{BEG} = $v->{_from};
+			$r{END} = $v->{_pos};
+		    }
+		}
 		if (ref($v) eq 'ARRAY') {
 		    my $zyg = [];
 		    for my $z (@$v) {
@@ -264,35 +270,25 @@ sub VIV::SET_OPT {
 	my $self = shift;
 	my $match = shift;
 	my $r = hoist($match);
-	(my $class = ref $r) =~ s/^STD/VAST/;
+	my $class = $match->{O}{kind} // $match->{sym} // 'termish';
+	$class =~ s/^STD:://;
+	$class =~ s/^/VAST::/;
 #	print STDERR ::Dump($r);
-	gen_class($class, $match->{O}{kind});
-	$r = bless $r, $class unless ref($r) =~ /^VAST/;
+	gen_class($class);
+	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
     }
 
     sub gen_class {
 	my $class = shift;
-	my $kind = shift;
+	# say $class;
 	no strict 'refs';
-	if ($kind) {
-	    $kind =~ s/STD::/VAST::/;
-	    if (@{$class . '::ISA'} and @{$kind . '::ISA'}) {
-		print STDERR "Existing class $class\n" if $OPT_log;
-		return;
-	    }
-	    print STDERR "Creating class $class $kind\n" if $OPT_log;
-	    @{$class . '::ISA'} = $kind;
-	    @{$kind . '::ISA'} = 'VAST::Base';
+	if (@{$class . '::ISA'}) {
+	    print STDERR "Existing class $class\n" if $OPT_log;
+	    return;
 	}
-	else {
-	    if (@{$class . '::ISA'}) {
-		print STDERR "Existing class $class\n" if $OPT_log;
-		return;
-	    }
-	    print STDERR "Creating class $class\n" if $OPT_log;
-	    @{$class . '::ISA'} = 'VAST::Base';
-	}
+	print STDERR "Creating class $class\n" if $OPT_log;
+	@{$class . '::ISA'} = 'VAST::Base';
     }
 
 }
@@ -369,6 +365,9 @@ sub VIV::SET_OPT {
 		if ($kb > $last) {
 		    push @text, substr($::ORIG, $last, $kb - $last);
 		}
+		if (ref($kid) eq 'HASH') {
+		    print STDERR ::Dump($self);
+		}
 		push @text, scalar $kid->emit_p5($lvl+1);
 		$last = $kid->{END};
 
@@ -393,7 +392,7 @@ sub VIV::SET_OPT {
 { package VAST::Additive; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my @t = $self->SUPER::emit_p5($lvl+1);
-	if ($t[0] eq '*') {
+	if ($t[0] eq '*') {	# *-1
 	    $t[0] = '';
 	}
 	$self->ret(@t);
@@ -432,7 +431,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::assertion__S_Bang; our @ISA = 'VAST::BASE';
+{ package VAST::assertion__S_Bang; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -440,7 +439,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::assertion__S_Bra; our @ISA = 'VAST::BASE';
+{ package VAST::assertion__S_Bra; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -448,7 +447,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::assertion__S_Cur_Ly; our @ISA = 'VAST::BASE';
+{ package VAST::assertion__S_Cur_Ly; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -456,7 +455,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::assertion__S_DotDotDot; our @ISA = 'VAST::BASE';
+{ package VAST::assertion__S_DotDotDot; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -464,7 +463,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::assertion__S_method; our @ISA = 'VAST::BASE';
+{ package VAST::assertion__S_method; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -472,7 +471,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::assertion__S_name; our @ISA = 'VAST::BASE';
+{ package VAST::assertion__S_name; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -480,7 +479,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::assertion__S_Question; our @ISA = 'VAST::BASE';
+{ package VAST::assertion__S_Question; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -488,7 +487,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::atom; our @ISA = 'VAST::BASE';
+{ package VAST::atom; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -520,7 +519,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_Back; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_Back; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -528,7 +527,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_d; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_d; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -536,7 +535,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_h; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_h; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -544,7 +543,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_misc; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_misc; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -552,7 +551,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_n; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_n; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -560,7 +559,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_s; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_s; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -568,7 +567,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_stopper; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_stopper; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -576,7 +575,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_t; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_t; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -584,7 +583,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_v; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_v; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -592,7 +591,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_w; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_w; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -600,7 +599,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::backslash__S_x; our @ISA = 'VAST::BASE';
+{ package VAST::backslash__S_x; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -608,7 +607,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::before; our @ISA = 'VAST::BASE';
+{ package VAST::before; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -656,7 +655,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::circumfix__S_Bra_Ket; our @ISA = 'VAST::BASE';
+{ package VAST::circumfix__S_Bra_Ket; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -664,7 +663,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::circumfix__S_Cur_Ly; our @ISA = 'VAST::BASE';
+{ package VAST::circumfix__S_Cur_Ly; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -672,7 +671,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::circumfix__S_Paren_Thesis; our @ISA = 'VAST::BASE';
+{ package VAST::circumfix__S_Paren_Thesis; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -680,7 +679,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::circumfix__S_sigil; our @ISA = 'VAST::BASE';
+{ package VAST::circumfix__S_sigil; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -688,7 +687,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::codeblock; our @ISA = 'VAST::BASE';
+{ package VAST::codeblock; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -729,9 +728,6 @@ sub VIV::SET_OPT {
 { package VAST::Concatenation; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        if ($t[1] eq '~') {
-            $t[1] = '.';
-        }
         $self->ret(@t);
     }
 }
@@ -805,7 +801,7 @@ sub VIV::SET_OPT {
 }
 
 
-{ package VAST::dotty__S_Dot; our @ISA = 'VAST::BASE';
+{ package VAST::dotty__S_Dot; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
         $self->ret(@t);
@@ -944,9 +940,7 @@ sub VIV::SET_OPT {
 { package VAST::infix__S_ColonEqual; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        if ($t[0] eq ':=') {
-            $t[0] = '=';	# XXX oversimplified
-        }
+	$t[0] = '=';	# XXX oversimplified
         $self->ret(@t);
     }
 }
@@ -1099,9 +1093,7 @@ sub VIV::SET_OPT {
 { package VAST::infix__S_PlusAmp; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        if ($t[0] eq '+&') {
-            $t[0] = '&';
-        }
+	$t[0] = '&';
         $self->ret(@t);
     }
 }
@@ -1109,9 +1101,7 @@ sub VIV::SET_OPT {
 { package VAST::infix__S_PlusVert; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        if ($t[0] eq '+|') {
-            $t[0] = '|';
-        }
+	$t[0] = '|';
         $self->ret(@t);
     }
 }
@@ -1168,17 +1158,16 @@ sub VIV::SET_OPT {
 { package VAST::infix__S_Tilde; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = '.';
         $self->ret(@t);
     }
 }
 
 
-{ package VAST::infix__S_TildeTilde; our @ISA = 'VAST::BASE';
+{ package VAST::infix__S_TildeTilde; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-	if ($t[0] eq '~~') {
-	    $t[0] = '=~';
-	}
+	$t[0] = '=~';
         $self->ret(@t);
     }
 }
@@ -1186,9 +1175,7 @@ sub VIV::SET_OPT {
 { package VAST::infix__S_TildeVert; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        if ($t[0] eq '~|') {
-            $t[0] = '|';
-        }
+	$t[0] = '|';
         $self->ret(@t);
     }
 }
@@ -1245,6 +1232,7 @@ sub VIV::SET_OPT {
 { package VAST::lambda; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = 'sub';
         $self->ret(@t);
     }
 }
@@ -1499,9 +1487,14 @@ sub VIV::SET_OPT {
 	elsif ($t[0] =~ /^\$\w+$/) {
 	    $t[1] =~ s/^([[{])/.$1/;
 	}
+	elsif ($t[0] =~ s/^&(\w+)/\$$1/) {
+	    $t[1] =~ s/^\(/->(/;
+	}
 	$t[1] =~ s/^\./->/;
+	my $t = join('', @t);
+	$t =~ s/^(.*\S)\s*:(delete|exists)/$2 $1/;
 #	print STDERR ::Dump(\@t);
-	$self->ret(@t);
+	$self->ret($t);
     }
 }
 
@@ -1974,6 +1967,8 @@ sub VIV::SET_OPT {
 { package VAST::postcircumfix__S_Lt_Gt; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = "{'";
+	$t[-1] = "'}";
         $self->ret(@t);
     }
 }
@@ -2078,6 +2073,7 @@ sub VIV::SET_OPT {
 { package VAST::prefix__S_Plus; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = '0+';
         $self->ret(@t);
     }
 }
@@ -2086,6 +2082,7 @@ sub VIV::SET_OPT {
 { package VAST::prefix__S_temp; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = 'local';
         $self->ret(@t);
     }
 }
@@ -2368,7 +2365,10 @@ sub VIV::SET_OPT {
 { package VAST::scope_declarator__S_my; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
+	my $t = join('', @t);
+	$t =~ s/my(\s+)&(\w+)/my$1\$$2/;
+	$t =~ s/my(\s+)([\$@%])(\w+)\s+is\s+context(?:\{'rw'})?/local$1${2}::$3/;
+        $self->ret($t);
     }
 }
 
@@ -2473,12 +2473,6 @@ sub VIV::SET_OPT {
 { package VAST::special_variable; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my @t = $self->SUPER::emit_p5($lvl+1);
-	if ($t[0] eq '$¢') {
-	    $t[0] = '$C';
-	}
-	elsif ($t[0] eq '$/') {
-	    $t[0] = '$M';
-	}
 	$self->ret(@t);
     }
 }
@@ -2486,6 +2480,7 @@ sub VIV::SET_OPT {
 { package VAST::special_variable__S_Dollar_a2_; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = '$C';
         $self->ret(@t);
     }
 }
@@ -2494,6 +2489,7 @@ sub VIV::SET_OPT {
 { package VAST::special_variable__S_DollarSlash; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = '$M';
         $self->ret(@t);
     }
 }
@@ -2550,7 +2546,10 @@ sub VIV::SET_OPT {
 { package VAST::statement_control__S_loop; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
+	my $t = join('', @t);
+	$t =~ s/^loop(\s+\()/for$1/;
+	$t =~ s/^loop/for (;;)/;
+        $self->ret($t);
     }
 }
 
@@ -2694,6 +2693,10 @@ sub VIV::SET_OPT {
 { package VAST::term__S_identifier; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	if ($t[0] eq 'item') {
+	    $t[0] = '\\';
+	    $t[1] =~ s/^\s+//;
+	}
         $self->ret(@t);
     }
 }
@@ -2791,9 +2794,6 @@ sub VIV::SET_OPT {
 { package VAST::term; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my @t = $self->SUPER::emit_p5($lvl+1);
-	if ($t[0] eq 'self') {
-	    $t[0] = '$self'
-	}
 	$self->ret(@t);
     }
 }
@@ -2809,6 +2809,7 @@ sub VIV::SET_OPT {
 { package VAST::term__S_self; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = '$self';
         $self->ret(@t);
     }
 }
@@ -2874,9 +2875,6 @@ sub VIV::SET_OPT {
 { package VAST::twigil; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my @t = $self->SUPER::emit_p5($lvl+1);
-	if ($t[0] eq '*') {
-	    $t[0] = '::';
-	}
 	$self->ret(@t);
     }
 }
@@ -2884,6 +2882,7 @@ sub VIV::SET_OPT {
 { package VAST::twigil__S_Dot; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = 'self->';	# XXX
         $self->ret(@t);
     }
 }
@@ -2892,6 +2891,7 @@ sub VIV::SET_OPT {
 { package VAST::twigil__S_Star; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = '::';
         $self->ret(@t);
     }
 }
