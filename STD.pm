@@ -3450,7 +3450,7 @@ token type_declarator:subset {
 
 token type_declarator:enum {
     <sym> <.ws>
-    <longname> <.ws> <trait>* <?before <[ < ( ]> > <arglist> <.ws>
+    <longname> <.ws> <trait>* <?before <[ < ( « ]> > <arglist> <.ws>
         { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<arglist>.Str); }
 }
 
