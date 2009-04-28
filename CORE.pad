@@ -310,6 +310,7 @@
     '&value' => { name => '&value', file => 'CORE.pad', line => __LINE__ },
     '&pairs' => { name => '&pairs', file => 'CORE.pad', line => __LINE__ },
     '&pair' => { name => '&pair', file => 'CORE.pad', line => __LINE__ },
+    '&enum' => { name => '&enum', file => 'CORE.pad', line => __LINE__ },
 
     '&sign' => { name => '&sign', file => 'CORE.pad', line => __LINE__ },
     '&abs' => { name => '&abs', file => 'CORE.pad', line => __LINE__ },

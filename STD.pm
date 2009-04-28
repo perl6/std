@@ -3443,18 +3443,15 @@ token type_declarator:subset {
     [
         <longname> { $¢.add_name($<longname>.Str); }
         [ of <.ws> <fulltypename> ]?
+        <trait>*
         [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
     ] || <.panic: "Malformed subset">
 }
 
 token type_declarator:enum {
-    :my $l;
     <sym> <.ws>
-    [
-    || $l = <longname>  <.ws> <arglist> <.ws>
-        { $¢.add_name($l.Str); $¢.add_enum($l.Str, $<arglist>.Str); }
-    || <arglist> <.ws>
-    ]
+    <longname> <.ws> <trait>* <?before <[ < ( ]> > <arglist> <.ws>
+        { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<arglist>.Str); }
 }
 
 token type_constraint {
