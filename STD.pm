@@ -1714,9 +1714,9 @@ rule scoped {
     | <declarator>
     | <regex_declarator>
     | <package_declarator>
-    | <fulltypename>+
+    | <typename>+
         {
-            my $t = $<fulltypename>;
+            my $t = $<typename>;
             @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
         }
         <multi_declarator>
@@ -2242,6 +2242,7 @@ token value:quote   { <quote> }
 token value:number  { <number> }
 token value:version { <version> }
 
+# Note: call this only to use existing type, not to declare type
 token typename {
     [
     | '::?'<identifier>                 # parse ::?CLASS as special case
@@ -2258,10 +2259,7 @@ token typename {
     ]
     # parametric type?
     <.unsp>? [ <?before '['> <postcircumfix> ]?
-}
-
-rule fulltypename {<typename>['|'<typename>]*
-    [ of <.ws> <fulltypename> ]?
+    <.ws> [ 'of' <.ws> <typename> ]?
 }
 
 token numish {
@@ -3401,9 +3399,9 @@ token trait_auxiliary:will {
     <sym> <.ws> <identifier> <.ws> <block>
 }
 
-rule trait_verb:of      {<sym> <fulltypename> }
-rule trait_verb:as      {<sym> <fulltypename> }
-rule trait_verb:returns {<sym> <fulltypename> }
+rule trait_verb:of      {<sym> <typename> }
+rule trait_verb:as      {<sym> <typename> }
+rule trait_verb:returns {<sym> <typename> }
 rule trait_verb:handles {<sym> <noun> }
 
 token capterm {
@@ -3436,15 +3434,16 @@ token signature {
     | <parameter>
     ] ** <param_sep>
     <.ws>
-    [ '-->' <.ws> <fulltypename> ]?
-    {{ $*IN_DECL = 0; $*SIGIL = '@'; $*CURPAD.{'$?GOTSIG'} ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')'; }}
+    { $*IN_DECL = 0; }
+    [ '-->' <.ws> <typename> ]?
+    {{ $*SIGIL = '@'; $*CURPAD.{'$?GOTSIG'} ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')'; }}
 }
 
 token type_declarator:subset {
     <sym> :s
     [
         <longname> { $¢.add_name($<longname>.Str); }
-        [ of <.ws> <fulltypename> ]?
+        [ of <.ws> <typename> ]?
         <trait>*
         [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
     ] || <.panic: "Malformed subset">
@@ -3459,7 +3458,7 @@ token type_declarator:enum {
 token type_constraint {
     [
     | <value>
-    | <fulltypename>
+    | <typename>
     | where <.ws> <EXPR(item %chaining)>
     ]
     <.ws>
@@ -3718,9 +3717,6 @@ token infix:lambda ( --> Term) {
 
 token circumfix:sigil ( --> Term)
     { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*SIGIL ||= $<sigil>.Str } }
-
-#token circumfix:typecast ( --> Term)
-#    { <typename> '(' ~ ')' <semilist> }
 
 token circumfix:sym<( )> ( --> Term)
     { :dba('parenthesized expression') '(' ~ ')' <semilist> }
@@ -4125,9 +4121,6 @@ token term:sym<???> ( --> List_prefix)
 
 token term:sym<!!!> ( --> List_prefix)
     { <sym> <args>? }
-
-# token term:typecast ( --> List_prefix)
-#     { <typename> <?spacey> <arglist> { $<sym> = $<typename>.Str; } }
 
 # force identifier(), identifier.(), etc. to be a function call always
 token term:identifier ( --> Term )
