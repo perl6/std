@@ -984,7 +984,7 @@ rule comp_unit {
 
 token pblock ($CURPAD is context<rw> = $*CURPAD) {
     :dba('parameterized block')
-    <?before <.lambda> | '{' >
+    [<?before <.lambda> | '{' > || <.panic: "Missing block">]
     [
     | <lambda>
         <.newpad>
@@ -993,7 +993,7 @@ token pblock ($CURPAD is context<rw> = $*CURPAD) {
     | <?before '{'>
         <.newpad>
         <blockoid>
-    ] || <.panic: "Malformed block">
+    ]
 }
 
 token lambda { '->' | '<->' }
@@ -1017,7 +1017,8 @@ token blockoid {
     <.finishpad>
     [
     | '{' ~ '}' <statementlist>
-    | <?terminator> <.panic: 'Missing {...}'>
+    | <?terminator> <.panic: 'Missing block'>
+    | <?> <.panic: "Malformed block">
     ]
 
     [
@@ -1169,6 +1170,7 @@ token statement_control:if {
     <sym> :s
     <xblock>
     [
+        [ <!before 'else'\s*'if'> || <.panic: "Please use 'elsif'"> ]
         'elsif'<?spacey> <elsif=xblock>       {*}                #= elsif
     ]*
     [
