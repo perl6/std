@@ -1021,28 +1021,42 @@ sub do_imports { my $self = shift;
     my $text = $args->Str;
     if ($text ne '') {
         return unless $text;
-        while ($text =~ s/^\s*:?(OUR|MY|STATE)?<(.*?)>,?//) {
+        while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
             my $scope = lc($1) || 'my';
             my $imports = $2;
-            local $::SCOPE = 'my';
+            local $::SCOPE = $scope;
             @imports = split ' ', $imports;
+            for (@imports) {
+                if (/^\w/) {
+                    if (/::/) {
+                        $self->add_name($_);
+                    }
+                    else {
+                        $self->add_routine($_);
+                    }
+                }
+                else {
+                    $self->add_variable($_);
+                }
+            }
         }
     }
     else {
         my $pkg = $self->find_stab($module . '::');
         @imports = keys %$pkg;
-    }
-    for (@imports) {
-        if (/^\w/) {
-            if (/::/) {
-                $self->add_name($_);
+        local $::SCOPE = 'my';
+        for (@imports) {
+            if (/^\w/) {
+                if (/::/) {
+                    $self->add_name($_);
+                }
+                else {
+                    $self->add_routine($_);
+                }
             }
             else {
-                $self->add_routine($_);
+                $self->add_variable($_);
             }
-        }
-        else {
-            $self->add_variable($_);
         }
     }
     $self;

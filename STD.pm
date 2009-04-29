@@ -232,8 +232,12 @@ method find_top_pkg ($name) {
 }
 
 method add_name ($name) {
+    my $scope = $*SCOPE // 'our';
     # say "Adding $*SCOPE $name in $*PKGNAME";
-    if ($*SCOPE//'') eq 'our' or $name ~~ /::/ {
+    if $scope eq 'augment' or $scope eq 'supersede' {
+        self.is_name($name) or self.panic("Can't $scope a non-existent type");
+    }
+    elsif $scope eq 'our' or $name ~~ /::/ {
         self.add_our_name($name);
     }
     else {
@@ -245,7 +249,12 @@ method add_name ($name) {
 method add_my_name ($name) {
     # say "add_my_name $name";
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    $*CURPAD.{$name} //= { name => $name };
+    if $*CURPAD.{$name}:exists {
+        self.worry("Name $name redeclared") unless $*SCOPE eq 'use';
+    }
+    else {
+        $*CURPAD.{$name} //= { name => $name };
+    }
     self;
 }
 
@@ -277,8 +286,18 @@ method add_our_name ($name) {
     }
     $name ~~ s/^\<//;
     $name ~~ s/\>$//;
-    $curpkg.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
-    $*CURPAD.{$name} //= $curpkg.{$name};  # the lexical alias
+    if $curpkg.{$name}:exists {
+        self.worry("Name $name redeclared");
+    }
+    else {
+        $curpkg.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+    }
+    if $*CURPAD.{$name}:exists {
+        self.worry("Name $name redeclared");
+    }
+    else {
+        $*CURPAD.{$name} = $curpkg.{$name};  # the lexical alias
+    }
     my $n = $*CURPAD.{$name ~ '::'} //= $curpkg.{$name ~ '::'} //= { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
     # say "Added package $name $n to $curpkg ";
     self;
@@ -1151,8 +1170,9 @@ token statement_control:use {
     | <version>
     | <module_name><arglist>?
         {{
+            my $SCOPE is context = 'use';
             my $longname = $<module_name><longname>.Str;
-            $¢.add_our_name($longname);
+            $¢.add_my_name($longname);
             # XXX cheat on import list for now
             $¢.do_imports($longname, $<arglist>[0]);
         }}

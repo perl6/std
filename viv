@@ -92,7 +92,9 @@ sub MAIN {
 	delete $r->{MATCH}{CORE};
     }
     if ($output eq 'ast') {
-	print Dump($r);
+	my $x = Dump($r);
+#	$x =~ s/\n.*: \[\]$//mg;
+	print $x;
     }
     elsif ($output eq 'p6') {
 	print $r->ret($r->emit_p6);
