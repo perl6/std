@@ -1007,7 +1007,6 @@ sub add_enum { my $self = shift;
     while ($expr =~ s/^\s*[<'](.*?)[>'],?//) {
         for (split ' ', $1) {
             next unless /^\w/; 
-            $self->add_name($_);
             $self->add_name($type . "::$_");
         }
     }
