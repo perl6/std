@@ -1304,7 +1304,13 @@ rule statement_mod_loop:given {<sym> <modifier_expr> }
 
 token def_module_name {
     <longname>
-    [ :dba('generic role') <?{ ($*PKGDECL//'') eq 'role' }> '[' ~ ']' <signature> ]?
+    [ :dba('generic role')
+        <?{ ($*PKGDECL//'') eq 'role' }>
+        <.newpad>
+        '[' ~ ']' <signature>
+        { $*IN_DECL = 0; }
+        <.finishpad>
+    ]?
 }
 
 token module_name:normal {
