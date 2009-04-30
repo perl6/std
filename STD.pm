@@ -3130,8 +3130,8 @@ method unitstop ($stop) { self.mixin( ::unitstop[$stop] ); }
 
 token charname {
     [
-    | \d+
-    | <[A..Z]><-[ \] , # ]>*?<[A..Z ) ]> <?before \s*<[ \] , # ]>>
+    | <radint>
+    | <[a..z A..Z]><-[ \] , # ]>*?<[a..z A..Z ) ]> <?before \s*<[ \] , # ]>>
     ] || <.panic: "Unrecognized character name">
 }
 
