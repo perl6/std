@@ -9,6 +9,7 @@ my $GOAL is context = "(eof)";
 my $PARSER is context<rw>;
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
+my $IN_REDUCE is context<rw> = 0;
 my $INTERPOLATION is context<rw> = '';
 my $IN_META is context<rw> = 0;
 my $QUASI_QUASH is context<rw>;
@@ -568,6 +569,7 @@ constant %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
 #constant $LOOSEST = %LOOSEST<prec>;
 constant $LOOSEST = "a=!"; # XXX preceding line is busted
 constant $item_assignment_prec = 'i=';
+constant $methodcall_prec = 'y=';
 
 
 role PrecOp {
@@ -1114,6 +1116,7 @@ token label {
 
 token statement {
     :my $endargs is context = -1;
+    :my $INTERPOLATION is context<rw> = 0;
     <!before <[\)\]\}]> >
 
     # this could either be a statement that follows a declaration
@@ -1541,6 +1544,7 @@ method can_meta ($op, $meta) {
 }
 
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
+    :my $IN_REDUCE is context<rw> = 1;
     <?before '['\S+']'>
     $<s> = (
         '['
@@ -1677,6 +1681,7 @@ token arglist {
     :my $inv_ok = $*INVOCANT_OK;
     :my StrPos $endargs is context<rw> = 0;
     :my $GOAL is context = 'endargs';
+    :my $INTERPOLATION is context<rw> = 0;
     <.ws>
     :dba('argument list')
     [
@@ -2186,7 +2191,14 @@ token variable {
         # Note: $() can also parse as contextualizer in an expression; should have same effect
         | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
         | <sigil> <?{ $*IN_DECL }> {*}                              #= anondecl
-        | <.panic: "Anonymous variable requires declarator">
+        | <?> {{
+            if $*INTERPOLATION {
+                return ();
+            }
+            else {
+                $¢.panic("Anonymous variable requires declarator");
+            }
+          }}
         ]
     ]
 
@@ -2236,6 +2248,7 @@ token name {
 }
 
 token morename {
+    :my $INTERPOLATION is context<rw> = 0;
     '::'
     [
         <?before '(' | <alpha> >
@@ -2354,9 +2367,13 @@ token rad_number {
     ]
 }
 
+token octints { [<.ws><octint><.ws>] ** ',' }
+
 token octint {
     <[ 0..7 ]>+ [ _ <[ 0..7 ]>+ ]*
 }
+
+token hexints { [<.ws><hexint><.ws>] ** ',' }
 
 token hexint {
     <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
@@ -2555,6 +2572,10 @@ token quote:sym«< >»   { '<'
                               [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
                               [ <?before '>' > <.obs('<>', 'lines() or ()')> ]?
                               <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
+
+token quote:sym<//>   {
+    '/'\s*'/' <.panic: "Null regex not allowed">
+}
 
 token quote:sym</ />   {
     '/' <nibble( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
@@ -3107,8 +3128,22 @@ method balanced ($start,$stop) { self.mixin( ::startstop[$start,$stop] ); }
 method unbalanced ($stop) { self.mixin( ::stop[$stop] ); }
 method unitstop ($stop) { self.mixin( ::unitstop[$stop] ); }
 
-token codepoint {
-    '[' {} ( [<!before ']'> .]*? ) ']'
+token charname {
+    [
+    | \d+
+    | <[A..Z]><-[ \] , # ]>*?<[A..Z ) ]> <?before \s*<[ \] , # ]>>
+    ] || <.panic: "Unrecognized character name">
+}
+
+token charnames { [<.ws><charname><.ws>] ** ',' }
+
+token charspec {
+    [
+    | '[' ~ ']' <charnames>
+    | \d+
+    | <[ ?..Z \\.._ ]>
+    | <?> <.panic: "Unrecognized \\c character">
+    ]
 }
 
 method truly ($bool,$opt) {
@@ -3125,20 +3160,14 @@ grammar Q is STD {
         token backslash:stopper { <text=stopper> }
         token backslash:a { <sym> }
         token backslash:b { <sym> }
-        token backslash:c { <sym>
-            [
-            | <codepoint>
-            | \d+
-            | [ <[ ?.._ ]> || <.panic: "Unrecognized \\c character"> ]
-            ]
-        }
+        token backslash:c { <sym> <charspec> }
         token backslash:e { <sym> }
         token backslash:f { <sym> }
         token backslash:n { <sym> }
-        token backslash:o { <sym> [ <octint> | '[' <octint>**',' ']' ] }
+        token backslash:o { <sym> [ <octint> | '[' ~ ']' <octints> ] }
         token backslash:r { <sym> }
         token backslash:t { <sym> }
-        token backslash:x { <sym> [ <hexint> | '[' [<.ws><hexint><.ws> ] ** ',' ']' ] }
+        token backslash:x { <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
         token backslash:sym<0> { <sym> }
     } # end role
 
@@ -3731,6 +3760,7 @@ token infix:lambda ( --> Term) {
                 "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
             }
         }
+        return () if $*IN_REDUCE;
         $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
     }}
 }
@@ -4503,6 +4533,8 @@ method EXPR ($preclvl)
         @termstack[*-1].<POST>:delete;
         self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
 
+        last TERM if $preclim eq $methodcall_prec; # in interpolation, probably
+
         loop {     # while we see adverbs
             $oldpos = $here.pos;
             last TERM if (@*MEMOS[$oldpos]<endstmt> // 0) == 2;
@@ -4806,26 +4838,20 @@ grammar Regex is STD {
     token backslash:A { <sym> <.obs('\\A as beginning-of-string matcher', '^')> }
     token backslash:a { <sym> <.panic: "\\a is allowed only in strings, not regexes"> }
     token backslash:b { :i <sym> }
-    token backslash:c { :i <sym>
-        [
-        | <codepoint>
-        | \d+
-        | [ <[ ?.._ ]> || <.panic: "Unrecognized \\c character"> ]
-        ]
-    }
+    token backslash:c { :i <sym> <charspec> }
     token backslash:d { :i <sym> }
     token backslash:e { :i <sym> }
     token backslash:f { :i <sym> }
     token backslash:h { :i <sym> }
     token backslash:n { :i <sym> }
-    token backslash:o { :i <sym> [ <octint> | '['<octint>[','<octint>]*']' ] }
+    token backslash:o { :i <sym> [ <octint> | '[' ~ ']' <octints> ] }
     token backslash:Q { <sym> <.obs('\\Q as quotemeta', 'quotes or literal variable match')> }
     token backslash:r { :i <sym> }
     token backslash:s { :i <sym> }
     token backslash:t { :i <sym> }
     token backslash:v { :i <sym> }
     token backslash:w { :i <sym> }
-    token backslash:x { :i <sym> [ <hexint> | '[' [<.ws><hexint><.ws> ] ** ',' ']' ] }
+    token backslash:x { :i <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
     token backslash:z { <sym> <.obs('\\z as end-of-string matcher', '$')> }
     token backslash:Z { <sym> <.obs('\\Z as end-of-string matcher', '\\n?$')> }
     token backslash:misc { $<litchar>=(\W) }
@@ -5061,7 +5087,7 @@ grammar P5Regex is STD {
     token backslash:h { :i <sym> }
     token backslash:l { :i <sym> }
     token backslash:n { :i <sym> }
-    token backslash:o { '0' [ <octint> | '{'<octint>[','<octint>]*'}' ]? }
+    token backslash:o { '0' [ <octint> | '{' ~ '}' <octints> ] }
     token backslash:p { :i <sym> '{' <[\w:]>+ '}' }
     token backslash:Q { <sym> }
     token backslash:r { :i <sym> }
@@ -5070,7 +5096,7 @@ grammar P5Regex is STD {
     token backslash:u { :i <sym> }
     token backslash:v { :i <sym> }
     token backslash:w { :i <sym> }
-    token backslash:x { :i <sym> [ <hexint> | '{' [<.ws><hexint><.ws> ] ** ',' '}' ] }
+    token backslash:x { :i <sym> [ <hexint> | '{' ~ '}' <hexints> ] }
     token backslash:z { :i <sym> }
     token backslash:misc { $<litchar>=(\W) | $<number>=(\d+) }
     token backslash:oops { <.panic: "Unrecognized Perl 5 regex backslash sequence"> }

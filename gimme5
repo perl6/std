@@ -2116,7 +2116,7 @@ END
             ::panic("Can't reverse serial disjunction") if $REV;
             for (@result) { s/^/eval { push \@gather, / }
             my $result = "do { my \@gather;\n" .
-                            ::indent(join("} \nor\n", @result),2) .
+                            ::indent(join("} // do {die \$@ if \$@ and \$@ !~ /ABORT/;1} \nor\n", @result),2) .
                           "} or do { die \$@ if \$@ };\n  \@gather;\n}";
             $result;
         }
