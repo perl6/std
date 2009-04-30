@@ -250,11 +250,23 @@ method add_name ($name) {
 method add_my_name ($name) {
     # say "add_my_name $name";
     $name = substr($name,2) while substr($name,0,2) eq '::';
-    if $*CURPAD.{$name}:exists {
+    my $curpkg = $*CURPAD;
+    if $name ~~ /::/ {
+        my @components = split(/\:\:/,$name);
+        my $first = @components[0] ~ '::';
+        while @components > 1 {
+            my $pkg = shift @components;
+            $curpkg.{$pkg} //= { name => $pkg, file => $COMPILING::FILE, line => self.line };
+            $curpkg = $curpkg.{$pkg ~ '::'} //= { };
+            # say "Adding new package $pkg in $curpkg ";
+        }
+        $name = shift @components;
+    }
+    if $*curpkg.{$name}:exists {
         self.worry("Name $name redeclared") unless $*SCOPE eq 'use';
     }
     else {
-        $*CURPAD.{$name} //= { name => $name };
+        $*curpkg.{$name} //= { name => $name };
     }
     self;
 }
