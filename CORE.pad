@@ -98,6 +98,7 @@
     Method => { name => 'Method', file => 'CORE.pad', line => __LINE__ },
     Submethod => { name => 'Submethod', file => 'CORE.pad', line => __LINE__ },
     Regex => { name => 'Regex', file => 'CORE.pad', line => __LINE__ },
+    Multi => { name => 'Multi', file => 'CORE.pad', line => __LINE__ },
 
     Str => { name => 'Str', file => 'CORE.pad', line => __LINE__ },
     Blob => { name => 'Blob', file => 'CORE.pad', line => __LINE__ },
