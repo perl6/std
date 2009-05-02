@@ -1004,11 +1004,8 @@ sub add_enum { my $self = shift;
     my $expr = shift;
     return unless $expr;
     # XXX complete kludge, really need to eval EXPR
-    while ($expr =~ s/^\s*[<'](.*?)[>'],?//) {
-        for (split ' ', $1) {
-            next unless /^\w/; 
-            $self->add_name($type . "::$_");
-        }
+    for ($expr =~ m/([a-zA-Z_]\w*)/g) {
+        $self->add_name($type . "::$_");
     }
     $self;
 }

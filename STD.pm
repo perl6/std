@@ -238,7 +238,7 @@ method add_name ($name) {
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or self.panic("Can't $scope a non-existent type");
     }
-    elsif $scope eq 'our' or $name ~~ /::/ {
+    elsif $scope eq 'our' {
         self.add_our_name($name);
     }
     else {
@@ -3518,8 +3518,8 @@ token type_declarator:subset {
 
 token type_declarator:enum {
     <sym> <.ws>
-    <longname> <.ws> <trait>* <?before <[ < ( « ]> > <arglist> <.ws>
-        { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<arglist>.Str); }
+    <longname> <.ws> <trait>* <?before <[ < ( « ]> > <noun> <.ws>
+        { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<noun>.Str); }
 }
 
 token type_constraint {
