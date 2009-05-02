@@ -290,6 +290,7 @@
     '&lines' => { name => '&lines', file => 'CORE.pad', line => __LINE__ },
     '&getc' => { name => '&getc', file => 'CORE.pad', line => __LINE__ },
     '&chdir' => { name => '&chdir', file => 'CORE.pad', line => __LINE__ },
+    '&chmod' => { name => '&chmod', file => 'CORE.pad', line => __LINE__ },
 
     '&zip' => { name => '&zip', file => 'CORE.pad', line => __LINE__ },
     '&each' => { name => '&each', file => 'CORE.pad', line => __LINE__ },
