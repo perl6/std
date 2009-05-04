@@ -202,6 +202,12 @@ sub load_pad {
     $PADS{$setting};
 }
 
+sub you_are_here {
+    my $self = shift;
+    print ::Dump($::CURPAD);
+    $self;
+}
+
 sub mixin {
     my $self = shift;
     my $WHAT = ref($self)||$self;

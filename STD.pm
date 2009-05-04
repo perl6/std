@@ -2201,7 +2201,7 @@ token variable {
         ]
     || <?before '$::('> '$' <name>?
     || '$::' <name>? # XXX
-    || '$:' <name>? # XXX
+    || '$:' <name> # XXX
     || [
         | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str } {*}                                    #= desigilname
         | <special_variable> {*}                                    #= special
@@ -3695,14 +3695,14 @@ rule default_value {
     '=' <EXPR(item %item_assignment)>
 }
 
-token statement_prefix:try     { <sym> <?before \s> <.ws> <statement> }
-token statement_prefix:gather  { <sym> <?before \s> <.ws> <statement> }
-token statement_prefix:contend { <sym> <?before \s> <.ws> <statement> }
-token statement_prefix:async   { <sym> <?before \s> <.ws> <statement> }
-token statement_prefix:maybe   { <sym> <?before \s> <.ws> <statement> }
-token statement_prefix:lazy    { <sym> <?before \s> <.ws> <statement> }
-token statement_prefix:do      { <sym> <?before \s> <.ws> <statement> {{
-        my $loop = $<statement><statement_mod_loop>;
+token statement_prefix:try     { <sym> <blorst> }
+token statement_prefix:gather  { <sym> <blorst> }
+token statement_prefix:contend { <sym> <blorst> }
+token statement_prefix:async   { <sym> <blorst> }
+token statement_prefix:maybe   { <sym> <blorst> }
+token statement_prefix:lazy    { <sym> <blorst> }
+token statement_prefix:do      { <sym> <blorst> {{
+        my $loop = $<blorst><statement><statement_mod_loop>;
         if $loop and @$loop and (my $s = $loop.[0].<sym>) ~~ /while|until/ {
             $¢.obs("do...$s" ,"repeat...$s");
         }
@@ -3710,10 +3710,23 @@ token statement_prefix:do      { <sym> <?before \s> <.ws> <statement> {{
 }
 token statement_prefix:lift    {
     :my $QUASI_QUASH is context = 1;
-    <sym> <?before \s> <.ws> <statement>
+    <sym> <blorst>
+}
+
+token blorst {
+    <?before \s> <.ws>
+    [
+    | <block>
+    | <statement>
+    ]
 }
 
 ## term
+
+# start playing with the setting stubber
+token term:YOU_ARE_HERE ( --> Term) {
+    <sym> <.you_are_here>
+}
 
 token term:new ( --> Term) {
     'new' \h+ <longname> \h* <!before ':'> <.obs("C++ constructor syntax", "method call syntax")>
@@ -4660,9 +4673,9 @@ grammar Regex is STD {
     multi method tweak (:$codes) { self }
     multi method tweak (:$graphs) { self }
     multi method tweak (:$chars) { self }
-    multi method tweak (:$rw) { self.panic(":rw not implemented") }
-    multi method tweak (:$keepall) { self.panic(":keepall not implemented") }
-    multi method tweak (:$panic) { self.panic(":panic not implemented") }
+    multi method tweak (:$rw) { self }
+    multi method tweak (:$keepall) { self }
+    multi method tweak (:$panic) { self }
     # end tweaks (DO NOT ERASE)
 
     token category:metachar { <sym> }
