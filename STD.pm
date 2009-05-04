@@ -3456,7 +3456,10 @@ rule trait {
 }
 
 token trait_auxiliary:is {
-    <sym> <.ws> <longname><postcircumfix>?
+    <sym> <.ws> <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
+}
+token trait_auxiliary:hides {
+    <sym> <.ws> <module_name>
 }
 token trait_auxiliary:does {
     :my $PKGDECL is context = 'role';
