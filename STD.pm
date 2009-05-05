@@ -508,46 +508,51 @@ method check_variable ($variable) {
                 $variable.worry("Unrecognized variable: $name") unless $name ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:/;
             }
             else {
-                my $v;
-                given $name {
-                    when '$?FILE'     { $v = $COMPILING::FILE; }
-                    when '$?LINE'     { $v = $variable.lineof($variable.pos); }
-                    when '$?POSITION' { $v = $variable.pos; }
-
-                    when '$?PARSER'   { $v = $*PARSER; }
-                    when '$?LANG'     { $v = $*LANG; }
-
-                    when '$?SCOPE'    { $v = $*CURPAD; }
-
-                    when '$?PACKAGE'  { $v = $*CURPKG; }
-                    when '$?MODULE'   { $v = $*CURPKG; } #  XXX should scan
-                    when '$?CLASS'    { $v = $*CURPKG; } #  XXX should scan
-                    when '$?ROLE'     { $v = $*CURPKG; } #  XXX should scan
-                    when '$?GRAMMAR'  { $v = $*CURPKG; } #  XXX should scan
-
-                    when '$?PACKAGENAME' { $v = $*PKGNAME; }
-
-                    when '$?OS'       { $v = 'unimpl'; }
-                    when '$?DISTRO'   { $v = 'unimpl'; }
-                    when '$?VM'       { $v = 'unimpl'; }
-                    when '$?XVM'      { $v = 'unimpl'; }
-                    when '$?PERL'     { $v = 'unimpl'; }
-
-                    when '$?USAGE'    { $v = 'unimpl'; }
-
-                    when '&?ROUTINE'  { $v = 'unimpl'; }
-                    when '&?BLOCK'    { $v = 'unimpl'; }
-
-                    when '%?CONFIG'    { $v = 'unimpl'; }
-                    when '%?DEEPMAGIC' { $v = 'unimpl'; }
-
-                    default { $variable.worry("Unrecognized variable: $name"); }
-                }
+                # search upward through languages to STD
+                my $v = $variable.lookup_compiler_var($name);
                 $variable.<value> = $v if $v;
             }
         }
     }
     self;
+}
+
+method lookup_compiler_var($name) {
+    given $name {
+        when '$?FILE'     { return $COMPILING::FILE; }
+        when '$?LINE'     { return self.lineof(self.pos); }
+        when '$?POSITION' { return self.pos; }
+
+        when '$?PARSER'   { return $*PARSER; }
+        when '$?LANG'     { return $*LANG; }
+
+        when '$?SCOPE'    { return $*CURPAD; }
+
+        when '$?PACKAGE'  { return $*CURPKG; }
+        when '$?MODULE'   { return $*CURPKG; } #  XXX should scan
+        when '$?CLASS'    { return $*CURPKG; } #  XXX should scan
+        when '$?ROLE'     { return $*CURPKG; } #  XXX should scan
+        when '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
+
+        when '$?PACKAGENAME' { return $*PKGNAME; }
+
+        when '$?OS'       { return 'unimpl'; }
+        when '$?DISTRO'   { return 'unimpl'; }
+        when '$?VM'       { return 'unimpl'; }
+        when '$?XVM'      { return 'unimpl'; }
+        when '$?PERL'     { return 'unimpl'; }
+
+        when '$?USAGE'    { return 'unimpl'; }
+
+        when '&?ROUTINE'  { return 'unimpl'; }
+        when '&?BLOCK'    { return 'unimpl'; }
+
+        when '%?CONFIG'    { return 'unimpl'; }
+        when '%?DEEPMAGIC' { return 'unimpl'; }
+
+        # (derived grammars should default to nextsame, terminating here)
+        default { self.worry("Unrecognized variable: $name"); return 0; }
+    }
 }
 
 # The internal precedence levels are *not* part of the public interface.
