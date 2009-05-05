@@ -973,50 +973,57 @@ rule comp_unit {
         if @COMPILING::WORRIES {
             warn "Potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES) ~ "\n";
         }
-
-        my %post_types;
-        my %unk_types;
-        my %unk_routines;
-        for keys(%*MYSTERY) {
-            my $p = %*MYSTERY{$_}.<pad>;
-            if $¢.is_name($_, $p) {
-                # types may not be post-declared
-                %post_types{$_} = %*MYSTERY{$_};
-                next;
-            }
-
-            next if $¢.is_known($_, $p);
-
-            # just a guess, but good enough to improve error reporting
-            if $_ lt 'a' {
-                %unk_types{$_} = %*MYSTERY{$_};
-            }
-            else {
-                %unk_routines{$_} = %*MYSTERY{$_};
-            }
-        }
-        if %post_types {
-            my @tmp = sort keys(%post_types);
-            warn "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
-            for @tmp {
-                warn "\t$_ used at ", %post_types{$_}.<line>, "\n";
-            }
-        }
-        if %unk_types {
-            my @tmp = sort keys(%unk_types);
-            warn "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
-            for @tmp {
-                warn "\t$_ used at ", %unk_types{$_}.<line>, "\n";
-            }
-        }
-        if %unk_routines {
-            my @tmp = sort keys(%unk_routines);
-            warn "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
-            for @tmp {
-                warn "\t$_ used at ", %unk_routines{$_}.<line>, "\n";
-            }
-        }
+        my $m = $¢.explain_mystery();
+        warn $m if $m;
     }}
+}
+
+
+method explain_mystery() {
+    my %post_types;
+    my %unk_types;
+    my %unk_routines;
+    my $m = '';
+    for keys(%*MYSTERY) {
+        my $p = %*MYSTERY{$_}.<pad>;
+        if self.is_name($_, $p) {
+            # types may not be post-declared
+            %post_types{$_} = %*MYSTERY{$_};
+            next;
+        }
+
+        next if self.is_known($_, $p);
+
+        # just a guess, but good enough to improve error reporting
+        if $_ lt 'a' {
+            %unk_types{$_} = %*MYSTERY{$_};
+        }
+        else {
+            %unk_routines{$_} = %*MYSTERY{$_};
+        }
+    }
+    if %post_types {
+        my @tmp = sort keys(%post_types);
+        $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t$_ used at " ~ %post_types{$_}.<line> ~ "\n";
+        }
+    }
+    if %unk_types {
+        my @tmp = sort keys(%unk_types);
+        $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t$_ used at " ~ %unk_types{$_}.<line> ~ "\n";
+        }
+    }
+    if %unk_routines {
+        my @tmp = sort keys(%unk_routines);
+        $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t$_ used at " ~ %unk_routines{$_}.<line> ~ "\n";
+        }
+    }
+    $m;
 }
 
 # Note: because of the possibility of placeholders we can't determine arity of
@@ -1028,7 +1035,16 @@ rule comp_unit {
 
 token pblock ($CURPAD is context<rw> = $*CURPAD) {
     :dba('parameterized block')
-    [<?before <.lambda> | '{' > || <.panic: "Missing block">]
+    [<?before <.lambda> | '{' > ||
+        {{
+            if %*MYSTERY {
+                $¢.panic("Missing block (eaten by accidental listop?)");
+            }
+            else {
+                $¢.panic("Missing block");
+            }
+        }}
+    ]
     [
     | <lambda>
         <.newpad>
@@ -5240,8 +5256,10 @@ method panic (Str $s) {
     if @COMPILING::WORRIES {
         $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES);
     }
+    $m ~= "\n";
+    $m ~= self.explain_mystery();
 
-    die "##### PARSE FAILED #####" ~ $m ~ "\n";
+    die "##### PARSE FAILED #####" ~ $m;
 }
 
 method worry (Str $s) {
