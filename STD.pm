@@ -1,7 +1,13 @@
 grammar STD:ver<5.0.0.alpha>:auth<http://perl.org>;
 
-# should some of these be parser instance attributes?
-my $LANG is context;
+# braided languages
+my $LANG is context = ::STD ;
+my $Q is context = ::STD::Q ;
+my $Quasi is context = ::STD::Quasi ;
+my $Regex is context = ::STD::Regex ;
+my $Trans is context = ::STD::Trans ;
+my $P5Regex is context = ::STD::P5Regex ;
+
 my $PKGDECL is context = "";
 my $PKGNAME is context = "";
 my @PKGS is context<rw> = ();
@@ -880,7 +886,7 @@ token unv {
    | \h* '#' [
          |  <?opener>
             [ <!after ^^ . > || <.panic: "Can't use embedded comments in column 1"> ]
-            <.quibble($¢.cursor_fresh( ::STD::Q ))>   {*}                               #= embedded
+            <.quibble($¢.cursor_fresh( $*Q ))>   {*}                               #= embedded
          | {} \N*            {*}                                 #= end
          ]
     ]
@@ -924,7 +930,12 @@ rule comp_unit {
     :my $begin_compunit is context = 1;
     :my $endargs        is context<rw> = -1;
 
-    :my $LANG is context;
+    :my $LANG is context = ::STD ;
+    :my $Q is context = ::STD::Q ;
+    :my $Quasi is context = ::STD::Quasi ;
+    :my $Regex is context = ::STD::Regex ;
+    :my $Trans is context = ::STD::Trans ;
+    :my $P5Regex is context = ::STD::P5Regex ;
     :my $PKGDECL is context = "";
     :my $PKGNAME is context = "GLOBAL";
     :my @PKGS is context<rw> = ();
@@ -1065,7 +1076,7 @@ token blockoid {
 }
 
 token regex_block {
-    :my $lang = ::Regex;
+    :my $lang = $*Regex;
     :my $GOAL is context = '}';
 
     [ <quotepair> <.ws>
@@ -1662,13 +1673,13 @@ token postcircumfix:sym<{ }> ( --> Methodcall)
     { :dba('subscript') '{' ~ '}' <semilist> }
 
 token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
+    { '<' <nibble($¢.cursor_fresh( $*Q ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
+    { '<<' <nibble($¢.cursor_fresh( $*Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
 
 token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
+    { '«' <nibble($¢.cursor_fresh( $*Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
@@ -2581,22 +2592,22 @@ method nibble ($lang) {
 }
 
 
-token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).unbalanced("'"))> "'" }
-token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).unbalanced('"'))> '"' }
+token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( $*Q ).tweak(:q).unbalanced("'"))> "'" }
+token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( $*Q ).tweak(:qq).unbalanced('"'))> '"' }
 
-token quote:sym<« »>   { '«' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
-token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
+token quote:sym<« »>   { '«' <nibble($¢.cursor_fresh( $*Q ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
+token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( $*Q ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
 token quote:sym«< >»   { '<'
                               [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
                               [ <?before '>' > <.obs('<>', 'lines() or ()')> ]?
-                              <nibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
+                              <nibble($¢.cursor_fresh( $*Q ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 token quote:sym<//>   {
     '/'\s*'/' <.panic: "Null regex not allowed">
 }
 
 token quote:sym</ />   {
-    '/' <nibble( $¢.cursor_fresh( ::Regex ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
+    '/' <nibble( $¢.cursor_fresh( $*Regex ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
     <.old_rx_mods>?
 }
 
@@ -2605,16 +2616,16 @@ token quote:qq {
     :my $qm;
     'qq'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( $*Q ).tweak(:qq).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( $*Q ).tweak(:qq))>
     ]
 }
 token quote:q {
     :my $qm;
     'q'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( $*Q ).tweak(:q).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( $*Q ).tweak(:q))>
     ]
 }
 
@@ -2622,8 +2633,8 @@ token quote:Q {
     :my $qm;
     'Q'
     [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( ::STD::Q ).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( ::STD::Q ))>
+    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( $*Q ).tweak($qm => 1))>
+    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( $*Q ))>
     ]
 }
 
@@ -2640,35 +2651,35 @@ token quote_mod:b  { <sym> }
 
 token quote:rx {
     <sym> » <!before '('>
-    <quibble( $¢.cursor_fresh( ::Regex ) )>
+    <quibble( $¢.cursor_fresh( $*Regex ) )>
     <!old_rx_mods>
 }
 
 token quote:m  {
     <sym> » <!before '('>
-    <quibble( $¢.cursor_fresh( ::Regex ) )>
+    <quibble( $¢.cursor_fresh( $*Regex ) )>
     <!old_rx_mods>
 }
 
 token quote:mm {
     <sym> » <!before '('>
-    <quibble( $¢.cursor_fresh( ::Regex ).tweak(:s))>
+    <quibble( $¢.cursor_fresh( $*Regex ).tweak(:s))>
     <!old_rx_mods>
 }
 
 token quote:s {
     <sym> » <!before '('>
-    <pat=sibble( $¢.cursor_fresh( ::Regex ), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
+    <pat=sibble( $¢.cursor_fresh( $*Regex ), $¢.cursor_fresh( $*Q ).tweak(:qq))>
     <!old_rx_mods>
 }
 
 token quote:ss {
     <sym> » <!before '('>
-    <pat=sibble( $¢.cursor_fresh( ::Regex ).tweak(:s), $¢.cursor_fresh( ::STD::Q ).tweak(:qq))>
+    <pat=sibble( $¢.cursor_fresh( $*Regex ).tweak(:s), $¢.cursor_fresh( $*Q ).tweak(:qq))>
     <!old_rx_mods>
 }
 token quote:tr {
-    <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( ::STD::Q ).tweak(:q))>
+    <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( $*Q ).tweak(:q))>
     <!old_tr_mods>
 }
 
@@ -2702,7 +2713,7 @@ token old_tr_mods {
 
 
 token quote:quasi {
-    <sym> » <!before '('> <quasiquibble($¢.cursor_fresh( ::STD::Quasi ))>
+    <sym> » <!before '('> <quasiquibble($¢.cursor_fresh( $*Quasi ))>
 }
 
 # XXX should eventually be derived from current Unicode tables.
@@ -3342,11 +3353,11 @@ grammar Q is STD {
     multi method tweak (:heredoc(:$to)) { self.truly($to, ':to'); self.cursor_herelang; }
 
     multi method tweak (:$regex) {
-        return ::Regex;
+        return $*Regex;
     }
 
     multi method tweak (:$trans) {
-        return ::Trans;
+        return $*Trans;
     }
 
     multi method tweak (*%x) {
@@ -4656,7 +4667,7 @@ method EXPR ($preclvl)
 grammar Regex is STD {
 
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( ::STD::Q ).mixin( ::q ).mixin( ::p5 ) }
+    multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( $*Q ).mixin( ::q ).mixin( ::p5 ) }
     multi method tweak (:overlap(:$ov)) { self }
     multi method tweak (:exhaustive(:$ex)) { self }
     multi method tweak (:continue(:$c)) { self }
@@ -4942,7 +4953,7 @@ grammar Regex is STD {
         <.normspace>?
         [
         | <name>
-        | <before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
+        | <before '['> <quibble($¢.cursor_fresh( $*Q ).tweak(:q))> # XXX parse as q[] for now
         ]
         <.normspace>?
     }
@@ -4973,7 +4984,7 @@ grammar Regex is STD {
     token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $*ratchet = eval $<mod_arg>.Str } }
     token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { $*ratchet = $0 } }
  
-    token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] [ :lang( $¢.cursor_fresh( ::STD::P5Regex ).unbalanced($*GOAL) ) <nibbler> ] }
+    token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] [ :lang( $¢.cursor_fresh( $*P5Regex ).unbalanced($*GOAL) ) <nibbler> ] }
 
     token mod_internal:adv {
         <?before ':' <.identifier> > [ :lang($¢.cursor_fresh($*LANG)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
@@ -5083,7 +5094,7 @@ grammar P5Regex is STD {
     # "normal" metachars
 
     token metachar:sym<[ ]> {
-        <before '['> <quibble($¢.cursor_fresh( ::STD::Q ).tweak(:q))> # XXX parse as q[] for now
+        <before '['> <quibble($¢.cursor_fresh( $*Q ).tweak(:q))> # XXX parse as q[] for now
     }
 
     token metachar:sym«(? )» {
