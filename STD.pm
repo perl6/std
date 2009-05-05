@@ -1,4 +1,4 @@
-grammar STD:ver<5.0.0.alpha>:auth<http://perl.org>;
+grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 # braided languages
 my $LANG is context = ::STD ;
