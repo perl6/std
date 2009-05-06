@@ -518,6 +518,18 @@ method check_variable ($variable) {
 }
 
 method lookup_compiler_var($name) {
+
+    # see if they did "constant $?FOO = something" earlier
+    my $lex = $*CURPAD.{$name};
+    if defined $lex {
+        if $lex.<thunk>:exists {
+            return $lex.<thunk>.();
+        }
+        else {
+            return $lex.<value>;
+        }
+    }
+
     given $name {
         when '$?FILE'     { return $COMPILING::FILE; }
         when '$?LINE'     { return self.lineof(self.pos); }
@@ -525,6 +537,11 @@ method lookup_compiler_var($name) {
 
         when '$?PARSER'   { return $*PARSER; }
         when '$?LANG'     { return $*LANG; }
+        when '$?Q'        { return $*Q; }
+        when '$?Quasi'    { return $*Quasi; }
+        when '$?Regex'    { return $*Regex; }
+        when '$?Trans'    { return $*Trans; }
+        when '$?P5Regex'  { return $*P5Regex; }
 
         when '$?SCOPE'    { return $*CURPAD; }
 
@@ -1079,6 +1096,14 @@ token block ($CURPAD is context<rw> = $*CURPAD) {
 }
 
 token blockoid {
+    # temporize braided languages
+    :temp $*LANG;
+    :temp $*Q;
+    :temp $*Quasi;
+    :temp $*Regex;
+    :temp $*Trans;
+    :temp $*P5Regex;
+
     <.finishpad>
     [
     | '{' ~ '}' <statementlist>
@@ -1097,6 +1122,14 @@ token blockoid {
 }
 
 token regex_block {
+    # temporize braided languages
+    :temp $*LANG;
+    :temp $*Q;
+    :temp $*Quasi;
+    :temp $*Regex;
+    :temp $*Trans;
+    :temp $*P5Regex;
+
     :my $lang = $*Regex;
     :my $GOAL is context = '}';
 
@@ -4981,7 +5014,8 @@ grammar Regex is STD {
 
     token mod_arg { :dba('modifier argument') '(' ~ ')' <semilist> }
 
-    token mod_internal:sym<:my>    { ':' <?before 'my' \s > [:lang($¢.cursor_fresh($*LANG)) <statement> <eat_terminator> ] }
+    token mod_internal:sym<:my>    { ':' <?before ['my'|'state'|'our'|'constant'] \s > [:lang($¢.cursor_fresh($*LANG)) <statement> <eat_terminator> ] }
+    token mod_internal:sym<:temp>    { ':' <?before ['temp'|'let'] \s > [:lang($¢.cursor_fresh($*LANG)) <statement> <eat_terminator> ] }
 
     # XXX needs some generalization
 
