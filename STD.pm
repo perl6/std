@@ -268,11 +268,11 @@ method add_my_name ($name) {
         }
         $name = shift @components;
     }
-    if $*curpkg.{$name}:exists {
+    if $curpkg.{$name}:exists {
         self.worry("Name $name redeclared") unless $*SCOPE eq 'use';
     }
     else {
-        $*curpkg.{$name} //= { name => $name };
+        $curpkg.{$name} //= { name => $name };
     }
     self;
 }
@@ -1059,7 +1059,14 @@ token pblock ($CURPAD is context<rw> = $*CURPAD) {
     :dba('parameterized block')
     [<?before <.lambda> | '{' > ||
         {{
-            if %*MYSTERY {
+            my $badlistop = try {
+                $*XBX.{'term'}<args><arglist>[0]<EXPR><circumfix><sym>[0] eq '{';
+            };
+            if $badlistop {
+                my $id = $*XBX.{'term'}<identifier>;
+                $id.panic("Block accidentally eaten by '" ~ $id.Str ~ "' function; please use parens");
+            }
+            elsif %*MYSTERY {
                 $¢.panic("Missing block (eaten by accidental listop?)");
             }
             else {
@@ -1083,7 +1090,9 @@ token lambda { '->' | '<->' }
 # Look for an expression followed by a required lambda.
 token xblock {
     :my $GOAL is context = '{';
+    :my $XBX is context;
     <EXPR>
+    { $XBX = $<EXPR> }
     <.ws>
     <pblock>
 }
