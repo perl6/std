@@ -29,6 +29,7 @@ my $INVOCANT_OK is context<rw>;
 my $INVOCANT_IS is context<rw>;
 my $CURPAD is context<rw>;
 my $REALLYADD is context<rw> = 0;
+my $BORG is context;
 
 my $CORE is context;
 my $CORESETTING is context = "CORE";
@@ -116,13 +117,13 @@ method newpad {
 
 method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
     my $line = self.lineof(self.pos);
-    $*CURPAD.{'$_'} //= { name => '$_', file => $COMPILING::FILE, line => $line };
-    $*CURPAD.{'$/'} //= { name => '$/', file => $COMPILING::FILE, line => $line };
-    $*CURPAD.{'$!'} //= { name => '$!', file => $COMPILING::FILE, line => $line };
+    $*CURPAD<$_> //= { name => '$_', file => $COMPILING::FILE, line => $line };
+    $*CURPAD<$/> //= { name => '$/', file => $COMPILING::FILE, line => $line };
+    $*CURPAD<$!> //= { name => '$!', file => $COMPILING::FILE, line => $line };
     if not $siggy {
-        $*CURPAD.{'@_'} = { name => '@_', file => $COMPILING::FILE, line => $line };
-        $*CURPAD.{'%_'} = { name => '%_', file => $COMPILING::FILE, line => $line };
-        $*CURPAD.{'$?GOTSIG'} = '';
+        $*CURPAD<@_> = { name => '@_', file => $COMPILING::FILE, line => $line };
+        $*CURPAD<%_> = { name => '%_', file => $COMPILING::FILE, line => $line };
+        $*CURPAD<$?GOTSIG> = '';
     }
     self;
 }
@@ -1059,15 +1060,18 @@ token pblock ($CURPAD is context<rw> = $*CURPAD) {
     :dba('parameterized block')
     [<?before <.lambda> | '{' > ||
         {{
-            my $badlistop = try {
-                $*XBX.{'term'}<args><arglist>[0]<EXPR><circumfix><sym>[0] eq '{';
-            };
-            if $badlistop {
-                my $id = $*XBX.{'term'}<identifier>;
-                $id.panic("Block accidentally eaten by '" ~ $id.Str ~ "' function; please use parens");
+            if $*BORG and $*BORG.<block> {
+                if $*BORG.<name> {
+                    my $m = "Function '" ~ $BORG.<name> ~ "' needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
+                    $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by '" ~ $BORG.<name> ~ "')");
+                }
+                else {
+                    my $m = "Expression needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
+                    $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by expression)");
+                }
             }
             elsif %*MYSTERY {
-                $¢.panic("Missing block (eaten by accidental listop?)");
+                $¢.panic("Missing block (apparently gobbled by undeclared routine?)");
             }
             else {
                 $¢.panic("Missing block");
@@ -1090,9 +1094,9 @@ token lambda { '->' | '<->' }
 # Look for an expression followed by a required lambda.
 token xblock {
     :my $GOAL is context = '{';
-    :my $XBX is context;
+    :my $BORG is context = {};
     <EXPR>
-    { $XBX = $<EXPR> }
+    { $BORG.<culprit> //= $<EXPR>.cursor(self.pos) }
     <.ws>
     <pblock>
 }
@@ -1792,7 +1796,13 @@ token arglist {
 }
 
 token circumfix:sym<{ }> ( --> Term) {
-    <?before '{' | <.lambda> > <pblock>
+    <?before '{' | <.lambda> >
+    <pblock>
+    {{
+        if $*BORG {
+            $*BORG.<block> = $<pblock>;
+        }
+    }}
 }
 
 token constant_declarator {
@@ -4289,6 +4299,14 @@ token term:identifier ( --> Term )
     { $name = $<identifier>.Str; $pos = $¢.pos; }
     <args( $¢.is_name($name) )>
     { self.add_mystery($name,$pos) unless $<args><invocant>; }
+    {{
+        if $*BORG and $*BORG.<block> {
+            if not $*BORG.<name> {
+                $*BORG.<culprit> = $<identifier>.cursor($pos);
+                $*BORG.<name> = $name;
+            }
+        }
+    }}
 }
 
 token term:opfunc ( --> Term )
@@ -4344,6 +4362,14 @@ token term:name ( --> Term)
 
     # unrecognized names are assumed to be post-declared listops.
     || <args> { self.add_mystery($name,$pos) unless $<args><invocant>; }
+        {{
+            if $*BORG and $*BORG.<block> {
+                if not $*BORG.<name> {
+                    $*BORG.<culprit> = $<longname>.cursor($pos);
+                    $*BORG.<name> //= $name;
+                }
+            }
+        }}
     ]
 }
 
@@ -5334,14 +5360,15 @@ method lineof ($p) {
     return 1 unless defined $p;
     my $line = @*MEMOS[$p]<L>;
     return $line if $line;
-    $line = 1;
+    $line = 0;
     my $pos = 0;
     my @text = split(/^/,$*ORIG);   # XXX p5ism, should be ^^
     for @text {
+        $line++;
         @*MEMOS[$pos++]<L> = $line
             for 1 .. chars($_);
-        $line++;
     }
+    @*MEMOS[$pos++]<L> = 'EOF';
     return @*MEMOS[$p]<L> // 0;
 }
 
