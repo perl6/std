@@ -1899,6 +1899,11 @@ token package_declarator:knowhow {
     <sym> <package_def>
 }
 
+token package_declarator:slang {
+    :my $PKGDECL is context = 'slang';
+    <sym> <package_def>
+}
+
 token package_declarator:require {   # here because of declarational aspects
     <sym> <.ws>
     [
@@ -2329,6 +2334,7 @@ token twigil:sym<*> { <sym> }
 token twigil:sym<+> { <sym> <!!worry: "The + twigil is deprecated, use the * twigil instead"> }
 token twigil:sym<?> { <sym> }
 token twigil:sym<=> { <sym> }
+token twigil:sym<~> { <sym> }
 
 token deflongname {
     :dba('name to be defined')
