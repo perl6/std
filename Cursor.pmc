@@ -985,7 +985,7 @@ sub $mangle {
 END
         $lang->deb("derive $genpkg from $WHAT adding $mangle") if $DEBUG & DEBUG::mixins;
         eval $e or die "Can't create $name: $@\n";
-        $::PARSER = $lang->cursor_fresh($genpkg);
+        $::LANG{'MAIN'} = $lang->cursor_fresh($genpkg);
         my $oldlexer = $::LEXERS{$WHAT};
         my $newlexer = $::LEXERS{$genpkg} //= {};
         $ANON{$genpkg}{SUP} = $WHAT;
