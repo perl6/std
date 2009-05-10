@@ -2231,7 +2231,7 @@ token special_variable:sym['$<'] {
 
 token special_variable:sym«\$>» {
     <sym> :: <?before \s | ',' | <terminator> >
-    <.obs("$() variable", '$*EUID')>
+    <.obs('$> variable', '$*EUID')>
 }
 
 token special_variable:sym<$.> {
