@@ -929,6 +929,8 @@ token pod_comment {
         ]
     | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
         [ .*?  "\n=" <.unsp>? 'end' » \N* || <.panic: "=begin without =end"> ]   {*}       #= anon
+    | 'for' » :: \h* [ <identifier> || $$ || '#' || <.panic: "Unrecognized token after =for"> ]
+        [.*?  ^^ \h* $$ || .*]
     | :: 
         [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
         \N*                                           {*}       #= misc
@@ -1113,10 +1115,10 @@ token blockoid {
     [
     | <?before \h* $$>  # (usual case without comments)
         { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
-    | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
+    | \h* <?before <[\\,:]>> {*}                         #= normal 
     | <.unv>? $$
         { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
+    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
     ]
 }
 
@@ -1142,10 +1144,10 @@ token regex_block {
     [
     | <?before \h* $$>  # (usual case without comments)
         { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
-    | \h* <.unsp>? <?before <[,:]>> {*}                         #= normal 
+    | \h* <?before <[\\,:]>> {*}                         #= normal 
     | <.unv>? $$
         { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }   {*}           #= endargs
+    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }   {*}           #= endargs
     ]
 }
 
