@@ -236,7 +236,7 @@ method add_name ($name) {
     my $scope = $*SCOPE // 'our';
     # say "Adding $*SCOPE $name in $*PKGNAME";
     if $scope eq 'augment' or $scope eq 'supersede' {
-        self.is_name($name) or self.panic("Can't $scope a non-existent type");
+        self.is_name($name) or self.worry("Can't $scope a non-existent type");
     }
     elsif $scope eq 'our' {
         self.add_our_name($name);
