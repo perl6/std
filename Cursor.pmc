@@ -887,9 +887,13 @@ sub add_macro { my $lang = shift;
     my $WHAT = ref $lang;
     if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
         my ($sym) = $name =~ /:sym(.*)/;
+        $sym =~ s/^<\s*(.*\S)\s*>$/<$1>/g;
+        $sym =~ s/^\(\s*(.*\S)\s*\)$/$1/g;
+        $sym =~ s/^\[\s*(.*\S)\s*\]$/$1/g;
+        $sym =~ s/^\{\s*(.*\S)\s*\}$/$1/g;
 
         # unfortunately p5 doesn't understand q«...»
-        if ($sym =~ s/^«(.*)»$/$1/) {
+        if ($sym =~ s/^«\s*(.*\S)\s*»$/$1/) {
             my $ok = "'";
             for my $try (qw( ' / ! : ; | + - = )) {
                 $ok = $try, last if index($sym,$try) < 0;
