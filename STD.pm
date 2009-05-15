@@ -3524,23 +3524,23 @@ rule trait {
 }
 
 token trait_auxiliary:is {
-    <sym> <.ws> <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
+    <sym>:s <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
 }
 token trait_auxiliary:hides {
-    <sym> <.ws> <module_name>
+    <sym>:s <module_name>
 }
 token trait_auxiliary:does {
     :my $PKGDECL is context = 'role';
-    <sym> <.ws> <module_name>
+    <sym>:s <module_name>
 }
 token trait_auxiliary:will {
-    <sym> <.ws> <identifier> <.ws> <block>
+    <sym>:s <identifier> <block>
 }
 
-rule trait_verb:of      {<sym> <typename> }
-rule trait_verb:as      {<sym> <typename> }
-rule trait_verb:returns {<sym> <typename> }
-rule trait_verb:handles {<sym> <noun> }
+token trait_verb:of      { <sym>:s <typename> }
+token trait_verb:as      { <sym>:s <typename> }
+token trait_verb:returns { <sym>:s <typename> }
+token trait_verb:handles { <sym>:s <noun> }
 
 token capterm {
     '\\'
@@ -5352,7 +5352,7 @@ method lineof ($p) {
         @*MEMOS[$pos++]<L> = $line
             for 1 .. chars($_);
     }
-    @*MEMOS[$pos++]<L> = 'EOF';
+    @*MEMOS[$pos++]<L> = $line;
     return @*MEMOS[$p]<L> // 0;
 }
 
