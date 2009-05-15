@@ -1648,7 +1648,11 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
 
 token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
 
-token postfix_prefix_meta_operator:sym< » >    { <sym> | '>>' }
+token postfix_prefix_meta_operator:sym< » >    {
+    [ <sym> | '>>' ]
+    # require >>.( on interpolated hypercall so infix:«$s»($a,$b) {...} dwims
+    [<!{ $*INTERPOLATION }> || <!before '('> ]
+}
 
 token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
     <sym> <!before '!'> {} <infixish(1)>
