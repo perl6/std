@@ -3729,7 +3729,7 @@ token parameter {
               when '|' { $¢.panic("Can't put a default on an slurpy capture parameter") }
               when '\\' { $¢.panic("Can't put a default on a capture parameter") }
             }
-            $kind = '?';
+            $kind //= '?';
         }}
     ]?
 
