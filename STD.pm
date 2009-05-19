@@ -925,10 +925,12 @@ token pod_comment {
     | 'begin' \h+ <identifier> ::
         [
         ||  .*? "\n=" <.unsp>? 'end' \h+ $<identifier> » \N*          {*} #= tagged
-        ||  .*                                                        {*} #= end
+        ||  <?{ $<identifier>.Str eq 'END'}> .*                           {*} #= end
+        || { my $id = $<identifier>.Str; self.panic("=begin $id without matching =end $id"); }
         ]
     | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
-        [ .*?  "\n=" <.unsp>? 'end' » \N* || <.panic: "=begin without =end"> ]   {*}       #= anon
+        [ .*?  "\n=" <.unsp>? 'end' » \N* || { self.panic("=begin without matching =end"); } ]   {*}       #= anon
+        
     | 'for' » :: \h* [ <identifier> || $$ || '#' || <.panic: "Unrecognized token after =for"> ]
         [.*?  ^^ \h* $$ || .*]
     | :: 
@@ -3729,7 +3731,7 @@ token parameter {
               when '|' { $¢.panic("Can't put a default on an slurpy capture parameter") }
               when '\\' { $¢.panic("Can't put a default on a capture parameter") }
             }
-            $kind //= '?';
+            $kind = '?' if $kind eq '!';
         }}
     ]?
 
