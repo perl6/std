@@ -1744,7 +1744,7 @@ token postop {
 token methodop {
     [
     | <longname>
-    | <?before '$' | '@' > <variable> { $*VAR = $<variable> }
+    | <?before '$' | '@' | '&' > <variable> { $*VAR = $<variable> }
     | <?before <[ ' " ]> > <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
