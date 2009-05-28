@@ -774,11 +774,8 @@ proto token postcircumfix is unary { <...> }  # unary as far as EXPR knows...
 token category:quote_mod { <sym> }
 proto token quote_mod { <...> }
 
-token category:trait_verb { <sym> }
-proto token trait_verb (:$endsym is context = 'spacey') { <...> }
-
-token category:trait_auxiliary { <sym> }
-proto token trait_auxiliary (:$endsym is context = 'spacey') { <...> }
+token category:trait_mod { <sym> }
+proto token trait_mod (:$endsym is context = 'spacey') { <...> }
 
 token category:type_declarator { <sym> }
 proto token type_declarator () { <...> }
@@ -846,7 +843,7 @@ token ws {
         | \h+ <![#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
         | <?before \w> <?after \w> :::
             { @*MEMOS[$startpos]<ws> = undef; }
-            <!>        # must \s+ between words
+            <.panic: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
     ]
     ||
     [
@@ -3523,30 +3520,29 @@ rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
 rule trait {
     :my $IN_DECL is context<rw> = 0;
     [
-    | <trait_verb>
-    | <trait_auxiliary>
+    | <trait_mod>
     | <colonpair>
     ]
 }
 
-token trait_auxiliary:is {
+token trait_mod:is {
     <sym>:s <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
 }
-token trait_auxiliary:hides {
+token trait_mod:hides {
     <sym>:s <module_name>
 }
-token trait_auxiliary:does {
+token trait_mod:does {
     :my $PKGDECL is context = 'role';
     <sym>:s <module_name>
 }
-token trait_auxiliary:will {
+token trait_mod:will {
     <sym>:s <identifier> <block>
 }
 
-token trait_verb:of      { <sym>:s <typename> }
-token trait_verb:as      { <sym>:s <typename> }
-token trait_verb:returns { <sym>:s <typename> }
-token trait_verb:handles { <sym>:s <noun> }
+token trait_mod:of      { <sym>:s <typename> }
+token trait_mod:as      { <sym>:s <typename> }
+token trait_mod:returns { <sym>:s <typename> }
+token trait_mod:handles { <sym>:s <noun> }
 
 token capterm {
     '\\'
@@ -5123,6 +5119,11 @@ grammar P5Regex is STD {
         :my $GOAL is context = '}';
         '{' :: [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <statementlist> ]
         [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
+    }
+
+    token ws {
+        <?{ $*sigspace }>
+        || [ <?before \s | '#'> <.nextsame> ]?   # still get all the pod goodness, hopefully
     }
 
     rule nibbler {
