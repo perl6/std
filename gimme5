@@ -1218,14 +1218,15 @@ sub atom {
     }
 
     if (s/^\{\*\}//) {
-        my $key = $NAME;
+        my $meth = $NAME;
+        my $tag = '';
         if (s/^(.*?)\s*#=\s+(.*)/$1/) {
-            $key .= " $2";
+            $tag = $2;
+            $tag =~ s/(['\\])/\\$1/g;
+            $tag = ", '$tag'";
         }
-	$key =~ s/ +/_/g;
         ws();
-        $key =~ s/(['\\])/\\$1/g;
-        return bless { name => '_REDUCE', args => "\$S, '$key'", min => 0, max => 0},
+        return bless { name => '_REDUCE', args => "\$S, '$meth'$tag", min => 0, max => 0},
                      "RE_method_internal";
     }
     if (/^\{/) {

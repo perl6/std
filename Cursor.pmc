@@ -1138,7 +1138,7 @@ sub _MATCHIFY { my $self = shift;
     my $S = shift;
     my $name = shift;
     return () unless @_;
-    my @result = lazymap( sub { my $x = shift; $x->_REDUCE($S, $name, 1)->retm() }, @_);
+    my @result = lazymap( sub { my $x = shift; $x->_REDUCE($S, $name)->retm() }, @_);
     if (wantarray) {
         @result;
     }
@@ -1153,7 +1153,7 @@ sub _MATCHIFYr { my $self = shift;
     return () unless @_;
     my $var = shift;
 #    $var->{_from} = $self->{_from};
-    $var->_REDUCE($S, $name, 1)->retm();
+    $var->_REDUCE($S, $name)->retm();
 }
 
 sub _SCANf { my $self = shift;
@@ -2012,15 +2012,17 @@ sub _LEFTRESULT_rev { $_[0]->_LEFTWB }
 
 sub _REDUCE { my $self = shift;
     my $S = shift;
-    my $tag = shift;
+    my $meth = shift;
+    my $key = $meth;
+    $key .= ' ' . $_[0] if @_;
 
-    $self->{_reduced} = $tag;
+    $self->{_reduced} = $key;
     $self->{_from} = $S;
     if ($::ACTIONS) {
-        eval { $::ACTIONS->$tag($self, @_) };
+        eval { $::ACTIONS->$meth($self, @_) };
         warn $@ if $@ and not $@ =~ /locate/;
     }
-    $self->deb("REDUCE $tag from " . $S . " to " . $self->{_pos}) if $DEBUG & DEBUG::matchers;
+    $self->deb("REDUCE $key from " . $S . " to " . $self->{_pos}) if $DEBUG & DEBUG::matchers;
     $self;
 }
 

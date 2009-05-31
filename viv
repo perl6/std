@@ -127,9 +127,7 @@ sub VIV::SET_OPT {
     sub AUTOLOAD {
 	my $self = shift;
 	my $match = shift;
-	my $rule = shift()//0;
-	# say " for ", $AUTOLOAD, " rule $rule";
-	return unless $rule;
+	return if @_;	# not interested in tagged reductions
 	return if $match->{_ast}{_specific} and ref($match->{_ast}) =~ /^VAST/;
 	my $r = hoist($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
