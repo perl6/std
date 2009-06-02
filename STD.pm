@@ -3829,8 +3829,11 @@ token term:sym<self> ( --> Term)
 token term:sym<defer> ( --> Term)
     { <sym> » }
 
-token term:rand ( --> Term)
-    { <sym> » [ <?before [ \h+ | '('] [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]? }
+token term:rand ( --> Term) {
+    <sym> »
+    [ <?before [ \h+ | '('] [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]?
+    [ <?before '()'> <.obs('rand()', 'rand')> ]?
+}
 
 token term:e ( --> Term)
     { <sym> » }
