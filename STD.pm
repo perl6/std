@@ -1548,9 +1548,9 @@ token infixish ($in_meta = $*IN_META) {
     | <colonpair> {
             $<fake> = 1;
             $<sym> = ':';
-            %<O><prec> = %comma<prec>;  # actual test is non-inclusive of comma!
+            %<O><prec> = %item_assignment<prec>;  # actual test is non-inclusive!
             %<O><assoc> = 'unary';
-            %<O><uassoc> = 'left';
+            %<O><kind> = 'ADVERB';
         }
     | '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
     | <infix_circumfix_meta_operator>
@@ -4508,7 +4508,7 @@ method EXPR ($preclvl)
                 $nop<_from> = $startpos;
                 $nop<_pos> = $endpos;
                 $nop<~CAPS> = \@chain;
-                push @termstack, $nop._REDUCE($startpos, 'EXPR');
+                push @termstack, $nop._REDUCE($startpos, 'CHAIN');
                 @termstack[*-1].<PRE>:delete;
                 @termstack[*-1].<POST> :delete;
             }
@@ -4557,7 +4557,7 @@ method EXPR ($preclvl)
                     }
                     $nop<~CAPS> = \@caps;
                 }
-                push @termstack, $nop._REDUCE($startpos, 'EXPR');
+                push @termstack, $nop._REDUCE($startpos, 'LIST');
                 @termstack[*-1].<PRE>:delete;
                 @termstack[*-1].<POST>:delete;
             }
@@ -4570,18 +4570,19 @@ method EXPR ($preclvl)
                 my $arg = pop @termstack;
                 $op<arg> = $arg;
                 my $a = $op<~CAPS>;
+                $op<_arity> = 'UNARY';
                 if $arg<_from> < $op<_from> { # postfix
                     $op<_from> = $arg<_from>;   # extend from to include arg
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     unshift @$a, $arg;
+                    push @termstack, $op._REDUCE($op<_from>, 'POSTFIX');
                 }
                 elsif $arg<_pos> > $op<_pos> {   # prefix
                     $op<_pos> = $arg<_pos>;     # extend pos to include arg
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     push @$a, $arg;
+                    push @termstack, $op._REDUCE($op<_from>, 'PREFIX');
                 }
-                $op<_arity> = 'UNARY';
-                push @termstack, $op._REDUCE($op<_from>, 'EXPR');
                 @termstack[*-1].<PRE>:delete;
                 @termstack[*-1].<POST>:delete;
             }
@@ -4602,7 +4603,7 @@ method EXPR ($preclvl)
                 push @$a, $right;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-                push @termstack, $op._REDUCE($op<_from>, 'EXPR');
+                push @termstack, $op._REDUCE($op<_from>, 'INFIX');
                 @termstack[*-1].<PRE>:delete;
                 @termstack[*-1].<POST>:delete;
             }
@@ -4704,8 +4705,8 @@ method EXPR ($preclvl)
             last if $inprec lt $LOOSEST;
 
         if $infix<fake> {
-            my $adverbs = @termstack[*-1]<ADV> ||= [];
-            push @$adverbs, $infix<colonpair>;
+            push @opstack, $infix;
+            &reduce();
             next;  # not really an infix, so keep trying
         }
 
