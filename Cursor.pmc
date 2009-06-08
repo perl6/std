@@ -819,8 +819,6 @@ sub cursor_all { my $self = shift;
 
     $self->deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
-    delete $r{'~CAPS'};
-#    $r{_from} = $fpos;
     $r{_pos} = $tpos;
 
     bless \%r, ref $self;

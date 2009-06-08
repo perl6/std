@@ -691,16 +691,6 @@ END
         # from here on we assume all nibbles are line-sized or less.
         if (s/^(.*\n)//) {
             my $line = $1;
-            if ($line =~ /^(\s*).*?given/) {
-                my $len = length($1);
-                $NEEDSEMI{$len} = 1;
-            }
-            elsif ($line =~ /^(\s*)}\n/) {
-                my $len = length($1);
-                if (delete $NEEDSEMI{$len}) {
-                    $line =~ s/}/};/;
-                }
-            }
             if ($line =~ m/# begin tweaks/) {
                 $out .= <<'END';
   sub multitweak { # begin tweaks
