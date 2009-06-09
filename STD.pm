@@ -2746,6 +2746,7 @@ token quote:tr {
 }
 
 token old_rx_mods {
+    <!after \s>
     (< i g s m x c e >+) 
     {{
         given $0.Str {
@@ -4233,7 +4234,7 @@ token infix:sym<::=> ( --> Item_assignment)
 
 token infix:sym<.=> ( --> Item_assignment) {
     <sym> <.ws>
-    [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip' > || <worryobs('.= as append operator', '~=')> ]
+    [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || <worryobs('.= as append operator', '~=')> ]
     { $<O><nextterm> = 'dottyopish' }
 }
 

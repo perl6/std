@@ -100,7 +100,7 @@ sub MAIN {
 	print $r->ret($r->emit_p6);
     }
     elsif ($output eq 'p5') {
-	print $r->ret($r->emit_p5(0));
+	print fixpod($r->ret($r->emit_p5(0)));
     }
     else {
 	die "Unknown output mode";
@@ -113,6 +113,23 @@ sub VIV::SET_OPT {
     $OPT_pos = $opt{pos};
     $OPT_match = $opt{match};
     $OPT_log = $opt{log};
+}
+
+sub fixpod {
+    my $text = shift;
+    return $text unless $text =~ /\n/;
+    my @text = split(/^/, $text);
+    my $in_begin = 0;
+    my $in_for = 0;
+    for (@text) {
+	$in_begin = $1 if /^=begin\s+(\w+)/;
+	$in_for = 1 if /^=for/;
+	$in_for = 0 if /^\s*$/;
+	my $docomment = $in_begin || $in_for;
+	$in_begin = 0 if /^=end\s+(\w+)/ and $1 eq $in_begin;
+	s/^/# / if $docomment;
+    }
+    join('', @text);
 }
 
 ###################################################################
@@ -306,8 +323,6 @@ sub VIV::SET_OPT {
 	my @list = @{$match->{list}};
 	my @delims = @{$match->{delims}};
 	my @all;
-	$r->{BEG} = $list[0]->{BEG} // $match->{_from};
-	$r->{END} = $list[-1]->{END} // $match->{_pos};
 	while (@delims) {
 	    my $term = shift @list;
 	    push @all, $term->{_ast};
@@ -315,6 +330,9 @@ sub VIV::SET_OPT {
 	    push @all, $infix->{_ast};
 	}
 	push @all, $list[0]->{_ast} if @list;
+	pop @all while @all and not $all[-1]{END};
+	$r->{BEG} = $all[0]{BEG};
+	$r->{END} = $all[-1]{END} // $r->{BEG};
 	$r->{'.'} = \@all;
 
 	my $class = $match->{O}{kind} // $match->{sym} // 'termish';
