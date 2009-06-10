@@ -1742,7 +1742,9 @@ token methodop {
     [
     | <longname>
     | <?before '$' | '@' | '&' > <variable> { $*VAR = $<variable> }
-    | <?before <[ ' " ]> > <quote>
+    | <?before <[ ' " ]> >
+        [ <!{$*INTERPOLATION}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
+        <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
 
