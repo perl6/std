@@ -1239,24 +1239,33 @@ token eat_terminator {
 }
 
 token statement_control:use {
-    <sym> :s
+    :my $longname;
+    <sym> <.ws>
     [
     | <version>
-    | <module_name><arglist>?
+    | <module_name>
         {{
             my $SCOPE is context = 'use';
-            my $longname = $<module_name><longname>.Str;
+            $longname = $<module_name><longname>.Str;
             $¢.add_my_name($longname);
-            # XXX cheat on import list for now
-            $¢.do_imports($longname, $<arglist>[0]);
         }}
+        [
+        || <.spacey> <arglist>
+            {{
+                # XXX cheat on import list for now
+                $¢.do_imports($longname, $<arglist>);
+            }}
+        || {{ $¢.do_imports($longname, ''); }}
+        ]
     ]
+    <.ws>
 }
 
 
 token statement_control:no {
-    <sym> :s
-    <module_name><arglist>?
+    <sym> <.ws>
+    <module_name>[<.spacey><arglist>]?
+    <.ws>
 }
 
 
@@ -1836,7 +1845,7 @@ rule scoped {
         <multi_declarator>
     | <multi_declarator>
     ]
-    || <?before <[A..Z]> > <longname> {{
+    || <?before <[A..Z]>><longname>{{
             my $t = $<longname>.Str;
             if not $¢.is_known($t) {
                 $¢.panic("In \"$*SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");

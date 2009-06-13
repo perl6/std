@@ -1025,8 +1025,8 @@ sub do_imports { my $self = shift;
     my $module = shift;
     my $args = shift;
     my @imports;
-    my $text = $args->Str;
-    if ($text ne '') {
+    if ($args) {
+        my $text = $args->Str;
         return unless $text;
         while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
             my $scope = lc($1) || 'my';

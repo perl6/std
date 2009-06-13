@@ -173,6 +173,7 @@
     Positional => { name => 'Positional', file => 'CORE.pad', line => __LINE__ },
     Associative => { name => 'Associative', file => 'CORE.pad', line => __LINE__ },
     Abstraction => { name => 'Abstraction', file => 'CORE.pad', line => __LINE__ },
+    Integral => { name => 'Integral', file => 'CORE.pad', line => __LINE__ },
     Ordering => { name => 'Ordering', file => 'CORE.pad', line => __LINE__ },
     KeyExtractor => { name => 'KeyExtractor', file => 'CORE.pad', line => __LINE__ },
     Comparator => { name => 'Comparator', file => 'CORE.pad', line => __LINE__ },
