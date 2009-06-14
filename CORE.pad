@@ -107,6 +107,8 @@
     Str => { name => 'Str', file => 'CORE.pad', line => __LINE__ },
     Blob => { name => 'Blob', file => 'CORE.pad', line => __LINE__ },
     Char => { name => 'Char', file => 'CORE.pad', line => __LINE__ },
+    AnyChar => { name => 'AnyChar', file => 'CORE.pad', line => __LINE__ },
+    CharLingua => { name => 'CharLingua', file => 'CORE.pad', line => __LINE__ },
     Byte => { name => 'Byte', file => 'CORE.pad', line => __LINE__ },
     Codepoint => { name => 'Codepoint', file => 'CORE.pad', line => __LINE__ },
     Grapheme => { name => 'Grapheme', file => 'CORE.pad', line => __LINE__ },
