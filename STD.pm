@@ -452,11 +452,11 @@ method add_my_variable ($name) {
                 self.worry("Redeclaration of $name (from $ofile line $oline)");
             }
             else {
-                self.worry("Redeclaration of $name (from line $oline)");
+                self.worry("Useless redeclaration of $name (from line $oline)");
             }
         }
         else {
-            self.worry("Redeclaration of $name");
+            self.worry(" Useless redeclaration of $name");
         }
     }
     $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
@@ -4477,8 +4477,7 @@ regex stdstopper {
 
 # A fairly complete operator precedence parser
 
-method EXPR ($preclvl)
-{
+method EXPR ($preclvl) {
     temp $*CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
     if self.peek {
         return self._AUTOLEXpeek('EXPR');

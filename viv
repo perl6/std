@@ -61,7 +61,6 @@ sub MAIN {
 	    $OPT_stab = 1;
 	}
 	elsif ($switch eq '--log' or $switch eq '-l') {
-	    say @_;
 	    $OPT_log = 1;
 	}
 	elsif ($switch eq '--pos' or $switch eq '-p') {
@@ -1590,8 +1589,18 @@ sub fixpod {
 
 { package VAST::method_def; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
+        my @b = $self->SUPER::emit_p5($lvl+1);
+	my @e = '';
+	while (@b) {
+	    my $t = pop(@b);
+	    if ($t =~ s/^\{//) {
+		$t = "{\n    my \$self = shift;\n" . pop(@b) . $t;
+		unshift(@e,$t);
+		last;
+	    }
+	    unshift(@e,$t);
+	}
+        $self->ret(@b,@e);
     }
 }
 
@@ -1763,6 +1772,7 @@ sub fixpod {
 { package VAST::multisig; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
+	pop(@t);shift(@t);
         $self->ret(@t);
     }
 }
@@ -2021,7 +2031,8 @@ sub fixpod {
 { package VAST::parameter; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
+	my $t = '    my ' . join('',@t) . " = shift;\n";
+        $self->ret($t);
     }
 }
 
@@ -2426,8 +2437,11 @@ sub fixpod {
 
 { package VAST::routine_declarator__S_method; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
+	my $comment = substr($::ORIG, $self->{BEG},100);
+	$comment =~ s/\s*\{.*//s;
+        my $t = join '', $self->SUPER::emit_p5($lvl+1);
+	$t =~ s/method/sub/;
+        $self->ret("## $comment\n$t");
     }
 }
 
@@ -2994,7 +3008,7 @@ sub fixpod {
 { package VAST::typename; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
+        $self->ret('');
     }
 }
 

@@ -194,8 +194,8 @@ sub un6 {
         $f =~ s/^\bloop \{//                    and $t .= qq/for (;;) {/, next;
         $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/default {/, next;
 #        $f =~ s/^\bdefault\s+\{//               and $t .= qq/else {/, next;
-        $f =~ s/^\btemp\s+([\$\@%])\*?(\w+)\s*=// and $t .= qq/local $1$2 =/, next;
-        $f =~ s/^\btemp\s+([\$\@%])\*?(\w+)//     and $t .= qq/local $1$2 = $1$2/, next; # dumb p5 semantics
+        $f =~ s/^\btemp\s+([\$\@%])\*?(\w+)\s*=// and $t .= qq/local $1::$2 =/, next;
+        $f =~ s/^\btemp\s+([\$\@%])\*?(\w+)//     and $t .= qq/local $1::$2 = $1::$2/, next; # dumb p5 semantics
         $f =~ s/^\btemp\b//             	and $t .= qq/local/, next;
         $f =~ s/^\bchars\(//             	and $t .= qq/length(/, next;
         $f =~ s/^\$\?PACKAGE//             	and $t .= qq/__PACKAGE__/, next;
@@ -219,6 +219,7 @@ sub un6 {
 #                                                and $t .= 'elsif ($_ eq ', next;
 
         $f =~ s/^(\#.*)//                 	and $t .= $1, next;
+        $f =~ s/^&reduce\(\)//                  and $t .= "\$reduce->()";
         $f =~ s/^(.)//s                 	and $t .= $1;
     }
     $t;
@@ -331,7 +332,7 @@ sub $name {
     my \$self = shift;
     my \$subs;
 
-    local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+    local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
 
     my \$C = \$self;
     my \$S = \$C->{'_pos'};
@@ -601,7 +602,7 @@ END
                 $body .= "    my \@origargs = \@_;\n";
             }
             $body .= <<'END';
-    local $CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
+    local $::CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
 <<DECL>>
 
     my $C = $self;
@@ -720,7 +721,6 @@ END
             $line =~ s/&reduce = ->/\$reduce = sub/;
             $line =~ s/ -> (.+?) {/sub { my ($1) = \@_;/;
             $line =~ s/ -> {/sub {/;
-            $line =~ s/&reduce\(\)/\$reduce->()/;
             $line =~ s/([\$\@%])\*(\w+)/${1}::$2/g;       # assume localized
             if ($line =~ s/^constant %/our %/) {
                 $line =~ tr/{}/()/;
