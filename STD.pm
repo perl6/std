@@ -781,22 +781,22 @@ token category:trait_mod { <sym> }
 proto token trait_mod (:$endsym is context = 'spacey') { <...> }
 
 token category:type_declarator { <sym> }
-proto token type_declarator () { <...> }
+proto token type_declarator (:$endsym is context = 'spacey') { <...> }
 
 token category:scope_declarator { <sym> }
 proto token scope_declarator (:$endsym is context = 'nofun') { <...> }
 
 token category:package_declarator { <sym> }
-proto token package_declarator () { <...> }
+proto token package_declarator (:$endsym is context = 'spacey') { <...> }
 
 token category:multi_declarator { <sym> }
-proto token multi_declarator () { <...> }
+proto token multi_declarator (:$endsym is context = 'spacey') { <...> }
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator () { <...> }
+proto token routine_declarator (:$endsym is context = 'endid') { <...> }
 
 token category:regex_declarator { <sym> }
-proto token regex_declarator () { <...> }
+proto token regex_declarator (:$endsym is context = 'spacey') { <...> }
 
 token category:statement_prefix { <sym> }
 proto rule  statement_prefix () { <...> }
@@ -832,7 +832,8 @@ token category:terminator { <sym> }
 proto token terminator { <...> }
 
 token unspacey { <.unsp>? }
-token spacey { <?before \s | '#'> }
+token endid { <?before <-[ \- \' \w ]> > }
+token spacey { <?before <[ \s \# ]> > }
 token nofun { <!before '(' | '.(' | '\\' > }
 
 # Lexical routines

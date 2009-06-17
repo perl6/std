@@ -266,6 +266,13 @@
     '&buf64' => { name => '&buf64', file => 'CORE.pad', line => __LINE__ },
     buf64 => { name => 'buf64', file => 'CORE.pad', line => __LINE__ },
 
+    '&utf8' => { name => '&utf8', file => 'CORE.pad', line => __LINE__ },
+    utf8 => { name => 'utf8', file => 'CORE.pad', line => __LINE__ },
+    '&utf16' => { name => '&utf16', file => 'CORE.pad', line => __LINE__ },
+    utf16 => { name => 'utf16', file => 'CORE.pad', line => __LINE__ },
+    '&utf32' => { name => '&utf32', file => 'CORE.pad', line => __LINE__ },
+    buf32 => { name => 'buf32', file => 'CORE.pad', line => __LINE__ },
+
     '&Bit' => { name => '&Bit', file => 'CORE.pad', line => __LINE__ },
     Bit => { name => 'Bit', file => 'CORE.pad', line => __LINE__ },
     '&Bool' => { name => '&Bool', file => 'CORE.pad', line => __LINE__ },
