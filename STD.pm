@@ -238,11 +238,14 @@ method add_name ($name) {
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or self.worry("Can't $scope a non-existent type");
     }
-    elsif $scope eq 'our' {
-        self.add_our_name($name);
-    }
     else {
-        self.add_my_name($name);
+        if $scope eq 'our' {
+            self.add_our_name($name);
+        }
+        else {
+            self.add_my_name($name);
+        }
+        self.add_routine($name);    # fake up a &Foo
     }
     self;
 }
