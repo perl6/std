@@ -3345,7 +3345,7 @@ grammar Q is STD {
     } # end role
 
     role w1 {
-        method postprocess ($s) { $s.comb }
+        method postprocess ($s) { $s.words }
     } # end role
 
     role w0 {
@@ -3353,7 +3353,7 @@ grammar Q is STD {
     } # end role
 
     role ww1 {
-        method postprocess ($s) { $s.comb }
+        method postprocess ($s) { $s.words }
     } # end role
 
     role ww0 {
