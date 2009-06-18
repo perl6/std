@@ -759,7 +759,7 @@ sub cursor_fate { my $self = shift;
     }
 
     my $P = $self->{_pos};
-    if ($P >= @::ORIG) {
+    if ($P > @::ORIG) {
         return sub {};
     }
 
