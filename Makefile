@@ -1,10 +1,17 @@
 .PHONY: check try cat clean distclean purge test
 
-FIXINS=Cursor.pmc LazyMap.pm mangle.pl
+FIXINS=Cursor.pmc LazyMap.pm mangle.pl CORE.pad
 
 all: $(FIXINS) check lex/STD/termish
 
 fast: $(FIXINS) check
+
+snap: $(FIXINS) check lex/STD/termish
+	mkdir snap.new
+	cp $(FIXINS) tryfile STD.pmc snap.new
+	mv lex snap.new
+	test -d snap && mv snap snap.old
+	mv snap.new snap
 
 STD.pmc: STD.pm gimme5
 	./gimme5 $< >STD.pm5
