@@ -7,10 +7,12 @@ all: $(FIXINS) check lex/STD/termish
 fast: $(FIXINS) check
 
 snap: $(FIXINS) check lex/STD/termish
+	rm -rf snap.new
 	mkdir snap.new
 	cp $(FIXINS) tryfile STD.pmc snap.new
 	mv lex snap.new
-	test -d snap && mv snap snap.old
+	rm -rf snap.old
+	-mv snap snap.old
 	mv snap.new snap
 
 STD.pmc: STD.pm gimme5
