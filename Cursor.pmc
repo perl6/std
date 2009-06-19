@@ -1027,6 +1027,7 @@ sub do_imports { my $self = shift;
     my $args = shift;
     my @imports;
     if ($args) {
+        $self->add_my_name($module);
         my $text = $args->Str;
         return unless $text;
         while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
@@ -1051,6 +1052,7 @@ sub do_imports { my $self = shift;
     }
     else {
         my $pkg = $self->find_stab($module . '::');
+        $self->add_my_name($module);
         @imports = keys %$pkg;
         local $::SCOPE = 'my';
         for (@imports) {
@@ -1073,14 +1075,19 @@ sub do_imports { my $self = shift;
 sub canonicalize_name { my $self = shift;
     my $name = shift;
     return $name unless $name =~ /::/;
+    $self->panic("Can't canonicalize a run-time name at compile time: $name") if $name =~ /::\(/;
     $name =~ s/^([\$\@%&][!*=?:^.]?)(.*::)(.*)$/$2<$1$3>/;
     my $vname;
     if ($name =~ s/::<(.*)>$//) {
         $vname = $1;
         $vname =~ s/^(.)[:^]/$1/;
     }
-    my @components = split(/::/, $name);
+    my @components = split(/::/, $name, -1);
     shift(@components) while @components and $components[0] eq '';
+    if (@components and $components[-1] eq '') {
+        pop @components;
+        $components[-1] .= '::';
+    }
     push(@components, $vname) if defined $vname;
     @components;
 }

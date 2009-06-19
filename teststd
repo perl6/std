@@ -25,7 +25,8 @@ $OUTPUT_AUTOFLUSH = 1;
 my $total = 0+@files;
 my @failed;
 for my $file (@files) {
-    print $file, "\n";
+    (my $short = $file) =~ s/(\.\.\/)+//;
+    print $short, "\n";
     system "./tryfile $file >tryfile.out";
     if ($CHILD_ERROR) {
         push(@failed,$file);

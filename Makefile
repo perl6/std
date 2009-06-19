@@ -37,6 +37,9 @@ clean:
 distclean purge: clean
 	rm -rf STD.pmc STD.pm5
 
+snaptest: snap all
+	cd snap; ../teststd ../../../t
+
 test: all
 	./teststd
 testt: all
