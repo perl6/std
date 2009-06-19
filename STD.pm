@@ -23,6 +23,7 @@ my $INVOCANT_IS is context<rw>;
 my $CURPAD is context<rw>;
 my $REALLYADD is context<rw> = 0;
 my $BORG is context;
+my $MULTINESS is context = '';
 
 my $CORE is context;
 my $CORESETTING is context = "CORE";
@@ -128,7 +129,7 @@ method is_name ($name, $curpad = $*CURPAD) {
 
     my $curpkg = $*CURPKG;
     if $name ~~ /::/ {
-        my @components = split(/\:\:/,$name);
+        my @components = self.canonicalize_name($name);
         return True if @components[0] eq 'COMPILING';
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
@@ -148,8 +149,6 @@ method is_name ($name, $curpad = $*CURPAD) {
         }
         $name = shift(@components)//'';
         return True if $name eq '';
-        $name ~~ s/^\<//;
-        $name ~~ s/\>$//;
     }
     else {
         my $pad = $curpad;
@@ -170,8 +169,7 @@ method find_stab ($name, $curpad = $*CURPAD) {
 
     my $curpkg = $*CURPKG;
     if $name ~~ /::/ {
-        $name = self.canonicalize_name($name) unless $name ~~ /^\w/;
-        my @components = split(/\:\:/,$name); 
+        my @components = self.canonicalize_name($name);
         if @components[*-1] eq '' or $name ~~ /\:\:$/ {
             pop(@components) if @components[*-1] eq ''; # work around p5 problems
             @components[*-1] ~= '::';
@@ -236,7 +234,7 @@ method add_name ($name) {
     my $scope = $*SCOPE // 'our';
     # say "Adding $*SCOPE $name in $*PKGNAME";
     if $scope eq 'augment' or $scope eq 'supersede' {
-        self.is_name($name) or self.worry("Can't $scope a non-existent type");
+        self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
     }
     else {
         if $scope eq 'our' {
@@ -245,77 +243,115 @@ method add_name ($name) {
         else {
             self.add_my_name($name);
         }
-        self.add_routine($name);    # fake up a &Foo
     }
     self;
 }
 
-method add_my_name ($name) {
+method add_my_name ($n) {
+    my $name = $n;
     # say "add_my_name $name";
-    $name = substr($name,2) while substr($name,0,2) eq '::';
     my $curpkg = $*CURPAD;
-    if $name ~~ /::/ {
-        my @components = split(/\:\:/,$name);
-        my $first = @components[0] ~ '::';
-        while @components > 1 {
-            my $pkg = shift @components;
-            $curpkg.{$pkg} //= { name => $pkg, file => $COMPILING::FILE, line => self.line };
-            $curpkg = $curpkg.{$pkg ~ '::'} //= { };
-            # say "Adding new package $pkg in $curpkg ";
-        }
-        $name = shift @components;
+    my @components = self.canonicalize_name($name);
+    while @components > 1 {
+        my $pkg = shift @components;
+        $curpkg.{$pkg} //= { }; # no name for forward declaration
+        $curpkg.{"&$pkg"} //= { name => "&$pkg", file => $COMPILING::FILE, line => self.line };
+        $curpkg = $curpkg.{$pkg ~ '::'} //= { name => $pkg ~ '::', file => $COMPILING::FILE, line => self.line };
+        # say "Adding new package $pkg in $curpkg ";
     }
+    $name = shift @components;
     if $curpkg.{$name}:exists {
-        self.worry("Name $name redeclared") unless $*SCOPE eq 'use' or $*PKGDECL eq 'role';
+        if $*SCOPE eq 'use' {}
+        elsif $*PKGDECL eq 'role' {}
+        elsif $*MULTINESS eq 'multi' and $curpkg.{$name}<mult> ne 'only' {}
+        elsif $curpkg.{$name}<mult> eq 'proto' {}
+        else {
+            my $old = $curpkg.{$name};
+            my $ofile = $old.<file> // '';
+            my $oline = $old.<line> // '???';
+            if $ofile {
+                if $ofile ne $COMPILING::FILE {
+                    self.worry("Redeclaration of lexical symbol $name (from $ofile line $oline)");
+                }
+                else {
+                    self.worry("Useless redeclaration of lexical symbol $name (from line $oline)");
+                }
+            }
+            else {
+                self.worry(" Useless redeclaration of lexical symbol $name");
+            }
+        }
     }
     else {
-        $curpkg.{$name} //= { name => $name };
+        $curpkg.{$name} //= {
+            name => $name,
+            file => $COMPILING::FILE, line => self.line,
+            mult => ($*MULTINESS||'only'),
+        };
+        if $name ~~ /^\w/ {
+            $curpkg.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
+            $curpkg.{$name ~ '::'} //= { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
+        }
     }
     self;
 }
 
-method add_our_name ($name) {
+method add_our_name ($n) {
+    my $name = $n;
     # say "add_our_name $name " ~ $*PKGNAME;
-    $name = substr($name,2) while substr($name,0,2) eq '::';
     my $curpkg = $*CURPKG;
     # say "curpkg $curpkg global $GLOBAL ", join ' ', %$*GLOBAL;
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
-    if $name ~~ /::/ {
-        my @components = split(/\:\:/,$name);
-        my $first = @components[0] ~ '::';
-        if $curpkg = self.find_top_pkg($first) {
-            # say "Found $first package $curpkg";
+    my @components = self.canonicalize_name($name);
+    if @components > 1 {
+        my $c = self.find_top_pkg(@components[0]);
+        if $c {
             shift @components;
+            $curpkg = $c;
         }
-        else {
-            $curpkg = $*CURPKG;
-            # say "Assuming current package $curpkg ";
-        }
-        while @components > 1 {
-            my $pkg = shift @components;
-            $curpkg.{$pkg} //= { name => $pkg, file => $COMPILING::FILE, line => self.line };
-            $curpkg = $curpkg.{$pkg ~ '::'} //= { };
-            # say "Adding new package $pkg in $curpkg ";
-        }
-        $name = shift @components;
     }
-    $name ~~ s/^\<//;
-    $name ~~ s/\>$//;
+    while @components > 1 {
+        my $pkg = shift @components;
+        $curpkg.{$pkg} //= { }; # no name for forward declaration
+        $curpkg = $curpkg.{$pkg ~ '::'} //= { name => $pkg ~ '::', file => $COMPILING::FILE, line => self.line };
+        # say "Adding new package $pkg in $curpkg ";
+    }
+    $name = shift @components;
     if $curpkg.{$name}:exists {
-        self.worry("Name $name redeclared") unless $*PKGDECL eq 'role';
+        if $*SCOPE eq 'use' {}
+        elsif $*PKGDECL eq 'role' {}
+        elsif $*MULTINESS eq 'multi' and $curpkg.{$name}<mult> ne 'only' {}
+        elsif $curpkg.{$name}<mult> eq 'proto' {}
+        else {
+            my $old = $curpkg.{$name};
+            my $ofile = $old.<file> // '';
+            my $oline = $old.<line> // '???';
+            if $ofile {
+                if $ofile ne $COMPILING::FILE {
+                    self.worry("Redeclaration of package symbol $name (from $ofile line $oline)");
+                }
+                else {
+                    self.worry("Useless redeclaration of package symbol $name (from line $oline)");
+                }
+            }
+            else {
+                self.worry(" Useless redeclaration of package symbol $name");
+            }
+        }
     }
     else {
-        $curpkg.{$name} = { name => $name, file => $COMPILING::FILE, line => self.line };
+        $curpkg.{$name} //= {
+            name => $name,
+            file => $COMPILING::FILE, line => self.line,
+            mult => ($*MULTINESS||'only'),
+        };
+        if $name ~~ /^\w/ {
+            $curpkg.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
+            $curpkg.{$name ~ '::'} //= { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
+        }
     }
-    if $*CURPAD.{$name}:exists {
-        self.worry("Name $name redeclared") unless $*PKGDECL eq 'role';
-    }
-    else {
-        $*CURPAD.{$name} = $curpkg.{$name};  # the lexical alias
-    }
-    my $n = $*CURPAD.{$name ~ '::'} //= $curpkg.{$name ~ '::'} //= { name => $name ~ '::', file => $COMPILING::FILE, line => self.line };
-    # say "Added package $name $n to $curpkg ";
+    self.add_my_name($n);   # the lexical alias
     self;
 }
 
@@ -341,19 +377,14 @@ method load_setting ($setting) {
     $*CURPKG = $*GLOBAL;
 }
 
-method is_known ($name, $curpad = $*CURPAD) {
+method is_known ($n, $curpad = $*CURPAD) {
+    my $name = $n;
     # say "is_known $name";
     return True if $*QUASI_QUASH;
     return True if $*CURPKG.{$name};
-    my $st;
-    ($st,$name) = $name ~~ /^(\W*)(.*)/;
-    $st ~~ s/\:\://;
-    $st ||= '&';
-    # say "is_known sigiltwigil $st $name";
     my $curpkg = $*CURPKG;
-    if $name ~~ /::/ {
-        $name = self.canonicalize_name($name) unless $name ~~ /^\w/;
-        my @components = split(/\:\:/,$name);
+    my @components = self.canonicalize_name($name);
+    if @components > 1 {
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
         if $curpkg = self.find_top_pkg(@components[0] ~ '::') {
@@ -366,62 +397,31 @@ method is_known ($name, $curpad = $*CURPAD) {
         }
         while @components > 1 {
             my $pkg = shift @components;
-            # say "Looking for $pkg in $curpkg " join ' ', keys(%$curpkg);
+            # say "Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg);
             $curpkg = $curpkg.{$pkg ~ '::'};
             return False unless $curpkg;
             # say "Found $pkg okay, now in $curpkg ";
         }
-        $name = shift(@components)//'';
-        # say "Final component is $name";
-        return True if $name eq '';
-        $name ~~ s/^\<//;
-        $name ~~ s/\>$//;
-        return True if $curpkg.{$name};
-        return True if $curpkg.{$st ~ $name};
     }
-    else {
-        my $vname = $st ~ $name;
-        return True if $*CURPKG.{$vname};
-        my $pad = $curpad;
-        while $pad {
-            return True if $pad.{$name};
-            return True if $pad.{$vname};
-            $pad = $pad.<OUTER::>;
-        }
+
+    $name = shift(@components)//'';
+    # say "Final component is $name";
+    return True if $name eq '';
+    return True if $curpkg.{$name};
+
+    my $pad = $curpad;
+    while $pad {
+        return True if $pad.{$name};
+        $pad = $pad.<OUTER::>;
     }
+
     return False;
 }
 
 
 method add_routine ($name) {
     my $vname = '&' ~ $name;
-    if ($*SCOPE//'') eq 'our' {
-        self.add_our_routine($vname);
-        if $vname ~~ s/\:\(.*// {
-            self.add_our_routine($vname);
-        }
-    }
-    else {
-        self.add_my_routine($vname);
-        if $vname ~~ s/\:\(.*// {
-            self.add_my_routine($vname);
-        }
-    }
-    self;
-}
-
-method add_my_routine ($name) {
-    # say "add_my_routine $name";
-    $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
-    self;
-}
-
-method add_our_routine ($name) {
-    # say "add_our_routine $name " ~ $*PKGNAME;
-    say "panic: unexpected package name $name" if $name ~~ /\:\:/;
-    $*CURPKG.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
-    # say "CORE $*CORE adding name $name to CURPAD $*CURPAD in $*PKGNAME";
-    $*CURPAD.{$name} //= $*CURPKG.{$name};  # the lexical alias
+    self.add_name($vname);
     self;
 }
 
@@ -435,43 +435,22 @@ method add_variable ($name) {
     self;
 }
 
-method add_my_variable ($name) {
+method add_my_variable ($n) {
+    my $name = $n;
     # say "add_my_variable $name";
     if substr($name, 0, 1) eq '&' {
-        $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
+        self.add_my_name($name);
         if $name ~~ s/\:\(.*// {
-            $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
+            self.add_my_name($name);
         }
         return self;
     }
-    if $name eq '$_' or $name ~~ s/\^|\:// {   # XXX hack
-        ;
-    }
-    elsif my $old = $*CURPAD.{$name} {
-        my $ofile = $old.<file> // '';
-        my $oline = $old.<line> // '???';
-        if $ofile {
-            if $ofile ne $COMPILING::FILE {
-                self.worry("Redeclaration of $name (from $ofile line $oline)");
-            }
-            else {
-                self.worry("Useless redeclaration of $name (from line $oline)");
-            }
-        }
-        else {
-            self.worry(" Useless redeclaration of $name");
-        }
-    }
-    $*CURPAD.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
+    self.add_my_name($name);
     self;
 }
 
 method add_our_variable ($name) {
-    # say "add_our_variable $name " ~ $*PKGNAME;
-    say "panic: unexpected package name $name" if $name ~~ /\:\:/;
-    $*CURPKG.{$name} //= { name => $name, file => $COMPILING::FILE, line => self.line };
-    # say "CORE $*CORE adding variable $name to CURPAD $*CURPAD in $*PKGNAME";
-    $*CURPAD.{$name} //= $*CURPKG.{$name};  # the lexical alias
+    self.add_our_name($name);
     self;
 }
 
@@ -504,8 +483,8 @@ method check_variable ($variable) {
         }
         when '?' {
             if $name ~~ /\:\:/ {
-                $name = self.canonicalize_name($name);
-                $variable.worry("Unrecognized variable: $name") unless $name ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:/;
+                my ($first) = self.canonicalize_name($name);
+                $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)$/;
             }
             else {
                 # search upward through languages to STD
@@ -964,6 +943,7 @@ rule comp_unit {
     :my $INVOCANT_IS is context<rw>;
     :my $CURPAD is context<rw>;
     :my $REALLYADD is context<rw> = 0;
+    :my $MULTINESS is context = '';
 
     :my $CORE is context;
     :my $CORESETTING is context = "CORE";
@@ -986,7 +966,7 @@ rule comp_unit {
     }}
     <statementlist>
     [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
-    { $<CORE> = $*CORE; }
+#    { $<CORE> = $*CORE; }
     # "CHECK" time...
     {{
         if @COMPILING::WORRIES {
@@ -1011,7 +991,7 @@ method explain_mystery() {
             next;
         }
 
-        next if self.is_known($_, $p);
+        next if self.is_known($_, $p) or self.is_known('&' ~ $_, $p);
 
         # just a guess, but good enough to improve error reporting
         if $_ lt 'a' {
@@ -1957,17 +1937,21 @@ rule package_def {
                 $*CURPKG = $*CURPKG.{'PARENT::'};
             }}
             {*}                                                     #= block
-        || <?{ $*begin_compunit }> {} <?before ';'>
-            {{
-                $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-                my $shortname = $longname.<name>.Str;
-                $*PKGNAME = $shortname;
-                my $newpkg = $*CURPKG.{$shortname ~ '::'} //= {};
-                $newpkg.<PARENT::> = $*CURPKG;
-                $*CURPKG = $newpkg;
-                $*begin_compunit = 0;
-            }}
-            {*}                                                     #= semi
+        || <?before ';'>
+            [
+            || <?{ $*begin_compunit }>
+                {{
+                    $longname orelse $¢.panic("Compilation unit cannot be anonymous");
+                    my $shortname = $longname.<name>.Str;
+                    $*PKGNAME = $shortname;
+                    my $newpkg = $*CURPKG.{$shortname ~ '::'} //= {};
+                    $newpkg.<PARENT::> = $*CURPKG;
+                    $*CURPKG = $newpkg;
+                    $*begin_compunit = 0;
+                }}
+                {*}                                                     #= semi
+            || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
+            ]
         || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
         ]
     ] || <.panic: "Malformed $*PKGDECL">
@@ -1984,10 +1968,22 @@ token declarator {
     ]
 }
 
-token multi_declarator:multi { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed multi'> ] }
-token multi_declarator:proto { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed proto'> ] }
-token multi_declarator:only  { <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed only'> ] }
-token multi_declarator:null  { <declarator> }
+token multi_declarator:multi {
+    :my $MULTINESS is context = 'multi';
+    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed multi'> ]
+}
+token multi_declarator:proto {
+    :my $MULTINESS is context = 'proto';
+    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed proto'> ]
+}
+token multi_declarator:only {
+    :my $MULTINESS is context = 'only';
+    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed only'> ]
+}
+token multi_declarator:null {
+    :my $MULTINESS is context = '';
+    <declarator>
+}
 
 token routine_declarator:sub       { <sym> <routine_def> }
 token routine_declarator:method    { <sym> <method_def> }
@@ -2339,9 +2335,10 @@ token twigil:sym<~> { <sym> }
 token deflongname {
     :dba('name to be defined')
     <name>
-    # XXX too soon
-    [ <colonpair>+ { $¢.add_macro($<name>) if $*IN_DECL; } ]?
-    { $¢.add_routine($<name>.Str) if $*IN_DECL; }
+    [
+    | <colonpair>+ { $¢.add_macro($<name>) if $*IN_DECL; }
+    | { $¢.add_routine($<name>.Str) if $*IN_DECL; }
+    ]
 }
 
 token longname {
@@ -2371,7 +2368,7 @@ token subshortname {
     [
     | <category>
         [ <colonpair>+ { $¢.add_macro($<category>) if $*IN_DECL; } ]?
-    | <desigilname> { $¢.add_routine($<desigilname>.Str) if $*IN_DECL; }
+    | <desigilname>
     ]
 }
 
@@ -3647,7 +3644,7 @@ token param_var {
         [
             # Is it a longname declaration?
         || <?{ $<sigil>.Str eq '&' }> <?ident> {}
-            <name=sublongname> {{ $*REALLYADD = 0 }} # sublongname adds symbol
+            <name=sublongname>
 
         ||  # Is it a shaped array or hash declaration?
             <?{ $<sigil>.Str eq '@' || $<sigil>.Str eq '%' }>
@@ -3672,7 +3669,7 @@ token param_var {
             if $*REALLYADD {
                 given $twigil {
                     when '' {
-                        self.add_variable($vname) if $n ne '';
+                        self.add_my_variable($vname) if $n ne '';
                     }
                     when '.' {
                     }

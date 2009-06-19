@@ -49,7 +49,6 @@
 	    '&like' => { name => '&like', file => 'CORE.pad', line => __LINE__ },
 	    '&skip_rest' => { name => '&skip_rest', file => 'CORE.pad', line => __LINE__ },
 	    '&unlike' => { name => '&unlike', file => 'CORE.pad', line => __LINE__ },
-	    '&nonce' => { name => '&nonce', file => 'CORE.pad', line => __LINE__ },
 	    '&skip_rest' => { name => '&skip_rest', file => 'CORE.pad', line => __LINE__ },
 	    '&eval_dies_ok' => { name => '&eval_dies_ok', file => 'CORE.pad', line => __LINE__ },
 	    '&eval_lives_ok' => { name => '&eval_lives_ok', file => 'CORE.pad', line => __LINE__ },

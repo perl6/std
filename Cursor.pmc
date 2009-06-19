@@ -1017,6 +1017,7 @@ sub add_enum { my $self = shift;
     # XXX complete kludge, really need to eval EXPR
     for ($expr =~ m/([a-zA-Z_]\w*)/g) {
         $self->add_name($type . "::$_");
+        $self->add_name($_);
     }
     $self;
 }
@@ -1071,9 +1072,17 @@ sub do_imports { my $self = shift;
 
 sub canonicalize_name { my $self = shift;
     my $name = shift;
-    return unless $name =~ /::/;
+    return $name unless $name =~ /::/;
     $name =~ s/^([\$\@%&][!*=?:^.]?)(.*::)(.*)$/$2<$1$3>/;
-    $name;
+    my $vname;
+    if ($name =~ s/::<(.*)>$//) {
+        $vname = $1;
+        $vname =~ s/^(.)[:^]/$1/;
+    }
+    my @components = split(/::/, $name);
+    shift(@components) while @components and $components[0] eq '';
+    push(@components, $vname) if defined $vname;
+    @components;
 }
 
 sub callm { my $self = shift;
