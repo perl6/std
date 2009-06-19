@@ -480,11 +480,13 @@ method check_variable ($variable) {
             }
         }
         when '^' {
+            my $MULTINESS is context = 'multi';
             my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
             if $siggy { $variable.panic("Placeholder variable $name cannot override existing signature $siggy"); }
             self.add_my_variable($name);
         }
         when ':' {
+            my $MULTINESS is context = 'multi';
             self.add_my_variable($name);
         }
         when '~' {
