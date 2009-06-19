@@ -29,7 +29,7 @@ for my $file (@files) {
     print $short, "\n";
     system "./tryfile $file >tryfile.out";
     if ($CHILD_ERROR) {
-        push(@failed,$file);
+        push(@failed,$short);
         $fail++;
         # catch those pesky CTRL-Cs
         if($CHILD_ERROR &= 127) {
