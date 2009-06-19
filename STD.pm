@@ -252,6 +252,8 @@ method add_my_name ($n) {
         # say "Adding new package $pkg in $curpkg ";
     }
     $name = shift @components;
+    return self unless defined $name and $name ne '';
+    return self if $name eq '$' or $name eq '@' or $name eq '%';
     if $curpkg.{$name}:exists {
         if $*SCOPE eq 'use' {}
         elsif $*PKGDECL eq 'role' {}
@@ -318,7 +320,7 @@ method add_our_name ($n) {
         # say "Adding new package $pkg in $curpkg ";
     }
     $name = shift @components;
-    return self unless defined $name;
+    return self unless defined $name and $name ne '';
     if $curpkg.{$name}:exists {
         if $*SCOPE eq 'use' {}
         elsif $*PKGDECL eq 'role' {}
@@ -2290,12 +2292,12 @@ token variable {
         $*SIGIL ||= $sigil;
     }> {}
     [
+    || <sigil> <twigil>? <?before '::' [ '{' | '<' | '(' ]> <longname> # XXX
     || '&'
         [
         | <twigil>? <sublongname> { $name = $<sublongname>.Str } {*}                                   #= subnoun
         | '[' ~ ']' <infixish(1)>
         ]
-    || <?before '$::('> '$' <name>?
     || '$::' <name>? # XXX
     || '$:' <name> # XXX
     || [
