@@ -246,7 +246,7 @@ method add_my_name ($n) {
     my @components = self.canonicalize_name($name);
     while @components > 1 {
         my $pkg = shift @components;
-        $curpkg.{$pkg} //= { }; # no name for forward declaration
+        $curpkg.{$pkg} //= { stub => 1 };
         $curpkg.{"&$pkg"} //= { name => "&$pkg", file => $COMPILING::FILE, line => self.line };
         $curpkg = $curpkg.{$pkg ~ '::'} //= { 'PARENT::' => $curpkg };
         # say "Adding new package $pkg in $curpkg ";
@@ -255,10 +255,17 @@ method add_my_name ($n) {
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
     if $curpkg.{$name}:exists {
-        if $*SCOPE eq 'use' {}
-        elsif $*PKGDECL eq 'role' {}
+        if $curpkg.{$name}<stub> {
+            $curpkg.{$name} = {
+                name => $name,
+                file => $COMPILING::FILE, line => self.line,
+                mult => ($*MULTINESS||'only'),
+            };
+        }
+        elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $curpkg.{$name}<mult> ne 'only' {}
-        elsif $curpkg.{$name}<mult> eq 'proto' {}
+        elsif ($curpkg.{$name}<mult>//'') eq 'proto' {}
+        elsif $*PKGDECL eq 'role' {}
         else {
             my $old = $curpkg.{$name};
             my $ofile = $old.<file> // '';
@@ -284,7 +291,7 @@ method add_my_name ($n) {
         }
     }
     else {
-        $curpkg.{$name} //= {
+        $curpkg.{$name} = {
             name => $name,
             file => $COMPILING::FILE, line => self.line,
             mult => ($*MULTINESS||'only'),
@@ -315,17 +322,24 @@ method add_our_name ($n) {
     }
     while @components > 1 {
         my $pkg = shift @components;
-        $curpkg.{$pkg} //= { }; # no name for forward declaration
+        $curpkg.{$pkg} //= { stub => 1 };
         $curpkg = $curpkg.{$pkg ~ '::'} //= { 'PARENT::' => $curpkg };
         # say "Adding new package $pkg in $curpkg ";
     }
     $name = shift @components;
     return self unless defined $name and $name ne '';
     if $curpkg.{$name}:exists {
-        if $*SCOPE eq 'use' {}
-        elsif $*PKGDECL eq 'role' {}
+        if $curpkg.{$name}<stub> {
+            $curpkg.{$name} = {
+                name => $name,
+                file => $COMPILING::FILE, line => self.line,
+                mult => ($*MULTINESS||'only'),
+            };
+        }
+        elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $curpkg.{$name}<mult> ne 'only' {}
         elsif $curpkg.{$name}<mult> eq 'proto' {}
+        elsif $*PKGDECL eq 'role' {}
         else {
             my $old = $curpkg.{$name};
             my $ofile = $old.<file> // '';
@@ -352,7 +366,7 @@ method add_our_name ($n) {
         }
     }
     else {
-        $curpkg.{$name} //= {
+        $curpkg.{$name} = {
             name => $name,
             file => $COMPILING::FILE, line => self.line,
             mult => ($*MULTINESS||'only'),
@@ -1152,6 +1166,7 @@ token regex_block {
 rule statementlist {
     :my $INVOCANT_OK is context<rw> = 0;
     :dba('statement list')
+
     [
     | $
     | <?before <[\)\]\}]> >
@@ -1926,9 +1941,9 @@ rule package_def {
         ]?
         <trait>*
         [
-        <?before '{'>
-        {{
-            # figure out the actual full package name (nested in outer package)
+        || <?before '{'>
+            {{
+                # figure out the actual full package name (nested in outer package)
                 my $pkg = $*PKGNAME || "GLOBAL";
                 my $shortname;
                 if $longname {
@@ -1944,6 +1959,7 @@ rule package_def {
                 push @PKGS, $pkg;
                 # say "adding $newpkg " ~ $*PKGNAME;
             }}
+
             <block>
             {{
                 $*PKGNAME = pop(@PKGS);
