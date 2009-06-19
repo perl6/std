@@ -318,6 +318,7 @@ method add_our_name ($n) {
         # say "Adding new package $pkg in $curpkg ";
     }
     $name = shift @components;
+    return self unless defined $name;
     if $curpkg.{$name}:exists {
         if $*SCOPE eq 'use' {}
         elsif $*PKGDECL eq 'role' {}
