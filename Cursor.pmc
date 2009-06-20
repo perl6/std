@@ -1074,7 +1074,7 @@ sub do_imports { my $self = shift;
 
 sub canonicalize_name { my $self = shift;
     my $name = shift;
-    $name =~ s/^([\$\@\%\&])[:^]/$1/;
+    $name =~ s/^([\$\@\%\&])(\^|:(?!:))/$1/;
     return $name unless $name =~ /::/;
     $self->panic("Can't canonicalize a run-time name at compile time: $name") if $name =~ /::\(/;
     $name =~ s/^([\$\@%&][!*=?:^.]?)(.*::)(.*)$/$2<$1$3>/;

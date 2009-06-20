@@ -1251,14 +1251,28 @@ token eat_terminator {
     ]
 }
 
+token statement_control:need {
+    :my $longname;
+    <sym>:s
+    [
+    |<version>
+    |<module_name>
+        {{
+            my $SCOPE is context = 'use';
+            $longname = $<module_name>[*-1]<longname>.Str;
+            $¢.do_imports($longname, '');
+        }}
+    ] ** ','
+}
+
 token statement_control:use {
     :my $longname;
+    :my $SCOPE is context = 'use';
     <sym> <.ws>
     [
     | <version>
     | <module_name>
         {{
-            my $SCOPE is context = 'use';
             $longname = $<module_name><longname>.Str;
         }}
         [
