@@ -361,7 +361,6 @@ method add_our_name ($n) {
             }
             else {  # XXX eventually check for conformant arrays here
                 # (redeclaration of identical package vars is not useless)
-                # self.worry("Useless redeclaration of package variable $name$loc");
             }
         }
     }
@@ -1754,7 +1753,7 @@ token postcircumfix:sym<( )> ( --> Methodcall)
     { :dba('argument list') '(' ~ ')' <semiarglist> }
 
 token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str eq '-1' and $¢.obs("[-1] subscript to access final element","[*-1]") } }
+    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } }
 
 token postcircumfix:sym<{ }> ( --> Methodcall)
     { :dba('subscript') '{' ~ '}' <semilist> }
@@ -3892,7 +3891,7 @@ token term:sym<defer> ( --> Term)
 
 token term:rand ( --> Term) {
     <sym> »
-    [ <?before [ \h+ | '('] [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]?
+    [ <?before '('? \h* [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]?
     [ <?before '()'> <.obs('rand()', 'rand')> ]?
 }
 

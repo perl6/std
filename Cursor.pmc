@@ -192,7 +192,7 @@ sub load_pad {
     my $self = shift;
     my $setting = shift;
     state %PADS;
-    return $PADS{$setting} if $PADS{$setting};
+    #return $PADS{$setting} if $PADS{$setting};
     my $file = "$setting.pad";
     my $store = $TMP_PREFIX . "$setting.pad.store";
     if (-f $store and -M $file and -M $file > -M $store) {
@@ -354,7 +354,7 @@ sub _AUTOLEXgen { my $self = shift;
         if ($cached_lexer) {
             #Cache hit, Keep them coming ;-)
             $lexer = $cached_lexer;
-            say "GOT HERE $cache_key";
+#            say "GOT HERE $cache_key";
         }
         else {
             # Cache miss
@@ -768,7 +768,7 @@ sub cursor_fate { my $self = shift;
     if (my $state = $lexer->{T}) {
         my @candidates;
         my $p = $P;
-        my $ch = $::ORIG[$p];
+        my $ch = $::ORIG[$p]//32;
         my $next;
         print ::LOG "=" x 10,"\n$p TRIE for ${pkg}::$name in ", ref $self, "\n",
                 $p," ", pack("U",$ch), "\n" if $DEBUG & DEBUG::autolexer;
