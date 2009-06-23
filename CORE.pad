@@ -157,6 +157,8 @@
 
     Str => { name => 'Str', file => 'CORE.pad', line => __LINE__ },
     '&Str' => { name => '&Str', file => 'CORE.pad', line => __LINE__ },
+    Cat => { name => 'Cat', file => 'CORE.pad', line => __LINE__ },
+    '&Cat' => { name => '&Cat', file => 'CORE.pad', line => __LINE__ },
     Blob => { name => 'Blob', file => 'CORE.pad', line => __LINE__ },
     '&Blob' => { name => '&Blob', file => 'CORE.pad', line => __LINE__ },
     '&Char' => { name => '&Char', file => 'CORE.pad', line => __LINE__ },
