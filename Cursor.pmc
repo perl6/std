@@ -1053,10 +1053,12 @@ sub do_imports { my $self = shift;
     else {
         my $pkg = $self->find_stab($module . '::');
         $self->add_my_name($module);
-        @imports = keys %$pkg;
+        eval { @imports = keys %{$pkg->{'EXPORT::'}{'DEFAULT::'}}; };
         local $::SCOPE = 'my';
         for (@imports) {
             if (/^\w/) {
+                next if /^PARENT/;
+                next if /^OUTER/;
                 if (/::/) {
                     $self->add_name($_);
                 }
