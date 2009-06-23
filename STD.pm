@@ -2082,7 +2082,7 @@ token special_variable:sym<$@> {
 token special_variable:sym<$#> {
     <sym> ::
     [
-    || (\w+) <.obs("\$#" ~ $0.Str ~ " variable", "\@\{" ~ $0.Str ~ "}.end")>
+    || (\w+) <.obs("\$#" ~ $0.Str ~ " variable", '@' ~ $0.Str ~ '.end')>
     || <.obs('$# variable', '.fmt')>
     ]
 }
@@ -2261,7 +2261,7 @@ token special_variable:sym<$\\> {
 
 token special_variable:sym<$|> {
     <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$| variable', 'Form module')>
+    <.obs('$| variable', ':autoflush on open')>
 }
 
 token special_variable:sym<$:> {
@@ -2280,7 +2280,8 @@ token special_variable:sym<$'> { #'
 }
 
 token special_variable:sym<$"> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
+    <sym> <!{ $*INTERPOLATION }>
+    :: <?before \s | ',' | '=' | <terminator> >
     <.obs('$" variable', '.join() method')>
 }
 
@@ -3342,16 +3343,10 @@ grammar Q is STD {
             <?before '$'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> ] || <.panic: "Non-variable \$ must be backslashed">
         }
-        token special_variable:sym<$"> {
-            '$' <stopper>
-            <.panic: "Can't use a \$ in the last position of an interpolating string">
-        }
-
     } # end role
 
     role s0 {
         token escape:sym<$> { <!> }
-        token special_variable:sym<$"> { <!> }
     } # end role
 
     role a1 {
