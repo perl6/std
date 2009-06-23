@@ -1218,6 +1218,13 @@ token statement {
             <.ws>
             [
             | <statement_mod_loop> {*}                              #= mod loop
+                {{
+                    my $sp = $<EXPR><statement_prefix>;
+                    if $sp and $sp<sym> eq 'do' {
+                       my $s = $<statement_mod_loop>[0]<sym>;
+                       $¢.obs("do...$s" ,"repeat...$s");
+                    }
+                }}
             | <statement_mod_cond> {*}                              #= mod cond
                 :dba('statement modifier loop')
                 [
@@ -3834,13 +3841,8 @@ token statement_prefix:contend { <sym> <blorst> }
 token statement_prefix:async   { <sym> <blorst> }
 token statement_prefix:maybe   { <sym> <blorst> }
 token statement_prefix:lazy    { <sym> <blorst> }
-token statement_prefix:do      { <sym> <blorst> {{
-        my $loop = $<blorst><statement><statement_mod_loop>;
-        if $loop and @$loop and (my $s = $loop.[0].<sym>) ~~ /while|until/ {
-            $¢.obs("do...$s" ,"repeat...$s");
-        }
-    }}
-}
+token statement_prefix:do      { <sym> <blorst> }
+
 token statement_prefix:lift    {
     :my $QUASI_QUASH is context = 1;
     <sym> <blorst>
