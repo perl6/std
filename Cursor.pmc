@@ -192,7 +192,7 @@ sub load_pad {
     my $self = shift;
     my $setting = shift;
     state %PADS;
-    #return $PADS{$setting} if $PADS{$setting};
+    return $PADS{$setting} if $PADS{$setting};
     my $file = "$setting.pad";
     my $store = $TMP_PREFIX . "$setting.pad.store";
     if (-f $store and -M $file and -M $file > -M $store) {
@@ -1051,9 +1051,11 @@ sub do_imports { my $self = shift;
         }
     }
     else {
-        my $pkg = $self->find_stab($module . '::');
+        my $pkg = $self->find_stab($module);
+        # say join(' ', keys(%$pkg));
         $self->add_my_name($module);
-        eval { @imports = keys %{$pkg->{'EXPORT::'}{'DEFAULT::'}}; };
+        eval { @imports = keys %{$pkg->{'EXPORT'}{'stash'}{'DEFAULT'}{'stash'}}; };
+        # say join(' ', @imports);
         local $::SCOPE = 'my';
         for (@imports) {
             if (/^\w/) {
@@ -1088,7 +1090,6 @@ sub canonicalize_name { my $self = shift;
     shift(@components) while @components and $components[0] eq '';
     if (@components and $components[-1] eq '') {
         pop @components;
-        $components[-1] .= '::';
     }
     push(@components, $vname) if defined $vname;
     @components;

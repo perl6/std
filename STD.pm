@@ -88,24 +88,28 @@ method TOP ($STOP = undef) {
 #    MY          # $stash = mypad()
 #    OUR         # $stash = $?PACKAGE;
 #    CORE        # $stash = $::CORE
-#    GLOBAL      # $stash = CORE::<GLOBAL::>
-#    PROCESS     # $stash = CORE::<PROCESS::>
+#    GLOBAL      # $stash = CORE::<GLOBAL>
+#    PROCESS     # $stash = CORE::<PROCESS>
 #    COMPILING   # $stash = compiling($rest) # compiler's run time
 #    CALLER      # ctx = ctx.caller # user's run time
 #    CONTEXT     # ctx = ctx.context # user's run time
 #
 #  Relative:
-#    OUTER       # $stash = $stash<OUTER::>
+#    OUTER       # $stash = $stash<OUTER>
 #    UNIT        # $stash = $stash.scanouter(:unit)
-#    SETTING     # $stash = UNIT::<OUTER::>
-#    PARENT      # $stash = $stash<PARENT::>
+#    SETTING     # $stash = UNIT::<OUTER>
+#    PARENT      # $stash = $stash<PARENT>
 #
 #    SUPER       # (give up, pass to dispatcher?)
 
 method newpad {
-    $*CURPAD = {
-        'OUTER::' => $*CURPAD,
+    my $outer = $*CURPAD<MY>;
+    my $my = { file => $COMPILING::FILE, line => self.lineof(self.pos), stash => (
+        $*CURPAD = {
+            OUTER => $outer,
+        }),
     };
+    $*CURPAD<MY> = $my;
     self;
 }
 
@@ -133,17 +137,17 @@ method is_name ($n, $curpad = $*CURPAD) {
         return True if @components[0] eq 'COMPILING';
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
-        if $curpkg = self.find_top_pkg(@components[0] ~ '::') {
+        if $curpkg = self.find_top_pkg(@components[0]) {
             # say "Found lexical package " ~ @components[0];
             shift @components;
         }
         else {
             # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL;
+            $curpkg = $*GLOBAL<stash>;
         }
         while @components > 1 {
             my $pkg = shift @components;
-            $curpkg = $curpkg.{$pkg ~ '::'};
+            $curpkg = $curpkg.{$pkg}<stash>;
             return False unless $curpkg;
             # say "Found $pkg okay, now in ";
         }
@@ -153,10 +157,10 @@ method is_name ($n, $curpad = $*CURPAD) {
     my $pad = $curpad;
     while $pad {
         return True if $pad.{$name};
-        $pad = $pad.<OUTER::>;
+        $pad = $pad.<OUTER><stash>;
     }
     return True if $curpkg.{$name};
-    return True if $*GLOBAL.{$name};
+    return True if $*GLOBAL<stash>{$name};
     return False;
 }
 
@@ -170,17 +174,17 @@ method find_stab ($n, $curpad = $*CURPAD) {
     if @components > 1 {
         return () if @components[0] eq 'CALLER';
         return () if @components[0] eq 'CONTEXT';
-        if $curpkg = self.find_top_pkg(@components[0] ~ '::') {
+        if $curpkg = self.find_top_pkg(@components[0]) {
             # say "Found lexical package " ~ @components[0];
             shift @components;
         }
         else {
             # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL;
+            $curpkg = $*GLOBAL<stash>;
         }
         while @components > 1 {
             my $pkg = shift @components;
-            $curpkg = $curpkg.{$pkg ~ '::'};
+            $curpkg = $curpkg.{$pkg}<stash>;
             return () unless $curpkg;
             # say "Found $pkg okay, now in ";
         }
@@ -190,33 +194,33 @@ method find_stab ($n, $curpad = $*CURPAD) {
 
     my $pad = $curpad;
     while $pad {
-        return $_ if $_ = $pad.{$name};
-        $pad = $pad.<OUTER::>;
+        return $_ if $_ = $pad.{$name}<stash>;
+        $pad = $pad.<OUTER><stash>;
     }
-    return $_ if $_ = $curpkg.{$name};
-    return $_ if $_ = $*GLOBAL.{$name};
+    return $_ if $_ = $curpkg.{$name}<stash>;
+    return $_ if $_ = $*GLOBAL<stash>{$name}<stash>;
     return ();
 }
 
 method find_top_pkg ($name) {
     # say "find_top_pkg $name";
-    if $name eq 'OUR::' {
+    if $name eq 'OUR' {
         return $*CURPKG;
     }
-    elsif $name eq 'MY::' {
+    elsif $name eq 'MY' {
         return $*CURPAD;
     }
-    elsif $name eq 'CORE::' {
-        return $*CORE;
+    elsif $name eq 'CORE' {
+        return $*CORE<stash>;
     }
-    elsif $name eq 'UNIT::' {
-        return $*UNIT;
+    elsif $name eq 'UNIT' {
+        return $*UNIT<stash>;
     }
     # everything is somewhere in lexical scope (we hope)
     my $pad = $*CURPAD;
     while $pad {
-        return $pad.{$name} if $pad.{$name};
-        $pad = $pad.<OUTER::> // 0;
+        return $pad.{$name}<stash> if $pad.{$name};
+        $pad = $pad.<OUTER><stash> // 0;
     }
     return 0;
 }
@@ -247,8 +251,8 @@ method add_my_name ($n) {
     while @components > 1 {
         my $pkg = shift @components;
         $curpkg.{$pkg} //= { stub => 1 };
-        $curpkg.{"&$pkg"} //= { name => "&$pkg", file => $COMPILING::FILE, line => self.line };
-        $curpkg = $curpkg.{$pkg ~ '::'} //= { 'PARENT::' => $curpkg };
+        $curpkg.{"&$pkg"} //= $curpkg.{$pkg};
+        $curpkg = $curpkg.{$pkg}<stash> //= { 'PARENT' => $curpkg };
         # say "Adding new package $pkg in $curpkg ";
     }
     $name = shift @components;
@@ -297,8 +301,8 @@ method add_my_name ($n) {
             mult => ($*MULTINESS||'only'),
         };
         if $name ~~ /^\w/ {
-            $curpkg.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
-            $curpkg.{$name ~ '::'} //= { 'PARENT::' => $curpkg };
+            $curpkg.{"&$name"} //= $curpkg.{$name};
+            $curpkg.{$name}<stash> //= { 'PARENT' => $curpkg };
         }
     }
     self;
@@ -323,7 +327,8 @@ method add_our_name ($n) {
     while @components > 1 {
         my $pkg = shift @components;
         $curpkg.{$pkg} //= { stub => 1 };
-        $curpkg = $curpkg.{$pkg ~ '::'} //= { 'PARENT::' => $curpkg };
+        $curpkg.{"&$pkg"} //= $curpkg.{$pkg};
+        $curpkg = $curpkg.{$pkg}<stash> //= { 'PARENT' => $curpkg };
         # say "Adding new package $pkg in $curpkg ";
     }
     $name = shift @components;
@@ -372,10 +377,10 @@ method add_our_name ($n) {
         };
         if $name ~~ /^\w/ {
             $curpkg.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
-            $curpkg.{$name ~ '::'} //= { 'PARENT::' => $curpkg };
+            $curpkg.{$name}<stash> //= { 'PARENT' => $curpkg };
         }
     }
-    self.add_my_name($n);   # the lexical alias
+    self.add_my_name($n) if $curpkg === $*CURPKG;   # the lexical alias
     self;
 }
 
@@ -396,9 +401,12 @@ method load_setting ($setting) {
     @PKGS = ();
 
     # XXX CORE   === SETTING for now
-    $*CORE = $*CURPAD = $*GLOBAL.{"CORE::"} = $*GLOBAL.{"SETTING::"} = self.load_pad($setting);
-    $*GLOBAL = $*CORE.{'GLOBAL::'};
-    $*CURPKG = $*GLOBAL;
+    $*CORE = self.load_pad($setting);
+    $*CURPAD = $*CORE<stash>;
+    $*CURPAD<MY> = $*CORE;
+    $*GLOBAL<stash><CORE> = $*GLOBAL<stash><SETTING> = $*CORE;
+    $*GLOBAL = $*CORE<stash><GLOBAL>;
+    $*CURPKG = $*GLOBAL<stash>;
 }
 
 method is_known ($n, $curpad = $*CURPAD) {
@@ -412,18 +420,18 @@ method is_known ($n, $curpad = $*CURPAD) {
         return True if @components[0] eq 'COMPILING';
         return True if @components[0] eq 'CALLER';
         return True if @components[0] eq 'CONTEXT';
-        if $curpkg = self.find_top_pkg(@components[0] ~ '::') {
+        if $curpkg = self.find_top_pkg(@components[0]) {
             # say "Found lexical package " ~ @components[0];
             shift @components;
         }
         else {
             # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL;
+            $curpkg = $*GLOBAL<stash>;
         }
         while @components > 1 {
             my $pkg = shift @components;
             # say "Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg);
-            $curpkg = $curpkg.{$pkg ~ '::'};
+            $curpkg = $curpkg.{$pkg}<stash>;
             return False unless $curpkg;
             # say "Found $pkg okay, now in $curpkg ";
         }
@@ -437,7 +445,7 @@ method is_known ($n, $curpad = $*CURPAD) {
     my $pad = $curpad;
     while $pad {
         return True if $pad.{$name};
-        $pad = $pad.<OUTER::>;
+        $pad = $pad.<OUTER><stash>;
     }
 
     return False;
@@ -1973,8 +1981,8 @@ rule package_def {
                     $shortname = '_anon_';
                 }
                 $*PKGNAME = $pkg ~ '::' ~ $shortname;
-                my $newpkg = $*CURPKG.{$shortname ~ '::'} //= {};
-                $newpkg.<PARENT::> = $*CURPKG;
+                my $newpkg = $*CURPKG.{$shortname}<stash> //= {};
+                $newpkg.<PARENT> = $*CURPKG;
                 $*CURPKG = $newpkg;
                 push @PKGS, $pkg;
                 # say "adding $newpkg " ~ $*PKGNAME;
@@ -1983,7 +1991,7 @@ rule package_def {
             <block>
             {{
                 $*PKGNAME = pop(@PKGS);
-                $*CURPKG = $*CURPKG.{'PARENT::'};
+                $*CURPKG = $*CURPKG.<PARENT>;
             }}
             {*}                                                     #= block
         || <?before ';'>
@@ -1993,8 +2001,8 @@ rule package_def {
                     $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                     my $shortname = $longname.<name>.Str;
                     $*PKGNAME = $shortname;
-                    my $newpkg = $*CURPKG.{$shortname ~ '::'} //= {};
-                    $newpkg.<PARENT::> = $*CURPKG;
+                    my $newpkg = $*CURPKG.{$shortname}<stash> //= {};
+                    $newpkg.<PARENT> = $*CURPKG;
                     $*CURPKG = $newpkg;
                     $*begin_compunit = 0;
                 }}
