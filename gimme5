@@ -1235,7 +1235,7 @@ sub atom {
     }
 
     if (s/^\(//) {
-        my $re = regex('\\)');
+        my $re = do { local $PAREN = 0; regex('\\)') };
         s/^\)// or panic "Missing )";
         ws();
         $re = bless $re, "RE_paren";
