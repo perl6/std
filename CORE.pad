@@ -1,3 +1,4 @@
+use YAML::XS;
 my $core = {
     stash => {
 	Bool => { name => 'Bool', file => 'CORE.pad', line => __LINE__,
@@ -21,84 +22,40 @@ my $core = {
 	},
 	DEBUG => { name => 'DEBUG', file => 'CORE.pad', line => __LINE__,
 	    stash => {
-		EXPR => { name => 'Increase', file => 'CORE.pad', line => __LINE__ },
-		trace_call => { name => 'Increase', file => 'CORE.pad', line => __LINE__ },
-		EXPORT => {
-		    stash => {
-			DEFAULT => {
-			    stash => {
-				EXPR => { name => 'Increase', file => 'CORE.pad', line => __LINE__ },
-				trace_call => { name => 'Increase', file => 'CORE.pad', line => __LINE__ },
-			    },
-			},
-		    },
-		},
+		EXPR => { name => 'Increase', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+		trace_call => { name => 'Increase', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
 	    },
 	},
 	GLOBAL => { name => 'GLOBAL', file => 'CORE.pad', line => __LINE__,
 	    stash => {
 		Test => { name => 'Test', file => 'CORE.pad', line => __LINE__,
 		    stash => {
-			'&plan' => { name => '&plan', file => 'CORE.pad', line => __LINE__ },
-			'&is' => { name => '&is', file => 'CORE.pad', line => __LINE__ },
-			'&ok' => { name => '&ok', file => 'CORE.pad', line => __LINE__ },
-			'&dies_ok' => { name => '&dies_ok', file => 'CORE.pad', line => __LINE__ },
-			'&lives_ok' => { name => '&lives_ok', file => 'CORE.pad', line => __LINE__ },
-			'&skip' => { name => '&skip', file => 'CORE.pad', line => __LINE__ },
-			'&todo' => { name => '&todo', file => 'CORE.pad', line => __LINE__ },
-			'&pass' => { name => '&pass', file => 'CORE.pad', line => __LINE__ },
-			'&flunk' => { name => '&flunk', file => 'CORE.pad', line => __LINE__ },
-			'&force_todo' => { name => '&force_todo', file => 'CORE.pad', line => __LINE__ },
-			'&use_ok' => { name => '&use_ok', file => 'CORE.pad', line => __LINE__ },
-			'&isa_ok' => { name => '&isa_ok', file => 'CORE.pad', line => __LINE__ },
-			'&cmp_ok' => { name => '&cmp_ok', file => 'CORE.pad', line => __LINE__ },
-			'&diag' => { name => '&diag', file => 'CORE.pad', line => __LINE__ },
-			'&is_deeply' => { name => '&is_deeply', file => 'CORE.pad', line => __LINE__ },
-			'&isnt' => { name => '&isnt', file => 'CORE.pad', line => __LINE__ },
-			'&like' => { name => '&like', file => 'CORE.pad', line => __LINE__ },
-			'&skip_rest' => { name => '&skip_rest', file => 'CORE.pad', line => __LINE__ },
-			'&unlike' => { name => '&unlike', file => 'CORE.pad', line => __LINE__ },
-			'&skip_rest' => { name => '&skip_rest', file => 'CORE.pad', line => __LINE__ },
-			'&eval_dies_ok' => { name => '&eval_dies_ok', file => 'CORE.pad', line => __LINE__ },
-			'&eval_lives_ok' => { name => '&eval_lives_ok', file => 'CORE.pad', line => __LINE__ },
-			'&approx' => { name => '&approx', file => 'CORE.pad', line => __LINE__ },
-			'&is_approx' => { name => '&is_approx', file => 'CORE.pad', line => __LINE__ },
-			'&throws_ok' => { name => '&throws_ok', file => 'CORE.pad', line => __LINE__ },
-			'&version_lt' => { name => '&version_lt', file => 'CORE.pad', line => __LINE__ },
-			EXPORT => { name => 'EXPORT', file => 'CORE.pad', line => __LINE__,
-			    stash => {
-				DEFAULT => { name => 'DEFAULT', file => 'CORE.pad', line => __LINE__,
-				    stash => {	# XXX would be aliases in the real thing
-					'&plan' => { name => '&plan', file => 'CORE.pad', line => __LINE__ },
-					'&is' => { name => '&is', file => 'CORE.pad', line => __LINE__ },
-					'&ok' => { name => '&ok', file => 'CORE.pad', line => __LINE__ },
-					'&dies_ok' => { name => '&dies_ok', file => 'CORE.pad', line => __LINE__ },
-					'&lives_ok' => { name => '&lives_ok', file => 'CORE.pad', line => __LINE__ },
-					'&skip' => { name => '&skip', file => 'CORE.pad', line => __LINE__ },
-					'&todo' => { name => '&todo', file => 'CORE.pad', line => __LINE__ },
-					'&pass' => { name => '&pass', file => 'CORE.pad', line => __LINE__ },
-					'&flunk' => { name => '&flunk', file => 'CORE.pad', line => __LINE__ },
-					'&force_todo' => { name => '&force_todo', file => 'CORE.pad', line => __LINE__ },
-					'&use_ok' => { name => '&use_ok', file => 'CORE.pad', line => __LINE__ },
-					'&isa_ok' => { name => '&isa_ok', file => 'CORE.pad', line => __LINE__ },
-					'&cmp_ok' => { name => '&cmp_ok', file => 'CORE.pad', line => __LINE__ },
-					'&diag' => { name => '&diag', file => 'CORE.pad', line => __LINE__ },
-					'&is_deeply' => { name => '&is_deeply', file => 'CORE.pad', line => __LINE__ },
-					'&isnt' => { name => '&isnt', file => 'CORE.pad', line => __LINE__ },
-					'&like' => { name => '&like', file => 'CORE.pad', line => __LINE__ },
-					'&skip_rest' => { name => '&skip_rest', file => 'CORE.pad', line => __LINE__ },
-					'&unlike' => { name => '&unlike', file => 'CORE.pad', line => __LINE__ },
-					'&skip_rest' => { name => '&skip_rest', file => 'CORE.pad', line => __LINE__ },
-					'&eval_dies_ok' => { name => '&eval_dies_ok', file => 'CORE.pad', line => __LINE__ },
-					'&eval_lives_ok' => { name => '&eval_lives_ok', file => 'CORE.pad', line => __LINE__ },
-					'&approx' => { name => '&approx', file => 'CORE.pad', line => __LINE__ },
-					'&is_approx' => { name => '&is_approx', file => 'CORE.pad', line => __LINE__ },
-					'&throws_ok' => { name => '&throws_ok', file => 'CORE.pad', line => __LINE__ },
-					'&version_lt' => { name => '&version_lt', file => 'CORE.pad', line => __LINE__ },
-				    },
-				},
-			    },
-			},
+			'&plan' => { name => '&plan', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&is' => { name => '&is', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&ok' => { name => '&ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&dies_ok' => { name => '&dies_ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&lives_ok' => { name => '&lives_ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&skip' => { name => '&skip', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&todo' => { name => '&todo', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&pass' => { name => '&pass', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&flunk' => { name => '&flunk', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&force_todo' => { name => '&force_todo', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&use_ok' => { name => '&use_ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&isa_ok' => { name => '&isa_ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&cmp_ok' => { name => '&cmp_ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&diag' => { name => '&diag', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&is_deeply' => { name => '&is_deeply', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&isnt' => { name => '&isnt', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&like' => { name => '&like', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&skip_rest' => { name => '&skip_rest', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&unlike' => { name => '&unlike', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&skip_rest' => { name => '&skip_rest', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&eval_dies_ok' => { name => '&eval_dies_ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&eval_lives_ok' => { name => '&eval_lives_ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&approx' => { name => '&approx', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&is_approx' => { name => '&is_approx', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&throws_ok' => { name => '&throws_ok', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
+			'&version_lt' => { name => '&version_lt', file => 'CORE.pad', line => __LINE__, export => 'DEFAULT' },
 		    },
 		},
 	    },
@@ -452,10 +409,17 @@ sub fixup {
     for my $k (keys %$h) {
 	my $v = $h->{$k};
 	if ($k =~ /^\w/) {
+	    next if $k eq 'EXPORT';
 	    $h->{"&$k"} = $h->{$k} if $k =~ /^\w+$/;
 	    fixup($v->{'stash'});
 	}
     }
+    for my $k (keys %$h) {
+	my $v = $h->{$k};
+	if ($v->{export}) {
+	    $h->{EXPORT}{stash}{$v->{export}}{stash}{$k} = $v;
+	}
+    }
 }
-fixup($core);
+fixup($core->{'stash'});
 $core;
