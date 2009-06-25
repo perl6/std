@@ -1490,7 +1490,8 @@ token termish {
     :my $VAR is context<rw>;
     :dba('prefix or noun')
     [
-    | <PRE>+ <noun>
+    | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><noun> and $<noun> = pop @$p }> <PRE> ]*
+        [ <?{ $<noun> }> || <noun> ]
     | <noun>
     ]
 
@@ -1675,11 +1676,12 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     $<s> = (
         '['
         [
-        || <op=infixish(1)> ']' ['«'|<?>]
-        || \\<op=infixish(1)> ']' ['«'|<?>]
+        || <op=infixish(1)> <?before ']'>
+        || \\<op=infixish(1)> <?before ']'>
         || <!>
         ]
-    ) <?before <[ \s ( ]> >
+    )
+    [ <?> || <.worry: "Malformed reduce"> <!> ] ']' ['«'|<?>]
 
     <.can_meta($<s><op>, "reduce")>
 
@@ -1692,6 +1694,7 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     { $<O> = $<s><op><O>; $<O><prec>:delete; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
     { $<sym> = $<s>.Str; }
 
+    [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><noun> = 1 } ]? > || { $<O><noun> = 1 } ]
 }
 
 token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
@@ -4640,15 +4643,17 @@ method EXPR ($preclvl) {
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     unshift @$a, $arg;
                     push @termstack, $op._REDUCE($op<_from>, 'POSTFIX');
+                    @termstack[*-1].<PRE>:delete;
+                    @termstack[*-1].<POST>:delete;
                 }
                 elsif $arg<_pos> > $op<_pos> {   # prefix
                     $op<_pos> = $arg<_pos>;     # extend pos to include arg
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     push @$a, $arg;
                     push @termstack, $op._REDUCE($op<_from>, 'PREFIX');
+                    @termstack[*-1].<PRE>:delete;
+                    @termstack[*-1].<POST>:delete;
                 }
-                @termstack[*-1].<PRE>:delete;
-                @termstack[*-1].<POST>:delete;
             }
             default {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;

@@ -121,7 +121,7 @@ BEGIN {
 
 sub new {
     my $class = shift;
-    $::ORIG = shift() . "\n";           # original string
+    $::ORIG = shift() . "\n;";           # original string
     { no warnings; @::ORIG = unpack("U*", $::ORIG); }
     $::MEMOS[@::ORIG] = undef;  # memos kept by position
     my %args = ('_pos' => 0, '_from' => 0);
