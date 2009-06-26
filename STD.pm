@@ -267,16 +267,17 @@ method add_my_name ($n) {
         mult => ($*MULTINESS||'only'),
     };
     if $curpkg.{$name}:exists {
+        my $omult = $curpkg.{$name}<mult> // '';
         if $curpkg.{$name}<stub> {
             $*DECLARING = $curpkg.{$name} = $declaring;
         }
         elsif $*SCOPE eq 'use' {}
-        elsif $*MULTINESS eq 'multi' and $curpkg.{$name}<mult> ne 'only' {}
-        elsif ($curpkg.{$name}<mult>//'') eq 'proto' {}
+        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
+        elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
         else {
             my $old = $curpkg.{$name};
-            my $ofile = $old.<file> // '';
+            my $ofile = $old.<file> // 0;
             my $oline = $old.<line> // '???';
             my $loc = '';
             if $ofile {
@@ -341,16 +342,17 @@ method add_our_name ($n) {
         mult => ($*MULTINESS||'only'),
     };
     if $curpkg.{$name}:exists {
+        my $omult = $curpkg.{$name}<mult> // '';
         if $curpkg.{$name}<stub> {
             $*DECLARING = $curpkg.{$name} = $declaring;
         }
         elsif $*SCOPE eq 'use' {}
-        elsif $*MULTINESS eq 'multi' and $curpkg.{$name}<mult> ne 'only' {}
-        elsif $curpkg.{$name}<mult> eq 'proto' {}
+        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
+        elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
         else {
             my $old = $curpkg.{$name};
-            my $ofile = $old.<file> // '';
+            my $ofile = $old.<file> // 0;
             my $oline = $old.<line> // '???';
             my $loc = '';
             if $ofile {
