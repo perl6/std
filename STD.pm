@@ -281,7 +281,8 @@ method add_my_name ($n) {
             my $loc = '';
             if $ofile {
                 if $ofile !=== $COMPILING::FILE {
-                    $loc = " (from $ofile line $oline)";
+                    my $oname = $ofile<name>;
+                    $loc = " (from $oname line $oline)";
                 }
                 else {
                     $loc = " (from line $oline)";
@@ -354,7 +355,8 @@ method add_our_name ($n) {
             my $loc = '';
             if $ofile {
                 if $ofile !=== $COMPILING::FILE {
-                    $loc = " (from $ofile line $oline)";
+                    my $oname = $ofile<name>;
+                    $loc = " (from $oname line $oline)";
                 }
                 else {
                     $loc = " (from line $oline)";
