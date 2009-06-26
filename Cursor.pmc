@@ -238,6 +238,7 @@ sub load_yaml_pad {
         $PADS{$setting} = LoadFile($file);
         store($PADS{$setting}, $store);
     }
+    # say join ' ', sort keys %{$PADS{$setting}{stash}};
     $PADS{$setting};
 }
 

@@ -65,8 +65,8 @@ my class StrLen { }
 my class Version { }
 
 my class Num { 
-    constant pi is export = atan2(1,1)*4;
-    constant e is export = exp(1);
+    constant pi is export = 3.14159_26535_89793_23846_26433_83279_50288;
+    constant e is export = 2.71828_18284_59045_23536_02874_71352_66249;
 }
 
 my class num { }
@@ -158,7 +158,6 @@ my proto VAR { }
 my proto WHO { }
 my proto WHENCE { }
 my proto new { }
-my proto HOW { }
 my proto fail { }
 my proto temp { }
 my proto let { }
@@ -266,14 +265,12 @@ my proto chmod { }
 my proto zip { }
 my proto each { }
 my proto roundrobin { }
-my proto caller { }
 my proto return { }
 my proto leave { }
 my proto make { }
 my proto pop { }
 my proto shift { }
 my proto unshift { }
-my proto reduce { }
 my proto keys { }
 my proto values { }
 my proto hash { }
@@ -362,7 +359,6 @@ class Test {
     proto like is export { }
     proto skip_rest is export { }
     proto unlike is export { }
-    proto skip_rest is export { }
     proto eval_dies_ok is export { }
     proto eval_lives_ok is export { }
     proto approx is export { }

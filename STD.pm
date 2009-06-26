@@ -85,32 +85,16 @@ method TOP ($STOP = undef) {
     }
 }
 
-#  Absolute:
-#    MY          # $stash = mypad()
-#    OUR         # $stash = $?PACKAGE;
-#    CORE        # $stash = $::CORE
-#    GLOBAL      # $stash = CORE::<GLOBAL>
-#    PROCESS     # $stash = CORE::<PROCESS>
-#    COMPILING   # $stash = compiling($rest) # compiler's run time
-#    CALLER      # ctx = ctx.caller # user's run time
-#    CONTEXT     # ctx = ctx.context # user's run time
-#
-#  Relative:
-#    OUTER       # $stash = $stash<OUTER>
-#    UNIT        # $stash = $stash.scanouter(:unit)
-#    SETTING     # $stash = UNIT::<OUTER>
-#    PARENT      # $stash = $stash<PARENT>
-#
-#    SUPER       # (give up, pass to dispatcher?)
-
 method newpad {
-    my $outer = $*CURPAD<MY> // 0;
-    my $my = { file => $COMPILING::FILE, line => self.lineof(self.pos), stash => (
-        $*CURPAD = {
-            OUTER => $outer
-        }),
+    my $outer = $*CURPAD<$?STAB> // 0;
+    my $line = self.lineof(self.pos);
+    my $my = {
+        file => $COMPILING::FILE, line => $line,
+        longname => $COMPILING::FILE<name> ~ ':' ~ $line,
+        stash => ($*CURPAD = { }),
     };
-    $*CURPAD<MY> = $my;
+    $*CURPAD<OUTER> = $outer if $outer;
+    $*CURPAD<$?STAB> = $my;
     self;
 }
 
@@ -243,40 +227,43 @@ method add_name ($name) {
     self;
 }
 
-method add_my_name ($n) {
+method add_my_name ($n, $d) {
     my $name = $n;
     # say "add_my_name $name";
     return self if $name ~~ /\:\:\(/;
-    my $curpkg = $*CURPAD;
+    my $curstash = $*CURPAD;
     my @components = self.canonicalize_name($name);
     while @components > 1 {
         my $pkg = shift @components;
-        $curpkg.{$pkg} //= { stub => 1 };
-        $curpkg.{"&$pkg"} //= $curpkg.{$pkg};
-        $curpkg = $curpkg.{$pkg}<stash> //= { 'PARENT' => $curpkg };
-        # say "Adding new package $pkg in $curpkg ";
+        my $newstab = $curstash.{$pkg} //= { stub => 1 };
+        # say "Adding new package $pkg in ", $curstash<$?STAB><longname>;
+        $curstash.{$pkg} //= { stub => 1 };
+        $curstash.{"&$pkg"} //= $newstab;
+        $curstash = $newstab<stash> //= { 'PARENT' => $curstash, '$?STAB' => $newstab };
     }
     $name = shift @components;
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
 
-    # This may just be a lexical alias to "our" and such
-    my $declaring = $*DECLARING // {
+    # This may just be a lexical alias to "our" and such,
+    # so reuse $*DECLARING pointer if it's there.
+    my $declaring = $d // {
         name => $name,
         file => $COMPILING::FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
     };
-    if $curpkg.{$name}:exists {
-        my $omult = $curpkg.{$name}<mult> // '';
-        if $curpkg.{$name}<stub> {
-            $*DECLARING = $curpkg.{$name} = $declaring;
+    if $curstash.{$name}:exists {
+        # say "$name exists, curstash = ", $curstash<$?STAB><longname>;
+        my $omult = $curstash.{$name}<mult> // '';
+        if $curstash.{$name}<stub> {
+            $*DECLARING = $curstash.{$name} = $declaring;
         }
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
         else {
-            my $old = $curpkg.{$name};
+            my $old = $curstash.{$name};
             my $ofile = $old.<file> // 0;
             my $oline = $old.<line> // '???';
             my $loc = '';
@@ -301,10 +288,10 @@ method add_my_name ($n) {
         }
     }
     else {
-        $*DECLARING = $curpkg.{$name} = $declaring;
+        $*DECLARING = $curstash.{$name} = $declaring;
         if $name ~~ /^\w/ {
-            $curpkg.{"&$name"} //= $curpkg.{$name};
-            $curpkg.{$name}<stash> //= { 'PARENT' => $curpkg };
+            $curstash.{"&$name"} //= $curstash.{$name};
+            $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
         }
     }
     self;
@@ -314,8 +301,8 @@ method add_our_name ($n) {
     my $name = $n;
     # say "add_our_name $name " ~ $*PKGNAME;
     return self if $name ~~ /\:\:\(/;
-    my $curpkg = $*CURPKG;
-    # say "curpkg $curpkg global $GLOBAL ", join ' ', %$*GLOBAL;
+    my $curstash = $*CURPKG;
+    # say "curstash $curstash global $GLOBAL ", join ' ', %$*GLOBAL;
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
     my @components = self.canonicalize_name($name);
@@ -323,15 +310,15 @@ method add_our_name ($n) {
         my $c = self.find_top_pkg(@components[0]);
         if $c {
             shift @components;
-            $curpkg = $c;
+            $curstash = $c;
         }
     }
     while @components > 1 {
         my $pkg = shift @components;
-        $curpkg.{$pkg} //= { stub => 1 };
-        $curpkg.{"&$pkg"} //= $curpkg.{$pkg};
-        $curpkg = $curpkg.{$pkg}<stash> //= { 'PARENT' => $curpkg };
-        # say "Adding new package $pkg in $curpkg ";
+        my $newstab = $curstash.{$pkg} //= { stub => 1 };
+        $curstash.{"&$pkg"} //= $newstab;
+        $curstash = $newstab<stash> //= { 'PARENT' => $curstash, '$?STAB' => $newstab };
+        # say "Adding new package $pkg in $curstash ";
     }
     $name = shift @components;
     return self unless defined $name and $name ne '';
@@ -341,17 +328,17 @@ method add_our_name ($n) {
         file => $COMPILING::FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
     };
-    if $curpkg.{$name}:exists {
-        my $omult = $curpkg.{$name}<mult> // '';
-        if $curpkg.{$name}<stub> {
-            $*DECLARING = $curpkg.{$name} = $declaring;
+    if $curstash.{$name}:exists {
+        my $omult = $curstash.{$name}<mult> // '';
+        if $curstash.{$name}<stub> {
+            $*DECLARING = $curstash.{$name} = $declaring;
         }
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
         else {
-            my $old = $curpkg.{$name};
+            my $old = $curstash.{$name};
             my $ofile = $old.<file> // 0;
             my $oline = $old.<line> // '???';
             my $loc = '';
@@ -376,13 +363,13 @@ method add_our_name ($n) {
         }
     }
     else {
-        $*DECLARING = $curpkg.{$name} = $declaring;
+        $*DECLARING = $curstash.{$name} = $declaring;
         if $name ~~ /^\w/ {
-            $curpkg.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
-            $curpkg.{$name}<stash> //= { 'PARENT' => $curpkg };
+            $curstash.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
+            $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
         }
     }
-    self.add_my_name($n) if $curpkg === $*CURPKG;   # the lexical alias
+    self.add_my_name($n) if $curstash === $*CURPKG;   # the lexical alias
     self;
 }
 
@@ -409,7 +396,7 @@ method load_setting ($setting) {
     $*GLOBAL<stash><CORE> = $*GLOBAL<stash><SETTING> = $*CORE;
     $*CURPAD<GLOBAL> = $*GLOBAL;
     $*CURPKG = $*GLOBAL<stash>;
-    $*CURPKG<$?TYPE> = $*GLOBAL;
+    $*CURPKG<$?STAB> = $*GLOBAL;
     $*CURPKG<PARENT> = $*CURPAD;
 }
 
@@ -444,13 +431,18 @@ method is_known ($n, $curpad = $*CURPAD) {
     $name = shift(@components)//'';
     # say "Final component is $name";
     return True if $name eq '';
+    # say "Found" if $curpkg.{$name};
     return True if $curpkg.{$name};
 
     my $pad = $curpad;
     while $pad {
+        # say "Looking in ", $pad<$?STAB><longname>;
+        # say "Found" if $pad.{$name};
         return True if $pad.{$name};
+        # say $pad.<OUTER><stash> // "No OUTER";
         $pad = $pad.<OUTER><stash>;
     }
+    # say "Not Found";
 
     return False;
 }
@@ -1993,8 +1985,9 @@ rule package_def {
                 }
                 $*PKGNAME = $pkg ~ '::' ~ $shortname;
                 my $newpkg = $*DECLARING<stash>;
+                $*DECLARING<longname> = $*PKGNAME;
                 $newpkg.<PARENT> = $*CURPKG;
-                $newpkg.<$?TYPE> = $*DECLARING;
+                $newpkg.<$?STAB> = $*DECLARING;
                 $*CURPKG = $newpkg;
                 push @PKGS, $pkg;
                 # say "adding $newpkg " ~ $*PKGNAME;
@@ -2013,9 +2006,10 @@ rule package_def {
                     $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                     my $shortname = $longname.<name>.Str;
                     $*PKGNAME = $shortname;
+                    $*DECLARING<longname> = $*PKGNAME;
                     my $newpkg = $*DECLARING<stash>;
                     $newpkg.<PARENT> = $*CURPKG;
-                    $newpkg.<$?TYPE> = $*DECLARING;
+                    $newpkg.<$?STAB> = $*DECLARING;
                     $*CURPKG = $newpkg;
                     $*begin_compunit = 0;
                 }}

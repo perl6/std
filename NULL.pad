@@ -1,9 +1,12 @@
 my $core = {
+    longname => "NULL:1",
+    file => 'CORE.pad', line => __LINE__ ,
     stash => {
-	GLOBAL => { name => 'GLOBAL', file => 'CORE.pad', line => __LINE__ },
-	PROCESS => { name => 'PROCESS', file => 'CORE.pad', line => __LINE__ },
+	GLOBAL => { name => 'GLOBAL', longname => 'CORE.pad'.__LINE__, file => 'CORE.pad', line => __LINE__ },
+	PROCESS => { name => 'PROCESS', longname => 'CORE.pad'.__LINE__, file => 'CORE.pad', line => __LINE__ },
     }
 };
+$core->{stash}{'$?STAB'} = $core;
 
 sub fixup {
     my $h = shift;
