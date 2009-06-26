@@ -10,7 +10,7 @@ snap: $(FIXINS) check lex/STD/termish
 	rm -rf snap.new
 	mkdir snap.new
 	svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
-	cp $(FIXINS) tryfile STD.pmc CORE.*.store snap.new
+	cp $(FIXINS) CORE.yml tryfile STD.pmc CORE.*.store snap.new
 	mv lex snap.new
 	rm -rf snap.old
 	-mv snap snap.old
