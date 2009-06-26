@@ -268,7 +268,7 @@ my $out = "";
 
 sub MAIN {
 
-    if (s/^\s*grammar (\w+)(?::\w+<.*?>)*(?:\s*is\s+(\w+))?;\n//) {
+    if (s/^\s*grammar (\w+(?:::\w+)*)(?::\w+<.*?>)*(?:\s*is\s+(\w+))?;\n//) {
 	$TOP = $PKG = $1;
 	my $extends = $2 // 'Cursor';
 	$out .= "package $PKG;\n";
