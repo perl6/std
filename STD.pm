@@ -8,6 +8,7 @@ my @PKGS is context<rw> = ();
 my $GOAL is context = "(eof)";
 my $ACTIONS is context<rw>;
 my $IN_DECL is context<rw>;
+my $DECLARING is context<rw>;
 my $IN_REDUCE is context<rw> = 0;
 my $INTERPOLATION is context<rw> = '';
 my $IN_META is context<rw> = 0;
@@ -103,10 +104,10 @@ method TOP ($STOP = undef) {
 #    SUPER       # (give up, pass to dispatcher?)
 
 method newpad {
-    my $outer = $*CURPAD<MY>;
+    my $outer = $*CURPAD<MY> // 0;
     my $my = { file => $COMPILING::FILE, line => self.lineof(self.pos), stash => (
         $*CURPAD = {
-            OUTER => $outer,
+            OUTER => $outer
         }),
     };
     $*CURPAD<MY> = $my;
@@ -258,13 +259,16 @@ method add_my_name ($n) {
     $name = shift @components;
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
+
+    # This may just be a lexical alias to "our" and such
+    my $declaring = $*DECLARING // {
+        name => $name,
+        file => $COMPILING::FILE, line => self.line,
+        mult => ($*MULTINESS||'only'),
+    };
     if $curpkg.{$name}:exists {
         if $curpkg.{$name}<stub> {
-            $curpkg.{$name} = {
-                name => $name,
-                file => $COMPILING::FILE, line => self.line,
-                mult => ($*MULTINESS||'only'),
-            };
+            $*DECLARING = $curpkg.{$name} = $declaring;
         }
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $curpkg.{$name}<mult> ne 'only' {}
@@ -276,7 +280,7 @@ method add_my_name ($n) {
             my $oline = $old.<line> // '???';
             my $loc = '';
             if $ofile {
-                if $ofile ne $COMPILING::FILE {
+                if $ofile !=== $COMPILING::FILE {
                     $loc = " (from $ofile line $oline)";
                 }
                 else {
@@ -295,11 +299,7 @@ method add_my_name ($n) {
         }
     }
     else {
-        $curpkg.{$name} = {
-            name => $name,
-            file => $COMPILING::FILE, line => self.line,
-            mult => ($*MULTINESS||'only'),
-        };
+        $*DECLARING = $curpkg.{$name} = $declaring;
         if $name ~~ /^\w/ {
             $curpkg.{"&$name"} //= $curpkg.{$name};
             $curpkg.{$name}<stash> //= { 'PARENT' => $curpkg };
@@ -333,13 +333,15 @@ method add_our_name ($n) {
     }
     $name = shift @components;
     return self unless defined $name and $name ne '';
+
+    my $declaring = $*DECLARING // {
+        name => $name,
+        file => $COMPILING::FILE, line => self.line,
+        mult => ($*MULTINESS||'only'),
+    };
     if $curpkg.{$name}:exists {
         if $curpkg.{$name}<stub> {
-            $curpkg.{$name} = {
-                name => $name,
-                file => $COMPILING::FILE, line => self.line,
-                mult => ($*MULTINESS||'only'),
-            };
+            $*DECLARING = $curpkg.{$name} = $declaring;
         }
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $curpkg.{$name}<mult> ne 'only' {}
@@ -351,7 +353,7 @@ method add_our_name ($n) {
             my $oline = $old.<line> // '???';
             my $loc = '';
             if $ofile {
-                if $ofile ne $COMPILING::FILE {
+                if $ofile !=== $COMPILING::FILE {
                     $loc = " (from $ofile line $oline)";
                 }
                 else {
@@ -370,11 +372,7 @@ method add_our_name ($n) {
         }
     }
     else {
-        $curpkg.{$name} = {
-            name => $name,
-            file => $COMPILING::FILE, line => self.line,
-            mult => ($*MULTINESS||'only'),
-        };
+        $*DECLARING = $curpkg.{$name} = $declaring;
         if $name ~~ /^\w/ {
             $curpkg.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
             $curpkg.{$name}<stash> //= { 'PARENT' => $curpkg };
@@ -400,13 +398,15 @@ method add_mystery ($name,$pos) {
 method load_setting ($setting) {
     @PKGS = ();
 
-    # XXX CORE   === SETTING for now
     $*CORE = self.load_pad($setting);
     $*CURPAD = $*CORE<stash>;
-    $*CURPAD<MY> = $*CORE;
+    $*CURPAD<MY> = $*CORE unless $setting eq 'NULL.setting';
+    $*GLOBAL = $*CORE<stash><GLOBAL> // {};
     $*GLOBAL<stash><CORE> = $*GLOBAL<stash><SETTING> = $*CORE;
-    $*GLOBAL = $*CORE<stash><GLOBAL>;
+    $*CURPAD<GLOBAL> = $*GLOBAL;
     $*CURPKG = $*GLOBAL<stash>;
+    $*CURPKG<$?TYPE> = $*GLOBAL;
+    $*CURPKG<PARENT> = $*CURPAD;
 }
 
 method is_known ($n, $curpad = $*CURPAD) {
@@ -545,7 +545,7 @@ method lookup_compiler_var($name) {
     }
 
     given $name {
-        when '$?FILE'     { return $COMPILING::FILE; }
+        when '$?FILE'     { return $COMPILING::FILE<name>; }
         when '$?LINE'     { return self.lineof(self.pos); }
         when '$?POSITION' { return self.pos; }
 
@@ -966,6 +966,7 @@ rule comp_unit {
     :my $PKGNAME is context = "GLOBAL";
     :my @PKGS is context<rw> = ();
     :my $IN_DECL is context<rw>;
+    :my $DECLARING is context<rw>;
     :my $INTERPOLATION is context<rw> = '';
     :my $IN_META is context<rw> = 0;
     :my $QUASI_QUASH is context<rw>;
@@ -981,7 +982,6 @@ rule comp_unit {
     :my $MULTINESS is context = '';
 
     :my $CORE is context;
-    :my $CORESETTING is context = "CORE";
     :my $GLOBAL is context;
     :my $CURPKG is context;
     :my $UNIT is context;
@@ -1846,6 +1846,7 @@ token circumfix:sym<{ }> ( --> Term) {
 
 token constant_declarator {
     :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
     <identifier>
     <?{ $*SCOPE eq 'constant' }>
     <!{ $¢.is_name($<identifier>.Str) }>
@@ -1857,6 +1858,7 @@ token constant_declarator {
 
 token variable_declarator {
     :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
     <variable>
     { $*IN_DECL = 0; self.add_variable($<variable>.Str) }
     [   # Is it a shaped array or hash declaration?
@@ -1963,6 +1965,8 @@ token package_declarator:does {
 
 rule package_def {
     :my $longname;
+    :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
     [
         [
             <def_module_name>{
@@ -1984,8 +1988,9 @@ rule package_def {
                     $shortname = '_anon_';
                 }
                 $*PKGNAME = $pkg ~ '::' ~ $shortname;
-                my $newpkg = $*CURPKG.{$shortname}<stash> //= {};
+                my $newpkg = $*DECLARING<stash>;
                 $newpkg.<PARENT> = $*CURPKG;
+                $newpkg.<$?TYPE> = $*DECLARING;
                 $*CURPKG = $newpkg;
                 push @PKGS, $pkg;
                 # say "adding $newpkg " ~ $*PKGNAME;
@@ -2004,8 +2009,9 @@ rule package_def {
                     $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                     my $shortname = $longname.<name>.Str;
                     $*PKGNAME = $shortname;
-                    my $newpkg = $*CURPKG.{$shortname}<stash> //= {};
+                    my $newpkg = $*DECLARING<stash>;
                     $newpkg.<PARENT> = $*CURPKG;
+                    $newpkg.<$?TYPE> = $*DECLARING;
                     $*CURPKG = $newpkg;
                     $*begin_compunit = 0;
                 }}
@@ -3528,6 +3534,7 @@ rule multisig {
 
 rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -3540,6 +3547,8 @@ rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
 }
 
 rule method_def ($CURPAD is context<rw> = $*CURPAD) {
+    :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
     <.newpad>
     [
         [
@@ -3562,6 +3571,7 @@ rule method_def ($CURPAD is context<rw> = $*CURPAD) {
 
 rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -3574,6 +3584,7 @@ rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
 
 rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -3595,6 +3606,13 @@ rule trait {
 
 token trait_mod:is {
     <sym>:s <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
+    {{
+        if $*DECLARING {
+            my $traitname = $<longname>.Str;
+            # XXX eventually will use multiple dispatch
+            $*DECLARING{$traitname} = self.gettrait($traitname, $<postcircumfix>);
+        }
+    }}
 }
 token trait_mod:hides {
     <sym>:s <module_name>
@@ -5412,7 +5430,7 @@ method locmess () {
     1 while $pre ~~ s!.*\n!!;
     my $post = substr($*ORIG, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
-    " at " ~ $COMPILING::FILE ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
+    " at " ~ $COMPILING::FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR";
 }
 

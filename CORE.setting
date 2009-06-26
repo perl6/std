@@ -1,0 +1,380 @@
+my module CORE;
+
+constant Nil = ();
+
+my enum Bool <False True>;
+
+my enum Order < Increase Same Decrease >;
+
+my class P6opaque { }
+my class Object { }
+my class Any { }
+my class Junction { }
+my class junction { }
+my class Whatever { }
+my class WhateverCode { }
+my class HyperWhatever { }
+my class Capture { }
+my class Match { }
+my class Signature { }
+my class Proxy { }
+my class Matcher { }
+my class Package { }
+my class Module { }
+my class Class { }
+my class Role { }
+my class Grammar { }
+my class Scalar { }
+my class Array { }
+my class Hash { }
+my class KeyHash { }
+my class KeySet { }
+my class KeyBag { }
+my class Pair { }
+my class List { }
+my class Seq { }
+my class Range { }
+my class Set { }
+my class Bag { }
+my class Mapping { }
+my class Void { }
+my class Undef { }
+my class Failure { }
+my class Exception { }
+my class Code { }
+my class Block { }
+my class Routine { }
+my class Sub { }
+my class Macro { }
+my class Method { }
+my class Submethod { }
+my class Regex { }
+my class Multi { }
+
+my class Str { }
+my class Cat { }
+my class Blob { }
+my class Char { }
+my class AnyChar { }
+my class CharLingua { }
+my class Byte { }
+my class Codepoint { }
+my class Grapheme { }
+my class StrPos { }
+my class StrLen { }
+my class Version { }
+
+my class Num { 
+    constant pi is export = atan2(1,1)*4;
+    constant e is export = exp(1);
+}
+
+my class num { }
+my class num16 { }
+my class num32 { }
+my class num64 { }
+my class num128 { }
+
+my class Complex { }
+my class complex { }
+
+# (eventually these should be instantiated generics, complex:of(num64) and such)
+my class complex16 { }
+my class complex32 { }
+my class complex64 { }
+my class complex128 { }
+
+my class Int { }
+my class int { }
+
+my class int1 { }
+my class int2 { }
+my class int4 { }
+my class int8 { }
+my class int16 { }
+my class int32 { }
+my class int64 { }
+
+my class Rat { }
+my class rat { }
+my class rat8 { }
+my class rat16 { }
+my class rat32 { }
+my class rat64 { }
+
+my class UInt { }
+my class uint { }
+my class uint1 { }
+my class uint2 { }
+my class uint4 { }
+my class uint8 { }
+my class uint16 { }
+my class uint32 { }
+my class uint64 { }
+
+my class Buf { }
+my class buf { }
+my class buf1 { }
+my class buf2 { }
+my class buf4 { }
+my class buf8 { }
+my class buf16 { }
+my class buf32 { }
+my class buf64 { }
+
+my class utf8 { }
+my class utf16 { }
+my class utf32 { }
+
+my class Bit { }
+my class bit { }
+my class bool { }
+
+my class Increasing { }
+my class Decreasing { }
+my class Ordered { }
+my class Callable { }
+my class Positional { }
+my class Associative { }
+my class Abstraction { }
+my class Integral { }
+my class Ordering { }
+my class KeyExtractor { }
+my class Comparator { }
+my class OrderingPair { }
+
+my class Instant { }
+my class Duration { }
+
+my class IO { }
+
+my class KitchenSink { }
+
+my proto WHAT { }
+my proto WHERE { }
+my proto HOW { }
+my proto WHICH { }
+my proto VAR { }
+my proto WHO { }
+my proto WHENCE { }
+my proto new { }
+my proto HOW { }
+my proto fail { }
+my proto temp { }
+my proto let { }
+my proto any { }
+my proto all { }
+my proto none { }
+my proto one { }
+my proto not { }
+my proto true { }
+my proto next { }
+my proto last { }
+my proto redo { }
+my proto break { }
+my proto goto { }
+
+my proto die { }
+my proto exit { }
+my proto warn { }
+my proto caller { }
+my proto want { }
+my proto eval { }
+my proto evalfile { }
+my proto callsame { }
+my proto callwith { }
+my proto nextsame { }
+my proto nextwith { }
+my proto lastcall { }
+my proto defined { }
+my proto undefine { }
+my proto item { }
+my proto list { }
+my proto slice { }
+my proto eager { }
+my proto hyper { }
+
+my proto cat { }
+my proto classify { }
+my proto quotemeta { }
+my proto chr { }
+my proto ord { }
+my proto p5chop { }
+my proto chop { }
+my proto p5chomp { }
+my proto chomp { }
+my proto trim { }
+my proto trim_start { }
+my proto trim_end { }
+my proto index { }
+my proto rindex { }
+my proto substr { }
+my proto join { }
+my proto split { }
+my proto comb { }
+my proto pack { }
+my proto unpack { }
+my proto uc { }
+my proto ucfirst { }
+my proto lc { }
+my proto lcfirst { }
+my proto normalize { }
+my proto nfc { }
+my proto nfd { }
+my proto nfkc { }
+my proto nfkd { }
+my proto samecase { }
+my proto sameaccent { }
+my proto capitalize { }
+my proto chars { }
+my proto graphs { }
+my proto codes { }
+my proto bytes { }
+
+my proto say { }
+my proto print { }
+my proto open { }
+my proto close { }
+my proto printf { }
+my proto sprintf { }
+my proto unlink { }
+my proto link { }
+my proto symlink { }
+my proto elems { }
+my proto end { }
+my proto grep { }
+my proto map { }
+my proto first { }
+my proto reduce { }
+my proto sort { }
+my proto min { }
+my proto max { }
+my proto uniq { }
+my proto push { }
+my proto reverse { }
+my proto flip { }
+my proto take { }
+my proto splice { }
+my proto slurp { }
+my proto get { }
+my proto lines { }
+my proto getc { }
+my proto prompt { }
+my proto chdir { }
+my proto chmod { }
+
+my proto zip { }
+my proto each { }
+my proto roundrobin { }
+my proto caller { }
+my proto return { }
+my proto leave { }
+my proto make { }
+my proto pop { }
+my proto shift { }
+my proto unshift { }
+my proto reduce { }
+my proto keys { }
+my proto values { }
+my proto hash { }
+my proto kv { }
+my proto key { }
+my proto value { }
+my proto pairs { }
+my proto pair { }
+my proto enum { }
+
+my proto sign { }
+my proto abs { }
+my proto floor { }
+my proto ceiling { }
+my proto round { }
+my proto truncate { }
+my proto exp { }
+my proto log { }
+my proto log10 { }
+my proto sqrt { }
+my proto roots { }
+my proto rand { }
+my proto srand { }
+my proto pick { }
+my proto cis { }
+my proto unpolar { }
+
+my proto sin { }
+my proto cos { }
+my proto tan { }
+my proto asin { }
+my proto acos { }
+my proto atan { }
+my proto sec { }
+my proto cosec { }
+my proto cotan { }
+my proto asec { }
+my proto acosec { }
+my proto acotan { }
+my proto sinh { }
+my proto cosh { }
+my proto tanh { }
+my proto asinh { }
+my proto acosh { }
+my proto atanh { }
+my proto sech { }
+my proto cosech { }
+my proto cotanh { }
+my proto asech { }
+my proto acosech { }
+my proto acotanh { }
+my proto atan2 { }
+
+my proto gmtime { }
+my proto localtime { }
+my proto time { }
+my proto times { }
+my proto gethost { }
+my proto getpw { }
+my proto chroot { }
+my proto getlogin { }
+my proto run { }
+my proto runinstead { }
+my proto fork { }
+my proto wait { }
+my proto kill { }
+my proto sleep { }
+
+class Test {
+    proto plan is export { }
+    proto is is export { }
+    proto ok is export { }
+    proto dies_ok is export { }
+    proto lives_ok is export { }
+    proto skip is export { }
+    proto todo is export { }
+    proto pass is export { }
+    proto flunk is export { }
+    proto force_todo is export { }
+    proto use_ok is export { }
+    proto isa_ok is export { }
+    proto cmp_ok is export { }
+    proto diag is export { }
+    proto is_deeply is export { }
+    proto isnt is export { }
+    proto like is export { }
+    proto skip_rest is export { }
+    proto unlike is export { }
+    proto skip_rest is export { }
+    proto eval_dies_ok is export { }
+    proto eval_lives_ok is export { }
+    proto approx is export { }
+    proto is_approx is export { }
+    proto throws_ok is export { }
+    proto version_lt is export { }
+}
+
+# XXX constants don't work yet
+module DEBUG {
+    class EXPR {}
+    class trace_call {}
+}
+
+YOU_ARE_HERE;

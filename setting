@@ -1,0 +1,41 @@
+#!/usr/local/bin/perl
+
+use STD;
+use utf8;
+
+my $failures = 0;
+
+if (not @ARGV) {
+    chomp(@ARGV = <STDIN>);
+    s/^\s*[AU]*\s+// for @ARGV;
+}
+
+for my $file (@ARGV) {
+    warn $file,"\n" if @ARGV > 1;
+    next unless -f $file;
+    eval {
+	warn "Undefined\n" unless defined STD->parsefile($file, setting => NULL);
+    };
+    if ($@) {
+	warn $@;
+	$failures++;
+    }
+}
+my ($time, $vsz) = split(' ', `ps -o "time= vsz=" $$`);
+$time =~ s/^00://;
+$vsz =~ s/\d\d\d$/m/;
+if ($failures) {
+    if ($vsz) {
+	warn "FAILED $time $vsz\n";
+    }
+    else {
+	warn "FAILED\n";
+    }
+    exit $failures;
+}
+elsif ($vsz) {
+    warn "ok $time $vsz\n";
+}
+else {
+    warn "ok\n";
+}

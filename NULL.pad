@@ -1,0 +1,27 @@
+my $core = {
+    stash => {
+	GLOBAL => { name => 'GLOBAL', file => 'CORE.pad', line => __LINE__ },
+	PROCESS => { name => 'PROCESS', file => 'CORE.pad', line => __LINE__ },
+    }
+};
+
+sub fixup {
+    my $h = shift;
+    return unless $h;
+    for my $k (keys %$h) {
+	my $v = $h->{$k};
+	if ($k =~ /^\w/) {
+	    next if $k eq 'EXPORT';
+	    $h->{"&$k"} = $h->{$k} if $k =~ /^\w+$/;
+	    fixup($v->{'stash'});
+	}
+    }
+    for my $k (keys %$h) {
+	my $v = $h->{$k};
+	if ($v->{export}) {
+	    $h->{EXPORT}{stash}{$v->{export}}{stash}{$k} = $v;
+	}
+    }
+}
+fixup($core->{'stash'});
+$core;

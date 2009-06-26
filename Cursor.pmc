@@ -37,7 +37,7 @@ sub ::init_globals {
     $::COMPILING::LAST_NIBBLE = { firstline => 0, lastline => 0 };
     $::COMPILING::LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
     $::COMPILING::LINE = 1;
-    $::COMPILING::FILE = '(eval)';
+    $::COMPILING::FILE = { name => '(eval)' };
     $::GOAL = "(eof)";
 }
 
@@ -140,11 +140,13 @@ sub parse {
     my %opts = @_;
     my $rule = $opts{rule} // 'comp_unit';
     my $actions = $opts{actions} // '';
+    my $setting = $opts{setting} // 'CORE';
+    local $::CORESETTING = $setting;
     $::ACTIONS = $actions if $actions;
     $TMP_PREFIX = $opts{tmp_prefix} // '';
     ::init_globals();
     local $::VOID = 1 if not defined wantarray;
-    local $::COMPILING::FILE = '(eval)';
+    local $::COMPILING::FILE = { name => '(eval)' };
     $class->new($text)->$rule();
 }
 
@@ -154,11 +156,13 @@ sub parsefile {
     my %opts = @_;
     my $rule = $opts{rule} // 'comp_unit';
     my $actions = $opts{actions} // '';
+    my $setting = $opts{setting} // 'CORE';
+    local $::CORESETTING = $setting;
     $::ACTIONS = $actions if $actions;
     $TMP_PREFIX = $opts{tmp_prefix} // '';
     ::init_globals();
     local $::VOID = 1 if not defined wantarray;
-    local $::COMPILING::FILE = $file;
+    local $::COMPILING::FILE = { name => $file };
     open(FILE, '<:utf8', $file) or die "Can't open $file: $!\n";
     my $text;
     {
@@ -185,10 +189,25 @@ sub parsefile {
 #    for my $key (sort {$HIST{$a} <=> $HIST{$b}} keys(%HIST)) {
 #       warn "$HIST{$key}\t$key\n";
 #    }
+    if ($::YOU_WERE_HERE) {
+        $result->you_were_here;
+    }
     $result;
 }
 
 sub load_pad {
+    my $self = shift;
+    my $setting = shift;
+    my $file = "$setting.yml";
+    if (-e $file) {
+        $self->load_yaml_pad($setting);
+    }
+    else {
+        $self->load_perl_pad($setting);
+    }
+}
+
+sub load_perl_pad {
     my $self = shift;
     my $setting = shift;
     state %PADS;
@@ -205,9 +224,68 @@ sub load_pad {
     $PADS{$setting};
 }
 
+sub load_yaml_pad {
+    my $self = shift;
+    my $setting = shift;
+    state %PADS;
+    return $PADS{$setting} if $PADS{$setting};
+    my $file = "$setting.yml";
+    my $store = $TMP_PREFIX . "$setting.yml.store";
+    if (-f $store and -M $file and -M $file > -M $store) {
+        $PADS{$setting} = retrieve($store);
+    }
+    else {
+        $PADS{$setting} = LoadFile($file);
+        store($PADS{$setting}, $store);
+    }
+    $PADS{$setting};
+}
+
+sub gettrait {
+    my $self = shift;
+    my $traitname = shift;
+    my $param = shift;
+    my $text;
+    if (@$param) {
+        $text = $param->[0]->Str;
+        $text =~ s/^<(.*)>$/$1/ or
+        $text =~ s/^\((.*)\)$/$1/;
+    }
+    if ($traitname eq 'export') {
+        if (defined $text) {
+            $text =~ s/://g;
+        }
+        else {
+            $text = 'DEFAULT';
+        }
+        my $name = $::DECLARING->{name};
+        $::CURPKG->{EXPORT}{stash}{$text}{stash}{$name} = $::DECLARING;
+        $::CURPKG->{EXPORT}{stash}{$text}{stash}{'&'.$name} = $::DECLARING
+                if $name =~ /^\w/;
+        $text;
+    }
+    elsif (defined $text) {
+        $text;
+    }
+    else {
+        1;
+    }
+}
+
 sub you_are_here {
     my $self = shift;
-    print ::Dump($::CURPAD);
+    $::YOU_WERE_HERE = $::CURPAD;
+    $self;
+}
+
+sub you_were_here {
+    my $self = shift;
+    my $file = $::COMPILING::FILE->{name};
+    $file =~ s/\.setting$/.yml/ or die "Can't dump setting for non-setting file";
+    delete $::YOU_WERE_HERE->{OUTER} if $file eq 'CORE.yml';
+    open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
+    print SETTING Dump({ file => $COMPILING::FILE, line => $self->line, stash => $::YOU_WERE_HERE });
+    close SETTING;
     $self;
 }
 
