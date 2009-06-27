@@ -221,7 +221,7 @@ method add_name ($name) {
         self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
     }
     else {
-        if $scope eq 'our' {
+        if $scope eq 'our' or $scope eq 'constant' {
             self.add_our_name($name);
         }
         else {
