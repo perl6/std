@@ -192,6 +192,10 @@ sub parsefile {
     if ($::YOU_WERE_HERE) {
         $result->you_were_here;
     }
+    elsif ($file =~ /\.pm$/) {
+        $::YOU_WERE_HERE = $::UNIT;
+        $result->you_were_here;
+    }
     $result;
 }
 
@@ -262,7 +266,7 @@ sub gettrait {
         my $name = $::DECLARING->{name};
         $::CURPKG->{EXPORT}{stash}{$text}{stash}{$name} = $::DECLARING;
         $::CURPKG->{EXPORT}{stash}{$text}{stash}{'&'.$name} = $::DECLARING
-                if $name =~ /^\w/;
+                if $name =~ /^\w/ and $::SCOPE ne 'constant';
         $text;
     }
     elsif (defined $text) {
@@ -282,8 +286,12 @@ sub you_are_here {
 sub you_were_here {
     my $self = shift;
     my $file = $::COMPILING::FILE->{name};
-    $file =~ s/\.setting$/.yml/ or die "Can't dump setting for non-setting file";
-    delete $::YOU_WERE_HERE->{OUTER} if $file eq 'CORE.yml';
+    $file =~ s/\.(setting|pm)$/.yml/ or die "Can't dump setting for non-module file";
+    $::UNIT //= $::YOU_WERE_HERE;
+    $::UNIT->{SETTINGNAME} = $::UNIT->{OUTER}{longname};
+    $::UNIT->{GLOBALish} = $::GLOBAL;
+    delete $::UNIT->{OUTER};
+    delete $::UNIT->{GLOBALish}{stash}{PARENT}; # don't want to slurp in CORE
     open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
     print SETTING Dump({ file => $COMPILING::FILE, line => $self->line, stash => $::YOU_WERE_HERE });
     close SETTING;
@@ -1093,6 +1101,7 @@ sub add_enum { my $self = shift;
     my $type = shift;
     my $expr = shift;
     return unless $expr;
+    local $::SCOPE = 'constant';
     # XXX complete kludge, really need to eval EXPR
     for ($expr =~ m/([a-zA-Z_]\w*)/g) {
         $self->add_name($type . "::$_");

@@ -112,7 +112,7 @@ my class uint16 { }
 my class uint32 { }
 my class uint64 { }
 
-my class Buf { }
+my role Buf { }
 my class buf { }
 my class buf1 { }
 my class buf2 { }
@@ -130,18 +130,17 @@ my class Bit { }
 my class bit { }
 my class bool { }
 
-my class Increasing { }
-my class Decreasing { }
-my class Ordered { }
-my class Callable { }
-my class Positional { }
-my class Associative { }
-my class Abstraction { }
-my class Integral { }
-my class Ordering { }
-my class KeyExtractor { }
-my class Comparator { }
-my class OrderingPair { }
+my role Ordered { }
+my role Callable { }
+my role Positional { }
+my role Associative { }
+my role Abstraction { }
+my role Integral { }
+
+my subset Comparator   of Code where { .signature === :(Any, Any --> Int ) };
+my subset KeyExtractor of Code where { .signature === :(Any --> Any) };
+my subset OrderingPair of Pair where { .left ~~ KeyExtractor && .right ~~ Comparator };
+my subset Ordering of Object where Signature | KeyExtractor | Comparator | OrderingPair | Whatever;
 
 my class Instant { }
 my class Duration { }
@@ -367,10 +366,21 @@ class Test {
     proto version_lt is export { }
 }
 
-# XXX constants don't work yet
-module DEBUG {
-    class EXPR {}
-    class trace_call {}
-}
+enum DEBUG <
+    :autolexer(1)
+    :lexer(2)
+    :fixed_length(4)
+    :fates(8)
+    :longest_token_pattern_generation(16)
+    :EXPR(32)
+    :matchers(64)
+    :trace_call(128)
+    :cursors(256)
+    :try_processing(1024)
+    :mixins(2048)
+    :callm_show_subnames(16384)
+    :use_color(32768)
+>;
+
 
 YOU_ARE_HERE;

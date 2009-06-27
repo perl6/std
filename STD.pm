@@ -27,6 +27,7 @@ my $BORG is context;
 my $MULTINESS is context = '';
 
 my $CORE is context;
+my $SETTING is context;
 my $CORESETTING is context = "CORE";
 my $GLOBAL is context;
 my $CURPKG is context;
@@ -198,6 +199,9 @@ method find_top_pkg ($name) {
     elsif $name eq 'CORE' {
         return $*CORE<stash>;
     }
+    elsif $name eq 'SETTING' {
+        return $*SETTING<stash>;
+    }
     elsif $name eq 'UNIT' {
         return $*UNIT<stash>;
     }
@@ -289,7 +293,7 @@ method add_my_name ($n, $d) {
     }
     else {
         $*DECLARING = $curstash.{$name} = $declaring;
-        if $name ~~ /^\w/ {
+        if $name ~~ /^\w/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $curstash.{$name};
             $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
         }
@@ -389,15 +393,18 @@ method add_mystery ($name,$pos) {
 method load_setting ($setting) {
     @PKGS = ();
 
-    $*CORE = self.load_pad($setting);
-    $*CURPAD = $*CORE<stash>;
-    $*CURPAD<MY> = $*CORE unless $setting eq 'NULL.setting';
-    $*GLOBAL = $*CORE<stash><GLOBAL> // {};
-    $*GLOBAL<stash><CORE> = $*GLOBAL<stash><SETTING> = $*CORE;
-    $*CURPAD<GLOBAL> = $*GLOBAL;
+    $*SETTING = self.load_pad($setting);
+    $*CURPAD = $*SETTING<stash>;
+    $*CORE = $*SETTING;
+    $*CORE = $*SETTING<stash><OUTER> while $*SETTING<stash><OUTER>;
+    $*GLOBAL = $*CORE<stash><GLOBAL> //= {
+        file => $COMPILING::FILE, line => 1,
+        longname => 'GLOBAL',
+        stash => {},
+    };
+    $GLOBAL<stash><$?STAB> = $GLOBAL;
     $*CURPKG = $*GLOBAL<stash>;
     $*CURPKG<$?STAB> = $*GLOBAL;
-    $*CURPKG<PARENT> = $*CURPAD;
 }
 
 method is_known ($n, $curpad = $*CURPAD) {
@@ -977,10 +984,7 @@ rule comp_unit {
     :my $REALLYADD is context<rw> = 0;
     :my $MULTINESS is context = '';
 
-    :my $CORE is context;
-    :my $GLOBAL is context;
     :my $CURPKG is context;
-    :my $UNIT is context;
     {{
 
         %*LANG<MAIN>    = ::STD ;
@@ -992,7 +996,8 @@ rule comp_unit {
 
         @COMPILING::WORRIES = ();
         self.load_setting($*CORESETTING);
-        $*UNIT = self.newpad;
+        self.newpad;
+        $*UNIT = $*CURPAD;
         self.finishpad(1);
     }}
     <statementlist>
@@ -1421,6 +1426,7 @@ rule statement_mod_loop:given {<sym> <modifier_expr> }
 token def_module_name {
     <longname>
     [ :dba('generic role')
+        <?before '['>
         <?{ ($*PKGDECL//'') eq 'role' }>
         <.newpad>
         '[' ~ ']' <signature>
