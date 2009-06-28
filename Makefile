@@ -1,6 +1,6 @@
 .PHONY: check try cat clean distclean purge test
 
-FIXINS=Cursor.pmc LazyMap.pm mangle.pl CORE.pad
+FIXINS=Cursor.pmc LazyMap.pm DEBUG.pm DEBUG.pmc Test.pm CORE.setting NULL.pad std mangle.pl CORE.pad
 
 all: $(FIXINS) check lex/STD/termish
 
@@ -10,7 +10,7 @@ snap: $(FIXINS) check lex/STD/termish
 	rm -rf snap.new
 	mkdir snap.new
 	svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
-	cp $(FIXINS) CORE.yml tryfile STD.pmc CORE.*.store snap.new
+	cp $(FIXINS) CORE.syml tryfile STD.pmc CORE.*.store snap.new
 	-mv lex snap.new
 	-rm -rf snap.old
 	-mv snap snap.old
@@ -21,15 +21,15 @@ STD.pmc: STD.pm gimme5
 	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD.pm5 >$@
 	rm -rf lex *.pad.store
 
-CORE.yml: CORE.setting
-	-rm CORE.yml.store
-	-./setting CORE.setting
+CORE.syml: CORE.setting
+	-rm CORE.syml.store
+	-./std CORE.setting
 
 check: STD.pmc
 	/usr/local/bin/perl -c $<
 
 # pre-generate common sublexers
-lex/STD/termish: STD.pmc CORE.yml
+lex/STD/termish: STD.pmc CORE.syml
 	@echo 'Generating STD lexers...'
 	./tryfile STD.pm
 
@@ -37,7 +37,7 @@ cat:
 	cat try5.out
 
 clean:
-	rm -rf lex try5.* *.pad.store
+	rm -rf lex try5.* *.pad.store *.syml.store *.syml
 
 distclean purge: clean
 	rm -rf STD.pmc STD.pm5

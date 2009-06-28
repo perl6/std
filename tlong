@@ -1,0 +1,18 @@
+#!/usr/local/bin/perl
+use 5.10.0;
+
+BEGIN { $ENV{STD5DEBUG} = -1; }
+binmode(STDIN, ":utf8");
+binmode(STDOUT, ":utf8");
+use STD;
+use utf8;
+use YAML::XS;
+use Encode;
+$/ = "\n\n";
+
+while (<>) {
+    my $r = eval { STD->parse($_) };
+    print $@ if $@;
+    say "ok" if $r;
+    print "=========================\n";
+}

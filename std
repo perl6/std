@@ -25,16 +25,10 @@ $time =~ s/^00://;
 $vsz =~ s/\d\d\d$/m/;
 if ($failures) {
     if ($vsz) {
-	warn "FAILED $time $vsz\n";
+	warn "std FAILED $time $vsz\n";
     }
     else {
-	warn "FAILED\n";
+	warn "std FAILED\n";
     }
     exit $failures;
-}
-elsif ($vsz) {
-    warn "ok $time $vsz\n";
-}
-else {
-    warn "ok\n";
 }

@@ -50,23 +50,7 @@ sub ::fatestr { my $f = shift;
     $text;
 }
 
-{ package DEBUG;
-    use constant {
-        autolexer => 1,
-        lexer => 2,
-        fixed_length => 4,
-        fates => 8,
-        longest_token_pattern_generation => 16,
-        EXPR => 32,
-        matchers => 64,
-        trace_call=> 128,
-        cursors => 256,
-        try_processing => 1024,
-        mixins => 2048,
-        callm_show_subnames => 16384,
-        use_color => 32768
-    };
-}
+use DEBUG;
 
 sub ::deb {
     print ::LOG @_, "\n";
@@ -202,7 +186,7 @@ sub parsefile {
 sub load_pad {
     my $self = shift;
     my $setting = shift;
-    my $file = "$setting.yml";
+    my $file = "$setting.syml";
     if (-e $file) {
         $self->load_yaml_pad($setting);
     }
@@ -233,8 +217,8 @@ sub load_yaml_pad {
     my $setting = shift;
     state %PADS;
     return $PADS{$setting} if $PADS{$setting};
-    my $file = "$setting.yml";
-    my $store = $TMP_PREFIX . "$setting.yml.store";
+    my $file = "$setting.syml";
+    my $store = $TMP_PREFIX . "$setting.syml.store";
     if (-f $store and -M $file and -M $file > -M $store) {
         $PADS{$setting} = retrieve($store);
     }
@@ -263,10 +247,7 @@ sub gettrait {
         else {
             $text = 'DEFAULT';
         }
-        my $name = $::DECLARING->{name};
-        $::CURPKG->{EXPORT}{stash}{$text}{stash}{$name} = $::DECLARING;
-        $::CURPKG->{EXPORT}{stash}{$text}{stash}{'&'.$name} = $::DECLARING
-                if $name =~ /^\w/ and $::SCOPE ne 'constant';
+        $self->set_export($text);
         $text;
     }
     elsif (defined $text) {
@@ -275,6 +256,17 @@ sub gettrait {
     else {
         1;
     }
+}
+
+sub set_export {
+        my $self = shift;
+        my $text = shift;
+        my $name = $::DECLARING->{name};
+        $::DECLARING->{export} = $text;
+        $::CURPKG->{EXPORT}{stash}{$text}{stash}{$name} = $::DECLARING;
+        $::CURPKG->{EXPORT}{stash}{$text}{stash}{'&'.$name} = $::DECLARING
+                if $name =~ /^\w/ and $::SCOPE ne 'constant';
+        $self;
 }
 
 sub you_are_here {
@@ -286,7 +278,8 @@ sub you_are_here {
 sub you_were_here {
     my $self = shift;
     my $file = $::COMPILING::FILE->{name};
-    $file =~ s/\.(setting|pm)$/.yml/ or die "Can't dump setting for non-module file";
+    $file =~ s/(\.setting)?$/.syml/;
+    $file =~ s!.*/!!;
     $::UNIT //= $::YOU_WERE_HERE;
     $::UNIT->{SETTINGNAME} = $::UNIT->{OUTER}{longname};
     $::UNIT->{GLOBALish} = $::GLOBAL;
@@ -1114,16 +1107,52 @@ sub do_imports { my $self = shift;
     my $module = shift;
     my $args = shift;
     my @imports;
+    my $topstab;
+    my $pkg;
+    my $lib = '.';
+    my $std = -x 'std' ? './std' : 'std';
+    for my $d (split ':', $ENV{PERL6LIB}//'.:..') {
+        if (-f "$d/$module.pm") {
+            $lib = $d;
+            last;
+        }
+    }
+    if (-f "$module.pm.syml" and -M "$lib/$module.pm" > -M "$module.pm.syml") {
+        $topstab = LoadFile("$module.pm.syml");
+    }
+    elsif (-f "$lib/$module.pm") {
+        system "$std $lib/$module.pm" and die "Can't compile $lib/$module.pm";
+        $topstab = LoadFile("$module.pm.syml");
+    }
+    $pkg = $topstab->{stash}{$module}{stash} if $topstab;;
     if ($args) {
         $self->add_my_name($module);
         my $text = $args->Str;
-        return unless $text;
+        return $self unless $text;
         while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
             my $scope = lc($1) || 'my';
             my $imports = $2;
             local $::SCOPE = $scope;
             @imports = split ' ', $imports;
             for (@imports) {
+                local $::DECLARING;
+                if ($pkg) {
+                    if ($_ =~ s/^://) {
+                        my @tagimports;
+                        eval { @tagimports = keys %{$pkg->{'EXPORT'}{'stash'}{$_}{'stash'}}; };
+                        $self->do_import_aliases($pkg, @tagimports);
+                    }
+                    elsif ($pkg->{$_}{export}) {
+                        $::DECLARING = $pkg->{$_};
+                    }
+                    elsif ($pkg->{'&'.$_}{export}) {
+                        $::DECLARING = $pkg->{'&'.$_};
+                    }
+                    elsif ($pkg->{$_}) {
+                        $self->worry("Can't import $_ because it's not exported by $module");
+                        next;
+                    }
+                }
                 if (/^\w/) {
                     if (/::/) {
                         $self->add_name($_);
@@ -1139,26 +1168,33 @@ sub do_imports { my $self = shift;
         }
     }
     else {
-        my $pkg = $self->find_stab($module);
         # say join(' ', keys(%$pkg));
         $self->add_my_name($module);
+        return $self unless $topstab and $pkg;
         eval { @imports = keys %{$pkg->{'EXPORT'}{'stash'}{'DEFAULT'}{'stash'}}; };
-        # say join(' ', @imports);
         local $::SCOPE = 'my';
-        for (@imports) {
-            if (/^\w/) {
-                next if /^PARENT/;
-                next if /^OUTER/;
-                if (/::/) {
-                    $self->add_name($_);
-                }
-                else {
-                    $self->add_routine($_);
-                }
+        $self->do_import_aliases($pkg, @imports);
+    }
+    $self;
+}
+
+sub do_import_aliases {
+    my $self = shift;
+    my $pkg = shift;
+    for (@_) {
+        $::DECLARING = $pkg->{$_};
+        if (/^\w/) {
+            next if /^PARENT/;
+            next if /^OUTER/;
+            if (/::/) {
+                $self->add_name($_);
             }
             else {
-                $self->add_variable($_);
+                $self->add_routine($_);
             }
+        }
+        else {
+            $self->add_variable($_);
         }
     }
     $self;

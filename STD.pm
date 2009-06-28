@@ -1,5 +1,7 @@
 grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
+use DEBUG;
+
 # braided languages
 my %LANG is context;
 my $PKGDECL is context = "";
@@ -30,6 +32,7 @@ my $CORE is context;
 my $SETTING is context;
 my $CORESETTING is context = "CORE";
 my $GLOBAL is context;
+my $PROCESS is context;
 my $CURPKG is context;
 my $UNIT is context;
 
@@ -396,15 +399,30 @@ method load_setting ($setting) {
     $*SETTING = self.load_pad($setting);
     $*CURPAD = $*SETTING<stash>;
     $*CORE = $*SETTING;
-    $*CORE = $*SETTING<stash><OUTER> while $*SETTING<stash><OUTER>;
+    for 1..100 {
+        my $outerer = $*SETTING<stash><OUTER>;
+        last unless $outerer;
+        $*CORE = $outerer;
+    }
+    if $*SETTING<stash><OUTER> {
+        warn "Internal error: infinite setting loop";
+        $*SETTING<stash><OUTER>:delete;
+    }
     $*GLOBAL = $*CORE<stash><GLOBAL> //= {
         file => $COMPILING::FILE, line => 1,
         longname => 'GLOBAL',
         stash => {},
     };
-    $GLOBAL<stash><$?STAB> = $GLOBAL;
+    $*GLOBAL<stash><$?STAB> = $*GLOBAL;
     $*CURPKG = $*GLOBAL<stash>;
     $*CURPKG<$?STAB> = $*GLOBAL;
+
+    $*PROCESS = $*CORE<stash><PROCESS> //= {
+        file => $COMPILING::FILE, line => 1,
+        longname => 'PROCESS',
+        stash => {},
+    };
+    $*PROCESS<stash><$?STAB> = $*PROCESS;
 }
 
 method is_known ($n, $curpad = $*CURPAD) {
