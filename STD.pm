@@ -89,6 +89,12 @@ method TOP ($STOP = undef) {
     }
 }
 
+#################
+# Symbol tables #
+#################
+
+# XXX probably needs to be refactored out to a separate role or class
+
 method newpad {
     my $outer = $*CURPAD<$?STAB> // 0;
     my $line = self.lineof(self.pos);
@@ -601,6 +607,10 @@ method lookup_compiler_var($name) {
     }
 }
 
+##############
+# Precedence #
+##############
+
 # The internal precedence levels are *not* part of the public interface.
 # The current values are mere implementation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
@@ -744,6 +754,10 @@ class Terminator does PrecOp {
     our %o = %terminator;
 } # end class
 
+##############
+# Categories #
+##############
+
 # Categories are designed to be easily extensible in derived grammars
 # by merely adding more rules in the same category.  The rules within
 # a given category start with the category name followed by a differentiating
@@ -871,7 +885,9 @@ token endid { <?before <-[ \- \' \w ]> > }
 token spacey { <?before <[ \s \# ]> > }
 token nofun { <!before '(' | '.(' | '\\' > }
 
-# Lexical routines
+##################
+# Lexer routines #
+##################
 
 token ws {
     :my @stub = return self if @*MEMOS[self.pos]<ws> :exists;
@@ -975,7 +991,9 @@ token pod_comment {
     ]
 }
 
-# Top-level rules
+###################
+# Top-level rules #
+###################
 
 # Note: we only check for the stopper.  We don't check for ^ because
 # we might be embedded in something else.
@@ -1030,7 +1048,6 @@ rule comp_unit {
         warn $m if $m;
     }}
 }
-
 
 method explain_mystery() {
     my %post_types;
@@ -1284,6 +1301,10 @@ token eat_terminator {
     ]
 }
 
+#####################
+# statement control #
+#####################
+
 token statement_control:need {
     :my $longname;
     <sym>:s
@@ -1422,12 +1443,9 @@ rule statement_control:CATCH   {<sym> <block> }
 rule statement_control:CONTROL {<sym> <block> }
 rule statement_control:TEMP    {<sym> <block> }
 
-rule term:BEGIN   {<sym> <block> }
-rule term:CHECK   {<sym> <block> }
-rule term:INIT    {<sym> <block> }
-rule term:START   {<sym> <block> }
-rule term:ENTER   {<sym> <block> }
-rule term:FIRST   {<sym> <block> }
+#######################
+# statement modifiers #
+#######################
 
 rule modifier_expr { <EXPR> }
 
@@ -1440,6 +1458,10 @@ rule statement_mod_loop:until {<sym> <modifier_expr> }
 
 rule statement_mod_loop:for   {<sym> <modifier_expr> }
 rule statement_mod_loop:given {<sym> <modifier_expr> }
+
+################
+# module names #
+################
 
 token def_module_name {
     <longname>
@@ -1468,401 +1490,9 @@ token version:sym<v> {
     'v' <?before \d+> :: <vnum> ** '.' '+'?
 }
 
-###################################################
-
-token PRE {
-    :dba('prefix or meta-prefix')
-    [
-    | <prefix>
-        { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
-                                                    {*}         #= prefix
-    | <prefix_circumfix_meta_operator>
-        { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.Str }
-                                                    {*}         #= precircum
-    ]
-    # XXX assuming no precedence change
-    
-    <prefix_postfix_meta_operator>*                 {*}         #= prepost
-    <.ws>
-}
-
-# (for when you want to tell EXPR that infix already parsed the term)
-token nullterm {
-    <?>
-}
-
-token nulltermish {
-    :dba('null term')
-    [
-    | <?stdstopper>
-    | <noun=termish>
-        {
-            $¢.<PRE>  = $<noun><PRE>:delete;
-            $¢.<POST> = $<noun><POST>:delete;
-            $¢.<~CAPS> = $<noun><~CAPS>;
-        }
-    | <?>
-    ]
-}
-
-token termish {
-    :my $SCOPE is context<rw> = "our";
-    :my $VAR is context<rw>;
-    :dba('prefix or noun')
-    [
-    | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><noun> and $<noun> = pop @$p }> <PRE> ]*
-        [ <?{ $<noun> }> || <noun> ]
-    | <noun>
-    ]
-
-    # also queue up any postfixes
-    :dba('postfix')
-    [
-    || <?{ $*INTERPOLATION }>
-        [
-        || <?{ $*INTERPOLATION eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
-        ||                                 <POST>+! <?after <[ \] } > ) ]> > 
-        || { $VAR = 0; }
-        ]
-    || <!{ $*INTERPOLATION }>
-        <POST>*
-    ]
-    {
-        self.check_variable($VAR) if $VAR;
-        $¢.<~CAPS> = $<noun><~CAPS>;
-    }
-}
-
-token noun:fatarrow           { <fatarrow> }
-token noun:variable           { <variable> { $*VAR = $<variable> } }
-token noun:package_declarator { <package_declarator> }
-token noun:scope_declarator   { <scope_declarator> }
-token noun:multi_declarator   { <?before 'multi'|'proto'|'only'> <multi_declarator> }
-token noun:routine_declarator { <routine_declarator> }
-token noun:regex_declarator   { <regex_declarator> }
-token noun:type_declarator    { <type_declarator> }
-token noun:circumfix          { <circumfix> }
-token noun:dotty              { <dotty> }
-token noun:value              { <value> }
-token noun:capterm            { <capterm> }
-token noun:sigterm            { <sigterm> }
-token noun:term               { <term> }
-token noun:statement_prefix   { <statement_prefix> }
-token noun:colonpair          { [ <colonpair> <.ws> ]+ }
-
-
-token fatarrow {
-    <key=identifier> \h* '=>' <.ws> <val=EXPR(item %item_assignment)>
-}
-
-token colonpair {
-    :my $key;
-    :my $value;
-
-    ':'
-    :dba('colon pair')
-    [
-    | '!' <identifier>
-        { $key = $<identifier>.Str; $value = 0; }
-        {*}                                                     #= false
-    | $<num> = [\d+] <identifier>
-    | <identifier>
-        { $key = $<identifier>.Str; }
-        [
-        || <.unsp>? <postcircumfix> { $value = $<postcircumfix>; }
-        || { $value = 1; }
-        ]
-        {*}                                                     #= value
-    | :dba('signature') '(' ~ ')' <fakesignature>
-    | <postcircumfix>
-        { $key = ""; $value = $<postcircumfix>; }
-        {*}                                                     #= structural
-    | $<var> = (<sigil> {} <twigil>? <desigilname>)
-        { $key = $<var><desigilname>.Str; $value = $<var>; }
-        {*}                                                     #= varname
-    ]
-    { $<k> = $key; $<v> = $value; }
-}
-
-token quotepair {
-    :my $key;
-    :my $value;
-
-    ':'
-    :dba('colon pair (restricted)')
-    [
-    | '!' <identifier>
-        { $key = $<identifier>.Str; $value = 0; }
-        {*}                                                     #= false
-    | <identifier>
-        { $key = $<identifier>.Str; }
-        [
-        || <.unsp>? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
-        || { $value = 1; }
-        ]
-        {*}                                                     #= value
-    | $<n>=(\d+) $<id>=(<[a..z]>+)
-        { $key = $<id>.Str; $value = $<n>.Str; }
-        {*}                                                     #= nth
-    ]
-    { $<k> = $key; $<v> = $value; }
-}
-
-token infixish ($in_meta = $*IN_META) {
-    :my $infix;
-    :my $IN_META is context<rw> = $in_meta;
-    <!stdstopper>
-    <!infixstopper>
-    :dba('infix or meta-infix')
-    [
-    | <colonpair> {
-            $<fake> = 1;
-            $<sym> = ':';
-            %<O><prec> = %item_assignment<prec>;  # actual test is non-inclusive!
-            %<O><assoc> = 'unary';
-            %<O><kind> = 'ADVERB';
-        }
-    | '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
-    | <infix_circumfix_meta_operator>
-        { $<O> = $<infix_circumfix_meta_operator><O>;
-          $<sym> = $<infix_circumfix_meta_operator><sym>; }
-    | <infix_prefix_meta_operator>
-        { $<O> = $<infix_prefix_meta_operator><O>;
-          $<sym> = $<infix_prefix_meta_operator><sym>; }
-    | <infix> <!before '='>
-           { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
-    | <infix> <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
-           { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
-    ]
-}
-
-# doing fancy as one rule simplifies LTM
-token dotty:sym<.*> ( --> Methodcall) {
-    ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
-    { $<sym> = $0.Str; }
-}
-
-token dotty:sym<.> ( --> Methodcall) {
-    <sym> <dottyop>
-}
-
-token privop ( --> Methodcall) {
-    '!' <methodop>
-}
-
-token dottyopish {
-    <noun=dottyop>
-}
-
-token dottyop {
-    :dba('dotty method or postfix')
-    [
-    | <methodop>
-    | <colonpair>
-    | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
-    ]
-}
-
-# Note, this rule mustn't do anything irreversible because it's used
-# as a lookahead by the quote interpolator.
-
-token POST {
-    <!stdstopper>
-
-    # last whitespace didn't end here
-    <!{ @*MEMOS[$¢.pos]<ws> }>
-
-    [ <.unsp> | '\\' ]?
-
-    [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
-
-    :dba('postfix')
-    [
-    | <dotty>  { $<O> = $<dotty><O>;  $<sym> = $<dotty><sym>;  $<~CAPS> = $<dotty><~CAPS>; }
-    | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; $<~CAPS> = $<privop><~CAPS>; }
-    | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; $<~CAPS> = $<postop><~CAPS>; }
-    ]
-    { $*SIGIL = '@'; }
-}
-
-method can_meta ($op, $meta) {
-    !$op<O><fiddly> || self.panic("Can't " ~ $meta ~ " a " ~ $op<O><dba> ~ " because it's too fiddly");
-    self;
-}
-
-regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
-    :my $IN_REDUCE is context<rw> = 1;
-    <?before '['\S+']'>
-    $<s> = (
-        '['
-        [
-        || <op=infixish(1)> <?before ']'>
-        || \\<op=infixish(1)> <?before ']'>
-        || <!>
-        ]
-    )
-    [ <?> || <.worry: "Malformed reduce"> <!> ] ']' ['«'|<?>]
-
-    <.can_meta($<s><op>, "reduce")>
-
-    [
-    || <!{ $<s><op><O><diffy> }>
-    || <?{ $<s><op><O><assoc> eq 'chain' }>
-    || <.panic("Can't reduce a " ~ $<s><op><O><dba> ~ " operator because it's diffy and not chaining")>
-    ]
-
-    { $<O> = $<s><op><O>; $<O><prec>:delete; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
-    { $<sym> = $<s>.Str; }
-
-    [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><noun> = 1 } ]? > || { $<O><noun> = 1 } ]
-}
-
-token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
-
-token postfix_prefix_meta_operator:sym< » >    {
-    [ <sym> | '>>' ]
-    # require >>.( on interpolated hypercall so infix:«$s»($a,$b) {...} dwims
-    [<!{ $*INTERPOLATION }> || <!before '('> ]
-}
-
-token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
-    <sym> <!before '!'> {} <infixish(1)>
-
-    [
-    || <?{ $<infixish>.Str eq '=' }>
-       { $¢ = ::Chaining.coerce($¢); }
-       
-    || <.can_meta($<infixish>, "negate")>    
-       <?{ $<infixish><O><iffy> }>
-       <?{ $<O> = $<infixish><O>; }>
-        
-    || <.panic("Can't negate a " ~ $<infixish><O><dba> ~ " operator because it's not iffy enough")>
-    ]
-}
-
-token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
-    <sym> {} <infixish(1)>
-    <.can_meta($<infixish>, "reverse")>
-    <?{ $<O> = $<infixish><O>; }>
-}
-
-#method lex1 (Str $s) {
-#    self.<O>{$s}++ and self.panic("Nested $s metaoperators not allowed");
-#    self;
-#}
-
-token infix_prefix_meta_operator:sym<X> ( --> List_infix) {
-    <sym> {}
-    [ <infixish(1)>
-        [X <.panic: "Old form of XopX found">]?
-        <.can_meta($<infixish>[0], "cross")>
-        <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
-    ]?
-}
-
-token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
-    [
-    | '«'
-    | '»'
-    ]
-    {} <infixish(1)> [ '«' | '»' ]
-    <.can_meta($<infixish>, "hyper")>
-    <?{ $<O> := $<infixish><O>; }>
-}
-
-token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
-    [
-    | '<<'
-    | '>>'
-    ]
-    {} <infixish(1)> [ '<<' | '>>' ]
-    <.can_meta($<infixish>, "hyper")>
-    <?{ $<O> := $<infixish><O>; }>
-}
-
-token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
-    '='
-    <.can_meta($op, "make assignment out of")>
-    [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of a " ~ $op<O><dba> ~ " operator because it's diffy")> ]
-    { $<O> = $op<O>; $<O><prec>:delete; $<O><fiddly> = 1; }
-}
-
-token postcircumfix:sym<( )> ( --> Methodcall)
-    { :dba('argument list') '(' ~ ')' <semiarglist> }
-
-token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } }
-
-token postcircumfix:sym<{ }> ( --> Methodcall)
-    { :dba('subscript') '{' ~ '}' <semilist> }
-
-token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
-
-token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
-
-token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
-
-token postop {
-    | <postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
-    | <postcircumfix>   { $<O> := $<postcircumfix><O>; $<sym> := $<postcircumfix><sym>; }
-}
-
-token methodop {
-    [
-    | <longname>
-    | <?before '$' | '@' | '&' > <variable> { $*VAR = $<variable> }
-    | <?before <[ ' " ]> >
-        [ <!{$*INTERPOLATION}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
-        <quote>
-        { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
-    ] <.unsp>? 
-
-    :dba('method arguments')
-    [
-    | ':' <?before \s> <!{ $*INTERPOLATION }> <arglist>
-    | <?[\\(]> <args>
-    ]?
-}
-
-token semiarglist {
-    <arglist> ** ';'
-    <.ws>
-}
-
-token arglist {
-    :my $inv_ok = $*INVOCANT_OK;
-    :my StrPos $endargs is context<rw> = 0;
-    :my $GOAL is context = 'endargs';
-    :my $INTERPOLATION is context<rw> = 0;
-    <.ws>
-    :dba('argument list')
-    [
-    | <?stdstopper>
-    | <EXPR(item %list_infix)> {{
-            my $delims = $<EXPR><delims>;
-            for @$delims {
-                if ($_.<sym> // '') eq ':' {
-                    if $inv_ok {
-                        $*INVOCANT_IS = $<EXPR><list>[0];
-                    }
-                }
-            }
-        }}
-    ]
-}
-
-token circumfix:sym<{ }> ( --> Term) {
-    <?before '{' | <.lambda> >
-    <pblock>
-    {{
-        if $*BORG {
-            $*BORG.<block> = $<pblock>;
-        }
-    }}
-}
+###############
+# Declarators #
+###############
 
 token constant_declarator {
     :my $IN_DECL is context<rw> = 1;
@@ -2081,6 +1711,243 @@ token routine_declarator:macro     { <sym> <macro_def> }
 token regex_declarator:regex { <sym>       <regex_def> }
 token regex_declarator:token { <sym>       <regex_def> }
 token regex_declarator:rule  { <sym>       <regex_def> }
+
+rule multisig {
+    [
+        ':'?'(' ~ ')' <signature>
+    ]
+    ** '|'
+}
+
+rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
+    :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
+    [
+        [ '&'<deflongname>? | <deflongname> ]?
+        <.newpad>
+        [ <multisig> | <trait> ]*
+        <!{
+            $*IN_DECL = 0;
+        }>
+        <blockoid>:!s
+    ] || <.panic: "Malformed routine">
+}
+
+rule method_def ($CURPAD is context<rw> = $*CURPAD) {
+    :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
+    <.newpad>
+    [
+        [
+        | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
+        | <multisig> <trait>*
+        | <sigil> '.'
+            :dba('subscript signature')
+            [
+            | '(' ~ ')' <signature>
+            | '[' ~ ']' <signature>
+            | '{' ~ '}' <signature>
+            | <?before '<'> <postcircumfix>
+            ]
+            <trait>*
+        | <?>
+        ]
+        <blockoid>:!s
+    ] || <.panic: "Malformed method">
+}
+
+rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
+    :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
+    [
+        [ '&'<deflongname>? | <deflongname> ]?
+        <.newpad>
+        [ [ ':'?'(' <signature> ')'] | <trait> ]*
+        { $*IN_DECL = 0; }
+        <.finishpad>
+        <regex_block>:!s
+    ] || <.panic: "Malformed regex">
+}
+
+rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
+    :my $IN_DECL is context<rw> = 1;
+    :my $DECLARING is context<rw>;
+    [
+        [ '&'<deflongname>? | <deflongname> ]?
+        <.newpad>
+        [ <multisig> | <trait> ]*
+        <!{
+            $*IN_DECL = 0;
+        }>
+        <blockoid>:!s
+    ] || <.panic: "Malformed macro">
+}
+
+rule trait {
+    :my $IN_DECL is context<rw> = 0;
+    [
+    | <trait_mod>
+    | <colonpair>
+    ]
+}
+
+token trait_mod:is {
+    <sym>:s <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
+    {{
+        if $*DECLARING {
+            my $traitname = $<longname>.Str;
+            # XXX eventually will use multiple dispatch
+            $*DECLARING{$traitname} = self.gettrait($traitname, $<postcircumfix>);
+        }
+    }}
+}
+token trait_mod:hides {
+    <sym>:s <module_name>
+}
+token trait_mod:does {
+    :my $PKGDECL is context = 'role';
+    <sym>:s <module_name>
+}
+token trait_mod:will {
+    <sym>:s <identifier> <block>
+}
+
+token trait_mod:of      { <sym>:s <typename> }
+token trait_mod:as      { <sym>:s <typename> }
+token trait_mod:returns { <sym>:s <typename> }
+token trait_mod:handles { <sym>:s <noun> }
+
+#########
+# Nouns #
+#########
+
+# (for when you want to tell EXPR that infix already parsed the term)
+token nullterm {
+    <?>
+}
+
+token nulltermish {
+    :dba('null term')
+    [
+    | <?stdstopper>
+    | <noun=termish>
+        {
+            $¢.<PRE>  = $<noun><PRE>:delete;
+            $¢.<POST> = $<noun><POST>:delete;
+            $¢.<~CAPS> = $<noun><~CAPS>;
+        }
+    | <?>
+    ]
+}
+
+token termish {
+    :my $SCOPE is context<rw> = "our";
+    :my $VAR is context<rw>;
+    :dba('prefix or noun')
+    [
+    | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><noun> and $<noun> = pop @$p }> <PRE> ]*
+        [ <?{ $<noun> }> || <noun> ]
+    | <noun>
+    ]
+
+    # also queue up any postfixes
+    :dba('postfix')
+    [
+    || <?{ $*INTERPOLATION }>
+        [
+        || <?{ $*INTERPOLATION eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
+        ||                                 <POST>+! <?after <[ \] } > ) ]> > 
+        || { $VAR = 0; }
+        ]
+    || <!{ $*INTERPOLATION }>
+        <POST>*
+    ]
+    {
+        self.check_variable($VAR) if $VAR;
+        $¢.<~CAPS> = $<noun><~CAPS>;
+    }
+}
+
+token noun:fatarrow           { <fatarrow> }
+token noun:variable           { <variable> { $*VAR = $<variable> } }
+token noun:package_declarator { <package_declarator> }
+token noun:scope_declarator   { <scope_declarator> }
+token noun:multi_declarator   { <?before 'multi'|'proto'|'only'> <multi_declarator> }
+token noun:routine_declarator { <routine_declarator> }
+token noun:regex_declarator   { <regex_declarator> }
+token noun:type_declarator    { <type_declarator> }
+token noun:circumfix          { <circumfix> }
+token noun:dotty              { <dotty> }
+token noun:value              { <value> }
+token noun:capterm            { <capterm> }
+token noun:sigterm            { <sigterm> }
+token noun:term               { <term> }
+token noun:statement_prefix   { <statement_prefix> }
+token noun:colonpair          { [ <colonpair> <.ws> ]+ }
+
+token fatarrow {
+    <key=identifier> \h* '=>' <.ws> <val=EXPR(item %item_assignment)>
+}
+
+token colonpair {
+    :my $key;
+    :my $value;
+
+    ':'
+    :dba('colon pair')
+    [
+    | '!' <identifier>
+        { $key = $<identifier>.Str; $value = 0; }
+        {*}                                                     #= false
+    | $<num> = [\d+] <identifier>
+    | <identifier>
+        { $key = $<identifier>.Str; }
+        [
+        || <.unsp>? <postcircumfix> { $value = $<postcircumfix>; }
+        || { $value = 1; }
+        ]
+        {*}                                                     #= value
+    | :dba('signature') '(' ~ ')' <fakesignature>
+    | <postcircumfix>
+        { $key = ""; $value = $<postcircumfix>; }
+        {*}                                                     #= structural
+    | $<var> = (<sigil> {} <twigil>? <desigilname>)
+        { $key = $<var><desigilname>.Str; $value = $<var>; }
+        {*}                                                     #= varname
+    ]
+    { $<k> = $key; $<v> = $value; }
+}
+
+token quotepair {
+    :my $key;
+    :my $value;
+
+    ':'
+    :dba('colon pair (restricted)')
+    [
+    | '!' <identifier>
+        { $key = $<identifier>.Str; $value = 0; }
+        {*}                                                     #= false
+    | <identifier>
+        { $key = $<identifier>.Str; }
+        [
+        || <.unsp>? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
+        || { $value = 1; }
+        ]
+        {*}                                                     #= value
+    | $<n>=(\d+) $<id>=(<[a..z]>+)
+        { $key = $<id>.Str; $value = $<n>.Str; }
+        {*}                                                     #= nth
+    ]
+    { $<k> = $key; $<v> = $value; }
+}
+
+rule term:BEGIN   {<sym> <block> }
+rule term:CHECK   {<sym> <block> }
+rule term:INIT    {<sym> <block> }
+rule term:START   {<sym> <block> }
+rule term:ENTER   {<sym> <block> }
+rule term:FIRST   {<sym> <block> }
 
 # Most of these special variable rules are there simply to catch old p5 brainos
 
@@ -2573,6 +2440,10 @@ token hexint {
     <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
 }
 
+##########
+# Quotes #
+##########
+
 our @herestub_queue;
 
 class Herestub {
@@ -2754,7 +2625,6 @@ method nibble ($lang) {
     self.cursor_fresh($lang).nibbler;
 }
 
-
 token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> "'" }
 token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> '"' }
 
@@ -2874,7 +2744,6 @@ token old_tr_mods {
         }
     }}
 }
-
 
 token quote:quasi {
     <sym> » <!before '('> <quasiquibble($¢.cursor_fresh( %*LANG<Quasi> ))>
@@ -3547,110 +3416,9 @@ grammar Quasi is STD {
 
 } # end grammar
 
-rule multisig {
-    [
-        ':'?'(' ~ ')' <signature>
-    ]
-    ** '|'
-}
-
-rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
-    [
-        [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad>
-        [ <multisig> | <trait> ]*
-        <!{
-            $*IN_DECL = 0;
-        }>
-        <blockoid>:!s
-    ] || <.panic: "Malformed routine">
-}
-
-rule method_def ($CURPAD is context<rw> = $*CURPAD) {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
-    <.newpad>
-    [
-        [
-        | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
-        | <multisig> <trait>*
-        | <sigil> '.'
-            :dba('subscript signature')
-            [
-            | '(' ~ ')' <signature>
-            | '[' ~ ']' <signature>
-            | '{' ~ '}' <signature>
-            | <?before '<'> <postcircumfix>
-            ]
-            <trait>*
-        | <?>
-        ]
-        <blockoid>:!s
-    ] || <.panic: "Malformed method">
-}
-
-rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
-    [
-        [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad>
-        [ [ ':'?'(' <signature> ')'] | <trait> ]*
-        { $*IN_DECL = 0; }
-        <.finishpad>
-        <regex_block>:!s
-    ] || <.panic: "Malformed regex">
-}
-
-rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
-    [
-        [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad>
-        [ <multisig> | <trait> ]*
-        <!{
-            $*IN_DECL = 0;
-        }>
-        <blockoid>:!s
-    ] || <.panic: "Malformed macro">
-}
-
-rule trait {
-    :my $IN_DECL is context<rw> = 0;
-    [
-    | <trait_mod>
-    | <colonpair>
-    ]
-}
-
-token trait_mod:is {
-    <sym>:s <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
-    {{
-        if $*DECLARING {
-            my $traitname = $<longname>.Str;
-            # XXX eventually will use multiple dispatch
-            $*DECLARING{$traitname} = self.gettrait($traitname, $<postcircumfix>);
-        }
-    }}
-}
-token trait_mod:hides {
-    <sym>:s <module_name>
-}
-token trait_mod:does {
-    :my $PKGDECL is context = 'role';
-    <sym>:s <module_name>
-}
-token trait_mod:will {
-    <sym>:s <identifier> <block>
-}
-
-token trait_mod:of      { <sym>:s <typename> }
-token trait_mod:as      { <sym>:s <typename> }
-token trait_mod:returns { <sym>:s <typename> }
-token trait_mod:handles { <sym>:s <noun> }
+###########################
+# Captures and Signatures #
+###########################
 
 token capterm {
     '\\'
@@ -3902,7 +3670,9 @@ token blorst {
     ]
 }
 
-## term
+#########
+# Terms #
+#########
 
 # start playing with the setting stubber
 token term:YOU_ARE_HERE ( --> Term) {
@@ -3988,6 +3758,282 @@ token circumfix:sym<( )> ( --> Term)
 
 token circumfix:sym<[ ]> ( --> Term)
     { :dba('array composer') '[' ~ ']' <semilist> }
+
+#############
+# Operators #
+#############
+
+token PRE {
+    :dba('prefix or meta-prefix')
+    [
+    | <prefix>
+        { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
+                                                    {*}         #= prefix
+    | <prefix_circumfix_meta_operator>
+        { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.Str }
+                                                    {*}         #= precircum
+    ]
+    # XXX assuming no precedence change
+    
+    <prefix_postfix_meta_operator>*                 {*}         #= prepost
+    <.ws>
+}
+
+token infixish ($in_meta = $*IN_META) {
+    :my $infix;
+    :my $IN_META is context<rw> = $in_meta;
+    <!stdstopper>
+    <!infixstopper>
+    :dba('infix or meta-infix')
+    [
+    | <colonpair> {
+            $<fake> = 1;
+            $<sym> = ':';
+            %<O><prec> = %item_assignment<prec>;  # actual test is non-inclusive!
+            %<O><assoc> = 'unary';
+            %<O><kind> = 'ADVERB';
+        }
+    | '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
+    | <infix_circumfix_meta_operator>
+        { $<O> = $<infix_circumfix_meta_operator><O>;
+          $<sym> = $<infix_circumfix_meta_operator><sym>; }
+    | <infix_prefix_meta_operator>
+        { $<O> = $<infix_prefix_meta_operator><O>;
+          $<sym> = $<infix_prefix_meta_operator><sym>; }
+    | <infix> <!before '='>
+           { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
+    | <infix> <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
+           { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
+    ]
+}
+
+# doing fancy as one rule simplifies LTM
+token dotty:sym<.*> ( --> Methodcall) {
+    ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
+    { $<sym> = $0.Str; }
+}
+
+token dotty:sym<.> ( --> Methodcall) {
+    <sym> <dottyop>
+}
+
+token privop ( --> Methodcall) {
+    '!' <methodop>
+}
+
+token dottyopish {
+    <noun=dottyop>
+}
+
+token dottyop {
+    :dba('dotty method or postfix')
+    [
+    | <methodop>
+    | <colonpair>
+    | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
+    ]
+}
+
+# Note, this rule mustn't do anything irreversible because it's used
+# as a lookahead by the quote interpolator.
+
+token POST {
+    <!stdstopper>
+
+    # last whitespace didn't end here
+    <!{ @*MEMOS[$¢.pos]<ws> }>
+
+    [ <.unsp> | '\\' ]?
+
+    [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
+
+    :dba('postfix')
+    [
+    | <dotty>  { $<O> = $<dotty><O>;  $<sym> = $<dotty><sym>;  $<~CAPS> = $<dotty><~CAPS>; }
+    | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; $<~CAPS> = $<privop><~CAPS>; }
+    | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; $<~CAPS> = $<postop><~CAPS>; }
+    ]
+    { $*SIGIL = '@'; }
+}
+
+method can_meta ($op, $meta) {
+    !$op<O><fiddly> || self.panic("Can't " ~ $meta ~ " a " ~ $op<O><dba> ~ " because it's too fiddly");
+    self;
+}
+
+regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
+    :my $IN_REDUCE is context<rw> = 1;
+    <?before '['\S+']'>
+    $<s> = (
+        '['
+        [
+        || <op=infixish(1)> <?before ']'>
+        || \\<op=infixish(1)> <?before ']'>
+        || <!>
+        ]
+    )
+    [ <?> || <.worry: "Malformed reduce"> <!> ] ']' ['«'|<?>]
+
+    <.can_meta($<s><op>, "reduce")>
+
+    [
+    || <!{ $<s><op><O><diffy> }>
+    || <?{ $<s><op><O><assoc> eq 'chain' }>
+    || <.panic("Can't reduce a " ~ $<s><op><O><dba> ~ " operator because it's diffy and not chaining")>
+    ]
+
+    { $<O> = $<s><op><O>; $<O><prec>:delete; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
+    { $<sym> = $<s>.Str; }
+
+    [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><noun> = 1 } ]? > || { $<O><noun> = 1 } ]
+}
+
+token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
+
+token postfix_prefix_meta_operator:sym< » >    {
+    [ <sym> | '>>' ]
+    # require >>.( on interpolated hypercall so infix:«$s»($a,$b) {...} dwims
+    [<!{ $*INTERPOLATION }> || <!before '('> ]
+}
+
+token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
+    <sym> <!before '!'> {} <infixish(1)>
+
+    [
+    || <?{ $<infixish>.Str eq '=' }>
+       { $¢ = ::Chaining.coerce($¢); }
+       
+    || <.can_meta($<infixish>, "negate")>    
+       <?{ $<infixish><O><iffy> }>
+       <?{ $<O> = $<infixish><O>; }>
+        
+    || <.panic("Can't negate a " ~ $<infixish><O><dba> ~ " operator because it's not iffy enough")>
+    ]
+}
+
+token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
+    <sym> {} <infixish(1)>
+    <.can_meta($<infixish>, "reverse")>
+    <?{ $<O> = $<infixish><O>; }>
+}
+
+#method lex1 (Str $s) {
+#    self.<O>{$s}++ and self.panic("Nested $s metaoperators not allowed");
+#    self;
+#}
+
+token infix_prefix_meta_operator:sym<X> ( --> List_infix) {
+    <sym> {}
+    [ <infixish(1)>
+        [X <.panic: "Old form of XopX found">]?
+        <.can_meta($<infixish>[0], "cross")>
+        <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
+    ]?
+}
+
+token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
+    [
+    | '«'
+    | '»'
+    ]
+    {} <infixish(1)> [ '«' | '»' ]
+    <.can_meta($<infixish>, "hyper")>
+    <?{ $<O> := $<infixish><O>; }>
+}
+
+token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
+    [
+    | '<<'
+    | '>>'
+    ]
+    {} <infixish(1)> [ '<<' | '>>' ]
+    <.can_meta($<infixish>, "hyper")>
+    <?{ $<O> := $<infixish><O>; }>
+}
+
+token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
+    '='
+    <.can_meta($op, "make assignment out of")>
+    [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of a " ~ $op<O><dba> ~ " operator because it's diffy")> ]
+    { $<O> = $op<O>; $<O><prec>:delete; $<O><fiddly> = 1; }
+}
+
+token postcircumfix:sym<( )> ( --> Methodcall)
+    { :dba('argument list') '(' ~ ')' <semiarglist> }
+
+token postcircumfix:sym<[ ]> ( --> Methodcall)
+    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } }
+
+token postcircumfix:sym<{ }> ( --> Methodcall)
+    { :dba('subscript') '{' ~ '}' <semilist> }
+
+token postcircumfix:sym«< >» ( --> Methodcall)
+    { '<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
+
+token postcircumfix:sym«<< >>» ( --> Methodcall)
+    { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
+
+token postcircumfix:sym<« »> ( --> Methodcall)
+    { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
+
+token postop {
+    | <postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
+    | <postcircumfix>   { $<O> := $<postcircumfix><O>; $<sym> := $<postcircumfix><sym>; }
+}
+
+token methodop {
+    [
+    | <longname>
+    | <?before '$' | '@' | '&' > <variable> { $*VAR = $<variable> }
+    | <?before <[ ' " ]> >
+        [ <!{$*INTERPOLATION}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
+        <quote>
+        { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
+    ] <.unsp>? 
+
+    :dba('method arguments')
+    [
+    | ':' <?before \s> <!{ $*INTERPOLATION }> <arglist>
+    | <?[\\(]> <args>
+    ]?
+}
+
+token semiarglist {
+    <arglist> ** ';'
+    <.ws>
+}
+
+token arglist {
+    :my $inv_ok = $*INVOCANT_OK;
+    :my StrPos $endargs is context<rw> = 0;
+    :my $GOAL is context = 'endargs';
+    :my $INTERPOLATION is context<rw> = 0;
+    <.ws>
+    :dba('argument list')
+    [
+    | <?stdstopper>
+    | <EXPR(item %list_infix)> {{
+            my $delims = $<EXPR><delims>;
+            for @$delims {
+                if ($_.<sym> // '') eq ':' {
+                    if $inv_ok {
+                        $*INVOCANT_IS = $<EXPR><list>[0];
+                    }
+                }
+            }
+        }}
+    ]
+}
+
+token circumfix:sym<{ }> ( --> Term) {
+    <?before '{' | <.lambda> >
+    <pblock>
+    {{
+        if $*BORG {
+            $*BORG.<block> = $<pblock>;
+        }
+    }}
+}
 
 ## methodcall
 
@@ -4571,7 +4617,9 @@ regex stdstopper {
     { @*MEMOS[$¢.pos]<endstmt> ||= 1; }
 }
 
-# A fairly complete operator precedence parser
+##############################
+# Operator Precedence Parser #
+##############################
 
 method EXPR ($preclvl) {
     temp $*CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
@@ -4848,9 +4896,9 @@ method EXPR ($preclvl) {
     self._MATCHIFYr($S, "EXPR", @termstack);
 }
 
-#################################################
-## Regex
-#################################################
+##########
+## Regex #
+##########
 
 grammar Regex is STD {
 
@@ -5203,6 +5251,10 @@ grammar Regex is STD {
 
 } # end grammar
 
+############
+# P5 Regex #
+############
+
 grammar P5Regex is STD {
 
     # begin tweaks (DO NOT ERASE)
@@ -5378,6 +5430,10 @@ grammar P5Regex is STD {
     token quantmod { [ '?' | '+' ]? }
 
 } # end grammar
+
+####################
+# Service Routines #
+####################
 
 # token panic (Str $s) { <commit> <fail($s)> }
 
