@@ -5,6 +5,7 @@ use DEBUG;
 # per parse
 my $ACTIONS is context;         # class or object which defines reduce actions
 my $SETTINGNAME is context;     # name of core setting
+my $TMP_PREFIX is context;      # where to put tmp files
 my $ORIG is context;            # the original program string
 my @ORIG is context;            # same thing as individual chars
 my @MEMOS is context;           # per-position info such as ws and line number
@@ -107,7 +108,6 @@ method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', 
     temp $*HIGHEXPECT = {};
     temp $*LAST_NIBBLE = { firstline => 0, lastline => 0 };
     temp $*LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
-    temp $*LINE = 1;
     temp $*GOAL = "(eof)";
     $*ORIG = $text ~ "\n;";           # original string
 
@@ -5115,6 +5115,7 @@ method add_my_name ($n, $d) {
         if $curstash.{$name}<stub> {
             $*DECLARING = $curstash.{$name} = $declaring;
         }
+        elsif $declaring === $curstash.{$name} {}  # already did this, probably enum
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
@@ -5190,6 +5191,7 @@ method add_our_name ($n) {
         if $curstash.{$name}<stub> {
             $*DECLARING = $curstash.{$name} = $declaring;
         }
+        elsif $declaring === $curstash.{$name} {} # already did it somehow
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
