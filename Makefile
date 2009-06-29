@@ -1,6 +1,6 @@
 .PHONY: check try cat clean distclean purge test
 
-FIXINS=Cursor.pmc LazyMap.pm DEBUG.pm DEBUG.pmc Test.pm CORE.setting NULL.pad std mangle.pl CORE.pad
+FIXINS=Cursor.pmc RE.pm LazyMap.pm DEBUG.pm DEBUG.pmc Test.pm CORE.setting NULL.pad std mangle.pl CORE.pad
 
 all: $(FIXINS) check lex/STD/termish
 
