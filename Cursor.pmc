@@ -1079,6 +1079,9 @@ sub do_imports { my $self = shift;
         system "$std $lib/$module.pm" and die "Can't compile $lib/$module.pm";
         $topstab = LoadFile("$module.pm.syml");
     }
+    else {
+        $self->worry("Can't locate module $module");
+    }
     $pkg = $topstab->{stash}{$module}{stash} if $topstab;;
     if ($args) {
         $self->add_my_name($module);
