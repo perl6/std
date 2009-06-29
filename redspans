@@ -10,8 +10,6 @@ use feature 'say';
 #let us play nice with others
 use POSIX qw(nice); nice 19;
 
-$::ACTIONS = 'Actions';
-
 my @loc;
 
 sub MAIN {
@@ -21,7 +19,7 @@ sub MAIN {
     my $txt = Encode::decode('utf8', `cat $file`);
     $loc[length($txt) - 1] = [];
 
-    STD->parsefile($file);
+    STD->parsefile($file, actions => 'Actions');
 
     my ($last_tree,$buffer) = ("","");
     for my $i (0 .. @loc-1) {
