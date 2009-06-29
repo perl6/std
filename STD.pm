@@ -2,44 +2,49 @@ grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 use DEBUG;
 
-# braided languages
-my %LANG is context;
-my $PKGDECL is context = "";
-my $PKGNAME is context = "";
-my @PKGS is context<rw> = ();
-my $GOAL is context = "(eof)";
-my $ACTIONS is context<rw>;
-my $IN_DECL is context<rw>;
-my $DECLARING is context<rw>;
-my $IN_REDUCE is context<rw> = 0;
-my $INTERPOLATION is context<rw> = '';
-my $IN_META is context<rw> = 0;
-my $QUASI_QUASH is context<rw>;
-my $SCOPE is context = "";
-my $SIGIL is context<rw>;
-my %MYSTERY is context<rw>;
-my $ORIG is context;
-my @MEMOS is context;
-my $VOID is context<rw>;
-my $INVOCANT_OK is context<rw>;
-my $INVOCANT_IS is context<rw>;
-my $CURPAD is context<rw>;
-my $REALLYADD is context<rw> = 0;
-my $BORG is context;
-my $MULTINESS is context = '';
+# per parse
+my $ACTIONS is context;         # class or object which defines reduce actions
+my $SETTINGNAME is context;     # name of core setting
+my $ORIG is context;            # the original program string
+my @ORIG is context;            # same thing as individual chars
+my @MEMOS is context;           # per-position info such as ws and line number
+my $HIGHWATER is context;      # where we were last looking for things
+my $HIGHMESS is context;       # current parse failure message
+my $HIGHEXPECT is context;     # things we were looking for at the bleeding edge
 
-my $CORE is context;
-my $SETTING is context;
-my $CORESETTING is context = "CORE";
-my $GLOBAL is context;
-my $PROCESS is context;
-my $CURPKG is context;
-my $UNIT is context;
+# symbol table management
+my $CORE is context;            # the CORE object
+my $SETTING is context;         # the SETTING object
+my $GLOBAL is context;          # the GLOBAL object
+my $PROCESS is context;         # the PROCESS object
+my $UNIT is context;            # the UNIT object
+my $CURPAD is context<rw>;      # current lexical stash
+my $CURPKG is context;          # current package stash
+my $PKGNAME is context = "";    # full package name of package assoc with current lexical scope
+my @PKGS is context<rw> = ();   # stack of outer lexical packages
 
-# random rule for debugging, please ignore
-token foo {
-   <?before [<ident>|<number>]> [<ident>|<number>]
-}
+my %MYSTERY is context<rw>;     # names we assume may be post-declared functions
+
+# tree attributes, marked as propagating up (u) down (d) or up-and-down (u/d)
+my %LANG is context;            # (d) braided languages: MAIN, Q, Regex, etc
+
+my $IN_DECL is context<rw>;     # (d) a declarator is looking for a name to declare
+my $SCOPE is context = "";      # (d) which scope declarator we're under
+my $MULTINESS is context;       # (d) which multi declarator we're under
+my $PKGDECL is context;         # (d) current package declarator
+my $DECLARING is context<rw>;   # (u/d) new object associated with declaration
+
+my $GOAL is context = "(eof)";  # (d) which special terminator we're most wanting
+my $IN_REDUCE is context<rw>;   # (d) attempting to parse an [op] construct
+my $IN_META is context<rw>;     # (d) parsing a metaoperator like [..]
+my $QUASI_QUASH is context<rw>; # (d) don't complain about undefined quasi-variables
+my $LEFTSIGIL is context<rw>;   # (u) sigil of LHS for item vs list assignment
+my $QSIGIL is context<rw>;      # (d) sigil of current interpolation
+
+my $INVOCANT_OK is context<rw>; # (d) parsing a list that allows an invocant
+my $INVOCANT_IS is context<rw>; # (u) invocant of args match
+
+my $BORG is context;            # (u/d) who to blame if we're missing a block
 
 =begin comment overview
 
@@ -87,6 +92,30 @@ method TOP ($STOP = undef) {
     else {
         self.comp_unit;
     }
+}
+
+method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', :$actions = '') {
+    temp $*TMP_PREFIX = $tmp_prefix;
+    temp $*SETTINGNAME = $setting;
+    temp $*ACTIONS = $actions;
+    temp $*DEBUG = $DEBUG;
+    temp @*MEMOS;
+
+    # various bits of info useful for error messages
+    temp $*HIGHWATER = 0;
+    temp $*HIGHMESS = '';
+    temp $*HIGHEXPECT = {};
+    temp $*LAST_NIBBLE = { firstline => 0, lastline => 0 };
+    temp $*LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
+    temp $*LINE = 1;
+    temp $*GOAL = "(eof)";
+    $*ORIG = $text ~ "\n;";           # original string
+
+    my $result = self.new($text)."$rule"();
+
+    # XXX here attach stuff that will enable :cont
+
+    $result;
 }
 
 ##############
@@ -488,18 +517,15 @@ rule comp_unit {
     :my @PKGS is context<rw> = ();
     :my $IN_DECL is context<rw>;
     :my $DECLARING is context<rw>;
-    :my $INTERPOLATION is context<rw> = '';
+    :my $QSIGIL is context<rw> = '';
     :my $IN_META is context<rw> = 0;
     :my $QUASI_QUASH is context<rw>;
     :my $SCOPE is context = "";
-    :my $SIGIL is context<rw>;
+    :my $LEFTSIGIL is context<rw>;
     :my %MYSTERY is context<rw> = ();
-    :my @MEMOS is context;
-    :my $VOID is context<rw>;
     :my $INVOCANT_OK is context<rw>;
     :my $INVOCANT_IS is context<rw>;
     :my $CURPAD is context<rw>;
-    :my $REALLYADD is context<rw> = 0;
     :my $MULTINESS is context = '';
 
     :my $CURPKG is context;
@@ -512,8 +538,8 @@ rule comp_unit {
         %*LANG<Trans>   = ::STD::Trans ;
         %*LANG<P5Regex> = ::STD::P5Regex ;
 
-        @COMPILING::WORRIES = ();
-        self.load_setting($*CORESETTING);
+        @*WORRIES = ();
+        self.load_setting($*SETTINGNAME);
         self.newpad;
         $*UNIT = $*CURPAD;
         self.finishpad(1);
@@ -523,8 +549,8 @@ rule comp_unit {
 #    { $<CORE> = $*CORE; }
     # "CHECK" time...
     {{
-        if @COMPILING::WORRIES {
-            warn "Potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES) ~ "\n";
+        if @*WORRIES {
+            warn "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
         }
         my $m = $¢.explain_mystery();
         warn $m if $m;
@@ -725,7 +751,7 @@ token label {
 
 token statement {
     :my $endargs is context = -1;
-    :my $INTERPOLATION is context<rw> = 0;
+    :my $QSIGIL is context<rw> = 0;
     <!before <[\)\]\}]> >
 
     # this could either be a statement that follows a declaration
@@ -1335,13 +1361,13 @@ token termish {
     # also queue up any postfixes
     :dba('postfix')
     [
-    || <?{ $*INTERPOLATION }>
+    || <?{ $*QSIGIL }>
         [
-        || <?{ $*INTERPOLATION eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
-        ||                                 <POST>+! <?after <[ \] } > ) ]> > 
+        || <?{ $*QSIGIL eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
+        ||                          <POST>+! <?after <[ \] } > ) ]> > 
         || { $VAR = 0; }
         ]
-    || <!{ $*INTERPOLATION }>
+    || <!{ $*QSIGIL }>
         <POST>*
     ]
     {
@@ -1668,7 +1694,7 @@ token special_variable:sym<$'> { #'
 }
 
 token special_variable:sym<$"> {
-    <sym> <!{ $*INTERPOLATION }>
+    <sym> <!{ $*QSIGIL }>
     :: <?before \s | ',' | '=' | <terminator> >
     <.obs('$" variable', '.join() method')>
 }
@@ -1714,7 +1740,7 @@ token variable {
     :my $name;
     <?before <sigil> {
         $sigil = $<sigil>.Str;
-        $*SIGIL ||= $sigil;
+        $*LEFTSIGIL ||= $sigil;
     }> {}
     [
     || <sigil> <twigil>? <?before '::' [ '{' | '<' | '(' ]> <longname> # XXX
@@ -1733,7 +1759,7 @@ token variable {
         | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
         | <sigil> <?{ $*IN_DECL }> {*}                              #= anondecl
         | <?> {{
-            if $*INTERPOLATION {
+            if $*QSIGIL {
                 return ();
             }
             else {
@@ -1791,7 +1817,7 @@ token name {
 }
 
 token morename {
-    :my $INTERPOLATION is context<rw> = 0;
+    :my $QSIGIL is context<rw> = '';
     '::'
     [
         <?before '(' | <alpha> >
@@ -2097,8 +2123,8 @@ token nibbler {
         $<escape> :delete;
         $<starter> :delete;
         $<stopper> :delete;
-        $COMPILING::LAST_NIBBLE = $¢;
-        $COMPILING::LAST_NIBBLE_MULTILINE = $¢ if $multiline;
+        $*LAST_NIBBLE = $¢;
+        $*LAST_NIBBLE_MULTILINE = $¢ if $multiline;
     }}
 }
 
@@ -2729,7 +2755,7 @@ grammar Q is STD {
 
     role s1 {
         token escape:sym<$> {
-            :my $INTERPOLATION is context = '$';
+            :my $QSIGIL is context = '$';
             <?before '$'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> ] || <.panic: "Non-variable \$ must be backslashed">
         }
@@ -2741,7 +2767,7 @@ grammar Q is STD {
 
     role a1 {
         token escape:sym<@> {
-            :my $INTERPOLATION is context<rw> = '@';
+            :my $QSIGIL is context<rw> = '@';
             <?before '@'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ] # trap ABORTBRANCH from variable's ::
         }
@@ -2753,7 +2779,7 @@ grammar Q is STD {
 
     role h1 {
         token escape:sym<%> {
-            :my $INTERPOLATION is context<rw> = '%';
+            :my $QSIGIL is context<rw> = '%';
             <?before '%'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
         }
@@ -2765,7 +2791,7 @@ grammar Q is STD {
 
     role f1 {
         token escape:sym<&> {
-            :my $INTERPOLATION is context<rw> = '&';
+            :my $QSIGIL is context<rw> = '&';
             <?before '&'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
         }
@@ -2939,7 +2965,7 @@ token signature {
     <.ws>
     { $*IN_DECL = 0; }
     [ '-->' <.ws> <typename> ]?
-    {{ $*SIGIL = '@'; $*CURPAD.{'$?GOTSIG'} ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')'; }}
+    {{ $*LEFTSIGIL = '@'; $*CURPAD.{'$?GOTSIG'} ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')'; }}
 }
 
 token type_declarator:subset {
@@ -3016,18 +3042,16 @@ token param_var {
             $vname ~= $twigil;
             my $n = try { $<name>[0].Str } // '';
             $vname ~= $n;
-            if $*REALLYADD {
-                given $twigil {
-                    when '' {
-                        self.add_my_variable($vname) if $n ne '';
-                    }
-                    when '.' {
-                    }
-                    when '!' {
-                    }
-                    default {
-                        self.worry("Illegal to use $twigil twigil in signature");
-                    }
+            given $twigil {
+                when '' {
+                    self.add_my_variable($vname) if $n ne '';
+                }
+                when '.' {
+                }
+                when '!' {
+                }
+                default {
+                    self.worry("Illegal to use $twigil twigil in signature");
                 }
             }
         }}
@@ -3038,9 +3062,7 @@ token parameter {
     :my $kind;
     :my $quant = '';
     :my $q;
-    :my $REALLYADD is context<rw> = 0;
 
-    {{ $*REALLYADD = 1 }}
 
     [
     | <type_constraint>+
@@ -3233,7 +3255,7 @@ token infix:lambda ( --> Term) {
 }
 
 token circumfix:sigil ( --> Term)
-    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*SIGIL ||= $<sigil>.Str } }
+    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } }
 
 token circumfix:sym<( )> ( --> Term)
     { :dba('parenthesized expression') '(' ~ ')' <semilist> }
@@ -3335,7 +3357,7 @@ token POST {
     | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; $<~CAPS> = $<privop><~CAPS>; }
     | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; $<~CAPS> = $<postop><~CAPS>; }
     ]
-    { $*SIGIL = '@'; }
+    { $*LEFTSIGIL = '@'; }
 }
 
 method can_meta ($op, $meta) {
@@ -3375,7 +3397,7 @@ token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
 token postfix_prefix_meta_operator:sym< » >    {
     [ <sym> | '>>' ]
     # require >>.( on interpolated hypercall so infix:«$s»($a,$b) {...} dwims
-    [<!{ $*INTERPOLATION }> || <!before '('> ]
+    [<!{ $*QSIGIL }> || <!before '('> ]
 }
 
 token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
@@ -3468,14 +3490,14 @@ token methodop {
     | <longname>
     | <?before '$' | '@' | '&' > <variable> { $*VAR = $<variable> }
     | <?before <[ ' " ]> >
-        [ <!{$*INTERPOLATION}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
+        [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
         <quote>
         { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
     ] <.unsp>? 
 
     :dba('method arguments')
     [
-    | ':' <?before \s> <!{ $*INTERPOLATION }> <arglist>
+    | ':' <?before \s> <!{ $*QSIGIL }> <arglist>
     | <?[\\(]> <args>
     ]?
 }
@@ -3489,7 +3511,7 @@ token arglist {
     :my $inv_ok = $*INVOCANT_OK;
     :my StrPos $endargs is context<rw> = 0;
     :my $GOAL is context = 'endargs';
-    :my $INTERPOLATION is context<rw> = 0;
+    :my $QSIGIL is context<rw> = '';
     <.ws>
     :dba('argument list')
     [
@@ -3855,7 +3877,7 @@ token infix:sym<^fff^> ( --> Conditional)
 token infix:sym<=> ()
 {
     <sym>
-    { $¢ = $*SIGIL eq '$' 
+    { $¢ = $*LEFTSIGIL eq '$' 
         ?? ::Item_assignment.coerce($¢)
         !! ::List_assignment.coerce($¢);
     }
@@ -4109,7 +4131,7 @@ method EXPR ($preclvl) {
         return self._AUTOLEXpeek('EXPR');
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
-    my $SIGIL is context<rw> = '';
+    my $LEFTSIGIL is context<rw> = '';
     my @termstack;
     my @opstack;
     my $termish = 'termish';
@@ -4254,7 +4276,7 @@ method EXPR ($preclvl) {
         self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
-        $*SIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';
+        $*LEFTSIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';
         my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
@@ -4921,8 +4943,8 @@ method newpad {
     my $outer = $*CURPAD<$?STAB> // 0;
     my $line = self.lineof(self.pos);
     my $my = {
-        file => $COMPILING::FILE, line => $line,
-        longname => $COMPILING::FILE<name> ~ ':' ~ $line,
+        file => $*FILE, line => $line,
+        longname => $*FILE<name> ~ ':' ~ $line,
         stash => ($*CURPAD = { }),
     };
     $*CURPAD<OUTER> = $outer if $outer;
@@ -4932,12 +4954,12 @@ method newpad {
 
 method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
     my $line = self.lineof(self.pos);
-    $*CURPAD<$_> //= { name => '$_', file => $COMPILING::FILE, line => $line };
-    $*CURPAD<$/> //= { name => '$/', file => $COMPILING::FILE, line => $line };
-    $*CURPAD<$!> //= { name => '$!', file => $COMPILING::FILE, line => $line };
+    $*CURPAD<$_> //= { name => '$_', file => $*FILE, line => $line };
+    $*CURPAD<$/> //= { name => '$/', file => $*FILE, line => $line };
+    $*CURPAD<$!> //= { name => '$!', file => $*FILE, line => $line };
     if not $siggy {
-        $*CURPAD<@_> = { name => '@_', file => $COMPILING::FILE, line => $line };
-        $*CURPAD<%_> = { name => '%_', file => $COMPILING::FILE, line => $line };
+        $*CURPAD<@_> = { name => '@_', file => $*FILE, line => $line };
+        $*CURPAD<%_> = { name => '%_', file => $*FILE, line => $line };
         $*CURPAD<$?GOTSIG> = '';
     }
     self;
@@ -5084,7 +5106,7 @@ method add_my_name ($n, $d) {
     # so reuse $*DECLARING pointer if it's there.
     my $declaring = $d // {
         name => $name,
-        file => $COMPILING::FILE, line => self.line,
+        file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
     };
     if $curstash.{$name}:exists {
@@ -5103,7 +5125,7 @@ method add_my_name ($n, $d) {
             my $oline = $old.<line> // '???';
             my $loc = '';
             if $ofile {
-                if $ofile !=== $COMPILING::FILE {
+                if $ofile !=== $*FILE {
                     my $oname = $ofile<name>;
                     $loc = " (from $oname line $oline)";
                 }
@@ -5160,7 +5182,7 @@ method add_our_name ($n) {
 
     my $declaring = $*DECLARING // {
         name => $name,
-        file => $COMPILING::FILE, line => self.line,
+        file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
     };
     if $curstash.{$name}:exists {
@@ -5178,7 +5200,7 @@ method add_our_name ($n) {
             my $oline = $old.<line> // '???';
             my $loc = '';
             if $ofile {
-                if $ofile !=== $COMPILING::FILE {
+                if $ofile !=== $*FILE {
                     my $oname = $ofile<name>;
                     $loc = " (from $oname line $oline)";
                 }
@@ -5200,7 +5222,7 @@ method add_our_name ($n) {
     else {
         $*DECLARING = $curstash.{$name} = $declaring;
         if $name ~~ /^\w/ {
-            $curstash.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
+            $curstash.{"&$name"} //= { name => "&$name", file => $*FILE, line => self.line };
             $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
         }
     }
@@ -5237,7 +5259,7 @@ method load_setting ($setting) {
         $*SETTING<stash><OUTER>:delete;
     }
     $*GLOBAL = $*CORE<stash><GLOBAL> //= {
-        file => $COMPILING::FILE, line => 1,
+        file => $*FILE, line => 1,
         longname => 'GLOBAL',
         stash => {},
     };
@@ -5246,7 +5268,7 @@ method load_setting ($setting) {
     $*CURPKG<$?STAB> = $*GLOBAL;
 
     $*PROCESS = $*CORE<stash><PROCESS> //= {
-        file => $COMPILING::FILE, line => 1,
+        file => $*FILE, line => 1,
         longname => 'PROCESS',
         stash => {},
     };
@@ -5394,7 +5416,7 @@ method lookup_compiler_var($name) {
     }
 
     given $name {
-        when '$?FILE'     { return $COMPILING::FILE<name>; }
+        when '$?FILE'     { return $*FILE<name>; }
         when '$?LINE'     { return self.lineof(self.pos); }
         when '$?POSITION' { return self.pos; }
 
@@ -5444,15 +5466,15 @@ method panic (Str $s) {
 
     $here = self.cursor($*HIGHWATER) if $highvalid;
 
-    my $first = $here.lineof($COMPILING::LAST_NIBBLE.<_from>);
-    my $last = $here.lineof($COMPILING::LAST_NIBBLE.<_pos>);
+    my $first = $here.lineof($*LAST_NIBBLE.<_from>);
+    my $last = $here.lineof($*LAST_NIBBLE.<_pos>);
     if $first != $last {
         if $here.lineof($here.pos) == $last {
             $m ~= "\n(Possible runaway string from line $first)";
         }
         else {
-            $first = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<_from>);
-            $last = $here.lineof($COMPILING::LAST_NIBBLE_MULTILINE.<_pos>);
+            $first = $here.lineof($*LAST_NIBBLE_MULTILINE.<_from>);
+            $last = $here.lineof($*LAST_NIBBLE_MULTILINE.<_pos>);
             # the bigger the string (in lines), the further back we suspect it
             if $here.lineof($here.pos) - $last < $last - $first  {
                 $m ~= "\n(Possible runaway string from line $first to line $last)";
@@ -5485,8 +5507,8 @@ method panic (Str $s) {
     }
     $m ~~ s|Syntax error|Syntax error (two terms in a row?)| if $m ~~ /infix|nofun/;
 
-    if @COMPILING::WORRIES {
-        $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @COMPILING::WORRIES);
+    if @*WORRIES {
+        $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @*WORRIES);
     }
     $m ~= "\n";
     $m ~= self.explain_mystery();
@@ -5495,7 +5517,7 @@ method panic (Str $s) {
 }
 
 method worry (Str $s) {
-    push @COMPILING::WORRIES, $s ~ self.locmess;
+    push @*WORRIES, $s ~ self.locmess;
     self;
 }
 
@@ -5506,7 +5528,7 @@ method locmess () {
     1 while $pre ~~ s!.*\n!!;
     my $post = substr($*ORIG, self.pos, 40);
     1 while $post ~~ s!(\n.*)!!;
-    " at " ~ $COMPILING::FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
+    " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR";
 }
 
