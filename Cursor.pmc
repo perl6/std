@@ -122,7 +122,7 @@ sub parse {
     my $class = shift;
     my $text = shift;
     my %opts = @_;
-    my $rule = $opts{rule} // 'comp_unit';
+    my $rule = $opts{rule} // 'TOP';
     my $actions = $opts{actions} // '';
     my $setting = $opts{setting} // 'CORE';
     local $::CORESETTING = $setting;
@@ -138,7 +138,7 @@ sub parsefile {
     my $class = shift;
     my $file = shift;
     my %opts = @_;
-    my $rule = $opts{rule} // 'comp_unit';
+    my $rule = $opts{rule} // 'TOP';
     my $actions = $opts{actions} // '';
     my $setting = $opts{setting} // 'CORE';
     local $::CORESETTING = $setting;

@@ -89,524 +89,6 @@ method TOP ($STOP = undef) {
     }
 }
 
-#################
-# Symbol tables #
-#################
-
-# XXX probably needs to be refactored out to a separate role or class
-
-method newpad {
-    my $outer = $*CURPAD<$?STAB> // 0;
-    my $line = self.lineof(self.pos);
-    my $my = {
-        file => $COMPILING::FILE, line => $line,
-        longname => $COMPILING::FILE<name> ~ ':' ~ $line,
-        stash => ($*CURPAD = { }),
-    };
-    $*CURPAD<OUTER> = $outer if $outer;
-    $*CURPAD<$?STAB> = $my;
-    self;
-}
-
-method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
-    my $line = self.lineof(self.pos);
-    $*CURPAD<$_> //= { name => '$_', file => $COMPILING::FILE, line => $line };
-    $*CURPAD<$/> //= { name => '$/', file => $COMPILING::FILE, line => $line };
-    $*CURPAD<$!> //= { name => '$!', file => $COMPILING::FILE, line => $line };
-    if not $siggy {
-        $*CURPAD<@_> = { name => '@_', file => $COMPILING::FILE, line => $line };
-        $*CURPAD<%_> = { name => '%_', file => $COMPILING::FILE, line => $line };
-        $*CURPAD<$?GOTSIG> = '';
-    }
-    self;
-}
-
-method is_name ($n, $curpad = $*CURPAD) {
-    my $name = $n;
-    # say "is_name $name";
-
-    my $curpkg = $*CURPKG;
-    return True if $name ~~ /\:\:\(/;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        return True if @components[0] eq 'COMPILING';
-        return True if @components[0] eq 'CALLER';
-        return True if @components[0] eq 'CONTEXT';
-        if $curpkg = self.find_top_pkg(@components[0]) {
-            # say "Found lexical package " ~ @components[0];
-            shift @components;
-        }
-        else {
-            # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL<stash>;
-        }
-        while @components > 1 {
-            my $pkg = shift @components;
-            $curpkg = $curpkg.{$pkg}<stash>;
-            return False unless $curpkg;
-            # say "Found $pkg okay, now in ";
-        }
-    }
-    $name = shift(@components)//'';
-    return True if $name eq '';
-    my $pad = $curpad;
-    while $pad {
-        return True if $pad.{$name};
-        $pad = $pad.<OUTER><stash>;
-    }
-    return True if $curpkg.{$name};
-    return True if $*GLOBAL<stash>{$name};
-    return False;
-}
-
-method find_stab ($n, $curpad = $*CURPAD) {
-    my $name = $n;
-    # say "find_stab $name";
-
-    my $curpkg = $*CURPKG;
-    return () if $name ~~ /\:\:\(/;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        return () if @components[0] eq 'CALLER';
-        return () if @components[0] eq 'CONTEXT';
-        if $curpkg = self.find_top_pkg(@components[0]) {
-            # say "Found lexical package " ~ @components[0];
-            shift @components;
-        }
-        else {
-            # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL<stash>;
-        }
-        while @components > 1 {
-            my $pkg = shift @components;
-            $curpkg = $curpkg.{$pkg}<stash>;
-            return () unless $curpkg;
-            # say "Found $pkg okay, now in ";
-        }
-    }
-    $name = shift(@components)//'';
-    return () if $name eq '';
-
-    my $pad = $curpad;
-    while $pad {
-        return $_ if $_ = $pad.{$name}<stash>;
-        $pad = $pad.<OUTER><stash>;
-    }
-    return $_ if $_ = $curpkg.{$name}<stash>;
-    return $_ if $_ = $*GLOBAL<stash>{$name}<stash>;
-    return ();
-}
-
-method find_top_pkg ($name) {
-    # say "find_top_pkg $name";
-    if $name eq 'OUR' {
-        return $*CURPKG;
-    }
-    elsif $name eq 'MY' {
-        return $*CURPAD;
-    }
-    elsif $name eq 'CORE' {
-        return $*CORE<stash>;
-    }
-    elsif $name eq 'SETTING' {
-        return $*SETTING<stash>;
-    }
-    elsif $name eq 'UNIT' {
-        return $*UNIT<stash>;
-    }
-    # everything is somewhere in lexical scope (we hope)
-    my $pad = $*CURPAD;
-    while $pad {
-        return $pad.{$name}<stash> if $pad.{$name};
-        $pad = $pad.<OUTER><stash> // 0;
-    }
-    return 0;
-}
-
-method add_name ($name) {
-    my $scope = $*SCOPE // 'our';
-    # say "Adding $*SCOPE $name in $*PKGNAME";
-    if $scope eq 'augment' or $scope eq 'supersede' {
-        self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
-    }
-    else {
-        if $scope eq 'our' or $scope eq 'constant' {
-            self.add_our_name($name);
-        }
-        else {
-            self.add_my_name($name);
-        }
-    }
-    self;
-}
-
-method add_my_name ($n, $d) {
-    my $name = $n;
-    # say "add_my_name $name";
-    return self if $name ~~ /\:\:\(/;
-    my $curstash = $*CURPAD;
-    my @components = self.canonicalize_name($name);
-    while @components > 1 {
-        my $pkg = shift @components;
-        my $newstab = $curstash.{$pkg} //= { stub => 1 };
-        # say "Adding new package $pkg in ", $curstash<$?STAB><longname>;
-        $curstash.{$pkg} //= { stub => 1 };
-        $curstash.{"&$pkg"} //= $newstab;
-        $curstash = $newstab<stash> //= { 'PARENT' => $curstash, '$?STAB' => $newstab };
-    }
-    $name = shift @components;
-    return self unless defined $name and $name ne '';
-    return self if $name eq '$' or $name eq '@' or $name eq '%';
-
-    # This may just be a lexical alias to "our" and such,
-    # so reuse $*DECLARING pointer if it's there.
-    my $declaring = $d // {
-        name => $name,
-        file => $COMPILING::FILE, line => self.line,
-        mult => ($*MULTINESS||'only'),
-    };
-    if $curstash.{$name}:exists {
-        # say "$name exists, curstash = ", $curstash<$?STAB><longname>;
-        my $omult = $curstash.{$name}<mult> // '';
-        if $curstash.{$name}<stub> {
-            $*DECLARING = $curstash.{$name} = $declaring;
-        }
-        elsif $*SCOPE eq 'use' {}
-        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
-        elsif $omult eq 'proto' {}
-        elsif $*PKGDECL eq 'role' {}
-        else {
-            my $old = $curstash.{$name};
-            my $ofile = $old.<file> // 0;
-            my $oline = $old.<line> // '???';
-            my $loc = '';
-            if $ofile {
-                if $ofile !=== $COMPILING::FILE {
-                    my $oname = $ofile<name>;
-                    $loc = " (from $oname line $oline)";
-                }
-                else {
-                    $loc = " (from line $oline)";
-                }
-            }
-            if $name ~~ /^\w/ {
-                self.panic("Illegal redeclaration of lexical symbol $name$loc");
-            }
-            elsif $name ~~ s/^\&// {
-                self.panic("Illegal redeclaration of lexical routine $name$loc");
-            }
-            else {  # XXX eventually check for conformant arrays here
-                self.worry("Useless redeclaration of lexical variable $name$loc");
-            }
-        }
-    }
-    else {
-        $*DECLARING = $curstash.{$name} = $declaring;
-        if $name ~~ /^\w/ and $*SCOPE ne 'constant' {
-            $curstash.{"&$name"} //= $curstash.{$name};
-            $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
-        }
-    }
-    self;
-}
-
-method add_our_name ($n) {
-    my $name = $n;
-    # say "add_our_name $name " ~ $*PKGNAME;
-    return self if $name ~~ /\:\:\(/;
-    my $curstash = $*CURPKG;
-    # say "curstash $curstash global $GLOBAL ", join ' ', %$*GLOBAL;
-    $name ~~ s/\:ver\<.*?\>//;
-    $name ~~ s/\:auth\<.*?\>//;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        my $c = self.find_top_pkg(@components[0]);
-        if $c {
-            shift @components;
-            $curstash = $c;
-        }
-    }
-    while @components > 1 {
-        my $pkg = shift @components;
-        my $newstab = $curstash.{$pkg} //= { stub => 1 };
-        $curstash.{"&$pkg"} //= $newstab;
-        $curstash = $newstab<stash> //= { 'PARENT' => $curstash, '$?STAB' => $newstab };
-        # say "Adding new package $pkg in $curstash ";
-    }
-    $name = shift @components;
-    return self unless defined $name and $name ne '';
-
-    my $declaring = $*DECLARING // {
-        name => $name,
-        file => $COMPILING::FILE, line => self.line,
-        mult => ($*MULTINESS||'only'),
-    };
-    if $curstash.{$name}:exists {
-        my $omult = $curstash.{$name}<mult> // '';
-        if $curstash.{$name}<stub> {
-            $*DECLARING = $curstash.{$name} = $declaring;
-        }
-        elsif $*SCOPE eq 'use' {}
-        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
-        elsif $omult eq 'proto' {}
-        elsif $*PKGDECL eq 'role' {}
-        else {
-            my $old = $curstash.{$name};
-            my $ofile = $old.<file> // 0;
-            my $oline = $old.<line> // '???';
-            my $loc = '';
-            if $ofile {
-                if $ofile !=== $COMPILING::FILE {
-                    my $oname = $ofile<name>;
-                    $loc = " (from $oname line $oline)";
-                }
-                else {
-                    $loc = " (from line $oline)";
-                }
-            }
-            if $name ~~ /^\w/ {
-                self.panic("Illegal redeclaration of package symbol $name$loc");
-            }
-            elsif $name ~~ s/^\&// {
-                self.panic("Illegal redeclaration of package routine $name$loc");
-            }
-            else {  # XXX eventually check for conformant arrays here
-                # (redeclaration of identical package vars is not useless)
-            }
-        }
-    }
-    else {
-        $*DECLARING = $curstash.{$name} = $declaring;
-        if $name ~~ /^\w/ {
-            $curstash.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
-            $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
-        }
-    }
-    self.add_my_name($n) if $curstash === $*CURPKG;   # the lexical alias
-    self;
-}
-
-method add_mystery ($name,$pos) {
-    if not self.is_known($name) {
-        # say "add_mystery $name";
-        # say "Mystery $name $*CURPAD";
-        %*MYSTERY{$name}.<pad> = $*CURPAD;
-        %*MYSTERY{$name}.<line> ~= self.lineof($pos) ~ ' ';
-    }
-    else {
-        # say "$name is known";
-    }
-    self;
-}
-
-method load_setting ($setting) {
-    @PKGS = ();
-
-    $*SETTING = self.load_pad($setting);
-    $*CURPAD = $*SETTING<stash>;
-    $*CORE = $*SETTING;
-    for 1..100 {
-        my $outerer = $*SETTING<stash><OUTER>;
-        last unless $outerer;
-        $*CORE = $outerer;
-    }
-    if $*SETTING<stash><OUTER> {
-        warn "Internal error: infinite setting loop";
-        $*SETTING<stash><OUTER>:delete;
-    }
-    $*GLOBAL = $*CORE<stash><GLOBAL> //= {
-        file => $COMPILING::FILE, line => 1,
-        longname => 'GLOBAL',
-        stash => {},
-    };
-    $*GLOBAL<stash><$?STAB> = $*GLOBAL;
-    $*CURPKG = $*GLOBAL<stash>;
-    $*CURPKG<$?STAB> = $*GLOBAL;
-
-    $*PROCESS = $*CORE<stash><PROCESS> //= {
-        file => $COMPILING::FILE, line => 1,
-        longname => 'PROCESS',
-        stash => {},
-    };
-    $*PROCESS<stash><$?STAB> = $*PROCESS;
-}
-
-method is_known ($n, $curpad = $*CURPAD) {
-    my $name = $n;
-    # say "is_known $name";
-    return True if $*QUASI_QUASH;
-    return True if $*CURPKG.{$name};
-    my $curpkg = $*CURPKG;
-    my @components = self.canonicalize_name($name);
-    if @components > 1 {
-        return True if @components[0] eq 'COMPILING';
-        return True if @components[0] eq 'CALLER';
-        return True if @components[0] eq 'CONTEXT';
-        if $curpkg = self.find_top_pkg(@components[0]) {
-            # say "Found lexical package " ~ @components[0];
-            shift @components;
-        }
-        else {
-            # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL<stash>;
-        }
-        while @components > 1 {
-            my $pkg = shift @components;
-            # say "Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg);
-            $curpkg = $curpkg.{$pkg}<stash>;
-            return False unless $curpkg;
-            # say "Found $pkg okay, now in $curpkg ";
-        }
-    }
-
-    $name = shift(@components)//'';
-    # say "Final component is $name";
-    return True if $name eq '';
-    # say "Found" if $curpkg.{$name};
-    return True if $curpkg.{$name};
-
-    my $pad = $curpad;
-    while $pad {
-        # say "Looking in ", $pad<$?STAB><longname>;
-        # say "Found" if $pad.{$name};
-        return True if $pad.{$name};
-        # say $pad.<OUTER><stash> // "No OUTER";
-        $pad = $pad.<OUTER><stash>;
-    }
-    # say "Not Found";
-
-    return False;
-}
-
-
-method add_routine ($name) {
-    my $vname = '&' ~ $name;
-    self.add_name($vname);
-    self;
-}
-
-method add_variable ($name) {
-    if ($*SCOPE//'') eq 'our' {
-        self.add_our_variable($name);
-    }
-    else {
-        self.add_my_variable($name);
-    }
-    self;
-}
-
-method add_my_variable ($n) {
-    my $name = $n;
-    # say "add_my_variable $name";
-    if substr($name, 0, 1) eq '&' {
-        self.add_my_name($name);
-        if $name ~~ s/\:\(.*// {
-            self.add_my_name($name);
-        }
-        return self;
-    }
-    self.add_my_name($name);
-    self;
-}
-
-method add_our_variable ($name) {
-    self.add_our_name($name);
-    self;
-}
-
-method check_variable ($variable) {
-    my $name = $variable.Str;
-    # say "check_variable $name";
-    my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W?)(.?)/;
-    given $twigil {
-        when '' {
-            my $ok = 0;
-            $ok = 1 if $name ~~ /::/;
-            $ok ||= $*IN_DECL;
-            $ok ||= $sigil eq '&';
-            $ok ||= $first lt 'A';
-            $ok ||= self.is_known($name);
-            if not $ok {
-                $variable.worry("Variable $name is not predeclared");
-            }
-        }
-        when '^' {
-            my $MULTINESS is context = 'multi';
-            my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
-            if $siggy { $variable.panic("Placeholder variable $name cannot override existing signature $siggy"); }
-            self.add_my_variable($name);
-        }
-        when ':' {
-            my $MULTINESS is context = 'multi';
-            self.add_my_variable($name);
-        }
-        when '~' {
-            return %*LANG.{substr($name,2)};
-        }
-        when '?' {
-            if $name ~~ /\:\:/ {
-                my ($first) = self.canonicalize_name($name);
-                $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)$/;
-            }
-            else {
-                # search upward through languages to STD
-                my $v = $variable.lookup_compiler_var($name);
-                $variable.<value> = $v if $v;
-            }
-        }
-    }
-    self;
-}
-
-method lookup_compiler_var($name) {
-
-    # see if they did "constant $?FOO = something" earlier
-    my $lex = $*CURPAD.{$name};
-    if defined $lex {
-        if $lex.<thunk>:exists {
-            return $lex.<thunk>.();
-        }
-        else {
-            return $lex.<value>;
-        }
-    }
-
-    given $name {
-        when '$?FILE'     { return $COMPILING::FILE<name>; }
-        when '$?LINE'     { return self.lineof(self.pos); }
-        when '$?POSITION' { return self.pos; }
-
-        when '$?LANG'    { return item %*LANG; }
-
-        when '$?SCOPE'    { return $*CURPAD; }
-
-        when '$?PACKAGE'  { return $*CURPKG; }
-        when '$?MODULE'   { return $*CURPKG; } #  XXX should scan
-        when '$?CLASS'    { return $*CURPKG; } #  XXX should scan
-        when '$?ROLE'     { return $*CURPKG; } #  XXX should scan
-        when '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
-
-        when '$?PACKAGENAME' { return $*PKGNAME; }
-
-        when '$?OS'       { return 'unimpl'; }
-        when '$?DISTRO'   { return 'unimpl'; }
-        when '$?VM'       { return 'unimpl'; }
-        when '$?XVM'      { return 'unimpl'; }
-        when '$?PERL'     { return 'unimpl'; }
-
-        when '$?USAGE'    { return 'unimpl'; }
-
-        when '&?ROUTINE'  { return 'unimpl'; }
-        when '&?BLOCK'    { return 'unimpl'; }
-
-        when '%?CONFIG'    { return 'unimpl'; }
-        when '%?DEEPMAGIC' { return 'unimpl'; }
-
-        # (derived grammars should default to nextsame, terminating here)
-        default { self.worry("Unrecognized variable: $name"); return 0; }
-    }
-}
-
 ##############
 # Precedence #
 ##############
@@ -5430,6 +4912,522 @@ grammar P5Regex is STD {
     token quantmod { [ '?' | '+' ]? }
 
 } # end grammar
+
+#################
+# Symbol tables #
+#################
+
+method newpad {
+    my $outer = $*CURPAD<$?STAB> // 0;
+    my $line = self.lineof(self.pos);
+    my $my = {
+        file => $COMPILING::FILE, line => $line,
+        longname => $COMPILING::FILE<name> ~ ':' ~ $line,
+        stash => ($*CURPAD = { }),
+    };
+    $*CURPAD<OUTER> = $outer if $outer;
+    $*CURPAD<$?STAB> = $my;
+    self;
+}
+
+method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
+    my $line = self.lineof(self.pos);
+    $*CURPAD<$_> //= { name => '$_', file => $COMPILING::FILE, line => $line };
+    $*CURPAD<$/> //= { name => '$/', file => $COMPILING::FILE, line => $line };
+    $*CURPAD<$!> //= { name => '$!', file => $COMPILING::FILE, line => $line };
+    if not $siggy {
+        $*CURPAD<@_> = { name => '@_', file => $COMPILING::FILE, line => $line };
+        $*CURPAD<%_> = { name => '%_', file => $COMPILING::FILE, line => $line };
+        $*CURPAD<$?GOTSIG> = '';
+    }
+    self;
+}
+
+method is_name ($n, $curpad = $*CURPAD) {
+    my $name = $n;
+    # say "is_name $name";
+
+    my $curpkg = $*CURPKG;
+    return True if $name ~~ /\:\:\(/;
+    my @components = self.canonicalize_name($name);
+    if @components > 1 {
+        return True if @components[0] eq 'COMPILING';
+        return True if @components[0] eq 'CALLER';
+        return True if @components[0] eq 'CONTEXT';
+        if $curpkg = self.find_top_pkg(@components[0]) {
+            # say "Found lexical package " ~ @components[0];
+            shift @components;
+        }
+        else {
+            # say "Looking for GLOBAL::<$name>";
+            $curpkg = $*GLOBAL<stash>;
+        }
+        while @components > 1 {
+            my $pkg = shift @components;
+            $curpkg = $curpkg.{$pkg}<stash>;
+            return False unless $curpkg;
+            # say "Found $pkg okay, now in ";
+        }
+    }
+    $name = shift(@components)//'';
+    return True if $name eq '';
+    my $pad = $curpad;
+    while $pad {
+        return True if $pad.{$name};
+        $pad = $pad.<OUTER><stash>;
+    }
+    return True if $curpkg.{$name};
+    return True if $*GLOBAL<stash>{$name};
+    return False;
+}
+
+method find_stab ($n, $curpad = $*CURPAD) {
+    my $name = $n;
+    # say "find_stab $name";
+
+    my $curpkg = $*CURPKG;
+    return () if $name ~~ /\:\:\(/;
+    my @components = self.canonicalize_name($name);
+    if @components > 1 {
+        return () if @components[0] eq 'CALLER';
+        return () if @components[0] eq 'CONTEXT';
+        if $curpkg = self.find_top_pkg(@components[0]) {
+            # say "Found lexical package " ~ @components[0];
+            shift @components;
+        }
+        else {
+            # say "Looking for GLOBAL::<$name>";
+            $curpkg = $*GLOBAL<stash>;
+        }
+        while @components > 1 {
+            my $pkg = shift @components;
+            $curpkg = $curpkg.{$pkg}<stash>;
+            return () unless $curpkg;
+            # say "Found $pkg okay, now in ";
+        }
+    }
+    $name = shift(@components)//'';
+    return () if $name eq '';
+
+    my $pad = $curpad;
+    while $pad {
+        return $_ if $_ = $pad.{$name}<stash>;
+        $pad = $pad.<OUTER><stash>;
+    }
+    return $_ if $_ = $curpkg.{$name}<stash>;
+    return $_ if $_ = $*GLOBAL<stash>{$name}<stash>;
+    return ();
+}
+
+method find_top_pkg ($name) {
+    # say "find_top_pkg $name";
+    if $name eq 'OUR' {
+        return $*CURPKG;
+    }
+    elsif $name eq 'MY' {
+        return $*CURPAD;
+    }
+    elsif $name eq 'CORE' {
+        return $*CORE<stash>;
+    }
+    elsif $name eq 'SETTING' {
+        return $*SETTING<stash>;
+    }
+    elsif $name eq 'UNIT' {
+        return $*UNIT<stash>;
+    }
+    # everything is somewhere in lexical scope (we hope)
+    my $pad = $*CURPAD;
+    while $pad {
+        return $pad.{$name}<stash> if $pad.{$name};
+        $pad = $pad.<OUTER><stash> // 0;
+    }
+    return 0;
+}
+
+method add_name ($name) {
+    my $scope = $*SCOPE // 'our';
+    # say "Adding $*SCOPE $name in $*PKGNAME";
+    if $scope eq 'augment' or $scope eq 'supersede' {
+        self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
+    }
+    else {
+        if $scope eq 'our' or $scope eq 'constant' {
+            self.add_our_name($name);
+        }
+        else {
+            self.add_my_name($name);
+        }
+    }
+    self;
+}
+
+method add_my_name ($n, $d) {
+    my $name = $n;
+    # say "add_my_name $name";
+    return self if $name ~~ /\:\:\(/;
+    my $curstash = $*CURPAD;
+    my @components = self.canonicalize_name($name);
+    while @components > 1 {
+        my $pkg = shift @components;
+        my $newstab = $curstash.{$pkg} //= { stub => 1 };
+        # say "Adding new package $pkg in ", $curstash<$?STAB><longname>;
+        $curstash.{$pkg} //= { stub => 1 };
+        $curstash.{"&$pkg"} //= $newstab;
+        $curstash = $newstab<stash> //= { 'PARENT' => $curstash, '$?STAB' => $newstab };
+    }
+    $name = shift @components;
+    return self unless defined $name and $name ne '';
+    return self if $name eq '$' or $name eq '@' or $name eq '%';
+
+    # This may just be a lexical alias to "our" and such,
+    # so reuse $*DECLARING pointer if it's there.
+    my $declaring = $d // {
+        name => $name,
+        file => $COMPILING::FILE, line => self.line,
+        mult => ($*MULTINESS||'only'),
+    };
+    if $curstash.{$name}:exists {
+        # say "$name exists, curstash = ", $curstash<$?STAB><longname>;
+        my $omult = $curstash.{$name}<mult> // '';
+        if $curstash.{$name}<stub> {
+            $*DECLARING = $curstash.{$name} = $declaring;
+        }
+        elsif $*SCOPE eq 'use' {}
+        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
+        elsif $omult eq 'proto' {}
+        elsif $*PKGDECL eq 'role' {}
+        else {
+            my $old = $curstash.{$name};
+            my $ofile = $old.<file> // 0;
+            my $oline = $old.<line> // '???';
+            my $loc = '';
+            if $ofile {
+                if $ofile !=== $COMPILING::FILE {
+                    my $oname = $ofile<name>;
+                    $loc = " (from $oname line $oline)";
+                }
+                else {
+                    $loc = " (from line $oline)";
+                }
+            }
+            if $name ~~ /^\w/ {
+                self.panic("Illegal redeclaration of lexical symbol $name$loc");
+            }
+            elsif $name ~~ s/^\&// {
+                self.panic("Illegal redeclaration of lexical routine $name$loc");
+            }
+            else {  # XXX eventually check for conformant arrays here
+                self.worry("Useless redeclaration of lexical variable $name$loc");
+            }
+        }
+    }
+    else {
+        $*DECLARING = $curstash.{$name} = $declaring;
+        if $name ~~ /^\w/ and $*SCOPE ne 'constant' {
+            $curstash.{"&$name"} //= $curstash.{$name};
+            $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
+        }
+    }
+    self;
+}
+
+method add_our_name ($n) {
+    my $name = $n;
+    # say "add_our_name $name " ~ $*PKGNAME;
+    return self if $name ~~ /\:\:\(/;
+    my $curstash = $*CURPKG;
+    # say "curstash $curstash global $GLOBAL ", join ' ', %$*GLOBAL;
+    $name ~~ s/\:ver\<.*?\>//;
+    $name ~~ s/\:auth\<.*?\>//;
+    my @components = self.canonicalize_name($name);
+    if @components > 1 {
+        my $c = self.find_top_pkg(@components[0]);
+        if $c {
+            shift @components;
+            $curstash = $c;
+        }
+    }
+    while @components > 1 {
+        my $pkg = shift @components;
+        my $newstab = $curstash.{$pkg} //= { stub => 1 };
+        $curstash.{"&$pkg"} //= $newstab;
+        $curstash = $newstab<stash> //= { 'PARENT' => $curstash, '$?STAB' => $newstab };
+        # say "Adding new package $pkg in $curstash ";
+    }
+    $name = shift @components;
+    return self unless defined $name and $name ne '';
+
+    my $declaring = $*DECLARING // {
+        name => $name,
+        file => $COMPILING::FILE, line => self.line,
+        mult => ($*MULTINESS||'only'),
+    };
+    if $curstash.{$name}:exists {
+        my $omult = $curstash.{$name}<mult> // '';
+        if $curstash.{$name}<stub> {
+            $*DECLARING = $curstash.{$name} = $declaring;
+        }
+        elsif $*SCOPE eq 'use' {}
+        elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
+        elsif $omult eq 'proto' {}
+        elsif $*PKGDECL eq 'role' {}
+        else {
+            my $old = $curstash.{$name};
+            my $ofile = $old.<file> // 0;
+            my $oline = $old.<line> // '???';
+            my $loc = '';
+            if $ofile {
+                if $ofile !=== $COMPILING::FILE {
+                    my $oname = $ofile<name>;
+                    $loc = " (from $oname line $oline)";
+                }
+                else {
+                    $loc = " (from line $oline)";
+                }
+            }
+            if $name ~~ /^\w/ {
+                self.panic("Illegal redeclaration of package symbol $name$loc");
+            }
+            elsif $name ~~ s/^\&// {
+                self.panic("Illegal redeclaration of package routine $name$loc");
+            }
+            else {  # XXX eventually check for conformant arrays here
+                # (redeclaration of identical package vars is not useless)
+            }
+        }
+    }
+    else {
+        $*DECLARING = $curstash.{$name} = $declaring;
+        if $name ~~ /^\w/ {
+            $curstash.{"&$name"} //= { name => "&$name", file => $COMPILING::FILE, line => self.line };
+            $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
+        }
+    }
+    self.add_my_name($n,$declaring) if $curstash === $*CURPKG;   # the lexical alias
+    self;
+}
+
+method add_mystery ($name,$pos) {
+    if not self.is_known($name) {
+        # say "add_mystery $name";
+        # say "Mystery $name $*CURPAD";
+        %*MYSTERY{$name}.<pad> = $*CURPAD;
+        %*MYSTERY{$name}.<line> ~= self.lineof($pos) ~ ' ';
+    }
+    else {
+        # say "$name is known";
+    }
+    self;
+}
+
+method load_setting ($setting) {
+    @PKGS = ();
+
+    $*SETTING = self.load_pad($setting);
+    $*CURPAD = $*SETTING<stash>;
+    $*CORE = $*SETTING;
+    for 1..100 {
+        my $outerer = $*SETTING<stash><OUTER>;
+        last unless $outerer;
+        $*CORE = $outerer;
+    }
+    if $*SETTING<stash><OUTER> {
+        warn "Internal error: infinite setting loop";
+        $*SETTING<stash><OUTER>:delete;
+    }
+    $*GLOBAL = $*CORE<stash><GLOBAL> //= {
+        file => $COMPILING::FILE, line => 1,
+        longname => 'GLOBAL',
+        stash => {},
+    };
+    $*GLOBAL<stash><$?STAB> = $*GLOBAL;
+    $*CURPKG = $*GLOBAL<stash>;
+    $*CURPKG<$?STAB> = $*GLOBAL;
+
+    $*PROCESS = $*CORE<stash><PROCESS> //= {
+        file => $COMPILING::FILE, line => 1,
+        longname => 'PROCESS',
+        stash => {},
+    };
+    $*PROCESS<stash><$?STAB> = $*PROCESS;
+}
+
+method is_known ($n, $curpad = $*CURPAD) {
+    my $name = $n;
+    # say "is_known $name";
+    return True if $*QUASI_QUASH;
+    return True if $*CURPKG.{$name};
+    my $curpkg = $*CURPKG;
+    my @components = self.canonicalize_name($name);
+    if @components > 1 {
+        return True if @components[0] eq 'COMPILING';
+        return True if @components[0] eq 'CALLER';
+        return True if @components[0] eq 'CONTEXT';
+        if $curpkg = self.find_top_pkg(@components[0]) {
+            # say "Found lexical package " ~ @components[0];
+            shift @components;
+        }
+        else {
+            # say "Looking for GLOBAL::<$name>";
+            $curpkg = $*GLOBAL<stash>;
+        }
+        while @components > 1 {
+            my $pkg = shift @components;
+            # say "Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg);
+            $curpkg = $curpkg.{$pkg}<stash>;
+            return False unless $curpkg;
+            # say "Found $pkg okay, now in $curpkg ";
+        }
+    }
+
+    $name = shift(@components)//'';
+    # say "Final component is $name";
+    return True if $name eq '';
+    # say "Found" if $curpkg.{$name};
+    return True if $curpkg.{$name};
+
+    my $pad = $curpad;
+    while $pad {
+        # say "Looking in ", $pad<$?STAB><longname>;
+        # say "Found" if $pad.{$name};
+        return True if $pad.{$name};
+        # say $pad.<OUTER><stash> // "No OUTER";
+        $pad = $pad.<OUTER><stash>;
+    }
+    # say "Not Found";
+
+    return False;
+}
+
+
+method add_routine ($name) {
+    my $vname = '&' ~ $name;
+    self.add_name($vname);
+    self;
+}
+
+method add_variable ($name) {
+    if ($*SCOPE//'') eq 'our' {
+        self.add_our_variable($name);
+    }
+    else {
+        self.add_my_variable($name);
+    }
+    self;
+}
+
+method add_my_variable ($n) {
+    my $name = $n;
+    # say "add_my_variable $name";
+    if substr($name, 0, 1) eq '&' {
+        self.add_my_name($name);
+        if $name ~~ s/\:\(.*// {
+            self.add_my_name($name);
+        }
+        return self;
+    }
+    self.add_my_name($name);
+    self;
+}
+
+method add_our_variable ($name) {
+    self.add_our_name($name);
+    self;
+}
+
+method check_variable ($variable) {
+    my $name = $variable.Str;
+    # say "check_variable $name";
+    my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W?)(.?)/;
+    given $twigil {
+        when '' {
+            my $ok = 0;
+            $ok = 1 if $name ~~ /::/;
+            $ok ||= $*IN_DECL;
+            $ok ||= $sigil eq '&';
+            $ok ||= $first lt 'A';
+            $ok ||= self.is_known($name);
+            if not $ok {
+                $variable.worry("Variable $name is not predeclared");
+            }
+        }
+        when '^' {
+            my $MULTINESS is context = 'multi';
+            my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
+            if $siggy { $variable.panic("Placeholder variable $name cannot override existing signature $siggy"); }
+            self.add_my_variable($name);
+        }
+        when ':' {
+            my $MULTINESS is context = 'multi';
+            self.add_my_variable($name);
+        }
+        when '~' {
+            return %*LANG.{substr($name,2)};
+        }
+        when '?' {
+            if $name ~~ /\:\:/ {
+                my ($first) = self.canonicalize_name($name);
+                $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)$/;
+            }
+            else {
+                # search upward through languages to STD
+                my $v = $variable.lookup_compiler_var($name);
+                $variable.<value> = $v if $v;
+            }
+        }
+    }
+    self;
+}
+
+method lookup_compiler_var($name) {
+
+    # see if they did "constant $?FOO = something" earlier
+    my $lex = $*CURPAD.{$name};
+    if defined $lex {
+        if $lex.<thunk>:exists {
+            return $lex.<thunk>.();
+        }
+        else {
+            return $lex.<value>;
+        }
+    }
+
+    given $name {
+        when '$?FILE'     { return $COMPILING::FILE<name>; }
+        when '$?LINE'     { return self.lineof(self.pos); }
+        when '$?POSITION' { return self.pos; }
+
+        when '$?LANG'    { return item %*LANG; }
+
+        when '$?SCOPE'    { return $*CURPAD; }
+
+        when '$?PACKAGE'  { return $*CURPKG; }
+        when '$?MODULE'   { return $*CURPKG; } #  XXX should scan
+        when '$?CLASS'    { return $*CURPKG; } #  XXX should scan
+        when '$?ROLE'     { return $*CURPKG; } #  XXX should scan
+        when '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
+
+        when '$?PACKAGENAME' { return $*PKGNAME; }
+
+        when '$?OS'       { return 'unimpl'; }
+        when '$?DISTRO'   { return 'unimpl'; }
+        when '$?VM'       { return 'unimpl'; }
+        when '$?XVM'      { return 'unimpl'; }
+        when '$?PERL'     { return 'unimpl'; }
+
+        when '$?USAGE'    { return 'unimpl'; }
+
+        when '&?ROUTINE'  { return 'unimpl'; }
+        when '&?BLOCK'    { return 'unimpl'; }
+
+        when '%?CONFIG'    { return 'unimpl'; }
+        when '%?DEEPMAGIC' { return 'unimpl'; }
+
+        # (derived grammars should default to nextsame, terminating here)
+        default { self.worry("Unrecognized variable: $name"); return 0; }
+    }
+}
 
 ####################
 # Service Routines #
