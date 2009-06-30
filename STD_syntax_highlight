@@ -25,7 +25,7 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     # read from standard input
     STD_syntax_highlight
 
-    # print ansi-escaped text for 'comp_unit'
+    # print ansi-escaped text for 'TOP'
     STD_syntax_highlight foo.pl
 
     # print separate html, css and javascript files
@@ -56,7 +56,6 @@ my ($full_html,$simple_html,$snippet_html,$ansi_text,$yaml) = (0,0,0,0,0);
 my ($file, $parser, $src_text); 
 
 # These are needed for redspans
-$::ACTIONS = 'Actions';
 my @loc;
 
 =item main
@@ -110,7 +109,7 @@ HELP
 
     #start parsing...
     $file = shift @ARGV;
-    my $what = shift @ARGV // 'comp_unit';
+    my $what = shift @ARGV // 'TOP';
 
     #what is the meaning of your input file?
     if(!$file || $file eq '-') {
@@ -126,7 +125,7 @@ HELP
     # slurp the file for parsing and redspans
     $src_text = Encode::decode('utf8', read_file($file) );
     $loc[length($src_text) - 1] = [];
-    $parser = STD->parse($src_text,$what);
+    $parser = STD->parse($src_text,rule=>$what,actions => 'Actions');
 
     # and finally print out the html code
     highlight_match();
@@ -519,14 +518,10 @@ sub redspans_traverse($%) {
             $action_refs{$action} = $action_ref = \$action;
         }
         for ($F..$P-1) {
-            unshift @{$loc[$_]}, $action_ref;
+            unshift @{$loc[$_]}, $action_ref; 
         }
     }
 
-    sub stdstopper { }
-    sub terminator { }
-    sub unitstopper { }
-    sub comp_unit { }
 }
 
 
