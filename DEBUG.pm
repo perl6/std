@@ -1,6 +1,6 @@
-module DEBUG;
+my module DEBUG;
 constant autolexer is export = 1;
-constant lexer is export = 2;
+constant symtab is export = 2;
 constant fixed_length is export = 4;
 constant fates is export = 8;
 constant longest_token_pattern_generation is export = 16;

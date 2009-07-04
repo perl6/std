@@ -1,7 +1,7 @@
 package DEBUG;
 our @EXPORTS = qw(
         autolexer
-        lexer
+        symtab
         fixed_length
         fates
         longest_token_pattern_generation
@@ -16,7 +16,7 @@ our @EXPORTS = qw(
 );
 use constant {
     autolexer => 1,
-    lexer => 2,
+    symtab => 2,
     fixed_length => 4,
     fates => 8,
     longest_token_pattern_generation => 16,

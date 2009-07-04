@@ -14,13 +14,13 @@ my $HIGHMESS is context;       # current parse failure message
 my $HIGHEXPECT is context;     # things we were looking for at the bleeding edge
 
 # symbol table management
-my $CORE is context;            # the CORE object
-my $SETTING is context;         # the SETTING object
-my $GLOBAL is context;          # the GLOBAL object
-my $PROCESS is context;         # the PROCESS object
-my $UNIT is context;            # the UNIT object
-my $CURPAD is context<rw>;      # current lexical stash
-my $CURPKG is context;          # current package stash
+my $CORE is context;            # the CORE scope
+my $SETTING is context;         # the SETTING scope
+my $GLOBAL is context;          # the GLOBAL scope
+my $PROCESS is context;         # the PROCESS scope
+my $UNIT is context;            # the UNIT scope
+my $CURPAD is context<rw>;      # current lexical scope
+my $CURPKG is context;          # current package scope
 my $PKGNAME is context = "";    # full package name of package assoc with current lexical scope
 my @PKGS is context<rw> = ();   # stack of outer lexical packages
 
@@ -33,12 +33,12 @@ my $IN_DECL is context<rw>;     # (d) a declarator is looking for a name to decl
 my $SCOPE is context = "";      # (d) which scope declarator we're under
 my $MULTINESS is context;       # (d) which multi declarator we're under
 my $PKGDECL is context;         # (d) current package declarator
-my $DECLARING is context<rw>;   # (u/d) new object associated with declaration
+my $DECLARAND is context<rw>;   # (u/d) new object associated with declaration
 
 my $GOAL is context = "(eof)";  # (d) which special terminator we're most wanting
 my $IN_REDUCE is context<rw>;   # (d) attempting to parse an [op] construct
 my $IN_META is context<rw>;     # (d) parsing a metaoperator like [..]
-my $QUASI_QUASH is context<rw>; # (d) don't complain about undefined quasi-variables
+my $QUASIMODO is context<rw>;   # (d) don't carp about quasi variables
 my $LEFTSIGIL is context<rw>;   # (u) sigil of LHS for item vs list assignment
 my $QSIGIL is context<rw>;      # (d) sigil of current interpolation
 
@@ -516,10 +516,10 @@ rule comp_unit {
     :my $PKGNAME is context = "GLOBAL";
     :my @PKGS is context<rw> = ();
     :my $IN_DECL is context<rw>;
-    :my $DECLARING is context<rw>;
+    :my $DECLARAND is context<rw>;
     :my $QSIGIL is context<rw> = '';
     :my $IN_META is context<rw> = 0;
-    :my $QUASI_QUASH is context<rw>;
+    :my $QUASIMODO is context<rw>;
     :my $SCOPE is context = "";
     :my $LEFTSIGIL is context<rw>;
     :my %MYSTERY is context<rw> = ();
@@ -933,16 +933,23 @@ token statement_control:when {
 }
 rule statement_control:default {<sym> <block> }
 
-rule statement_control:BEGIN   {<sym> <block> }
+token statement_prefix:BEGIN   { <sym> <blorst> }
+token statement_prefix:INIT    { <sym> <blorst> }
+token statement_prefix:START   { <sym> <blorst> }
+token statement_prefix:ENTER   { <sym> <blorst> }
+token statement_prefix:FIRST   { <sym> <blorst> }
+
+# rule statement_control:BEGIN   {<sym> <block> }
+# rule statement_control:INIT    {<sym> <block> }
+# rule statement_control:START   {<sym> <block> }
+# rule statement_control:ENTER   {<sym> <block> }
+# rule statement_control:FIRST   {<sym> <block> }
+
 rule statement_control:CHECK   {<sym> <block> }
-rule statement_control:INIT    {<sym> <block> }
 rule statement_control:END     {<sym> <block> }
-rule statement_control:START   {<sym> <block> }
-rule statement_control:ENTER   {<sym> <block> }
 rule statement_control:LEAVE   {<sym> <block> }
 rule statement_control:KEEP    {<sym> <block> }
 rule statement_control:UNDO    {<sym> <block> }
-rule statement_control:FIRST   {<sym> <block> }
 rule statement_control:NEXT    {<sym> <block> }
 rule statement_control:LAST    {<sym> <block> }
 rule statement_control:PRE     {<sym> <block> }
@@ -1004,7 +1011,7 @@ token version:sym<v> {
 
 token constant_declarator {
     :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
+    :my $DECLARAND is context<rw>;
     <identifier>
     <?{ $*SCOPE eq 'constant' }>
     <!{ $¢.is_name($<identifier>.Str) }>
@@ -1016,7 +1023,7 @@ token constant_declarator {
 
 token variable_declarator {
     :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
+    :my $DECLARAND is context<rw>;
     <variable>
     { $*IN_DECL = 0; self.add_variable($<variable>.Str) }
     [   # Is it a shaped array or hash declaration?
@@ -1124,7 +1131,7 @@ token package_declarator:does {
 rule package_def {
     :my $longname;
     :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
+    :my $DECLARAND is context<rw>;
     [
         [
             <def_module_name>{
@@ -1146,19 +1153,17 @@ rule package_def {
                     $shortname = '_anon_';
                 }
                 $*PKGNAME = $pkg ~ '::' ~ $shortname;
-                my $newpkg = $*DECLARING<stash>;
-                $*DECLARING<longname> = $*PKGNAME;
-                $newpkg.<PARENT> = $*CURPKG;
-                $newpkg.<$?STAB> = $*DECLARING;
+                my $newpkg = $*CURPKG.{$shortname ~ '::'};
+                $newpkg.<PARENT::> = $*CURPKG;
                 $*CURPKG = $newpkg;
                 push @PKGS, $pkg;
-                # say "adding $newpkg " ~ $*PKGNAME;
+                say "adding $newpkg " ~ $*PKGNAME if $*DEBUG +& DEBUG::symtab;
             }}
 
             <block>
             {{
                 $*PKGNAME = pop(@PKGS);
-                $*CURPKG = $*CURPKG.<PARENT>;
+                $*CURPKG = $*CURPKG.<PARENT::>;
             }}
             {*}                                                     #= block
         || <?before ';'>
@@ -1168,10 +1173,8 @@ rule package_def {
                     $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                     my $shortname = $longname.<name>.Str;
                     $*PKGNAME = $shortname;
-                    $*DECLARING<longname> = $*PKGNAME;
-                    my $newpkg = $*DECLARING<stash>;
-                    $newpkg.<PARENT> = $*CURPKG;
-                    $newpkg.<$?STAB> = $*DECLARING;
+                    my $newpkg = $*CURPKG.{$shortname ~ '::'};
+                    $newpkg.<PARENT::> = $*CURPKG;
                     $*CURPKG = $newpkg;
                     $*begin_compunit = 0;
                 }}
@@ -1229,7 +1232,7 @@ rule multisig {
 
 rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
+    :my $DECLARAND is context<rw>;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -1243,7 +1246,7 @@ rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
 
 rule method_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
+    :my $DECLARAND is context<rw>;
     <.newpad>
     [
         [
@@ -1266,7 +1269,7 @@ rule method_def ($CURPAD is context<rw> = $*CURPAD) {
 
 rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
+    :my $DECLARAND is context<rw>;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -1279,7 +1282,7 @@ rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
 
 rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
     :my $IN_DECL is context<rw> = 1;
-    :my $DECLARING is context<rw>;
+    :my $DECLARAND is context<rw>;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -1302,10 +1305,10 @@ rule trait {
 token trait_mod:is {
     <sym>:s <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
     {{
-        if $*DECLARING {
+        if $*DECLARAND {
             my $traitname = $<longname>.Str;
             # XXX eventually will use multiple dispatch
-            $*DECLARING{$traitname} = self.gettrait($traitname, $<postcircumfix>);
+            $*DECLARAND{$traitname} = self.gettrait($traitname, $<postcircumfix>);
         }
     }}
 }
@@ -1449,13 +1452,6 @@ token quotepair {
     ]
     { $<k> = $key; $<v> = $value; }
 }
-
-rule term:BEGIN   {<sym> <block> }
-rule term:CHECK   {<sym> <block> }
-rule term:INIT    {<sym> <block> }
-rule term:START   {<sym> <block> }
-rule term:ENTER   {<sym> <block> }
-rule term:FIRST   {<sym> <block> }
 
 # Most of these special variable rules are there simply to catch old p5 brainos
 
@@ -2064,7 +2060,7 @@ token tribble ($l, $lang2 = $l) {
 
 token quasiquibble ($l) {
     :my ($lang, $start, $stop);
-    :my $QUASI_QUASH is context = 0; # :COMPILING sets true
+    :my $QUASIMODO is context = 0; # :COMPILING sets true
     <babble($l)>
     { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
@@ -2906,7 +2902,7 @@ grammar Q is STD {
 
 grammar Quasi is STD {
     token term:unquote {
-        :my $QUASI_QUASH is context = 0;
+        :my $QUASIMODO is context = 0;
         <starter><starter><starter> <EXPR> <stopper><stopper><stopper>
     }
 
@@ -2914,7 +2910,7 @@ grammar Quasi is STD {
     multi method tweak (:$ast) { self; } # XXX some transformer operating on the normal AST?
     multi method tweak (:$lang) { self.cursor_fresh( $lang ); }
     multi method tweak (:$unquote) { self; } # XXX needs to override unquote
-    multi method tweak (:$COMPILING) { $*QUASI_QUASH = 1; self; } # XXX needs to lazify the lexical lookups somehow
+    multi method tweak (:$COMPILING) { $*QUASIMODO = 1; self; } # XXX needs to lazify the lexical lookups somehow
 
     multi method tweak (*%x) {
         my @k = keys(%x);
@@ -3162,7 +3158,7 @@ token statement_prefix:lazy    { <sym> <blorst> }
 token statement_prefix:do      { <sym> <blorst> }
 
 token statement_prefix:lift    {
-    :my $QUASI_QUASH is context = 1;
+    :my $QUASIMODO is context = 1;
     <sym> <blorst>
 }
 
@@ -4939,27 +4935,28 @@ grammar P5Regex is STD {
 # Symbol tables #
 #################
 
+use NAME;
+use STASH;
+
 method newpad {
-    my $outer = $*CURPAD<$?STAB> // 0;
+    my $outer = $*CURPAD;
     my $line = self.lineof(self.pos);
-    my $my = {
-        file => $*FILE, line => $line,
-        longname => $*FILE<name> ~ ':' ~ $line,
-        stash => ($*CURPAD = { }),
-    };
-    $*CURPAD<OUTER> = $outer if $outer;
-    $*CURPAD<$?STAB> = $my;
+    $*CURPAD = STASH.new(
+        _file => $*FILE, _line => $line,
+        _cf => $*FILE<name> ~ ':' ~ $line,
+    );
+    $*CURPAD<OUTER::> = $outer if $outer;
     self;
 }
 
 method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
     my $line = self.lineof(self.pos);
-    $*CURPAD<$_> //= { name => '$_', file => $*FILE, line => $line };
-    $*CURPAD<$/> //= { name => '$/', file => $*FILE, line => $line };
-    $*CURPAD<$!> //= { name => '$!', file => $*FILE, line => $line };
+    $*CURPAD<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line );
+    $*CURPAD<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line );
+    $*CURPAD<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line );
     if not $siggy {
-        $*CURPAD<@_> = { name => '@_', file => $*FILE, line => $line };
-        $*CURPAD<%_> = { name => '%_', file => $*FILE, line => $line };
+        $*CURPAD<@_> = NAME.new( name => '@_', file => $*FILE, line => $line );
+        $*CURPAD<%_> = NAME.new( name => '%_', file => $*FILE, line => $line );
         $*CURPAD<$?GOTSIG> = '';
     }
     self;
@@ -4967,65 +4964,72 @@ method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
 
 method is_name ($n, $curpad = $*CURPAD) {
     my $name = $n;
-    # say "is_name $name";
+    say "is_name $name" if $*DEBUG +& DEBUG::symtab;
 
     my $curpkg = $*CURPKG;
     return True if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
-        return True if @components[0] eq 'COMPILING';
-        return True if @components[0] eq 'CALLER';
-        return True if @components[0] eq 'CONTEXT';
+        return True if @components[0] eq 'COMPILING::';
+        return True if @components[0] eq 'CALLER::';
+        return True if @components[0] eq 'CONTEXT::';
         if $curpkg = self.find_top_pkg(@components[0]) {
-            # say "Found lexical package " ~ @components[0];
+            say "Found lexical package ", @components[0] if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL<stash>;
+            say "Looking for GLOBAL::<$name>" if $*DEBUG +& DEBUG::symtab;
+            $curpkg = $*GLOBAL;
         }
         while @components > 1 {
             my $pkg = shift @components;
-            $curpkg = $curpkg.{$pkg}<stash>;
+            $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
-            # say "Found $pkg okay, now in ";
+            say "Found $pkg okay" if $*DEBUG +& DEBUG::symtab;
         }
     }
     $name = shift(@components)//'';
+    say "Looking for $name" if $*DEBUG +& DEBUG::symtab;
     return True if $name eq '';
     my $pad = $curpad;
     while $pad {
-        return True if $pad.{$name};
-        $pad = $pad.<OUTER><stash>;
+        say "Looking in ", $pad.cf if $*DEBUG +& DEBUG::symtab;
+        if $pad.{$name} {
+            say "Found $name in ", $pad.cf if $*DEBUG +& DEBUG::symtab;
+            return True;
+        }
+        $pad = $pad.<OUTER::>;
     }
     return True if $curpkg.{$name};
-    return True if $*GLOBAL<stash>{$name};
+    return True if $*GLOBAL.{$name};
+    say "$name not found" if $*DEBUG +& DEBUG::symtab;
     return False;
 }
 
-method find_stab ($n, $curpad = $*CURPAD) {
+method find_stash ($n, $curpad = $*CURPAD) {
     my $name = $n;
-    # say "find_stab $name";
+    say "find_stash $name" if $*DEBUG +& DEBUG::symtab;
 
     my $curpkg = $*CURPKG;
     return () if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
-        return () if @components[0] eq 'CALLER';
-        return () if @components[0] eq 'CONTEXT';
+        return () if @components[0] eq 'COMPILING::';
+        return () if @components[0] eq 'CALLER::';
+        return () if @components[0] eq 'CONTEXT::';
         if $curpkg = self.find_top_pkg(@components[0]) {
-            # say "Found lexical package " ~ @components[0];
+            say "Found lexical package ", @components[0] if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL<stash>;
+            say "Looking for GLOBAL::<$name>" if $*DEBUG +& DEBUG::symtab;
+            $curpkg = $*GLOBAL;
         }
         while @components > 1 {
             my $pkg = shift @components;
-            $curpkg = $curpkg.{$pkg}<stash>;
+            $curpkg = $curpkg.{$pkg};
             return () unless $curpkg;
-            # say "Found $pkg okay, now in ";
+            say "Found $pkg okay" if $*DEBUG +& DEBUG::symtab;
         }
     }
     $name = shift(@components)//'';
@@ -5033,43 +5037,43 @@ method find_stab ($n, $curpad = $*CURPAD) {
 
     my $pad = $curpad;
     while $pad {
-        return $_ if $_ = $pad.{$name}<stash>;
-        $pad = $pad.<OUTER><stash>;
+        return $_ if $_ = $pad.{$name};
+        $pad = $pad.<OUTER::>;
     }
-    return $_ if $_ = $curpkg.{$name}<stash>;
-    return $_ if $_ = $*GLOBAL<stash>{$name}<stash>;
+    return $_ if $_ = $curpkg.{$name};
+    return $_ if $_ = $*GLOBAL.{$name};
     return ();
 }
 
 method find_top_pkg ($name) {
-    # say "find_top_pkg $name";
-    if $name eq 'OUR' {
+    say "find_top_pkg $name" if $*DEBUG +& DEBUG::symtab;
+    if $name eq 'OUR::' {
         return $*CURPKG;
     }
-    elsif $name eq 'MY' {
+    elsif $name eq 'MY::' {
         return $*CURPAD;
     }
-    elsif $name eq 'CORE' {
-        return $*CORE<stash>;
+    elsif $name eq 'CORE::' {
+        return $*CORE;
     }
-    elsif $name eq 'SETTING' {
-        return $*SETTING<stash>;
+    elsif $name eq 'SETTING::' {
+        return $*SETTING;
     }
-    elsif $name eq 'UNIT' {
-        return $*UNIT<stash>;
+    elsif $name eq 'UNIT::' {
+        return $*UNIT;
     }
     # everything is somewhere in lexical scope (we hope)
     my $pad = $*CURPAD;
     while $pad {
-        return $pad.{$name}<stash> if $pad.{$name};
-        $pad = $pad.<OUTER><stash> // 0;
+        return $pad.{$name} if $pad.{$name};
+        $pad = $pad.<OUTER::>;
     }
     return 0;
 }
 
 method add_name ($name) {
     my $scope = $*SCOPE // 'our';
-    # say "Adding $*SCOPE $name in $*PKGNAME";
+    say "Adding $*SCOPE $name in $*PKGNAME" if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
     }
@@ -5086,44 +5090,40 @@ method add_name ($name) {
 
 method add_my_name ($n, $d) {
     my $name = $n;
-    # say "add_my_name $name";
+    say "add_my_name $name" if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPAD;
     my @components = self.canonicalize_name($name);
     while @components > 1 {
         my $pkg = shift @components;
-        my $newstab = $curstash.{$pkg} //= { stub => 1 };
-        # say "Adding new package $pkg in ", $curstash<$?STAB><longname>;
-        $curstash.{$pkg} //= { stub => 1 };
-        $curstash.{"&$pkg"} //= $newstab;
-        $curstash = $newstab<stash> //= { 'PARENT' => $curstash, '$?STAB' => $newstab };
+        my $newstash = $curstash.{$pkg} //= STASH.new( 'PARENT::' => $curstash );
+        say "Adding new package $pkg in ", $curstash.cf if $*DEBUG +& DEBUG::symtab;
+        $curstash = $newstash;
     }
     $name = shift @components;
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
 
     # This may just be a lexical alias to "our" and such,
-    # so reuse $*DECLARING pointer if it's there.
-    my $declaring = $d // {
+    # so reuse $*DECLARAND pointer if it's there.
+    my $declaring = $d // NAME.new(
+        xpad => $*CURPAD,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
-    };
-    if $curstash.{$name}:exists {
-        # say "$name exists, curstash = ", $curstash<$?STAB><longname>;
+    );
+    if $curstash.{$name}:exists and $curstash.{$name}<line> {
+        say "$name exists, curstash = ", $curstash.cf if $*DEBUG +& DEBUG::symtab;
         my $omult = $curstash.{$name}<mult> // '';
-        if $curstash.{$name}<stub> {
-            $*DECLARING = $curstash.{$name} = $declaring;
-        }
-        elsif $declaring === $curstash.{$name} {}  # already did this, probably enum
+        if $declaring === $curstash.{$name} {}  # already did this, probably enum
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
         else {
             my $old = $curstash.{$name};
-            my $ofile = $old.<file> // 0;
-            my $oline = $old.<line> // '???';
+            my $ofile = $old.file // 0;
+            my $oline = $old.line // '???';
             my $loc = '';
             if $ofile {
                 if $ofile !=== $*FILE {
@@ -5146,10 +5146,10 @@ method add_my_name ($n, $d) {
         }
     }
     else {
-        $*DECLARING = $curstash.{$name} = $declaring;
-        if $name ~~ /^\w/ and $*SCOPE ne 'constant' {
+        $*DECLARAND = $curstash.{$name} = $declaring;
+        if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $curstash.{$name};
-            $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
+            $curstash.{$name ~ '::'} //= STASH.new( 'PARENT::' => $curstash, _file => $*FILE, _line => self.line );
         }
     }
     self;
@@ -5157,10 +5157,10 @@ method add_my_name ($n, $d) {
 
 method add_our_name ($n) {
     my $name = $n;
-    # say "add_our_name $name " ~ $*PKGNAME;
+    say "add_our_name $name " ~ $*PKGNAME if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPKG;
-    # say "curstash $curstash global $GLOBAL ", join ' ', %$*GLOBAL;
+    say "curstash $curstash global $GLOBAL ", join ' ', %$*GLOBAL if $*DEBUG +& DEBUG::symtab;
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
     my @components = self.canonicalize_name($name);
@@ -5173,33 +5173,30 @@ method add_our_name ($n) {
     }
     while @components > 1 {
         my $pkg = shift @components;
-        my $newstab = $curstash.{$pkg} //= { stub => 1 };
-        $curstash.{"&$pkg"} //= $newstab;
-        $curstash = $newstab<stash> //= { 'PARENT' => $curstash, '$?STAB' => $newstab };
-        # say "Adding new package $pkg in $curstash ";
+        my $newstash = $curstash.{$pkg} //= STASH.new('PARENT::' => $curstash );
+        $curstash = $newstash;
+        say "Adding new package $pkg in $curstash " if $*DEBUG +& DEBUG::symtab;
     }
     $name = shift @components;
     return self unless defined $name and $name ne '';
 
-    my $declaring = $*DECLARING // {
+    my $declaring = $*DECLARAND // NAME.new(
+        xpad => $*CURPAD,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
-    };
-    if $curstash.{$name}:exists {
+    );
+    if $curstash.{$name}:exists and $curstash.{$name}<line> {
         my $omult = $curstash.{$name}<mult> // '';
-        if $curstash.{$name}<stub> {
-            $*DECLARING = $curstash.{$name} = $declaring;
-        }
-        elsif $declaring === $curstash.{$name} {} # already did it somehow
+        if $declaring === $curstash.{$name} {} # already did it somehow
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
         else {
             my $old = $curstash.{$name};
-            my $ofile = $old.<file> // 0;
-            my $oline = $old.<line> // '???';
+            my $ofile = $old.file // 0;
+            my $oline = $old.line // '???';
             my $loc = '';
             if $ofile {
                 if $ofile !=== $*FILE {
@@ -5222,10 +5219,10 @@ method add_our_name ($n) {
         }
     }
     else {
-        $*DECLARING = $curstash.{$name} = $declaring;
-        if $name ~~ /^\w/ {
-            $curstash.{"&$name"} //= { name => "&$name", file => $*FILE, line => self.line };
-            $curstash.{$name}<stash> //= { 'PARENT' => $curstash };
+        $*DECLARAND = $curstash.{$name} = $declaring;
+        if $name ~~ /^\w+$/ {
+            $curstash.{"&$name"} //= $declaring;
+            $curstash.{$name ~ '::'} //= STASH.new( 'PARENT::' => $curstash, _file => $*FILE, _line => self.line );
         }
     }
     self.add_my_name($n,$declaring) if $curstash === $*CURPKG;   # the lexical alias
@@ -5234,13 +5231,12 @@ method add_our_name ($n) {
 
 method add_mystery ($name,$pos) {
     if not self.is_known($name) {
-        # say "add_mystery $name";
-        # say "Mystery $name $*CURPAD";
+        say "add_mystery $name $*CURPAD" if $*DEBUG +& DEBUG::symtab;
         %*MYSTERY{$name}.<pad> = $*CURPAD;
         %*MYSTERY{$name}.<line> ~= self.lineof($pos) ~ ' ';
     }
     else {
-        # say "$name is known";
+        say "$name is known" if $*DEBUG +& DEBUG::symtab;
     }
     self;
 }
@@ -5249,77 +5245,71 @@ method load_setting ($setting) {
     @PKGS = ();
 
     $*SETTING = self.load_pad($setting);
-    $*CURPAD = $*SETTING<stash>;
+    $*CURPAD = $*SETTING;
     $*CORE = $*SETTING;
     for 1..100 {
-        my $outerer = $*SETTING<stash><OUTER>;
+        my $outerer = $*CORE.<OUTER::>;
         last unless $outerer;
         $*CORE = $outerer;
     }
-    if $*SETTING<stash><OUTER> {
+    if $*CORE.<OUTER::> {
         warn "Internal error: infinite setting loop";
-        $*SETTING<stash><OUTER>:delete;
+        $*CORE.<OUTER::>:delete;
     }
-    $*GLOBAL = $*CORE<stash><GLOBAL> //= {
-        file => $*FILE, line => 1,
-        longname => 'GLOBAL',
-        stash => {},
-    };
-    $*GLOBAL<stash><$?STAB> = $*GLOBAL;
-    $*CURPKG = $*GLOBAL<stash>;
-    $*CURPKG<$?STAB> = $*GLOBAL;
-
-    $*PROCESS = $*CORE<stash><PROCESS> //= {
-        file => $*FILE, line => 1,
-        longname => 'PROCESS',
-        stash => {},
-    };
-    $*PROCESS<stash><$?STAB> = $*PROCESS;
+    $*GLOBAL = $*CORE.<GLOBAL::> //= STASH.new(
+        _file => $*FILE, _line => 1,
+        _cf => 'GLOBAL',
+    );
+    $*CURPKG = $*GLOBAL;
 }
 
 method is_known ($n, $curpad = $*CURPAD) {
     my $name = $n;
-    # say "is_known $name";
-    return True if $*QUASI_QUASH;
+    say "is_known $name" if $*DEBUG +& DEBUG::symtab;
+    return True if $*QUASIMODO;
     return True if $*CURPKG.{$name};
     my $curpkg = $*CURPKG;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
-        return True if @components[0] eq 'COMPILING';
-        return True if @components[0] eq 'CALLER';
-        return True if @components[0] eq 'CONTEXT';
+        return True if @components[0] eq 'COMPILING::';
+        return True if @components[0] eq 'CALLER::';
+        return True if @components[0] eq 'CONTEXT::';
         if $curpkg = self.find_top_pkg(@components[0]) {
-            # say "Found lexical package " ~ @components[0];
+            say "Found lexical package ", @components[0] if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            # say "Looking for GLOBAL::<$name>";
-            $curpkg = $*GLOBAL<stash>;
+            say "Looking for GLOBAL::<$name>" if $*DEBUG +& DEBUG::symtab;
+            $curpkg = $*GLOBAL;
         }
         while @components > 1 {
             my $pkg = shift @components;
-            # say "Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg);
-            $curpkg = $curpkg.{$pkg}<stash>;
+            say "Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg) if $*DEBUG +& DEBUG::symtab;
+            $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
-            # say "Found $pkg okay, now in $curpkg ";
+            say "Found $pkg okay, now in $curpkg " if $*DEBUG +& DEBUG::symtab;
         }
     }
 
     $name = shift(@components)//'';
-    # say "Final component is $name";
+    say "Final component is $name" if $*DEBUG +& DEBUG::symtab;
     return True if $name eq '';
-    # say "Found" if $curpkg.{$name};
-    return True if $curpkg.{$name};
+    if $curpkg.{$name} {
+        say "Found" if $*DEBUG +& DEBUG::symtab;
+        return True;
+    }
 
     my $pad = $curpad;
     while $pad {
-        # say "Looking in ", $pad<$?STAB><longname>;
-        # say "Found" if $pad.{$name};
-        return True if $pad.{$name};
-        # say $pad.<OUTER><stash> // "No OUTER";
-        $pad = $pad.<OUTER><stash>;
+        say "Looking in ", $pad.cf if $*DEBUG +& DEBUG::symtab;
+        if $pad.{$name} {
+            say "Found $name in ", $pad.cf if $*DEBUG +& DEBUG::symtab;
+            return True;
+        }
+        say $pad.<OUTER::> // "No OUTER" if $*DEBUG +& DEBUG::symtab;
+        $pad = $pad.<OUTER::>;
     }
-    # say "Not Found";
+    say "Not Found" if $*DEBUG +& DEBUG::symtab;
 
     return False;
 }
@@ -5343,7 +5333,7 @@ method add_variable ($name) {
 
 method add_my_variable ($n) {
     my $name = $n;
-    # say "add_my_variable $name";
+    say "add_my_variable $name" if $*DEBUG +& DEBUG::symtab;
     if substr($name, 0, 1) eq '&' {
         self.add_my_name($name);
         if $name ~~ s/\:\(.*// {
@@ -5362,7 +5352,7 @@ method add_our_variable ($name) {
 
 method check_variable ($variable) {
     my $name = $variable.Str;
-    # say "check_variable $name";
+    say "check_variable $name" if $*DEBUG +& DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W?)(.?)/;
     given $twigil {
         when '' {
@@ -5424,7 +5414,7 @@ method lookup_compiler_var($name) {
 
         when '$?LANG'    { return item %*LANG; }
 
-        when '$?SCOPE'    { return $*CURPAD; }
+        when '$?STASH'    { return $*CURPAD; }
 
         when '$?PACKAGE'  { return $*CURPKG; }
         when '$?MODULE'   { return $*CURPKG; } #  XXX should scan

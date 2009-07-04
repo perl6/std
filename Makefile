@@ -1,6 +1,6 @@
 .PHONY: check try cat clean distclean purge test
 
-FIXINS=Cursor.pmc LazyMap.pm DEBUG.pm DEBUG.pmc Test.pm CORE.setting NULL.pad std mangle.pl CORE.pad
+FIXINS=Cursor.pmc LazyMap.pm DEBUG.pm DEBUG.pmc Test.pm CORE.setting NULL.pad std mangle.pl CORE.pad NAME.pm NAME.pmc STASH.pm STASH.pmc
 
 all: $(FIXINS) check lex/STD/termish
 
@@ -37,7 +37,7 @@ cat:
 	cat try5.out
 
 clean:
-	rm -rf lex try5.* *.pad.store *.syml.store *.syml
+	rm -rf lex try5.* *.pad.store *.syml.store *.syml STD.pmc STD.pm5
 
 distclean purge: clean
 	rm -rf STD.pmc STD.pm5

@@ -1,0 +1,11 @@
+use 5.010;
+package NAME;
+sub new {
+    my $class = shift;
+    my %attrs = @_;
+    bless \%attrs, $class;
+}
+sub name  { return $self->{name} };
+sub file  { return $self->{file} };
+sub line  { return $self->{line} };
+1;

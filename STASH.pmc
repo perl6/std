@@ -1,0 +1,11 @@
+use 5.010;
+package STASH;
+sub new {
+    my $class = shift;
+    my %attrs = @_;
+    bless \%attrs, $class;
+}
+sub cf    { return $self->{'_cf'} };
+sub file  { return $self->{'_file'} };
+sub line  { return $self->{'_line'} };
+1;

@@ -3,6 +3,8 @@ use strict;
 use warnings;
 no warnings 'recursion';
 use utf8;
+use NAME;
+use STASH;
 
 my $TRIE = 1;
 my $STORABLE = 1;
@@ -144,10 +146,10 @@ sub load_pad {
     my $setting = shift;
     my $file = "$setting.syml";
     if (-e $file) {
-        $self->load_yaml_pad($setting);
+        bless($self->load_yaml_pad($setting),'STASH');
     }
     else {
-        $self->load_perl_pad($setting);
+        bless($self->load_perl_pad($setting),'STASH');
     }
 }
 
@@ -182,7 +184,7 @@ sub load_yaml_pad {
         $PADS{$setting} = LoadFile($file);
         store($PADS{$setting}, $store);
     }
-    # say join ' ', sort keys %{$PADS{$setting}{stash}};
+    # say join ' ', sort keys %{ $PADS{$setting} };
     $PADS{$setting};
 }
 
@@ -199,9 +201,10 @@ sub gettrait {
     if ($traitname eq 'export') {
         if (defined $text) {
             $text =~ s/://g;
+            $text .= '::';
         }
         else {
-            $text = 'DEFAULT';
+            $text = 'DEFAULT::';
         }
         $self->set_export($text);
         $text;
@@ -217,10 +220,13 @@ sub gettrait {
 sub set_export {
         my $self = shift;
         my $text = shift;
-        my $name = $::DECLARING->{name};
-        $::DECLARING->{export} = $text;
-        $::CURPKG->{EXPORT}{stash}{$text}{stash}{$name} = $::DECLARING;
-        $::CURPKG->{EXPORT}{stash}{$text}{stash}{'&'.$name} = $::DECLARING
+        my $name = $::DECLARAND->{name};
+        my $xpad = $::DECLARAND->{xpad};
+        $::DECLARAND->{export} = $text;
+        my $x = $xpad->{'EXPORT::'} //= STASH::->new( 'PARENT::' => $::CURPAD );
+        $x->{$text} //= STASH::->new( 'PARENT::' => $x );
+        $x->{$text}->{$name} = $::DECLARAND;
+        $x->{$text}->{'&'.$name} = $::DECLARAND
                 if $name =~ /^\w/ and $::SCOPE ne 'constant';
         $self;
 }
@@ -237,12 +243,12 @@ sub you_were_here {
     $file =~ s/(\.setting)?$/.syml/;
     $file =~ s!.*/!!;
     $::UNIT //= $::YOU_WERE_HERE;
-    $::UNIT->{SETTINGNAME} = $::UNIT->{OUTER}{longname};
+    $::UNIT->{SETTINGNAME} = $::UNIT->{'OUTER::'}->cf;
     $::UNIT->{GLOBALish} = $::GLOBAL;
-    delete $::UNIT->{OUTER};
-    delete $::UNIT->{GLOBALish}{stash}{PARENT}; # don't want to slurp in CORE
+    delete $::UNIT->{'OUTER::'};
+    delete $::UNIT->{GLOBALish}->{'PARENT::'}; # don't want to slurp in CORE
     open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
-    print SETTING Dump({ file => $::FILE, line => $self->line, stash => $::YOU_WERE_HERE });
+    print SETTING Dump($::YOU_WERE_HERE);
     close SETTING;
     $self;
 }
@@ -1062,7 +1068,7 @@ sub do_imports { my $self = shift;
     my $module = shift;
     my $args = shift;
     my @imports;
-    my $topstab;
+    my $topsym;
     my $pkg;
     my $lib = '.';
     my $std = -x 'std' ? './std' : 'std';
@@ -1073,16 +1079,18 @@ sub do_imports { my $self = shift;
         }
     }
     if (-f "$module.pm.syml" and -M "$lib/$module.pm" > -M "$module.pm.syml") {
-        $topstab = LoadFile("$module.pm.syml");
+        $topsym = LoadFile("$module.pm.syml");
     }
     elsif (-f "$lib/$module.pm") {
         system "$std $lib/$module.pm" and die "Can't compile $lib/$module.pm";
-        $topstab = LoadFile("$module.pm.syml");
+        $topsym = LoadFile("$module.pm.syml");
     }
     else {
         $self->worry("Can't locate module $module");
     }
-    $pkg = $topstab->{stash}{$module}{stash} if $topstab;;
+    $pkg = $topsym;
+#    $pkg = eval { $topsym->{$module . '::'} if $topsym };
+#    say Dump($pkg);
     if ($args) {
         $self->add_my_name($module);
         my $text = $args->Str;
@@ -1093,18 +1101,18 @@ sub do_imports { my $self = shift;
             local $::SCOPE = $scope;
             @imports = split ' ', $imports;
             for (@imports) {
-                local $::DECLARING;
+                local $::DECLARAND;
                 if ($pkg) {
                     if ($_ =~ s/^://) {
                         my @tagimports;
-                        eval { @tagimports = keys %{$pkg->{'EXPORT'}{'stash'}{$_}{'stash'}}; };
+                        eval { @tagimports = keys %{ $pkg->{'EXPORT::'}->{$_} }; };
                         $self->do_import_aliases($pkg, @tagimports);
                     }
                     elsif ($pkg->{$_}{export}) {
-                        $::DECLARING = $pkg->{$_};
+                        $::DECLARAND = $pkg->{$_};
                     }
                     elsif ($pkg->{'&'.$_}{export}) {
-                        $::DECLARING = $pkg->{'&'.$_};
+                        $::DECLARAND = $pkg->{'&'.$_};
                     }
                     elsif ($pkg->{$_}) {
                         $self->worry("Can't import $_ because it's not exported by $module");
@@ -1128,8 +1136,8 @@ sub do_imports { my $self = shift;
     else {
         # say join(' ', keys(%$pkg));
         $self->add_my_name($module);
-        return $self unless $topstab and $pkg;
-        eval { @imports = keys %{$pkg->{'EXPORT'}{'stash'}{'DEFAULT'}{'stash'}}; };
+        return $self unless $topsym and $pkg;
+        eval { @imports = keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }; };
         local $::SCOPE = 'my';
         $self->do_import_aliases($pkg, @imports);
     }
@@ -1139,8 +1147,9 @@ sub do_imports { my $self = shift;
 sub do_import_aliases {
     my $self = shift;
     my $pkg = shift;
+#    say "attempting to import @_";
     for (@_) {
-        $::DECLARING = $pkg->{$_};
+        $::DECLARAND = $pkg->{$_};
         if (/^\w/) {
             next if /^PARENT/;
             next if /^OUTER/;
@@ -1168,7 +1177,7 @@ sub canonicalize_name { my $self = shift;
     if ($name =~ s/::<(.*)>$//) {
         $vname = $1;
     }
-    my @components = split(/::/, $name, -1);
+    my @components = split(/(?<=::)/, $name, -1);
     shift(@components) while @components and $components[0] eq '';
     if (@components and $components[-1] eq '') {
         pop @components;
