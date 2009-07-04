@@ -822,7 +822,7 @@ token statement_control:need {
         {{
             my $SCOPE is context = 'use';
             $longname = $<module_name>[*-1]<longname>.Str;
-            $¢.do_imports($longname, '');
+            $¢.do_imports($longname);
         }}
     ] ** ','
 }
@@ -840,7 +840,6 @@ token statement_control:use {
         [
         || <.spacey> <arglist>
             {{
-                # XXX cheat on import list for now
                 $¢.do_imports($longname, $<arglist>);
             }}
         || {{ $¢.do_imports($longname, ''); }}
@@ -934,18 +933,12 @@ token statement_control:when {
 rule statement_control:default {<sym> <block> }
 
 token statement_prefix:BEGIN   { <sym> <blorst> }
+token statement_prefix:CHECK   { <sym> <blorst> }
 token statement_prefix:INIT    { <sym> <blorst> }
 token statement_prefix:START   { <sym> <blorst> }
 token statement_prefix:ENTER   { <sym> <blorst> }
 token statement_prefix:FIRST   { <sym> <blorst> }
 
-# rule statement_control:BEGIN   {<sym> <block> }
-# rule statement_control:INIT    {<sym> <block> }
-# rule statement_control:START   {<sym> <block> }
-# rule statement_control:ENTER   {<sym> <block> }
-# rule statement_control:FIRST   {<sym> <block> }
-
-rule statement_control:CHECK   {<sym> <block> }
 rule statement_control:END     {<sym> <block> }
 rule statement_control:LEAVE   {<sym> <block> }
 rule statement_control:KEEP    {<sym> <block> }
@@ -1303,12 +1296,12 @@ rule trait {
 }
 
 token trait_mod:is {
-    <sym>:s <longname><postcircumfix>?  # e.g. context<rw> and Array[Int]
+    <sym>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
     {{
         if $*DECLARAND {
             my $traitname = $<longname>.Str;
             # XXX eventually will use multiple dispatch
-            $*DECLARAND{$traitname} = self.gettrait($traitname, $<postcircumfix>);
+            $*DECLARAND{$traitname} = self.gettrait($traitname, $<circumfix>);
         }
     }}
 }
@@ -1414,13 +1407,13 @@ token colonpair {
     | <identifier>
         { $key = $<identifier>.Str; }
         [
-        || <.unsp>? <postcircumfix> { $value = $<postcircumfix>; }
+        || <.unsp>? <circumfix> { $value = $<circumfix>; }
         || { $value = 1; }
         ]
         {*}                                                     #= value
     | :dba('signature') '(' ~ ')' <fakesignature>
-    | <postcircumfix>
-        { $key = ""; $value = $<postcircumfix>; }
+    | <circumfix>
+        { $key = ""; $value = $<circumfix>; }
         {*}                                                     #= structural
     | $<var> = (<sigil> {} <twigil>? <desigilname>)
         { $key = $<var><desigilname>.Str; $value = $<var>; }
@@ -1442,7 +1435,7 @@ token quotepair {
     | <identifier>
         { $key = $<identifier>.Str; }
         [
-        || <.unsp>? <?before '('> <postcircumfix> { $value = $<postcircumfix>; }
+        || <.unsp>? <?before '('> <circumfix> { $value = $<circumfix>; }
         || { $value = 1; }
         ]
         {*}                                                     #= value
@@ -1927,8 +1920,8 @@ token rad_number {
             [ '*' <base=radint> '**' <exp=radint> ]?
        '>'
 #      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
-    || <?before '['> <postcircumfix>
-    || <?before '('> <postcircumfix>
+    || <?before '['> <circumfix>
+    || <?before '('> <circumfix>
     ]
 }
 
@@ -2132,9 +2125,9 @@ method nibble ($lang) {
 token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> "'" }
 token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> '"' }
 
-token quote:sym<« »>   { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
-token quote:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
-token quote:sym«< >»   { '<'
+token circumfix:sym<« »>   { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
+token circumfix:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
+token circumfix:sym«< >»   { '<'
                               [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
                               [ <?before '>' > <.obs('<>', 'lines() or ()')> ]?
                               <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
@@ -3525,8 +3518,18 @@ token arglist {
     ]
 }
 
+token term:lambda ( --> Term) {
+    <?before <.lambda> >
+    <pblock>
+    {{
+        if $*BORG {
+            $*BORG.<block> = $<pblock>;
+        }
+    }}
+}
+
 token circumfix:sym<{ }> ( --> Term) {
-    <?before '{' | <.lambda> >
+    <?before '{' >
     <pblock>
     {{
         if $*BORG {
@@ -4571,7 +4574,7 @@ grammar Regex is STD {
 
     token metachar:qw {
         <?before '<' \s >  # (note required whitespace)
-        <quote>
+        <circumfix>
     }
 
     token metachar:sym«< >» {
