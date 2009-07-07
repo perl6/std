@@ -1005,11 +1005,9 @@ token version:sym<v> {
 token constant_declarator {
     :my $IN_DECL is context<rw> = 1;
     :my $DECLARAND is context<rw>;
-    <identifier>
     <?{ $*SCOPE eq 'constant' }>
-    <!{ $¢.is_name($<identifier>.Str) }>
+    <identifier> <.ws> <?before '='>
     { $*IN_DECL = 0; self.add_name($<identifier>.Str) }
-    <.ws>
 
     <trait>*
 }
@@ -2827,8 +2825,8 @@ grammar Q is STD {
         token backslash:misc { {} (.) { $<text> = "\\" ~ $0.Str; } }
 
         # begin tweaks (DO NOT ERASE)
-        multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
-        multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
+        multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
+        multi method tweak (:double(:$qq)!) { self.panic("Too late for :qq") }
         # end tweaks (DO NOT ERASE)
 
     } # end role
@@ -2839,48 +2837,48 @@ grammar Q is STD {
         token backslash:misc { {} [ (\W) { $<text> = $0.Str; } | $<x>=(\w) <.panic("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
 
         # begin tweaks (DO NOT ERASE)
-        multi method tweak (:single(:$q)) { self.panic("Too late for :q") }
-        multi method tweak (:double(:$qq)) { self.panic("Too late for :qq") }
+        multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
+        multi method tweak (:double(:$qq)!) { self.panic("Too late for :qq") }
         # end tweaks (DO NOT ERASE)
 
     } # end role
 
     role p5 {
         # begin tweaks (DO NOT ERASE)
-        multi method tweak (:$g) { self }
-        multi method tweak (:$i) { self }
-        multi method tweak (:$m) { self }
-        multi method tweak (:$s) { self }
-        multi method tweak (:$x) { self }
-        multi method tweak (:$p) { self }
-        multi method tweak (:$c) { self }
+        multi method tweak (:$g!) { self }
+        multi method tweak (:$i!) { self }
+        multi method tweak (:$m!) { self }
+        multi method tweak (:$s!) { self }
+        multi method tweak (:$x!) { self }
+        multi method tweak (:$p!) { self }
+        multi method tweak (:$c!) { self }
         # end tweaks (DO NOT ERASE)
     } # end role
 
     # begin tweaks (DO NOT ERASE)
 
-    multi method tweak (:single(:$q)) { self.truly($q,':q'); self.mixin( ::q ); }
+    multi method tweak (:single(:$q)!) { self.truly($q,':q'); self.mixin( ::q ); }
 
-    multi method tweak (:double(:$qq)) { self.truly($qq, ':qq'); self.mixin( ::qq ); }
+    multi method tweak (:double(:$qq)!) { self.truly($qq, ':qq'); self.mixin( ::qq ); }
 
-    multi method tweak (:backslash(:$b))   { self.mixin($b ?? ::b1 !! ::b0) }
-    multi method tweak (:scalar(:$s))      { self.mixin($s ?? ::s1 !! ::s0) }
-    multi method tweak (:array(:$a))       { self.mixin($a ?? ::a1 !! ::a0) }
-    multi method tweak (:hash(:$h))        { self.mixin($h ?? ::h1 !! ::h0) }
-    multi method tweak (:function(:$f))    { self.mixin($f ?? ::f1 !! ::f0) }
-    multi method tweak (:closure(:$c))     { self.mixin($c ?? ::c1 !! ::c0) }
+    multi method tweak (:backslash(:$b)!)   { self.mixin($b ?? ::b1 !! ::b0) }
+    multi method tweak (:scalar(:$s)!)      { self.mixin($s ?? ::s1 !! ::s0) }
+    multi method tweak (:array(:$a)!)       { self.mixin($a ?? ::a1 !! ::a0) }
+    multi method tweak (:hash(:$h)!)        { self.mixin($h ?? ::h1 !! ::h0) }
+    multi method tweak (:function(:$f)!)    { self.mixin($f ?? ::f1 !! ::f0) }
+    multi method tweak (:closure(:$c)!)     { self.mixin($c ?? ::c1 !! ::c0) }
 
-    multi method tweak (:exec(:$x))        { self.mixin($x ?? ::x1 !! ::x0) }
-    multi method tweak (:words(:$w))       { self.mixin($w ?? ::w1 !! ::w0) }
-    multi method tweak (:quotewords(:$ww)) { self.mixin($ww ?? ::ww1 !! ::ww0) }
+    multi method tweak (:exec(:$x)!)        { self.mixin($x ?? ::x1 !! ::x0) }
+    multi method tweak (:words(:$w)!)       { self.mixin($w ?? ::w1 !! ::w0) }
+    multi method tweak (:quotewords(:$ww)!) { self.mixin($ww ?? ::ww1 !! ::ww0) }
 
-    multi method tweak (:heredoc(:$to)) { self.truly($to, ':to'); self.cursor_herelang; }
+    multi method tweak (:heredoc(:$to)!) { self.truly($to, ':to'); self.cursor_herelang; }
 
-    multi method tweak (:$regex) {
+    multi method tweak (:$regex!) {
         return %*LANG<Regex>;
     }
 
-    multi method tweak (:$trans) {
+    multi method tweak (:$trans!) {
         return %*LANG<Trans>;
     }
 
@@ -2900,10 +2898,10 @@ grammar Quasi is STD {
     }
 
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:$ast) { self; } # XXX some transformer operating on the normal AST?
-    multi method tweak (:$lang) { self.cursor_fresh( $lang ); }
-    multi method tweak (:$unquote) { self; } # XXX needs to override unquote
-    multi method tweak (:$COMPILING) { $*QUASIMODO = 1; self; } # XXX needs to lazify the lexical lookups somehow
+    multi method tweak (:$ast!) { self; } # XXX some transformer operating on the normal AST?
+    multi method tweak (:$lang!) { self.cursor_fresh( $lang ); }
+    multi method tweak (:$unquote!) { self; } # XXX needs to override unquote
+    multi method tweak (:$COMPILING!) { $*QUASIMODO = 1; self; } # XXX needs to lazify the lexical lookups somehow
 
     multi method tweak (*%x) {
         my @k = keys(%x);
@@ -4406,29 +4404,29 @@ method EXPR ($preclvl) {
 grammar Regex is STD {
 
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:Perl5(:$P5)) { self.cursor_fresh( %*LANG<Q> ).mixin( ::q ).mixin( ::p5 ) }
-    multi method tweak (:overlap(:$ov)) { self }
-    multi method tweak (:exhaustive(:$ex)) { self }
-    multi method tweak (:continue(:$c)) { self }
-    multi method tweak (:pos(:$p)) { self }
-    multi method tweak (:sigspace(:$s)) { self }
-    multi method tweak (:ratchet(:$r)) { self }
-    multi method tweak (:global(:$g)) { self }
-    multi method tweak (:ignorecase(:$i)) { self }
-    multi method tweak (:ignoreaccent(:$a)) { self }
-    multi method tweak (:samecase(:$ii)) { self }
-    multi method tweak (:sameaccent(:$aa)) { self }
-    multi method tweak (:$nth) { self }
-    multi method tweak (:st(:$nd)) { self }
-    multi method tweak (:rd(:$th)) { self }
-    multi method tweak (:$x) { self }
-    multi method tweak (:$bytes) { self }
-    multi method tweak (:$codes) { self }
-    multi method tweak (:$graphs) { self }
-    multi method tweak (:$chars) { self }
-    multi method tweak (:$rw) { self }
-    multi method tweak (:$keepall) { self }
-    multi method tweak (:$panic) { self }
+    multi method tweak (:Perl5(:$P5)!) { self.cursor_fresh( %*LANG<Q> ).mixin( ::q ).mixin( ::p5 ) }
+    multi method tweak (:overlap(:$ov)!) { self }
+    multi method tweak (:exhaustive(:$ex)!) { self }
+    multi method tweak (:continue(:$c)!) { self }
+    multi method tweak (:pos(:$p)!) { self }
+    multi method tweak (:sigspace(:$s)!) { self }
+    multi method tweak (:ratchet(:$r)!) { self }
+    multi method tweak (:global(:$g)!) { self }
+    multi method tweak (:ignorecase(:$i)!) { self }
+    multi method tweak (:ignoreaccent(:$a)!) { self }
+    multi method tweak (:samecase(:$ii)!) { self }
+    multi method tweak (:sameaccent(:$aa)!) { self }
+    multi method tweak (:$nth!) { self }
+    multi method tweak (:st(:$nd)!) { self }
+    multi method tweak (:rd(:$th)!) { self }
+    multi method tweak (:$x!) { self }
+    multi method tweak (:$bytes!) { self }
+    multi method tweak (:$codes!) { self }
+    multi method tweak (:$graphs!) { self }
+    multi method tweak (:$chars!) { self }
+    multi method tweak (:$rw!) { self }
+    multi method tweak (:$keepall!) { self }
+    multi method tweak (:$panic!) { self }
     # end tweaks (DO NOT ERASE)
 
     token category:metachar { <sym> }
@@ -4761,8 +4759,8 @@ grammar Regex is STD {
 grammar P5Regex is STD {
 
     # begin tweaks (DO NOT ERASE)
-    multi method tweak (:global(:$g)) { self }
-    multi method tweak (:ignorecase(:$i)) { self }
+    multi method tweak (:global(:$g)!) { self }
+    multi method tweak (:ignorecase(:$i)!) { self }
     # end tweaks (DO NOT ERASE)
 
     token category:metachar { <sym> }

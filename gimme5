@@ -670,13 +670,13 @@ END
 
         if (s/^\s*multi method tweak\s*\((.*?)\)\s+{//) {
             my $sig = $1;
-            if ($sig =~ m/^:(\w+)\(:(\$(\w+))\)$/) {
+            if ($sig =~ m/^:(\w+)\(:(\$(\w+))\)!$/) {
                 $out .= "    elsif (\$k eq '$1' or \$k eq '$3') {\n        my $2 = \$v; ";
             }
-            elsif ($sig =~ m/^:(\w+)\((\$\w+)\)$/) {
+            elsif ($sig =~ m/^:(\w+)\((\$\w+)\)!$/) {
                 $out .= "    elsif (\$k eq '$1') {\n        my $2 = \$v; ";
             }
-            elsif ($sig =~ m/^:(\$(\w+))$/) {
+            elsif ($sig =~ m/^:(\$(\w+))!$/) {
                 $out .= "    elsif (\$k eq '$2') {\n        my $1 = \$v; ";
             }
             elsif ($sig =~ m/^\*%x$/) {
