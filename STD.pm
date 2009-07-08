@@ -498,6 +498,7 @@ token pod_comment {
         [.*?  ^^ \h* $$ || .*]
     | :: 
         [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
+        [<alpha>||\s||<.panic: "Illegal pod directive">]
         \N*                                           {*}       #= misc
     ]
 }
