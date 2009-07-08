@@ -1007,7 +1007,7 @@ token constant_declarator {
     :my $IN_DECL is context<rw> = 1;
     :my $DECLARAND is context<rw>;
     <?{ $*SCOPE eq 'constant' }>
-    <identifier> <.ws> <?before '='>
+    <identifier> <.ws> <?before '='|'is'\s>
     { $*IN_DECL = 0; self.add_name($<identifier>.Str) }
 
     <trait>*
