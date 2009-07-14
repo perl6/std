@@ -249,6 +249,7 @@ my proto min { }
 my proto max { }
 my proto uniq { }
 my proto push { }
+my proto rotate { }
 my proto reverse { }
 my proto flip { }
 my proto take { }
