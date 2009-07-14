@@ -1,0 +1,5 @@
+lex/
+*.store
+*.syml
+STD.pm5
+STD.pmc
