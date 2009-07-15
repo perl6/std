@@ -1064,12 +1064,9 @@ sub add_enum { my $self = shift;
     $self;
 }
 
-sub do_imports { my $self = shift;
+sub do_need { my $self = shift;
     my $module = shift;
-    my $args = shift;
-    my @imports;
     my $topsym;
-    my $pkg;
     my $lib = '.';
     my $std = -x 'std' ? './std' : 'std';
     for my $d (split ':', $ENV{PERL6LIB}//'.:..') {
@@ -1088,11 +1085,19 @@ sub do_imports { my $self = shift;
     else {
         $self->worry("Can't locate module $module");
     }
-    $pkg = $topsym;
-#    $pkg = eval { $topsym->{$module . '::'} if $topsym };
-#    say Dump($pkg);
+    $self->add_my_name($module);
+    $::DECLARAND{pkg} = $topsym;
+    $self;
+}
+
+sub do_use { my $self = shift;
+    my $module = shift;
+    my $args = shift;
+    my @imports;
+    my $pkg;
+    $self->do_need($module);
+    $pkg = $::DECLARAND{pkg};
     if ($args) {
-        $self->add_my_name($module);
         my $text = $args->Str;
         return $self unless $text;
         while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
@@ -1134,9 +1139,7 @@ sub do_imports { my $self = shift;
         }
     }
     else {
-        # say join(' ', keys(%$pkg));
-        $self->add_my_name($module);
-        return $self unless $topsym and $pkg;
+        return $self unless $pkg;
         eval { @imports = keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }; };
         local $::SCOPE = 'my';
         $self->do_import_aliases($pkg, @imports);

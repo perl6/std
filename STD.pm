@@ -823,7 +823,7 @@ token statement_control:need {
         {{
             my $SCOPE is context = 'use';
             $longname = $<module_name>[*-1]<longname>.Str;
-            $¢.do_imports($longname);
+            $¢.do_need($longname);
         }}
     ] ** ','
 }
@@ -841,9 +841,9 @@ token statement_control:use {
         [
         || <.spacey> <arglist>
             {{
-                $¢.do_imports($longname, $<arglist>);
+                $¢.do_use($longname, $<arglist>);
             }}
-        || {{ $¢.do_imports($longname, ''); }}
+        || {{ $¢.do_use($longname, ''); }}
         ]
     ]
     <.ws>
@@ -4474,7 +4474,12 @@ grammar Regex is STD {
 
     token termish {
         <.ws>
-        <noun=quantified_atom>+
+        [
+        || <noun=quantified_atom>+
+        || <?before <stopper> | <[&|~]>  >  <.panic: "Null pattern not allowed">
+        || <?before <[ \] \) \> ]> > <.panic: "Unmatched closing bracket">
+        || <.panic: "Unrecognized regex metacharacter">
+        ]
     }
     token infixish {
         <!infixstopper>
@@ -4507,7 +4512,6 @@ grammar Regex is STD {
         [
         | \w
         | <metachar> ::
-        | <.panic: "Unrecognized regex metacharacter">
         ]
     }
 
