@@ -3575,8 +3575,14 @@ token prefix:sym<+> ( --> Symbolic_unary)
 token prefix:sym<-> ( --> Symbolic_unary)
     { <sym> }
 
+token prefix:sym<~~> ( --> Symbolic_unary)
+    { <sym> <.badinfix> }
+
 token prefix:sym<~> ( --> Symbolic_unary)
     { <sym> }
+
+token prefix:sym<??> ( --> Symbolic_unary)
+    { <sym> <.badinfix> }
 
 token prefix:sym<?> ( --> Symbolic_unary)
     { <sym> }
@@ -3590,8 +3596,14 @@ token prefix:sym<+^> ( --> Symbolic_unary)
 token prefix:sym<?^> ( --> Symbolic_unary)
     { <sym> }
 
+token prefix:sym<^^> ( --> Symbolic_unary)
+    { <sym> <.badinfix> }
+
 token prefix:sym<^> ( --> Symbolic_unary)
     { <sym> }
+
+token prefix:sym<||> ( --> Symbolic_unary)
+    { <sym> <.badinfix> }
 
 token prefix:sym<|> ( --> Symbolic_unary)
     { <sym> }
@@ -5564,6 +5576,16 @@ method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
 method worryobs (Str $old, Str $new, Str $when = ' in Perl 6') {
     self.worry("Possible obsolete use of $old;$when please use $new instead");
     self;
+}
+
+# Since most keys are valid prefix operators or terms, this rule is difficult
+# to reach ('say »+«' works), but it's okay as a last-ditch default anyway.
+token term:sym<miscbad> {
+    {} <!{ $*QSIGIL }> <infixish> <.badinfix($<infixish>.Str)>
+}
+
+method badinfix (Str $bad = $*sym) {
+    self.panic("Preceding operator expects term, but found infix $bad instead");
 }
 
 ## vim: expandtab sw=4 ft=perl6
