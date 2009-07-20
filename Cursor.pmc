@@ -243,10 +243,10 @@ sub you_were_here {
     $file =~ s/(\.setting)?$/.syml/;
     $file =~ s!.*/!!;
     $::UNIT //= $::YOU_WERE_HERE;
-    $::UNIT->{SETTINGNAME} = $::UNIT->{'OUTER::'}->cf;
-    $::UNIT->{GLOBALish} = $::GLOBAL;
+    $::UNIT->{_SETTINGNAME} = $::UNIT->{'OUTER::'}->cf;
+    $::UNIT->{_GLOBALish} = $::GLOBAL;
     delete $::UNIT->{'OUTER::'};
-    delete $::UNIT->{GLOBALish}->{'PARENT::'}; # don't want to slurp in CORE
+    delete $::UNIT->{_GLOBALish}->{'PARENT::'}; # don't want to slurp in CORE
     open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
     print SETTING Dump($::YOU_WERE_HERE);
     close SETTING;

@@ -1452,7 +1452,6 @@ token special_variable:sym<$¢> { <sym> }
 token special_variable:sym<$!> { <sym> <!before \w> }
 
 token special_variable:sym<$!{ }> {
-    # XXX the backslashes are necessary here for bootstrapping, not for P6...
     ( '$!{' :: (.*?) '}' )
     <.obs($0.Str ~ " variable", 'smart match against $!')>
 }
@@ -2027,7 +2026,8 @@ token sibble ($l, $lang2) {
     $start <left=nibble($lang)> $stop 
     [ <?{ $start ne $stop }>
         <.ws>
-        [ '=' || <.panic: "Missing '='"> ]
+        [ <infixish> || "Missing assignment operator" ]
+        [ <?{ $<infixish>.Str eq '=' || $<infixish>.<infix_postfix_meta_operator> }> || <.panic: "Malformed assignment operator"> ]
         <.ws>
         <right=EXPR(item %item_assignment)>
     || 
@@ -5106,7 +5106,7 @@ method add_name ($name) {
     self;
 }
 
-method add_my_name ($n, $d) {
+method add_my_name ($n, $d, $p) {
     my $name = $n;
     say "add_my_name $name" if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
@@ -5167,7 +5167,7 @@ method add_my_name ($n, $d) {
         $*DECLARAND = $curstash.{$name} = $declaring;
         if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $curstash.{$name};
-            $curstash.{$name ~ '::'} //= STASH.new( 'PARENT::' => $curstash, _file => $*FILE, _line => self.line );
+            $curstash.{$name ~ '::'} //= ($p // STASH.new( 'PARENT::' => $curstash, _file => $*FILE, _line => self.line ));
         }
     }
     self;
@@ -5243,7 +5243,7 @@ method add_our_name ($n) {
             $curstash.{$name ~ '::'} //= STASH.new( 'PARENT::' => $curstash, _file => $*FILE, _line => self.line );
         }
     }
-    self.add_my_name($n,$declaring) if $curstash === $*CURPKG;   # the lexical alias
+    self.add_my_name($n, $declaring, $curstash.{$name ~ '::'}) if $curstash === $*CURPKG;   # the lexical alias
     self;
 }
 
