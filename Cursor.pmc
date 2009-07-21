@@ -929,6 +929,7 @@ sub add_macro { my $lang = shift;
         $sym =~ s/^\(\s*(.*\S)\s*\)$/$1/g;
         $sym =~ s/^\[\s*(.*\S)\s*\]$/$1/g;
         $sym =~ s/^\{\s*(.*\S)\s*\}$/$1/g;
+        $sym =~ s/\\x\[(.*)\]/\\x{$1}/g;
 
         # unfortunately p5 doesn't understand q«...»
         if ($sym =~ s/^«\s*(.*\S)\s*»$/$1/) {
@@ -953,6 +954,7 @@ sub add_macro { my $lang = shift;
         }
         elsif ($mangle =~ s/^\[(.*)\]$/$1/ or
             $mangle =~ s/^\{(.*)\}$/$1/) {
+            $mangle =~ s/\\x\[(.*)\]/\\x{$1}/g;
             @list = eval $mangle;
         }
         else {

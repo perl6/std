@@ -138,12 +138,12 @@ constant %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>);
 constant %junctive_and    = (:dba('junctive and')    , :prec<q=>, :assoc<list>);
 constant %junctive_or     = (:dba('junctive or')     , :prec<p=>, :assoc<list>);
 constant %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>);
-constant %nonchaining     = (:dba('nonchaining')     , :prec<n=>, :assoc<non>, :diffy);
+constant %structural      = (:dba('structural infix'), :prec<n=>, :assoc<non>, :diffy);
 constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :diffy, :iffy);
 constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>);
 constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>);
 constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :fiddly);
-constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :fiddly);
+constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>);
 constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>);
 constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>, :fiddly);
 constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>);
@@ -219,8 +219,8 @@ class Junctive_or does PrecOp {
 class Named_unary does PrecOp {
     our %o = %named_unary;
 } # end class
-class Nonchaining does PrecOp {
-    our %o = %nonchaining;
+class Structural does PrecOp {
+    our %o = %structural;
 } # end class
 class Chaining does PrecOp {
     our %o = %chaining;
@@ -3349,7 +3349,8 @@ token POST {
 }
 
 method can_meta ($op, $meta) {
-    !$op<O><fiddly> || self.panic("Can't " ~ $meta ~ " a " ~ $op<O><dba> ~ " because it's too fiddly");
+    !$op<O><fiddly> ||
+        self.panic("Can't " ~ $meta ~ " " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are too fiddly");
     self;
 }
 
@@ -3371,7 +3372,7 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     [
     || <!{ $<s><op><O><diffy> }>
     || <?{ $<s><op><O><assoc> eq 'chain' }>
-    || <.panic("Can't reduce a " ~ $<s><op><O><dba> ~ " operator because it's diffy and not chaining")>
+    || <.panic("Can't reduce " ~ $<s><op><sym> ~ " because " ~ $<s><op><O><dba> ~ " operators are diffy and not chaining")>
     ]
 
     { $<O> = $<s><op><O>; $<O><prec>:delete; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
@@ -3399,7 +3400,7 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
        <?{ $<infixish><O><iffy> }>
        <?{ $<O> = $<infixish><O>; }>
         
-    || <.panic("Can't negate a " ~ $<infixish><O><dba> ~ " operator because it's not iffy enough")>
+    || <.panic("Can't negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
     ]
 }
 
@@ -3446,8 +3447,8 @@ token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
 token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
     '='
     <.can_meta($op, "make assignment out of")>
-    [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of a " ~ $op<O><dba> ~ " operator because it's diffy")> ]
-    { $<O> = $op<O>; $<O><prec>:delete; $<O><fiddly> = 1; }
+    [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
+    { $<O> = $op<O>; $<sym> = $op<sym> ~ '='; $<O><dba> = "assignment"; $<O><prec>:delete; $<O><iffy> = 0; }
 }
 
 token postcircumfix:sym<( )> ( --> Methodcall)
@@ -3722,32 +3723,32 @@ token prefix:temp ( --> Named_unary)
     { <sym> » <?before \s*> }
 
 
-## nonchaining binary
-token infix:sym« <=> » ( --> Nonchaining)
+## structural infix
+token infix:sym« <=> » ( --> Structural)
     { <sym> <?{ $<O><returns> = "Order"; }> }
 
-token infix:cmp ( --> Nonchaining)
+token infix:cmp ( --> Structural)
     { <sym> <?{ $<O><returns> = "Order"; }> }
 
-token infix:leg ( --> Nonchaining)
+token infix:leg ( --> Structural)
     { <sym> <?{ $<O><returns> = "Order"; }> }
 
-token infix:but ( --> Nonchaining)
+token infix:but ( --> Structural)
     { <sym> }
 
-token infix:does ( --> Nonchaining)
+token infix:does ( --> Structural)
     { <sym> }
 
-token infix:sym<..> ( --> Nonchaining)
+token infix:sym<..> ( --> Structural)
     { <sym> [<!{ $*IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
 
-token infix:sym<^..> ( --> Nonchaining)
+token infix:sym<^..> ( --> Structural)
     { <sym> }
 
-token infix:sym<..^> ( --> Nonchaining)
+token infix:sym<..^> ( --> Structural)
     { <sym> }
 
-token infix:sym<^..^> ( --> Nonchaining)
+token infix:sym<^..^> ( --> Structural)
     { <sym> }
 
 
