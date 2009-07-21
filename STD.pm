@@ -394,7 +394,7 @@ proto token terminator { <...> }
 token unspacey { <.unsp>? }
 token endid { <?before <-[ \- \' \w ]> > }
 token spacey { <?before <[ \s \# ]> > }
-token nofun { <!before '(' | '.(' | '\\' > }
+token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' > }
 
 ##################
 # Lexer routines #
