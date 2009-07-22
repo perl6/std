@@ -2026,7 +2026,7 @@ token sibble ($l, $lang2) {
     $start <left=nibble($lang)> $stop 
     [ <?{ $start ne $stop }>
         <.ws>
-        [ <infixish> || "Missing assignment operator" ]
+        [ <infixish> || <panic: "Missing assignment operator"> ]
         [ <?{ $<infixish>.Str eq '=' || $<infixish>.<infix_postfix_meta_operator> }> || <.panic: "Malformed assignment operator"> ]
         <.ws>
         <right=EXPR(item %item_assignment)>
@@ -5275,7 +5275,7 @@ method load_setting ($setting) {
         warn "Internal error: infinite setting loop";
         $*CORE.<OUTER::>:delete;
     }
-    $*GLOBAL = $*CORE.<GLOBAL::> //= STASH.new(
+    $*GLOBAL = $*CORE.<GLOBAL::> = STASH.new(
         _file => $*FILE, _line => 1,
         _cf => 'GLOBAL',
     );
@@ -5533,12 +5533,19 @@ method worry (Str $s) {
 }
 
 method locmess () {
-    my $pre = substr($*ORIG, 0, self.pos);
-    my $line = self.lineof(self.pos);
+    my $pos = self.pos;
+    my $line = self.lineof($pos);
+    if self.pos >= @*MEMOS - 1 {
+        $pos -= 2;
+        $line = ($line - 1) ~ " (EOF)";
+    }
+    my $pre = substr($*ORIG, 0, $pos);
     $pre = substr($pre, -40, 40);
     1 while $pre ~~ s!.*\n!!;
-    my $post = substr($*ORIG, self.pos, 40);
+    $pre = '<BOL>' if $pre eq '';
+    my $post = substr($*ORIG, $pos, 40);
     1 while $post ~~ s!(\n.*)!!;
+    $post = '<EOL>' if $post eq '';
     " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR";
 }
