@@ -47,6 +47,8 @@ use LazyMap qw(lazymap eager);
 use Term::ANSIColor;
 our $BLUE = color 'blue';
 our $GREEN = color 'green';
+our $CYAN = color 'cyan';
+our $MAGENTA = color 'magenta';
 our $YELLOW = color 'yellow';
 our $RED = color 'red';
 our $CLEAR = color 'clear';
@@ -67,6 +69,8 @@ our $ALT;
 our $PREFIX = "";
 my $IMP = '(?#::)';
 our $PURIFY = 0;        # ignore {*} IMPs?
+$::PERL6HERE = $ENV{PERL6HERE} // '⏏';
+Encode::_utf8_on($::PERL6HERE);
 
 binmode(STDIN, ":utf8");
 binmode(STDERR, ":utf8");

@@ -659,7 +659,7 @@ token xblock {
 
 token block ($CURPAD is context<rw> = $*CURPAD) {
     :dba('scoped block')
-    <?before '{' >
+    [ <?before '{' > || <.panic: "Missing block"> ]
     <.newpad>
     <blockoid>
 }
@@ -1499,7 +1499,7 @@ token special_variable:sym<$%> {
 # Note: this works because placeholders are restricted to lowercase
 token special_variable:sym<$^X> {
     <sigil> '^' $<letter> = [<[A..Z]>] \W
-    <.obscaret($<sigil>.Str ~ '^' ~ $<letter>.Str, $<sigil>, $<letter>.Str)>
+    <.obscaret($<sigil>.Str ~ '^' ~ $<letter>.Str, $<sigil>.Str, $<letter>.Str)>
 }
 
 token special_variable:sym<$^> {
@@ -1589,7 +1589,7 @@ token special_variable:sym<$+> {
 
 token special_variable:sym<${^ }> {
     ( <sigil> '{^' :: (.*?) '}' )
-    <.obscaret($0.Str, $<sigil>, $0.{0}.Str)>
+    <.obscaret($0.Str, $<sigil>.Str, $0.{0}.Str)>
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
@@ -3481,7 +3481,7 @@ token methodop {
     | <?before <[ ' " ]> >
         [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
         <quote>
-        { $<quote> ~~ /\W/ or $¢.panic("Useless use of quotes") }
+        { my $t = $<quote><nibble>.Str; $t ~~ /\W/ or $t ~~ /^(WHO|WHAT|WHERE|WHEN|WHY|HOW)$/ or $¢.worry("Useless use of quotes") }
     ] <.unsp>? 
 
     :dba('method arguments')
@@ -5535,8 +5535,8 @@ method worry (Str $s) {
 method locmess () {
     my $pos = self.pos;
     my $line = self.lineof($pos);
-    if self.pos >= @*MEMOS - 1 {
-        $pos -= 2;
+    if $pos >= @*MEMOS - 2 {
+        $pos = @*MEMOS - 3;
         $line = ($line - 1) ~ " (EOF)";
     }
     my $pre = substr($*ORIG, 0, $pos);
@@ -5546,7 +5546,7 @@ method locmess () {
     my $post = substr($*ORIG, $pos, 40);
     1 while $post ~~ s!(\n.*)!!;
     $post = '<EOL>' if $post eq '';
-    " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::RED ~ 
+    " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::YELLOW ~ $*PERL6HERE ~ $Cursor::RED ~ 
         "$post$Cursor::CLEAR";
 }
 

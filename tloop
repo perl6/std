@@ -8,13 +8,13 @@ use YAML::XS;
 use Encode;
  use Term::ReadLine;
  my $term = new Term::ReadLine 'STD non-repl';
- my $prompt = "> ";
+ my $prompt = " ";
  my $OUT = $term->OUT || \*STDOUT;
  while ( defined ($_ = $term->readline($prompt)) ) {
     my $text = Encode::decode("UTF-8", $_);
     my $r = eval { STD->parse($text) };
     print $@ if $@;
     say "ok" if $r;
-    say "=====================";
+    say "\n\n\n";
     $term->addhistory($_) if /\S/;
 }
