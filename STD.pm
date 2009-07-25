@@ -670,7 +670,7 @@ token blockoid {
 
     <.finishpad>
     [
-    | '{' ~ '}' <statementlist>
+    | :dba('block') '{' ~ '}' <statementlist>
     | <?terminator> <.panic: 'Missing block'>
     | <?> <.panic: "Malformed block">
     ]
@@ -1735,7 +1735,7 @@ token variable {
     || '&'
         [
         | <twigil>? <sublongname> { $name = $<sublongname>.Str } {*}                                   #= subnoun
-        | '[' ~ ']' <infixish(1)>
+        | :dba('infix noun') '[' ~ ']' <infixish(1)>
         ]
     || '$::' <name>? # XXX
     || '$:' <name> # XXX
@@ -2698,7 +2698,7 @@ token charnames { [<.ws><charname><.ws>] ** ',' }
 
 token charspec {
     [
-    | '[' ~ ']' <charnames>
+    | :dba('character name') '[' ~ ']' <charnames>
     | \d+
     | <[ ?..Z \\.._ ]>
     | <?> <.panic: "Unrecognized \\c character">
@@ -2723,10 +2723,10 @@ grammar Q is STD {
         token backslash:e { <sym> }
         token backslash:f { <sym> }
         token backslash:n { <sym> }
-        token backslash:o { <sym> [ <octint> | '[' ~ ']' <octints> ] }
+        token backslash:o { :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
         token backslash:r { <sym> }
         token backslash:t { <sym> }
-        token backslash:x { <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
+        token backslash:x { :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
         token backslash:sym<0> { <sym> }
     } # end role
 
@@ -2931,6 +2931,7 @@ rule capture {
 }
 
 token sigterm {
+    :dba('signature')
     ':(' ~ ')' <fakesignature>
 }
 
@@ -2983,6 +2984,7 @@ token type_constraint {
 }
 
 rule post_constraint {
+    :dba('constraint')
     [
     | '[' ~ ']' <signature>
     | '(' ~ ')' <signature>
@@ -3002,6 +3004,7 @@ token named_param {
 }
 
 token param_var {
+    :dba('formal parameter')
     [
     | '[' ~ ']' <signature>
     | '(' ~ ')' <signature>
@@ -3286,7 +3289,7 @@ token infixish ($in_meta = $*IN_META) {
             %<O><assoc> = 'unary';
             %<O><kind> = 'ADVERB';
         }
-    | '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
+    | :dba('bracketed infix') '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
     | <infix_circumfix_meta_operator>
         { $<O> = $<infix_circumfix_meta_operator><O>;
           $<sym> = $<infix_circumfix_meta_operator><sym>; }
@@ -4492,6 +4495,7 @@ grammar Regex is STD {
         || <noun=quantified_atom>+
         || <?before <stopper> | <[&|~]>  >  <.panic: "Null pattern not allowed">
         || <?before <[ \] \) \> ]> > <.panic: "Unmatched closing bracket">
+        || <?before ';'> <.panic: "Regex missing terminator">
         || <.panic: "Unrecognized regex metacharacter">
         ]
     }
@@ -4645,14 +4649,14 @@ grammar Regex is STD {
     token backslash:f { :i <sym> }
     token backslash:h { :i <sym> }
     token backslash:n { :i <sym> }
-    token backslash:o { :i <sym> [ <octint> | '[' ~ ']' <octints> ] }
+    token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
     token backslash:Q { <sym> <.obs('\\Q as quotemeta', 'quotes or literal variable match')> }
     token backslash:r { :i <sym> }
     token backslash:s { :i <sym> }
     token backslash:t { :i <sym> }
     token backslash:v { :i <sym> }
     token backslash:w { :i <sym> }
-    token backslash:x { :i <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
+    token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
     token backslash:z { <sym> <.obs('\\z as end-of-string matcher', '$')> }
     token backslash:Z { <sym> <.obs('\\Z as end-of-string matcher', '\\n?$')> }
     token backslash:misc { $<litchar>=(\W) }
@@ -4898,7 +4902,7 @@ grammar P5Regex is STD {
     token backslash:h { :i <sym> }
     token backslash:l { :i <sym> }
     token backslash:n { :i <sym> }
-    token backslash:o { '0' [ <octint> | '{' ~ '}' <octints> ] }
+    token backslash:o { :dba('octal character') '0' [ <octint> | '{' ~ '}' <octints> ] }
     token backslash:p { :i <sym> '{' <[\w:]>+ '}' }
     token backslash:Q { <sym> }
     token backslash:r { :i <sym> }
@@ -4907,7 +4911,7 @@ grammar P5Regex is STD {
     token backslash:u { :i <sym> }
     token backslash:v { :i <sym> }
     token backslash:w { :i <sym> }
-    token backslash:x { :i <sym> [ <hexint> | '{' ~ '}' <hexints> ] }
+    token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '{' ~ '}' <hexints> ] }
     token backslash:z { :i <sym> }
     token backslash:misc { $<litchar>=(\W) | $<number>=(\d+) }
     token backslash:oops { <.panic: "Unrecognized Perl 5 regex backslash sequence"> }
