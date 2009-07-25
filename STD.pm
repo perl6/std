@@ -546,7 +546,7 @@ rule comp_unit {
         self.finishpad(1);
     }}
     <statementlist>
-    [ <?unitstopper> || <.panic: "Can't understand next input--giving up"> ]
+    [ <?unitstopper> || <.panic: "Confused"> ]
 #    { $<CORE> = $*CORE; }
     # "CHECK" time...
     {{
@@ -806,7 +806,7 @@ token eat_terminator {
     || <?terminator>
     || $
     || {{ if @*MEMOS[$¢.pos]<ws> { $¢.pos = @*MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
-        <.panic: "Syntax error">
+        <.panic: "Confused">
     ]
 }
 
@@ -3429,7 +3429,7 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
     | '«'
     | '»'
     ]
-    {} <infixish(1)> [ '«' | '»' ]
+    {} <infixish(1)> [ '«' | '»' || <.panic: "Missing « or »"> ]
     <.can_meta($<infixish>, "hyper")>
     <?{ $<O> := $<infixish><O>; }>
 }
@@ -3439,7 +3439,7 @@ token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
     | '<<'
     | '>>'
     ]
-    {} <infixish(1)> [ '<<' | '>>' ]
+    {} <infixish(1)> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
     <.can_meta($<infixish>, "hyper")>
     <?{ $<O> := $<infixish><O>; }>
 }
@@ -5516,7 +5516,7 @@ method panic (Str $s) {
             $m ~= "\n    expecting @keys" unless @keys[0] eq 'whitespace';
         }
     }
-    $m ~~ s|Syntax error|Syntax error (two terms in a row?)| if $m ~~ /infix|nofun/;
+    $m ~~ s|Confused|Confused (two terms in a row?)| if $m ~~ /infix|nofun/;
 
     if @*WORRIES {
         $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @*WORRIES);
@@ -5524,7 +5524,7 @@ method panic (Str $s) {
     $m ~= "\n";
     $m ~= self.explain_mystery();
 
-    die "##### PARSE FAILED #####" ~ $m;
+    die $Cursor::RED ~ '===' ~ $Cursor::CLEAR ~ 'SORRY!' ~ $Cursor::RED ~ '===' ~ $Cursor::CLEAR ~ $m;
 }
 
 method worry (Str $s) {
