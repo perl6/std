@@ -1216,6 +1216,7 @@ token regex_declarator:token { <sym>       <regex_def> }
 token regex_declarator:rule  { <sym>       <regex_def> }
 
 rule multisig {
+    :dba('signature')
     [
         ':'?'(' ~ ')' <signature>
     ]
