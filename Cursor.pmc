@@ -824,7 +824,7 @@ sub cursor_fate { my $self = shift;
                 while (my ($final,$fnum) = splice(@x,0,2)) {
                     my $pend = $p;
                     if ($final) {
-                        print ::LOG $p,"     probing $fnum\n" if $DEBUG & DEBUG::autolexer;
+                        print ::LOG $p,"     probing $fnum $final\n" if $DEBUG & DEBUG::autolexer;
                         pos($::ORIG) = $p;
                         next unless &{$RXCACHE{$final} //= eval "sub { \$::ORIG =~ /\\G$final/xsgc }"};
                         $pend = pos($::ORIG);

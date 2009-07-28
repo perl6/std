@@ -1589,8 +1589,8 @@ token special_variable:sym<$+> {
 }
 
 token special_variable:sym<${^ }> {
-    ( <sigil> '{^' :: (.*?) '}' )
-    <.obscaret($0.Str, $<sigil>.Str, $0.{0}.Str)>
+    <sigil> '{^' :: $<text>=[.*?] '}'
+    <.obscaret($<sigil>.Str ~ '{^' ~ $<text>.Str ~ '}', $<sigil>.Str, $<text>.Str)>
 }
 
 # XXX should eventually rely on multi instead of nested cases here...
@@ -1641,9 +1641,23 @@ token special_variable:sym<::{ }> {
     '::' <?before '{'>
 }
 
-token special_variable:sym<${ }> {
-    ( <[$@%]> '{' :: (.*?) '}' )
-    <.obs("" ~ $0.Str ~ " variable", "\{" ~ $<sigil>.Str ~ "}(" ~ $0.{0}.Str ~ ")")>
+regex special_variable:sym<${ }> {
+    <sigil> '{' {} $<text>=[.*?] '}'
+    {{
+        my $sigil = $<sigil>.Str;
+        my $text = $<text>.Str;
+        my $bad = $sigil ~ '{' ~ $text ~ '}';
+        $text = $text - 1 if $text ~~ /^\d+$/;
+        if $text !~~ /^(\w|\:)+$/ {
+            $¢.obs($bad, $sigil ~ '(' ~ $text ~ ')');
+        }
+        elsif $*QSIGIL {
+            $¢.obs($bad, '{' ~ $sigil ~ $text ~ '}');
+        }
+        else {
+            $¢.obs($bad, $sigil ~ $text);
+        }
+    }}
 }
 
 token special_variable:sym<$[> {
@@ -2005,7 +2019,7 @@ token quibble ($l) {
     <babble($l)>
     { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
-    $start <nibble($lang)> $stop
+    $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
 
     {{
         if $lang<_herelang> {
@@ -2024,7 +2038,7 @@ token sibble ($l, $lang2) {
     <babble($l)>
     { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
-    $start <left=nibble($lang)> $stop 
+    $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
     [ <?{ $start ne $stop }>
         <.ws>
         [ <infixish> || <panic: "Missing assignment operator"> ]
@@ -2042,7 +2056,7 @@ token tribble ($l, $lang2 = $l) {
     <babble($l)>
     { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
-    $start <left=nibble($lang)> $stop 
+    $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
     [ <?{ $start ne $stop }>
         <.ws> <quibble($lang2)>
     || 
@@ -2059,7 +2073,7 @@ token quasiquibble ($l) {
 
     [
     || <?{ $start eq '{' }> [ :lang($lang) <block> ]
-    || $start [ :lang($lang) <statementlist> ] $stop
+    || $start [ :lang($lang) <statementlist> ] [$stop || <.panic: "Couldn't find terminator $stop"> ]
     ]
 }
 
@@ -4462,7 +4476,7 @@ grammar Regex is STD {
     token category:mod_internal { <sym> }
     proto token mod_internal { <...> }
 
-    proto token rxinfix { <...> }
+    proto token regex_infix { <...> }
 
     token ws {
         <?{ $*sigspace }>
@@ -4472,6 +4486,8 @@ grammar Regex is STD {
     token normspace {
         <?before \s | '#'> [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <.ws> ]
     }
+
+    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex (for literal please quote with single quotes)"> }  # no unspace in regexen
 
     # suppress fancy end-of-line checking
     token codeblock {
@@ -4495,29 +4511,28 @@ grammar Regex is STD {
         || <noun=quantified_atom>+
         || <?before <stopper> | <[&|~]>  >  <.panic: "Null pattern not allowed">
         || <?before <[ \] \) \> ]> > <.panic: "Unmatched closing bracket">
-        || <?before ';'> <.panic: "Regex missing terminator">
-        || <.panic: "Unrecognized regex metacharacter">
+        || <.panic: "Unrecognized regex metacharacter (must be quoted to match literally)">
         ]
     }
     token infixish {
         <!infixstopper>
         <!stdstopper>
-        <rxinfix>
+        <regex_infix>
         {
-            $<O> = $<rxinfix><O>;
-            $<sym> = $<rxinfix><sym>;
+            $<O> = $<regex_infix><O>;
+            $<sym> = $<regex_infix><sym>;
         }
     }
 
-    token rxinfix:sym<||> ( --> Tight_or ) { <sym> }
-    token rxinfix:sym<&&> ( --> Tight_and ) { <sym> }
-    token rxinfix:sym<|> ( --> Junctive_or ) { <sym> }
-    token rxinfix:sym<&> ( --> Junctive_and ) { <sym> }
-    token rxinfix:sym<~> ( --> Additive ) { <sym> }
+    token regex_infix:sym<||> ( --> Tight_or ) { <sym> }
+    token regex_infix:sym<&&> ( --> Tight_and ) { <sym> }
+    token regex_infix:sym<|> ( --> Junctive_or ) { <sym> }
+    token regex_infix:sym<&> ( --> Junctive_and ) { <sym> }
+    token regex_infix:sym<~> ( --> Additive ) { <sym> }
 
     token quantified_atom {
         <!stopper>
-        <!rxinfix>
+        <!regex_infix>
         <atom>
         <.ws>
         [ <quantifier> <.ws> ]?
@@ -4541,6 +4556,14 @@ grammar Regex is STD {
     token metachar:sym<|>   { '|'  :: <fail> }
     token metachar:sym<]>   { ']'  :: <fail> }
     token metachar:sym<)>   { ')'  :: <fail> }
+    token metachar:sym<;>   {
+        ';' {}
+        [
+        || <?before \N*? <stopper> > <.panic: "Semicolon must be quoted">
+        || <?before .> <.panic: "Regex missing terminator (or semicolon must be quoted?)">
+        || <.panic: "Regex missing terminator">   # the final fake ;
+        ]
+    }
 
     token metachar:quant { <quantifier> <.panic: "quantifier quantifies nothing"> }
 
@@ -4549,6 +4572,7 @@ grammar Regex is STD {
     token metachar:sigwhite {
         <normspace>
     }
+    token metachar:unsp   { <unsp> }
 
     token metachar:sym<{ }> {
         <?before '{'>
@@ -4801,7 +4825,7 @@ grammar P5Regex is STD {
     token category:mod_internal { <sym> }
     proto token mod_internal { <...> }
 
-    proto token rxinfix { <...> }
+    proto token regex_infix { <...> }
 
     # suppress fancy end-of-line checking
     token codeblock {
@@ -4827,18 +4851,18 @@ grammar P5Regex is STD {
     token infixish {
         <!infixstopper>
         <!stdstopper>
-        <rxinfix>
+        <regex_infix>
         {
-            $<O> = $<rxinfix><O>;
-            $<sym> = $<rxinfix><sym>;
+            $<O> = $<regex_infix><O>;
+            $<sym> = $<regex_infix><sym>;
         }
     }
 
-    token rxinfix:sym<|> ( --> Junctive_or ) { <sym> }
+    token regex_infix:sym<|> ( --> Junctive_or ) { <sym> }
 
     token quantified_atom {
         <!stopper>
-        <!rxinfix>
+        <!regex_infix>
         <atom>
         [ <.ws> <quantifier>
 #            <?{ $<atom>.max_width }>
