@@ -7,7 +7,7 @@ our @EXPORTS = qw(
         longest_token_pattern_generation
         EXPR
         matchers
-        trace_call=> 128,
+        trace_call
         cursors
         try_processing
         mixins
