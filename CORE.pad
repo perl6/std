@@ -366,6 +366,7 @@ my $core = STASH::->new( _file => $file, _line => __LINE__,
 sub fixup {
     my $stash = shift;
     return unless $stash;
+    no strict 'refs';
     for my $k (keys %$stash) {
 	my $v = $stash->{$k};
 	if ($k =~ /^\w/) {
