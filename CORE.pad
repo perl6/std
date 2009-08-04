@@ -1,5 +1,4 @@
 use strict;
-use YAML::XS;
 use STASH;
 use NAME;
 my $file = { name => 'CORE.pad' };
