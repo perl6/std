@@ -201,6 +201,7 @@ sub un6 {
         $f =~ s/^\btemp\s+([\$\@%])\*?(\w+)\s*=// and $t .= qq/local $1::$2 =/, next;
         $f =~ s/^\btemp\s+([\$\@%])\*?(\w+)//     and $t .= qq/local $1::$2 = $1::$2/, next; # dumb p5 semantics
         $f =~ s/^\btemp\b//             	and $t .= qq/local/, next;
+        $f =~ s/^\binvert\b//             	and $t .= qq/reverse/, next;
         $f =~ s/^\bchars\(//             	and $t .= qq/length(/, next;
         $f =~ s/^\$\?PACKAGE//             	and $t .= qq/__PACKAGE__/, next;
 
@@ -277,15 +278,13 @@ sub MAIN {
 	my $extends = $2 // 'Cursor';
 	$out .= "package $PKG;\n";
 	$out .= <<"END";
-use 5.010;
-use strict;
-use warnings;
-no warnings 'qw', 'recursion';
-use $extends; # for base class as well as DEBUG constants
 use Moose ':all' => { -prefix => "moose_" };
+use $extends; # for base class as well as DEBUG constants
 moose_extends('$extends');
+
+no warnings 'qw', 'recursion';
+
 my \$retree;
-use utf8;
 
 \$DB::deep = \$DB::deep = 1000; # suppress used-once warning
 
@@ -903,7 +902,12 @@ END
     }
     dumpretree();
 
-    print "# Emulate context vars by localizing 'our' vars living in main\n";
+    print <<'END';
+use 5.010;
+use utf8;
+# Emulate context vars by localizing 'our' vars living in main\n";
+END
+
     for (sort keys(%OUR)) {
         print "our $_;\n";
     }
@@ -914,7 +918,6 @@ our $DEBUG;
 
 our %INSTANTIATED;
 require 'mangle.pl';
-use utf8;
 
 END
 

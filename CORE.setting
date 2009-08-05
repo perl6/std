@@ -278,6 +278,7 @@ my proto kv { }
 my proto key { }
 my proto value { }
 my proto pairs { }
+my proto invert { }
 my proto pair { }
 my proto enum { }
 

@@ -801,7 +801,7 @@ token statement {
 
 token eat_terminator {
     [
-    || ';'
+    || ';' [ <?before $> { $*ORIG ~~ s/\;$//; $¢.<_from> = $¢.<_pos> = $¢.<_pos> - 1; } ]?
     || <?{ @*MEMOS[$¢.pos]<endstmt> }> <.ws>
     || <?terminator>
     || $
@@ -2456,6 +2456,8 @@ constant %open2close = (
 "\xFF62" => "\xFF63",
 );
 
+constant %close2open = invert %open2close;
+
 token opener {
   <[
 \x0028
@@ -2662,11 +2664,12 @@ method peek_delimiters {
     if $char ~~ /^\s$/ {
         self.panic("Whitespace not allowed as delimiter");
     }
-
-# XXX not defined yet
-#    <?before <+isPe> > {
-#        self.panic("Use a closing delimiter for an opener is reserved");
-#    }
+    elsif %close2open{$char} {
+        self.panic("Use of a closing delimiter for an opener is reserved");
+    }
+    elsif $char eq ':' {
+        self.panic("Colons may not be used to delimit quoting constructs");
+    }
 
     my $rightbrack = %open2close{$char};
     if not defined $rightbrack {

@@ -305,7 +305,7 @@ sub from { $_[0]->{_from} // $_[0]->{_pos} }
 sub to { $_[0]->{_pos} }
 sub pos { $_[0]->{_pos} }
 sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
-sub Str { exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from}) : '' }
+sub Str { no warnings; exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from})//'' : '' }
 sub peek { $_[0]->{_peek} }
 sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
