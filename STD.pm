@@ -3760,6 +3760,9 @@ token infix:but ( --> Structural)
 token infix:does ( --> Structural)
     { <sym> }
 
+token infix:defines ( --> Structural)
+    { <sym> }
+
 token infix:sym<..> ( --> Structural)
     { <sym> [<!{ $*IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
 
