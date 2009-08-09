@@ -27,12 +27,12 @@ WARNING
 
     #sanity check: working directory should end with src/perl6
     my $cwd = getcwd();
-    unless($cwd =~ m{src/perl6$}) {
-        die "Please run $PROGRAM_NAME in src/perl6\n";
+    unless($cwd =~ m{src/perl6/std_hilite$}) {
+        die "Please run $PROGRAM_NAME in src/perl6/std_hilte\n";
     }
 
     #sanity check: make sure STD.pm is correctly built
-    unless(-r 'STD.pmc') {
+    unless(-r '../STD.pmc') {
         die "Could not find 'STD.pmc'. Maybe your forgot to 'make'\n";
     }
 
@@ -48,7 +48,7 @@ WARNING
         mkdir 'html' or die "Could not create html directory\n";
     }
  
-    my $dir_to_test = '../../t/';
+    my $dir_to_test = '../../../t/';
     my $fail = 0;
     my $success = 0;
     say "Finding *.t in $dir_to_test... Please wait";

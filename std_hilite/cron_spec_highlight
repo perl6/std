@@ -25,7 +25,7 @@ $status = system('cd ../../..; svn update');
 die "Could not svn update pugs\n" if $status != 0;
 
 say "\n--Running 'make clean all' for STD.pm";
-$status = system('make clean all'); 
+$status = system('cd ..; make clean all'); 
 die "Could not make STD.pm\n" if $status != 0;
 
 say "\n-- Running syntax highlighter";
