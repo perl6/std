@@ -66,19 +66,18 @@ WARNING
     for my $file (@files) {
         my $myfile = $file;
         $myfile =~ s/^\.\.\/\.\.\/t/html/;   
-        my $jquery_js = File::Spec->catfile( dirname(dirname($myfile)), $JQUERY_JS);
-        if(not -e $jquery_js) {
-            print "Copying $jquery_js\n";
-            copy("$JQUERY_JS", "$jquery_js") or 
-                die "Could not copy: $OS_ERROR\n";
-        }
         my ($simple_html,$snippet_html, $full_html) = (
             "$myfile.simple.html", 
             "$myfile.snippet.html",
             "$myfile.html");
         my ($html_filename,$html_path,$html_suffix) = fileparse($full_html);
         mkpath $html_path;
-   
+
+        my $dir = dirname(dirname($myfile));
+        copy_resource($JQUERY_JS, $dir);
+        copy_resource("$HILITE.js", $dir);
+        copy_resource("$HILITE.css", $dir);
+        
         #run the process and time it
         print <<"OUT";
 
@@ -123,14 +122,19 @@ OUT
             say $file;
         }
     }
-
-    #Copy javascript/css files and inform the user
-    say "\nCopying javascript and css files to html directory..";
-    copy("$HILITE.js","html/$HILITE.js") or die "Could not copy: $OS_ERROR\n";
-    copy("$JQUERY_JS", "html/$JQUERY_JS") or die "Could not copy: $OS_ERROR\n";
-    copy("$HILITE.css", "html/$HILITE.css") or die "Could not copy: $OS_ERROR\n";
     say "\nThe output is now in the html directory. Thanks for your time ;-)";
 }
+
+# copy resource
+sub copy_resource {
+    my ($src,$dir) = @_;
+    my $dst = File::Spec->catfile( $dir, basename($src));
+    if(not -e $dst) {
+        print "Copying $dst\n";
+        copy($src, $dst) or warn "WARN: Could not copy: $OS_ERROR\n";
+    }
+}
+
 
 # write the error log in the html file provied
 sub write_error_html {
