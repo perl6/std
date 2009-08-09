@@ -186,7 +186,7 @@ sub highlight_perl6_full {
 
     # slurp libraries and javascript to inline them
     my ($JQUERY_JS,$JS,$CSS) = (
-        'jquery-1.2.6.pack.js', 
+        'jquery-1.3.2.min.js', 
         'STD_syntax_highlight.js',
         'STD_syntax_highlight.css');
     my %colors = ();

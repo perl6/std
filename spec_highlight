@@ -54,7 +54,7 @@ WARNING
     say "Going to run $total tests... Maybe watch a movie meanwhile?";
 
     my $HILITE = "STD_syntax_highlight";
-    my $JQUERY_JS = "jquery-1.2.6.pack.js";
+    my $JQUERY_JS = "jquery-1.3.2.min.js";
     my $start_time = new Benchmark;
     my @failed;
     for my $file (@files) {
