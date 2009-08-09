@@ -120,7 +120,7 @@ sub parsefile {
 
     my $result;
     if ($STORABLE) {
-        my $store = $::TMP_PREFIX . "lex/STD.pm.store";
+        my $store = "lex/STD.pm.store";
         if (-f $store and -M $file > -M $store) {
             *::LEXERS = retrieve($store);
         }
