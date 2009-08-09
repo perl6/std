@@ -192,7 +192,7 @@ sub highlight_perl6_full {
         'STD_syntax_highlight.css');
     my %colors = ();
     my $line;
-    open CSS_FILE, $CSS
+    open CSS_FILE, "std_hilite/$CSS"
         or die "Could not open $CSS: $OS_ERROR\n";
     while($line = <CSS_FILE>) {
         if($line =~ /^\s*\.(\w+)\s*{\s*color\s*:\s*(\w+)/) {
@@ -205,11 +205,11 @@ sub highlight_perl6_full {
     my $js = qq{<script type="text/javascript" src="../$JS"></script>};
     my $css = qq{<link href="../$CSS" rel="stylesheet" type="text/css">};
     if(!$clean_html) {
-        $jquery_js = read_file($JQUERY_JS) 
+        $jquery_js = read_file("std_hilite/$JQUERY_JS") 
             or die "Error while slurping file: $OS_ERROR\n";    
-        $js = read_file($JS) 
+        $js = read_file("std_hilite/$JS") 
             or die "Error while slurping file: $OS_ERROR\n";
-        $css = read_file($CSS)
+        $css = read_file("std_hilite/$CSS")
             or die "Error while slurping file: $OS_ERROR\n";
         $jquery_js = qq{<script type="text/javascript">\n$jquery_js\n</script>};
         $js = qq{<script type="text/javascript">\n$js\n</script>};
@@ -271,7 +271,7 @@ sub highlight_perl6_simple {
     my %colors = ();
 
     my $CSS = "STD_syntax_highlight.css";
-    open CSS_FILE, $CSS
+    open CSS_FILE, "std_hilite/$CSS"
         or die "Could not open $CSS: $OS_ERROR\n";
     my $line;
     while($line = <CSS_FILE>) {
@@ -284,7 +284,7 @@ sub highlight_perl6_simple {
     # slurp css inline it
     my $css = qq{<link href="../$CSS" rel="stylesheet" type="text/css">};
     if(!$clean_html) {
-        $css = read_file($CSS)
+        $css = read_file("std_hilite/$CSS")
             or die "Error while slurping file: $OS_ERROR\n";
         $css = qq{<style type="text/css">\n$css\n</style>};
     }
@@ -335,7 +335,7 @@ sub highlight_perl6_snippet_html {
     my %colors = ();
 
     my $CSS = "STD_syntax_highlight.css";
-    open CSS_FILE, $CSS
+    open CSS_FILE, "std_hilite/$CSS"
         or die "Could not open $CSS: $OS_ERROR\n";
     my $line;
     while($line = <CSS_FILE>) {

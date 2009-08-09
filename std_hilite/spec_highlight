@@ -27,12 +27,12 @@ WARNING
 
     #sanity check: working directory should end with src/perl6
     my $cwd = getcwd();
-    unless($cwd =~ m{src/perl6/std_hilite$}) {
-        die "Please run $PROGRAM_NAME in src/perl6/std_hilte\n";
+    unless($cwd =~ m{src/perl6$}) {
+        die "Please run $PROGRAM_NAME in src/perl6\n";
     }
 
     #sanity check: make sure STD.pm is correctly built
-    unless(-r '../STD.pmc') {
+    unless(-r 'STD.pmc') {
         die "Could not find 'STD.pmc'. Maybe your forgot to 'make'\n";
     }
 
@@ -48,7 +48,7 @@ WARNING
         mkdir 'html' or die "Could not create html directory\n";
     }
  
-    my $dir_to_test = '../../../t/';
+    my $dir_to_test = '../../t/';
     my $fail = 0;
     my $success = 0;
     say "Finding *.t in $dir_to_test... Please wait";
@@ -59,13 +59,13 @@ WARNING
     my $total = 0+@files;
     say "Going to run $total tests... Maybe watch a movie meanwhile?";
 
-    my $HILITE = "STD_syntax_highlight";
+    my $HILITE = "std_hilite/STD_syntax_highlight";
     my $JQUERY_JS = "jquery-1.3.2.min.js";
     my $start_time = new Benchmark;
     my @failed;
     for my $file (@files) {
         my $myfile = $file;
-        $myfile =~ s/^\.\.\/\.\.\/\.\.\/t/html/;   
+        $myfile =~ s/^\.\.\/\.\.\/t/html/;   
         my ($simple_html,$snippet_html, $full_html) = (
             "$myfile.simple.html", 
             "$myfile.snippet.html",
@@ -74,9 +74,9 @@ WARNING
         mkpath $html_path;
 
         my $dir = dirname(dirname($myfile));
-        copy_resource($JQUERY_JS, $dir);
-        copy_resource("$HILITE.js", $dir);
-        copy_resource("$HILITE.css", $dir);
+        copy_resource("std_hilite/$JQUERY_JS", $dir);
+        copy_resource("std_hilite/$HILITE.js", $dir);
+        copy_resource("std_hilite/$HILITE.css", $dir);
         
         #run the process and time it
         print <<"OUT";
