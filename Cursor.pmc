@@ -18,7 +18,6 @@ our $DEBUG = 0 + ($ENV{STD5DEBUG} // 0);
 our %LEXERS;       # per language, the cache of lexers, keyed by rule name
 our %FATECACHE; # fates we've already turned into linked lists
 my %lexer_cache = ();
-our $TMP_PREFIX = '';
 
 sub ::fatestr { my $f = shift;
     my $text = '';
@@ -121,7 +120,7 @@ sub parsefile {
 
     my $result;
     if ($STORABLE) {
-        my $store = $TMP_PREFIX . "lex/STD.pm.store";
+        my $store = $::TMP_PREFIX . "lex/STD.pm.store";
         if (-f $store and -M $file > -M $store) {
             *::LEXERS = retrieve($store);
         }
@@ -162,7 +161,7 @@ sub load_perl_pad {
     state %PADS;
     return $PADS{$setting} if $PADS{$setting};
     my $file = "$setting.pad";
-    my $store = $TMP_PREFIX . "$setting.pad.store";
+    my $store = $::TMP_PREFIX . "$setting.pad.store";
     if (-f $store and -M $file and -M $file > -M $store) {
         $PADS{$setting} = retrieve($store);
     }
@@ -179,7 +178,7 @@ sub load_yaml_pad {
     state %PADS;
     return $PADS{$setting} if $PADS{$setting};
     my $file = "$setting.syml";
-    my $store = $TMP_PREFIX . "$setting.syml.store";
+    my $store = $::TMP_PREFIX . "$setting.syml.store";
     if (-f $store and -M $file and -M $file > -M $store) {
         $PADS{$setting} = retrieve($store);
     }
@@ -380,7 +379,7 @@ sub _AUTOLEXgen { my $self = shift;
     }
     $self->deb("AUTOLEXgen $key in $lang") if $DEBUG & DEBUG::autolexer;
     my $lexer = {};
-    (my $dir = $TMP_PREFIX . 'lex::' . $lang) =~ s/::/\//g;
+    (my $dir = $::TMP_PREFIX . 'lex::' . $lang) =~ s/::/\//g;
     (my $file = $key) =~ s/::/-/g;
     $file =~ s/:\*$//;
     my $name = $key;
