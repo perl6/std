@@ -42,6 +42,12 @@ WARNING
             "(e.g. 'export LANG=en_US.UTF-8' in your ~/.bashrc)";
     }
 
+    #make sure that the output html directory is there
+    unless(-d 'html') {
+        print "Creating html directory...\n";
+        mkdir 'html' or die "Could not create html directory\n";
+    }
+ 
     my $dir_to_test = '../../t/';
     my $fail = 0;
     my $success = 0;
