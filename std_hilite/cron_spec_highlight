@@ -21,7 +21,7 @@ INTRO
 my $status;
 
 say "\n--Running 'svn update'";
-$status = system('cd ../..; svn update'); 
+$status = system('cd ../../..; svn update'); 
 die "Could not svn update pugs\n" if $status != 0;
 
 say "\n--Running 'make clean all' for STD.pm";
