@@ -60,6 +60,12 @@ WARNING
     for my $file (@files) {
         my $myfile = $file;
         $myfile =~ s/^\.\.\/\.\.\/t/html/;   
+        my $jquery_js = File::Spec->catfile( dirname(dirname($myfile)), $JQUERY_JS);
+        if(not -e $jquery_js) {
+            print "Copying $jquery_js\n";
+            copy("$JQUERY_JS", "$jquery_js") or 
+                die "Could not copy: $OS_ERROR\n";
+        }
         my ($simple_html,$snippet_html, $full_html) = (
             "$myfile.simple.html", 
             "$myfile.snippet.html",
