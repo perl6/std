@@ -65,7 +65,7 @@ WARNING
     my @failed;
     for my $file (@files) {
         my $myfile = $file;
-        $myfile =~ s/^\.\.\/\.\.\/t/html/;   
+        $myfile =~ s/^\.\.\/\.\.\/\.\.\/t/html/;   
         my ($simple_html,$snippet_html, $full_html) = (
             "$myfile.simple.html", 
             "$myfile.snippet.html",
