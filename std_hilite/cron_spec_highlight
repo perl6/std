@@ -14,7 +14,7 @@ my $WEB_ROOT='~/public_html';
 print <<"INTRO";
 
 Hi my name is $PROGRAM_NAME. 
-I am usually run as a cron job to generate Perl6 syntax highlighted htmls.
+I am usually run as a cron job to generate Perl 6 syntax highlighted htmls.
 
 INTRO
 
