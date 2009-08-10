@@ -2170,10 +2170,6 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 #############################################################3
 
 { package main;
-    sub indent { my $s = shift;
-        $s =~ s/^/\n  /mg;
-        $s;
-    }
 
     sub qm { my $s = shift;
         my $r = '';

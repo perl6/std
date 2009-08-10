@@ -353,7 +353,7 @@ token category:multi_declarator { <sym> }
 proto token multi_declarator (:$endsym is context = 'spacey') { <...> }
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator (:$endsym is context = 'endid') { <...> }
+proto token routine_declarator (:$endsym is context = 'nofun') { <...> }
 
 token category:regex_declarator { <sym> }
 proto token regex_declarator (:$endsym is context = 'spacey') { <...> }
@@ -394,7 +394,7 @@ proto token terminator { <...> }
 token unspacey { <.unsp>? }
 token endid { <?before <-[ \- \' \w ]> > }
 token spacey { <?before <[ \s \# ]> > }
-token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' > }
+token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
 
 ##################
 # Lexer routines #
@@ -801,7 +801,7 @@ token statement {
 
 token eat_terminator {
     [
-    || ';' [ <?before $> { $*ORIG ~~ s/\;$//; $¢.<_from> = $¢.<_pos> = $¢.<_pos> - 1; } ]?
+    || ';' [ <?before $> { $*ORIG ~~ s/\;$/ /; } ]?
     || <?{ @*MEMOS[$¢.pos]<endstmt> }> <.ws>
     || <?terminator>
     || $
@@ -2967,7 +2967,7 @@ token signature {
     <.ws>
     [
     | <?before '-->' | ')' | ']' | '{' | ':'\s >
-    | <parameter>
+    | [ <parameter> || <.panic: "Malformed parameter"> ]
     ] ** <param_sep>
     <.ws>
     { $*IN_DECL = 0; }
@@ -3107,6 +3107,7 @@ token parameter {
         | '!'           { $quant = '!'; $kind //= '!' }
         | <?>
         ]
+    | {} <name> <.panic("Invalid typename " ~ $<name>.Str)>
     ]
 
     <trait>*
@@ -3250,7 +3251,7 @@ token term:sym<**> ( --> Term)
 token infix:lambda ( --> Term) {
     <?before '{' | '->' > {{
         my $line = $¢.lineof($¢.pos);
-        for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when' {
+        for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when', 'sub' {
             my $m = %*MYSTERY{$_};
             next unless $m;
             if $line - ($m.<line>//-123) < 5 {
