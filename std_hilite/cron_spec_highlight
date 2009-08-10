@@ -29,11 +29,11 @@ $status = system('cd ..; make clean all');
 die "Could not make STD.pm\n" if $status != 0;
 
 say "\n-- Running syntax highlighter";
-$status = system("./spec_highlight");
+$status = system("cd ..; std_hilite/spec_highlight");
 #die "Could not run spec_highlight\n" if $status != 0;
 
 say "\n-- Copying the result to $WEB_ROOT/html";
-$status = system("/bin/cp -R html $WEB_ROOT/"); 
+$status = system("/bin/cp -R ../html $WEB_ROOT/"); 
 die "Could not copy the output\n" if $status != 0;
 
 say "\n-- I am done... Thanks for your valuable time";
