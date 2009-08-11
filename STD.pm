@@ -460,8 +460,9 @@ token unv {
    | \h+                 {*}                                    #= hwhite
    | <?before '='> ^^ <.pod_comment>  {*}                    #= pod
    | \h* '#' [
-         |  <?opener>
-            [ <!after ^^ . > || <.panic: "Can't use embedded comments in column 1"> ]
+         |  '`'<?opener>
+            <.quibble($¢.cursor_fresh( %*LANG<Q> ))>   {*}                               #= embedded
+         |  <?opener> <.worry: "Embedded comment without backtick is deprecated">
             <.quibble($¢.cursor_fresh( %*LANG<Q> ))>   {*}                               #= embedded
          | {} \N*            {*}                                 #= end
          ]
@@ -4956,7 +4957,7 @@ grammar P5Regex is STD {
     token assertion:sym«>» { <sym> <rx> }
 
     token rx {
-        #[:lang(self.unbalanced(')')) <nibbler>]
+        # [:lang(self.unbalanced(')')) <nibbler>]
         <nibbler>
         [ <?before ')'> || <.panic: "Unable to parse Perl 5 regex; couldn't find right parenthesis"> ]
     }
