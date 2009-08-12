@@ -460,10 +460,10 @@ token unv {
    | \h+                 {*}                                    #= hwhite
    | <?before '='> ^^ <.pod_comment>  {*}                    #= pod
    | \h* '#' [
-         |  '`'<?opener>
+         |  '`' [ <?opener> || <.panic: "Opening bracket is required for #` comment"> ]
             <.quibble($¢.cursor_fresh( %*LANG<Q> ))>   {*}                               #= embedded
          |  <?opener> <.worry: "Embedded comment without backtick is deprecated">
-            <.quibble($¢.cursor_fresh( %*LANG<Q> ))>   {*}                               #= embedded
+            <.quibble($¢.cursor_fresh( %*LANG<Q> ))>   {*}                               #= oldembedded
          | {} \N*            {*}                                 #= end
          ]
     ]
