@@ -309,7 +309,7 @@ END
         if ( s/^(#line.*\n)// ) { next }
 	if ( s/^([ \t]*\n)// ) { $out .= $1; next; };
 
-	if (s/^ (=begin \s+ (\w+) .*? \n =end \s+ \2 .*? \n) //sx) {
+	if (s/^ [\x20\t]* (=begin \s+ (\w+) .*? \n [\x20\t]* =end \s+ \2 .*? \n) //sx) {
 	    my $c = $1;
 	    $c =~ s/^/# /mg;
 	    $out .= $c;

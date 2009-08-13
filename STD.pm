@@ -47,43 +47,43 @@ my $INVOCANT_IS is context<rw>; # (u) invocant of args match
 
 my $BORG is context;            # (u/d) who to blame if we're missing a block
 
-=begin comment overview
+    =begin comment overview
 
-This file is designed to be either preprocessed into a grammar with
-action statements or used as-is without any preprocessing.  The {*}
-notation is a no-op action block, but can be identified uniquely via a
-combination of the preceding token or rule name plus any additional text
-following a #= comment.  We put this into a comment rather than using
-a macro so that bootstrap compilers don't have to worry about macros
-yet, and to keep the main grammar relatively uncluttered by action
-statements.  Note that the preprocessor can certainly generate accesses
-to the match state within the action block, so we need not mention it
-explicitly.
+    This file is designed to be either preprocessed into a grammar with
+    action statements or used as-is without any preprocessing.  The {*}
+    notation is a no-op action block, but can be identified uniquely via a
+    combination of the preceding token or rule name plus any additional text
+    following a #= comment.  We put this into a comment rather than using
+    a macro so that bootstrap compilers don't have to worry about macros
+    yet, and to keep the main grammar relatively uncluttered by action
+    statements.  Note that the preprocessor can certainly generate accesses
+    to the match state within the action block, so we need not mention it
+    explicitly.
 
-Also, some rules are named by syntactic category plus an additonal symbol
-specified in adverbial form, either in bare :name form or in :sym<name>
-form.  (It does not matter which form you use for identifier symbols,
-except that to specify a symbol "sym" you must use the :sym<sym> form
-of adverb.)  If you use the <sym> rule within the rule, it will parse the
-symbol at that point.  At the final reduction point of a rule, if $sym
-has been set, that is used as the final symbol name for the rule.  This
-need not match the symbol specified as part the rule name; that is just
-for disambiguating the name.  However, if no $sym is set, the original
-symbol will be used by default.
+    Also, some rules are named by syntactic category plus an additonal symbol
+    specified in adverbial form, either in bare :name form or in :sym<name>
+    form.  (It does not matter which form you use for identifier symbols,
+    except that to specify a symbol "sym" you must use the :sym<sym> form
+    of adverb.)  If you use the <sym> rule within the rule, it will parse the
+    symbol at that point.  At the final reduction point of a rule, if $sym
+    has been set, that is used as the final symbol name for the rule.  This
+    need not match the symbol specified as part the rule name; that is just
+    for disambiguating the name.  However, if no $sym is set, the original
+    symbol will be used by default.
 
-Note that rules automatically get an implicit {*} at their return, so
-for the TOP rule the implicit action name is also simply "TOP".
+    Note that rules automatically get an implicit {*} at their return, so
+    for the TOP rule the implicit action name is also simply "TOP".
 
-Another nod toward preprocessing is that blocks that contain nested braces
-are delimited by double braces so that the preprocessor does not need to
-understand Perl 6 code.
+    Another nod toward preprocessing is that blocks that contain nested braces
+    are delimited by double braces so that the preprocessor does not need to
+    understand Perl 6 code.
 
-This grammar relies on transitive longest-token semantics, though
-initially we made a feeble attempt to order rules so a procedural
-interpretation of alternation could usually produce a correct parse.
-(This is becoming less true over time.)
+    This grammar relies on transitive longest-token semantics, though
+    initially we made a feeble attempt to order rules so a procedural
+    interpretation of alternation could usually produce a correct parse.
+    (This is becoming less true over time.)
 
-=end comment overview
+    =end comment overview
 
 method TOP ($STOP = undef) {
     if defined $STOP {
@@ -461,7 +461,7 @@ token unv {
    :dba('horizontal whitespace')
    [
    | \h+                 {*}                                    #= hwhite
-   | <?before '='> ^^ <.pod_comment>  {*}                    #= pod
+   | <?before \h* '=' [ \w | '\\'] > ^^ <.pod_comment>  {*}                    #= pod
    | \h* <comment>
    ]
 }
@@ -495,16 +495,16 @@ token identifier {
 # XXX We need to parse the pod eventually to support $= variables.
 
 token pod_comment {
-    ^^ '=' <.unsp>?
+    ^^ \h* '=' <.unsp>?
     [
     | 'begin' \h+ <identifier> ::
         [
-        ||  .*? "\n=" <.unsp>? 'end' \h+ $<identifier> » \N*          {*} #= tagged
+        ||  .*? "\n" \h* '=' <.unsp>? 'end' \h+ $<identifier> » \N*          {*} #= tagged
         ||  <?{ $<identifier>.Str eq 'END'}> .*                           {*} #= end
         || { my $id = $<identifier>.Str; self.panic("=begin $id without matching =end $id"); }
         ]
     | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
-        [ .*?  "\n=" <.unsp>? 'end' » \N* || { self.panic("=begin without matching =end"); } ]   {*}       #= anon
+        [ .*? "\n" \h* '=' <.unsp>? 'end' » \N* || { self.panic("=begin without matching =end"); } ]   {*}       #= anon
         
     | 'for' » :: \h* [ <identifier> || $$ || '#' || <.panic: "Unrecognized token after =for"> ]
         [.*?  ^^ \h* $$ || .*]

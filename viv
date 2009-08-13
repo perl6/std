@@ -25,8 +25,8 @@ viv [switches] filename
     where switches can be:
     	-e	use following argument as program
     	--ast	spit out an abstract syntax tree (default)
-    	--p5	spit out a Perl 5 representation (unimpl)
-    	--p6	spit out a Perl 6 representation (partially impl)
+    	--p5	spit out a Perl 5 representation (partially impl)
+    	--p6	spit out a Perl 6 representation
     	--stab	include the symbol table
     	--pos	include position info in AST
     	--match	include match tree info in AST
