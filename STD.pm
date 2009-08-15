@@ -807,7 +807,7 @@ token statement {
         \h*
         <!before ';' | ')' | ']' | '}' >
         <!infixstopper>
-        <.panic: "Statements must be separated with semicolon">
+        <.panic: "Missing semicolon or comma after block">
     ]?
 }
 
