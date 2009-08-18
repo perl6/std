@@ -476,6 +476,15 @@ token comment:sym<#( )> {
     <.quibble($¢.cursor_fresh( %*LANG<Q> ))>
 }
 
+token comment:sym<#=( )> {
+    '#=' <?opener>
+    <quibble($¢.cursor_fresh( %*LANG<Q> ))>
+}
+
+token comment:sym<#=> {
+   '#=' {} $<attachment> = [\N*]
+}
+
 token comment:sym<#> {
    '#' {} \N*
 }
