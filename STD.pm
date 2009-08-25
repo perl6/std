@@ -2683,7 +2683,10 @@ method peek_delimiters {
     my $startpos = $pos;
     my $char = substr($*ORIG,$pos++,1);
     if $char ~~ /^\s$/ {
-        self.panic("Whitespace not allowed as delimiter");
+        self.panic("Whitespace character is not allowed as delimiter"); # "can't happen"
+    }
+    elsif $char ~~ /^\w$/ {
+        self.panic("Alphanumeric character is not allowed as delimiter");
     }
     elsif %close2open{$char} {
         self.panic("Use of a closing delimiter for an opener is reserved");
