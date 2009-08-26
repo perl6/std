@@ -5653,7 +5653,7 @@ token term:sym<miscbad> {
 }
 
 method badinfix (Str $bad = $*sym) {
-    self.panic("Preceding operator expects term, but found infix $bad instead");
+    self.panic("Preceding context expects a term, but found infix $bad instead");
 }
 
 ## vim: expandtab sw=4 ft=perl6
