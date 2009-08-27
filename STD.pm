@@ -5577,7 +5577,7 @@ method panic (Str $s) {
         }
     }
     if $m ~~ /infix|nofun/ {
-        my @t = $here.termish;
+        my @t = try { $here.termish };
         if @t {
             $m ~~ s|Confused|Two terms in a row| if @t;
         }
