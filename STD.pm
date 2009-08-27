@@ -3904,7 +3904,7 @@ token infix:sym<?? !!> ( --> Conditional) {
 }
 
 token infix:sym<?> ( --> Conditional)
-    { <sym> <.obs('?: for the conditional operator', '??!!')> }
+    { <sym> {} <!before '?'> <?before <-[;]>*?':'> <.obs('?: for the conditional operator', '??!!')> }
 
 token infix:sym<ff> ( --> Conditional)
     { <sym> }
@@ -5576,7 +5576,12 @@ method panic (Str $s) {
             $m ~= "\n    expecting @keys" unless @keys[0] eq 'whitespace';
         }
     }
-    $m ~~ s|Confused|Confused (two terms in a row?)| if $m ~~ /infix|nofun/;
+    if $m ~~ /infix|nofun/ {
+        my @t = $here.termish;
+        if @t {
+            $m ~~ s|Confused|Two terms in a row| if @t;
+        }
+    }
 
     if @*WORRIES {
         $m ~= "\nOther potential difficulties:\n  " ~ join( "\n  ", @*WORRIES);
