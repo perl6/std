@@ -30,7 +30,7 @@ my %*MYSTERY;     # names we assume may be post-declared functions
 my %*LANG;            # (d) braided languages: MAIN, Q, Regex, etc
 
 my $*IN_DECL;     # (d) a declarator is looking for a name to declare
-my $*SCOPE ::= "";      # (d) which scope declarator we're under
+my $*SCOPE = "";      # (d) which scope declarator we're under
 my $*MULTINESS;       # (d) which multi declarator we're under
 my $*PKGDECL ::= "";         # (d) current package declarator
 my $*DECLARAND;   # (u/d) new object associated with declaration
@@ -542,7 +542,7 @@ rule comp_unit {
     :my $*QSIGIL ::= '';
     :my $*IN_META = 0;
     :my $*QUASIMODO;
-    :my $*SCOPE ::= "";
+    :my $*SCOPE = "";
     :my $*LEFTSIGIL;
     :my %*MYSTERY = ();
     :my $*INVOCANT_OK;
@@ -844,7 +844,7 @@ token statement_control:need {
     |<version>
     |<module_name>
         {{
-            my $*SCOPE ::= 'use';
+            my $*SCOPE = 'use';
             $longname = $<module_name>[*-1]<longname>.Str;
             $¢.do_need($longname);
         }}
@@ -853,7 +853,7 @@ token statement_control:need {
 
 token statement_control:use {
     :my $longname;
-    :my $*SCOPE ::= 'use';
+    :my $*SCOPE = 'use';
     <sym> <.ws>
     [
     | <version>
@@ -1147,6 +1147,7 @@ rule package_def {
     :my $longname;
     :my $*IN_DECL = 1;
     :my $*DECLARAND;
+    { $*SCOPE ||= 'our'; }
     [
         [
             <def_module_name>{
@@ -1372,7 +1373,7 @@ token nulltermish {
 }
 
 token termish {
-    :my $*SCOPE ::= "our";
+    :my $*SCOPE = "";
     :my $*VAR;
     :dba('prefix or noun')
     [
@@ -5159,7 +5160,7 @@ method find_top_pkg ($name) {
 }
 
 method add_name ($name) {
-    my $scope = $*SCOPE // 'OUR';
+    my $scope = $*SCOPE || 'my';
     say "Adding $scope $name in $*PKGNAME" if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
@@ -5409,7 +5410,7 @@ method add_routine ($name) {
 }
 
 method add_variable ($name) {
-    if ($*SCOPE//'') eq 'our' {
+    if ($*SCOPE||'') eq 'our' {
         self.add_our_variable($name);
     }
     else {
