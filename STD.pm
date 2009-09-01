@@ -3,49 +3,49 @@ grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 use DEBUG;
 
 # per parse
-my $ACTIONS is context;         # class or object which defines reduce actions
-my $SETTINGNAME is context;     # name of core setting
-my $TMP_PREFIX is context;      # where to put tmp files
-my $ORIG is context;            # the original program string
-my @ORIG is context;            # same thing as individual chars
-my @MEMOS is context;           # per-position info such as ws and line number
-my $HIGHWATER is context;      # where we were last looking for things
-my $HIGHMESS is context;       # current parse failure message
-my $HIGHEXPECT is context;     # things we were looking for at the bleeding edge
+my $*ACTIONS;         # class or object which defines reduce actions
+my $*SETTINGNAME;     # name of core setting
+my $*TMP_PREFIX;      # where to put tmp files
+my $*ORIG;            # the original program string
+my @*ORIG;            # same thing as individual chars
+my @*MEMOS;           # per-position info such as ws and line number
+my $*HIGHWATER;      # where we were last looking for things
+my $*HIGHMESS;       # current parse failure message
+my $*HIGHEXPECT;     # things we were looking for at the bleeding edge
 
 # symbol table management
-my $CORE is context;            # the CORE scope
-my $SETTING is context;         # the SETTING scope
-my $GLOBAL is context;          # the GLOBAL scope
-my $PROCESS is context;         # the PROCESS scope
-my $UNIT is context;            # the UNIT scope
-my $CURPAD is context<rw>;      # current lexical scope
-my $CURPKG is context;          # current package scope
-my $PKGNAME is context = "";    # full package name of package assoc with current lexical scope
-my @PKGS is context<rw> = ();   # stack of outer lexical packages
+my $*CORE;            # the CORE scope
+my $*SETTING;         # the SETTING scope
+my $*GLOBAL;          # the GLOBAL scope
+my $*PROCESS;         # the PROCESS scope
+my $*UNIT;            # the UNIT scope
+my $*CURPAD;      # current lexical scope
+my $*CURPKG;          # current package scope
+my $*PKGNAME = "";    # full package name of package assoc with current lexical scope
+my @*PKGS = ();   # stack of outer lexical packages
 
-my %MYSTERY is context<rw>;     # names we assume may be post-declared functions
+my %*MYSTERY;     # names we assume may be post-declared functions
 
 # tree attributes, marked as propagating up (u) down (d) or up-and-down (u/d)
-my %LANG is context;            # (d) braided languages: MAIN, Q, Regex, etc
+my %*LANG;            # (d) braided languages: MAIN, Q, Regex, etc
 
-my $IN_DECL is context<rw>;     # (d) a declarator is looking for a name to declare
-my $SCOPE is context = "";      # (d) which scope declarator we're under
-my $MULTINESS is context;       # (d) which multi declarator we're under
-my $PKGDECL is context;         # (d) current package declarator
-my $DECLARAND is context<rw>;   # (u/d) new object associated with declaration
+my $*IN_DECL;     # (d) a declarator is looking for a name to declare
+my $*SCOPE ::= "";      # (d) which scope declarator we're under
+my $*MULTINESS;       # (d) which multi declarator we're under
+my $*PKGDECL ::= "";         # (d) current package declarator
+my $*DECLARAND;   # (u/d) new object associated with declaration
 
-my $GOAL is context = "(eof)";  # (d) which special terminator we're most wanting
-my $IN_REDUCE is context<rw>;   # (d) attempting to parse an [op] construct
-my $IN_META is context<rw>;     # (d) parsing a metaoperator like [..]
-my $QUASIMODO is context<rw>;   # (d) don't carp about quasi variables
-my $LEFTSIGIL is context<rw>;   # (u) sigil of LHS for item vs list assignment
-my $QSIGIL is context<rw>;      # (d) sigil of current interpolation
+my $*GOAL ::= "(eof)";  # (d) which special terminator we're most wanting
+my $*IN_REDUCE;   # (d) attempting to parse an [op] construct
+my $*IN_META;     # (d) parsing a metaoperator like [..]
+my $*QUASIMODO;   # (d) don't carp about quasi variables
+my $*LEFTSIGIL;   # (u) sigil of LHS for item vs list assignment
+my $*QSIGIL;      # (d) sigil of current interpolation
 
-my $INVOCANT_OK is context<rw>; # (d) parsing a list that allows an invocant
-my $INVOCANT_IS is context<rw>; # (u) invocant of args match
+my $*INVOCANT_OK; # (d) parsing a list that allows an invocant
+my $*INVOCANT_IS; # (u) invocant of args match
 
-my $BORG is context;            # (u/d) who to blame if we're missing a block
+my $*BORG;            # (u/d) who to blame if we're missing a block
 
     =begin comment overview
 
@@ -87,7 +87,7 @@ my $BORG is context;            # (u/d) who to blame if we're missing a block
 
 method TOP ($STOP = undef) {
     if defined $STOP {
-        my $GOAL is context = $STOP;
+        my $*GOAL ::= $STOP;
         self.unitstop($STOP).comp_unit;
     }
     else {
@@ -96,19 +96,19 @@ method TOP ($STOP = undef) {
 }
 
 method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', :$actions = '') {
-    temp $*TMP_PREFIX = $tmp_prefix;
-    temp $*SETTINGNAME = $setting;
-    temp $*ACTIONS = $actions;
-    temp $*DEBUG = $DEBUG;
+    my $*TMP_PREFIX ::= $tmp_prefix;
+    my $*SETTINGNAME ::= $setting;
+    my $*ACTIONS ::= $actions;
+    my $*DEBUG ::= $DEBUG;
     temp @*MEMOS;
 
     # various bits of info useful for error messages
-    temp $*HIGHWATER = 0;
-    temp $*HIGHMESS = '';
-    temp $*HIGHEXPECT = {};
-    temp $*LAST_NIBBLE = { firstline => 0, lastline => 0 };
-    temp $*LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
-    temp $*GOAL = "(eof)";
+    my $*HIGHWATER = 0;
+    my $*HIGHMESS = '';
+    my $*HIGHEXPECT = {};
+    my $*LAST_NIBBLE = { firstline => 0, lastline => 0 };
+    my $*LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
+    my $*GOAL ::= "(eof)";
     $*ORIG = $text ~ "\n;";           # original string
 
     my $result = self.new($text)."$rule"();
@@ -279,8 +279,8 @@ class Terminator does PrecOp {
 # there's appropriate whitespace.  # Note that endsym isn't called if <sym>
 # isn't called.
 
-my $endsym is context = "null";
-my $endargs is context = -1;
+my $*endsym = "null";
+my $*endargs = -1;
 
 proto token category { <...> }
 
@@ -329,7 +329,7 @@ token category:postfix { <sym> }
 proto token postfix is unary is defequiv(%autoincrement) { <...> }
 
 token category:dotty { <sym> }
-proto token dotty (:$endsym is context = 'unspacey') { <...> }
+proto token dotty (:$*endsym = 'unspacey') { <...> }
 
 token category:circumfix { <sym> }
 proto token circumfix { <...> }
@@ -341,37 +341,37 @@ token category:quote_mod { <sym> }
 proto token quote_mod { <...> }
 
 token category:trait_mod { <sym> }
-proto token trait_mod (:$endsym is context = 'spacey') { <...> }
+proto token trait_mod (:$*endsym = 'spacey') { <...> }
 
 token category:type_declarator { <sym> }
-proto token type_declarator (:$endsym is context = 'spacey') { <...> }
+proto token type_declarator (:$*endsym = 'spacey') { <...> }
 
 token category:scope_declarator { <sym> }
-proto token scope_declarator (:$endsym is context = 'nofun') { <...> }
+proto token scope_declarator (:$*endsym = 'nofun') { <...> }
 
 token category:package_declarator { <sym> }
-proto token package_declarator (:$endsym is context = 'spacey') { <...> }
+proto token package_declarator (:$*endsym = 'spacey') { <...> }
 
 token category:multi_declarator { <sym> }
-proto token multi_declarator (:$endsym is context = 'spacey') { <...> }
+proto token multi_declarator (:$*endsym = 'spacey') { <...> }
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator (:$endsym is context = 'nofun') { <...> }
+proto token routine_declarator (:$*endsym = 'nofun') { <...> }
 
 token category:regex_declarator { <sym> }
-proto token regex_declarator (:$endsym is context = 'spacey') { <...> }
+proto token regex_declarator (:$*endsym = 'spacey') { <...> }
 
 token category:statement_prefix { <sym> }
 proto rule  statement_prefix () { <...> }
 
 token category:statement_control { <sym> }
-proto rule  statement_control (:$endsym is context = 'spacey') { <...> }
+proto rule  statement_control (:$*endsym = 'spacey') { <...> }
 
 token category:statement_mod_cond { <sym> }
-proto rule  statement_mod_cond (:$endsym is context = 'nofun') { <...> }
+proto rule  statement_mod_cond (:$*endsym = 'nofun') { <...> }
 
 token category:statement_mod_loop { <sym> }
-proto rule  statement_mod_loop (:$endsym is context = 'nofun') { <...> }
+proto rule  statement_mod_loop (:$*endsym = 'nofun') { <...> }
 
 token category:infix_prefix_meta_operator { <sym> }
 proto token infix_prefix_meta_operator is binary { <...> }
@@ -531,26 +531,26 @@ token pod_comment {
 # Note: we only check for the stopper.  We don't check for ^ because
 # we might be embedded in something else.
 rule comp_unit {
-    :my $begin_compunit is context = 1;
-    :my $endargs        is context<rw> = -1;
-    :my %LANG is context;
-    :my $PKGDECL is context = "";
-    :my $PKGNAME is context = "GLOBAL";
-    :my @PKGS is context<rw> = ();
-    :my $IN_DECL is context<rw>;
-    :my $DECLARAND is context<rw>;
-    :my $QSIGIL is context<rw> = '';
-    :my $IN_META is context<rw> = 0;
-    :my $QUASIMODO is context<rw>;
-    :my $SCOPE is context = "";
-    :my $LEFTSIGIL is context<rw>;
-    :my %MYSTERY is context<rw> = ();
-    :my $INVOCANT_OK is context<rw>;
-    :my $INVOCANT_IS is context<rw>;
-    :my $CURPAD is context<rw>;
-    :my $MULTINESS is context = '';
+    :my $*begin_compunit = 1;
+    :my $*endargs = -1;
+    :my %*LANG;
+    :my $*PKGDECL ::= "";
+    :my $*PKGNAME = "GLOBAL";
+    :my @*PKGS = ();
+    :my $*IN_DECL;
+    :my $*DECLARAND;
+    :my $*QSIGIL ::= '';
+    :my $*IN_META = 0;
+    :my $*QUASIMODO;
+    :my $*SCOPE ::= "";
+    :my $*LEFTSIGIL;
+    :my %*MYSTERY = ();
+    :my $*INVOCANT_OK;
+    :my $*INVOCANT_IS;
+    :my $*CURPAD;
+    :my $*MULTINESS = '';
 
-    :my $CURPKG is context;
+    :my $*CURPKG;
     {{
 
         %*LANG<MAIN>    = ::STD ;
@@ -633,14 +633,15 @@ method explain_mystery() {
 # possible place to check arity is not here but in the rule that calls this
 # rule.  (Could also be done in a later pass.)
 
-token pblock ($CURPAD is context<rw> = $*CURPAD) {
+token pblock () {
+    :temp $*CURPAD;
     :dba('parameterized block')
     [<?before <.lambda> | '{' > ||
         {{
             if $*BORG and $*BORG.<block> {
                 if $*BORG.<name> {
-                    my $m = "Function '" ~ $BORG.<name> ~ "' needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
-                    $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by '" ~ $BORG.<name> ~ "')");
+                    my $m = "Function '" ~ $*BORG.<name> ~ "' needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
+                    $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by '" ~ $*BORG.<name> ~ "')");
                 }
                 else {
                     my $m = "Expression needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
@@ -670,15 +671,16 @@ token lambda { '->' | '<->' }
 
 # Look for an expression followed by a required lambda.
 token xblock {
-    :my $GOAL is context = '{';
-    :my $BORG is context = {};
+    :my $*GOAL ::= '{';
+    :my $*BORG = {};
     <EXPR>
-    { $BORG.<culprit> //= $<EXPR>.cursor(self.pos) }
+    { $*BORG.<culprit> //= $<EXPR>.cursor(self.pos) }
     <.ws>
     <pblock>
 }
 
-token block ($CURPAD is context<rw> = $*CURPAD) {
+token block () {
+    :temp $*CURPAD;
     :dba('scoped block')
     [ <?before '{' > || <.panic: "Missing block"> ]
     <.newpad>
@@ -686,7 +688,7 @@ token block ($CURPAD is context<rw> = $*CURPAD) {
 }
 
 token blockoid {
-    # temporize braided languages
+    # encapsulate braided languages
     :temp %*LANG;
 
     <.finishpad>
@@ -707,11 +709,11 @@ token blockoid {
 }
 
 token regex_block {
-    # temporize braided languages
+    # encapsulate braided languages
     :temp %*LANG;
 
     :my $lang = %*LANG<Regex>;
-    :my $GOAL is context = '}';
+    :my $*GOAL ::= '}';
 
     [ <quotepair> <.ws>
         {
@@ -737,7 +739,7 @@ token regex_block {
 
 # statement semantics
 rule statementlist {
-    :my $INVOCANT_OK is context<rw> = 0;
+    :my $*INVOCANT_OK = 0;
     :dba('statement list')
 
     [
@@ -749,7 +751,7 @@ rule statementlist {
 
 # embedded semis, context-dependent semantics
 rule semilist {
-    :my $INVOCANT_OK is context<rw> = 0;
+    :my $*INVOCANT_OK = 0;
     :dba('semicolon list')
     [
     | <?before <[\)\]\}]> >
@@ -772,8 +774,8 @@ token label {
 }
 
 token statement {
-    :my $endargs is context = -1;
-    :my $QSIGIL is context<rw> = 0;
+    :my $*endargs = -1;
+    :my $*QSIGIL ::= 0;
     <!before <[\)\]\}]> >
 
     # this could either be a statement that follows a declaration
@@ -842,7 +844,7 @@ token statement_control:need {
     |<version>
     |<module_name>
         {{
-            my $SCOPE is context = 'use';
+            my $*SCOPE ::= 'use';
             $longname = $<module_name>[*-1]<longname>.Str;
             $¢.do_need($longname);
         }}
@@ -851,7 +853,7 @@ token statement_control:need {
 
 token statement_control:use {
     :my $longname;
-    :my $SCOPE is context = 'use';
+    :my $*SCOPE ::= 'use';
     <sym> <.ws>
     [
     | <version>
@@ -1025,8 +1027,8 @@ token version:sym<v> {
 ###############
 
 token constant_declarator {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARAND is context<rw>;
+    :my $*IN_DECL = 1;
+    :my $*DECLARAND;
     <?{ $*SCOPE eq 'constant' }>
     <identifier> <.ws> <?before '='|'is'\s>
     { $*IN_DECL = 0; self.add_name($<identifier>.Str) }
@@ -1035,8 +1037,8 @@ token constant_declarator {
 }
 
 token variable_declarator {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARAND is context<rw>;
+    :my $*IN_DECL = 1;
+    :my $*DECLARAND;
     <variable>
     { $*IN_DECL = 0; self.add_variable($<variable>.Str) }
     [   # Is it a shaped array or hash declaration?
@@ -1054,7 +1056,7 @@ token variable_declarator {
     <trait>*
 }
 
-rule scoped {
+rule scoped($*SCOPE) {
     :dba('scoped declarator')
     [
     | <declarator>
@@ -1079,47 +1081,47 @@ rule scoped {
 }
 
 
-token scope_declarator:my        { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:our       { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:state     { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:constant  { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:has       { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:augment   { <sym> { $*SCOPE = $<sym> } <scoped> }
-token scope_declarator:supersede { <sym> { $*SCOPE = $<sym> } <scoped> }
+token scope_declarator:my        { <sym> <scoped('my')> }
+token scope_declarator:our       { <sym> <scoped('our')> }
+token scope_declarator:state     { <sym> <scoped('state')> }
+token scope_declarator:constant  { <sym> <scoped('constant')> }
+token scope_declarator:has       { <sym> <scoped('has')> }
+token scope_declarator:augment   { <sym> <scoped('augment')> }
+token scope_declarator:supersede { <sym> <scoped('supersede')> }
 
 
 token package_declarator:class {
-    :my $PKGDECL is context = 'class';
+    :my $*PKGDECL ::= 'class';
     <sym> <package_def>
 }
 
 token package_declarator:grammar {
-    :my $PKGDECL is context = 'grammar';
+    :my $*PKGDECL ::= 'grammar';
     <sym> <package_def>
 }
 
 token package_declarator:module {
-    :my $PKGDECL is context = 'module';
+    :my $*PKGDECL ::= 'module';
     <sym> <package_def>
 }
 
 token package_declarator:package {
-    :my $PKGDECL is context = 'package';
+    :my $*PKGDECL ::= 'package';
     <sym> <package_def>
 }
 
 token package_declarator:role {
-    :my $PKGDECL is context = 'role';
+    :my $*PKGDECL ::= 'role';
     <sym> <package_def>
 }
 
 token package_declarator:knowhow {
-    :my $PKGDECL is context = 'knowhow';
+    :my $*PKGDECL ::= 'knowhow';
     <sym> <package_def>
 }
 
 token package_declarator:slang {
-    :my $PKGDECL is context = 'slang';
+    :my $*PKGDECL ::= 'slang';
     <sym> <package_def>
 }
 
@@ -1143,8 +1145,8 @@ token package_declarator:does {
 
 rule package_def {
     :my $longname;
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARAND is context<rw>;
+    :my $*IN_DECL = 1;
+    :my $*DECLARAND;
     [
         [
             <def_module_name>{
@@ -1169,13 +1171,13 @@ rule package_def {
                 my $newpkg = $*CURPKG.{$shortname ~ '::'};
                 $newpkg.<PARENT::> = $*CURPKG;
                 $*CURPKG = $newpkg;
-                push @PKGS, $pkg;
+                push @*PKGS, $pkg;
                 say "adding $newpkg " ~ $*PKGNAME if $*DEBUG +& DEBUG::symtab;
             }}
 
             <block>
             {{
-                $*PKGNAME = pop(@PKGS);
+                $*PKGNAME = pop(@*PKGS);
                 $*CURPKG = $*CURPKG.<PARENT::>;
             }}
             {*}                                                     #= block
@@ -1211,19 +1213,19 @@ token declarator {
 }
 
 token multi_declarator:multi {
-    :my $MULTINESS is context = 'multi';
+    :my $*MULTINESS = 'multi';
     <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed multi'> ]
 }
 token multi_declarator:proto {
-    :my $MULTINESS is context = 'proto';
+    :my $*MULTINESS = 'proto';
     <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed proto'> ]
 }
 token multi_declarator:only {
-    :my $MULTINESS is context = 'only';
+    :my $*MULTINESS = 'only';
     <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed only'> ]
 }
 token multi_declarator:null {
-    :my $MULTINESS is context = '';
+    :my $*MULTINESS = '';
     <declarator>
 }
 
@@ -1244,9 +1246,10 @@ rule multisig {
     ** '|'
 }
 
-rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARAND is context<rw>;
+rule routine_def () {
+    :temp $*CURPAD;
+    :my $*IN_DECL = 1;
+    :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -1258,9 +1261,10 @@ rule routine_def ($CURPAD is context<rw> = $*CURPAD) {
     ] || <.panic: "Malformed routine">
 }
 
-rule method_def ($CURPAD is context<rw> = $*CURPAD) {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARAND is context<rw>;
+rule method_def () {
+    :temp $*CURPAD;
+    :my $*IN_DECL = 1;
+    :my $*DECLARAND;
     <.newpad>
     [
         [
@@ -1281,9 +1285,10 @@ rule method_def ($CURPAD is context<rw> = $*CURPAD) {
     ] || <.panic: "Malformed method">
 }
 
-rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARAND is context<rw>;
+rule regex_def () {
+    :temp $*CURPAD;
+    :my $*IN_DECL = 1;
+    :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -1294,9 +1299,10 @@ rule regex_def ($CURPAD is context<rw> = $*CURPAD) {
     ] || <.panic: "Malformed regex">
 }
 
-rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
-    :my $IN_DECL is context<rw> = 1;
-    :my $DECLARAND is context<rw>;
+rule macro_def () {
+    :temp $*CURPAD;
+    :my $*IN_DECL = 1;
+    :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad>
@@ -1309,7 +1315,7 @@ rule macro_def ($CURPAD is context<rw> = $*CURPAD) {
 }
 
 rule trait {
-    :my $IN_DECL is context<rw> = 0;
+    :my $*IN_DECL = 0;
     [
     | <trait_mod>
     | <colonpair>
@@ -1330,7 +1336,7 @@ token trait_mod:hides {
     <sym>:s <module_name>
 }
 token trait_mod:does {
-    :my $PKGDECL is context = 'role';
+    :my $*PKGDECL ::= 'role';
     <sym>:s <module_name>
 }
 token trait_mod:will {
@@ -1366,8 +1372,8 @@ token nulltermish {
 }
 
 token termish {
-    :my $SCOPE is context<rw> = "our";
-    :my $VAR is context<rw>;
+    :my $*SCOPE ::= "our";
+    :my $*VAR;
     :dba('prefix or noun')
     [
     | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><noun> and $<noun> = pop @$p }> <PRE> ]*
@@ -1382,13 +1388,13 @@ token termish {
         [
         || <?{ $*QSIGIL eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
         ||                          <POST>+! <?after <[ \] } > ) ]> > 
-        || { $VAR = 0; }
+        || { $*VAR = 0; }
         ]
     || <!{ $*QSIGIL }>
         <POST>*
     ]
     {
-        self.check_variable($VAR) if $VAR;
+        self.check_variable($*VAR) if $*VAR;
         $¢.<~CAPS> = $<noun><~CAPS>;
     }
 }
@@ -1757,7 +1763,7 @@ token desigilname {
 }
 
 token variable {
-    :my $IN_META is context<rw> = 0;
+    :my $*IN_META = 0;
     :my $sigil = '';
     :my $twigil = '';
     :my $name;
@@ -1840,7 +1846,7 @@ token name {
 }
 
 token morename {
-    :my $QSIGIL is context<rw> = '';
+    :my $*QSIGIL ::= '';
     '::'
     [
         <?before '(' | <alpha> >
@@ -1990,11 +1996,11 @@ role herestop {
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
 
 method heredoc () {
-    temp $*CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
+    my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
     return if self.peek;
     my $here = self;
     while my $herestub = shift @herestub_queue {
-        my $DELIM is context = $herestub.delim;
+        my $*DELIM = $herestub.delim;
         my $lang = $herestub.lang.mixin( ::herestop );
         my $doc;
         if ($doc) = $here.nibble($lang) {
@@ -2088,7 +2094,7 @@ token tribble ($l, $lang2 = $l) {
 
 token quasiquibble ($l) {
     :my ($lang, $start, $stop);
-    :my $QUASIMODO is context = 0; # :COMPILING sets true
+    :my $*QUASIMODO = 0; # :COMPILING sets true
     <babble($l)>
     { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
@@ -2785,7 +2791,7 @@ grammar Q is STD {
 
     role s1 {
         token escape:sym<$> {
-            :my $QSIGIL is context = '$';
+            :my $*QSIGIL ::= '$';
             <?before '$'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> ] || <.panic: "Non-variable \$ must be backslashed">
         }
@@ -2797,7 +2803,7 @@ grammar Q is STD {
 
     role a1 {
         token escape:sym<@> {
-            :my $QSIGIL is context<rw> = '@';
+            :my $*QSIGIL ::= '@';
             <?before '@'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ] # trap ABORTBRANCH from variable's ::
         }
@@ -2809,7 +2815,7 @@ grammar Q is STD {
 
     role h1 {
         token escape:sym<%> {
-            :my $QSIGIL is context<rw> = '%';
+            :my $*QSIGIL ::= '%';
             <?before '%'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
         }
@@ -2821,7 +2827,7 @@ grammar Q is STD {
 
     role f1 {
         token escape:sym<&> {
-            :my $QSIGIL is context<rw> = '&';
+            :my $*QSIGIL ::= '&';
             <?before '&'>
             [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
         }
@@ -2936,7 +2942,7 @@ grammar Q is STD {
 
 grammar Quasi is STD {
     token term:unquote {
-        :my $QUASIMODO is context = 0;
+        :my $*QUASIMODO = 0;
         <starter><starter><starter> <EXPR> <stopper><stopper><stopper>
     }
 
@@ -2967,7 +2973,7 @@ token capterm {
 }
 
 rule capture {
-    :my $INVOCANT_OK is context<rw> = 1;
+    :my $*INVOCANT_OK = 1;
     <EXPR>
 }
 
@@ -2978,15 +2984,16 @@ token sigterm {
 
 rule param_sep { [','|':'|';'|';;'] }
 
-token fakesignature($CURPAD is context<rw> = $*CURPAD) {
+token fakesignature() {
+    :temp $*CURPAD;
     <.newpad>
     <signature>
 }
 
 token signature {
     # XXX incorrectly scopes &infix:<x> parameters to outside following block
-    :my $IN_DECL is context<rw> = 1;
-    :my $zone is context<rw> = 'posreq';
+    :my $*IN_DECL = 1;
+    :my $*zone = 'posreq';
     :my $startpos = self.pos;
     <.ws>
     [
@@ -3034,7 +3041,7 @@ rule post_constraint {
 }
 
 token named_param {
-    :my $GOAL is context = ')';
+    :my $*GOAL ::= ')';
     ':'
     [
     | <name=identifier> '(' <.ws>
@@ -3082,6 +3089,8 @@ token param_var {
                 when '.' {
                 }
                 when '!' {
+                }
+                when '*' {
                 }
                 default {
                     self.worry("Illegal to use $twigil twigil in signature");
@@ -3196,7 +3205,7 @@ token statement_prefix:lazy    { <sym> <blorst> }
 token statement_prefix:do      { <sym> <blorst> }
 
 token statement_prefix:lift    {
-    :my $QUASIMODO is context = 1;
+    :my $*QUASIMODO = 1;
     <sym> <blorst>
 }
 
@@ -3319,7 +3328,7 @@ token PRE {
 
 token infixish ($in_meta = $*IN_META) {
     :my $infix;
-    :my $IN_META is context<rw> = $in_meta;
+    :my $*IN_META = $in_meta;
     <!stdstopper>
     <!infixstopper>
     :dba('infix or meta-infix')
@@ -3401,7 +3410,7 @@ method can_meta ($op, $meta) {
 }
 
 regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
-    :my $IN_REDUCE is context<rw> = 1;
+    :my $*IN_REDUCE = 1;
     <?before '['\S+']'>
     $<s> = (
         '['
@@ -3544,9 +3553,9 @@ token semiarglist {
 
 token arglist {
     :my $inv_ok = $*INVOCANT_OK;
-    :my StrPos $endargs is context<rw> = 0;
-    :my $GOAL is context = 'endargs';
-    :my $QSIGIL is context<rw> = '';
+    :my StrPos $*endargs = 0;
+    :my $*GOAL ::= 'endargs';
+    :my $*QSIGIL ::= '';
     <.ws>
     :dba('argument list')
     [
@@ -3888,7 +3897,7 @@ token infix:sym<max> ( --> Tight_or)
 
 ## conditional
 token infix:sym<?? !!> ( --> Conditional) {
-    :my $GOAL is context = '!!';
+    :my $*GOAL ::= '!!';
     '??'
     <.ws>
     <EXPR(item %item_assignment)>
@@ -4023,9 +4032,9 @@ token term:opfunc ( --> Term )
 
 token args ($istype = 0) {
     :my $listopish = 0;
-    :my $GOAL is context = '';
-    :my $INVOCANT_OK is context<rw> = 1;
-    :my $INVOCANT_IS is context<rw>;
+    :my $*GOAL ::= '';
+    :my $*INVOCANT_OK = 1;
+    :my $*INVOCANT_IS;
     [
 #    | :dba('argument list') '.(' ~ ')' <semiarglist> {*}             #= func args
     | :dba('argument list') '(' ~ ')' <semiarglist> {*}              #= func args
@@ -4186,12 +4195,12 @@ regex stdstopper {
 ##############################
 
 method EXPR ($preclvl) {
-    temp $*CTX = self.callm if $*DEBUG +& DEBUG::trace_call;
+    my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
     if self.peek {
         return self._AUTOLEXpeek('EXPR');
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
-    my $LEFTSIGIL is context<rw> = '';
+    my $*LEFTSIGIL = '';
     my @termstack;
     my @opstack;
     my $termish = 'termish';
@@ -4522,16 +4531,16 @@ grammar Regex is STD {
 
     # suppress fancy end-of-line checking
     token codeblock {
-        :my $GOAL is context = '}';
+        :my $*GOAL ::= '}';
         '{' :: [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <statementlist> ]
         [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
     }
 
     rule nibbler {
-        :my $sigspace    is context<rw> = $*sigspace    // 0;
-        :my $ratchet     is context<rw> = $*ratchet     // 0;
-        :my $ignorecase is context<rw> = $*ignorecase // 0;
-        :my $ignoreaccent    is context<rw> = $*ignoreaccent    // 0;
+        :temp $*sigspace;
+        :temp $*ratchet;
+        :temp $*ignorecase;
+        :temp $*ignoreaccent;
         [ \s* < || | && & > ]?
         <EXPR>
     }
@@ -4775,8 +4784,7 @@ grammar Regex is STD {
 
     token mod_arg { :dba('modifier argument') '(' ~ ')' <semilist> }
 
-    token mod_internal:sym<:my>    { ':' <?before ['my'|'state'|'our'|'constant'] \s > [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <statement> <eat_terminator> ] }
-    token mod_internal:sym<:temp>    { ':' <?before ['temp'|'let'] \s > [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <statement> <eat_terminator> ] }
+    token mod_internal:sym<:my>    { ':' <?before ['my'|'state'|'our'|'constant'|'temp'|'let'] \s > [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <statement> <eat_terminator> ] }
 
     # XXX needs some generalization
 
@@ -4860,7 +4868,7 @@ grammar P5Regex is STD {
 
     # suppress fancy end-of-line checking
     token codeblock {
-        :my $GOAL is context = '}';
+        :my $*GOAL ::= '}';
         '{' :: [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <statementlist> ]
         [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
     }
@@ -4871,7 +4879,7 @@ grammar P5Regex is STD {
     }
 
     rule nibbler {
-        :my $ignorecase is context<rw> = $*ignorecase // 0;
+        :temp $*ignorecase;
         <EXPR>
     }
 
@@ -5151,8 +5159,8 @@ method find_top_pkg ($name) {
 }
 
 method add_name ($name) {
-    my $scope = $*SCOPE // 'our';
-    say "Adding $*SCOPE $name in $*PKGNAME" if $*DEBUG +& DEBUG::symtab;
+    my $scope = $*SCOPE // 'OUR';
+    say "Adding $scope $name in $*PKGNAME" if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
     }
@@ -5321,7 +5329,7 @@ method add_mystery ($name,$pos) {
 }
 
 method load_setting ($setting) {
-    @PKGS = ();
+    @*PKGS = ();
 
     $*SETTING = self.load_pad($setting);
     $*CURPAD = $*SETTING;
@@ -5446,13 +5454,13 @@ method check_variable ($variable) {
             }
         }
         when '^' {
-            my $MULTINESS is context = 'multi';
+            my $*MULTINESS = 'multi';
             my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
             if $siggy { $variable.panic("Placeholder variable $name cannot override existing signature $siggy"); }
             self.add_my_variable($name);
         }
         when ':' {
-            my $MULTINESS is context = 'multi';
+            my $*MULTINESS = 'multi';
             self.add_my_variable($name);
         }
         when '~' {
