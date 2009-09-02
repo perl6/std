@@ -3289,8 +3289,14 @@ token infix:lambda ( --> Term) {
             my $m = %*MYSTERY{$_};
             next unless $m;
             if $line - ($m.<line>//-123) < 5 {
-                $¢.panic("$_() interpreted as function call at line " ~ $m.<line> ~
-                "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
+                if $m.<ctx> eq '(' {
+                    $¢.panic($_ ~ '() interpreted as postdeclared function call at line ' ~ $m.<line> ~
+                    "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
+                }
+                else {
+                    $¢.panic("'$_' interpreted as postdeclared listop at line " ~ $m.<line> ~
+                    "; please use 'do' to introduce statement_control:<$_>.\nUnexpected block in infix position (two terms in a row)");
+                }
             }
         }
         return () if $*IN_REDUCE;
@@ -4015,7 +4021,7 @@ token term:identifier ( --> Term )
     <identifier> <?before [<unsp>|'(']? >
     { $name = $<identifier>.Str; $pos = $¢.pos; }
     <args( $¢.is_name($name) )>
-    { self.add_mystery($name,$pos) unless $<args><invocant>; }
+    { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
     {{
         if $*BORG and $*BORG.<block> {
             if not $*BORG.<name> {
@@ -4078,7 +4084,7 @@ token term:name ( --> Term)
         {*}                                                     #= typename
 
     # unrecognized names are assumed to be post-declared listops.
-    || <args> { self.add_mystery($name,$pos) unless $<args><invocant>; }
+    || <args> { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
         {{
             if $*BORG and $*BORG.<block> {
                 if not $*BORG.<name> {
@@ -5317,11 +5323,13 @@ method add_our_name ($n) {
     self;
 }
 
-method add_mystery ($name,$pos) {
+method add_mystery ($name,$pos,$ctx) {
     if not self.is_known($name) {
         say "add_mystery $name $*CURPAD" if $*DEBUG +& DEBUG::symtab;
         %*MYSTERY{$name}.<pad> = $*CURPAD;
-        %*MYSTERY{$name}.<line> ~= self.lineof($pos) ~ ' ';
+        %*MYSTERY{$name}.<ctx> = $ctx;
+        %*MYSTERY{$name}.<line> ~= ',' if %*MYSTERY{$name}.<line>;
+        %*MYSTERY{$name}.<line> ~= self.lineof($pos);
     }
     else {
         say "$name is known" if $*DEBUG +& DEBUG::symtab;
