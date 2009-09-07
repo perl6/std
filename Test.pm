@@ -1,5 +1,6 @@
 class Test;
 proto plan is export { }
+proto done_testing is export { }
 proto is is export { }
 proto ok is export { }
 proto dies_ok is export { }
