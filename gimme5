@@ -901,7 +901,6 @@ END
     print <<'END';
 
 our $moreinput;
-our $DEBUG;
 
 our %INSTANTIATED;
 require 'mangle.pl';
