@@ -3283,7 +3283,7 @@ token term:sym<**> ( --> Term)
     { <sym> }
 
 token infix:lambda ( --> Term) {
-    <?before '{' | '->' > {{
+    <?before '{' | '->' > <!{ $*IN_META }> {{
         my $line = $¢.lineof($¢.pos);
         for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when', 'sub' {
             my $m = %*MYSTERY{$_};
