@@ -1,0 +1,38 @@
+
+vijs - STD.pm parsing Perl 6, emitting the AST to JavaScript, where the AST is
+    walked by a trampolined/stackless/continuation-returning interpreter.
+
+requirements:
+ - have Perl 5 installed and all of STD5.pmc's and viv's dependencies; 
+ - build V8 (Google's BSD-licensed JS engine) from source (optionally install)
+    - see http://code.google.com/p/v8/wiki/Source
+    - you'll need g++, Python 2.5, scons (latest release candidate)
+ - install the Perl 5 extension for V8 (originally named Acme::JavaScript::V8)
+    - see http://github.com/fictorial/perl-v8
+    - original: http://d.hatena.ne.jp/dayflower/20080905/1220592409
+ - install File::Slurp (or write your own to do what it does, or whatever :)
+ - accept some draconian EULA (kidding)
+
+usage:
+ - ./viv --js -e 'say()'
+ - ./viv --js -e 'say(23)'
+ - ./viv --js -e 'say(421,510)'
+ - etc.
+ - Yes, that really is the extent of STD's schema that it understands so far.
+
+vision:
+ - host/backend for Perl 6 on Google's V8 JavaScript VM, linked into perl
+   initially to make use of STD5.pmc.
+ - may eventually extend/fork V8 to add Perl 6 features/semantics natively, but
+   writing the runtime in JavaScript initially (lots of boxing/unboxing, yes).
+ - the interpreter will not emit JavaScript source yet... perhaps when it's time
+   to make it an optimizing compiler.
+
+plans:
+ - write a custom Actions package so 'BEGIN{}' and 'use OtherPackage;' can tell
+   the runtime to hook back into the STD parser as needed, and vice versa.
+ - implement the metaclass/metaobject protocols/API
+ - implement all the builtins. :) or do I repeat myself?
+    - note: borrow lots from all the other Perl 6 implementations, of course.
+
+last updated 2009-09-16 - diakopter
