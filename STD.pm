@@ -1963,6 +1963,7 @@ token rad_number {
 #      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
     || <?before '['> <circumfix>
     || <?before '('> <circumfix>
+    || <.panic: "Malformed radix number">
     ]
 }
 
