@@ -27,6 +27,7 @@ viv [switches] filename
     	--ast	spit out an abstract syntax tree (default)
     	--p5	spit out a Perl 5 representation (partially impl)
     	--p6	spit out a Perl 6 representation
+		--js    use the JS/V8 interpreter backend
     	--stab	include the symbol table
     	--pos	include position info in AST
     	--match	include match tree info in AST
@@ -53,6 +54,11 @@ sub MAIN {
 	    $output = 'p5';
 	    $OPT_pos = 1;
 	}
+    elsif ($switch eq '--js') { # TODO: add a full parse mode (Actions)
+        $output = 'js';
+        $OPT_pos = 1;
+        $OPT_stab = 1;
+    }
 	elsif ($switch eq '--p6' or $switch eq '-6') {
 	    $output = 'p6';
 	    $OPT_pos = 1;
@@ -102,9 +108,51 @@ sub MAIN {
     elsif ($output eq 'p5') {
 	print fixpod($r->ret($r->emit_p5(0)));
     }
+    elsif ($output eq 'js') {
+        run_js_interpreter($r);
+    }
     else {
 	die "Unknown output mode";
     }
+}
+
+sub say_them { say @_ }
+sub sayit {
+    #say $_[0];
+    $_[0]
+}
+
+sub run_js_interpreter {
+    eval 'use Time::HiRes qw( gettimeofday );
+    use V8;
+    use File::Slurp;
+    use ToJS;';
+    my $ctx = V8::Context->new();
+    $ctx->register_method_by_name("say_them");
+    $ctx->execute(scalar(read_file("js/json2.js")));
+    $ctx->execute(scalar(read_file("js/interp.js")));
+    $ctx->execute(scalar(read_file("js/builtins.js")));
+    # TODO: put "prelude" in its own file..
+    $ctx->execute(<<'PRELUDE');
+    function say() {
+        if (typeof(arguments)!='undefined') {
+            for (var s_args=[], i=-1, j=-1, a, l=arguments.length; i<l;)
+                if (typeof(a=arguments[++i])!='undefined') {
+                    s_args[++j] = typeof(a)==='string' ? a : a.toString();
+                }
+            say_them.apply(this, s_args);
+        } else {
+            say_them('');
+        }
+    }
+    var p6toplevel={
+        'say': new p6builtin.p6sub(say,'say')
+    };
+    
+PRELUDE
+    my $start = gettimeofday();
+    $ctx->execute('top_interp('.sayit(ToJS::emit_js($_[0])).',p6toplevel);');
+    say("\n\ttime in interpreter: ".sprintf("%.6f s", gettimeofday()-$start));
 }
 
 # viv should likely be abstracted into a module instead of doing this hack... - pmurias
