@@ -132,24 +132,6 @@ sub run_js_interpreter {
     $ctx->execute(scalar(read_file("js/json2.js")));
     $ctx->execute(scalar(read_file("js/interp.js")));
     $ctx->execute(scalar(read_file("js/builtins.js")));
-    # TODO: put "prelude" in its own file..
-    $ctx->execute(<<'PRELUDE');
-    function say() {
-        if (typeof(arguments)!='undefined') {
-            for (var s_args=[], i=-1, j=-1, a, l=arguments.length; i<l;)
-                if (typeof(a=arguments[++i])!='undefined') {
-                    s_args[++j] = typeof(a)==='string' ? a : a.toString();
-                }
-            say_them.apply(this, s_args);
-        } else {
-            say_them('');
-        }
-    }
-    var p6toplevel={
-        'say': new p6builtin.p6sub(say,'say')
-    };
-    
-PRELUDE
     my $start = gettimeofday();
     $ctx->execute('top_interp('.sayit(ToJS::emit_js($_[0])).',p6toplevel);');
     say("\n\ttime in interpreter: ".sprintf("%.6f s", gettimeofday()-$start));

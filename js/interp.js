@@ -90,10 +90,11 @@ function keys(o) {
 
 function top_interp(obj,context) {
     interp(obj.M,context);
-    var result;
-    return typeof(result = obj.M.result) != 'undefined'
-        ? result
-        : 'Error; undefined result';
+    return '';
+    //var result;
+    //return typeof(result = obj.M.result) != 'undefined'
+    //    ? result
+    //    : 'Error; undefined result';
 }
 
 var S=function(s){
@@ -129,7 +130,8 @@ function interp(obj,context) {
                 }
                 interp(act[act.SYM],act.context);
                 if (act[act.SYM].result instanceof p6builtin.p6sub) {
-                    act[act.SYM].result.func.apply(act.context, ArgArray);
+                    act.result = act[act.SYM].result.
+                        func.apply(act.context, ArgArray);
                     act = act.invoker;
                     result = [];
                 } else {

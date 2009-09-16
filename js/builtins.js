@@ -27,3 +27,28 @@ toString:function(){
 };
 
 })();
+
+
+function say() {
+    if (typeof(arguments)!='undefined') {
+        for (var s_args=[], i=-1, j=-1, a, l=arguments.length; i<l;)
+            if (typeof(a=arguments[++i])!='undefined') {
+                s_args[++j] = typeof(a)==='string' ? a : a.toString();
+            }
+        say_them.apply(this, s_args);
+    } else {
+        say_them('');
+    }
+    return new p6builtin.Integer(1);
+}
+var p6toplevel={
+    'say': new p6builtin.p6sub(say,'say')
+};
+
+
+
+
+
+
+
+
