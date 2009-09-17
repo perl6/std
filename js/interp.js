@@ -50,12 +50,8 @@ numish:function(){
     }
 },
 integer:function(){
-    switch(this.phase) {
-    case 0:
-        ++this.phase;
-        this.result = new p6builtin.Integer(+this.TEXT);
-        return [this.invoker];
-    }
+    this.result = new p6builtin.Integer(+this.TEXT);
+    return [this.invoker];
 },
 eat_terminator:function(){
     switch(this.phase) {
@@ -76,13 +72,30 @@ termish:function(){
         this.result = this.M.result;
         return [this.invoker];
     }
+},
+NIBBLER__:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        if (this.nibble.M.length > 1) {
+            throw 'string interpolation not yet implemented';
+        }
+        return [this.nibble.M[0],this];
+    case 1:
+        this.result = this.nibble.M[0].result;
+        return [this.invoker];
+    }
+},
+Str:function(){
+    this.result = new p6builtin.Str(this.TEXT);
+    return [this.invoker];
 }
 
 };
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.value__S_number = disp.noun__S_value = disp.value__S_quote =
-    //disp.quote__S_Double_Double = 
     disp.SYMBOL__;
+disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 
 function keys(o) {
     var res = [], j=-1;

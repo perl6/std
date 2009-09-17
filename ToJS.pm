@@ -1,5 +1,7 @@
 use strict;
 use warnings;
+use utf8;
+use Encode;
 
 { package ToJS;
 
@@ -13,7 +15,7 @@ $jsk->{$_} = 1 for (qw(break continue do for import new this void case
   extends try const finally debugger super));
 
 sub tps {
-    my $str = (shift).'';
+    my $str = Encode::decode_utf8(shift);
     return '"'.$1.'"' if $str =~ /\(0x(\w+)/;
     $str =~ s/^VAST:://;
     return $str if (!(shift || 0) && $str =~ /^[\w_]+$/

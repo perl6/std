@@ -116,17 +116,23 @@ sub MAIN {
     }
 }
 
-sub say_them { say @_ }
+sub say_them {
+    # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)
+    my @in = ();
+    push @in, Encode::decode_utf8($_) for @_;
+    say @in;
+}
 sub sayit {
     #say $_[0];
-    $_[0]
+    $_[0];
 }
 
 sub run_js_interpreter {
     eval 'use Time::HiRes qw( gettimeofday );
     use V8;
     use File::Slurp;
-    use ToJS;';
+    use ToJS;
+    use Encode;';
     my $ctx = V8::Context->new();
     $ctx->register_method_by_name("say_them");
     $ctx->execute(scalar(read_file("js/json2.js")));

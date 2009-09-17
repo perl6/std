@@ -9,6 +9,15 @@ toString: function(){
 }
 };
 
+p6builtin.Str = function(str) {
+    this.v = typeof(str)=='string' ? str : str.toString();
+};
+p6builtin.Str.prototype = {
+toString: function(){
+    return this.v;
+}
+};
+
 p6builtin.Undef = {
 toString: function(){
     return 'Undef';
