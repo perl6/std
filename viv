@@ -445,8 +445,21 @@ sub indent {
 	    if (ref $n eq 'Str') {
 		push @dot, bless($n,"VAST::Str");
 	    }
-	    else {
+	    elsif (ref $n eq 'VAST::Str') {
+		push @dot, $n;
+	    }
+	    elsif (ref $n eq 'ARRAY') {
+		push @dot, $n->[0]{_ast};
+	    }
+	    elsif ($n->{_ast}) {
+		push @dot, $n->{_ast};
+	    }
+	    elsif ($n->{EXPR}) {
 		push @dot, $n->{EXPR}->{_ast};
+	    }
+	    else {
+		warn "Oops", ::Dump($n);
+		exit;
 	    }
 	}
 	my $a = $r->{'.'} = \@dot;

@@ -2119,7 +2119,7 @@ token nibbler {
         [
         || <starter> <nibbler> <stopper>
                         {{
-                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to );
+                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
 
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
@@ -2132,7 +2132,8 @@ token nibbler {
                             $to = $from = $¢.pos;
                         }}
         || <escape>     {{
-                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ), $<escape>[*-1];
+                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
+                            push @nibbles, $<escape>[*-1];
                             $text = '';
                             $to = $from = $¢.pos;
                         }}
@@ -2148,7 +2149,7 @@ token nibbler {
         ]
     ]*
     {{
-        push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to );
+        push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to or !@nibbles;
         $<nibbles> = \@nibbles;
         $<_pos> = $¢.pos;
         $<nibbler> :delete;
