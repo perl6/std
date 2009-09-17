@@ -80,7 +80,9 @@ termish:function(){
 
 };
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
-    disp.value__S_number = disp.noun__S_value = disp.SYMBOL__;
+    disp.value__S_number = disp.noun__S_value = disp.value__S_quote =
+    //disp.quote__S_Double_Double = 
+    disp.SYMBOL__;
 
 function keys(o) {
     var res = [], j=-1;
@@ -110,6 +112,7 @@ function interp(obj,context) {
             act.phase = 0;
             act.context = result[1].context;
             //say('trying '+act.T);
+            //say(keys(act), act.SYM);
         } else {
             //say('returning to '+act.T);
         }
@@ -141,7 +144,7 @@ function interp(obj,context) {
                 act = (result = disp[act.T].call(act))[0];
             }
         } else {
-            throw 'Type '+act.T+' not found!\n'+S(act,undefined,' ');
+            throw act.T+' not yet implemented; srsly!!?!?';
         }
     }
     return obj.result;
