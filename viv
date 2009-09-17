@@ -436,6 +436,30 @@ sub indent {
 	$match->{'_ast'} = $r;
     }
 
+    sub nibbler {
+	my $self = shift;
+	my $match = shift;
+	my $r = hoist($match);
+	my @dot;
+	for my $n ( @{ $match->{nibbles} } ) {
+	    if (ref $n eq 'Str') {
+		push @dot, bless($n,"VAST::Str");
+	    }
+	    else {
+		push @dot, $n->{EXPR}->{_ast};
+	    }
+	}
+	my $a = $r->{'.'} = \@dot;
+	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
+	$r->{END} = $a->[-1]->{END} // $match->{_pos};
+
+	my $class = 'VAST::nibbler';
+#	print STDERR ::Dump($r);
+	gen_class($class);
+	$r = bless $r, $class;
+	$match->{'_ast'} = $r;
+    }
+
     sub EXPR {
 	return;
     }
@@ -555,7 +579,15 @@ sub indent {
 
 }
 
-{ package VAST::TEXT; our @ISA = 'VAST::Base'; }
+{ package VAST::Str; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	return $self->{TEXT};
+    }
+    sub emit_p6 {  my $self = shift; my $lvl = shift;
+	return $self->{TEXT};
+    }
+
+}
 
 { package VAST::Additive; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;

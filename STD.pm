@@ -2119,7 +2119,7 @@ token nibbler {
         [
         || <starter> <nibbler> <stopper>
                         {{
-                            push @nibbles, $¢.cursor_singleton(TEXT => $text, _from => $from, _pos => $to );
+                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to );
 
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
@@ -2132,7 +2132,7 @@ token nibbler {
                             $to = $from = $¢.pos;
                         }}
         || <escape>     {{
-                            push @nibbles, $¢.cursor_singleton(TEXT => $text, _from => $from, _pos => $to ), $<escape>[*-1];
+                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ), $<escape>[*-1];
                             $text = '';
                             $to = $from = $¢.pos;
                         }}
@@ -2148,7 +2148,7 @@ token nibbler {
         ]
     ]*
     {{
-        push @nibbles, $¢.cursor_singleton(TEXT => $text, _from => $from, _pos => $to );
+        push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to );
         $<nibbles> = \@nibbles;
         $<_pos> = $¢.pos;
         $<nibbler> :delete;

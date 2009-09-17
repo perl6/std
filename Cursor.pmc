@@ -867,11 +867,11 @@ sub cursor_all { my $self = shift;
     bless \%r, ref $self;
 }
 
-sub cursor_singleton { my $self = shift;
-    $self->deb("cursor_new @_") if $DEBUG & DEBUG::cursors;
+sub makestr { my $self = shift;
+    $self->deb("maketext @_") if $DEBUG & DEBUG::cursors;
     my %r = @_;
 
-    bless \%r, ref $self;
+    bless \%r, "Str";
 }
 
 sub cursor_tweak { my $self = shift;
