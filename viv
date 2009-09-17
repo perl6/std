@@ -184,6 +184,7 @@ sub indent {
 	my $match = shift;
 	return if @_;	# not interested in tagged reductions
 	return if $match->{_ast}{_specific} and ref($match->{_ast}) =~ /^VAST/;
+	print STDERR "AUTOLOAD $AUTOLOAD\n" if $OPT_log;
 	my $r = hoistast($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
 	$class =~ s/__S_\d\d\d/__S_/ and $r->{_specific} = 1;
@@ -337,6 +338,7 @@ sub indent {
 	if ($match->{ADV}) {
 	    $r{ADV} = $match->{ADV};
 	}
+	\%r;
     }
 
     sub CHAIN {
