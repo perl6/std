@@ -221,10 +221,10 @@ sub indent {
 	    elsif ($k eq 'sym') {
 		if (ref $v) {
 		    if (ref($v) eq 'ARRAY') {
-			$r{SYM} = ::Dump($v);
+			$r{SYM} = $v;
 		    }
 		    elsif (ref($v) eq 'HASH') {
-			$r{SYM} = ::Dump($v);
+			$r{SYM} = $v;
 		    }
 		    elsif ($v->{_pos}) {
 			$r{SYM} = $v->Str;
