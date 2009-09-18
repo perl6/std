@@ -904,6 +904,22 @@ sub cursor { my $self = shift;
     bless \%r, ref $self;
 }
 
+sub cursor_force { my $self = shift;
+    my $tpos = shift;
+
+    if ($DEBUG & DEBUG::cursors) {
+        my $peek = substr($::ORIG,$tpos,20);
+        $peek =~ s/\n/\\n/g;
+        $peek =~ s/\t/\\t/g;
+        $self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
+    }
+    my %r = %$self;
+#    $r{_from} = $self->{_pos} // 0;
+    $r{_pos} = $::HIGHWATER = $tpos;
+
+    bless \%r, ref $self;
+}
+
 sub cursor_rev { my $self = shift;
     my $fpos = shift;
 

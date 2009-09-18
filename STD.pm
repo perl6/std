@@ -3524,8 +3524,17 @@ token postcircumfix:sym<[ ]> ( --> Methodcall)
 token postcircumfix:sym<{ }> ( --> Methodcall)
     { :dba('subscript') '{' ~ '}' <semilist> }
 
-token postcircumfix:sym«< >» ( --> Methodcall)
-    { '<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> [ '>' || <.panic: "Unable to parse quote-words subscript; couldn't find right angle quote"> ] }
+token postcircumfix:sym«< >» ( --> Methodcall) {
+    :my $pos;
+    '<'
+    { $pos = $¢.pos }
+    [
+    || <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>'
+    || <?before \h* [ \d | <sigil> | ':' ] >
+       { $¢.cursor_force($pos).panic("Whitespace required before < operator") }
+    || { $¢.cursor_force($pos).panic("Unable to parse quote-words subscript; couldn't find right angle quote") }
+    ]
+}
 
 token postcircumfix:sym«<< >>» ( --> Methodcall)
     { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
