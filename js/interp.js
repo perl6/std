@@ -86,16 +86,69 @@ NIBBLER__:function(){
         return [this.invoker];
     }
 },
+Concatenation:function(){
+    // Str concatenation
+    var strings = Array(this.eval_args.length);
+    // TODO: make iterative (stackless) and don't assume toString() won't
+    // overflow the JS stack.
+    // TODO: use the Perl 6 stringify instead of just JS toString()
+    for (var i=0,a; i < strings.length; ++i) {
+        strings[i] = typeof(a=this.eval_args[i])=='string'
+            ? a
+            : a.toString();
+    }
+    this.result = strings.join('');
+    return [this.invoker];
+},
 Str:function(){
     this.result = new p6builtin.Str(this.TEXT);
     return [this.invoker];
+},
+eval_args:function eval_args(){
+    switch(this.phase) {
+    case 0:
+        this.idx=-1;
+        if (!this.M.length) {
+            this.M = [this.M];
+        }
+        this.len=this.M.length;
+        this.invoker.eval_args = Array(this.len);
+        ++this.phase;
+    case 1:
+        if (this.idx > -1) {
+            this.invoker.eval_args[this.idx] = this.M[this.idx].result;
+        }
+        if (this.idx < this.len - 1) {
+            return [this.M[++this.idx],this];
+        } else {
+            this.result = this.invoker.eval_args;
+            return [this.invoker];
+        }
+    case 2:
+        if (disp[this.invoker.T]===eval_args) {
+            this.invoker.eval_args = this.eval_args;
+            this.invoker.phase = 2;
+        } else {
+            this.invoker.eval_args = this.result = this.eval_args;
+        }
+        return [this.invoker];
+    }
+},
+Comma:function(){
+    if (this.invoker.eval_args) {
+        this.invoker.eval_args = this.invoker.eval_args.concat(this.eval_args);
+    } else {
+        this.invoker.eval_args = this.eval_args;
+        this.invoker.phase = 2;
+    }
+    return [this.invoker];
 }
-
 };
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.value__S_number = disp.noun__S_value = disp.value__S_quote =
-    disp.SYMBOL__;
+    disp.noun__S_circumfix = disp.circumfix__S_Paren_Thesis = disp.SYMBOL__;
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
+disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 
 function keys(o) {
     var res = [], j=-1;
@@ -106,10 +159,6 @@ function keys(o) {
 function top_interp(obj,context) {
     interp(obj.M,context);
     return '';
-    //var result;
-    //return typeof(result = obj.M.result) != 'undefined'
-    //    ? result
-    //    : 'Error; undefined result';
 }
 
 var S=function(s){
@@ -117,7 +166,7 @@ var S=function(s){
 };
 
 function interp(obj,context) {
-    var act = obj, result = Array(1);
+    var act = obj, result = Array(1), empty = [0], last;
     act.phase = 0; act.context = context;
     for(;typeof(act) != 'undefined';) {
         if (result.length > 1) {
@@ -130,31 +179,24 @@ function interp(obj,context) {
             //say('returning to '+act.T);
         }
         if (disp[act.T]) {
-            if (act.args) {
-                var ArgList = act.args.M.M, ArgArray = [];
-                if (typeof(ArgList.M)!='undefined') {
-                    if (typeof(ArgList.M.length)!='undefined') {
-                        throw S(ArgList.M);
-                    } else if (ArgList.M.T == 'Comma') {
-                        ArgList = ArgList.M.M;
-                    } else {
-                        ArgList = [ArgList.M.M];
-                    }
-                    for (var i=0;i<ArgList.length;i+=2) {
-                        ArgArray[i/2] = interp(ArgList[i],act.context);
-                    }
-                }
-                interp(act[act.SYM],act.context);
-                if (act[act.SYM].result instanceof p6builtin.p6sub) {
-                    act.result = act[act.SYM].result.
-                        func.apply(act.context, ArgArray);
-                    act = act.invoker;
-                    result = [];
-                } else {
-                    throw act+" is not a subroutine!";
-                }
+            if (act.args && !act.eval_args) {
+                act = {
+                    T : "eval_args",
+                    M : typeof(act.args.length)!='undefined'
+                        ? act.args
+                        : [act.args],
+                    phase : 0,
+                    invoker : act,
+                    context : act.context
+                };
+                result = empty;
+                continue;
             } else {
-                act = (result = disp[act.T].call(act))[0];
+                act = (result = disp[act.T].call(last = act))[0];
+                if (last.result instanceof p6builtin.p6sub && last.eval_args) {
+                    last.result = (last.referent = last.result).
+                        func.apply(last.context, last.eval_args);
+                }
             }
         } else {
             throw act.T+' not yet implemented; srsly!!?!?';

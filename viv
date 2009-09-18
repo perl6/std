@@ -122,7 +122,7 @@ sub sayit {
     #say $_[0];
     $_[0];
 }
-
+ 
 sub run_js_interpreter {
     eval 'use Time::HiRes qw( gettimeofday );
     use V8;
@@ -134,8 +134,9 @@ sub run_js_interpreter {
     $ctx->execute(scalar(read_file("js/json2.js")));
     $ctx->execute(scalar(read_file("js/interp.js")));
     $ctx->execute(scalar(read_file("js/builtins.js")));
+    my $ast = ToJS::emit_js($_[0]);
     my $start = gettimeofday();
-    $ctx->execute('top_interp('.sayit(ToJS::emit_js($_[0])).',p6toplevel);');
+    $ctx->execute('top_interp('.sayit($ast).',p6toplevel);');
     say("\n\ttime in interpreter: ".sprintf("%.6f s", gettimeofday()-$start));
 }
 
