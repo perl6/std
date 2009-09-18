@@ -10,7 +10,6 @@ use STD;
 use utf8;
 use YAML::XS;
 
-my $OPT_pos = 0;
 my $OPT_match = 0;
 my $OPT_log = 0;
 my $OPT_stab = 0;
@@ -52,16 +51,13 @@ sub MAIN {
 	}
 	elsif ($switch eq '--p5' or $switch eq '-5') {
 	    $output = 'p5';
-	    $OPT_pos = 1;
 	}
     elsif ($switch eq '--js') { # TODO: add a full parse mode (Actions)
         $output = 'js';
-        $OPT_pos = 1;
         $OPT_stab = 1;
     }
 	elsif ($switch eq '--p6' or $switch eq '-6') {
 	    $output = 'p6';
-	    $OPT_pos = 1;
 	}
 	elsif ($switch eq '--stab' or $switch eq '-s') {
 	    $OPT_stab = 1;
@@ -70,7 +66,7 @@ sub MAIN {
 	    $OPT_log = 1;
 	}
 	elsif ($switch eq '--pos' or $switch eq '-p') {
-	    $OPT_pos = 1;	# attach position and prior ws len
+	    # obsolete, ignored
 	}
 	elsif ($switch eq '--match' or $switch eq '-m') {
 	    $OPT_match = 1;	# attach match object
@@ -146,7 +142,6 @@ sub run_js_interpreter {
 # viv should likely be abstracted into a module instead of doing this hack... - pmurias
 sub VIV::SET_OPT {
     my %opt = @_;
-    $OPT_pos = $opt{pos};
     $OPT_match = $opt{match};
     $OPT_log = $opt{log};
 }
@@ -256,10 +251,8 @@ sub indent {
 		}
 	    }
 	    elsif ($k eq '_from') {
-		if ($OPT_pos) {
-		    $r{BEG} = $v;
-		    $r{END} = $node->{_pos};
-		}
+		$r{BEG} = $v;
+		$r{END} = $node->{_pos};
 		if (exists $::MEMOS[$v]{'ws'}) {
 		    my $wsstart = $::MEMOS[$v]{'ws'};
 		    $r{WS} = $v - $wsstart if defined $wsstart and $wsstart < $v
@@ -267,10 +260,8 @@ sub indent {
 	    }
 	    elsif ($k =~ /^[a-zA-Z]/) {
 		if ($k eq 'noun') {	# trim off PRE and POST
-		    if ($OPT_pos) {
-			$r{BEG} = $v->{_from};
-			$r{END} = $v->{_pos};
-		    }
+		    $r{BEG} = $v->{_from};
+		    $r{END} = $v->{_pos};
 		}
 		if (ref($v) eq 'ARRAY') {
 		    my $zyg = [];
@@ -368,6 +359,7 @@ sub indent {
 
 	my @list = @{$match->{list}};
 	my @delims = @{$match->{delims}};
+	$r->{'args'} = [ map { $_->{_ast} } @list ];
 	my @all;
 	while (@delims) {
 	    my $term = shift @list;
@@ -394,7 +386,9 @@ sub indent {
 	my $self = shift;
 	my $match = shift;
 	my $r = hoist($match);
-	my $a = $r->{'.'} = [$match->{arg}->{_ast},$match->{_ast}];
+	my $arg = $match->{arg}->{_ast};
+	$r->{'arg'} = $arg;
+	my $a = $r->{'.'} = [$arg,$match->{_ast}];
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
 
@@ -411,7 +405,9 @@ sub indent {
 	my $self = shift;
 	my $match = shift;
 	my $r = hoist($match);
-	my $a = $r->{'.'} = [$match->{_ast},$match->{arg}->{_ast}];
+	my $arg = $match->{arg}->{_ast};
+	$r->{'arg'} = $arg;
+	my $a = $r->{'.'} = [$match->{_ast},$arg];
 
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
@@ -429,7 +425,10 @@ sub indent {
 	my $self = shift;
 	my $match = shift;
 	my $r = hoist($match);
-	my $a = $r->{'.'} = [$match->{left}->{_ast},$match->{_ast},$match->{right}->{_ast}];
+	my $left = $match->{left}->{_ast};
+	my $right = $match->{right}->{_ast};
+	$r->{'args'} = [$left,$right];
+	my $a = $r->{'.'} = [$left,$match->{_ast},$right];
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
 
