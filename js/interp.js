@@ -76,15 +76,26 @@ termish:function(){
 NIBBLER__:function(){
     switch(this.phase) {
     case 0:
-        ++this.phase;
-        if (this.nibble.M.length > 1) {
-            throw 'string interpolation not yet implemented';
+        if (this.nibble.M.length < 2) {
+            this.phase = 1;
+            return [this.nibble.M[0],this];
         }
-        return [this.nibble.M[0],this];
+        this.phase = 2;
+        this.concat = {
+            T: 'Concatenation',
+            args: this.nibble.M
+        };
+        return [this.concat,this];
     case 1:
         this.result = this.nibble.M[0].result;
         return [this.invoker];
+    case 2:
+        this.result = this.concat.result;
+        return [this.invoker];
     }
+},
+nibbler:function(){
+    return [this.invoker];
 },
 Concatenation:function(){
     // Str concatenation
@@ -93,9 +104,12 @@ Concatenation:function(){
     // overflow the JS stack.
     // TODO: use the Perl 6 stringify instead of just JS toString()
     for (var i=0,a; i < strings.length; ++i) {
-        strings[i] = typeof(a=this.eval_args[i])=='string'
-            ? a
-            : a.toString();
+        var a = this.eval_args[i];
+        strings[i] = a instanceof p6builtin.p6var
+            ? a.value.toString()
+            : typeof(a)=='string'
+                ? a
+                : a.toString();
     }
     this.result = strings.join('');
     return [this.invoker];
@@ -142,11 +156,51 @@ Comma:function(){
         this.invoker.phase = 2;
     }
     return [this.invoker];
-}
+},
+scope_declarator__S_my:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.M.M.M.M,this];
+    case 1:
+        this.result = this.context[this.M.M.M.M.result.toString()] = this.M.M.M.M.result;
+        return [this.invoker];
+    }
+},
+variable:function(){
+    this.result = new p6builtin.p6var(this.sigil.TEXT, this.desigilname.longname.name.identifier.TEXT, this.context);
+    return [this.invoker];
+},
+Item_assignment:function(){
+    this.eval_args[0].set(this.eval_args[1]);
+    this.result = this.eval_args[1];
+    return [this.invoker];
+},
+noun__S_variable:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.variable,this];
+    case 1:
+        this.result = this.variable.result.value;
+        return [this.invoker];
+    }
+},
+escape__S_Dollar:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.EXPR,this];
+    case 1:
+        this.result = this.EXPR.result;
+        return [this.invoker];
+    }
+},
 };
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.value__S_number = disp.noun__S_value = disp.value__S_quote =
-    disp.noun__S_circumfix = disp.circumfix__S_Paren_Thesis = disp.SYMBOL__;
+    disp.noun__S_circumfix = disp.circumfix__S_Paren_Thesis = 
+    disp.noun__S_scope_declarator = disp.SYMBOL__;
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 
@@ -162,7 +216,7 @@ function top_interp(obj,context) {
 }
 
 var S=function(s){
-    say(JSON.stringify(s));
+    say(JSON.stringify(s,null,' '));
 };
 
 function interp(obj,context) {

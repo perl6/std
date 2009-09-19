@@ -35,6 +35,30 @@ toString:function(){
 }
 };
 
+p6builtin.p6var = function(sigil,name,context){
+// essentially a "slot"
+    this.sigil = sigil;
+    this.name = name;
+    this.context = context;
+    var a;
+    // either create or lookup. :)  Inefficient, I know.
+    if (typeof(a = this.context[this.sigil+this.name])=='undefined') {
+        this.context[this.sigil+this.name] = this;
+        this.value = null;
+    } else {
+        return a;
+    }
+};
+p6builtin.p6var.prototype = {
+set:function(value){
+    this.value = value;
+    return this;
+},
+toString:function(){
+    return this.sigil+this.name;
+}
+};
+
 })();
 
 
