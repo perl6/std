@@ -44,7 +44,7 @@ toString:function(){
 };
 
 p6builtin.p6var = function(sigil,name,context){
-// essentially a "slot"
+// essentially an autovivifying "slot" (STD has prevented undeclared uses!)
     this.sigil = sigil;
     this.name = name;
     this.context = context;
@@ -66,13 +66,22 @@ toString:function(){
     return this.value.toString();
     //return this.sigil + this.name;
 },
-increment: function(){
+increment:function(){
     this.value = this.value.succ();
     return this;
 },
-decrement: function(){
+decrement:function(){
     this.value = this.value.pred();
     return this;
+},
+do_Additive:function(right){
+    var left = this.value instanceof p6builtin.Int
+        ? this.value // TODO: use the proper coercion
+        : new p6builtin.Int(Number(this.value.toString()))
+    right = right instanceof p6builtin.Int
+        ? right // TODO: use the proper coercion
+        : new p6builtin.Int(Number(right.toString()))
+    return new p6builtin.Int(left.v + right.v);
 }
 };
 

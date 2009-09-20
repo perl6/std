@@ -16,7 +16,7 @@ statementlist:function(){
                 }
             }
             if (typeof(this.result)=='undefined') {
-                this.result = this.M[0].result;
+                this.result = this.M[this.len - 1].result;
             }
             return [this.invoker];
         }
@@ -240,6 +240,10 @@ circumfix__S_Paren_Thesis:function(){
         this.result = this.do_next.result;
         return [this.invoker];
     }
+},
+Additive:function(){
+    this.result = this.eval_args[0].do_Additive(this.eval_args[1]);
+    return [this.invoker];
 }
 };
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
