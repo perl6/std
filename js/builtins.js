@@ -13,6 +13,18 @@ succ: function(){
 },
 pred: function(){
     return new p6builtin.Int(this.v - 1);
+},
+do_Additive:function(right, subtract){
+    var left = this;
+    if (left instanceof p6builtin.p6var) left = left.value; // deref
+    if (right instanceof p6builtin.p6var) right = right.value; // deref
+    left = left instanceof p6builtin.Int
+        ? left // TODO: use the proper coercion
+        : new p6builtin.Int(Number(this.value.toString()))
+    right = right instanceof p6builtin.Int
+        ? right // TODO: use the proper coercion
+        : new p6builtin.Int(Number(right.toString()))
+    return new p6builtin.Int(subtract ? left.v - right.v : left.v + right.v);
 }
 };
 
@@ -75,13 +87,8 @@ decrement:function(){
     return this;
 },
 do_Additive:function(right, subtract){
-    var left = this.value instanceof p6builtin.Int
-        ? this.value // TODO: use the proper coercion
-        : new p6builtin.Int(Number(this.value.toString()))
-    right = right instanceof p6builtin.Int
-        ? right // TODO: use the proper coercion
-        : new p6builtin.Int(Number(right.toString()))
-    return new p6builtin.Int(subtract ? left.v - right.v : left.v + right.v);
+    return p6builtin.Int.prototype.do_Additive.call(
+        this.value, right, subtract);
 }
 };
 
