@@ -71,7 +71,7 @@ sub emit_js {
             : $array_text.$close_indent.']';
     }
     else { # it's a hash, probably blessed.
-        $text .= "{".jsind(1)."T: ".tps(ref($self),1);
+        $text .= "{".jsind(1)."T: ".tps(ref($self),1).",'T__".tps(ref($self))."':1";
         for my $prop (keys %$self) {
             next if !defined $self->{$prop} || $prop eq '.';
             $text .= ','.jsind().tps($prop).': ';

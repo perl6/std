@@ -1,17 +1,25 @@
 var p6builtin = {}; (function(){
 
-p6builtin.Integer = function(integer) {
+// immutable
+p6builtin.Int = function(integer) {
     this.v = integer;
 };
-p6builtin.Integer.prototype = {
+p6builtin.Int.prototype = {
 toString: function(){
     return this.v.toString();
+},
+succ: function(){
+    return new p6builtin.Int(this.v + 1);
+},
+pred: function(){
+    return new p6builtin.Int(this.v - 1);
 }
 };
 
 p6builtin.Str = function(str) {
     this.v = typeof(str)=='string' ? str : str.toString();
 };
+
 p6builtin.Str.prototype = {
 toString: function(){
     return this.v;
@@ -55,7 +63,16 @@ set:function(value){
     return this;
 },
 toString:function(){
-    return this.sigil+this.name;
+    return this.value.toString();
+    //return this.sigil + this.name;
+},
+increment: function(){
+    this.value = this.value.succ();
+    return this;
+},
+decrement: function(){
+    this.value = this.value.pred();
+    return this;
 }
 };
 
@@ -72,7 +89,7 @@ function say() {
     } else {
         say_them('');
     }
-    return new p6builtin.Integer(1);
+    return new p6builtin.Int(1);
 }
 var p6toplevel={
     'say': new p6builtin.p6sub(say,'say')
