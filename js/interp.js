@@ -242,7 +242,8 @@ circumfix__S_Paren_Thesis:function(){
     }
 },
 Additive:function(){
-    this.result = this.eval_args[0].do_Additive(this.eval_args[1]);
+    this.result = this.eval_args[0].do_Additive(this.eval_args[1],
+        this.M[1].M.T == 'infix__S_Minus');
     return [this.invoker];
 }
 };
