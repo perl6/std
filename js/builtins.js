@@ -76,7 +76,6 @@ set:function(value){
 },
 toString:function(){
     return this.value.toString();
-    //return this.sigil + this.name;
 },
 increment:function(){
     this.value = this.value.succ();
@@ -89,6 +88,15 @@ decrement:function(){
 do_Additive:function(right, subtract){
     return p6builtin.Int.prototype.do_Additive.call(
         this.value, right, subtract);
+}
+};
+
+p6builtin.p6array = function(items){
+    this.items = items;
+};
+p6builtin.p6array.prototype = {
+toString:function(){
+    return this.items.join('');
 }
 };
 

@@ -131,11 +131,11 @@ eval_args:function eval_args(){
             this.M = [this.M];
         }
         this.len=this.M.length;
-        this.invoker.eval_args = Array(this.len);
+        this.invoker.eval_args = [];
         ++this.phase;
     case 1:
         if (this.idx > -1) {
-            this.invoker.eval_args[this.idx] = this.M[this.idx].result;
+            this.invoker.eval_args.push(this.M[this.idx].result);
         }
         if (this.idx < this.len - 1) {
             return [this.M[++this.idx],this];
@@ -144,8 +144,10 @@ eval_args:function eval_args(){
             return [this.invoker];
         }
     case 2:
-        if (disp[this.invoker.T]===eval_args) {
-            this.invoker.eval_args = this.eval_args;
+        if (disp[this.invoker.T]===eval_args || this.invoker.T=='List_assignment') {
+            for (var i=0;i<this.eval_args.length;++i) {
+                this.invoker.eval_args.push(this.eval_args[i]);
+            }
             this.invoker.phase = 2;
         } else {
             this.invoker.eval_args = this.result = this.eval_args;
@@ -155,7 +157,9 @@ eval_args:function eval_args(){
 },
 Comma:function(){
     if (this.invoker.eval_args) {
-        this.invoker.eval_args = this.invoker.eval_args.concat(this.eval_args);
+        for (var i=0;i<this.eval_args.length;++i) {
+            this.invoker.eval_args.push(this.eval_args[i]);
+        }
     } else {
         this.invoker.eval_args = this.eval_args;
         this.invoker.phase = 2;
@@ -245,6 +249,14 @@ Additive:function(){
     this.result = this.eval_args[0].do_Additive(this.eval_args[1],
         this.M[1].M.T == 'infix__S_Minus');
     return [this.invoker];
+},
+List_assignment:function(){
+    this.result = this.eval_args[0];
+    this.result.value = new p6builtin.p6array(this.eval_args.slice(1));
+    return [this.invoker];
+},
+Methodcall:function(){
+    throw S(keys(this));
 }
 };
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
@@ -253,6 +265,7 @@ disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.noun__S_scope_declarator = disp.SYMBOL__;
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
+disp.escape__S_At = disp.escape__S_Dollar;
 
 function keys(o) {
     var res = [], j=-1;
