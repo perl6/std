@@ -54,7 +54,6 @@ sub MAIN {
 	}
 	elsif ($switch eq '--jsx') {
 	    $output = 'jsx';
-	    $OPT_pos = 1;
 	    $OPT_stab = 1;
 	}
     elsif ($switch eq '--js') { # TODO: add a full parse mode (Actions)
