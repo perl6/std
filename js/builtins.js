@@ -34,6 +34,18 @@ do_Additive:function(right, subtract){
         ? right // TODO: use the proper coercion
         : new p6builtin.Int(Number(right));
     return new p6builtin.Int(subtract ? left.v.subtract(right.v) : left.v.add(right.v));
+},
+do_Multiplicative:function(right){
+    var left = this;
+    if (left instanceof p6builtin.p6var) left = left.value; // deref
+    if (right instanceof p6builtin.p6var) right = right.value; // deref
+    left = left instanceof p6builtin.Int
+        ? left // TODO: use the proper coercion
+        : new p6builtin.Int(Number(this.value.toString()));
+    right = right instanceof p6builtin.Int
+        ? right // TODO: use the proper coercion
+        : new p6builtin.Int(Number(right));
+    return new p6builtin.Int(left.v.multiply(right.v));
 }
 };
 
@@ -97,6 +109,10 @@ decrement:function(){
 do_Additive:function(right, subtract){
     return p6builtin.Int.prototype.do_Additive.call(
         this.value, right, subtract);
+},
+do_Multiplicative:function(right){
+    return p6builtin.Int.prototype.do_Multiplicative.call(
+        this.value, right);
 }
 };
 

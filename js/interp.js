@@ -224,6 +224,10 @@ Additive:function(){
         this.M[1].M.T == 'infix__S_Minus');
     return [this.invoker];
 },
+Multiplicative:function(){
+    this.result = this.eval_args[0].do_Multiplicative(this.eval_args[1]);
+    return [this.invoker];
+},
 List_assignment:function(){
     this.result = this.eval_args[0];
     this.result.value = new p6builtin.p6array(this.eval_args.slice(1));
