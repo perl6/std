@@ -2,21 +2,21 @@ var disp = { // "bytecode" dispatch - by name of grammar node.
 statementlist:function(){
     switch(this.phase) {
     case 0:
-        this.idx=-1;
-        this.len=this.M.length;
+        this.idx = -1;
+        this.MM = Array(this.len = this.M.length);
         ++this.phase;
     case 1:
         if (this.idx < this.len - 1) {
-            return [this.M[++this.idx],this];
+            return [this.MM[++this.idx] = dupe(this.M[this.idx]),this];
         } else {
             while (this.len > 0) {
-                if (this.M[--this.len].T != 'eat_terminator') {
-                    this.result = this.M[this.len].result;
+                if (this.MM[--this.len].T != 'eat_terminator') {
+                    this.result = this.MM[this.len].result;
                     break;
                 }
             }
             if (typeof(this.result)=='undefined') {
-                this.result = this.M[this.len - 1].result;
+                this.result = this.MM[this.len - 1].result;
             }
             return [this.invoker];
         }
@@ -28,6 +28,7 @@ statement:function(){
         ++this.phase;
         this.do_next = this.statement_control
             || this.EXPR;
+        this.do_next = dupe(this.do_next);
         return [this.do_next,this];
     case 1:
         this.result = this.do_next.result;
@@ -38,9 +39,9 @@ SYMBOL__:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        return [this[this.SYM],this];
+        return [this.do_next = dupe(this[this.SYM]),this];
     case 1:
-        this.result = this[this.SYM].result;
+        this.result = this.do_next.result;
         return [this.invoker];
     }
 },
@@ -48,59 +49,37 @@ numish:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        return [this.M,this];
+        return [this.do_next = dupe(this.M),this];
     case 1:
-        this.result = this.M.result;
+        this.result = this.do_next.result;
         return [this.invoker];
     }
 },
 integer:function(){
-    this.result = new p6builtin.Int(+this.TEXT);
+    // cache integer generation since it's immutable
+    if (typeof(this.result)=='undefined') {
+        this.result = new p6builtin.Int(+this.TEXT);
+    }
     return [this.invoker];
 },
 eat_terminator:function(){
-    switch(this.phase) {
-    case 0:
-        return [this.invoker];
-    }
+    return [this.invoker];
 },
 identifier:function(){
     this.result = symbol_lookup(this.context, this.TEXT);
     return [this.invoker];
 },
-termish:function(){
-    switch(this.phase) {
-    case 0:
-        ++this.phase;
-        return [this.M,this];
-    case 1:
-        this.result = this.M.result;
-        return [this.invoker];
-    }
-},
 NIBBLER__:function(){
     switch(this.phase) {
     case 0:
-        if (this.nibble.M.length < 2) {
-            this.phase = 1;
-            return [this.nibble.M[0],this];
-        }
-        this.phase = 2;
-        this.concat = {
-            T: 'Concatenation',
-            args: this.nibble.M
-        };
-        return [this.concat,this];
+        this.phase = 1;
+        return [this.do_next = this.nibble.M.length < 2
+            ? dupe(this.nibble.M[0])
+            : { T: 'Concatenation', args: this.nibble.M },this];
     case 1:
-        this.result = this.nibble.M[0].result;
-        return [this.invoker];
-    case 2:
-        this.result = this.concat.result;
+        this.result = this.do_next.result;
         return [this.invoker];
     }
-},
-nibbler:function(){
-    return [this.invoker];
 },
 Concatenation:function(){
     // Str concatenation
@@ -135,10 +114,10 @@ eval_args:function eval_args(){
         ++this.phase;
     case 1:
         if (this.idx > -1) {
-            this.invoker.eval_args.push(this.M[this.idx].result);
+            this.invoker.eval_args.push(this.do_next.result);
         }
         if (this.idx < this.len - 1) {
-            return [this.M[++this.idx],this];
+            return [this.do_next = dupe(this.M[++this.idx]),this];
         } else {
             this.result = this.invoker.eval_args;
             return [this.invoker];
@@ -170,11 +149,10 @@ scope_declarator__S_my:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        return [this.M.M.M.M,this];
+        return [this.do_next = dupe(this.M.M.M.M),this];
     case 1:
-        var a = this.M.M.M.M.result;
-        this.result = this.context[a.sigil+a.name] =
-            this.M.M.M.M.result;
+        var a = this.do_next.result;
+        this.result = this.context[a.sigil+a.name] = this.do_next.result;
         return [this.invoker];
     }
 },
@@ -190,8 +168,8 @@ Autoincrement:function(){
             : this.eval_args[0].increment().value;
     } else { // pre-increment/decrement
         this.result = this.M[0].M.T=='prefix__S_MinusMinus'
-            ? this.eval_args[0].decrement().value
-            : this.eval_args[0].increment().value;
+            ? this.eval_args[1].decrement().value
+            : this.eval_args[1].increment().value;
     }
     return [this.invoker];
 },
@@ -209,9 +187,9 @@ noun__S_variable:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        return [this.variable,this];
+        return [this.do_next = dupe(this.variable),this];
     case 1:
-        this.result = this.variable.result;
+        this.result = this.do_next.result;
         return [this.invoker];
     }
 },
@@ -219,27 +197,23 @@ escape__S_Dollar:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        return [this.EXPR,this];
+        return [this.do_next = dupe(this.EXPR),this];
     case 1:
-        this.result = this.EXPR.result;
+        this.result = this.do_next.result;
         return [this.invoker];
     }
-},
+},/*
 statement_control__S_use:function(){
     // only require/BEGIN the fake Test.pm
     var ctx = this.context;
     ctx.is;
     return [this.invoker];
-},
+},*/
 circumfix__S_Paren_Thesis:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        this.do_next = {
-            T: 'statementlist',
-            M: this.semilist.M
-        };
-        return [this.do_next,this];
+        return [this.do_next = { T: 'statementlist', M: this.semilist.M },this];
     case 1:
         this.result = this.do_next.result;
         return [this.invoker];
@@ -259,6 +233,7 @@ Methodcall:function(){
     throw S(keys(this));
 }
 };
+// aliases (nodes with identical semantics)
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.value__S_number = disp.noun__S_value = disp.value__S_quote =
     disp.noun__S_circumfix = //disp.circumfix__S_Paren_Thesis = 
@@ -266,6 +241,8 @@ disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 disp.escape__S_At = disp.escape__S_Dollar;
+disp.termish = disp.numish;
+disp.nibbler = disp.eat_terminator;
 
 function keys(o) {
     var res = [], j=-1;
@@ -278,7 +255,7 @@ function top_interp(obj,context) {
     return '';
 }
 
-var S=function(s){
+function S(s){
     say(JSON.stringify(s,null,' '));
 };
 
@@ -304,6 +281,7 @@ function interp(obj,context) {
         if (result.length > 1) {
             act.invoker = result[1];
             act.phase = 0;
+            act.eval_args = null;
             act.context = result[1].context;
             //say('trying '+act.T);
             //say(keys(act), act.SYM);
@@ -318,8 +296,8 @@ function interp(obj,context) {
                 act = {
                     T : "eval_args",
                     M : typeof(act.args.length)!='undefined'
-                        ? act.args
-                        : [act.args],
+                        ? dupe_array(act.args)
+                        : [dupe(act.args)],
                     phase : 0,
                     invoker : act,
                     context : act.context
@@ -329,7 +307,7 @@ function interp(obj,context) {
             } else if (act.arg && !act.eval_args) {
                 act = {
                     T : "eval_args",
-                    M : [act.arg],
+                    M : [dupe(act.arg)],
                     phase : 0,
                     invoker : act,
                     context : act.context
@@ -348,6 +326,25 @@ function interp(obj,context) {
         }
     }
     return obj.result;
+}
+
+function dupe(act){ // shallow clone
+    var newact = {};
+    for (var i in act) {
+        newact[i] = act[i];
+    }
+    newact.phase = 0;
+    newact.postDo = undefined;
+    act.eval_args = null;
+    return newact;
+}
+
+function dupe_array(act_array){
+    var newacts = Array(act_array.length);
+    for (var i in act_array) {
+        newacts[i] = dupe(act_array[i]);
+    }
+    return newacts;
 }
 
 function symbol_lookup(ctx,sym){

@@ -115,6 +115,7 @@ function say() {
     }
     return new p6builtin.Int(1);
 }
+
 var p6toplevel={
     'say': new p6builtin.p6sub(say,'say')
 };
