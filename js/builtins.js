@@ -1,18 +1,27 @@
 var p6builtin = {}; (function(){
 
+var bigInt = libBigInt;
+
 // immutable
 p6builtin.Int = function(integer) {
-    this.v = integer;
+    if (typeof(integer)=='string') {
+        this.v = bigInt.nbi();
+        this.v.fromString(integer,10);
+    } else {
+        this.v = integer instanceof bigInt
+            ? integer
+            : bigInt.nbv(integer);
+    }
 };
 p6builtin.Int.prototype = {
 toString: function(){
     return this.v.toString();
 },
 succ: function(){
-    return new p6builtin.Int(this.v + 1);
+    return new p6builtin.Int(this.v.add(bigInt.ONE));
 },
 pred: function(){
-    return new p6builtin.Int(this.v - 1);
+    return new p6builtin.Int(this.v.subtract(bigInt.ONE));
 },
 do_Additive:function(right, subtract){
     var left = this;
@@ -20,11 +29,11 @@ do_Additive:function(right, subtract){
     if (right instanceof p6builtin.p6var) right = right.value; // deref
     left = left instanceof p6builtin.Int
         ? left // TODO: use the proper coercion
-        : new p6builtin.Int(Number(this.value.toString()))
+        : new p6builtin.Int(Number(this.value.toString()));
     right = right instanceof p6builtin.Int
         ? right // TODO: use the proper coercion
-        : new p6builtin.Int(Number(right.toString()))
-    return new p6builtin.Int(subtract ? left.v - right.v : left.v + right.v);
+        : new p6builtin.Int(Number(right));
+    return new p6builtin.Int(subtract ? left.v.subtract(right.v) : left.v.add(right.v));
 }
 };
 

@@ -163,6 +163,7 @@ sub run_js_interpreter {
     my $ctx = V8::Context->new();
     $ctx->register_method_by_name("say_them");
     $ctx->execute(scalar(read_file("js/json2.js")));
+    $ctx->execute(scalar(read_file("js/libBigInt.js")));
     $ctx->execute(scalar(read_file("js/interp.js")));
     $ctx->execute(scalar(read_file("js/builtins.js")));
     my $ast = ToJS::emit_js($_[0]);

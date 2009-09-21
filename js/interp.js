@@ -58,7 +58,7 @@ numish:function(){
 integer:function(){
     // cache integer generation since it's immutable
     if (typeof(this.result)=='undefined') {
-        this.result = new p6builtin.Int(+this.TEXT);
+        this.result = new p6builtin.Int(this.TEXT);
     }
     return [this.invoker];
 },

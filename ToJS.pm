@@ -19,7 +19,7 @@ sub tps {
     return '"'.$1.'"' if $str =~ /\(0x(\w+)/;
     $str =~ s/^VAST:://;
     return $str if (!(shift || 0) && $str =~ /^[\w_]+$/
-        && !exists $jsk->{$str}) || $str =~ /^\d+$/;
+        && !exists $jsk->{$str});# || $str =~ /^\d+$/;
     $str =~ s/([\\"])/\\$1/g;
     $str =~ s/\n/\\n/mg;
     return '"'.$str.'"';
