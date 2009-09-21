@@ -52,6 +52,11 @@ sub MAIN {
 	elsif ($switch eq '--p5' or $switch eq '-5') {
 	    $output = 'p5';
 	}
+	elsif ($switch eq '--jsx') {
+	    $output = 'jsx';
+	    $OPT_pos = 1;
+	    $OPT_stab = 1;
+	}
     elsif ($switch eq '--js') { # TODO: add a full parse mode (Actions)
         $output = 'js';
         $OPT_stab = 1;
@@ -106,6 +111,35 @@ sub MAIN {
     }
     elsif ($output eq 'js') {
         run_js_interpreter($r);
+    }
+    elsif ($output eq 'jsx') {
+	eval 'use ToJS;';
+	say "<html><head></head><body>";
+	for (qw[js/json2.js js/interp.js js/builtins.js]) {
+	    say "<script src=\"$_\"></script>";
+	}
+	say "<script>
+    function say() {
+        if (typeof(arguments)!='undefined') {
+            for (var s_args=[], i=-1, j=-1, a, l=arguments.length; i<l;)
+                if (typeof(a=arguments[++i])!='undefined') {
+                    s_args[++j] = typeof(a)==='string' ? a : a.toString();
+                }
+	    var str = '';
+	    for (i in s_args) {
+		str += s_args[i];
+	    }
+	    alert(str);
+        } else {
+        }
+    }
+    var p6toplevel={
+        'say': new p6builtin.p6sub(say,'say')
+    };
+    ";
+	say 'top_interp('.sayit(ToJS::emit_js($r)).',p6toplevel);';
+	say "</script>";
+	say "</body></html>";
     }
     else {
 	die "Unknown output mode";
