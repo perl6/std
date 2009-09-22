@@ -183,6 +183,7 @@ Autoincrement:function(){
     return [this.invoker];
 },
 variable:function(){
+    //say('variable in contextId: '+this.context.contextId+'\n'+keys(this.context));
     this.result = new p6builtin.p6var(this.sigil.TEXT,
         this.desigilname.longname.name.identifier.TEXT, this.context);
     return [this.invoker];
@@ -235,9 +236,10 @@ Additive:function(){
 },
 Multiplicative:function(){
     this.result = this.eval_args[0].do_Multiplicative(this.eval_args[1],
-        this.M[1].M.T == 'infix__S_Slash'
-            ? 1
-            : this.M[1].M.T == 'infix__S_Percent' ? 2 : 0);
+        this.M[1].M.T == 'infix__S_Slash' ? 1
+            : this.M[1].M.T == 'infix__S_Percent' ? 2
+            : this.M[1].M.T == 'infix__S_PlusLt' ? 3
+            : 0);
     return [this.invoker];
 },
 List_assignment:function(){

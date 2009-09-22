@@ -48,6 +48,9 @@ do_Multiplicative:function(right, divide){
     if (!divide) {
         return new p6builtin.Int(left.v.multiply(right.v));
     }
+    if (divide==3) {
+        return new p6builtin.Int(left.v.shiftLeft(right.v));
+    }
     var q = bigInt.nbi(), r = bigInt.nbi();
     left.v.divRemTo(right.v,q,r);
     return new p6builtin.Int(divide == 1 ? q : r);
@@ -159,14 +162,17 @@ function say() { // javascript say
 
 var Scope = (function(){
     function Deriver(){}
+    var contextId = 0;
     return function(parentScope){
         if (!parentScope) {
             this.constructor = Scope;
+            this.contextId = contextId++;
             return this;
         }
         Deriver.prototype = parentScope;
         var newScope = new Deriver();
         newScope.constructor = Scope;
+        newScope.contextId = contextId++;
         return newScope;
     };
 })();
