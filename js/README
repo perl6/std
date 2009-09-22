@@ -7,6 +7,7 @@ requirements:
  - build V8 (Google's BSD-licensed JS engine) from source (optionally install)
     - see http://code.google.com/p/v8/wiki/Source
     - you'll need g++, Python 2.5, scons (latest release candidate)
+    - ********** See detailed installation instructions below **********
  - install the Perl 5 extension for V8 (originally named Acme::JavaScript::V8)
     - see http://github.com/fictorial/perl-v8
     - original: http://d.hatena.ne.jp/dayflower/20080905/1220592409
@@ -16,9 +17,8 @@ requirements:
 usage:
  - ./viv --js -e 'say()'
  - ./viv --js -e 'say(23)'
- - ./viv --js -e 'say(421,510)'
+ - ./viv --js -e 'say(421,510, 3333875928739872 * 5534775873878723587)'
  - etc.
- - Yes, that really is the extent of STD's schema that it understands so far.
 
 vision:
  - host/backend for Perl 6 on Google's V8 JavaScript VM, linked into perl
@@ -35,4 +35,27 @@ plans:
  - implement all the builtins. :) or do I repeat myself?
     - note: borrow lots from all the other Perl 6 implementations, of course.
 
-last updated 2009-09-16 - diakopter
+last updated 2009-09-22 - diakopter
+
+If your perl is 64-bit, you'll want to export CFLAGS=-fPIC before building v8
+and perl-v8, and build v8 with:  scons arch=x64
+
+
+07:41 <@diakopter> check out the /bleeding_edge (or /trunk they're both
+    very stable) branch from the v8 repo
+07:42 <@diakopter> have scons & python 2.5
+07:42 <@diakopter> and g++
+07:42 < pmurias> diakopter: i saw the readme
+07:43 <@diakopter> pmurias: is your perl 64-bit or 32
+07:43 < pmurias> i can built it with typing scons, but
+    i don't know how to install it
+07:43 < pmurias> 32-bit
+07:44 <@diakopter> copy or ln -s the libv8.a to /usr/local/lib/
+07:44 <@diakopter> easiest
+07:44 < pmurias> that could be put in the readme
+07:44 <@diakopter> then git clone the perl-v8 repo
+07:44 <@diakopter> it's a few KB
+07:45 <@diakopter> cd perl-v8 ; make -f bridge.mk
+07:45 <@diakopter> perl Makefile.PL
+07:45 <@diakopter> make && make test && make install
+07:46  * diakopter pastes into README
