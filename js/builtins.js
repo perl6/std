@@ -35,7 +35,7 @@ do_Additive:function(right, subtract){
         : new p6builtin.Int(Number(right));
     return new p6builtin.Int(subtract ? left.v.subtract(right.v) : left.v.add(right.v));
 },
-do_Multiplicative:function(right){
+do_Multiplicative:function(right, divide){
     var left = this;
     if (left instanceof p6builtin.p6var) left = left.value; // deref
     if (right instanceof p6builtin.p6var) right = right.value; // deref
@@ -45,7 +45,12 @@ do_Multiplicative:function(right){
     right = right instanceof p6builtin.Int
         ? right // TODO: use the proper coercion
         : new p6builtin.Int(Number(right));
-    return new p6builtin.Int(left.v.multiply(right.v));
+    if (!divide) {
+        return new p6builtin.Int(left.v.multiply(right.v));
+    }
+    var q = bigInt.nbi(), r = bigInt.nbi();
+    left.v.divRemTo(right.v,q,r);
+    return new p6builtin.Int(divide == 1 ? q : r);
 }
 };
 
@@ -110,9 +115,9 @@ do_Additive:function(right, subtract){
     return p6builtin.Int.prototype.do_Additive.call(
         this.value, right, subtract);
 },
-do_Multiplicative:function(right){
+do_Multiplicative:function(right, divide){
     return p6builtin.Int.prototype.do_Multiplicative.call(
-        this.value, right);
+        this.value, right, divide);
 }
 };
 

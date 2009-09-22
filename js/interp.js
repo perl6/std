@@ -6,30 +6,35 @@ statementlist:function(){
         this.MM = Array(this.len = this.M.length);
         ++this.phase;
     case 1:
-        if (this.idx < this.len - 1) {
-            return [this.MM[++this.idx] = dupe(this.M[this.idx]),this];
-        } else {
-            while (this.len > 0) {
-                if (this.MM[--this.len].T != 'eat_terminator') {
-                    this.result = this.MM[this.len].result;
-                    break;
-                }
+        while (++this.idx < this.len) {
+            var next;
+            if ((next = this.MM[this.idx]
+                    = dupe(this.M[this.idx])).T != 'eat_terminator') {
+                return [next,this];
             }
-            if (typeof(this.result)=='undefined') {
-                this.result = this.MM[this.len - 1].result;
-            }
-            return [this.invoker];
         }
+        while (this.len > 0) {
+            if (this.MM[--this.len].T != 'eat_terminator') {
+                this.result = this.MM[this.len].result;
+                break;
+            }
+        }
+        if (typeof(this.result)=='undefined') {
+            this.result = this.MM[this.len - 1].result;
+        }
+        ++this.phase;
+        return [this.invoker];
+    case 2:
+        return [this.invoker];
     }
 },
 statement:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        this.do_next = this.statement_control
-            || this.EXPR;
-        this.do_next = dupe(this.do_next);
-        return [this.do_next,this];
+        if (this.statement_control || this.EXPR)
+        return [this.do_next = dupe(this.statement_control || this.EXPR),this];
+        return [this.invoker];
     case 1:
         this.result = this.do_next.result;
         return [this.invoker];
@@ -123,7 +128,8 @@ eval_args:function eval_args(){
             return [this.invoker];
         }
     case 2:
-        if (disp[this.invoker.T]===eval_args || this.invoker.T=='List_assignment') {
+        if (disp[this.invoker.T]===eval_args
+                || this.invoker.T=='List_assignment') {
             for (var i=0;i<this.eval_args.length;++i) {
                 this.invoker.eval_args.push(this.eval_args[i]);
             }
@@ -225,7 +231,10 @@ Additive:function(){
     return [this.invoker];
 },
 Multiplicative:function(){
-    this.result = this.eval_args[0].do_Multiplicative(this.eval_args[1]);
+    this.result = this.eval_args[0].do_Multiplicative(this.eval_args[1],
+        this.M[1].M.T == 'infix__S_Slash'
+            ? 1
+            : this.M[1].M.T == 'infix__S_Percent' ? 2 : 0);
     return [this.invoker];
 },
 List_assignment:function(){
@@ -339,7 +348,7 @@ function dupe(act){ // shallow clone
     }
     newact.phase = 0;
     newact.postDo = undefined;
-    act.eval_args = null;
+    newact.eval_args = null;
     return newact;
 }
 

@@ -114,7 +114,7 @@ sub MAIN {
     elsif ($output eq 'jsx') {
 	eval 'use ToJS;';
 	say "<html><head></head><body>";
-	for (qw[js/json2.js js/interp.js js/builtins.js]) {
+	for (qw[js/json2.js js/libBigInt.js js/interp.js js/builtins.js]) {
 	    say "<script src=\"$_\"></script>";
 	}
 	say "<script>
