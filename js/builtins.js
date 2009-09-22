@@ -70,14 +70,25 @@ toString: function(){
 }
 };
 
-p6builtin.p6sub = function(func,name,source){
+p6builtin.jssub = function(func,name,source){
     this.func = func;
     this.name = name;
     this.source = func.toString();
 };
-p6builtin.p6sub.prototype = {
+p6builtin.jssub.prototype = {
 toString:function(){
     return this.source.toString();
+}
+};
+
+p6builtin.p6sub = function(sub_body, declaration_context){
+    this.sub_body = sub_body;
+    this.context = declaration_context; // parent for closure
+    this.T = 'p6sub_invocation';
+};
+p6builtin.p6sub.prototype = {
+toString:function(){
+    return this.sub_body.BEG;
 }
 };
 
@@ -133,27 +144,36 @@ toString:function(){
 })();
 
 
-function say() {
+function say() { // javascript say
     if (typeof(arguments)!='undefined') {
         for (var s_args=[], i=-1, j=-1, a, l=arguments.length; i<l;)
             if (typeof(a=arguments[++i])!='undefined') {
                 s_args[++j] = typeof(a)==='string' ? a : a.toString();
             }
-        say_them.apply(this, s_args);
+        say_them.apply(this.context, s_args);
     } else {
         say_them('');
     }
-    return new p6builtin.Int(1);
+    this.result = new p6builtin.Int(1);
 }
 
-var p6toplevel={
-    'say': new p6builtin.p6sub(say,'say')
-};
+var Scope = (function(){
+    function Deriver(){}
+    return function(parentScope){
+        if (!parentScope) {
+            this.constructor = Scope;
+            return this;
+        }
+        Deriver.prototype = parentScope;
+        var newScope = new Deriver();
+        newScope.constructor = Scope;
+        return newScope;
+    };
+})();
 
+var p6toplevel = new Scope();
+p6toplevel.say = new p6builtin.jssub(say,'say');
 
-
-
-
-
+1;
 
 

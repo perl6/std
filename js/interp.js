@@ -1,3 +1,6 @@
+var global_trace = 0
+// + 1;
+
 var disp = { // "bytecode" dispatch - by name of grammar node.
 statementlist:function(){
     switch(this.phase) {
@@ -242,15 +245,68 @@ List_assignment:function(){
     this.result.value = new p6builtin.p6array(this.eval_args.slice(1));
     return [this.invoker];
 },
+routine_declarator__S_sub:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.do_next = dupe(this.routine_def),this];
+    case 1:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
+routine_def:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.do_next = dupe(this.blockoid),this];
+    case 1:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
+blockoid:function(){
+    this.result = new p6builtin.p6sub(this.statementlist, this.context);
+    return [this.invoker];
+},
+p6sub_invocation:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        this.do_next = dupe(this.sub_body);
+        // derive new Scope from the declaration context (new "lexpad"/frame)
+        this.do_next.context = new Scope(this.context);
+        this.do_next.invoker = this;
+        this.do_next.phase = 0;
+        return [this.do_next];
+    case 1:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
 Methodcall:function(){
-    throw S(keys(this));
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        if (this.eval_args[0] instanceof p6builtin.p6sub) {
+            return [this.do_next = dupe(this.eval_args[0]),this];
+        } else if (this.eval_args[0] instanceof p6builtin.p6var &&
+                this.eval_args[0].value instanceof p6builtin.p6sub) {
+            return [this.do_next = dupe(this.eval_args[0].value), this];
+        }
+        throw keys(this.eval_args[0]) + ' cannot be invoked';
+    case 1:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
 }
 };
 // aliases (nodes with identical semantics)
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.value__S_number = disp.noun__S_value = disp.value__S_quote =
     disp.noun__S_circumfix = //disp.circumfix__S_Paren_Thesis = 
-    disp.noun__S_scope_declarator = disp.SYMBOL__;
+    disp.noun__S_scope_declarator = disp.noun__S_routine_declarator =
+    disp.SYMBOL__;
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 disp.escape__S_At = disp.escape__S_Dollar;
@@ -296,10 +352,10 @@ function interp(obj,context) {
             act.phase = 0;
             act.eval_args = null;
             act.context = result[1].context;
-            //say('trying '+act.T);
+            if (global_trace) say('trying '+act.T);
             //say(keys(act), act.SYM);
         } else {
-            //say('returning to '+act.T);
+            if (global_trace) say('returning to '+act.T);
             if (last.invoker && last.invoker===act) {
                 doPostDo(last);
             }
@@ -329,13 +385,13 @@ function interp(obj,context) {
                 continue;
             } else {
                 act = (result = disp[act.T].call(last = act))[0];
-                if (last.result instanceof p6builtin.p6sub && last.eval_args) {
-                    last.result = (last.referent = last.result).
-                        func.apply(last.context, last.eval_args);
+                if (last.result instanceof p6builtin.jssub && last.eval_args) {
+                    last.result.func.apply(last, last.eval_args);
                 }
             }
         } else {
-            throw act.T+' not yet implemented; srsly!!?!?';
+            throw act.T+' not yet implemented; srsly!!?!?\nlast: '+last.T+'\n'
+                + keys(act).join(',');
         }
     }
     return obj.result;
