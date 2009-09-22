@@ -1040,7 +1040,7 @@ token variable_declarator {
     :my $*IN_DECL = 1;
     :my $*DECLARAND;
     <variable>
-    { $*IN_DECL = 0; self.add_variable($<variable>.Str) }
+    { $*IN_DECL = 0; $¢.add_variable($<variable>.Str) }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
@@ -5239,7 +5239,10 @@ method add_my_name ($n, $d, $p) {
                     $loc = " (from line $oline)";
                 }
             }
-            if $name ~~ /^\w/ {
+            if $old.opad {
+                self.panic("Lexical symbol $name$loc is already bound to an outer scope implicitly\n  and must therefore be rewritten explicitly as " ~ $old.name ~ " before you can\n  unambiguously declare a new $name in the same scope");
+            }
+            elsif $name ~~ /^\w/ {
                 self.panic("Illegal redeclaration of lexical symbol $name$loc");
             }
             elsif $name ~~ s/^\&// {
@@ -5407,14 +5410,26 @@ method is_known ($n, $curpad = $*CURPAD) {
     }
 
     my $pad = $curpad;
+    my $outer = 0;
     while $pad {
         say "Looking in ", $pad.cf if $*DEBUG +& DEBUG::symtab;
         if $pad.{$name} {
             say "Found $name in ", $pad.cf if $*DEBUG +& DEBUG::symtab;
+            if $outer { # fake up an alias to outer symbol to catch reclaration
+                my $n = $pad.{$name};
+                $curpad.{$name} = NAME.new(
+                    xpad => $pad,
+                    opad => $pad,
+                    name => ("OUTER::" x $outer) ~ "<$name>",
+                    file => $*FILE, line => self.line,
+                    mult => 'only',
+                );
+            }
             return True;
         }
         say $pad.<OUTER::> // "No OUTER" if $*DEBUG +& DEBUG::symtab;
         $pad = $pad.<OUTER::>;
+        $outer++;
     }
     say "Not Found" if $*DEBUG +& DEBUG::symtab;
 
