@@ -3363,6 +3363,10 @@ token infixish ($in_meta = $*IN_META) {
     ]
 }
 
+# NOTE: Do not add dotty ops beginning with anything other than dot!
+#   Dotty ops have to parse as .foo terms as well, and almost anything
+#   other than dot will conflict with some other prefix.
+
 # doing fancy as one rule simplifies LTM
 token dotty:sym<.*> ( --> Methodcall) {
     ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
