@@ -606,21 +606,21 @@ method explain_mystery() {
         my @tmp = sort keys(%post_types);
         $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
-            $m ~= "\t$_ used at " ~ %post_types{$_}.<line> ~ "\n";
+            $m ~= "\t$_ used at line " ~ %post_types{$_}.<line> ~ "\n";
         }
     }
     if %unk_types {
         my @tmp = sort keys(%unk_types);
         $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
-            $m ~= "\t$_ used at " ~ %unk_types{$_}.<line> ~ "\n";
+            $m ~= "\t$_ used at line " ~ %unk_types{$_}.<line> ~ "\n";
         }
     }
     if %unk_routines {
         my @tmp = sort keys(%unk_routines);
         $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
-            $m ~= "\t$_ used at " ~ %unk_routines{$_}.<line> ~ "\n";
+            $m ~= "\t$_ used at line " ~ %unk_routines{$_}.<line> ~ "\n";
         }
     }
     $m;
