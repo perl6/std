@@ -45,15 +45,20 @@ do_Multiplicative:function(right, divide){
     right = right instanceof p6builtin.Int
         ? right // TODO: use the proper coercion
         : new p6builtin.Int(Number(right));
-    if (!divide) {
+    switch(divide || 0) {
+    case 3:
+        return new p6builtin.Int(left.v.shiftLeft(right.v));
+    case 4:
+        return new p6builtin.Int(left.v.shiftRight(right.v));
+    case 1:
+    case 2:
+        var q = bigInt.nbi(), r = bigInt.nbi();
+        left.v.divRemTo(right.v,q,r);
+        return new p6builtin.Int(divide == 1 ? q : r);
+    default:
         return new p6builtin.Int(left.v.multiply(right.v));
     }
-    if (divide==3) {
-        return new p6builtin.Int(left.v.shiftLeft(right.v));
-    }
-    var q = bigInt.nbi(), r = bigInt.nbi();
-    left.v.divRemTo(right.v,q,r);
-    return new p6builtin.Int(divide == 1 ? q : r);
+    
 }
 };
 

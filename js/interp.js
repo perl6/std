@@ -239,6 +239,7 @@ Multiplicative:function(){
         this.M[1].M.T == 'infix__S_Slash' ? 1
             : this.M[1].M.T == 'infix__S_Percent' ? 2
             : this.M[1].M.T == 'infix__S_PlusLt' ? 3
+            : this.M[1].M.T == 'infix__S_PlusGt' ? 4
             : 0);
     return [this.invoker];
 },
