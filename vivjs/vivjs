@@ -4,6 +4,10 @@ use warnings;
 use lib '..';
 use v5.10;
 use Getopt::Long;
+use ToJS;
+use Time::HiRes qw( gettimeofday );
+use Encode;
+use File::Slurp;
 do 'viv';
 
 sub help {
@@ -35,11 +39,11 @@ else {
     $r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
 }
 
+my @js = qw[js/json2.js js/libBigInt.js js/interp.js js/builtins.js];
 
 if (defined $C and $C eq 'html') {
-    eval 'use ToJS;';
     say "<html><head></head><body>";
-    for (qw[js/json2.js js/libBigInt.js js/interp.js js/builtins.js]) {
+    for (@js) {
         say "<script src=\"$_\"></script>";
     }
     say "<script>";
@@ -53,21 +57,14 @@ if (defined $C and $C eq 'html') {
 }
 
 sub run_js_interpreter {
-    eval 'use Time::HiRes qw( gettimeofday );
-    use V8;
-    use File::Slurp;
-    use ToJS;
-    use Encode;';
+    require V8;
     my $ctx = V8::Context->new();
     $ctx->register_method_by_name("say_them");
-    $ctx->execute(scalar(read_file("js/json2.js")));
-    $ctx->execute(scalar(read_file("js/libBigInt.js")));
-    $ctx->execute(scalar(read_file("js/interp.js")));
-    $ctx->execute(scalar(read_file("js/builtins.js")));
+    $ctx->execute(scalar(read_file($_))) for @js;
     my $ast = ToJS::emit_js($_[0]);
     my $start = gettimeofday();
     $ctx->execute('top_interp('.$ast.',p6toplevel);');
-    say("\n\ttime in interpreter: ".sprintf("%.6f s", gettimeofday()-$start));
+#    say("\n\ttime in interpreter: ".sprintf("%.6f s", gettimeofday()-$start));
 }
 sub say_them {
     # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)
