@@ -75,6 +75,24 @@ statement_mod_cond__S_if:function(){
         return [this.invoker];
     }
 },
+statement_control__S_if:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.do_next = dupe(this.xblock),this];
+    case 1:
+        if (this.do_next.result.toBool()) {
+            this.phase = 2;
+            return [this.do_next =
+                dupe(this.xblock.pblock.blockoid.statementlist), this];
+        }
+        this.result = new p6builtin.Nil();
+        return [this.invoker];
+    case 2:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
 modifier_expr:function(){
     switch(this.phase) {
     case 0:
@@ -251,16 +269,6 @@ noun__S_variable:function(){
         this.result = this.do_next.result;
         return [this.invoker];
     }
-},
-escape__S_Dollar:function(){
-    switch(this.phase) {
-    case 0:
-        ++this.phase;
-        return [this.do_next = dupe(this.EXPR),this];
-    case 1:
-        this.result = this.do_next.result;
-        return [this.invoker];
-    }
 },/*
 statement_control__S_use:function(){
     // only require/BEGIN the fake Test.pm
@@ -361,7 +369,7 @@ disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.SYMBOL__;
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
-disp.escape__S_At = disp.escape__S_Dollar;
+disp.xblock = disp.escape__S_At = disp.escape__S_Dollar = disp.modifier_expr;
 disp.termish = disp.numish;
 disp.nibbler = disp.eat_terminator;
 

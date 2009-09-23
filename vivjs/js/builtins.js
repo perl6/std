@@ -98,6 +98,16 @@ toBool:function(){
 }
 };
 
+p6builtin.Nil = function(){},
+p6builtin.Nil.prototype = {
+toString: function(){
+    return 'Nil';
+},
+toBool:function(){
+    return false;
+}
+};
+
 p6builtin.jssub = function(func,name,source){
     this.func = func;
     this.name = name;
