@@ -426,6 +426,7 @@ disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 disp.xblock = disp.escape__S_At = disp.escape__S_Dollar = disp.modifier_expr;
 disp.nibbler = disp.eat_terminator;
 disp.Loose_and = disp.Tight_and;
+disp.Loose_or = disp.Tight_or;
 
 function keys(o) {
     var res = [], j=-1;
@@ -459,7 +460,9 @@ function doPostDo(act){
 
 var __lazyarg_Types = {
     Tight_and : 1,
-    Tight_or : 1
+    Tight_or : 1,
+    Loose_and: 1,
+    Loose_or: 1
 };
 
 function interp(obj,context) {
