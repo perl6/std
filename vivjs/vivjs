@@ -1,0 +1,75 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use lib '..';
+use v5.10;
+use Getopt::Long;
+do 'viv';
+
+sub help {
+print <<'HELP';
+Usage: mildew [switches] [--] [programfile] [arguments]
+  -Cbackend       compile using the compiler backend
+                  (valid backends are: html)
+HELP
+exit;
+}
+my $PROG = '';
+my ($help,$C);
+Getopt::Long::Parser->new( config => [qw( bundling no_ignore_case pass_through require_order)], )->getoptions(
+    "C=s" => \$C,
+    "e=s" => \$PROG,
+    'h|help' => \$help,
+) || help;
+help if $help;
+
+my $r;
+if (@ARGV and -f $ARGV[0]) {
+    $r = STD->parsefile($ARGV[0], actions => 'Actions')->{'_ast'};
+}
+else {
+    if (not $PROG) {
+        local $/;
+        $PROG = <>;
+    }
+    $r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
+}
+
+
+if (defined $C and $C eq 'html') {
+    eval 'use ToJS;';
+    say "<html><head></head><body>";
+    for (qw[js/json2.js js/libBigInt.js js/interp.js js/builtins.js]) {
+        say "<script src=\"$_\"></script>";
+    }
+    say "<script>";
+    say "say_them = console.debug;";
+    
+    say 'top_interp('.ToJS::emit_js($r).',p6toplevel);';
+    say "</script>";
+    say "</body></html>";
+} else {
+    run_js_interpreter($r);
+}
+
+sub run_js_interpreter {
+    eval 'use Time::HiRes qw( gettimeofday );
+    use V8;
+    use File::Slurp;
+    use ToJS;
+    use Encode;';
+    my $ctx = V8::Context->new();
+    $ctx->register_method_by_name("say_them");
+    $ctx->execute(scalar(read_file("js/json2.js")));
+    $ctx->execute(scalar(read_file("js/libBigInt.js")));
+    $ctx->execute(scalar(read_file("js/interp.js")));
+    $ctx->execute(scalar(read_file("js/builtins.js")));
+    my $ast = ToJS::emit_js($_[0]);
+    my $start = gettimeofday();
+    $ctx->execute('top_interp('.$ast.',p6toplevel);');
+    say("\n\ttime in interpreter: ".sprintf("%.6f s", gettimeofday()-$start));
+}
+sub say_them {
+    # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)
+    say map { Encode::decode_utf8($_) } @_;
+}
