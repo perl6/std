@@ -385,14 +385,30 @@ Methodcall:function(){
 Tight_and:function(){
     switch(this.phase) {
     case 0:
-        this.and_index = 0;
+        this.last_index = 0;
         this.phase = 1;
         this.do_next = null;
     case 1:
         if (!this.do_next || (this.do_next.result.toBool()
-                && ++this.and_index < this.args.length)) {
+                && ++this.last_index < this.args.length)) {
             return [this.do_next =
-                dupe(this.args[this.and_index]), this];
+                dupe(this.args[this.last_index]), this];
+        }
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
+Tight_or:function(){
+    switch(this.phase) {
+    case 0:
+        this.last_index = 0;
+        this.phase = 1;
+        this.do_next = null;
+    case 1:
+        if (!this.do_next || (!this.do_next.result.toBool()
+                && ++this.last_index < this.args.length)) {
+            return [this.do_next =
+                dupe(this.args[this.last_index]), this];
         }
         this.result = this.do_next.result;
         return [this.invoker];
@@ -409,6 +425,7 @@ disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 disp.xblock = disp.escape__S_At = disp.escape__S_Dollar = disp.modifier_expr;
 disp.nibbler = disp.eat_terminator;
+disp.Loose_and = disp.Tight_and;
 
 function keys(o) {
     var res = [], j=-1;
@@ -440,6 +457,11 @@ function doPostDo(act){
     }
 }
 
+var __lazyarg_Types = {
+    Tight_and : 1,
+    Tight_or : 1
+};
+
 function interp(obj,context) {
     var act = obj, result = Array(1), empty = [0], last = act;
     act.phase = 0; act.context = context;
@@ -458,7 +480,7 @@ function interp(obj,context) {
             }
         }
         if (disp[act.T]) {
-            if (act.args && !act.eval_args && act.T != 'Tight_and') {
+            if (act.args && !act.eval_args && !__lazyarg_Types[act.T]) {
                 act = {
                     T : "eval_args",
                     M : typeof(act.args.length)!='undefined'
