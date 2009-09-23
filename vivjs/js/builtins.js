@@ -17,6 +17,9 @@ p6builtin.Int.prototype = {
 toString: function(){
     return this.v.toString();
 },
+toBool: function(){
+    return this.v.signum() != 0;
+},
 succ: function(){
     return new p6builtin.Int(this.v.add(bigInt.ONE));
 },
@@ -58,23 +61,39 @@ do_Multiplicative:function(right, divide){
     default:
         return new p6builtin.Int(left.v.multiply(right.v));
     }
-    
+}
+};
+
+p6builtin.Bool = function(bool) {
+    this.v = typeof(bool)=='boolean' ? bool : !!bool;
+};
+p6builtin.Bool.prototype = {
+toString: function(){
+    return this.v ? '1' : '0';
+},
+toBool:function(){
+    return this.v;
 }
 };
 
 p6builtin.Str = function(str) {
     this.v = typeof(str)=='string' ? str : str.toString();
 };
-
 p6builtin.Str.prototype = {
 toString: function(){
     return this.v;
+},
+toBool:function(){
+    return this.v.length != 0 && this.v != '0'
 }
 };
 
 p6builtin.Undef = {
 toString: function(){
     return 'Undef';
+},
+toBool:function(){
+    return false;
 }
 };
 
@@ -86,28 +105,35 @@ p6builtin.jssub = function(func,name,source){
 p6builtin.jssub.prototype = {
 toString:function(){
     return this.source.toString();
+},
+toBool:function(){
+    return true;
 }
 };
 
 p6builtin.p6sub = function(sub_body, declaration_context){
     this.sub_body = sub_body;
-    this.context = declaration_context; // parent for closure
+    this.declaration_context = declaration_context; // parent for closure
     this.T = 'p6sub_invocation';
 };
 p6builtin.p6sub.prototype = {
 toString:function(){
     return this.sub_body.BEG;
+},
+toBool:function(){
+    return true;
 }
 };
 
-p6builtin.p6var = function(sigil,name,context){
+p6builtin.p6var = function(sigil,name,context,forceDeclare){
 // essentially an autovivifying "slot" (STD has prevented undeclared uses!)
     this.sigil = sigil;
     this.name = name;
     this.context = context;
     var a;
     // either create or lookup. :)  Inefficient, I know.
-    if (typeof(a = this.context[this.sigil+this.name])=='undefined') {
+    if (forceDeclare
+            || typeof(a = this.context[this.sigil+this.name])=='undefined') {
         this.context[this.sigil+this.name] = this;
         this.value = null;
     } else {
@@ -137,6 +163,9 @@ do_Additive:function(right, subtract){
 do_Multiplicative:function(right, divide){
     return p6builtin.Int.prototype.do_Multiplicative.call(
         this.value, right, divide);
+},
+toBool:function(){
+    return this.v.toBool();
 }
 };
 
@@ -146,6 +175,9 @@ p6builtin.p6array = function(items){
 p6builtin.p6array.prototype = {
 toString:function(){
     return this.items.join('');
+},
+toBool:function(){
+    return true;
 }
 };
 
@@ -184,6 +216,8 @@ var Scope = (function(){
 
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
+p6toplevel.True = new p6builtin.Bool(true);
+p6toplevel.False = new p6builtin.Bool(false);
 
 1;
 

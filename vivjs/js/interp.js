@@ -7,7 +7,7 @@ statementlist:function(){
     case 0:
         this.idx = -1;
         this.MM = Array(this.len = this.M.length);
-        ++this.phase;
+        this.phase = 1;
     case 1:
         while (++this.idx < this.len) {
             var next;
@@ -25,19 +25,51 @@ statementlist:function(){
         if (typeof(this.result)=='undefined') {
             this.result = this.MM[this.len - 1].result;
         }
-        ++this.phase;
+        //++this.phase;
         return [this.invoker];
-    case 2:
-        return [this.invoker];
+    //case 2:
+    //    return [this.invoker];
     }
 },
 statement:function(){
     switch(this.phase) {
     case 0:
-        ++this.phase;
-        if (this.statement_control || this.EXPR)
-        return [this.do_next = dupe(this.statement_control || this.EXPR),this];
+        if (this.statement_mod_cond
+                && typeof(this.statement_mod_cond.length)!='undefined'
+                && this.statement_mod_cond.length) {
+            this.phase = 1;
+            return [this.do_next =
+                dupe(this.statement_mod_cond[0]), this];
+        } else {
+            this.do_next = 0;
+        }
+    case 1:
+        this.phase = 2;
+        if ((!this.do_next || this.do_next.result.toBool())
+                && (this.statement_control || this.EXPR))
+            return [this.do_next =
+                dupe(this.statement_control || this.EXPR),this];
         return [this.invoker];
+    case 2:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
+statement_mod_cond__S_if:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.do_next = dupe(this.modifier_expr),this];
+    case 1:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
+modifier_expr:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.do_next = dupe(this.EXPR),this];
     case 1:
         this.result = this.do_next.result;
         return [this.invoker];
@@ -114,6 +146,11 @@ eval_args:function eval_args(){
     switch(this.phase) {
     case 0:
         this.idx=-1;
+        if (!this.M) {
+            this.invoker.eval_args = this.invoker.eval_args || [];
+            this.phase = 4;
+            return [this.invoker];
+        }
         if (!this.M.length) {
             this.M = [this.M];
         }
@@ -140,6 +177,9 @@ eval_args:function eval_args(){
         } else {
             this.invoker.eval_args = this.result = this.eval_args;
         }
+        return [this.invoker];
+    case 3:
+        this.result = this.do_next.result;
         return [this.invoker];
     }
 },
@@ -183,7 +223,6 @@ Autoincrement:function(){
     return [this.invoker];
 },
 variable:function(){
-    //say('variable in contextId: '+this.context.contextId+'\n'+keys(this.context));
     this.result = new p6builtin.p6var(this.sigil.TEXT,
         this.desigilname.longname.name.identifier.TEXT, this.context);
     return [this.invoker];
@@ -278,7 +317,7 @@ p6sub_invocation:function(){
         ++this.phase;
         this.do_next = dupe(this.sub_body);
         // derive new Scope from the declaration context (new "lexpad"/frame)
-        this.do_next.context = new Scope(this.context);
+        this.do_next.context = new Scope(this.declaration_context);
         this.do_next.invoker = this;
         this.do_next.phase = 0;
         return [this.do_next];
