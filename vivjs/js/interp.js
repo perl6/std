@@ -78,13 +78,25 @@ statement_mod_cond__S_if:function(){
 statement_control__S_if:function(){
     switch(this.phase) {
     case 0:
-        ++this.phase;
-        return [this.do_next = dupe(this.xblock),this];
+        this.elsif_index = -1;
+        this.phase = 1;
+        this.do_after = this.xblock.pblock.blockoid.statementlist;
+        return [this.do_next = dupe(this.xblock.EXPR),this];
     case 1:
         if (this.do_next.result.toBool()) {
             this.phase = 2;
+            return [this.do_next = dupe(this.do_after), this];
+        }
+        if (this.elsif && this.elsif.length != 0
+                && ++this.elsif_index < this.elsif.length) {
+            this.do_after = 
+                this.elsif[this.elsif_index].pblock.blockoid.statementlist;
             return [this.do_next =
-                dupe(this.xblock.pblock.blockoid.statementlist), this];
+                dupe(this.elsif[this.elsif_index].EXPR), this];
+        } else if (this['else'] && this['else'].length != 0) {
+            this.phase = 2;
+            return [this.do_next =
+                dupe(this['else'][0].blockoid.statementlist), this];
         }
         this.result = new p6builtin.Nil();
         return [this.invoker];
