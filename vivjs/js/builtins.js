@@ -63,7 +63,7 @@ do_Multiplicative:function(right, divide){
     }
 }
 };
-
+  
 p6builtin.Bool = function(bool) {
     this.v = typeof(bool)=='boolean' ? bool : !!bool;
 };
