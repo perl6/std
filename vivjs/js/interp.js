@@ -6,8 +6,13 @@ statementlist:function(){
     switch(this.phase) {
     case 0:
         this.idx = -1;
-        this.MM = Array(this.len = this.M.length);
-        this.phase = 1;
+        if (this.M) {
+            this.MM = Array(this.len = this.M.length);
+            this.phase = 1;
+        } else {
+            this.phase = 2;
+            return [this.do_next = dupe(this.statement), this];
+        }
     case 1:
         while (++this.idx < this.len) {
             var next;
@@ -25,10 +30,10 @@ statementlist:function(){
         if (typeof(this.result)=='undefined') {
             this.result = this.MM[this.len - 1].result;
         }
-        //++this.phase;
         return [this.invoker];
-    //case 2:
-    //    return [this.invoker];
+    case 2:
+        this.result = this.do_next.result;
+        return [this.invoker];
     }
 },
 statement:function(){
