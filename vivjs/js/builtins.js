@@ -88,7 +88,8 @@ toBool:function(){
 }
 };
 
-p6builtin.Undef = {
+p6builtin.Undef = function(){},
+p6builtin.Undef.prototype = {
 toString: function(){
     return 'Undef';
 },

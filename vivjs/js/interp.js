@@ -28,11 +28,16 @@ statementlist:function(){
             }
         }
         if (typeof(this.result)=='undefined') {
-            this.result = this.MM[this.len - 1].result;
+            this.result = this.MM[this.len - 1]
+                ? this.MM[this.len - 1].result
+                : new p6builtin.Undef();
         }
         return [this.invoker];
     case 2:
         this.result = this.do_next.result;
+        if (typeof(this.result)=='undefined') {
+            this.result = new p6builtin.Undef();
+        }
         return [this.invoker];
     }
 },
