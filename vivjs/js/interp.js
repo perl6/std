@@ -125,6 +125,16 @@ SYMBOL__:function(){
         return [this.invoker];
     }
 },
+termish:function(){
+    switch(this.phase) {
+    case 0:
+        ++this.phase;
+        return [this.do_next = dupe(this.M),this];
+    case 1:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
 numish:function(){
     switch(this.phase) {
     case 0:
@@ -257,8 +267,8 @@ Autoincrement:function(){
             : this.eval_args[0].increment().value;
     } else { // pre-increment/decrement
         this.result = this.M[0].M.T=='prefix__S_MinusMinus'
-            ? this.eval_args[1].decrement().value
-            : this.eval_args[1].increment().value;
+            ? this.eval_args[0].decrement().value
+            : this.eval_args[0].increment().value;
     }
     return [this.invoker];
 },
@@ -371,6 +381,22 @@ Methodcall:function(){
         this.result = this.do_next.result;
         return [this.invoker];
     }
+},
+Tight_and:function(){
+    switch(this.phase) {
+    case 0:
+        this.and_index = 0;
+        this.phase = 1;
+        this.do_next = null;
+    case 1:
+        if (!this.do_next || (this.do_next.result.toBool()
+                && ++this.and_index < this.args.length)) {
+            return [this.do_next =
+                dupe(this.args[this.and_index]), this];
+        }
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
 }
 };
 // aliases (nodes with identical semantics)
@@ -382,7 +408,6 @@ disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 disp.xblock = disp.escape__S_At = disp.escape__S_Dollar = disp.modifier_expr;
-disp.termish = disp.numish;
 disp.nibbler = disp.eat_terminator;
 
 function keys(o) {
@@ -433,7 +458,7 @@ function interp(obj,context) {
             }
         }
         if (disp[act.T]) {
-            if (act.args && !act.eval_args) {
+            if (act.args && !act.eval_args && act.T != 'Tight_and') {
                 act = {
                     T : "eval_args",
                     M : typeof(act.args.length)!='undefined'
