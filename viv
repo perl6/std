@@ -171,7 +171,7 @@ sub indent {
 	my @all;
 	my @fake;
 	for my $k (keys %$node) {
-	    #print STDERR $node->{_reduced}, " $k\n";
+	    print STDERR $node->{_reduced}, " $k\n" if $OPT_log;
 	    my $v = $node->{$k};
 	    if ($k eq 'O') {
 		for my $key (keys %$v) {
@@ -250,10 +250,15 @@ sub indent {
 		    $r{$k} = $zyg;
 #		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
 		}
-		elsif (ref $v) {
+		elsif (ref($v)) {
 		    if (exists $v->{'_ast'}) {
 			push @fake, $v->{'_ast'};
 			$r{$k} = $v->{'_ast'};
+		    }
+		    elsif (exists $v->{'_from'}) {
+			$r{$k}{BEG} = $v->{'_from'};
+			$r{$k}{END} = $v->{'_pos'};
+			$r{$k}{TEXT} = $v->Str;
 		    }
 		    else {
 			$r{$k} = $v;

@@ -3263,15 +3263,6 @@ token term:rand ( --> Term) {
     [ <?before '()'> <.obs('rand()', 'rand')> ]?
 }
 
-token term:e ( --> Term)
-    { <sym> » }
-
-token term:i ( --> Term)
-    { <sym> » }
-
-token term:pi ( --> Term)
-    { <sym> » }
-
 token term:Inf ( --> Term)
     { <sym> » }
 
@@ -5332,7 +5323,7 @@ method add_our_name ($n) {
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
-        if $name ~~ /^\w+$/ {
+        if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $declaring;
             $curstash.{$name ~ '::'} //= STASH.new( 'PARENT::' => $curstash, _file => $*FILE, _line => self.line );
         }
