@@ -103,6 +103,24 @@ toString: function(){
 },
 toBool:function(){
     return this.v.length != 0 && this.v != '0'
+},
+do_infix__S_lt:function(right){
+    return new p6builtin.Bool(this.v < right.v);
+},
+do_infix__S_le:function(right){
+    return new p6builtin.Bool(this.v <= right.v);
+},
+do_infix__S_gt:function(right){
+    return new p6builtin.Bool(this.v > right.v);
+},
+do_infix__S_ge:function(right){
+    return new p6builtin.Bool(this.v >= right.v);
+},
+do_infix__S_eq:function(right){
+    return new p6builtin.Bool(this.v == right.v);
+},
+do_infix__S_ne:function(right){
+    return new p6builtin.Bool(this.v != right.v);
 }
 };
 
@@ -214,6 +232,24 @@ do_infix__S_EqualEqual:function(right){
 },
 do_infix__S_BangEqual:function(right){
     return this.value.do_infix__S_BangEqual(right.value ? right.value : right);
+},
+do_infix__S_lt:function(right){
+    return this.value.do_infix__S_lt(right.value ? right.value : right);
+},
+do_infix__S_le:function(right){
+    return this.value.do_infix__S_le(right.value ? right.value : right);
+},
+do_infix__S_gt:function(right){
+    return this.value.do_infix__S_gt(right.value ? right.value : right);
+},
+do_infix__S_ge:function(right){
+    return this.value.do_infix__S_ge(right.value ? right.value : right);
+},
+do_infix__S_eq:function(right){
+    return this.value.do_infix__S_eq(right.value ? right.value : right);
+},
+do_infix__S_ne:function(right){
+    return this.value.do_infix__S_ne(right.value ? right.value : right);
 }
 };
 
