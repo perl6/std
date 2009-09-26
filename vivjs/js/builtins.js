@@ -202,6 +202,18 @@ do_infix__S_Lt:function(right){
 },
 do_infix__S_LtEqual:function(right){
     return this.value.do_infix__S_LtEqual(right.value ? right.value : right);
+},
+do_infix__S_Gt:function(right){
+    return this.value.do_infix__S_Gt(right.value ? right.value : right);
+},
+do_infix__S_GtEqual:function(right){
+    return this.value.do_infix__S_GtEqual(right.value ? right.value : right);
+},
+do_infix__S_EqualEqual:function(right){
+    return this.value.do_infix__S_EqualEqual(right.value ? right.value : right);
+},
+do_infix__S_BangEqual:function(right){
+    return this.value.do_infix__S_BangEqual(right.value ? right.value : right);
 }
 };
 
