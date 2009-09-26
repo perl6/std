@@ -1247,6 +1247,16 @@ rule multisig {
     ** '|'
 }
 
+method checkyada {
+    try {
+        my $startsym = self.<blockoid><statementlist><statement>[0]<EXPR><term><sym> // '';
+        if $startsym eq '...' or $startsym eq '!!!' or $startsym eq '???' {
+            $*DECLARAND<stub> = 1;
+        }
+    };
+    return self;
+}
+
 rule routine_def () {
     :temp $*CURPAD;
     :my $*IN_DECL = 1;
@@ -1259,6 +1269,7 @@ rule routine_def () {
             $*IN_DECL = 0;
         }>
         <blockoid>:!s
+        <.checkyada>
     ] || <.panic: "Malformed routine">
 }
 
@@ -1283,6 +1294,7 @@ rule method_def () {
         | <?>
         ]
         <blockoid>:!s
+        <.checkyada>
     ] || <.panic: "Malformed method">
 }
 
@@ -1312,6 +1324,7 @@ rule macro_def () {
             $*IN_DECL = 0;
         }>
         <blockoid>:!s
+        <.checkyada>
     ] || <.panic: "Malformed macro">
 }
 
@@ -5212,16 +5225,16 @@ method add_my_name ($n, $d, $p) {
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
     );
-    if $curstash.{$name}:exists and $curstash.{$name}<line> {
+    my $old = $curstash.{$name};
+    if $old and $old<line> and not $old<stub> {
         say "$name exists, curstash = ", $curstash.cf if $*DEBUG +& DEBUG::symtab;
-        my $omult = $curstash.{$name}<mult> // '';
-        if $declaring === $curstash.{$name} {}  # already did this, probably enum
+        my $omult = $old<mult> // '';
+        if $declaring === $old {}  # already did this, probably enum
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
         else {
-            my $old = $curstash.{$name};
             my $ofile = $old.file // 0;
             my $oline = $old.line // '???';
             my $loc = '';
@@ -5289,15 +5302,15 @@ method add_our_name ($n) {
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
     );
-    if $curstash.{$name}:exists and $curstash.{$name}<line> {
-        my $omult = $curstash.{$name}<mult> // '';
-        if $declaring === $curstash.{$name} {} # already did it somehow
+    my $old = $curstash.{$name};
+    if $old and $old<line> and not $old<stub> {
+        my $omult = $old<mult> // '';
+        if $declaring === $old {} # already did it somehow
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
         else {
-            my $old = $curstash.{$name};
             my $ofile = $old.file // 0;
             my $oline = $old.line // '???';
             my $loc = '';
