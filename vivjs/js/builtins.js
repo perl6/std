@@ -63,7 +63,7 @@ do_Multiplicative:function(right, divide){
     }
 },
 do_infix__S_Lt:function(right){
-    return new p6builtin.Bool(this.v.compareTo(right.v) < 1);
+    return new p6builtin.Bool(this.v.compareTo(right.v) < 0);
 }
 };
   
