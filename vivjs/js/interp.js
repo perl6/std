@@ -272,6 +272,7 @@ Autoincrement:function(){
 variable:function(){
     this.result = new p6builtin.p6var(this.sigil.TEXT,
         this.desigilname.longname.name.identifier.TEXT, this.context);
+    //say(keys(this.context));
     return [this.invoker];
 },
 Item_assignment:function(){
@@ -335,17 +336,28 @@ routine_declarator__S_sub:function(){
     }
 },
 routine_def:function(){
+    //throw keys(this); 
     switch(this.phase) {
     case 0:
         ++this.phase;
-        return [this.do_next = dupe(this.blockoid),this];
+        this.do_next = dupe(this.blockoid);
+        var arg_slots = [], signature;
+        if (this.multisig && this.multisig.length) {
+            for (var i in (signature = this.multisig[0].signature)) {
+                arg_slots[i] = [signature[i].parameter[0].param_var.sigil.TEXT,
+                    signature[i].parameter[0].param_var.name[0].TEXT];
+            }
+        }
+        this.do_next.arg_slots = arg_slots;
+        return [this.do_next,this];
     case 1:
         this.result = this.do_next.result;
         return [this.invoker];
     }
 },
 blockoid:function(){
-    this.result = new p6builtin.p6sub(this.statementlist, this.context);
+    this.result = new p6builtin.p6sub(this.statementlist, this.context,
+        this.arg_slots);
     return [this.invoker];
 },
 p6sub_invocation:function(){
@@ -353,9 +365,16 @@ p6sub_invocation:function(){
     case 0:
         ++this.phase;
         this.do_next = dupe(this.sub_body);
-        // derive new Scope from the declaration context (new "lexpad"/frame)
-        this.do_next.context = new Scope(this.declaration_context);
         this.do_next.invoker = this;
+        // derive new Scope from the declaration context (new "lexpad"/frame)
+        var ctx = this.do_next.context = new Scope(this.declaration_context);
+        for (var i in this.arg_slots) {
+            var arg_var = new p6builtin.p6var(this.arg_slots[i][0],
+                this.arg_slots[i][1], ctx, true);
+            arg_var.value = typeof(this.arg_array[i])!='undefined'
+                ? this.arg_array[i][0]
+                : new p6builtin.Undef();
+        }
         this.do_next.phase = 0;
         return [this.do_next];
     case 1:
@@ -364,17 +383,34 @@ p6sub_invocation:function(){
     }
 },
 Methodcall:function(){
+    //throw keys(this.M[1].M.semiarglist);
     switch(this.phase) {
     case 0:
-        ++this.phase;
-        if (this.eval_args[0] instanceof p6builtin.p6sub) {
-            return [this.do_next = dupe(this.eval_args[0]),this];
-        } else if (this.eval_args[0] instanceof p6builtin.p6var &&
-                this.eval_args[0].value instanceof p6builtin.p6sub) {
-            return [this.do_next = dupe(this.eval_args[0].value), this];
+        this.subr = this.eval_args[0];
+        if (this.M && this.M[1] && this.M[1].M.semiarglist) {
+            this.phase = 1;
+            // replaces eval_args with the sub's args
+            return [this.do_next = dupe(this.M[1].M.semiarglist), this];
+        } else {
+            this.eval_args = []; // empty the sub's arg list to-be
+            this.do_next = null;
         }
-        throw keys(this.eval_args[0]) + ' cannot be invoked';
+        // fall through
     case 1:
+        this.phase = 2;
+        //throw S(this.eval_args);
+        if (this.subr instanceof p6builtin.p6sub) {
+            this.do_next = dupe(this.subr);
+            this.do_next.arg_array = this.eval_args;
+            return [this.do_next, this];
+        } else if (this.subr instanceof p6builtin.p6var &&
+                this.subr.value instanceof p6builtin.p6sub) {
+            this.do_next = dupe(this.subr.value);
+            this.do_next.arg_array = this.eval_args;
+            return [this.do_next, this];
+        }
+        throw keys(this.subr) + ' cannot be invoked';
+    case 2:
         this.result = this.do_next.result;
         return [this.invoker];
     }
@@ -419,8 +455,17 @@ rad_number:function(){
     return [this.invoker];
 },
 Symbolic_unary:function(){
+    // yes, yes, it currently treats all Symbolic_unary as the negation sign.
     //throw keys(this.M[0]);
     this.result = new p6builtin.Int(this.eval_args[0].v.negate());
+    return [this.invoker];
+},
+comparison_op:function(){
+    var op = 'do_'+this.comp_node, op_method;
+    if (typeof(op_method = this.left[op])=='undefined') {
+        throw this.comp_node+' not yet implemented; srsly!!?!??';
+    }
+    this.result = op_method.call(this.left, this.right);
     return [this.invoker];
 },
 termish:function(){
@@ -431,25 +476,36 @@ termish:function(){
             return [this.do_next = dupe(this.M),this];
         }
         // handle chained operators
-        this.last_index = 0;
+        this.last_index = -1;
         this.MM = Array(this.args.length);
         this.do_next = null;
         this.phase = 1;
         // fall through
     case 1:
-        // process args until we have 2, then run the comparison,
-        if (this.last_index > 2 || (!this.do_next.result.toBool()
-                && ++this.last_index < this.chain.length)) {
-            if (this.last_index < 1) {
-                
-            }
-            return [this.do_next =
-                dupe(this.chain[this.last_index]), this];
+        // evaluate first 2 args
+        if (this.last_index == this.MM.length) {
+            this.result = this.do_next.result;
+            return [this.invoker];
         }
-        
-        this.do_next = 
-        this.result = this.do_next.result;
-        return [this.invoker];
+        if (this.last_index > -1) { // gather result of arg or comparison
+            this.MM[this.last_index] = this.do_next.result;
+        }
+        if ((++this.last_index % 2) == 0) { // queue up next arg
+            if (this.last_index > 2 && !this.do_next.result.toBool()) {
+                this.result = this.do_next.result;
+                return [this.invoker];
+            }
+            return [this.do_next = dupe(this.chain[this.last_index]), this];
+        } else if (this.last_index == 1) { // skip "first" comparison
+            return [this.do_next = dupe(this.chain[++this.last_index]), this];
+        } else { // ready for a comparison
+            return [this.do_next = {
+                T: 'comparison_op',
+                comp_node: this.chain[++this.last_index - 2].T,
+                left: this.MM[this.last_index - 3],
+                right: this.MM[this.last_index - 1]
+            }, this];
+        }
     case 2:
         this.result = this.do_next.result;
         return [this.invoker];
@@ -584,7 +640,21 @@ function symbol_lookup(ctx,sym){
     if (typeof(result = ctx[sym]) != 'undefined') {
         return result;
     } else {
-        return p6builtin.Undef;
+        return new p6builtin.Undef();
     }
 }
+
+function Type(obj){
+    var type;
+    switch(type = typeof obj) {
+    case 'object':
+        if (typeof(obj.T)!='undefined') {
+            return obj.T;
+        }
+        return obj.constructor.name;
+    default:
+        return type;
+    }
+}
+
 1;

@@ -122,8 +122,9 @@ toBool:function(){
 }
 };
 
-p6builtin.p6sub = function(sub_body, declaration_context){
+p6builtin.p6sub = function(sub_body, declaration_context, arg_slots){
     this.sub_body = sub_body;
+    this.arg_slots = arg_slots;
     this.declaration_context = declaration_context; // parent for closure
     this.T = 'p6sub_invocation';
 };
