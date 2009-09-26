@@ -64,6 +64,9 @@ do_Multiplicative:function(right, divide){
 },
 do_infix__S_Lt:function(right){
     return new p6builtin.Bool(this.v.compareTo(right.v) < 0);
+},
+do_infix__S_LtEqual:function(right){
+    return new p6builtin.Bool(this.v.compareTo(right.v) <= 0);
 }
 };
   
@@ -184,6 +187,9 @@ toBool:function(){
 },
 do_infix__S_Lt:function(right){
     return this.value.do_infix__S_Lt(right.value ? right.value : right);
+},
+do_infix__S_LtEqual:function(right){
+    return this.value.do_infix__S_LtEqual(right.value ? right.value : right);
 }
 };
 
