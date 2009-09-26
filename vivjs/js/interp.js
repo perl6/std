@@ -234,11 +234,18 @@ Comma:function(){
     }
     return [this.invoker];
 },
+new_variable:function(){
+    this.result = new p6builtin.p6var(this.sigil.TEXT,
+        this.desigilname.longname.name.identifier.TEXT, this.context, true);
+    return [this.invoker];
+},
 scope_declarator__S_my:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        return [this.do_next = dupe(this.M.M.M.M),this];
+        this.do_next = dupe(this.M.M.M.M);
+        this.do_next.T = 'new_variable';
+        return [this.do_next,this];
     case 1:
         var a = this.do_next.result;
         this.result = this.context[a.sigil+a.name] = this.do_next.result;

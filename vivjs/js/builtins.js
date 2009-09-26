@@ -6,7 +6,7 @@ var bigInt = libBigInt;
 p6builtin.Int = function(integer,radix) {
     if (typeof(integer)=='string') {
         this.v = bigInt.nbi();
-        this.v.fromString(integer,radix || 10);
+        this.v.fromString(integer,+(radix || 10));
     } else {
         this.v = integer instanceof bigInt
             ? integer
