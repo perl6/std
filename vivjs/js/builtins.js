@@ -61,6 +61,9 @@ do_Multiplicative:function(right, divide){
     default:
         return new p6builtin.Int(left.v.multiply(right.v));
     }
+},
+do_infix__S_Lt:function(right){
+    return new p6builtin.Bool(this.v.compareTo(right.v) < 1);
 }
 };
   
@@ -178,6 +181,9 @@ do_Multiplicative:function(right, divide){
 },
 toBool:function(){
     return this.v.toBool();
+},
+do_infix__S_Lt:function(right){
+    return this.value.do_infix__S_Lt(right.value ? right.value : right);
 }
 };
 

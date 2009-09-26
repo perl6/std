@@ -477,7 +477,8 @@ termish:function(){
         }
         // handle chained operators
         this.last_index = -1;
-        this.MM = Array(this.args.length);
+        //throw keys(this);
+        this.MM = Array(this.chain.length);
         this.do_next = null;
         this.phase = 1;
         // fall through
@@ -499,9 +500,10 @@ termish:function(){
         } else if (this.last_index == 1) { // skip "first" comparison
             return [this.do_next = dupe(this.chain[++this.last_index]), this];
         } else { // ready for a comparison
+            //throw keys(this.chain[this.last_index - 2].infix.T);
             return [this.do_next = {
                 T: 'comparison_op',
-                comp_node: this.chain[++this.last_index - 2].T,
+                comp_node: this.chain[this.last_index - 2].infix.T,
                 left: this.MM[this.last_index - 3],
                 right: this.MM[this.last_index - 1]
             }, this];
