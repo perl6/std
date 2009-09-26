@@ -3,10 +3,10 @@ var p6builtin = {}; (function(){
 var bigInt = libBigInt;
 
 // immutable
-p6builtin.Int = function(integer) {
+p6builtin.Int = function(integer,radix) {
     if (typeof(integer)=='string') {
         this.v = bigInt.nbi();
-        this.v.fromString(integer,10);
+        this.v.fromString(integer,radix || 10);
     } else {
         this.v = integer instanceof bigInt
             ? integer

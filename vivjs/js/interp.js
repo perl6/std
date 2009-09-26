@@ -125,16 +125,6 @@ SYMBOL__:function(){
         return [this.invoker];
     }
 },
-termish:function(){
-    switch(this.phase) {
-    case 0:
-        ++this.phase;
-        return [this.do_next = dupe(this.M),this];
-    case 1:
-        this.result = this.do_next.result;
-        return [this.invoker];
-    }
-},
 numish:function(){
     switch(this.phase) {
     case 0:
@@ -410,6 +400,50 @@ Tight_or:function(){
             return [this.do_next =
                 dupe(this.args[this.last_index]), this];
         }
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
+rad_number:function(){
+    var radix = +this.radix.TEXT;
+    if (radix > 36 || radix < 2)
+        throw 'radix out of range (2..36)';
+    this.result = new p6builtin.Int(this.intpart.TEXT, radix);
+    return [this.invoker];
+},
+Symbolic_unary:function(){
+    //throw keys(this.M[0]);
+    this.result = new p6builtin.Int(this.eval_args[0].v.negate());
+    return [this.invoker];
+},
+termish:function(){
+    switch(this.phase) {
+    case 0:
+        if (this.M.T) {
+            this.phase = 2;
+            return [this.do_next = dupe(this.M),this];
+        }
+        // handle chained operators
+        this.last_index = 0;
+        this.MM = Array(this.args.length);
+        this.do_next = null;
+        this.phase = 1;
+        // fall through
+    case 1:
+        // process args until we have 2, then run the comparison,
+        if (this.last_index > 2 || (!this.do_next.result.toBool()
+                && ++this.last_index < this.chain.length)) {
+            if (this.last_index < 1) {
+                
+            }
+            return [this.do_next =
+                dupe(this.chain[this.last_index]), this];
+        }
+        
+        this.do_next = 
+        this.result = this.do_next.result;
+        return [this.invoker];
+    case 2:
         this.result = this.do_next.result;
         return [this.invoker];
     }
