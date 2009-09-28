@@ -19,17 +19,34 @@ HELP
 exit;
 }
 my $PROG = '';
-my ($help,$C);
+my ($help,$C,$test_mode);
 Getopt::Long::Parser->new( config => [qw( bundling no_ignore_case pass_through require_order)], )->getoptions(
     "C=s" => \$C,
     "e=s" => \$PROG,
     'h|help' => \$help,
+    't|test_mode' => \$test_mode,
 ) || help;
 help if $help;
 
+my $setting;
+if ($test_mode) {
+    $setting = 'vijsTEST';
+    unless (-f 'vijsTEST.setting') {
+        my $s_c = scalar(read_file('Test.pm'));
+        $s_c =~ s/^proto/my proto/g;
+        $s_c =~ s/^class\sTest/ /g;
+        my $c_c = scalar(read_file('CORE.setting'));
+        $c_c =~ s/YOU_ARE_HERE;/ /;
+        write_file( 'vijsTEST.setting', $s_c.$c_c.'YOU_ARE_HERE;');
+        my $out = `./setting vijsTEST.setting 2>&1`;
+    }
+}
+else {
+    $setting = 'CORE';
+}
 my $r;
 if (@ARGV and -f $ARGV[0]) {
-    $r = STD->parsefile($ARGV[0], actions => 'Actions')->{'_ast'};
+    $r = STD->parsefile($ARGV[0], actions => 'Actions', setting => $setting)->{'_ast'};
 }
 else {
     if (not $PROG) {
@@ -37,7 +54,7 @@ else {
         $PROG = <>;
     }
     $PROG = $PROG;
-    $r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
+    $r = STD->parse($PROG, actions => 'Actions', setting => $setting)->{'_ast'};
 }
 
 my @js = qw[js/json2.js js/libBigInt.js js/interp.js js/builtins.js
