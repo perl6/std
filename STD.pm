@@ -3393,7 +3393,6 @@ token dottyop {
     :dba('dotty method or postfix')
     [
     | <methodop>
-    | <colonpair>
     | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
     ]
 }
@@ -3562,6 +3561,7 @@ token methodop {
     | <?before <[ ' " ]> >
         [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
         <quote>
+        [ <?before '(' | '.(' | '\\'> || <.panic: "Quoted method name requires parenthesized arguments"> ]
         { my $t = $<quote><nibble>.Str; $t ~~ /\W/ or $t ~~ /^(WHO|WHAT|WHERE|WHEN|WHY|HOW)$/ or $¢.worry("Useless use of quotes") }
     ] <.unsp>? 
 
