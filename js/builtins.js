@@ -93,6 +93,12 @@ do_infix__S_BangEqual:function(right){
 },
 negate:function(){
     return new p6builtin.Int(this.v.negate());
+},
+do_infix__S_TildeTilde:function(right,swapped){
+    if (!swapped) {
+        return (right.value || right).do_infix__S_TildeTilde(this,true);
+    }
+    return new p6builtin.Bool(this.v.compareTo(new p6builtin.Int(right.toString())) == 0);
 }
 };
 
@@ -206,6 +212,12 @@ toBool:function(){
 },
 negate:function(){
     return new p6builtin.Int(this.toString()).negate();
+},
+do_infix__S_TildeTilde:function(right,swapped){
+    if (!swapped) {
+        return (right.value || right).do_infix__S_TildeTilde(this,true);
+    }
+    return new p6builtin.Bool(this.v == right.toBool());
 }
 };
 
@@ -242,6 +254,12 @@ do_infix__S_ne:function(right){
 },
 negate:function(){
     return new p6builtin.Num(0).negate();
+},
+do_infix__S_TildeTilde:function(right,swapped){
+    if (!swapped) {
+        return (right.value || right).do_infix__S_TildeTilde(this, true);
+    }
+    return new p6builtin.Bool(right.toString() == this.v);
 }
 };
 
@@ -268,6 +286,12 @@ toString: function(){
 },
 toBool:function(){
     return false;
+},
+do_infix__S_TildeTilde:function(right,swapped){
+    if (!swapped) {
+        return (right.value || right).do_infix__S_TildeTilde(this, true);
+    }
+    return new p6builtin.Bool(right instanceof p6builtin.Nil);
 }
 };
 
@@ -303,6 +327,12 @@ toString:function(){
 },
 toBool:function(){
     return true;
+},
+do_infix__S_TildeTilde:function(right,swapped){
+    if (!swapped) {
+        return (right.value || right).do_infix__S_TildeTilde(this, true);
+    }
+    throw 'smartmatch not yet implemented for Sub';
 }
 };
 
@@ -389,6 +419,10 @@ do_infix__S_ne:function(right){
 },
 negate:function(){
     return this.value.negate();
+},
+do_infix__S_TildeTilde:function(right){
+    return (right.value || right).do_infix__S_TildeTilde(this.value || this,
+        true);
 }
 };
 
