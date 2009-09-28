@@ -1,5 +1,5 @@
 var global_trace = 0
-// + 1;
+ + 1;
 
 var disp = { // "bytecode" dispatch - by name of grammar node.
 statementlist:function(){
@@ -71,6 +71,36 @@ statement_mod_cond__S_if:function(){
         ++this.phase;
         return [this.do_next = dupe(this.modifier_expr),this];
     case 1:
+        this.result = this.do_next.result;
+        return [this.invoker];
+    }
+},
+statement_control__S_unless:function(){
+    switch(this.phase) {
+    case 0:
+        this.elsif_index = -1;
+        this.phase = 1;
+        this.do_after = this.xblock.pblock.blockoid.statementlist;
+        return [this.do_next = dupe(this.xblock.EXPR),this];
+    case 1:
+        if (!this.do_next.result.toBool()) {
+            this.phase = 2;
+            return [this.do_next = dupe(this.do_after), this];
+        }
+        if (this.elsif && this.elsif.length != 0
+                && ++this.elsif_index < this.elsif.length) {
+            this.do_after = 
+                this.elsif[this.elsif_index].pblock.blockoid.statementlist;
+            return [this.do_next =
+                dupe(this.elsif[this.elsif_index].EXPR), this];
+        } else if (this['else'] && this['else'].length != 0) {
+            this.phase = 2;
+            return [this.do_next =
+                dupe(this['else'][0].blockoid.statementlist), this];
+        }
+        this.result = new p6builtin.Nil();
+        return [this.invoker];
+    case 2:
         this.result = this.do_next.result;
         return [this.invoker];
     }
@@ -270,6 +300,7 @@ Autoincrement:function(){
     return [this.invoker];
 },
 variable:function(){
+    if (this.desigilname.longname.name.identifier.TEXT=='True') throw keys(this.desigilname.longname);
     this.result = new p6builtin.p6var(this.sigil.TEXT,
         this.desigilname.longname.name.identifier.TEXT, this.context);
     //say(keys(this.context));
@@ -289,13 +320,13 @@ noun__S_variable:function(){
         this.result = this.do_next.result;
         return [this.invoker];
     }
-},/*
+},
 statement_control__S_use:function(){
     // only require/BEGIN the fake Test.pm
-    var ctx = this.context;
-    ctx.is;
+    //var ctx = this.context;
+    //ctx.is;
     return [this.invoker];
-},*/
+},
 circumfix__S_Paren_Thesis:function(){
     switch(this.phase) {
     case 0:
@@ -464,8 +495,9 @@ comparison_op:function(){
     var op = 'do_'+this.comp_node, op_method;
     if (typeof(op_method = this.left[op])=='undefined') {
         throw this.comp_node+' not yet implemented; srsly!!?!??';
+    } else {
+        this.result = op_method.call(this.left, this.right);
     }
-    this.result = op_method.call(this.left, this.right);
     return [this.invoker];
 },
 termish:function(){
@@ -585,7 +617,7 @@ function interp(obj,context) {
             //say(keys(act), act.SYM);
         } else {
             if (global_trace) say('returning to '+act.T);
-            //if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
+            if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
             if (last.invoker && last.invoker===act) {
                 doPostDo(last);
             }
@@ -620,8 +652,11 @@ function interp(obj,context) {
                 }
             }
         } else {
-            throw act.T+' not yet implemented; srsly!!?!?\nlast: '+last.T+'\n'
-                + keys(act).join(',');
+            //throw act.T+' not yet implemented; srsly!!?!?\nlast: '+last.T+'\n'
+            //    + keys(act).join(',');
+            last = act;
+            act = last.invoker;
+            result = [null];
         }
     }
     return obj.result;
@@ -662,7 +697,7 @@ function Type(obj){
         if (typeof(obj.T)!='undefined') {
             return obj.T;
         }
-        return obj.constructor.name;
+        return obj.constructor.prototype.WHAT ? obj.WHAT() : obj.constructor.name;
     default:
         return type;
     }

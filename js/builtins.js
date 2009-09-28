@@ -240,40 +240,40 @@ toBool:function(){
     return this.v.toBool();
 },
 do_infix__S_Lt:function(right){
-    return this.value.do_infix__S_Lt(right.value ? right.value : right);
+    return this.value.do_infix__S_Lt(right.value || right);
 },
 do_infix__S_LtEqual:function(right){
-    return this.value.do_infix__S_LtEqual(right.value ? right.value : right);
+    return this.value.do_infix__S_LtEqual(right.value || right);
 },
 do_infix__S_Gt:function(right){
-    return this.value.do_infix__S_Gt(right.value ? right.value : right);
+    return this.value.do_infix__S_Gt(right.value || right);
 },
 do_infix__S_GtEqual:function(right){
-    return this.value.do_infix__S_GtEqual(right.value ? right.value : right);
+    return this.value.do_infix__S_GtEqual(right.value || right);
 },
 do_infix__S_EqualEqual:function(right){
-    return this.value.do_infix__S_EqualEqual(right.value ? right.value : right);
+    return this.value.do_infix__S_EqualEqual(right.value || right);
 },
 do_infix__S_BangEqual:function(right){
-    return this.value.do_infix__S_BangEqual(right.value ? right.value : right);
+    return this.value.do_infix__S_BangEqual(right.value || right);
 },
 do_infix__S_lt:function(right){
-    return this.value.do_infix__S_lt(right.value ? right.value : right);
+    return this.value.do_infix__S_lt(right.value || right);
 },
 do_infix__S_le:function(right){
-    return this.value.do_infix__S_le(right.value ? right.value : right);
+    return this.value.do_infix__S_le(right.value || right);
 },
 do_infix__S_gt:function(right){
-    return this.value.do_infix__S_gt(right.value ? right.value : right);
+    return this.value.do_infix__S_gt(right.value || right);
 },
 do_infix__S_ge:function(right){
-    return this.value.do_infix__S_ge(right.value ? right.value : right);
+    return this.value.do_infix__S_ge(right.value || right);
 },
 do_infix__S_eq:function(right){
-    return this.value.do_infix__S_eq(right.value ? right.value : right);
+    return this.value.do_infix__S_eq(right.value || right);
 },
 do_infix__S_ne:function(right){
-    return this.value.do_infix__S_ne(right.value ? right.value : right);
+    return this.value.do_infix__S_ne(right.value || right);
 }
 };
 
@@ -324,8 +324,10 @@ var Scope = (function(){
 
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
-p6toplevel.True = new p6builtin.Bool(true);
-p6toplevel.False = new p6builtin.Bool(false);
+p6toplevel["Bool::True"] = p6toplevel.True = new p6builtin.Bool(true);
+p6toplevel["Bool::False"] = p6toplevel.False = new p6builtin.Bool(false);
+
+
 
 1;
 

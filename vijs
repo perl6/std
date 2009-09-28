@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use lib '..';
+#use lib '..';
 use v5.10;
 use Getopt::Long;
 use ToJS;
