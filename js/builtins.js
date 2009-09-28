@@ -205,6 +205,12 @@ p6builtin.Rat = function(nu,de) {
     case 'number':
         this.nu = new p6builtin.Int(nu);
         break;
+    case 'Int()':
+        this.nu = nu.v;
+        break;
+    case 'BigInteger':
+        this.nu = nu;
+        break;
     case 'object':
     default: throw 'unknown Rat initializer type: '+sym;
     }
@@ -212,6 +218,12 @@ p6builtin.Rat = function(nu,de) {
     case 'string':
     case 'number':
         this.de = new p6builtin.Int(de);
+        break;
+    case 'Int()':
+        this.de = de.v;
+        break;
+    case 'BigInteger':
+        this.de = de;
         break;
     case 'object':
     default: throw 'unknown Rat initializer type: '+sym;
@@ -228,10 +240,10 @@ toBool: function(){
     return this.nu != 0;
 },
 succ: function(){
-    return new p6builtin.Num(this.nu.v.add(this.de.v), this.de.v);
+    return new p6builtin.Rat(this.nu.v.add(this.de.v), this.de.v);
 },
 pred: function(){
-    return new p6builtin.Num(this.nu.v.subtract(this.de.v), this.de.v);
+    return new p6builtin.Rat(this.nu.v.subtract(this.de.v), this.de.v);
 },
 do_Additive:function(right, subtract){
     throw 'Rat Additive not yet implemented; srsly!??!?!';
