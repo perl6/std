@@ -1,6 +1,14 @@
 var global_trace = 0
 // + 1;
 
+var Derive = (function(){
+    function F(){};
+    return function(obj){
+        F.prototype = obj;
+        return new F();
+    };
+})();
+
 var disp = { // "bytecode" dispatch - by name of grammar node.
 statementlist:function(){
     switch(this.phase) {
@@ -397,7 +405,7 @@ routine_def:function(){
 blockoid:function(){
     switch(this.phase) {
     case 0:
-        this.result = new p6builtin.p6sub(this.statementlist, this.context,
+        this.result = new p6builtin.Sub(this.statementlist, this.context,
             this.arg_slots);
         if (this.invoker.T == 'pblock') {
             this.phase = 1;
@@ -410,7 +418,7 @@ blockoid:function(){
         return [this.invoker];
     }
 },
-p6sub_invocation:function(){
+Sub_invocation:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
@@ -449,12 +457,12 @@ Methodcall:function(){
     case 1:
         this.phase = 2;
         //throw S(this.eval_args);
-        if (this.subr instanceof p6builtin.p6sub) {
+        if (this.subr instanceof p6builtin.Sub) {
             this.do_next = dupe(this.subr);
             this.do_next.arg_array = this.eval_args;
             return [this.do_next, this];
         } else if (this.subr instanceof p6builtin.p6var &&
-                this.subr.value instanceof p6builtin.p6sub) {
+                this.subr.value instanceof p6builtin.Sub) {
             this.do_next = dupe(this.subr.value);
             this.do_next.arg_array = this.eval_args;
             return [this.do_next, this];
@@ -513,6 +521,9 @@ Symbolic_unary:function(){
         break;
     case 'prefix__S_Tilde':
         this.result = new p6builtin.Str(this.eval_args[0].toString());
+        break;
+    case 'prefix__S_Plus':
+        this.result = new p6builtin.Num(this.eval_args[0].toString());
         break;
     default: throw 'Symbolic_unary '+sym+' not yet implemented; srsly!!?!??';
     }
@@ -608,7 +619,7 @@ disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 disp.xblock = disp.escape__S_At = disp.escape__S_Dollar = disp.modifier_expr;
-disp.term__S_DotDotDot = disp.comment__S_Sharp =
+disp.term__S_DotDotDot = disp.comment__S_Sharp = disp.terminator__S_Ly =
     disp.terminator__S_Semi = disp.nibbler = disp.eat_terminator;
 disp.Loose_and = disp.Tight_and;
 disp.Loose_or = disp.Tight_or;

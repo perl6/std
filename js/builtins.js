@@ -197,6 +197,71 @@ negate:function(){
 }
 };
 
+// immutable pair of Ints, representing numerator & denominator of a ratio
+p6builtin.Rat = function(nu,de) {
+    var sym;
+    switch(sym = Type(nu)) {
+    case 'string':
+    case 'number':
+        this.nu = new p6builtin.Int(nu);
+        break;
+    case 'object':
+    default: throw 'unknown Rat initializer type: '+sym;
+    }
+    switch(sym = Type(de)) {
+    case 'string':
+    case 'number':
+        this.de = new p6builtin.Int(de);
+        break;
+    case 'object':
+    default: throw 'unknown Rat initializer type: '+sym;
+    }
+};
+p6builtin.Rat.prototype = {
+WHAT: function(){
+    return 'Rat()';
+},
+toString: function(){
+    return this.nu.toString()+'/'+this.de.toString();
+},
+toBool: function(){
+    return this.nu != 0;
+},
+succ: function(){
+    return new p6builtin.Num(this.nu.v.add(this.de.v), this.de.v);
+},
+pred: function(){
+    return new p6builtin.Num(this.nu.v.subtract(this.de.v), this.de.v);
+},
+do_Additive:function(right, subtract){
+    throw 'Rat Additive not yet implemented; srsly!??!?!';
+},
+do_Multiplicative:function(right, divide){
+    throw 'Rat Multiplicative not yet implemented; srsly!??!?!';
+},
+do_infix__S_Lt:function(right){
+    throw 'Rat Multiplicative not yet implemented; srsly!??!?!';
+},
+do_infix__S_LtEqual:function(right){
+    throw 'Rat comparisons not yet implemented; srsly!??!?!';
+},
+do_infix__S_Gt:function(right){
+    throw 'Rat comparisons not yet implemented; srsly!??!?!';
+},
+do_infix__S_GtEqual:function(right){
+    throw 'Rat comparisons not yet implemented; srsly!??!?!';
+},
+do_infix__S_EqualEqual:function(right){
+    throw 'Rat comparisons not yet implemented; srsly!??!?!';
+},
+do_infix__S_BangEqual:function(right){
+    throw 'Rat comparisons not yet implemented; srsly!??!?!';
+},
+negate:function(){
+    return new p6builtin.Rat(this.nu.negate(), this.de);
+}
+};
+
 p6builtin.Bool = function(bool) {
     this.v = typeof(bool)=='boolean' ? bool : !!bool;
 };
@@ -273,6 +338,12 @@ toString: function(){
 },
 toBool:function(){
     return false;
+},
+do_infix__S_TildeTilde:function(right,swapped){
+    if (!swapped) {
+        return (right.value || right).do_infix__S_TildeTilde(this, true);
+    }
+    return new p6builtin.Bool(right instanceof p6builtin.Undef);
 }
 };
 
@@ -312,15 +383,15 @@ toBool:function(){
 }
 };
 
-p6builtin.p6sub = function(sub_body, declaration_context, arg_slots){
+p6builtin.Sub = function(sub_body, declaration_context, arg_slots){
     this.sub_body = sub_body;
     this.arg_slots = arg_slots;
     this.declaration_context = declaration_context; // parent for closure
-    this.T = 'p6sub_invocation';
+    this.T = 'Sub_invocation';
 };
-p6builtin.p6sub.prototype = {
+p6builtin.Sub.prototype = {
 WHAT: function(){
-    return 'P6SUB';
+    return 'Sub()';
 },
 toString:function(){
     return this.sub_body.BEG;
@@ -353,7 +424,7 @@ p6builtin.p6var = function(sigil,name,context,forceDeclare){
 };
 p6builtin.p6var.prototype = {
 WHAT: function(){
-    return 'P6VAR';
+    return this.value.WHAT();
 },
 set:function(value){
     this.value = value;
@@ -471,11 +542,23 @@ var Scope = (function(){
     };
 })();
 
+function do_die(msg){
+    if (typeof(msg)!='undefined') {
+        throw msg.toString();
+    }
+    throw 'ENOERRORMESSAGE';
+}
+
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
 p6toplevel["Bool::True"] = p6toplevel.True = new p6builtin.Bool(true);
 p6toplevel["Bool::False"] = p6toplevel.False = new p6builtin.Bool(false);
-
+(p6toplevel["Int"] = Derive(p6builtin.Int.prototype)).constructor = p6builtin.Int;
+(p6toplevel["Num"] = Derive(p6builtin.Num.prototype)).constructor = p6builtin.Num;
+(p6toplevel["Str"] = Derive(p6builtin.Str.prototype)).constructor = p6builtin.Str;
+(p6toplevel["Bool"] = Derive(p6builtin.Bool.prototype)).constructor = p6builtin.Bool;
+(p6toplevel["Sub"] = Derive(p6builtin.Sub.prototype)).constructor = p6builtin.Sub;
+(p6toplevel["Rat"] = Derive(p6builtin.Rat.prototype)).constructor = p6builtin.Rat;
 
 
 1;
