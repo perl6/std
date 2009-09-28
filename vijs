@@ -12,7 +12,7 @@ do 'viv';
 
 sub help {
 print <<'HELP';
-Usage: mildew [switches] [--] [programfile] [arguments]
+Usage: vijs [switches] [--] [programfile] [arguments]
   -Cbackend       compile using the compiler backend
                   (valid backends are: html)
 HELP
