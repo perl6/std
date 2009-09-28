@@ -1,5 +1,5 @@
 function do_ok(expr,msg){
-    say((this.result = new p6builtin.Bool(expr.ToBool && expr.toBool())).v
+    say((this.result = new p6builtin.Bool(expr.toBool && expr.toBool())).v
         ? 'ok '+msg
         : 'nok '+msg);
 }

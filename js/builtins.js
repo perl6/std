@@ -2,7 +2,7 @@ var p6builtin = {}; (function(){
 
 var bigInt = libBigInt;
 
-// immutable
+// immutable, emulated arbitrary-precision BigInteger
 p6builtin.Int = function(integer,radix) {
     if (typeof(integer)=='string') {
         this.v = bigInt.nbi();
@@ -31,25 +31,15 @@ pred: function(){
 },
 do_Additive:function(right, subtract){
     var left = this;
-    if (left instanceof p6builtin.p6var) left = left.value; // deref
-    if (right instanceof p6builtin.p6var) right = right.value; // deref
-    left = left instanceof p6builtin.Int
-        ? left // TODO: use the proper coercion
-        : new p6builtin.Int(Number(this.value.toString()));
-    right = right instanceof p6builtin.Int
-        ? right // TODO: use the proper coercion
+    right = right.value || right;
+    right = right instanceof p6builtin.Int ? right
         : new p6builtin.Int(Number(right));
     return new p6builtin.Int(subtract ? left.v.subtract(right.v) : left.v.add(right.v));
 },
 do_Multiplicative:function(right, divide){
     var left = this;
-    if (left instanceof p6builtin.p6var) left = left.value; // deref
-    if (right instanceof p6builtin.p6var) right = right.value; // deref
-    left = left instanceof p6builtin.Int
-        ? left // TODO: use the proper coercion
-        : new p6builtin.Int(Number(this.value.toString()));
-    right = right instanceof p6builtin.Int
-        ? right // TODO: use the proper coercion
+    right = right.value || right;
+    right = right instanceof p6builtin.Int ? right
         : new p6builtin.Int(Number(right));
     switch(divide || 0) {
     case 3:
@@ -66,25 +56,141 @@ do_Multiplicative:function(right, divide){
     }
 },
 do_infix__S_Lt:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Int ? right
+        : new p6builtin.Int(Number(right));
     return new p6builtin.Bool(this.v.compareTo(right.v) < 0);
 },
 do_infix__S_LtEqual:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Int ? right
+        : new p6builtin.Int(Number(right));
     return new p6builtin.Bool(this.v.compareTo(right.v) <= 0);
 },
 do_infix__S_Gt:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Int ? right
+        : new p6builtin.Int(Number(right));
     return new p6builtin.Bool(this.v.compareTo(right.v) > 0);
 },
 do_infix__S_GtEqual:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Int ? right
+        : new p6builtin.Int(Number(right));
     return new p6builtin.Bool(this.v.compareTo(right.v) >= 0);
 },
 do_infix__S_EqualEqual:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Int ? right
+        : new p6builtin.Int(Number(right));
     return new p6builtin.Bool(this.v.compareTo(right.v) == 0);
 },
 do_infix__S_BangEqual:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Int ? right
+        : new p6builtin.Int(Number(right));
     return new p6builtin.Bool(this.v.compareTo(right.v) != 0);
+},
+negate:function(){
+    return new p6builtin.Int(this.v.negate());
 }
 };
-  
+
+// immutable, boxed JS double
+p6builtin.Num = function(num) {
+    var sym;
+    switch(sym = typeof(num)) {
+    case 'string':
+        this.v = Number(num);
+        break;
+    case 'number':
+        this.v = num;
+        break;
+    default: throw 'unknown Num initializer type: '+sym;
+    }
+};
+p6builtin.Num.prototype = {
+WHAT: function(){
+    return 'Num()';
+},
+toString: function(){
+    return this.v.toString();
+},
+toBool: function(){
+    return this.v != 0;
+},
+succ: function(){
+    return new p6builtin.Num(this.v + 1);
+},
+pred: function(){
+    return new p6builtin.Num(this.v - 1);
+},
+do_Additive:function(right, subtract){
+    var left = this;
+    right = right.value || right;
+    right = right instanceof p6builtin.Num ? right
+        : new p6builtin.Num(Number(right.toString()));
+    return new p6builtin.Num(subtract ? left.v - right.v : left.v + right.v);
+},
+do_Multiplicative:function(right, divide){
+    var left = this;
+    right = right.value || right;
+    right = right instanceof p6builtin.Num ? right
+        : new p6builtin.Num(Number(right.toString()));
+    switch(divide || 0) {
+    case 3:
+        return new p6builtin.Num(left.v << right.v);
+    case 4:
+        return new p6builtin.Num(left.v >> right.v);
+    case 1:
+        return new p6builtin.Num(left.v / right.v);
+    case 2:
+        return new p6builtin.Num(left.v % right.v);
+    default:
+        return new p6builtin.Num(left.v * right.v);
+    }
+},
+do_infix__S_Lt:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Num ? right
+        : new p6builtin.Num(Number(right.toString()));
+    return new p6builtin.Bool(this.v < right.v);
+},
+do_infix__S_LtEqual:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Num ? right
+        : new p6builtin.Num(Number(right.toString()));
+    return new p6builtin.Bool(this.v <= right.v);
+},
+do_infix__S_Gt:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Num ? right
+        : new p6builtin.Num(Number(right.toString()));
+    return new p6builtin.Bool(this.v > right.v);
+},
+do_infix__S_GtEqual:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Num ? right
+        : new p6builtin.Num(Number(right.toString()));
+    return new p6builtin.Bool(this.v >= right.v);
+},
+do_infix__S_EqualEqual:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Num ? right
+        : new p6builtin.Num(Number(right.toString()));
+    return new p6builtin.Bool(this.v == right.v);
+},
+do_infix__S_BangEqual:function(right){
+    right = right.value || right;
+    right = right instanceof p6builtin.Num ? right
+        : new p6builtin.Num(Number(right.toString()));
+    return new p6builtin.Bool(this.v != right.v);
+},
+negate:function(){
+    return new p6builtin.Num(0 - this.v);
+}
+};
+
 p6builtin.Bool = function(bool) {
     this.v = typeof(bool)=='boolean' ? bool : !!bool;
 };
@@ -97,6 +203,9 @@ toString: function(){
 },
 toBool:function(){
     return this.v;
+},
+negate:function(){
+    return new p6builtin.Int(this.toString()).negate();
 }
 };
 
@@ -130,6 +239,9 @@ do_infix__S_eq:function(right){
 },
 do_infix__S_ne:function(right){
     return new p6builtin.Bool(this.v != right.v);
+},
+negate:function(){
+    return new p6builtin.Num(0).negate();
 }
 };
 
@@ -274,6 +386,9 @@ do_infix__S_eq:function(right){
 },
 do_infix__S_ne:function(right){
     return this.value.do_infix__S_ne(right.value || right);
+},
+negate:function(){
+    return this.value.negate();
 }
 };
 
