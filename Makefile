@@ -8,10 +8,9 @@ fast: $(FIXINS) check
 
 snap: $(FIXINS) check lex/STD/termish
 	rm -rf snap.new
-	cp -ra snap snap.new
+	mkdir snap
 	svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
 	cp $(FIXINS)  tryfile STD.pmc *.syml CORE.*.store snap.new
-	cd snap.new; ln -s ../vivjs/js .; ln -s ../viv .; ln -s ../vivjs/vivjs .; ln -s ../vivjs/ToJS.pm .; cd ..
 	-mv lex snap.new
 	-rm -rf snap.old
 	-mv snap snap.old
