@@ -142,6 +142,8 @@ my role Positional { }
 my role Associative { }
 my role Abstraction { }
 my role Integral { }
+my role AttributeDeclarand { }
+my role ContainerDeclarand { }
 
 my subset Comparator   of Code where { .signature === :(Any, Any --> Int ) };
 my subset KeyExtractor of Code where { .signature === :(Any --> Any) };
