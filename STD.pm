@@ -3985,9 +3985,31 @@ token infix:sym<::=> ( --> Item_assignment)
     { <sym> }
 
 token infix:sym<.=> ( --> Item_assignment) {
-    <sym> <.ws>
-    [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || <worryobs('.= as append operator', '~=')> ]
-    { $<O><nextterm> = 'dottyopish' }
+    <sym>
+    {
+        $<O><nextterm> = 'dottyopish';
+        $<O><_reducecheck> = 'checkdoteq';
+    }
+}
+
+method checkdoteq {
+    # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || ]
+    return self if self.<left><scope_declarator>;
+    my $ok = 0;
+
+    try {
+        my $methop = self.<right><methodop>;
+        my $name = $methop.<longname>.Str;
+        if $name eq 'new' or $name eq 'sort' or $name eq 'subst' or $name eq 'trans' or $name eq 'reverse' or $name eq 'uniq' or $name eq 'map' or $name eq 'samecase' or $name eq 'substr' or $name eq 'flip' or $name eq 'fmt' {
+            $ok = 1;
+        }
+        elsif not $methop.<args>[0] {
+            $ok = 1;
+        }
+    };
+
+    self.cursor_force(self.<infix><_pos>).worryobs('.= as append operator', '~=') unless $ok;
+    self;
 }
 
 token infix:sym« => » ( --> Item_assignment)
@@ -4359,6 +4381,10 @@ method EXPR ($preclvl) {
                 push @$a, $right;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
+                my $ck;
+                if $ck = $op<O><_reducecheck> {
+                    $op.$ck;
+                }
                 push @termstack, $op._REDUCE($op<_from>, 'INFIX');
                 @termstack[*-1].<PRE>:delete;
                 @termstack[*-1].<POST>:delete;
