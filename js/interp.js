@@ -608,6 +608,10 @@ pblock:function(){
         this.result = this.do_next.result;
         return [this.invoker];
     }
+},
+number__S_rational:function(){
+    this.result = new p6builtin.Rat(this.nu.TEXT, this.de.TEXT);
+    return [this.invoker];
 }
 };
 // aliases (nodes with identical semantics)
