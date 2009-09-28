@@ -14,6 +14,9 @@ p6builtin.Int = function(integer,radix) {
     }
 };
 p6builtin.Int.prototype = {
+WHAT: function(){
+    return 'Int()';
+},
 toString: function(){
     return this.v.toString();
 },
@@ -86,6 +89,9 @@ p6builtin.Bool = function(bool) {
     this.v = typeof(bool)=='boolean' ? bool : !!bool;
 };
 p6builtin.Bool.prototype = {
+WHAT: function(){
+    return 'Bool()';
+},
 toString: function(){
     return this.v ? '1' : '0';
 },
@@ -98,6 +104,9 @@ p6builtin.Str = function(str) {
     this.v = typeof(str)=='string' ? str : str.toString();
 };
 p6builtin.Str.prototype = {
+WHAT: function(){
+    return 'Str()';
+},
 toString: function(){
     return this.v;
 },
@@ -126,6 +135,9 @@ do_infix__S_ne:function(right){
 
 p6builtin.Undef = function(){},
 p6builtin.Undef.prototype = {
+WHAT: function(){
+    return 'Undef()';
+},
 toString: function(){
     return 'Undef';
 },
@@ -136,6 +148,9 @@ toBool:function(){
 
 p6builtin.Nil = function(){},
 p6builtin.Nil.prototype = {
+WHAT: function(){
+    return 'Nil()';
+},
 toString: function(){
     return 'Nil';
 },
@@ -150,6 +165,9 @@ p6builtin.jssub = function(func,name,source){
     this.source = func.toString();
 };
 p6builtin.jssub.prototype = {
+WHAT: function(){
+    return 'JSSUB';
+},
 toString:function(){
     return this.source.toString();
 },
@@ -165,6 +183,9 @@ p6builtin.p6sub = function(sub_body, declaration_context, arg_slots){
     this.T = 'p6sub_invocation';
 };
 p6builtin.p6sub.prototype = {
+WHAT: function(){
+    return 'P6SUB';
+},
 toString:function(){
     return this.sub_body.BEG;
 },
@@ -189,6 +210,9 @@ p6builtin.p6var = function(sigil,name,context,forceDeclare){
     }
 };
 p6builtin.p6var.prototype = {
+WHAT: function(){
+    return 'P6VAR';
+},
 set:function(value){
     this.value = value;
     return this;

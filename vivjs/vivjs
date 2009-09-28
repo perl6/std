@@ -36,10 +36,12 @@ else {
         local $/;
         $PROG = <>;
     }
+    $PROG = $PROG;
     $r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
 }
 
-my @js = qw[js/json2.js js/libBigInt.js js/interp.js js/builtins.js];
+my @js = qw[js/json2.js js/libBigInt.js js/interp.js js/builtins.js
+    js/Test.pm.js];
 
 if (defined $C and $C eq 'html') {
     say "<html><head></head><body>";

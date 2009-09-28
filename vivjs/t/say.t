@@ -1,2 +1,2 @@
-say "1..1";
-say "ok 1";
+plan 1
+ok 1, "yay";

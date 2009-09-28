@@ -563,7 +563,15 @@ var __lazyarg_Types = {
     Loose_and: 1,
     Loose_or: 1
 };
-
+/*
+var __lazyarg_Identifiers = {
+    'ok' : 1,
+    'is' : 1,
+    'isnt' : 1,
+    'is_deeply' : 1,
+    'isa_ok' : 1
+};
+*/
 function interp(obj,context) {
     var act = obj, result = Array(1), empty = [0], last = act;
     act.phase = 0; act.context = context;
@@ -577,6 +585,7 @@ function interp(obj,context) {
             //say(keys(act), act.SYM);
         } else {
             if (global_trace) say('returning to '+act.T);
+            //if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
             if (last.invoker && last.invoker===act) {
                 doPostDo(last);
             }
