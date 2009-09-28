@@ -1,47 +1,50 @@
+var test_number;
+
 function do_ok(expr,msg){
-    say((this.result = new p6builtin.Bool(expr.toBool && expr.toBool())).v
-        ? 'ok '+msg
-        : 'nok '+msg);
+    say(((this.result = new p6builtin.Bool(expr.toBool && expr.toBool())).v
+        ? 'ok '
+        : 'nok ') + test_number++ + ' - ' + msg);
 }
 
 function do_is(left,right,msg){
-    say((this.result = new p6builtin.Bool(
+    say(((this.result = new p6builtin.Bool(
         left.WHAT()=='Int()' ? left.do_infix__S_EqualEqual(right).v
       : (left.WHAT()=='Bool()' && right.toBool) ? left.v === right.toBool().v
       : left.WHAT()=='Str()' ? left.do_infix__S_eq(right).v
       : false
     )).v
-        ? 'ok '+msg
-        : 'nok '+msg);
+        ? 'ok '
+        : 'nok ') + test_number++ + ' - ' + msg);
 }
 
 function do_isnt(left,right,msg){
-    say((this.result = new p6builtin.Bool(!(
+    say(((this.result = new p6builtin.Bool(!(
         left.WHAT()=='Int()' ? left.do_infix__S_EqualEqual(right).v
       : (left.WHAT()=='Bool()' && right.toBool) ? left.v === right.toBool().v
       : left.WHAT()=='Str()' ? left.do_infix__S_eq(right).v
       : false
     ))).v
-        ? 'ok '+msg
-        : 'nok '+msg);
+        ? 'ok '
+        : 'nok ') + test_number++ + ' - ' + msg);
 }
 
 function do_plan(planned){
     this.result = new p6builtin.Bool(true);
     say('1..'+planned);
+    test_number = 1;
 }
 
 function do_pass(msg){
-    say('ok '+msg);
+    say('ok ' + test_number++ + ' - ' + msg);
 }
 
 function do_flunk(msg){
-    say('nok '+msg);
+    say('nok ' + test_number++ + ' - ' + msg);
 }
 
 function test_stub(left,right,msg){
     this.result = new p6builtin.Bool(false);
-    say('nok');
+    say(('nok ') + test_number++ + ' - ' + msg);
 }
 
 // install the JSSUBS in place of the p6subs for which they're standing in
