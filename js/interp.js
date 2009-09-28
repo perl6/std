@@ -608,7 +608,8 @@ disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
 disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
 disp.xblock = disp.escape__S_At = disp.escape__S_Dollar = disp.modifier_expr;
-disp.comment__S_Sharp = disp.nibbler = disp.eat_terminator;
+disp.term__S_DotDotDot = disp.comment__S_Sharp =
+    disp.terminator__S_Semi = disp.nibbler = disp.eat_terminator;
 disp.Loose_and = disp.Tight_and;
 disp.Loose_or = disp.Tight_or;
 
