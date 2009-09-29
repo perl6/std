@@ -107,6 +107,9 @@ do_Exponentiation:function(right){
         throw 'Exponentiation of Int to '+Type(right)+' NYI';
     }
     return new p6builtin.Int(this.v.pow(right.v));
+},
+do_NumericComplement:function(){
+    return new p6builtin.Int(this.v.negate().subtract(bigInt.ONE));
 }
 };
 p6builtin.Int.bigInt = bigInt;

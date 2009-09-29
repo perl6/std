@@ -573,6 +573,9 @@ Symbolic_unary:function(){
     case 'prefix__S_Plus':
         this.result = new p6builtin.Num(this.eval_args[0].toString());
         break;
+    case 'prefix__S_PlusCaret':
+        this.result = this.eval_args[0].do_NumericComplement();
+        break;
     default: throw 'Symbolic_unary '+sym+' not yet implemented; srsly!!?!??';
     }
     return [this.invoker];
