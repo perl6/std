@@ -403,7 +403,7 @@ toNum:function(){
     var res;
     var str = filt__(this.v);
     if (isNaN(res = Number(str))) {
-        return (res = /^(?:0([dbox]))(\d+)/i.exec(str))
+        return (res = /^(?:0([dbox]))([^\.]+)/i.exec(str))
             ? new p6builtin.Int(res[2], DBOX[res[1] || 'd'])
             : new p6builtin.Int(str);
     }
@@ -414,7 +414,7 @@ toInt:function(){
     var res;
     var str = filt__(this.v);
     if (isNaN(res = Number(str)) || res.toString()!=str) {
-        return (res = /^(?:0([dbox]))?(\d+)/i.exec(str))
+        return (res = /^(?:0([dbox]))?([^\.]+)/i.exec(str))
             ? new p6builtin.Int(res[2], DBOX[res[1] || 'd'])
             : new p6builtin.Int(str);
     }

@@ -567,7 +567,7 @@ rad_number:function(){
         return [this.invoker];
     case 1:
         var int_str = this.do_next.result.toString();
-        if (/^0[dbox]/i.test(int_str)) {
+        if (/^0[dbox]/i.test(int_str) && this.int_radix==10) {
             this.result = new p6builtin.Int(
                 new p6builtin.Str(this.do_next.result).toInt().toString(),
                     this.int_radix);
