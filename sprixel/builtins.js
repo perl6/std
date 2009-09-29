@@ -100,6 +100,13 @@ do_infix__S_TildeTilde:function(right,swapped){
     }
     return new p6builtin.Bool(this.isUndefined ? right instanceof p6builtin.Int
         : this.v.compareTo(new p6builtin.Int(right.toString())) == 0);
+},
+do_Exponentiation:function(right){
+    right = right.value || right;
+    if (Type(right)!='Int()') {
+        throw 'Exponentiation of Int to '+Type(right)+' NYI';
+    }
+    return new p6builtin.Int(this.v.pow(right.v));
 }
 };
 p6builtin.Int.bigInt = bigInt;
@@ -401,9 +408,9 @@ toNum:function(){
 },
 toInt:function(){
     var res;
-    if (isNaN(res = Number(this.v))) {
-        return (res = /^0([dbox])(\d+)/i.exec(this.v))
-            ? new p6builtin.Int(res[2], DBOX[res[1]])
+    if (isNaN(res = Number(this.v)) || res.toString()!=this.v) {
+        return (res = /^(?:0([dbox]))?(\d+)/i.exec(this.v))
+            ? new p6builtin.Int(res[2], DBOX[res[1] || 'd'])
             : new p6builtin.Int(this.v);
     }
     return new p6builtin.Int(res);
@@ -576,6 +583,15 @@ negate:function(){
 do_infix__S_TildeTilde:function(right){
     return (right.value || right).do_infix__S_TildeTilde(this.value || this,
         true);
+},
+toInt:function(){
+    return this.value.toInt();
+},
+toNum:function(){
+    return this.value.toNum();
+},
+do_Exponentiation:function(){
+    return this.do_Exponentiation(right.value || right);
 }
 };
 

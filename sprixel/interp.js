@@ -466,10 +466,16 @@ Methodcall:function(){
     switch(this.phase) {
     case 0:
         this.subr = this.eval_args[0];
+        //throw keys(this.M[1].dotty.dottyop.methodop.longname.name.identifier);
         if (this.M && this.M[1] && this.M[1].M.semiarglist) {
             this.phase = 1;
             // replaces eval_args with the sub's args
             return [this.do_next = dupe(this.M[1].M.semiarglist), this];
+        } if (this.M && this.M[1] && this.M[1].dotty
+                && this.M[1].dotty.dottyop.methodop.arglist.length) {
+            //throw keys(this.M[1].dotty.dottyop.methodop.arglist);
+            return [this.do_next = dupe(
+                this.M[1].dotty.dottyop.methodop.arglist), this];
         } else {
             this.eval_args = []; // empty the sub's arg list to-be
             this.do_next = null;
@@ -478,7 +484,24 @@ Methodcall:function(){
     case 1:
         this.phase = 2;
         //throw S(this.eval_args);
-        if (this.subr instanceof p6builtin.Sub) {
+        if (this.M && this.M[1] && this.M[1].dotty
+                && this.M[1].dotty.dottyop) {
+            // it's a full blown method call.  this.subr becomes the responding
+            //   object; now we need to resolve the method member itself.
+            var sym;
+            this.subr = symbol_lookup(this.invocant = this.subr, 
+                sym = this.M[1].dotty.dottyop.
+                    methodop.longname.name.identifier.TEXT);
+            if (Type(this.subr)=='Undef()') {
+                this.subr = symbol_lookup(this.context, sym);
+            }
+            if (this.subr && this.subr.isUndefined) { // it's a Type object
+                this.result = this.invocant['to'+sym]();
+                return [this.invoker];
+            }
+            this.subr.invocant = this.invocant;
+            throw 'real method calls NYI';
+        } else if (this.subr instanceof p6builtin.Sub) {
             this.do_next = dupe(this.subr);
             this.do_next.arg_array = this.eval_args;
             return [this.do_next, this];
@@ -488,6 +511,7 @@ Methodcall:function(){
             this.do_next.arg_array = this.eval_args;
             return [this.do_next, this];
         }
+        //throw Type(this.subr);
         throw keys(this.subr) + ' cannot be invoked';
     case 2:
         this.result = this.do_next.result;
@@ -635,6 +659,10 @@ pblock:function(){
 },
 number__S_rational:function(){
     this.result = new p6builtin.Rat(this.nu.TEXT, this.de.TEXT);
+    return [this.invoker];
+},
+Exponentiation:function(){
+    this.result = this.eval_args[0].do_Exponentiation(this.eval_args[1]);
     return [this.invoker];
 }
 };
