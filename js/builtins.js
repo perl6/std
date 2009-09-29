@@ -228,6 +228,12 @@ p6builtin.Rat = function(nu,de) {
     case 'object':
     default: throw 'unknown Rat initializer type: '+sym;
     }
+    // reduce it...
+    var gcd;
+    while ((gcd = this.nu.gcd(this.de)).compareTo(bigInt.ONE) > 0) {
+        this.nu = this.nu.divide(gcd);
+        this.de = this.de.divide(gcd);
+    }
 };
 p6builtin.Rat.prototype = {
 WHAT: function(){
