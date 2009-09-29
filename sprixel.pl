@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-#use lib '..';
 use v5.10;
 use Getopt::Long;
 use ToJS;
@@ -12,7 +11,7 @@ do 'viv';
 
 sub help {
 print <<'HELP';
-Usage: vijs [switches] [--] [programfile] [arguments]
+Usage: perl sprixel.pl [switches] [--] [programfile] [arguments]
   -Cbackend       compile using the compiler backend
                   (valid backends are: html)
 HELP
@@ -30,15 +29,15 @@ help if $help;
 
 my $setting;
 if ($test_mode) {
-    $setting = 'vijsTEST';
-    unless (-f 'vijsTEST.setting') {
+    $setting = 'sprixelTEST';
+    unless (-f 'sprixelTEST.setting') {
         my $s_c = scalar(read_file('Test.pm'));
         $s_c =~ s/^proto/my proto/g;
         $s_c =~ s/^class\sTest/ /g;
         my $c_c = scalar(read_file('CORE.setting'));
         $c_c =~ s/YOU_ARE_HERE;/ /;
-        write_file( 'vijsTEST.setting', $s_c.$c_c.'YOU_ARE_HERE;');
-        my $out = `./setting vijsTEST.setting 2>&1`;
+        write_file( 'sprixelTEST.setting', $s_c.$c_c.'YOU_ARE_HERE;');
+        my $out = `./setting sprixelTEST.setting 2>&1`;
     }
 }
 else {
@@ -57,8 +56,8 @@ else {
     $r = STD->parse($PROG, actions => 'Actions', setting => $setting)->{'_ast'};
 }
 
-my @js = qw[js/json2.js js/libBigInt.js js/interp.js js/builtins.js
-    js/Test.pm.js];
+my @js = qw[sprixel/json2.js sprixel/libBigInt.js sprixel/interp.js sprixel/builtins.js
+    sprixel/Test.pm.js];
 
 if (defined $C and $C eq 'html') {
     say "<html><head></head><body>";
