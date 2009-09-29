@@ -359,12 +359,33 @@ Additive:function(){
     return [this.invoker];
 },
 Multiplicative:function(){
-    this.result = this.eval_args[0].do_Multiplicative(this.eval_args[1],
-        this.M[1].M.T == 'infix__S_Slash' ? 1
-            : this.M[1].M.T == 'infix__S_Percent' ? 2
-            : this.M[1].M.T == 'infix__S_PlusLt' ? 3
-            : this.M[1].M.T == 'infix__S_PlusGt' ? 4
-            : 0);
+    var sym = this.M[1].M.T, done=false;
+    try {
+        var leftText, rightText;
+        // "constant folding" for division of two ints (coercion to Rat)
+        if (sym == 'infix__S_Slash' && 
+                ((this.args[0].M.M && this.args[0].M.M.M.M.T == 'integer' &&
+                    (leftText = this.args[0].M.M.M.M.TEXT)) ||
+                (this.args[0].M[0].prefix.TEXT == '-'
+                    && this.args[0].M[1].M.M.M.M.T == 'integer' &&
+                    (leftText = '-'+this.args[0].M[1].M.M.M.M.TEXT))) &&
+                ((this.args[1].M.M && this.args[1].M.M.M.M.T == 'integer' &&
+                    (rightText = this.args[1].M.M.M.M.TEXT)) ||
+                (this.args[1].M[0].prefix.TEXT == '-'
+                    && this.args[1].M[1].M.M.M.M.T == 'integer' &&
+                    (rightText = '-'+this.args[1].M[1].M.M.M.M.TEXT)))) {
+            this.result = new p6builtin.Rat(leftText, rightText);
+            done = true;
+        }
+    } catch(e) {};
+    if (!done) {
+        this.result = this.eval_args[0].do_Multiplicative(this.eval_args[1],
+            sym == 'infix__S_Slash' ? 1
+                : sym == 'infix__S_Percent' ? 2
+                : sym == 'infix__S_PlusLt' ? 3
+                : sym == 'infix__S_PlusGt' ? 4
+                : 0);
+    }
     return [this.invoker];
 },
 List_assignment:function(){
@@ -517,7 +538,11 @@ Symbolic_unary:function(){
     var sym;
     switch(sym = this.M[0].prefix.T) {
     case 'prefix__S_Minus':
-        this.result = new p6builtin.Int(this.eval_args[0].negate());
+        this.result = Type(this.eval_args[0])=='Int()'
+            ? new p6builtin.Int(this.eval_args[0].negate())
+            : Type(this.eval_args[0])=='Num()'
+                ? new p6builtin.Num(this.eval_args[0].negate())
+                : new p6builtin.Num(bigInt.ZERO.negate());
         break;
     case 'prefix__S_Tilde':
         this.result = new p6builtin.Str(this.eval_args[0].toString());
