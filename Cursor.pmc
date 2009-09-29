@@ -1124,13 +1124,70 @@ sub do_need { my $self = shift;
     $self;
 }
 
+sub do_import { my $self = shift;
+    my $module = shift;
+    my $args = shift;
+    my @imports;
+
+    my $pkg = $self->find_stash($module);
+    if ($args) {
+        my $text = $args->Str;
+        return $self unless $text;
+        while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
+            my $scope = lc($1) || 'my';
+            my $imports = $2;
+            local $::SCOPE = $scope;
+            @imports = split ' ', $imports;
+            for (@imports) {
+                local $::DECLARAND;
+                if ($pkg) {
+                    if ($_ =~ s/^://) {
+                        my @tagimports;
+                        eval { @tagimports = keys %{ $pkg->{'EXPORT::'}->{$_} }; };
+                        $self->do_import_aliases($pkg, @tagimports);
+                    }
+                    elsif ($pkg->{$_}{export}) {
+                        $::DECLARAND = $pkg->{$_};
+                    }
+                    elsif ($pkg->{'&'.$_}{export}) {
+                        $::DECLARAND = $pkg->{'&'.$_};
+                    }
+                    elsif ($pkg->{$_}) {
+                        $self->worry("Can't import $_ because it's not exported by $module");
+                        next;
+                    }
+                }
+                if (/^\w/) {
+                    if (/::/) {
+                        $self->add_name($_);
+                    }
+                    else {
+                        $self->add_routine($_);
+                    }
+                }
+                else {
+                    $self->add_variable($_);
+                }
+            }
+        }
+    }
+    else {
+        return $self unless $pkg;
+        eval { @imports = keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }; };
+        local $::SCOPE = 'my';
+        $self->do_import_aliases($pkg, @imports);
+    }
+
+    $self;
+}
+
 sub do_use { my $self = shift;
     my $module = shift;
     my $args = shift;
     my @imports;
-    my $pkg;
+
     $self->do_need($module);
-    $pkg = $::DECLARAND{pkg};
+    my $pkg = $::DECLARAND{pkg};
     if ($args) {
         my $text = $args->Str;
         return $self unless $text;

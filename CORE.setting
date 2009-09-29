@@ -69,8 +69,8 @@ class Num {
     constant e  is export = 2.71828_18284_59045_23536_02874_71352_66249;
     constant i  is export = 1i;
 }
-Num defines *;
-# XXX hand export till defines works
+import Num;
+# XXX hand export till import works
 constant pi = 3.14159_26535_89793_23846_26433_83279_50288;
 constant e  = 2.71828_18284_59045_23536_02874_71352_66249;
 constant i  = 1i;

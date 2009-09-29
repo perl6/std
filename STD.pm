@@ -851,6 +851,21 @@ token statement_control:need {
     ] ** ','
 }
 
+token statement_control:import {
+    :my $longname;
+    :my $*SCOPE = 'use';
+    <sym> <.ws>
+    <noun>
+    [
+    || <.spacey> <arglist>
+        {{
+            $¢.do_import($<noun>.Str, $<arglist>);
+        }}
+    || {{ $¢.do_import($<noun>.Str, ''); }}
+    ]
+    <.ws>
+}
+
 token statement_control:use {
     :my $longname;
     :my $*SCOPE = 'use';
@@ -3815,9 +3830,6 @@ token infix:but ( --> Structural)
     { <sym> }
 
 token infix:does ( --> Structural)
-    { <sym> }
-
-token infix:defines ( --> Structural)
     { <sym> }
 
 token infix:sym<..> ( --> Structural)
