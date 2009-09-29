@@ -105,12 +105,15 @@ do_infix__S_TildeTilde:function(right,swapped){
 // immutable, boxed JS double
 p6builtin.Num = function(num) {
     var sym;
-    switch(sym = typeof(num)) {
+    switch(sym = Type(num)) {
     case 'string':
         this.v = Number(num);
         break;
     case 'number':
         this.v = num;
+        break;
+    case 'Num()':
+        this.v = num.v;
         break;
     default: throw 'unknown Num initializer type: '+sym;
     }
@@ -240,7 +243,7 @@ WHAT: function(){
     return 'Rat()';
 },
 toString: function(){
-    return this.nu.toString()+'/'+this.de.toString();
+    return this.toNum().toString();
 },
 toBool: function(){
     return this.nu != 0;
@@ -285,6 +288,18 @@ do_infix__S_BangEqual:function(right){
 },
 negate:function(){
     return new p6builtin.Rat(this.nu.negate(), this.de);
+},
+toNum:function(){
+    var q = bigInt.nbi(), r = bigInt.nbi();
+    this.nu.divRemTo(this.de, q, r);
+    if (r.signum() == 0) {
+        return new p6builtin.Int(q);
+    }
+    var large = bigInt.nbi();
+    large.fromString('10000000000000000000000000000000000',10);
+    return new p6builtin.Num((r.signum() < 0 ? '-' : '') +
+        Number(q.abs().toString() + '.' +
+        r.abs().multiply(large).divide(this.de).toString()));
 }
 };
 
