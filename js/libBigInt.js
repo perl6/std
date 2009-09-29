@@ -1084,6 +1084,11 @@ function bnGCD(a) {
   return y;
 }
 
+// (public) lcm(this,a)
+function bnLCM(b) {
+  return this.multiply(b).divide(this.gcd(b));
+}
+
 // (protected) this % n, n < 2^26
 function bnpModInt(n) {
   if(n <= 0) return 0;
@@ -1230,6 +1235,7 @@ BigInteger.prototype.modPow = bnModPow;
 BigInteger.prototype.modInverse = bnModInverse;
 BigInteger.prototype.pow = bnPow;
 BigInteger.prototype.gcd = bnGCD;
+BigInteger.prototype.lcm = bnLCM;
 BigInteger.prototype.isProbablePrime = bnIsProbablePrime;
 
 // BigInteger interfaces not implemented in jsbn:

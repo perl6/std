@@ -203,7 +203,7 @@ p6builtin.Rat = function(nu,de) {
     switch(sym = Type(nu)) {
     case 'string':
     case 'number':
-        this.nu = new p6builtin.Int(nu);
+        this.nu = new p6builtin.Int(nu).v;
         break;
     case 'Int()':
         this.nu = nu.v;
@@ -217,7 +217,7 @@ p6builtin.Rat = function(nu,de) {
     switch(sym = Type(de)) {
     case 'string':
     case 'number':
-        this.de = new p6builtin.Int(de);
+        this.de = new p6builtin.Int(de).v;
         break;
     case 'Int()':
         this.de = de.v;
@@ -246,7 +246,15 @@ pred: function(){
     return new p6builtin.Rat(this.nu.v.subtract(this.de.v), this.de.v);
 },
 do_Additive:function(right, subtract){
-    throw 'Rat Additive not yet implemented; srsly!??!?!';
+    var left = this;
+    right = right.value || right;
+    right = right instanceof p6builtin.Rat ? right
+        : new p6builtin.Rat(Number(right.toString()));
+    var lcm = left.de.lcm(right.de);
+    var leftNu = left.nu.multiply(lcm.divide(left.de));
+    var rightNu = right.nu.multiply(lcm.divide(right.de));
+    return new p6builtin.Rat(subtract ? leftNu.subtract(rightNu)
+        : leftNu.add(rightNu), lcm);
 },
 do_Multiplicative:function(right, divide){
     throw 'Rat Multiplicative not yet implemented; srsly!??!?!';
