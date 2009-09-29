@@ -176,7 +176,7 @@ numish:function(){
 integer:function(){
     // cache integer generation since it's immutable
     if (typeof(this.result)=='undefined') {
-        this.result = new p6builtin.Int(this.TEXT);
+        this.result = new p6builtin.Str(this.TEXT).toInt();
     }
     return [this.invoker];
 },
@@ -538,11 +538,10 @@ Symbolic_unary:function(){
     var sym;
     switch(sym = this.M[0].prefix.T) {
     case 'prefix__S_Minus':
-        this.result = Type(this.eval_args[0])=='Int()'
-            ? new p6builtin.Int(this.eval_args[0].negate())
-            : Type(this.eval_args[0])=='Num()'
-                ? new p6builtin.Num(this.eval_args[0].negate())
-                : new p6builtin.Num(bigInt.ZERO.negate());
+        var type = Type(this.eval_args[0]);
+        this.result = {'Int()':1,'Num()':1,'Rat()':1}[type]
+            ? this.eval_args[0].negate()
+            : new p6builtin.Num(p6builtin.Int.bigInt.ZERO.negate());
         break;
     case 'prefix__S_Tilde':
         this.result = new p6builtin.Str(this.eval_args[0].toString());
@@ -642,7 +641,7 @@ number__S_rational:function(){
 // aliases (nodes with identical semantics)
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.value__S_number = disp.noun__S_value = disp.value__S_quote =
-    disp.noun__S_circumfix = //disp.circumfix__S_Paren_Thesis = 
+    disp.noun__S_circumfix =
     disp.noun__S_scope_declarator = disp.noun__S_routine_declarator =
     disp.SYMBOL__;
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;

@@ -98,22 +98,27 @@ do_infix__S_TildeTilde:function(right,swapped){
     if (!swapped) {
         return (right.value || right).do_infix__S_TildeTilde(this,true);
     }
-    return new p6builtin.Bool(this.v.compareTo(new p6builtin.Int(right.toString())) == 0);
+    return new p6builtin.Bool(this.isUndefined ? right instanceof p6builtin.Int
+        : this.v.compareTo(new p6builtin.Int(right.toString())) == 0);
 }
 };
+p6builtin.Int.bigInt = bigInt;
 
 // immutable, boxed JS double
 p6builtin.Num = function(num) {
     var sym;
     switch(sym = Type(num)) {
     case 'string':
-        this.v = Number(num);
+        this.v = Number(new p6builtin.Str(num).toNum().toString());
         break;
     case 'number':
         this.v = num;
         break;
     case 'Num()':
         this.v = num.v;
+        break;
+    case 'BigInteger':
+        this.v = Number(num.toString());
         break;
     default: throw 'unknown Num initializer type: '+sym;
     }
@@ -197,6 +202,13 @@ do_infix__S_BangEqual:function(right){
 },
 negate:function(){
     return new p6builtin.Num(0 - this.v);
+},
+do_infix__S_TildeTilde:function(right,swapped){
+    if (!swapped) {
+        return (right.value || right).do_infix__S_TildeTilde(this,true);
+    }
+    return new p6builtin.Bool(this.isUndefined ? right instanceof p6builtin.Num
+        : this.v == right.v); // they're reduced
 }
 };
 
@@ -289,17 +301,23 @@ do_infix__S_BangEqual:function(right){
 negate:function(){
     return new p6builtin.Rat(this.nu.negate(), this.de);
 },
+do_infix__S_TildeTilde:function(right,swapped){
+    if (!swapped) {
+        return (right.value || right).do_infix__S_TildeTilde(this,true);
+    }
+    return new p6builtin.Bool(this.isUndefined ? right instanceof p6builtin.Rat
+        : (this.de.compareTo(right.de)==0 &&
+        this.nu.compareTo(right.nu)==0)); // they're reduced
+},
 toNum:function(){
     var q = bigInt.nbi(), r = bigInt.nbi();
     this.nu.divRemTo(this.de, q, r);
     if (r.signum() == 0) {
         return new p6builtin.Int(q);
     }
-    var large = bigInt.nbi();
-    large.fromString('10000000000000000000000000000000000',10);
-    return new p6builtin.Num((r.signum() < 0 ? '-' : '') +
-        Number(q.abs().toString() + '.' +
-        r.abs().multiply(large).divide(this.de).toString()));
+    return new p6builtin.Num(((r.signum() < 0 || q.signum() < 0) ? '-' : '') +
+        (Number(+q.abs().toString()) + Number(r.abs().toString())
+            / Number(this.de.toString())).toString());
 }
 };
 
@@ -323,9 +341,12 @@ do_infix__S_TildeTilde:function(right,swapped){
     if (!swapped) {
         return (right.value || right).do_infix__S_TildeTilde(this,true);
     }
-    return new p6builtin.Bool(this.v == right.toBool());
+    return new p6builtin.Bool(this.isUndefined ? right instanceof p6builtin.Bool
+        : this.v == right.toBool());
 }
 };
+
+var DBOX={b:2,B:2,x:16,X:16,o:8,O:8,d:10,D:10};
 
 p6builtin.Str = function(str) {
     this.v = typeof(str)=='string' ? str : str.toString();
@@ -365,7 +386,27 @@ do_infix__S_TildeTilde:function(right,swapped){
     if (!swapped) {
         return (right.value || right).do_infix__S_TildeTilde(this, true);
     }
-    return new p6builtin.Bool(right.toString() == this.v);
+    return new p6builtin.Bool(this.isUndefined ? right instanceof p6builtin.Str
+        : right.toString() == this.v);
+},
+toNum:function(){
+    var res;
+    if (isNaN(res = Number(this.v))) {
+        return (res = /^0([dbox])(\d+)/i.exec(this.v))
+            ? new p6builtin.Int(res[2], DBOX[res[1]])
+            : new p6builtin.Int(this.v);
+    }
+    return Math.floor(res)==res ? new p6builtin.Int(res)
+        : new p6builtin.Num(res);
+},
+toInt:function(){
+    var res;
+    if (isNaN(res = Number(this.v))) {
+        return (res = /^0([dbox])(\d+)/i.exec(this.v))
+            ? new p6builtin.Int(res[2], DBOX[res[1]])
+            : new p6builtin.Int(this.v);
+    }
+    return new p6builtin.Int(res);
 }
 };
 
@@ -592,14 +633,22 @@ function do_die(msg){
 
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
+p6toplevel.die = new p6builtin.jssub(do_die,'die');
 p6toplevel["Bool::True"] = p6toplevel.True = new p6builtin.Bool(true);
 p6toplevel["Bool::False"] = p6toplevel.False = new p6builtin.Bool(false);
-(p6toplevel["Int"] = Derive(p6builtin.Int.prototype)).constructor = p6builtin.Int;
-(p6toplevel["Num"] = Derive(p6builtin.Num.prototype)).constructor = p6builtin.Num;
-(p6toplevel["Str"] = Derive(p6builtin.Str.prototype)).constructor = p6builtin.Str;
-(p6toplevel["Bool"] = Derive(p6builtin.Bool.prototype)).constructor = p6builtin.Bool;
-(p6toplevel["Sub"] = Derive(p6builtin.Sub.prototype)).constructor = p6builtin.Sub;
-(p6toplevel["Rat"] = Derive(p6builtin.Rat.prototype)).constructor = p6builtin.Rat;
+var tmp1;
+(tmp1 = p6toplevel["Int"] = Derive(p6builtin.Int.prototype)).constructor =
+p6builtin.Int; tmp1.isUndefined = true;
+(tmp1 = p6toplevel["Num"] = Derive(p6builtin.Num.prototype)).constructor =
+p6builtin.Num; tmp1.isUndefined = true;
+(tmp1 = p6toplevel["Str"] = Derive(p6builtin.Str.prototype)).constructor =
+p6builtin.Str; tmp1.isUndefined = true;
+(tmp1 = p6toplevel["Bool"] = Derive(p6builtin.Bool.prototype)).constructor =
+p6builtin.Bool; tmp1.isUndefined = true;
+(tmp1 = p6toplevel["Sub"] = Derive(p6builtin.Sub.prototype)).constructor =
+p6builtin.Sub; tmp1.isUndefined = true;
+(tmp1 = p6toplevel["Rat"] = Derive(p6builtin.Rat.prototype)).constructor =
+p6builtin.Rat; tmp1.isUndefined = true;
 
 
 1;

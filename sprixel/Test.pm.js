@@ -8,10 +8,11 @@ function do_ok(expr,msg){
 
 function do_is(left,right,msg){
     say(((this.result = new p6builtin.Bool(
-        left.WHAT()=='Int()' ? left.do_infix__S_EqualEqual(right).v
+        right.WHAT()=='Str()' ? left.toString()==right.v
+      : left.WHAT()=='Int()' ? left.do_infix__S_EqualEqual(right).v
       : (left.WHAT()=='Bool()' && right.toBool) ? left.v === right.toBool().v
       : left.WHAT()=='Str()' ? left.do_infix__S_eq(right).v
-      : false
+      : left.WHAT()=='Num()' ? left.do_infix__S_EqualEqual(right).v : false
     )).v
         ? 'ok '
         : 'nok ') + test_number++ + (msg ? ' - ' + msg : ''));
@@ -19,7 +20,8 @@ function do_is(left,right,msg){
 
 function do_isa_ok(left,right,msg){
     say(((this.result = new p6builtin.Bool(
-        left.WHAT()==right.WHAT()
+        left.WHAT()==((right.WHAT()=='Str()' && !right.isUndefined)
+            ? this.context[right].WHAT() : right.WHAT())
     )).v
         ? 'ok '
         : 'nok ') + test_number++ + (msg ? ' - ' + msg : ''));
