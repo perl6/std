@@ -1,7 +1,7 @@
 .PHONY: check try cat clean distclean purge test
 
 FIXINS=Cursor.pmc LazyMap.pm DEBUG.pm DEBUG.pmc Test.pm CORE.setting NULL.pad \
-std mangle.pl CORE.pad NAME.pm NAME.pmc STASH.pm STASH.pmc vijs ToJS.pm viv
+std mangle.pl CORE.pad NAME.pm NAME.pmc STASH.pm STASH.pmc sprixel.pl ToJS.pm viv
 
 all: $(FIXINS) check lex/STD/termish
 
@@ -12,7 +12,7 @@ snap: $(FIXINS) check lex/STD/termish
 	mkdir snap.new
 	svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
 	cp $(FIXINS)  tryfile STD.pmc *.syml CORE.*.store snap.new
-	@-ln -s ../js snap.new/js
+	@-ln -s ../sprixel snap.new/sprixel
 	-mv lex snap.new
 	-rm -rf snap.old
 	-mv snap snap.old
