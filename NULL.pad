@@ -2,7 +2,7 @@ use 5.010;
 use strict;
 use STASH;
 my $core = STASH::->new(
-    _cf => "NULL.pad:1",
+    _id => "MY:file<NULL.pad>:line(1):pos(0)",
     _file => 'NULL.pad', _line => __LINE__ ,
 );
 

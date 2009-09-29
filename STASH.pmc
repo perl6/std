@@ -5,7 +5,7 @@ sub new {
     my %attrs = @_;
     bless \%attrs, $class;
 }
-sub cf    { return $self->{'_cf'} };
-sub file  { return $self->{'_file'} };
-sub line  { return $self->{'_line'} };
+sub id    { return $_[0]->{'_id'} };
+sub file  { return $_[0]->{'_file'} };
+sub line  { return $_[0]->{'_line'} };
 1;

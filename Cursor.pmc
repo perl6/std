@@ -245,7 +245,7 @@ sub you_were_here {
     $file =~ s/(\.setting)?$/.syml/;
     $file =~ s!.*/!!;
     $::UNIT //= $::YOU_WERE_HERE;
-    $::UNIT->{_SETTINGNAME} = $::UNIT->{'OUTER::'}->cf;
+    $::UNIT->{_SETTINGNAME} = $::UNIT->{'OUTER::'}->id;
     $::UNIT->{_GLOBALish} = $::GLOBAL;
     delete $::UNIT->{'OUTER::'};
     delete $::UNIT->{_GLOBALish}->{'PARENT::'}; # don't want to slurp in CORE
@@ -314,6 +314,20 @@ sub caps { exists $_[0]->{'~CAPS'} ? @{$_[0]->{'~CAPS'}} : () }
 sub chunks { die "unimpl" }
 sub ast { exists $_[0]->{'_ast'} ? $_[0]->{'_ast'} : $_[0]->Str }
 sub make { $_[0]->{'_ast'} = $_[1]; $_[0] }
+
+sub clean_id { my $self = shift;
+    my ($id,$name) = @_;
+    my $file = $::FILE->{name};
+
+    $id .= '::';
+    $id =~ s/^MY:file<CORE.setting>.*?::/CORE::/;
+    $id =~ s/^MY:file<\w+.setting>.*?::/SETTING::/;
+    $id =~ s/:file<\Q$file\E>//;
+    $id =~ s/MY:line\(1\):pos\(0\)/UNIT/;
+    $id =~ s/:pos\(\d+\)//;
+    $id .= "<$name>";
+    $id;
+}
 
 sub list { my $self = shift;
     my @result;
