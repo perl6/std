@@ -418,7 +418,7 @@ toInt:function(){
             ? new p6builtin.Int(res[2], DBOX[res[1] || 'd'])
             : new p6builtin.Int(str);
     }
-    return new p6builtin.Int(res);
+    return new p6builtin.Int(str.replace(/(^[^\.]+).*/, "$1"), 10);
 }
 };
 

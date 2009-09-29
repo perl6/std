@@ -19,6 +19,8 @@ statementlist:function(){
             this.phase = 1;
         } else {
             this.phase = 2;
+            this.len = 1;
+            this.MM = Array(1);
             return [this.do_next = dupe(this.statement), this];
         }
     case 1:
@@ -222,15 +224,6 @@ Concatenation:function(){
                 : a.toString();
     }
     this.result = strings.join('');
-    return [this.invoker];
-},
-Replication:function(){
-    // this is half correct, because "A" x 3 gives "AAA", but it does
-    // exactly the same for "A" xx 3 - should give "A","A","A" 
-    this.result = '';
-    for ( var i=0;  i<this.eval_args[1]; i++ ) {
-        this.result = this.result + this.eval_args[0];
-    }
     return [this.invoker];
 },
 Str:function(){
@@ -560,11 +553,29 @@ Tight_or:function(){
     }
 },
 rad_number:function(){
-    var radix = +this.radix.TEXT;
-    if (radix > 36 || radix < 2)
-        throw 'radix out of range (2..36)';
-    this.result = new p6builtin.Int(this.intpart.TEXT, radix);
-    return [this.invoker];
+    switch(this.phase) {
+    case 0:
+        //throw keys(this.circumfix);
+        this.int_radix = +this.radix.TEXT;
+        if (this.int_radix > 36 || this.int_radix < 2)
+            throw 'radix out of range (2..36)';
+        if (!this.intpart) {
+            this.phase = 1;
+            return [this.do_next = dupe(this.circumfix.semilist), this];
+        }
+        this.result = new p6builtin.Int(this.intpart.TEXT, this.int_radix);
+        return [this.invoker];
+    case 1:
+        var int_str = this.do_next.result.toString();
+        if (/^0[dbox]/i.test(int_str)) {
+            this.result = new p6builtin.Int(
+                new p6builtin.Str(this.do_next.result).toInt().toString(),
+                    this.int_radix);
+        } else {
+            this.result = new p6builtin.Int(int_str, this.int_radix);
+        }
+        return [this.invoker];
+    }
 },
 Symbolic_unary:function(){
     // yes, yes, it currently treats all Symbolic_unary as the negation sign.
@@ -685,7 +696,7 @@ disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
     disp.noun__S_scope_declarator = disp.noun__S_routine_declarator =
     disp.SYMBOL__;
 disp.quote__S_Double_Double = disp.quote__S_Single_Single = disp.NIBBLER__;
-disp.args = disp.arglist = disp.semiarglist = disp.eval_args;
+disp.args = disp.arglist = disp.semiarglist = disp.semilist = disp.eval_args;
 disp.xblock = disp.escape__S_At = disp.escape__S_Dollar = disp.modifier_expr;
 disp.term__S_DotDotDot = disp.comment__S_Sharp = disp.terminator__S_Ly =
     disp.terminator__S_Semi = disp.nibbler = disp.eat_terminator;
@@ -750,7 +761,7 @@ function interp(obj,context) {
             //say(keys(act), act.SYM);
         } else {
             if (global_trace) say('returning to '+act.T);
-            //if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
+            if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
             if (last.invoker && last.invoker===act) {
                 doPostDo(last);
             }

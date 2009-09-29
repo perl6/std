@@ -38,7 +38,7 @@ sub jsind {
 
 sub emit_js {
     my $self = shift;
-    return tps($self,1) unless $self =~ /\(0x/;
+    return tps($self,1) unless ref $self;
     #print("\nat ".ref($self));
     my $last_js_parent = $this_js_parent.'';
     my $text = '';
