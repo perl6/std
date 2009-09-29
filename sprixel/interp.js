@@ -226,6 +226,15 @@ Concatenation:function(){
     this.result = strings.join('');
     return [this.invoker];
 },
+Replication:function(){
+    // this is partly working  - "A" x 3 gives "AAA", but so does
+    // "A" xx 3 - should give "A","A","A"
+    this.result = '';
+    for ( var i=0;  i<this.eval_args[1]; i++ ) {
+        this.result = this.result + this.eval_args[0];
+    }
+    return [this.invoker];
+},
 Str:function(){
     this.result = new p6builtin.Str(this.TEXT);
     return [this.invoker];
