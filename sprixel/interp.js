@@ -825,4 +825,8 @@ function Type(obj){
     }
 }
 
+function filt__(str){
+    return str.replace(/_/g,'');
+}
+
 1;

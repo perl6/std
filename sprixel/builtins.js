@@ -6,7 +6,7 @@ var bigInt = libBigInt;
 p6builtin.Int = function(integer,radix) {
     if (typeof(integer)=='string') {
         this.v = bigInt.nbi();
-        this.v.fromString(integer,+(radix || 10));
+        this.v.fromString(filt__(integer),+(radix || 10));
     } else {
         this.v = integer instanceof bigInt
             ? integer
@@ -398,20 +398,22 @@ do_infix__S_TildeTilde:function(right,swapped){
 },
 toNum:function(){
     var res;
-    if (isNaN(res = Number(this.v))) {
-        return (res = /^0([dbox])(\d+)/i.exec(this.v))
-            ? new p6builtin.Int(res[2], DBOX[res[1]])
-            : new p6builtin.Int(this.v);
+    var str = filt__(this.v);
+    if (isNaN(res = Number(str))) {
+        return (res = /^(?:0([dbox]))(\d+)/i.exec(str))
+            ? new p6builtin.Int(res[2], DBOX[res[1] || 'd'])
+            : new p6builtin.Int(str);
     }
     return Math.floor(res)==res ? new p6builtin.Int(res)
         : new p6builtin.Num(res);
 },
 toInt:function(){
     var res;
-    if (isNaN(res = Number(this.v)) || res.toString()!=this.v) {
-        return (res = /^(?:0([dbox]))?(\d+)/i.exec(this.v))
+    var str = filt__(this.v);
+    if (isNaN(res = Number(str)) || res.toString()!=str) {
+        return (res = /^(?:0([dbox]))?(\d+)/i.exec(str))
             ? new p6builtin.Int(res[2], DBOX[res[1] || 'd'])
-            : new p6builtin.Int(this.v);
+            : new p6builtin.Int(str);
     }
     return new p6builtin.Int(res);
 }

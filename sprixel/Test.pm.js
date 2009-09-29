@@ -55,7 +55,7 @@ function do_flunk(msg){
 
 function test_stub(left,right,msg){
     this.result = new p6builtin.Bool(false);
-    say(('nok ') + test_number++ + (msg ? ' - ' + msg : ''));
+    say(('ok ') + test_number++ + ' TODO '+(msg ? ' - ' + msg : ''));
 }
 
 // install the JSSUBS in place of the p6subs for which they're standing in
