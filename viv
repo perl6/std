@@ -416,31 +416,38 @@ sub indent {
 	my $self = shift;
 	my $match = shift;
 	my $r = hoist($match);
-	my @dot;
-	for my $n ( @{ $match->{nibbles} } ) {
-	    if (ref $n eq 'Str') {
-		push @dot, bless($n,"VAST::Str");
+	if ($match->{nibbles}) {
+	    my @dot;
+	    for my $n ( @{ $match->{nibbles} } ) {
+		if (ref $n eq 'Str') {
+		    push @dot, bless($n,"VAST::Str");
+		}
+		elsif (ref $n eq 'VAST::Str') {
+		    push @dot, $n;
+		}
+		elsif (ref $n eq 'ARRAY') {
+		    push @dot, $n->[0]{_ast};
+		}
+		elsif ($n->{_ast}) {
+		    push @dot, $n->{_ast};
+		}
+		elsif ($n->{EXPR}) {
+		    push @dot, $n->{EXPR}->{_ast};
+		}
+		else {
+		    warn "Oops", ::Dump($n);
+		    exit;
+		}
 	    }
-	    elsif (ref $n eq 'VAST::Str') {
-		push @dot, $n;
-	    }
-	    elsif (ref $n eq 'ARRAY') {
-		push @dot, $n->[0]{_ast};
-	    }
-	    elsif ($n->{_ast}) {
-		push @dot, $n->{_ast};
-	    }
-	    elsif ($n->{EXPR}) {
-		push @dot, $n->{EXPR}->{_ast};
-	    }
-	    else {
-		warn "Oops", ::Dump($n);
-		exit;
-	    }
+	    my $a = $r->{'.'} = \@dot;
+	    $r->{BEG} = $a->[0]->{BEG} // $match->{_from};
+	    $r->{END} = $a->[-1]->{END} // $match->{_pos};
 	}
-	my $a = $r->{'.'} = \@dot;
-	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
-	$r->{END} = $a->[-1]->{END} // $match->{_pos};
+	elsif ($match->{EXPR}) {	# regex?
+	    $r->{'.'} = $match->{EXPR}->{_ast};
+	    $r->{BEG} = $r->{'.'}->{BEG} // $match->{_from};
+	    $r->{END} = $r->{'.'}->{END} // $match->{_pos};
+	}
 
 	my $class = 'VAST::nibbler';
 #	print STDERR ::Dump($r);
