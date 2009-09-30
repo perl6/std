@@ -845,7 +845,7 @@ token statement_control:need {
     |<module_name>
         {{
             my $*SCOPE = 'use';
-            $longname = $<module_name>[*-1]<longname>.Str;
+            $longname = $<module_name>[*-1]<longname>;
             $¢.do_need($longname);
         }}
     ] ** ','
@@ -859,9 +859,9 @@ token statement_control:import {
     [
     || <.spacey> <arglist>
         {{
-            $¢.do_import($<noun>.Str, $<arglist>);
+            $¢.do_import($<noun>, $<arglist>);
         }}
-    || {{ $¢.do_import($<noun>.Str, ''); }}
+    || {{ $¢.do_import($<noun>, ''); }}
     ]
     <.ws>
 }
@@ -874,7 +874,7 @@ token statement_control:use {
     | <version>
     | <module_name>
         {{
-            $longname = $<module_name><longname>.Str;
+            $longname = $<module_name><longname>;
         }}
         [
         || <.spacey> <arglist>
@@ -5091,7 +5091,7 @@ method newpad {
     my $line = self.lineof(self.pos);
     $*CURPAD = STASH.new(
         _file => $*FILE, _line => $line,
-        _id => 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')',
+        _id => ['MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')'],
     );
     $*CURPAD<OUTER::> = $outer if $outer;
     self;
@@ -5246,7 +5246,7 @@ method add_my_name ($n, $d, $p) {
     while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= STASH.new( 'PARENT::' => $curstash.id, _stub => 1, _id => $sid );
+        my $newstash = $curstash.{$pkg} //= STASH.new( 'PARENT::' => $curstash.idref, _stub => 1, _id => [$sid] );
         say "Adding new package $pkg in ", $curstash.id if $*DEBUG +& DEBUG::symtab;
         $curstash = $newstash;
     }
@@ -5300,11 +5300,11 @@ method add_my_name ($n, $d, $p) {
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
-        $*DECLARAND<inpad> = $curstash.id;
+        $*DECLARAND<inpad> = $curstash.idref;
         if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $curstash.{$name};
             $sid ~= "::$name";
-            $*NEWPKG = $curstash.{$name ~ '::'} //= ($p // STASH.new( 'PARENT::' => $curstash.id, _file => $*FILE, _line => self.line, _id => $sid ));
+            $*NEWPKG = $curstash.{$name ~ '::'} //= ($p // STASH.new( 'PARENT::' => $curstash.idref, _file => $*FILE, _line => self.line, _id => [$sid] ));
         }
     }
     self;
@@ -5330,7 +5330,7 @@ method add_our_name ($n) {
     while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= STASH.new('PARENT::' => $curstash.id, _stub => 1, _id => $sid );
+        my $newstash = $curstash.{$pkg} //= STASH.new('PARENT::' => $curstash.idref, _stub => 1, _id => [$sid] );
         $curstash = $newstash;
         say "Adding new package $pkg in $curstash " if $*DEBUG +& DEBUG::symtab;
     }
@@ -5378,11 +5378,11 @@ method add_our_name ($n) {
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
-        $*DECLARAND<inpkg> = $curstash.id;
+        $*DECLARAND<inpkg> = $curstash.idref;
         if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $declaring;
             $sid ~= "::$name";
-            $curstash.{$name ~ '::'} //= STASH.new( 'PARENT::' => $curstash.id, _file => $*FILE, _line => self.line, _id => $sid );
+            $curstash.{$name ~ '::'} //= STASH.new( 'PARENT::' => $curstash.idref, _file => $*FILE, _line => self.line, _id => [$sid] );
         }
     }
     self.add_my_name($n, $declaring, $curstash.{$name ~ '::'}) if $curstash === $*CURPKG;   # the lexical alias
@@ -5416,9 +5416,10 @@ method load_setting ($setting) {
         warn "Internal error: infinite setting loop";
         $*CORE.<OUTER::>:delete;
     }
+    $*CORE.<_id> //= ['CORE'];
     $*GLOBAL = $*CORE.<GLOBAL::> = STASH.new(
         _file => $*FILE, _line => 1,
-        _id => 'GLOBAL',
+        _id => ['GLOBAL'],
     );
     $*CURPKG = $*GLOBAL;
 }

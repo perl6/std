@@ -220,17 +220,17 @@ sub gettrait {
 }
 
 sub set_export {
-        my $self = shift;
-        my $text = shift;
-        my $name = $::DECLARAND->{name};
-        my $xpad = $::DECLARAND->{xpad};
-        $::DECLARAND->{export} = $text;
-        my $x = $xpad->{'EXPORT::'} //= STASH::->new( 'PARENT::' => $::CURPAD );
-        $x->{$text} //= STASH::->new( 'PARENT::' => $x );
-        $x->{$text}->{$name} = $::DECLARAND;
-        $x->{$text}->{'&'.$name} = $::DECLARAND
-                if $name =~ /^\w/ and $::SCOPE ne 'constant';
-        $self;
+    my $self = shift;
+    my $text = shift;
+    my $name = $::DECLARAND->{name};
+    my $xpad = $::DECLARAND->{xpad};
+    $::DECLARAND->{export} = $text;
+    my $x = $xpad->{'EXPORT::'} //= STASH::->new( 'PARENT::' => $::CURPAD );
+    $x->{$text} //= STASH::->new( 'PARENT::' => $x );
+    $x->{$text}->{$name} = $::DECLARAND;
+    $x->{$text}->{'&'.$name} = $::DECLARAND
+            if $name =~ /^\w/ and $::SCOPE ne 'constant';
+    $self;
 }
 
 sub you_are_here {
@@ -245,7 +245,8 @@ sub you_were_here {
     $file =~ s/(\.setting)?$/.syml/;
     $file =~ s!.*/!!;
     $::UNIT //= $::YOU_WERE_HERE;
-    $::UNIT->{_SETTINGNAME} = $::UNIT->{'OUTER::'}->id;
+    my $id = $::UNIT->{'OUTER::'}->id;
+    $::UNIT->{_SETTINGNAME} = $id // '???';
     $::UNIT->{_GLOBALish} = $::GLOBAL;
     delete $::UNIT->{'OUTER::'};
     delete $::UNIT->{_GLOBALish}->{'PARENT::'}; # don't want to slurp in CORE
@@ -1099,7 +1100,8 @@ sub add_enum { my $self = shift;
 }
 
 sub do_need { my $self = shift;
-    my $module = shift;
+    my $m = shift;
+    my $module = $m->Str;
     my $topsym;
     my $lib = '.';
     my $std = -x 'std' ? './std' : 'std';
@@ -1120,16 +1122,27 @@ sub do_need { my $self = shift;
         $self->worry("Can't locate module $module");
     }
     $self->add_my_name($module);
-    $::DECLARAND{pkg} = $topsym;
+    $::DECLARAND->{really} = $topsym;
     $self;
 }
 
 sub do_import { my $self = shift;
-    my $module = shift;
+    my $m = shift;
     my $args = shift;
     my @imports;
+    my $module = $m->Str;
+    if ($module =~ /(class|module|role|package)\s+(\S+)/) {
+        $module = $2;
+    }
 
     my $pkg = $self->find_stash($module);
+    if ($pkg->{really}) {
+        $pkg = $pkg->{really};
+    }
+    else {
+        use YAML::XS;
+#        warn Dump($pkg);
+    }
     if ($args) {
         my $text = $args->Str;
         return $self unless $text;
@@ -1187,54 +1200,7 @@ sub do_use { my $self = shift;
     my @imports;
 
     $self->do_need($module);
-    my $pkg = $::DECLARAND{pkg};
-    if ($args) {
-        my $text = $args->Str;
-        return $self unless $text;
-        while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
-            my $scope = lc($1) || 'my';
-            my $imports = $2;
-            local $::SCOPE = $scope;
-            @imports = split ' ', $imports;
-            for (@imports) {
-                local $::DECLARAND;
-                if ($pkg) {
-                    if ($_ =~ s/^://) {
-                        my @tagimports;
-                        eval { @tagimports = keys %{ $pkg->{'EXPORT::'}->{$_} }; };
-                        $self->do_import_aliases($pkg, @tagimports);
-                    }
-                    elsif ($pkg->{$_}{export}) {
-                        $::DECLARAND = $pkg->{$_};
-                    }
-                    elsif ($pkg->{'&'.$_}{export}) {
-                        $::DECLARAND = $pkg->{'&'.$_};
-                    }
-                    elsif ($pkg->{$_}) {
-                        $self->worry("Can't import $_ because it's not exported by $module");
-                        next;
-                    }
-                }
-                if (/^\w/) {
-                    if (/::/) {
-                        $self->add_name($_);
-                    }
-                    else {
-                        $self->add_routine($_);
-                    }
-                }
-                else {
-                    $self->add_variable($_);
-                }
-            }
-        }
-    }
-    else {
-        return $self unless $pkg;
-        eval { @imports = keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }; };
-        local $::SCOPE = 'my';
-        $self->do_import_aliases($pkg, @imports);
-    }
+    $self->do_import($module,$args);
     $self;
 }
 

@@ -3,6 +3,7 @@ use STASH;
 use NAME;
 my $file = { name => 'CORE.pad' };
 my $core = STASH::->new( _file => $file, _line => __LINE__,
+    _id => ['MY:file<CORE.pad>'];
     Bool => NAME::->new( name => 'Bool', file => $file, line => __LINE__ ),
     'Bool::' => STASH::->new( _file => $file, _line => __LINE__,
 	True => NAME::->new( name => 'True', file => $file, line => __LINE__ ),
