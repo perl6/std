@@ -309,6 +309,10 @@ END
 
         if ( s/^(#line.*\n)// ) { next }
 	if ( s/^([ \t]*\n)// ) { $out .= $1; next; };
+        if ( /^method EXPR / ) { $out .= <<'END'; }
+sub EXPR__PEEK { $_[0]->_AUTOLEXpeek('EXPR',$retree) }
+END
+
 
 	if (s/^ [\x20\t]* (=begin \s+ (\w+) .*? \n [\x20\t]* =end \s+ \2 .*? \n) //sx) {
 	    my $c = $1;
