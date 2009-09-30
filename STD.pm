@@ -3221,6 +3221,7 @@ $¢.panic("Can't put optional positional parameter after variadic parameters");
 }
 
 rule default_value {
+    :my $*IN_DECL = 0;
     '=' <EXPR(item %item_assignment)>
 }
 
