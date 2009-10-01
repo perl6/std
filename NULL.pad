@@ -1,9 +1,10 @@
 use 5.010;
 use strict;
 use STASH;
+my $id = "MY:file<NULL.pad>:line(1):pos(0)";
 my $core = STASH::->new(
-    _id => ["MY:file<NULL.pad>:line(1):pos(0)"],
-    _file => 'NULL.pad', _line => __LINE__ ,
+    '!id' => [$id],
+    '!file' => 'NULL.pad', '!line' => __LINE__ ,
 );
 
 sub fixup {
@@ -19,7 +20,7 @@ sub fixup {
 	}
     }
     for my $k (keys %$stash) {
-	next if $k =~ /^\_/;
+	next if $k =~ /^\!/;
 	my $v = $stash->{$k};
 	if ($v->{export}) {
 	    $stash->{'EXPORT::'}->{ '$v->{export}' . '::' }->{$k} = $v;
@@ -27,4 +28,11 @@ sub fixup {
     }
 }
 fixup($core);
-$core;
+my $ALL = {
+    'CORE' => $core,
+    'MY:file<NULL.pad>' => $core,
+    'SETTING' => $core,
+    $id => $core,
+
+};
+$ALL;

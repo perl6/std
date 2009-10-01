@@ -1,9 +1,10 @@
+my $id = 'MY:file<CORE.pad>:line(1):pos(0)';
 use strict;
 use STASH;
 use NAME;
 my $file = { name => 'CORE.pad' };
 my $core = STASH::->new( _file => $file, _line => __LINE__,
-    _id => ['MY:file<CORE.pad>'];
+    '!id' => [$id];
     Bool => NAME::->new( name => 'Bool', file => $file, line => __LINE__ ),
     'Bool::' => STASH::->new( _file => $file, _line => __LINE__,
 	True => NAME::->new( name => 'True', file => $file, line => __LINE__ ),
@@ -376,7 +377,7 @@ sub fixup {
 	}
     }
     for my $k (keys %$stash) {
-	next if $k =~ /^_/;
+	next if $k =~ /^!/;
 	my $v = $stash->{$k};
 	if ($v->{export}) {
 	    $stash->{'EXPORT::'}{$v->{export}}{$k} = $v;
@@ -384,4 +385,9 @@ sub fixup {
     }
 }
 fixup($core);
-$core;
+my $ALL = {
+    'CORE' => $core,
+    'SETTING' => $core,
+    $id => $core,
+};
+$ALL;

@@ -14,6 +14,7 @@ my $*HIGHMESS;       # current parse failure message
 my $*HIGHEXPECT;     # things we were looking for at the bleeding edge
 
 # symbol table management
+our $ALL;            # all the stashes, keyed by id
 my $*CORE;            # the CORE scope
 my $*SETTING;         # the SETTING scope
 my $*GLOBAL;          # the GLOBAL scope
@@ -21,7 +22,6 @@ my $*PROCESS;         # the PROCESS scope
 my $*UNIT;            # the UNIT scope
 my $*CURPAD;      # current lexical scope
 my $*CURPKG;          # current package scope
-my $*PKGNAME = "";    # full package name of package assoc with current lexical scope
 
 my %*MYSTERY;     # names we assume may be post-declared functions
 
@@ -535,7 +535,6 @@ rule comp_unit {
     :my $*endargs = -1;
     :my %*LANG;
     :my $*PKGDECL ::= "";
-    :my $*PKGNAME = "GLOBAL";
     :my $*IN_DECL;
     :my $*DECLARAND;
     :my $*NEWPKG;
@@ -564,11 +563,11 @@ rule comp_unit {
         self.load_setting($*SETTINGNAME);
         self.newpad;
         $*UNIT = $*CURPAD;
+        $ALL.<UNIT> = $*UNIT;
         self.finishpad(1);
     }}
     <statementlist>
     [ <?unitstopper> || <.panic: "Confused"> ]
-#    { $<CORE> = $*CORE; }
     # "CHECK" time...
     {{
         if @*WORRIES {
@@ -1176,20 +1175,17 @@ rule package_def {
         || <?before '{'>
             [
             :temp $*CURPKG;
-            :temp $*PKGNAME;
             {{
                 # figure out the actual full package name (nested in outer package)
                 if $longname and $*NEWPKG {
                     my $shortname = $longname.<name>.Str;
                     if $*SCOPE eq 'our' {
-                        $*PKGNAME = $*CURPKG.id ~ '::' ~ $shortname;
                         $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                        say "adding " ~ $*CURPKG.id ~ " " ~ $*PKGNAME if $*DEBUG +& DEBUG::symtab;
+                        say "added our " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
                     }
                     else {
-                        $*PKGNAME = $*CURPAD.id ~ '::' ~ $shortname;
                         $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                        say "adding " ~ $*CURPKG.id ~ " " ~ $*PKGNAME if $*DEBUG +& DEBUG::symtab;
+                        say "added my " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
                     }
                 }
             }}
@@ -1202,9 +1198,20 @@ rule package_def {
                 {{
                     $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                     my $shortname = $longname.<name>.Str;
-                    $*PKGNAME = $shortname;
                     $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
                     $*begin_compunit = 0;
+
+                    # throw out null core when compiling the real CORE
+                    if $shortname eq 'CORE' and $*CORE.id ~~ /NULL/ {
+                        $*UNIT<OUTER::> = [''];
+                        $*CORE = $*UNIT;
+                        $*SETTING = $*UNIT;
+                        $ALL = {
+                            CORE => $*UNIT,
+                            SETTING => $*UNIT,
+                            $*UNIT.id => $*UNIT,
+                        };
+                    }
                 }}
                 {*}                                                     #= semi
             || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
@@ -5088,13 +5095,16 @@ use NAME;
 use STASH;
 
 method newpad {
-    my $outer = $*CURPAD;
+    my $oid = $*CURPAD.id;
+    $ALL.{$oid} === $*CURPAD or die "internal error: current pad id is invalid";
     my $line = self.lineof(self.pos);
+    my $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
     $*CURPAD = STASH.new(
-        _file => $*FILE, _line => $line,
-        _id => ['MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')'],
+        'OUTER::' => [$oid],
+        '!file' => $*FILE, '!line' => $line,
+        '!id' => [$id],
     );
-    $*CURPAD<OUTER::> = $outer if $outer;
+    $ALL.{$id} = $*CURPAD;
     self;
 }
 
@@ -5106,7 +5116,7 @@ method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
     if not $siggy {
         $*CURPAD<@_> = NAME.new( name => '@_', file => $*FILE, line => $line );
         $*CURPAD<%_> = NAME.new( name => '%_', file => $*FILE, line => $line );
-        $*CURPAD<$?GOTSIG> = '';
+        $*CURPAD<$?GOTSIG>:delete;
     }
     self;
 }
@@ -5147,7 +5157,8 @@ method is_name ($n, $curpad = $*CURPAD) {
             say "Found $name in ", $pad.id if $*DEBUG +& DEBUG::symtab;
             return True;
         }
-        $pad = $pad.<OUTER::>;
+        my $oid = $pad.<OUTER::>[0] || last;
+        $pad = $ALL.{$oid};
     }
     return True if $curpkg.{$name};
     return True if $*GLOBAL.{$name};
@@ -5159,37 +5170,37 @@ method find_stash ($n, $curpad = $*CURPAD) {
     my $name = $n;
     say "find_stash $name" if $*DEBUG +& DEBUG::symtab;
 
-    my $curpkg = $*CURPKG;
     return () if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
         return () if @components[0] eq 'COMPILING::';
         return () if @components[0] eq 'CALLER::';
         return () if @components[0] eq 'CONTEXT::';
-        if $curpkg = self.find_top_pkg(@components[0]) {
+        if $curpad = self.find_top_pkg(@components[0]) {
             say "Found lexical package ", @components[0] if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
             say "Looking for GLOBAL::<$name>" if $*DEBUG +& DEBUG::symtab;
-            $curpkg = $*GLOBAL;
+            $curpad = $*GLOBAL;
         }
         while @components > 1 {
-            my $pkg = shift @components;
-            $curpkg = $curpkg.{$pkg};
-            return () unless $curpkg;
-            say "Found $pkg okay" if $*DEBUG +& DEBUG::symtab;
+            my $pad = shift @components;
+            $curpad = $curpad.{$pad};
+            return () unless $curpad;
+            say "Found $pad okay" if $*DEBUG +& DEBUG::symtab;
         }
     }
     $name = shift(@components)//'';
-    return () if $name eq '';
+    return $curpad if $name eq '';
 
     my $pad = $curpad;
     while $pad {
         return $_ if $_ = $pad.{$name};
-        $pad = $pad.<OUTER::>;
+        my $oid = $pad.<OUTER::>[0] || last;
+        $pad = $ALL.{$oid};
     }
-    return $_ if $_ = $curpkg.{$name};
+    return $_ if $_ = $curpad.{$name};
     return $_ if $_ = $*GLOBAL.{$name};
     return ();
 }
@@ -5215,14 +5226,15 @@ method find_top_pkg ($name) {
     my $pad = $*CURPAD;
     while $pad {
         return $pad.{$name} if $pad.{$name};
-        $pad = $pad.<OUTER::>;
+        my $oid = $pad.<OUTER::>[0] || last;
+        $pad = $ALL.{$oid};
     }
     return 0;
 }
 
 method add_name ($name) {
     my $scope = $*SCOPE || 'my';
-    say "Adding $scope $name in $*PKGNAME" if $*DEBUG +& DEBUG::symtab;
+    say "Adding $scope $name" if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
     }
@@ -5239,7 +5251,7 @@ method add_name ($name) {
 
 method add_my_name ($n, $d, $p) {
     my $name = $n;
-    say "add_my_name $name" if $*DEBUG +& DEBUG::symtab;
+    say "add_my_name $name in ", $*CURPAD.id if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPAD;
     my @components = self.canonicalize_name($name);
@@ -5247,7 +5259,10 @@ method add_my_name ($n, $d, $p) {
     while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= STASH.new( 'PARENT::' => $curstash.idref, _stub => 1, _id => [$sid] );
+        my $newstash = $curstash.{$pkg} //= STASH.new(
+            'PARENT::' => $curstash.idref,
+            '!stub' => 1,
+            '!id' => [$sid] );
         say "Adding new package $pkg in ", $curstash.id if $*DEBUG +& DEBUG::symtab;
         $curstash = $newstash;
     }
@@ -5305,7 +5320,10 @@ method add_my_name ($n, $d, $p) {
         if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $curstash.{$name};
             $sid ~= "::$name";
-            $*NEWPKG = $curstash.{$name ~ '::'} //= ($p // STASH.new( 'PARENT::' => $curstash.idref, _file => $*FILE, _line => self.line, _id => [$sid] ));
+            $*NEWPKG = $curstash.{$name ~ '::'} //= ($p // STASH.new(
+                'PARENT::' => $curstash.idref,
+                '!file' => $*FILE, '!line' => self.line,
+                '!id' => [$sid] ));
         }
     }
     self;
@@ -5313,7 +5331,7 @@ method add_my_name ($n, $d, $p) {
 
 method add_our_name ($n) {
     my $name = $n;
-    say "add_our_name $name " ~ $*PKGNAME if $*DEBUG +& DEBUG::symtab;
+    say "add_our_name $name in " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPKG;
     say "curstash $curstash global $GLOBAL ", join ' ', %$*GLOBAL if $*DEBUG +& DEBUG::symtab;
@@ -5331,7 +5349,10 @@ method add_our_name ($n) {
     while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= STASH.new('PARENT::' => $curstash.idref, _stub => 1, _id => [$sid] );
+        my $newstash = $curstash.{$pkg} //= STASH.new(
+            'PARENT::' => $curstash.idref,
+            '!stub' => 1,
+            '!id' => [$sid] );
         $curstash = $newstash;
         say "Adding new package $pkg in $curstash " if $*DEBUG +& DEBUG::symtab;
     }
@@ -5383,7 +5404,10 @@ method add_our_name ($n) {
         if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $declaring;
             $sid ~= "::$name";
-            $curstash.{$name ~ '::'} //= STASH.new( 'PARENT::' => $curstash.idref, _file => $*FILE, _line => self.line, _id => [$sid] );
+            $curstash.{$name ~ '::'} //= STASH.new(
+                'PARENT::' => $curstash.idref,
+                '!file' => $*FILE, '!line' => self.line,
+                '!id' => [$sid] );
         }
     }
     self.add_my_name($n, $declaring, $curstash.{$name ~ '::'}) if $curstash === $*CURPKG;   # the lexical alias
@@ -5405,22 +5429,17 @@ method add_mystery ($name,$pos,$ctx) {
 }
 
 method load_setting ($setting) {
-    $*SETTING = self.load_pad($setting);
+    $ALL = self.load_pad($setting);
+
+    $*CORE = $ALL<CORE>;
+    $*CORE.<!id> //= ['CORE'];
+
+    $*SETTING = $ALL<SETTING>;
     $*CURPAD = $*SETTING;
-    $*CORE = $*SETTING;
-    for 1..100 {
-        my $outerer = $*CORE.<OUTER::>;
-        last unless $outerer;
-        $*CORE = $outerer;
-    }
-    if $*CORE.<OUTER::> {
-        warn "Internal error: infinite setting loop";
-        $*CORE.<OUTER::>:delete;
-    }
-    $*CORE.<_id> //= ['CORE'];
+
     $*GLOBAL = $*CORE.<GLOBAL::> = STASH.new(
-        _file => $*FILE, _line => 1,
-        _id => ['GLOBAL'],
+        '!file' => $*FILE, '!line' => 1,
+        '!id' => ['GLOBAL'],
     );
     $*CURPKG = $*GLOBAL;
 }
@@ -5479,8 +5498,9 @@ method is_known ($n, $curpad = $*CURPAD) {
             }
             return True;
         }
-        say $pad.<OUTER::> // "No OUTER" if $*DEBUG +& DEBUG::symtab;
-        $pad = $pad.<OUTER::>;
+        my $oid = $pad.<OUTER::>[0] || last;
+        say $oid // "No OUTER" if $*DEBUG +& DEBUG::symtab;
+        $pad = $ALL.{$oid};
         $outer++;
     }
     say "Not Found" if $*DEBUG +& DEBUG::symtab;
@@ -5596,7 +5616,7 @@ method lookup_compiler_var($name) {
         when '$?ROLE'     { return $*CURPKG; } #  XXX should scan
         when '$?GRAMMAR'  { return $*CURPKG; } #  XXX should scan
 
-        when '$?PACKAGENAME' { return $*PKGNAME; }
+        when '$?PACKAGENAME' { return $*CURPKG.id }
 
         when '$?OS'       { return 'unimpl'; }
         when '$?DISTRO'   { return 'unimpl'; }

@@ -5,8 +5,8 @@ sub new {
     my %attrs = @_;
     bless \%attrs, $class;
 }
-sub idref    { return $_[0]->{'_id'} };
-sub id    { return $_[0]->{'_id'}->[0] };
-sub file  { return $_[0]->{'_file'} };
-sub line  { return $_[0]->{'_line'} };
+sub idref    { return $_[0]->{'!id'} };
+sub id    { return $_[0]->{'!id'}->[0] // '???' };
+sub file  { return $_[0]->{'!file'} };
+sub line  { return $_[0]->{'!line'} };
 1;
