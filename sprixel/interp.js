@@ -141,6 +141,7 @@ statement_control__S_loop:function(){
     switch(this.phase) {
     case 0:
         this.phase = 1;
+        this.catch_next = this.catch_last = true;
         //this.context = new Scope(this.context); // derive scope for ctrl exprs
         this.loop_block = null;
         this.result = new p6builtin.List();
@@ -175,6 +176,11 @@ statement_control__S_loop:function(){
             return [this.do_next = dupe(this.eee.e3), this];
         }
         return [this]; // special, trampoline to myself!
+    case 13: // interrupt "last"
+        return [this.invoker];
+    case 15: // interrupt "next"
+        this.phase = 3;
+        return [this];
     }
 },
 modifier_expr:function(){
@@ -877,7 +883,10 @@ function interp(obj,context) {
                 if (last.result instanceof p6builtin.jssub && last.eval_args) {
                     if (continuation // must be a built-in op that is flattened
                             = last.result.func.apply(last, last.eval_args)) {
-                        continuation.invoker = act;
+                        if (!continuation.invoker) {
+                            // sometimes the invoker is set by the subroutine
+                            continuation.invoker = act;
+                        }
                         continuation.context = act.context;
                         continuation.last_op = last;
                         act = continuation;

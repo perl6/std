@@ -671,10 +671,34 @@ function do_map(block,list){
     };
 }
 
+function do_last(){
+    var parent = this;
+    while(typeof(parent = parent.invoker)!='undefined' && parent!==null) {
+        if (parent.catch_last) {
+            parent.phase = 13;
+            return parent;
+        }
+    }
+    throw 'last() not inside an iteration block';
+}
+
+function do_next(){
+    var parent = this;
+    while(typeof(parent = parent.invoker)!='undefined' && parent!==null) {
+        if (parent.catch_last) {
+            parent.phase = 15;
+            return parent;
+        }
+    }
+    throw 'last() not inside an iteration block';
+}
+
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
 p6toplevel.map = new p6builtin.jssub(do_map,'map');
 p6toplevel.die = new p6builtin.jssub(do_die,'die');
+p6toplevel.next = new p6builtin.jssub(do_next,'next');
+p6toplevel.last = new p6builtin.jssub(do_last,'last');
 p6toplevel["Bool::True"] = p6toplevel.True = new p6builtin.Bool(true);
 p6toplevel["Bool::False"] = p6toplevel.False = new p6builtin.Bool(false);
 var tmp1;
