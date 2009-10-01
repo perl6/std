@@ -33,6 +33,7 @@ my $*SCOPE = "";      # (d) which scope declarator we're under
 my $*MULTINESS;       # (d) which multi declarator we're under
 my $*PKGDECL ::= "";         # (d) current package declarator
 my $*NEWPKG;      # (u/d) new package being declared
+my $*NEWPAD;      # (u/d) new lexpad being declared
 my $*DECLARAND;   # (u/d) new object associated with declaration
 
 my $*GOAL ::= "(eof)";  # (d) which special terminator we're most wanting
@@ -538,6 +539,7 @@ rule comp_unit {
     :my $*IN_DECL;
     :my $*DECLARAND;
     :my $*NEWPKG;
+    :my $*NEWPAD;
     :my $*QSIGIL ::= '';
     :my $*IN_META = 0;
     :my $*QUASIMODO;
@@ -1162,6 +1164,7 @@ rule package_def {
     :my $*IN_DECL = 1;
     :my $*DECLARAND;
     :my $*NEWPKG;
+    :my $*NEWPAD;
     { $*SCOPE ||= 'our'; }
     [
         [
@@ -5097,14 +5100,23 @@ use STASH;
 
 method newpad {
     my $oid = $*CURPAD.id;
-    $ALL.{$oid} === $*CURPAD or die "internal error: current pad id is invalid";
+#    $ALL.{$oid} === $*CURPAD or die "internal error: current pad id is invalid";
     my $line = self.lineof(self.pos);
-    my $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
-    $*CURPAD = STASH.new(
-        'OUTER::' => [$oid],
-        '!file' => $*FILE, '!line' => $line,
-        '!id' => [$id],
-    );
+    my $id;
+    if $*NEWPAD {
+        $*NEWPAD.<OUTER::> = $*CURPAD.idref;
+        $*CURPAD = $*NEWPAD;
+        $*NEWPAD = 0;
+        $id = $*CURPAD.id;
+    }
+    else {
+        $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
+        $*CURPAD = STASH.new(
+            'OUTER::' => [$oid],
+            '!file' => $*FILE, '!line' => $line,
+            '!id' => [$id],
+        );
+    }
     $ALL.{$id} = $*CURPAD;
     self;
 }
@@ -5318,10 +5330,11 @@ method add_my_name ($n, $d, $p) {
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
         $*DECLARAND<inpad> = $curstash.idref;
-        if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
+        $*DECLARAND<const> ||= 1 if $*SCOPE eq 'constant';
+        if !$*DECLARAND<const> and $name ~~ /^\w+$/ {
             $curstash.{"&$name"} //= $curstash.{$name};
             $sid ~= "::$name";
-            $*NEWPKG = $curstash.{$name ~ '::'} //= ($p // STASH.new(
+            $*NEWPAD = $curstash.{$name ~ '::'} //= ($p // STASH.new(
                 'PARENT::' => $curstash.idref,
                 '!file' => $*FILE, '!line' => self.line,
                 '!id' => [$sid] ));
@@ -5405,7 +5418,7 @@ method add_our_name ($n) {
         if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
             $curstash.{"&$name"} //= $declaring;
             $sid ~= "::$name";
-            $curstash.{$name ~ '::'} //= STASH.new(
+            $*NEWPAD = $curstash.{$name ~ '::'} //= STASH.new(
                 'PARENT::' => $curstash.idref,
                 '!file' => $*FILE, '!line' => self.line,
                 '!id' => [$sid] );

@@ -15,6 +15,7 @@ require 'mangle.pl';
 
 our $CTX = '';
 our $DEBUG = 0 + ($ENV{STD5DEBUG} // 0);
+$::DEBUG //= 0;
 our %LEXERS;       # per language, the cache of lexers, keyed by rule name
 our %FATECACHE; # fates we've already turned into linked lists
 my %lexer_cache = ();
@@ -38,10 +39,9 @@ package Cursor;
 
 use Carp;
 use File::Copy;
-
-# $SIG{__DIE__} = sub { confess(@_) };
-
-use LazyMap qw(lazymap eager);
+use YAML::Syck;
+use Storable;
+use Encode;
 
 use Term::ANSIColor;
 our $BLUE = color 'blue';
@@ -52,16 +52,9 @@ our $YELLOW = color 'yellow';
 our $RED = color 'red';
 our $CLEAR = color 'clear';
 
-sub deb { my $self = shift;
-    my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
-    print ::LOG $pos,'/',$self->lineof($pos), "\t", $CTX, ' ', @_, "\n";
-}
-
-$::DEBUG //= 0;
+use LazyMap qw(lazymap eager);
 
 use Moose ':all' => { -prefix => 'moose_' };
-
-use Encode;
 
 our %AUTOLEXED;
 our $ALT;
@@ -84,6 +77,86 @@ BEGIN {
     }
     binmode(::LOG, ":utf8");
 }
+
+#############################################################
+# Cursor Accessors
+#############################################################
+
+sub _PARAMS {}  # overridden in parametric role packages
+
+sub from { $_[0]->{_from} // $_[0]->{_pos} }
+sub to { $_[0]->{_pos} }
+sub pos { $_[0]->{_pos} }
+sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
+sub Str { no warnings; exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from})//'' : '' }
+sub peek { $_[0]->{_peek} }
+sub orig { \$::ORIG }
+sub WHAT { ref $_[0] || $_[0] }
+
+sub item { $_[0] }
+sub caps { exists $_[0]->{'~CAPS'} ? @{$_[0]->{'~CAPS'}} : () }
+sub chunks { die "unimpl" }
+sub ast { exists $_[0]->{'_ast'} ? $_[0]->{'_ast'} : $_[0]->Str }
+sub make { $_[0]->{'_ast'} = $_[1]; $_[0] }
+
+sub list { my $self = shift;
+    my @result;
+    # can't just do this in numerical order because some might be missing
+    # and we don't know the max
+    for my $k (keys %$self) {
+        $result[$k] = $self->{$k} if $k =~ /^\d/;
+    }
+    \@result;
+}
+
+sub hash { my $self = shift;
+    my %result;
+    for my $k (keys %$self) {
+        $result{$k} = $self->{$k} if $k !~ /^[_\d~]/;
+    }
+    \%result;
+}
+
+sub deb { my $self = shift;
+    my $pos = ref $self && defined $self->{_pos} ? $self->{_pos} : "?";
+    print ::LOG $pos,'/',$self->lineof($pos), "\t", $CTX, ' ', @_, "\n";
+}
+
+sub clean {
+    my $self = shift;
+    delete $self->{_fate};
+    delete $self->{_pos};       # EXPR blows up without this for some reason
+    delete $self->{_reduced};
+    for my $k (values %$self) {
+        next unless ref $k;
+        if (ref $k eq 'ARRAY') {
+            for my $k2 (@$k) {
+                eval {
+                    $k2->clean if ref $k2;
+                }
+            }
+        }
+        else {
+            eval {
+                $k->clean;
+            }
+        }
+    }
+    $self;
+}
+
+sub dump {
+    my $self = shift;
+    my %copy = %$self;
+    delete $copy{_reduced};
+    delete $copy{_fate};
+    my $text = STD::Dump(\%copy);
+    $text;
+}
+
+#############################################################
+# Setup/Teardown
+#############################################################
 
 sub new {
     my $class = shift;
@@ -189,50 +262,6 @@ sub load_yaml_pad {
     $PADS{$setting};
 }
 
-sub gettrait {
-    my $self = shift;
-    my $traitname = shift;
-    my $param = shift;
-    my $text;
-    if (@$param) {
-        $text = $param->[0]->Str;
-        $text =~ s/^<(.*)>$/$1/ or
-        $text =~ s/^\((.*)\)$/$1/;
-    }
-    if ($traitname eq 'export') {
-        if (defined $text) {
-            $text =~ s/://g;
-        }
-        else {
-            $text = 'DEFAULT';
-        }
-        $self->set_export($text);
-        $text;
-    }
-    elsif (defined $text) {
-        $text;
-    }
-    else {
-        1;
-    }
-}
-
-sub set_export {
-    my $self = shift;
-    my $text = shift;
-    my $textpkg = $text . '::';
-    my $name = $::DECLARAND->{name};
-    my $xpad = delete $::DECLARAND->{xpad};
-    $::DECLARAND->{export} = $text;
-    my $sid = $::CURPAD->idref;
-    my $x = $xpad->{'EXPORT::'} //= STASH::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
-    $x->{$textpkg} //= STASH::->new( 'PARENT::' => $x->idref, '!id' => [$sid->[0] . '::EXPORT::' . $text] );
-    $x->{$textpkg}->{$name} = $::DECLARAND;
-    $x->{$textpkg}->{'&'.$name} = $::DECLARAND
-            if $name =~ /^\w/ and $::SCOPE ne 'constant';
-    $self;
-}
-
 sub you_are_here {
     my $self = shift;
     $::YOU_WERE_HERE = $::CURPAD;
@@ -263,400 +292,6 @@ sub you_were_here {
     $self;
 }
 
-sub mixin {
-    my $self = shift;
-    my $WHAT = ref($self)||$self;
-    my @mixins = @_;
-
-    my $NEWWHAT = $WHAT . '::';
-    my @newmix;
-    for my $mixin (@mixins) {
-        my $ext = ref($mixin) || $mixin;
-        push @newmix, $ext;
-        $ext =~ s/(\w)\w*::/$1/g;       # just looking for a "cache" key, really
-        $NEWWHAT .= '_X_' . $ext;
-    }
-    $self->deb("mixin $NEWWHAT from $WHAT @newmix") if $DEBUG & DEBUG::mixins;
-    no strict 'refs';
-    if (not exists &{$NEWWHAT.'::meta'}) {              # never composed this one yet?
-        # fake up mixin with MI, being sure to put "roles" in front
-        my $eval = "package $NEWWHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$WHAT'); moose_with(" . join(',', map {"'$_'"} @newmix) . ");our \$CATEGORY = '.';\n";
-        $self->deb($eval) if $DEBUG & DEBUG::mixins;
-        eval $eval;
-        warn $@ if $@;
-    }
-    return $self->cursor_fresh($NEWWHAT);
-}
-
-sub tweak {
-    my $self = shift;
-    my $class = ref $self;
-    no strict 'refs';
-    for (;;) {
-        my $retval = eval {
-            $self->deb("Calling $class" . '::multitweak') if $DEBUG & DEBUG::mixins;
-            &{$class . '::multitweak'}($self,@_);
-        }; 
-        return $retval if $retval;
-        die $@ unless $@ =~ /^NOMATCH|^Undefined subroutine/;
-        last unless $class =~ s/(.*)::.*/$1/;
-    }
-}
-
-sub _PARAMS {}  # overridden in parametric role packages
-
-use YAML::Syck;
-use Storable;
-
-sub from { $_[0]->{_from} // $_[0]->{_pos} }
-sub to { $_[0]->{_pos} }
-sub pos { $_[0]->{_pos} }
-sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
-sub Str { no warnings; exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from})//'' : '' }
-sub peek { $_[0]->{_peek} }
-sub orig { \$::ORIG }
-sub WHAT { ref $_[0] || $_[0] }
-
-sub item { $_[0] }
-sub caps { exists $_[0]->{'~CAPS'} ? @{$_[0]->{'~CAPS'}} : () }
-sub chunks { die "unimpl" }
-sub ast { exists $_[0]->{'_ast'} ? $_[0]->{'_ast'} : $_[0]->Str }
-sub make { $_[0]->{'_ast'} = $_[1]; $_[0] }
-
-sub clean_id { my $self = shift;
-    my ($id,$name) = @_;
-    my $file = $::FILE->{name};
-
-    $id .= '::';
-    $id =~ s/^MY:file<CORE.setting>.*?::/CORE::/;
-    $id =~ s/^MY:file<\w+.setting>.*?::/SETTING::/;
-    $id =~ s/:file<\Q$file\E>//;
-    $id =~ s/MY:line\(1\):pos\(0\)/UNIT/;
-    $id =~ s/:pos\(\d+\)//;
-    $id .= "<$name>";
-    $id;
-}
-
-sub list { my $self = shift;
-    my @result;
-    # can't just do this in numerical order because some might be missing
-    # and we don't know the max
-    for my $k (keys %$self) {
-        $result[$k] = $self->{$k} if $k =~ /^\d/;
-    }
-    \@result;
-}
-sub hash { my $self = shift;
-    my %result;
-    for my $k (keys %$self) {
-        $result{$k} = $self->{$k} if $k !~ /^[_\d~]/;
-    }
-    \%result;
-}
-
-sub lexers { my $self = shift;
-    my $lang = ref $self;
-    $self->deb("LANG = $lang") if $DEBUG & DEBUG::autolexer;
-    $::LEXERS{$lang} //= {};
-}
-
-my $fakepos = 1;
-
-sub _AUTOLEXpeek { my $self = shift;
-    my $key = shift;
-    my $retree = shift;
-
-    $self->deb("AUTOLEXpeek $key") if $DEBUG & DEBUG::autolexer;
-    die "Null key" if $key eq '';
-    if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
-        die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
-        $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
-        return { PATS => ['(?#::)'] };  # (but if we advanced just assume a :: here)
-    }
-    $key = 'termish' if $key eq 'EXPR';
-    return $::LEXERS{ref $self}->{$key} //= $self->_AUTOLEXgen($key, $retree);
-}
-
-
-sub _AUTOLEXgen { my $self = shift;
-    my $key = shift;
-    my $retree = shift;
-
-    my $lang = ref $self;
-    if ($lang =~ /^ANON/) {
-        no strict 'refs';
-        my $super = join '+', @{ref($self) . '::ISA'};
-        my $category = ${ref($self) . '::CATEGORY'} // '.';
-        print ::LOG "AUTOLEXgen $key in $lang from $super without $category\n" if $DEBUG & DEBUG::mixins;
-        my $superlexer = $self->cursor_fresh($super)->_AUTOLEXpeek($key,$retree);
-        my $same = 1;
-        for my $pat (@{$superlexer->{PATS}}) {
-            if ($pat =~ / $category /) {
-                print ::LOG "\tNope: $pat\n" if $DEBUG & DEBUG::mixins;
-                $same = 0;
-                last;
-            }
-        }
-        # no need to regen a sublexer that will turn out the same
-        return $superlexer if $same;
-    }
-    $self->deb("AUTOLEXgen $key in $lang") if $DEBUG & DEBUG::autolexer;
-    my $lexer = {};
-    (my $dir = $::TMP_PREFIX . 'lex::' . $lang) =~ s/::/\//g;
-    (my $file = $key) =~ s/::/-/g;
-    $file =~ s/:\*$//;
-    my $name = $key;
-    my $dba = $retree->{$key}{dba};
-    if (not $dba) {
-        $dba = $name;
-        $dba =~ s/_0[01]$//;
-        $dba =~ s/_(\d\d)$/ (alt $1)/;
-        $dba =~ s/:\*$//;
-    }
-
-    my $cache_key = "$dir/$file.store";
-    my $cached_lexer = $lexer_cache{$cache_key};
-    if ($STORABLE and -e $cache_key) {
-        my $lexer;
-        if ($cached_lexer) {
-            #Cache hit, Keep them coming ;-)
-            $lexer = $cached_lexer;
-#            say "GOT HERE $cache_key";
-        }
-        else {
-            # Cache miss
-            $lexer_cache{$cache_key} = $lexer = retrieve($cache_key);
-        }
-        my $pat = $lexer->{PATS};
-        my $fates;
-        my $i = 0;
-        for (@$pat) {
-            my $fstr;
-            if ( m/\(\?#FATE(\d+) +(.*?)\)/) {
-                warn "MISMATCH $i $1" unless $i == $1;
-                $fstr = $2;
-            }
-            else {
-                die "Whoops, no fate in storage";
-            }
-            my $fate;
-            if ($fate = $FATECACHE{$fstr}) {
-                $fates->[$i] = $fate;
-            }
-            else {
-                $FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
-                while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-                    $fate->[1] = $1;
-                    $fate->[2] = $2;
-                    if ($fate->[0] = $FATECACHE{$fstr}) {
-                        last;
-                    }
-                    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
-                }
-            }
-            $i++;
-        }
-        $lexer->{FATES} = $fates;
-        return $lexer;
-    }
-    elsif (open(LEX, "$dir/$file")) {
-        binmode(LEX, ":utf8");
-        $self->deb("using cached $dir/$file") if $DEBUG & DEBUG::autolexer;
-
-        chomp($name = <LEX>);
-        local $/ = "";
-        my @para = <LEX>;
-        close LEX;
-        my %lexer;
-        $lexer{NAME} = $name;
-        $lexer{DBA} = $dba;
-        $lexer{FILE} = "$dir/$file";
-        my @pat = split(/\n/, $para[0]);
-        $lexer{PATS} = \@pat;
-        my $fates;
-        my $i = 0;
-        for (@pat) {
-            s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/;
-            my $fstr = $1;
-            my $fate = $fates->[$i] = [0,0,0];
-            while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-                $fate->[1] = $1;
-                $fate->[2] = $2;
-                $fate = $fate->[0] = [0,0,0] if $fstr ne '';
-            }
-            $i++;
-        }
-        $lexer{FATES} = $fates;
-        eval {
-            $lexer{T} = Load($para[1]) if $TRIE and @para > 1;
-        };
-
-        return \%lexer;
-    }
-    else {
-        { package RE_base; 1; }
-        my @pat;
-        my $oldfakepos = $AUTOLEXED{$key} // 0;
-        $AUTOLEXED{$key} = $fakepos;
-        my $ast = $retree->{$key};
-        if ($ast and ref $ast ne 'HASH') {
-            @pat = $ast->longest($self->cursor_peek());
-        }
-        else {  # a protomethod, look up all methods it can call
-            my $proto = $key;
-            if ($proto =~ s/:\*$//) {
-                my $protopat = $proto . '__S_';
-                my $protolen = length($protopat);
-                my $altnum = 0;
-                my $peek = $self->cursor_peek();
-                for my $class ($self->meta->linearized_isa) {
-                    for my $method (sort $class->meta->get_method_list) {
-                        if (substr($method,0,$protolen) eq $protopat) {
-                            next if substr($method,-6,6) eq '__PEEK';
-                            my $callname = $class . '::' . $method . '__PEEK';
-                            my $peeklex = $peek->$callname();
-                            if ($peeklex and $peeklex->{PATS}) {
-                                my @alts = @{$peeklex->{PATS}};
-                                for my $alt (@alts) {
-                                    $alt .= "\t(?#FATE)" unless $alt =~ /FATE/;
-                                    $alt =~ s/\(\?#FATE\d*/(?#FATE $proto ${class}::$method/;
-                                    $altnum++;
-                                }
-                                push @pat, @alts;
-                            }
-                        }
-                    }
-                }
-            }
-            else {
-                die "BAD KEY $key";
-            }
-        }
-        for (@pat) {
-            s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
-            s/(\(\?#::\))+/(?#::)/;
-        }
-        my $fates;
-        my $i = 0;
-        for (@pat) {
-            my $fstr;
-            if ( s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/) {
-                $fstr = $1;
-            }
-            else {
-                $_ .= "\t(?#FATE$i )";
-                $fstr = "";
-            }
-            my $fate;
-            if ($fate = $FATECACHE{$fstr}) {
-                $fates->[$i] = $fate;
-            }
-            else {
-                $FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
-                while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-                    $fate->[1] = $1;
-                    $fate->[2] = $2;
-                    if ($fate->[0] = $FATECACHE{$fstr}) {
-                        last;
-                    }
-                    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
-                }
-            }
-            $i++;
-        }
-        warn "(null pattern for $key)" unless @pat;
-        my $pat = join("\n", @pat);
-
-        $AUTOLEXED{$key} = $oldfakepos;
-
-        my $T;
-        if ($TRIE) {
-            $T = {};
-          PAT:
-            for my $fnum (0..@pat-1) {
-                my ($chars) = $pat[$fnum];
-                $chars =~ s/\(\?#::\)//g;
-                my @chars;
-                my $final = '';
-                while ($chars ne '') {
-                    last if $chars =~ m/^\t/;
-                    if ($chars =~ s/^\\(\W)([*+?{]?)//) {
-                        if ($2) {
-                            $final = "\\$1$2$chars";
-                            last;
-                        }
-                        push(@chars, ord($1));
-                        next;
-                    }
-                    if ($chars =~ s/^(\\\w.*)//) {
-                        $final = $1;
-                        last;
-                    }
-                    if ($chars =~ /^(\[\S+)/) {
-                        $final = $1;
-                        last;
-                    }
-                    if ($chars =~ /^(\.\S+)/) {
-                        $final = $1;
-                        last;
-                    }
-                    if ($chars =~ s/^(.)([*+?{]?)//) {
-                        if ($2) {
-                            $final = "$1$2$chars";
-                            last;
-                        }
-                        push(@chars, unpack('U',$1));
-                        next;
-                    }
-                }
-                my $state = $T;
-                for my $ch (@chars) {
-                    my $char = chr($ch);
-                    if (my $next = $state->{$char}) {
-                        $state = $next;
-                    }
-                    else {
-                        $state = $state->{$char} = {};
-                    }
-                }
-                push @{$state->{'~~'}}, $final, $fnum;
-            }
-        }
-
-
-        $lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "FATES" => $fates, "T" => $T, "DBA" => $dba};
-
-        return $lexer if $lang =~ /ANON/;
-
-        if (not -d $dir) {
-            use File::Path 'mkpath';
-            mkpath($dir);
-        }
-       if ($STORABLE) {
-            delete $lexer->{FATES};
-            store($lexer, "$dir/$file.store");
-            $lexer->{FATES} = $fates;
-            if ($file eq 'termish') {
-                copy("$dir/termish.store","$dir/EXPR.store")
-                or croak "Could not copy $dir/termish.store";
-        }
-        }
-
-        open(my $cache, '>:utf8', "$dir/$file") // die "Can't print: $!";
-        print $cache $name,"\n";
-        print $cache join("\n",@pat),"\n\n" or die "Can't print: $!";
-        print $cache Dump($T) if $T and not $STORABLE;
-        close($cache) or die "Can't close: $!";
-        $self->deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
-        # force operator precedence method to look like a term
-        if ($file eq 'termish') {
-            copy("$dir/termish","$dir/EXPR")
-            or croak "Could not copy $dir/termish";
-        }
-    }
-    $lexer;
-}
-
 sub delete {
     my $self = shift;
     delete $self->{@_};
@@ -676,6 +311,10 @@ sub delete {
         $self->{_t};
     }
 }
+
+#############################################################
+# Cursor transformations
+#############################################################
 
 sub cursor_peek { my $self = shift;
     $self->deb("cursor_peek") if $DEBUG & DEBUG::cursors;
@@ -700,77 +339,6 @@ sub cursor_herelang { my $self = shift;
     my %r = %$self;
     $r{_herelang} = $self;
     bless \%r, 'STD::Q';
-}
-
-# remove consistent leading whitespace (mutates text nibbles in place)
-
-sub trim_heredoc { my $doc = shift;
-    my ($stopper) = $doc->stopper or
-        $doc->panic("Couldn't find delimiter for heredoc\n");
-    my $ws = $stopper->{ws}->Str;
-    return $stopper if $ws eq '';
-
-    my $wsequiv = $ws;
-    $wsequiv =~ s{^(\t+)}[' ' x (length($1) * ($::TABSTOP // 8))]xe;
-
-    # We can't use ^^ after escapes, since the escape may be mid-line
-    # and we'd get false positives.  Use a fake newline instead.
-    $doc->{nibbles}[0] =~ s/^/\n/;
-
-    for (@{$doc->{nibbles}}) {
-        next if ref $_;   # next unless $_ =~ Str;
-
-        # prefer exact match over any ws
-        s{(?<=\n)(\Q$ws\E|[ \t]+)}{
-            my $white = $1;
-            if ($white eq $ws) {
-                '';
-            }
-            else {
-                $white =~ s[^ (\t+) ][ ' ' x (length($1) * ($::TABSTOP // 8)) ]xe;
-                if ($white =~ s/^\Q$wsequiv\E//) {
-                    $white;
-                }
-                else {
-                    '';
-                }
-            }
-        }eg;
-    }
-    $doc->{nibbles}[0] =~ s/^\n//;  # undo fake newline
-    $stopper;
-}
-
-sub clean {
-    my $self = shift;
-    delete $self->{_fate};
-    delete $self->{_pos};       # EXPR blows up without this for some reason
-    delete $self->{_reduced};
-    for my $k (values %$self) {
-        next unless ref $k;
-        if (ref $k eq 'ARRAY') {
-            for my $k2 (@$k) {
-                eval {
-                    $k2->clean if ref $k2;
-                }
-            }
-        }
-        else {
-            eval {
-                $k->clean;
-            }
-        }
-    }
-    $self;
-}
-
-sub dump {
-    my $self = shift;
-    my %copy = %$self;
-    delete $copy{_reduced};
-    delete $copy{_fate};
-    my $text = STD::Dump(\%copy);
-    $text;
 }
 
 sub cursor_bind { my $self = shift;     # this is parent's match cursor
@@ -959,297 +527,9 @@ sub cursor_rev { my $self = shift;
     bless \%r, ref $self;
 }
 
-sub add_macro { my $lang = shift;
-    my $start = shift;
-    state $GEN = "500";
-    $lang->{_from} = $start->{_from};
-    my $name = $lang->Str;
-    my $WHAT = ref $lang;
-    if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
-        my ($sym) = $name =~ /:sym(.*)/;
-        $sym =~ s/^<\s*(.*\S)\s*>$/<$1>/g;
-        $sym =~ s/^\(\s*(.*\S)\s*\)$/$1/g;
-        $sym =~ s/^\[\s*(.*\S)\s*\]$/$1/g;
-        $sym =~ s/^\{\s*(.*\S)\s*\}$/$1/g;
-        $sym =~ s/\\x\[(.*)\]/\\x{$1}/g;
-
-        # unfortunately p5 doesn't understand q«...»
-        if ($sym =~ s/^«\s*(.*\S)\s*»$/$1/) {
-            my $ok = "'";
-            for my $try (qw( ' / ! : ; | + - = )) {
-                $ok = $try, last if index($sym,$try) < 0;
-            }
-            $sym = $ok . $sym . $ok;
-        }
-
-        my $rule = "token $name { <sym> }";
-
-        # produce p5 method name
-        my $mangle = $name;
-        $mangle =~ s/^(\w*):(sym)?//;
-        my $category = $1;
-        my @list;
-        if ($mangle =~ s/^<(.*)>$/$1/ or
-            $mangle =~ s/^«(.*)»$/$1/) {
-            $mangle =~ s/\\(.)/$1/g;
-            @list = $mangle =~ /(\S+)/g;
-        }
-        elsif ($mangle =~ s/^\[(.*)\]$/$1/ or
-            $mangle =~ s/^\{(.*)\}$/$1/) {
-            $mangle =~ s/\\x\[(.*)\]/\\x{$1}/g;
-            @list = eval $mangle;
-        }
-        else {
-            @list = $mangle;
-        }
-        $mangle = ::mangle(@list);
-        $mangle = $category . '__S_' . sprintf("%03d",$GEN++) . $mangle;
-
-        # XXX assuming no equiv specified, but to do that right,
-        # this should be delayed till the block start is seen
-        my $coercion = '';
-        if ($name =~ /^infix:/) {
-            $coercion = 'Additive';
-        }
-        elsif ($name =~ /^prefix:/) {
-            if ($sym =~ /^\W/) {
-                $coercion = 'Symbolic_unary';
-            }
-            else {
-                $coercion = 'Named_unary';
-            }
-        }
-        elsif ($name =~ /^postfix:/) {
-            $coercion = 'Methodcall';
-        }
-        elsif ($name =~ /^term:/) {
-            $coercion = 'Term';
-        }
-        my $COERCE = '';
-        $COERCE = " Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) }," if $coercion;
-
-        state $genpkg = 'ANON000';
-        $genpkg++;
-        my $e = <<"END";
-package $genpkg;
-use Moose ':all' => { -prefix => 'moose_' };
-moose_extends('$WHAT');
-
-# $rule
-
-my \$retree = {
-    '$mangle' => bless({
-        'kind' => 'token',
-        'min' => 12345,
-        're' => bless({
-            'a' => 0,
-            'i' => 0,
-            'min' => 12345,
-            'name' => 'sym',
-            'rest' => '',
-            'sym' => q$sym,
-        }, 'RE_method'),
-    }, 'RE'),
-};
-
-our \$CATEGORY = '$category';
-
-sub ${mangle}__PEEK { \$_[0]->_AUTOLEXpeek('$mangle',\$retree) }
-sub $mangle {
-    my \$self = shift;
-    local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
-    my %args = \@_;
-    my \$sym = \$args{sym} // q$sym;
-
-    my \$C = \$self;
-    my \$S = \$self->{_pos};
-    \$C->{'sym'} = \$sym;
-
-    \$self->_MATCHIFY(\$S, '$mangle',$COERCE
-        \$C->_SYM(\$sym, 0)
-    );
-}
-1;
-END
-        $lang->deb("derive $genpkg from $WHAT adding $mangle") if $DEBUG & DEBUG::mixins;
-        eval $e or die "Can't create $name: $@\n";
-        $::LANG{'MAIN'} = $lang->cursor_fresh($genpkg);
-        my $oldlexer = $::LEXERS{$WHAT};
-        my $newlexer = $::LEXERS{$genpkg} //= {};
-        print ::LOG "=====================================\nADD $rule => $mangle\n" if $DEBUG & DEBUG::mixins;;
-        for my $name (sort keys %{$oldlexer}) {
-            print ::LOG "  $name:\n" if $DEBUG & DEBUG::mixins;
-            my $same = 1;
-            for my $pat (@{$oldlexer->{$name}->{PATS}}) {
-                if ($pat =~ / $category /) {
-                    print ::LOG "\t$pat\n" if $DEBUG & DEBUG::mixins;
-                    $same = 0;
-                    last;
-                }
-            }
-            # no need to regen a sublexer that will turn out the same
-            $newlexer->{$name} = $oldlexer->{$name} if $same;
-        }
-    }
-    $lang;
-}
-
-sub add_enum { my $self = shift;
-    my $type = shift;
-    my $expr = shift;
-    return unless $expr;
-    local $::SCOPE = 'constant';
-    # XXX complete kludge, really need to eval EXPR
-    for ($expr =~ m/([a-zA-Z_]\w*)/g) {
-        $self->add_name($type . "::$_");
-        $self->add_name($_);
-    }
-    $self;
-}
-
-sub do_need { my $self = shift;
-    my $m = shift;
-    my $module = $m->Str;
-    my $topsym;
-    my $lib = '.';
-    my $std = -x 'std' ? './std' : 'std';
-    for my $d (split ':', $ENV{PERL6LIB}//'.:..') {
-        if (-f "$d/$module.pm") {
-            $lib = $d;
-            last;
-        }
-    }
-    if (-f "$module.pm.syml" and -M "$lib/$module.pm" > -M "$module.pm.syml") {
-        $topsym = LoadFile("$module.pm.syml");
-    }
-    elsif (-f "$lib/$module.pm") {
-        system "$std $lib/$module.pm" and die "Can't compile $lib/$module.pm";
-        $topsym = LoadFile("$module.pm.syml");
-    }
-    else {
-        $self->worry("Can't locate module $module");
-    }
-    $self->add_my_name($module);
-    $::DECLARAND->{really} = $topsym;
-    $self;
-}
-
-sub do_import { my $self = shift;
-    my $m = shift;
-    my $args = shift;
-    my @imports;
-    my $module = $m->Str;
-    if ($module =~ /(class|module|role|package)\s+(\S+)/) {
-        $module = $2;
-    }
-
-    my $pkg = $self->find_stash($module);
-    if ($pkg->{really}) {
-        $pkg = $pkg->{really}->{UNIT};
-    }
-    else {
-        $pkg = $self->find_stash($module . '::');
-    }
-    if ($args) {
-        my $text = $args->Str;
-        return $self unless $text;
-        while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
-            my $scope = lc($1) || 'my';
-            my $imports = $2;
-            local $::SCOPE = $scope;
-            @imports = split ' ', $imports;
-            for (@imports) {
-                local $::DECLARAND;
-                if ($pkg) {
-                    if ($_ =~ s/^://) {
-                        my @tagimports;
-                        eval { @tagimports = keys %{ $pkg->{'EXPORT::'}->{$_} }; };
-                        $self->do_import_aliases($pkg, @tagimports);
-                    }
-                    elsif ($pkg->{$_}{export}) {
-                        $::DECLARAND = $pkg->{$_};
-                    }
-                    elsif ($pkg->{'&'.$_}{export}) {
-                        $::DECLARAND = $pkg->{'&'.$_};
-                    }
-                    elsif ($pkg->{$_}) {
-                        $self->worry("Can't import $_ because it's not exported by $module");
-                        next;
-                    }
-                }
-                if (/^\w/) {
-                    if (/::/) {
-                        $self->add_name($_);
-                    }
-                    else {
-                        $self->add_routine($_);
-                    }
-                }
-                else {
-                    $self->add_variable($_);
-                }
-            }
-        }
-    }
-    else {
-        return $self unless $pkg;
-        eval { @imports = keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }; };
-        local $::SCOPE = 'my';
-        $self->do_import_aliases($pkg, @imports);
-    }
-
-    $self;
-}
-
-sub do_use { my $self = shift;
-    my $module = shift;
-    my $args = shift;
-    my @imports;
-
-    $self->do_need($module);
-    $self->do_import($module,$args);
-    $self;
-}
-
-sub do_import_aliases {
-    my $self = shift;
-    my $pkg = shift;
-#    say "attempting to import @_";
-    for (@_) {
-        $::DECLARAND = $pkg->{$_};
-        if (/^\w/) {
-            next if /^PARENT/;
-            next if /^OUTER/;
-            if (/::/) {
-                $self->add_name($_);
-            }
-            else {
-                $self->add_routine($_);
-            }
-        }
-        else {
-            next if /^!/;
-            $self->add_variable($_);
-        }
-    }
-    $self;
-}
-
-sub canonicalize_name { my $self = shift;
-    my $name = shift;
-    $name =~ s/^([\$\@\%\&])(\^|:(?!:))/$1/;
-    return $name unless $name =~ /::/;
-    $self->panic("Can't canonicalize a run-time name at compile time: $name") if $name =~ /::\(/;
-    $name =~ s/^([\$\@%&][!*=?:^.]?)(.*::)(.*)$/$2<$1$3>/;
-    my $vname;
-    if ($name =~ s/::<(.*)>$//) {
-        $vname = $1;
-    }
-    my @components = split(/(?<=::)/, $name, -1);
-    shift(@components) while @components and $components[0] eq '';
-    push(@components, $vname) if defined $vname;
-    @components;
-}
+#############################################################
+# Regex service routines
+#############################################################
 
 sub callm { my $self = shift;
     my $arg = shift;
@@ -2228,7 +1508,316 @@ sub fail { my $self = shift;
 
 sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
-#############################################################3
+#############################################################
+# JIT lexer generator
+#############################################################
+
+sub lexers { my $self = shift;
+    my $lang = ref $self;
+    $self->deb("LANG = $lang") if $DEBUG & DEBUG::autolexer;
+    $::LEXERS{$lang} //= {};
+}
+
+my $fakepos = 1;
+
+sub _AUTOLEXpeek { my $self = shift;
+    my $key = shift;
+    my $retree = shift;
+
+    $self->deb("AUTOLEXpeek $key") if $DEBUG & DEBUG::autolexer;
+    die "Null key" if $key eq '';
+    if ($AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
+        die "Left recursion in $key" if $fakepos == $AUTOLEXED{$key};
+        $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
+        return { PATS => ['(?#::)'] };  # (but if we advanced just assume a :: here)
+    }
+    $key = 'termish' if $key eq 'EXPR';
+    return $::LEXERS{ref $self}->{$key} //= $self->_AUTOLEXgen($key, $retree);
+}
+
+
+sub _AUTOLEXgen { my $self = shift;
+    my $key = shift;
+    my $retree = shift;
+
+    my $lang = ref $self;
+    if ($lang =~ /^ANON/) {
+        no strict 'refs';
+        my $super = join '+', @{ref($self) . '::ISA'};
+        my $category = ${ref($self) . '::CATEGORY'} // '.';
+        print ::LOG "AUTOLEXgen $key in $lang from $super without $category\n" if $DEBUG & DEBUG::mixins;
+        my $superlexer = $self->cursor_fresh($super)->_AUTOLEXpeek($key,$retree);
+        my $same = 1;
+        for my $pat (@{$superlexer->{PATS}}) {
+            if ($pat =~ / $category /) {
+                print ::LOG "\tNope: $pat\n" if $DEBUG & DEBUG::mixins;
+                $same = 0;
+                last;
+            }
+        }
+        # no need to regen a sublexer that will turn out the same
+        return $superlexer if $same;
+    }
+    $self->deb("AUTOLEXgen $key in $lang") if $DEBUG & DEBUG::autolexer;
+    my $lexer = {};
+    (my $dir = $::TMP_PREFIX . 'lex::' . $lang) =~ s/::/\//g;
+    (my $file = $key) =~ s/::/-/g;
+    $file =~ s/:\*$//;
+    my $name = $key;
+    my $dba = $retree->{$key}{dba};
+    if (not $dba) {
+        $dba = $name;
+        $dba =~ s/_0[01]$//;
+        $dba =~ s/_(\d\d)$/ (alt $1)/;
+        $dba =~ s/:\*$//;
+    }
+
+    my $cache_key = "$dir/$file.store";
+    my $cached_lexer = $lexer_cache{$cache_key};
+    if ($STORABLE and -e $cache_key) {
+        my $lexer;
+        if ($cached_lexer) {
+            #Cache hit, Keep them coming ;-)
+            $lexer = $cached_lexer;
+#            say "GOT HERE $cache_key";
+        }
+        else {
+            # Cache miss
+            $lexer_cache{$cache_key} = $lexer = retrieve($cache_key);
+        }
+        my $pat = $lexer->{PATS};
+        my $fates;
+        my $i = 0;
+        for (@$pat) {
+            my $fstr;
+            if ( m/\(\?#FATE(\d+) +(.*?)\)/) {
+                warn "MISMATCH $i $1" unless $i == $1;
+                $fstr = $2;
+            }
+            else {
+                die "Whoops, no fate in storage";
+            }
+            my $fate;
+            if ($fate = $FATECACHE{$fstr}) {
+                $fates->[$i] = $fate;
+            }
+            else {
+                $FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
+                while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+                    $fate->[1] = $1;
+                    $fate->[2] = $2;
+                    if ($fate->[0] = $FATECACHE{$fstr}) {
+                        last;
+                    }
+                    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
+                }
+            }
+            $i++;
+        }
+        $lexer->{FATES} = $fates;
+        return $lexer;
+    }
+    elsif (open(LEX, "$dir/$file")) {
+        binmode(LEX, ":utf8");
+        $self->deb("using cached $dir/$file") if $DEBUG & DEBUG::autolexer;
+
+        chomp($name = <LEX>);
+        local $/ = "";
+        my @para = <LEX>;
+        close LEX;
+        my %lexer;
+        $lexer{NAME} = $name;
+        $lexer{DBA} = $dba;
+        $lexer{FILE} = "$dir/$file";
+        my @pat = split(/\n/, $para[0]);
+        $lexer{PATS} = \@pat;
+        my $fates;
+        my $i = 0;
+        for (@pat) {
+            s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/;
+            my $fstr = $1;
+            my $fate = $fates->[$i] = [0,0,0];
+            while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+                $fate->[1] = $1;
+                $fate->[2] = $2;
+                $fate = $fate->[0] = [0,0,0] if $fstr ne '';
+            }
+            $i++;
+        }
+        $lexer{FATES} = $fates;
+        eval {
+            $lexer{T} = Load($para[1]) if $TRIE and @para > 1;
+        };
+
+        return \%lexer;
+    }
+    else {
+        { package RE_base; 1; }
+        my @pat;
+        my $oldfakepos = $AUTOLEXED{$key} // 0;
+        $AUTOLEXED{$key} = $fakepos;
+        my $ast = $retree->{$key};
+        if ($ast and ref $ast ne 'HASH') {
+            @pat = $ast->longest($self->cursor_peek());
+        }
+        else {  # a protomethod, look up all methods it can call
+            my $proto = $key;
+            if ($proto =~ s/:\*$//) {
+                my $protopat = $proto . '__S_';
+                my $protolen = length($protopat);
+                my $altnum = 0;
+                my $peek = $self->cursor_peek();
+                for my $class ($self->meta->linearized_isa) {
+                    for my $method (sort $class->meta->get_method_list) {
+                        if (substr($method,0,$protolen) eq $protopat) {
+                            next if substr($method,-6,6) eq '__PEEK';
+                            my $callname = $class . '::' . $method . '__PEEK';
+                            my $peeklex = $peek->$callname();
+                            if ($peeklex and $peeklex->{PATS}) {
+                                my @alts = @{$peeklex->{PATS}};
+                                for my $alt (@alts) {
+                                    $alt .= "\t(?#FATE)" unless $alt =~ /FATE/;
+                                    $alt =~ s/\(\?#FATE\d*/(?#FATE $proto ${class}::$method/;
+                                    $altnum++;
+                                }
+                                push @pat, @alts;
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                die "BAD KEY $key";
+            }
+        }
+        for (@pat) {
+            s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
+            s/(\(\?#::\))+/(?#::)/;
+        }
+        my $fates;
+        my $i = 0;
+        for (@pat) {
+            my $fstr;
+            if ( s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/) {
+                $fstr = $1;
+            }
+            else {
+                $_ .= "\t(?#FATE$i )";
+                $fstr = "";
+            }
+            my $fate;
+            if ($fate = $FATECACHE{$fstr}) {
+                $fates->[$i] = $fate;
+            }
+            else {
+                $FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
+                while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
+                    $fate->[1] = $1;
+                    $fate->[2] = $2;
+                    if ($fate->[0] = $FATECACHE{$fstr}) {
+                        last;
+                    }
+                    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
+                }
+            }
+            $i++;
+        }
+        warn "(null pattern for $key)" unless @pat;
+        my $pat = join("\n", @pat);
+
+        $AUTOLEXED{$key} = $oldfakepos;
+
+        my $T;
+        if ($TRIE) {
+            $T = {};
+          PAT:
+            for my $fnum (0..@pat-1) {
+                my ($chars) = $pat[$fnum];
+                $chars =~ s/\(\?#::\)//g;
+                my @chars;
+                my $final = '';
+                while ($chars ne '') {
+                    last if $chars =~ m/^\t/;
+                    if ($chars =~ s/^\\(\W)([*+?{]?)//) {
+                        if ($2) {
+                            $final = "\\$1$2$chars";
+                            last;
+                        }
+                        push(@chars, ord($1));
+                        next;
+                    }
+                    if ($chars =~ s/^(\\\w.*)//) {
+                        $final = $1;
+                        last;
+                    }
+                    if ($chars =~ /^(\[\S+)/) {
+                        $final = $1;
+                        last;
+                    }
+                    if ($chars =~ /^(\.\S+)/) {
+                        $final = $1;
+                        last;
+                    }
+                    if ($chars =~ s/^(.)([*+?{]?)//) {
+                        if ($2) {
+                            $final = "$1$2$chars";
+                            last;
+                        }
+                        push(@chars, unpack('U',$1));
+                        next;
+                    }
+                }
+                my $state = $T;
+                for my $ch (@chars) {
+                    my $char = chr($ch);
+                    if (my $next = $state->{$char}) {
+                        $state = $next;
+                    }
+                    else {
+                        $state = $state->{$char} = {};
+                    }
+                }
+                push @{$state->{'~~'}}, $final, $fnum;
+            }
+        }
+
+
+        $lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "FATES" => $fates, "T" => $T, "DBA" => $dba};
+
+        return $lexer if $lang =~ /ANON/;
+
+        if (not -d $dir) {
+            use File::Path 'mkpath';
+            mkpath($dir);
+        }
+       if ($STORABLE) {
+            delete $lexer->{FATES};
+            store($lexer, "$dir/$file.store");
+            $lexer->{FATES} = $fates;
+            if ($file eq 'termish') {
+                copy("$dir/termish.store","$dir/EXPR.store")
+                or croak "Could not copy $dir/termish.store";
+        }
+        }
+
+        open(my $cache, '>:utf8', "$dir/$file") // die "Can't print: $!";
+        print $cache $name,"\n";
+        print $cache join("\n",@pat),"\n\n" or die "Can't print: $!";
+        print $cache Dump($T) if $T and not $STORABLE;
+        close($cache) or die "Can't close: $!";
+        $self->deb("regenerated $dir/$file") if $DEBUG & DEBUG::autolexer;
+        # force operator precedence method to look like a term
+        if ($file eq 'termish') {
+            copy("$dir/termish","$dir/EXPR")
+            or croak "Could not copy $dir/termish";
+        }
+    }
+    $lexer;
+}
+
+#############################################################
+# longest token set generator
+#############################################################
 
 { package main;
 
@@ -2704,6 +2293,420 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
         }
         return $IMP;
     }
+}
+
+#############################################################
+# Parser service routines
+#############################################################
+
+sub gettrait {
+    my $self = shift;
+    my $traitname = shift;
+    my $param = shift;
+    my $text;
+    if (@$param) {
+        $text = $param->[0]->Str;
+        $text =~ s/^<(.*)>$/$1/ or
+        $text =~ s/^\((.*)\)$/$1/;
+    }
+    if ($traitname eq 'export') {
+        if (defined $text) {
+            $text =~ s/://g;
+        }
+        else {
+            $text = 'DEFAULT';
+        }
+        $self->set_export($text);
+        $text;
+    }
+    elsif (defined $text) {
+        $text;
+    }
+    else {
+        1;
+    }
+}
+
+sub set_export {
+    my $self = shift;
+    my $text = shift;
+    my $textpkg = $text . '::';
+    my $name = $::DECLARAND->{name};
+    my $xpad = delete $::DECLARAND->{xpad};
+    $::DECLARAND->{export} = $text;
+    my $sid = $::CURPAD->idref;
+    my $x = $xpad->{'EXPORT::'} //= STASH::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
+    $x->{$textpkg} //= STASH::->new( 'PARENT::' => $x->idref, '!id' => [$sid->[0] . '::EXPORT::' . $text] );
+    $x->{$textpkg}->{$name} = $::DECLARAND;
+    $x->{$textpkg}->{'&'.$name} = $::DECLARAND
+            if $name =~ /^\w/ and $::SCOPE ne 'constant';
+    $self;
+}
+
+sub mixin {
+    my $self = shift;
+    my $WHAT = ref($self)||$self;
+    my @mixins = @_;
+
+    my $NEWWHAT = $WHAT . '::';
+    my @newmix;
+    for my $mixin (@mixins) {
+        my $ext = ref($mixin) || $mixin;
+        push @newmix, $ext;
+        $ext =~ s/(\w)\w*::/$1/g;       # just looking for a "cache" key, really
+        $NEWWHAT .= '_X_' . $ext;
+    }
+    $self->deb("mixin $NEWWHAT from $WHAT @newmix") if $DEBUG & DEBUG::mixins;
+    no strict 'refs';
+    if (not exists &{$NEWWHAT.'::meta'}) {              # never composed this one yet?
+        # fake up mixin with MI, being sure to put "roles" in front
+        my $eval = "package $NEWWHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$WHAT'); moose_with(" . join(',', map {"'$_'"} @newmix) . ");our \$CATEGORY = '.';\n";
+        $self->deb($eval) if $DEBUG & DEBUG::mixins;
+        eval $eval;
+        warn $@ if $@;
+    }
+    return $self->cursor_fresh($NEWWHAT);
+}
+
+sub tweak {
+    my $self = shift;
+    my $class = ref $self;
+    no strict 'refs';
+    for (;;) {
+        my $retval = eval {
+            $self->deb("Calling $class" . '::multitweak') if $DEBUG & DEBUG::mixins;
+            &{$class . '::multitweak'}($self,@_);
+        }; 
+        return $retval if $retval;
+        die $@ unless $@ =~ /^NOMATCH|^Undefined subroutine/;
+        last unless $class =~ s/(.*)::.*/$1/;
+    }
+}
+
+sub clean_id { my $self = shift;
+    my ($id,$name) = @_;
+    my $file = $::FILE->{name};
+
+    $id .= '::';
+    $id =~ s/^MY:file<CORE.setting>.*?::/CORE::/;
+    $id =~ s/^MY:file<\w+.setting>.*?::/SETTING::/;
+    $id =~ s/:file<\Q$file\E>//;
+    $id =~ s/MY:line\(1\):pos\(0\)/UNIT/;
+    $id =~ s/:pos\(\d+\)//;
+    $id .= "<$name>";
+    $id;
+}
+
+# remove consistent leading whitespace (mutates text nibbles in place)
+
+sub trim_heredoc { my $doc = shift;
+    my ($stopper) = $doc->stopper or
+        $doc->panic("Couldn't find delimiter for heredoc\n");
+    my $ws = $stopper->{ws}->Str;
+    return $stopper if $ws eq '';
+
+    my $wsequiv = $ws;
+    $wsequiv =~ s{^(\t+)}[' ' x (length($1) * ($::TABSTOP // 8))]xe;
+
+    # We can't use ^^ after escapes, since the escape may be mid-line
+    # and we'd get false positives.  Use a fake newline instead.
+    $doc->{nibbles}[0] =~ s/^/\n/;
+
+    for (@{$doc->{nibbles}}) {
+        next if ref $_;   # next unless $_ =~ Str;
+
+        # prefer exact match over any ws
+        s{(?<=\n)(\Q$ws\E|[ \t]+)}{
+            my $white = $1;
+            if ($white eq $ws) {
+                '';
+            }
+            else {
+                $white =~ s[^ (\t+) ][ ' ' x (length($1) * ($::TABSTOP // 8)) ]xe;
+                if ($white =~ s/^\Q$wsequiv\E//) {
+                    $white;
+                }
+                else {
+                    '';
+                }
+            }
+        }eg;
+    }
+    $doc->{nibbles}[0] =~ s/^\n//;  # undo fake newline
+    $stopper;
+}
+
+sub add_macro { my $lang = shift;
+    my $start = shift;
+    state $GEN = "500";
+    $lang->{_from} = $start->{_from};
+    my $name = $lang->Str;
+    my $WHAT = ref $lang;
+    if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
+        my ($sym) = $name =~ /:sym(.*)/;
+        $sym =~ s/^<\s*(.*\S)\s*>$/<$1>/g;
+        $sym =~ s/^\(\s*(.*\S)\s*\)$/$1/g;
+        $sym =~ s/^\[\s*(.*\S)\s*\]$/$1/g;
+        $sym =~ s/^\{\s*(.*\S)\s*\}$/$1/g;
+        $sym =~ s/\\x\[(.*)\]/\\x{$1}/g;
+
+        # unfortunately p5 doesn't understand q«...»
+        if ($sym =~ s/^«\s*(.*\S)\s*»$/$1/) {
+            my $ok = "'";
+            for my $try (qw( ' / ! : ; | + - = )) {
+                $ok = $try, last if index($sym,$try) < 0;
+            }
+            $sym = $ok . $sym . $ok;
+        }
+
+        my $rule = "token $name { <sym> }";
+
+        # produce p5 method name
+        my $mangle = $name;
+        $mangle =~ s/^(\w*):(sym)?//;
+        my $category = $1;
+        my @list;
+        if ($mangle =~ s/^<(.*)>$/$1/ or
+            $mangle =~ s/^«(.*)»$/$1/) {
+            $mangle =~ s/\\(.)/$1/g;
+            @list = $mangle =~ /(\S+)/g;
+        }
+        elsif ($mangle =~ s/^\[(.*)\]$/$1/ or
+            $mangle =~ s/^\{(.*)\}$/$1/) {
+            $mangle =~ s/\\x\[(.*)\]/\\x{$1}/g;
+            @list = eval $mangle;
+        }
+        else {
+            @list = $mangle;
+        }
+        $mangle = ::mangle(@list);
+        $mangle = $category . '__S_' . sprintf("%03d",$GEN++) . $mangle;
+
+        # XXX assuming no equiv specified, but to do that right,
+        # this should be delayed till the block start is seen
+        my $coercion = '';
+        if ($name =~ /^infix:/) {
+            $coercion = 'Additive';
+        }
+        elsif ($name =~ /^prefix:/) {
+            if ($sym =~ /^\W/) {
+                $coercion = 'Symbolic_unary';
+            }
+            else {
+                $coercion = 'Named_unary';
+            }
+        }
+        elsif ($name =~ /^postfix:/) {
+            $coercion = 'Methodcall';
+        }
+        elsif ($name =~ /^term:/) {
+            $coercion = 'Term';
+        }
+        my $COERCE = '';
+        $COERCE = " Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) }," if $coercion;
+
+        state $genpkg = 'ANON000';
+        $genpkg++;
+        my $e = <<"END";
+package $genpkg;
+use Moose ':all' => { -prefix => 'moose_' };
+moose_extends('$WHAT');
+
+# $rule
+
+my \$retree = {
+    '$mangle' => bless({
+        'kind' => 'token',
+        'min' => 12345,
+        're' => bless({
+            'a' => 0,
+            'i' => 0,
+            'min' => 12345,
+            'name' => 'sym',
+            'rest' => '',
+            'sym' => q$sym,
+        }, 'RE_method'),
+    }, 'RE'),
+};
+
+our \$CATEGORY = '$category';
+
+sub ${mangle}__PEEK { \$_[0]->_AUTOLEXpeek('$mangle',\$retree) }
+sub $mangle {
+    my \$self = shift;
+    local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+    my %args = \@_;
+    my \$sym = \$args{sym} // q$sym;
+
+    my \$C = \$self;
+    my \$S = \$self->{_pos};
+    \$C->{'sym'} = \$sym;
+
+    \$self->_MATCHIFY(\$S, '$mangle',$COERCE
+        \$C->_SYM(\$sym, 0)
+    );
+}
+1;
+END
+        $lang->deb("derive $genpkg from $WHAT adding $mangle") if $DEBUG & DEBUG::mixins;
+        eval $e or die "Can't create $name: $@\n";
+        $::LANG{'MAIN'} = $lang->cursor_fresh($genpkg);
+        my $oldlexer = $::LEXERS{$WHAT};
+        my $newlexer = $::LEXERS{$genpkg} //= {};
+        print ::LOG "=====================================\nADD $rule => $mangle\n" if $DEBUG & DEBUG::mixins;;
+        for my $name (sort keys %{$oldlexer}) {
+            print ::LOG "  $name:\n" if $DEBUG & DEBUG::mixins;
+            my $same = 1;
+            for my $pat (@{$oldlexer->{$name}->{PATS}}) {
+                if ($pat =~ / $category /) {
+                    print ::LOG "\t$pat\n" if $DEBUG & DEBUG::mixins;
+                    $same = 0;
+                    last;
+                }
+            }
+            # no need to regen a sublexer that will turn out the same
+            $newlexer->{$name} = $oldlexer->{$name} if $same;
+        }
+    }
+    $lang;
+}
+
+sub add_enum { my $self = shift;
+    my $type = shift;
+    my $expr = shift;
+    return unless $expr;
+    local $::SCOPE = 'constant';
+    # XXX complete kludge, really need to eval EXPR
+    for ($expr =~ m/([a-zA-Z_]\w*)/g) {
+        $self->add_name($type . "::$_");
+        $self->add_name($_);
+    }
+    $self;
+}
+
+sub do_use { my $self = shift;
+    my $module = shift;
+    my $args = shift;
+    my @imports;
+
+    $self->do_need($module);
+    $self->do_import($module,$args);
+    $self;
+}
+
+sub do_need { my $self = shift;
+    my $m = shift;
+    my $module = $m->Str;
+    my $topsym;
+    my $lib = '.';
+    my $std = -x 'std' ? './std' : 'std';
+    for my $d (split ':', $ENV{PERL6LIB}//'.:..') {
+        if (-f "$d/$module.pm") {
+            $lib = $d;
+            last;
+        }
+    }
+    if (-f "$module.pm.syml" and -M "$lib/$module.pm" > -M "$module.pm.syml") {
+        $topsym = LoadFile("$module.pm.syml");
+    }
+    elsif (-f "$lib/$module.pm") {
+        system "$std $lib/$module.pm" and die "Can't compile $lib/$module.pm";
+        $topsym = LoadFile("$module.pm.syml");
+    }
+    else {
+        $self->worry("Can't locate module $module");
+    }
+    $self->add_my_name($module);
+    $::DECLARAND->{really} = $topsym;
+    $self;
+}
+
+sub do_import { my $self = shift;
+    my $m = shift;
+    my $args = shift;
+    my @imports;
+    my $module = $m->Str;
+    if ($module =~ /(class|module|role|package)\s+(\S+)/) {
+        $module = $2;
+    }
+
+    my $pkg = $self->find_stash($module);
+    if ($pkg->{really}) {
+        $pkg = $pkg->{really}->{UNIT};
+    }
+    else {
+        $pkg = $self->find_stash($module . '::');
+    }
+    if ($args) {
+        my $text = $args->Str;
+        return $self unless $text;
+        while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
+            my $scope = lc($1) || 'my';
+            my $imports = $2;
+            local $::SCOPE = $scope;
+            @imports = split ' ', $imports;
+            for (@imports) {
+                if ($pkg) {
+                    if ($_ =~ s/^://) {
+                        my @tagimports;
+                        eval { @tagimports = keys %{ $pkg->{'EXPORT::'}->{$_} }; };
+                        $self->do_import_aliases($pkg, @tagimports);
+                    }
+                    elsif ($pkg->{$_}{export}) {
+                        $self->add_my_name($_, $pkg->{$_});
+                    }
+                    elsif ($pkg->{'&'.$_}{export}) {
+                        $_ = '&' . $_;
+                        $self->add_my_name($_, $pkg->{$_});
+                    }
+                    elsif ($pkg->{$_}) {
+                        $self->worry("Can't import $_ because it's not exported by $module");
+                        next;
+                    }
+                }
+                else {
+                    $self->add_my_name($_);
+                }
+            }
+        }
+    }
+    else {
+        return $self unless $pkg;
+        eval { @imports = keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }; };
+        local $::SCOPE = 'my';
+        $self->do_import_aliases($pkg, @imports);
+    }
+
+    $self;
+}
+
+sub do_import_aliases {
+    my $self = shift;
+    my $pkg = shift;
+#    say "attempting to import @_";
+    for (@_) {
+        next if /^!/;
+        next if /^PARENT::/;
+        next if /^OUTER::/;
+        $self->add_my_name($_, $pkg->{$_});
+    }
+    $self;
+}
+
+sub canonicalize_name { my $self = shift;
+    my $name = shift;
+    $name =~ s/^([\$\@\%\&])(\^|:(?!:))/$1/;
+    return $name unless $name =~ /::/;
+    $self->panic("Can't canonicalize a run-time name at compile time: $name") if $name =~ /::\(/;
+    $name =~ s/^([\$\@%&][!*=?:^.]?)(.*::)(.*)$/$2<$1$3>/;
+    my $vname;
+    if ($name =~ s/::<(.*)>$//) {
+        $vname = $1;
+    }
+    my @components = split(/(?<=::)/, $name, -1);
+    shift(@components) while @components and $components[0] eq '';
+    push(@components, $vname) if defined $vname;
+    @components;
 }
 
 ## vim: expandtab sw=4
