@@ -3233,6 +3233,7 @@ rule default_value {
 }
 
 token statement_prefix:try     { <sym> <blorst> }
+token statement_prefix:quietly { <sym> <blorst> }
 token statement_prefix:gather  { <sym> <blorst> }
 token statement_prefix:contend { <sym> <blorst> }
 token statement_prefix:async   { <sym> <blorst> }
@@ -3249,7 +3250,7 @@ token blorst {
     <?before \s> <.ws>
     [
     | <block>
-    | <statement>
+    | <statement>  # creates a dynamic scope but not lexical scope
     ]
 }
 
@@ -5273,7 +5274,7 @@ method add_my_name ($n, $d, $p) {
     # This may just be a lexical alias to "our" and such,
     # so reuse $*DECLARAND pointer if it's there.
     my $declaring = $d // NAME.new(
-        xpad => $*CURPAD,
+        xpad => $curstash,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
@@ -5360,7 +5361,7 @@ method add_our_name ($n) {
     return self unless defined $name and $name ne '';
 
     my $declaring = $*DECLARAND // NAME.new(
-        xpad => $*CURPAD,
+        xpad => $curstash,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
