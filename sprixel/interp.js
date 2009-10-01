@@ -145,12 +145,12 @@ statement_control__S_loop:function(){
         //this.context = new Scope(this.context); // derive scope for ctrl exprs
         this.loop_block = null;
         this.result = new p6builtin.List();
-        if (this.eee.e1) {
+        if (this.eee && this.eee.e1) {
             return [this.do_next = dupe(this.eee.e1), this];
         }
     case 1:
         this.phase = 2;
-        if (this.eee.e2) {
+        if (this.eee && this.eee.e2) {
             return [this.do_next = dupe(this.eee.e2), this];
         } else {
             this.do_next = { result : new p6builtin.Bool(true) };
@@ -172,7 +172,7 @@ statement_control__S_loop:function(){
         return [this.invoker];
     case 3:
         this.phase = 1;
-        if (this.eee.e3) {
+        if (this.eee && this.eee.e3) {
             return [this.do_next = dupe(this.eee.e3), this];
         }
         return [this]; // special, trampoline to myself!
