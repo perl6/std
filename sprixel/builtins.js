@@ -601,32 +601,28 @@ do_Exponentiation:function(){
 };
 
 p6builtin.p6array = function(items){
-    this.items = items;
+    this.items = items || [];
 };
 p6builtin.p6array.prototype = {
 toString:function(){
     return this.items.join('');
 },
+'push':function(item){
+    this.items.push(item);
+},
+do_count:function(){
+    return this.items.length;
+},
 toBool:function(){
     return true;
+},
+WHAT:function(){
+    return 'Array()';
 }
 };
 
 })();
 
-
-function say() { // javascript say
-    if (typeof(arguments)!='undefined') {
-        for (var s_args=[], i=-1, j=-1, a, l=arguments.length; i<l;)
-            if (typeof(a=arguments[++i])!='undefined') {
-                s_args[++j] = typeof(a)==='string' ? a : a.toString();
-            }
-        say_them.apply(this.context, s_args);
-    } else {
-        say_them('');
-    }
-    this.result = new p6builtin.Int(1);
-}
 
 var Scope = (function(){
     function Deriver(){}
@@ -652,8 +648,18 @@ function do_die(msg){
     throw 'ENOERRORMESSAGE';
 }
 
+function do_map(block,list){
+    return {
+        T: 'do_iterate_map',
+        block: block.value || block,
+        list: list.value || list,
+        phase: 0
+    };
+}
+
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
+p6toplevel.map = new p6builtin.jssub(do_map,'map');
 p6toplevel.die = new p6builtin.jssub(do_die,'die');
 p6toplevel["Bool::True"] = p6toplevel.True = new p6builtin.Bool(true);
 p6toplevel["Bool::False"] = p6toplevel.False = new p6builtin.Bool(false);

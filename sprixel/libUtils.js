@@ -213,7 +213,7 @@ function emit_js(self) {
         var idx = 0;
         var array_text = '[' + jsind(1);
         for (var i=0; i<self.length; ++i) {
-            if (typeof(self[i])=='undefined') continue;
+            if (typeof(self[i])=='undefined' || self[i]===null) continue;
             idx++ && (array_text += ',' + jsind());
             this_js_member = idx;
             array_text += emit_js(i);
@@ -226,7 +226,7 @@ function emit_js(self) {
         text += "{" + jsind(1);
         var first = 1;
         for (var prop in self) {
-            if (typeof(self[prop])=='undefined'
+            if (typeof(self[prop])=='undefined' || self[prop]===null
                 || prop == '__INTERNAL__TOJS__SEEN') continue;
             text += (first ? (first = 0, '') : ',' + jsind())
                 + (this_js_member = tps(prop)) + ': ' + emit_js(self[prop]);
@@ -845,7 +845,7 @@ function getGlobal() {
   }).call(null);
 }
 
-
+1;
 
 
 

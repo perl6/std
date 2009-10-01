@@ -31,13 +31,17 @@ my $app_act = '';
 my $has_top = 0;
 my $this_js_parent = '';
 my $this_js_member = '';
+my $pos_props = {'BEG' => 1, 'END' => 1, 'WS' => 1, 'LAST' => 1};
+my $include_pos;
 
 sub jsind {
-    "\n".(' ' x ($jsi += shift || 0))
+    return '';
+    #"\n".(' ' x ($jsi += shift || 0))
 }
 
 sub emit_js {
     my $self = shift;
+    $include_pos = shift || 0;
     return tps($self,1) unless ref $self;
     #print("\nat ".ref($self));
     my $last_js_parent = $this_js_parent.'';
@@ -73,7 +77,8 @@ sub emit_js {
     else { # it's a hash, probably blessed.
         $text .= "{".jsind(1)."T: ".tps(ref($self),1).",'T__".tps(ref($self))."':1";
         for my $prop (keys %$self) {
-            next if !defined $self->{$prop} || $prop eq '.';
+            next if !defined $self->{$prop} || $prop eq '.' ||
+                (!$include_pos && exists $pos_props->{$prop});
             $text .= ','.jsind().tps($prop).': ';
             $this_js_member = tps($prop);
             $text .= emit_js($self->{$prop});

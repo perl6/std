@@ -1,14 +1,6 @@
 var global_trace = 0
 // + 1;
 
-var Derive = (function(){
-    function F(){};
-    return function(obj){
-        F.prototype = obj;
-        return new F();
-    };
-})();
-
 var disp = { // "bytecode" dispatch - by name of grammar node.
 statementlist:function(){
     switch(this.phase) {
@@ -439,7 +431,8 @@ blockoid:function(){
     case 0:
         this.result = new p6builtin.Sub(this.statementlist, this.context,
             this.arg_slots);
-        if (this.invoker.T == 'pblock') {
+        if (this.invoker.T == 'pblock'
+                && this.invoker.invoker.invoker.invoker.T!='eval_args') {
             this.phase = 1;
             this.do_next = dupe(this.result);
             return [this.do_next, this];
@@ -458,6 +451,7 @@ Sub_invocation:function(){
         this.do_next.invoker = this;
         // derive new Scope from the declaration context (new "lexpad"/frame)
         var ctx = this.do_next.context = new Scope(this.declaration_context);
+        if (this.topic) { ctx['$_'] = this.topic };
         for (var i in this.arg_slots) {
             var arg_var = new p6builtin.p6var(this.arg_slots[i][0],
                 this.arg_slots[i][1], ctx, true);
@@ -575,8 +569,12 @@ rad_number:function(){
         this.result = new p6builtin.Int(this.intpart.TEXT, this.int_radix);
         return [this.invoker];
     case 1:
-        var int_str = this.do_next.result.toString();
-        if (/^0[dbox]/i.test(int_str) && this.int_radix==10) {
+        var int_str = this.do_next.result.toString(), res;
+        //throw [int_str, /^0([dbox])/i.exec(int_str)];
+        if ((/^0[dbox]/i.test(int_str) && this.int_radix==10) || (
+            (res = /^0([dbox])/i.exec(int_str))
+                && DBOX[res[1]] == this.int_radix
+        )) {
             this.result = new p6builtin.Int(
                 new p6builtin.Str(this.do_next.result).toInt().toString(),
                     this.int_radix);
@@ -696,6 +694,33 @@ number__S_rational:function(){
 Exponentiation:function(){
     this.result = this.eval_args[0].do_Exponentiation(this.eval_args[1]);
     return [this.invoker];
+},
+quote__S_Slash_Slash:function(){
+    throw keys(this.M.M[0]);
+},
+do_iterate_map:function(){
+    switch(this.phase) {
+    case 0:
+        if (!this.list || !(this.count = this.list.do_count())) {
+            this.result = new p6builtin.Nil();
+            return [this.invoker];
+        }
+        this.idx = -1;
+        this.result = new p6builtin.p6array();
+        this.phase = 1;
+    case 1:
+        if (this.idx > -1) {
+            this.result.push(this.do_next.result);
+        }
+        if (this.idx < this.count - 1) {
+            this.do_next = dupe(this.block);
+            this.do_next.topic = this.list.items[++this.idx];
+            return [this.do_next, this];
+        } else {
+            this.last_op.result = this.result;
+            return [this.invoker];
+        }
+    }
 }
 };
 // aliases (nodes with identical semantics)
@@ -758,7 +783,7 @@ var __lazyarg_Identifiers = {
 };
 */
 function interp(obj,context) {
-    var act = obj, result = Array(1), empty = [0], last = act;
+    var act = obj, result = Array(1), empty = [0], last = act, continuation;
     act.phase = 0; act.context = context;
     for(;typeof(act) != 'undefined';) {
         if (result.length > 1) {
@@ -770,7 +795,7 @@ function interp(obj,context) {
             //say(keys(act), act.SYM);
         } else {
             if (global_trace) say('returning to '+act.T);
-            if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
+            //if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
             if (last.invoker && last.invoker===act) {
                 doPostDo(last);
             }
@@ -797,12 +822,17 @@ function interp(obj,context) {
                     context : act.context
                 };
                 result = empty;
-                continue;
             } else {
                 act = (result = disp[act.T].call(last = act))[0];
                 if (last.result instanceof p6builtin.jssub && last.eval_args) {
-                    //S(last.eval_args);
-                    last.result.func.apply(last, last.eval_args);
+                    if (continuation // must be a built-in op that is flattened
+                            = last.result.func.apply(last, last.eval_args)) {
+                        continuation.invoker = act;
+                        continuation.context = act.context;
+                        continuation.last_op = last;
+                        act = continuation;
+                        result = empty;
+                    }
                 }
             }
         } else {

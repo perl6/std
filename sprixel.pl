@@ -18,12 +18,15 @@ HELP
 exit;
 }
 my $PROG = '';
-my ($help,$C,$test_mode);
+my ($help,$C,$test_mode,$verbose,$pos);
+$pos = 0;
 Getopt::Long::Parser->new( config => [qw( bundling no_ignore_case pass_through require_order)], )->getoptions(
     "C=s" => \$C,
     "e=s" => \$PROG,
     'h|help' => \$help,
     't|test_mode' => \$test_mode,
+    'v|verbose' => \$verbose,
+    'pos' => \$pos,
 ) || help;
 help if $help;
 
@@ -56,7 +59,8 @@ else {
     $r = STD->parse($PROG, actions => 'Actions', setting => $setting)->{'_ast'};
 }
 
-my @js = qw[sprixel/json2.js sprixel/libBigInt.js sprixel/interp.js sprixel/builtins.js
+my @js = qw[sprixel/libUtils.js sprixel/json2.js sprixel/libBigInt.js
+    sprixel/interp.js sprixel/builtins.js
     sprixel/Test.pm.js];
 
 if (defined $C and $C eq 'html') {
@@ -71,7 +75,7 @@ if (defined $C and $C eq 'html') {
     say "</script>";
     say "</body></html>";
 } else {
-    run_js_interpreter($r);
+    run_js_interpreter($r, $verbose);
 }
 
 sub run_js_interpreter {
@@ -79,11 +83,12 @@ sub run_js_interpreter {
     my $ctx = V8::Context->new();
     $ctx->register_method_by_name("say_them");
     $ctx->execute(scalar(read_file($_))) for @js;
-    my $ast = ToJS::emit_js($_[0]);
+    my $ast = ToJS::emit_js($_[0], $pos);
+    say $ast if $_[1];
     my $start = gettimeofday();
     eval { $ctx->execute('top_interp('.$ast.',p6toplevel);') };
     warn $@ if $@;
-    #say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
+    say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
 }
 sub say_them {
     # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)
