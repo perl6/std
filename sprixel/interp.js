@@ -183,6 +183,38 @@ statement_control__S_loop:function(){
         return [this];
     }
 },
+statement_control__S_while:function(){
+    switch(this.phase) {
+    case 0:
+        this.phase = 1;
+        this.catch_next = this.catch_last = true;
+        this.loop_block = null;
+    case 1:
+        this.phase = 2;
+        return [this.do_next = dupe(this.M.M[0]), this];
+    case 2:
+        if (this.do_next.result.toBool()) {
+            this.phase = 1;
+            if (!this.loop_block) {
+                if (this.xblock && this.xblock.pblock.blockoid && this.xblock.pblock.blockoid
+                    && this.xblock.pblock.blockoid.statementlist) {
+                    this.loop_block = new p6builtin.Sub(
+                        this.xblock.pblock.blockoid.statementlist, this.context, []);
+                } else {
+                    return [this.invoker];
+                }
+            }
+            return [this.do_next = this.loop_block, this];
+        }
+        return [this.invoker];
+    case 13: // interrupt "last"
+        return [this.invoker];
+    case 15: // interrupt "next"
+        this.do_next = { result : new p6builtin.Bool(true) };
+        this.phase = 1;
+        return [this];
+    }
+},
 modifier_expr:function(){
     switch(this.phase) {
     case 0:
