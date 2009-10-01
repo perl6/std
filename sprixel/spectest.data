@@ -1,0 +1,5 @@
+# spectest.data - sprixel version
+# to fudge tests write the test numbers after the file name.
+../01-sanity/04-if.t
+S02-builtin_data_types/num.t
+S02-literals/radix.t skip 87 94..97 109..127
