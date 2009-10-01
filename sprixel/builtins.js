@@ -600,24 +600,38 @@ do_Exponentiation:function(){
 }
 };
 
-p6builtin.p6array = function(items){
-    this.items = items || [];
+function List_flatten(js_list){
+    var result = [], list;
+    for(var i=0,l=js_list.length;i<l;++i){
+        //say('CCCCCCCCCCCC  '+(js_list[i].items ? ToJS(js_list[i].items) : 'NOT A LIST: '+js_list[i]));
+        Array.prototype.splice.apply(result, [result.length, 0].concat(
+            (Type(list = js_list[i])=='List()')
+                ? List_flatten(list.items)
+                : list));
+    }
+    return result;
+}
+
+p6builtin.List = function(items){
+    this.count = (this.items = items ? List_flatten(items) : []).length;
+    //S(this.items);
 };
-p6builtin.p6array.prototype = {
+p6builtin.List.prototype = {
 toString:function(){
     return this.items.join('');
 },
-'push':function(item){
+push:function(item){
     this.items.push(item);
+    ++this.count;
 },
 do_count:function(){
-    return this.items.length;
+    return this.count;
 },
 toBool:function(){
     return true;
 },
 WHAT:function(){
-    return 'Array()';
+    return 'List()';
 }
 };
 

@@ -88,7 +88,7 @@ sub run_js_interpreter {
     my $start = gettimeofday();
     eval { $ctx->execute('top_interp('.$ast.',p6toplevel);') };
     warn $@ if $@;
-    #say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
+    say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
 }
 sub say_them {
     # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)

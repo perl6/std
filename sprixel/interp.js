@@ -393,7 +393,7 @@ Multiplicative:function(){
 },
 List_assignment:function(){
     this.result = this.eval_args[0];
-    this.result.value = new p6builtin.p6array(this.eval_args.slice(1));
+    this.result.value = new p6builtin.List(this.eval_args.slice(1));
     return [this.invoker];
 },
 routine_declarator__S_sub:function(){
@@ -706,7 +706,7 @@ do_iterate_map:function(){
             return [this.invoker];
         }
         this.idx = -1;
-        this.result = new p6builtin.p6array();
+        this.result = new p6builtin.List();
         this.phase = 1;
     case 1:
         if (this.idx > -1) {
@@ -782,6 +782,12 @@ var __lazyarg_Identifiers = {
     'isa_ok' : 1
 };
 */
+
+var JSI=0;
+function JSIND(n) {
+    return Array((JSI += n || 0) + 1).join(' ');
+}
+
 function interp(obj,context) {
     var act = obj, result = Array(1), empty = [0], last = act, continuation;
     act.phase = 0; act.context = context;
