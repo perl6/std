@@ -28,7 +28,7 @@ var Derive = (function(){
 var DBOX={b:2,B:2,x:16,X:16,o:8,O:8,d:10,D:10};
 
 function F__() { }
-
+/*
 function Beget(parent) {
   F__.prototype = parent;
   return new F__();
@@ -119,9 +119,9 @@ String.prototype.charCodeAt = function(idx) {
 
 function popArgs() { arguments.length--; return arguments }
 
-Array.prototype.has = function Array_prototype_has(item) {
-  return Array_prototype_indexOf.call(this, item) != -1;
-}
+//Array.prototype.has = function Array_prototype_has(item) {
+//  return Array_prototype_indexOf.call(this, item) != -1;
+//}
 
 Array.prototype.removeAt = function Array_prototype_removeAt(index) {
   var len;
@@ -137,7 +137,7 @@ Array.prototype.removeAt = function Array_prototype_removeAt(index) {
 }
 
 Array.prototype.isArray = true;
-/*
+
 // IE doesn't have Array.prototype.indexOf
 // from https://developer.mozilla.org/En/Core_JavaScript_1.5_Reference:Objects:Array:indexOf
 // available under MIT license, according to https://developer.mozilla.org/Project:Copyrights
@@ -162,7 +162,7 @@ if (!Array.prototype.indexOf) {
 } else {
   Array_prototype_indexOf = Array.prototype.indexOf
 }
-*/
+
 var ObjectToString = Object.prototype.toString;
 var ArrayToString = Array.prototype.toString;
 var ArrayJoin = Array.prototype.join;
@@ -181,7 +181,7 @@ Object.Length = function Object_Length() {
   for (var i in this) if (this.hasOwnProperty(i)) memberCount++;
   return memberCount;
 };
-
+*/
 var ToJS = (function(){
 
 var seen, jsi, app_act, this_js_parent, this_js_member, o, r, objs;
@@ -255,7 +255,7 @@ return function topEmit(obj) {
 };
 
 })();
-
+/*
 Array.prototype.flatten = function(includeUndefined) {
   var result = [];
   var len = this.length;
@@ -695,7 +695,7 @@ Array.prototype.distinct = function(s){
     }
     return a;
 };
-
+*/
 /*
   Copyright (c) 2007, 2008 Alessandro Warth <awarth@cs.ucla.edu>
 
@@ -720,7 +720,7 @@ Array.prototype.distinct = function(s){
   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
   OTHER DEALINGS IN THE SOFTWARE.
 */
-
+/*
 Array.prototype.map = function(f) {
   var r = []
   for (var idx = 0; idx < this.length; idx++)
@@ -844,7 +844,7 @@ function getGlobal() {
     return this;
   }).call(null);
 }
-
+*/
 1;
 
 

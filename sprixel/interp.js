@@ -137,6 +137,46 @@ statement_control__S_if:function(){
         return [this.invoker];
     }
 },
+statement_control__S_loop:function(){
+    switch(this.phase) {
+    case 0:
+        this.phase = 1;
+        //this.context = new Scope(this.context); // derive scope for ctrl exprs
+        this.loop_block = null;
+        this.result = new p6builtin.List();
+        if (this.eee.e1) {
+            return [this.do_next = dupe(this.eee.e1), this];
+        }
+    case 1:
+        this.phase = 2;
+        if (this.eee.e2) {
+            return [this.do_next = dupe(this.eee.e2), this];
+        } else {
+            this.do_next = { result : new p6builtin.Bool(true) };
+        }
+    case 2:
+        if (this.do_next.result.toBool()) {
+            this.phase = 3;
+            if (!this.loop_block) {
+                if (this.block && this.block.blockoid && this.block.blockoid
+                    && this.block.blockoid.statementlist) {
+                    this.loop_block = new p6builtin.Sub(
+                        this.block.blockoid.statementlist, this.context, []);
+                } else {
+                    return [this.invoker];
+                }
+            }
+            return [this.do_next = this.loop_block, this];
+        }
+        return [this.invoker];
+    case 3:
+        this.phase = 1;
+        if (this.eee.e3) {
+            return [this.do_next = dupe(this.eee.e3), this];
+        }
+        return [this]; // special, trampoline to myself!
+    }
+},
 modifier_expr:function(){
     switch(this.phase) {
     case 0:
@@ -322,6 +362,10 @@ variable:function(){
     //if (this.desigilname.longname.name.identifier.TEXT=='True') throw keys(this.desigilname.longname);
     this.result = new p6builtin.p6var(this.sigil.TEXT,
         this.desigilname.longname.name.identifier.TEXT, this.context);
+    if (!this.result.value) {
+        throw this.sigil.TEXT+this.desigilname.longname.name.identifier.TEXT+
+            ' is not defined';
+    }
     return [this.invoker];
     //say(keys(this.context));
 },
