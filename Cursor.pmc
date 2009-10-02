@@ -2577,7 +2577,7 @@ sub add_enum { my $self = shift;
     return unless $expr;
     local $::SCOPE = 'constant';
     # XXX complete kludge, really need to eval EXPR
-    $expr =~ s/<\S+>//g;
+    $expr =~ s/<\S+>//g;  # handle :name<string>
     for ($expr =~ m/([a-zA-Z_]\w*)/g) {
         $self->add_name($type . "::$_");
         $self->add_name($_);
@@ -2601,7 +2601,15 @@ sub do_need { my $self = shift;
     my $topsym;
     my $lib = '.';
     my $std = -x 'std' ? './std' : 'std';
-    for my $d (split ':', $ENV{PERL6LIB}//'.:..') {
+    if (not @::PERL6lib) {
+        if ($ENV{PERL6LIB}) {
+            @::PERL6LIB = split ':', $ENV{PERL6LIB}
+        }
+        else {
+            @::PERL6LIB = qw( ./lib ../lib . .. );
+        }
+    }
+    for my $d (@::PERL6LIB) {
         if (-f "$d/$module.pm") {
             $lib = $d;
             last;
