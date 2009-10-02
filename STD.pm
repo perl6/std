@@ -941,15 +941,16 @@ token statement_control:repeat {
 }
 
 token statement_control:loop {
-    <sym> :s
+    <sym> <.ws>
     $<eee> = (
-        '('
-            <e1=EXPR>? ';'   {*}                            #= e1
-            <e2=EXPR>? ';'   {*}                            #= e2
-            <e3=EXPR>?       {*}                            #= e3
-        ')'                      {*}                            #= eee
-    )?
-    <block>                     {*}                             #= block
+        '(' [ :s
+            <e1=EXPR>? ';'
+            <e2=EXPR>? ';'
+            <e3=EXPR>?
+        ')'||<.panic: "Malformed loop spec">]
+        [ <?before '{' > <.panic: "Whitespace required before block"> ]?
+    )? <.ws>
+    <block>
 }
 
 
