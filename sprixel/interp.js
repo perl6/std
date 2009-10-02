@@ -809,6 +809,22 @@ do_iterate_map:function(){
         }
     }
 },
+Conditional:function(){
+    switch(this.phase) {
+    case 0:
+        this.phase = 1;
+        return this.do_next = dupe(this.args[0], this);
+    case 1:
+        this.phase = 2;
+        if (this.do_next.result.toBool()) {
+            return this.do_next = dupe(this.M[1].infix.EXPR, this);
+        }
+        return this.do_next = dupe(this.args[1], this);
+    case 2:
+        this.result = this.do_next.result;
+        return this.invoker;
+    }
+},
 package_declarator: function(){
     throw keys(this);
 }
@@ -861,7 +877,8 @@ var __lazyarg_Types = {
     Tight_and : 1,
     Tight_or : 1,
     Loose_and: 1,
-    Loose_or: 1
+    Loose_or: 1,
+    Conditional: 1
 };
 /*
 var __lazyarg_Identifiers = {
