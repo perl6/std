@@ -509,9 +509,11 @@ routine_def:function(){
         this.do_next = dupe(this.blockoid, this);
         var arg_slots = [], signature;
         if (this.multisig && this.multisig.length) {
+            var param_var;
             for (var i in (signature = this.multisig[0].signature)) {
-                arg_slots[i] = [signature[i].parameter[0].param_var.sigil.TEXT,
-                    signature[i].parameter[0].param_var.name[0].TEXT];
+                arg_slots[i] = [(param_var =
+                    signature[i].parameter[0].param_var).sigil.TEXT,
+                    param_var.name[0].TEXT];
             }
         }
         this.do_next.arg_slots = arg_slots;
@@ -820,10 +822,8 @@ Conditional:function(){
         return this.do_next = dupe(this.args[0], this);
     case 1:
         this.phase = 2;
-        if (this.do_next.result.toBool()) {
-            return this.do_next = dupe(this.M[1].infix.EXPR, this);
-        }
-        return this.do_next = dupe(this.args[1], this);
+        return this.do_next = dupe(this.args[
+            this.do_next.result.toBool() ? 1 : 2], this);
     case 2:
         this.result = this.do_next.result;
         return this.invoker;
