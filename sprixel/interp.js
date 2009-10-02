@@ -413,6 +413,7 @@ variable:function(){
     this.result = new p6builtin.p6var(this.sigil.TEXT,
         this.desigilname.longname.name.identifier.TEXT, this.context);
     if (!this.result.value) {
+        throw keys(this.context);
         throw this.sigil.TEXT+this.desigilname.longname.name.identifier.TEXT+
             ' is not defined';
     }
@@ -543,7 +544,10 @@ Sub_invocation:function(){
         this.do_next = dupe(this.sub_body, this);
         // derive new Scope from the declaration context (new "lexpad"/frame)
         var ctx = this.do_next.context = new Scope(this.declaration_context);
-        if (this.topic) { ctx['$_'] = this.topic };
+        if (this.topic) {
+            var topic = new p6builtin.p6var('$', '_', this.context, true);
+            topic.value = this.topic;
+        }
         for (var i in this.arg_slots) {
             var arg_var = new p6builtin.p6var(this.arg_slots[i][0],
                 this.arg_slots[i][1], ctx, true);
