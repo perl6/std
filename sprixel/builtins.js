@@ -49,6 +49,8 @@ do_Multiplicative:function(right, divide){
         return new p6builtin.Int(left.v.shiftLeft(right.v));
     case 4:
         return new p6builtin.Int(left.v.shiftRight(right.v));
+    case 5:
+        return new p6builtin.Int(left.v.divide(right.v));
     case 1:
     case 2:
         var q = bigInt.nbi(), r = bigInt.nbi();

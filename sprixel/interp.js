@@ -479,10 +479,11 @@ Multiplicative:function(){
     } catch(e) {};
     if (!done) {
         this.result = this.eval_args[0].do_Multiplicative(this.eval_args[1],
-            sym == 'infix__S_Slash' ? 1
+            sym == 'infix__S_Slash'         ? 1
                 : sym == 'infix__S_Percent' ? 2
-                : sym == 'infix__S_PlusLt' ? 3
-                : sym == 'infix__S_PlusGt' ? 4
+                : sym == 'infix__S_PlusLt'  ? 3
+                : sym == 'infix__S_PlusGt'  ? 4
+                : sym == 'infix__S_div'     ? 5
                 : 0);
     }
     return this.invoker;
