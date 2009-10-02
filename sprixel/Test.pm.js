@@ -1,14 +1,19 @@
-var test_number = 1;
+var test_number = 0;
 
 function do_plan(planned){
     this.result = new p6builtin.Bool(true);
     say('1..'+planned);
 }
 
+function do_done_testing(){
+    this.result = new p6builtin.Bool(true);
+    say('1..'+test_number);
+}
+
 function do_ok(expr,msg){
     say(((this.result = new p6builtin.Bool(expr.toBool && expr.toBool())).v
         ? 'ok '
-        : 'not ok ') + test_number++ + (msg ? ' - ' + msg : ''));
+        : 'not ok ') + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
 function do_is(left,right,msg){
@@ -21,7 +26,7 @@ function do_is(left,right,msg){
       : left.WHAT()=='Num()' ? left.do_infix__S_EqualEqual(right).v : false
     )).v
         ? 'ok '
-        : 'not ok ') + test_number++ + (msg ? ' - ' + msg : ''));
+        : 'not ok ') + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
 function do_isa_ok(left,right,msg){
@@ -30,7 +35,7 @@ function do_isa_ok(left,right,msg){
             ? this.context[right].WHAT() : right.WHAT())
     )).v
         ? 'ok '
-        : 'not ok ') + test_number++ + (msg ? ' - ' + msg : ''));
+        : 'not ok ') + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
 function do_isnt(left,right,msg){
@@ -41,24 +46,25 @@ function do_isnt(left,right,msg){
       : false
     ))).v
         ? 'ok '
-        : 'not ok ') + test_number++ + (msg ? ' - ' + msg : ''));
+        : 'not ok ') + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
 function do_pass(msg){
-    say('ok ' + test_number++ + (msg ? ' - ' + msg : ''));
+    say('ok ' + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
 function do_flunk(msg){
-    say('not ok ' + test_number++ + (msg ? ' - ' + msg : ''));
+    say('not ok ' + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
 function test_stub(left,right,msg){
     this.result = new p6builtin.Bool(false);
-    say(('ok ') + test_number++ + ' TODO '+(msg ? ' - ' + msg : ''));
+    say(('ok ') + ++test_number + ' TODO '+(msg ? ' - ' + msg : ''));
 }
 
 // install the JSSUBS in place of the p6subs for which they're standing in
 p6toplevel["plan"]          = new p6builtin.jssub(do_plan,   'plan');
+p6toplevel["done_testing"]  = new p6builtin.jssub(do_done_testing, 'done_testing');
 p6toplevel["ok"]            = new p6builtin.jssub(do_ok,     'ok');
 p6toplevel["is"]            = new p6builtin.jssub(do_is,     'is');
 p6toplevel["isnt"]          = new p6builtin.jssub(do_isnt,   'isnt');
