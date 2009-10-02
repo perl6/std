@@ -768,7 +768,7 @@ pblock:function(){
     switch(this.phase) {
     case 0:
         ++this.phase;
-        return [this.do_next = dupe(this.blockoid),this];
+        return this.do_next = dupe(this.blockoid, this);
     case 1:
         this.result = this.do_next.result;
         return this.invoker;
@@ -906,9 +906,9 @@ function interp(obj,context) {
         //    act.phase = 0;
         //    act.eval_args = null;
         //    act.context = result[1].context;
-        //    if (global_trace) {
-        //        say((act.phase ? 'returning to ' : 'trying ')+ act.T);
-        //    }
+            if (global_trace) {
+                say((act.phase ? 'returning to ' : 'trying ')+ act.T);
+            }
             //say(keys(act), act.SYM);
         //} else {
             //if (global_trace) say('returning to '+act.T);
