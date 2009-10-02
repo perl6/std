@@ -392,6 +392,24 @@ do_infix__S_eq:function(right){
 do_infix__S_ne:function(right){
     return new p6builtin.Bool(this.v != right.v);
 },
+do_infix__S_Lt:function(right){
+    return new p6builtin.Bool(this.v < right.v);
+},
+do_infix__S_LtEqual:function(right){
+    return new p6builtin.Bool(this.v <= right.v);
+},
+do_infix__S_Gt:function(right){
+    return new p6builtin.Bool(this.v > right.v);
+},
+do_infix__S_GtEqual:function(right){
+    return new p6builtin.Bool(this.v >= right.v);
+},
+do_infix__S_EqualEqual:function(right){
+    return new p6builtin.Bool(this.v == right.v);
+},
+do_infix__S_BangEqual:function(right){
+    return new p6builtin.Bool(this.v != right.v);
+},
 negate:function(){
     return new p6builtin.Num(0).negate();
 },

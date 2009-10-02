@@ -1,7 +1,7 @@
 # Makefile for sprixel
 
 # list of simple tests that sprixel passes
-T_01_SANITY = ../../t/01-sanity/04-if.t
+T_01_SANITY = ../../t/01-sanity/03-equal.t ../../t/01-sanity/04-if.t
 TESTS = $(T_01_SANITY)
 
 # usage: make -f sprixel.mk test
@@ -11,6 +11,6 @@ test:
 
 # usage: make -f sprixel.mk spectest
 spectest:
-	perl sprixel/harness-fudging.pl 'perl sprixel.pl' sprixel/spectest.data ../../t/spec
+	perl sprixel/harness-fudging.pl 'perl sprixel.pl -t' sprixel/spectest.data ../../t/spec
 	@echo Q.E.D.
 
