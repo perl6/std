@@ -34,7 +34,7 @@ my $setting;
 if ($test_mode) {
     $setting = 'sprixelTEST';
     unless (-f 'sprixelTEST.setting') {
-        my $s_c = scalar(read_file('Test.pm'));
+        my $s_c = scalar(read_file('lib/Test.pm'));
         $s_c =~ s/^proto/my proto/g;
         $s_c =~ s/^class\sTest/ /g;
         my $c_c = scalar(read_file('CORE.setting'));

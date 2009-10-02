@@ -829,6 +829,10 @@ Conditional:function(){
         return this.invoker;
     }
 },
+circumfix__S_Bra_Ket:function(){
+    this.result = new p6builtin.List();
+    return this.invoker;
+},
 package_declarator: function(){
     throw keys(this);
 }
