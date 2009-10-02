@@ -3958,6 +3958,12 @@ token infix:sym<?? !!> ( --> Conditional) {
         || <.panic: "Found ?? but no !!; possible precedence problem">
         ]
     ]
+    { $<O><_reducecheck> = 'raise_middle'; }
+}
+
+method raise_middle {
+    self.<middle> = self.<infix><EXPR>;
+    self;
 }
 
 token infix:sym<?> ( --> Conditional)
@@ -4010,11 +4016,11 @@ token infix:sym<.=> ( --> Item_assignment) {
     <sym>
     {
         $<O><nextterm> = 'dottyopish';
-        $<O><_reducecheck> = 'checkdoteq';
+        $<O><_reducecheck> = 'check_doteq';
     }
 }
 
-method checkdoteq {
+method check_doteq {
     # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || ]
     return self if self.<left><scope_declarator>;
     my $ok = 0;
@@ -4405,7 +4411,7 @@ method EXPR ($preclvl) {
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
                 my $ck;
                 if $ck = $op<O><_reducecheck> {
-                    $op.$ck;
+                    $op = $op.$ck;
                 }
                 push @termstack, $op._REDUCE($op<_from>, 'INFIX');
                 @termstack[*-1].<PRE>:delete;

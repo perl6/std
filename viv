@@ -398,7 +398,13 @@ sub indent {
 	my $r = hoist($match);
 	my $left = $match->{left}->{_ast};
 	my $right = $match->{right}->{_ast};
-	$r->{'args'} = [$left,$right];
+	if ($match->{middle}) { # ternary
+	    my $middle = $match->{middle}->{_ast};
+	    $r->{'args'} = [$left,$middle,$right];
+	}
+	else {
+	    $r->{'args'} = [$left,$right];
+	}
 	my $a = $r->{'.'} = [$left,$match->{_ast},$right];
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
