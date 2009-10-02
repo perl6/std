@@ -279,8 +279,8 @@ sub you_were_here {
         $STD::ALL->{SETTING} = $::YOU_WERE_HERE;
     }
     else {
-        $::UNIT->{'$?SETTINGID'} = $STD::ALL->{SETTING}->id;
-        $::UNIT->{'$?COREID'} = $STD::ALL->{CORE}->id;
+        $::UNIT->{'$?SETTING_ID'} = $STD::ALL->{SETTING}->id;
+        $::UNIT->{'$?CORE_ID'} = $STD::ALL->{CORE}->id;
         $STD::ALL = {
             UNIT => $::UNIT,
         };
@@ -2390,8 +2390,7 @@ sub clean_id { my $self = shift;
     $id .= '::';
     $id =~ s/^MY:file<CORE.setting>.*?::/CORE::/;
     $id =~ s/^MY:file<\w+.setting>.*?::/SETTING::/;
-    $id =~ s/:file<\Q$file\E>//;
-    $id =~ s/MY:line\(1\):pos\(0\)/UNIT/;
+    $id =~ s/^MY:file<\Q$file\E>$/UNIT/;
     $id =~ s/:pos\(\d+\)//;
     $id .= "<$name>";
     $id;
@@ -2606,7 +2605,7 @@ sub do_need { my $self = shift;
             @::PERL6LIB = split ':', $ENV{PERL6LIB}
         }
         else {
-            @::PERL6LIB = qw( ./lib ../lib . .. );
+            @::PERL6LIB = qw( ./lib ../lib t/spec/packages ../t/spec/packages . .. );
         }
     }
     for my $d (@::PERL6LIB) {

@@ -1,6 +1,8 @@
 grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 use DEBUG;
+use NAME;
+use STASH;
 
 # per parse
 my $*ACTIONS;         # class or object which defines reduce actions
@@ -563,10 +565,17 @@ rule comp_unit {
 
         @*WORRIES = ();
         self.load_setting($*SETTINGNAME);
-        self.newpad;
+        my $oid = $*SETTING.id;
+        my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
+        $*CURPAD = STASH.new(
+            'OUTER::' => [$oid],
+            '!file' => $*FILE, '!line' => 0,
+            '!id' => [$id],
+        );
+        $ALL.{$id} = $*CURPAD;
         $*UNIT = $*CURPAD;
         $ALL.<UNIT> = $*UNIT;
-        self.finishpad(1);
+        self.finishpad;
     }}
     <statementlist>
     [ <?unitstopper> || <.panic: "Confused"> ]
@@ -5102,12 +5111,9 @@ grammar P5Regex is STD {
 # Symbol tables #
 #################
 
-use NAME;
-use STASH;
-
 method newpad {
     my $oid = $*CURPAD.id;
-#    $ALL.{$oid} === $*CURPAD or die "internal error: current pad id is invalid";
+    $ALL.{$oid} === $*CURPAD or die "internal error: current pad id is invalid";
     my $line = self.lineof(self.pos);
     my $id;
     if $*NEWPAD {
@@ -5128,16 +5134,11 @@ method newpad {
     self;
 }
 
-method finishpad($siggy = $*CURPAD.{'$?GOTSIG'}//0) {
+method finishpad {
     my $line = self.lineof(self.pos);
     $*CURPAD<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line );
     $*CURPAD<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line );
     $*CURPAD<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line );
-    if not $siggy {
-        $*CURPAD<@_> = NAME.new( name => '@_', file => $*FILE, line => $line );
-        $*CURPAD<%_> = NAME.new( name => '%_', file => $*FILE, line => $line );
-        $*CURPAD<$?GOTSIG>:delete;
-    }
     self;
 }
 
@@ -5578,7 +5579,14 @@ method check_variable ($variable) {
             $ok ||= $first lt 'A';
             $ok ||= self.is_known($name);
             if not $ok {
-                $variable.worry("Variable $name is not predeclared");
+                if $name eq '@_' or $name eq '%_' {
+                    my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
+                    if $siggy { $variable.panic("Placeholder variable $name cannot override existing signature $siggy"); }
+                    self.add_my_variable($name);
+                }
+                else {
+                    $variable.worry("Variable $name is not predeclared");
+                }
             }
         }
         when '^' {
