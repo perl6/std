@@ -688,6 +688,9 @@ Symbolic_unary:function(){
             ? this.eval_args[0].negate()
             : new p6builtin.Num(p6builtin.Int.bigInt.ZERO.negate());
         break;
+    case 'prefix__S_Bang':
+        this.result = new p6builtin.Bool(this.eval_args[0]?1:0);
+        break;
     case 'prefix__S_Tilde':
         this.result = new p6builtin.Str(this.eval_args[0].toString());
         break;
