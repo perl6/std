@@ -46,6 +46,20 @@ statementlist:function(){
 statement:function(){
     switch(this.phase) {
     case 0:
+        //say(keys(this.statement_mod_loop[0].modifier_expr));
+        if (this.statement_mod_loop
+                && typeof(this.statement_mod_loop.length)!='undefined'
+                && this.statement_mod_loop.length) {
+            this.phase = 2;
+            var stripped = dupe(this);
+            stripped.statement_mod_loop = null;
+            return [this.do_next = {
+                T: 'statement_control__S_while',
+                phase: 0,
+                block_override: stripped,
+                M: { M: [this.statement_mod_loop[0].modifier_expr] }
+            }, this];
+        }
         if (this.statement_mod_cond
                 && typeof(this.statement_mod_cond.length)!='undefined'
                 && this.statement_mod_cond.length) {
@@ -53,11 +67,11 @@ statement:function(){
             return [this.do_next =
                 dupe(this.statement_mod_cond[0]), this];
         } else {
-            this.do_next = 0;
+            this.do_next = { result: new p6builtin.Bool(true) };
         }
     case 1:
         this.phase = 2;
-        if ((!this.do_next || this.do_next.result.toBool())
+        if (this.do_next.result.toBool()
                 && (this.statement_control || this.EXPR))
             return [this.do_next =
                 dupe(this.statement_control || this.EXPR),this];
@@ -189,13 +203,18 @@ statement_control__S_while:function(){
         this.phase = 1;
         this.catch_next = this.catch_last = true;
         this.loop_block = null;
+        if (this.block_override) {
+            this.block_override.context = this.context;
+        }
     case 1:
         this.phase = 2;
         return [this.do_next = dupe(this.M.M[0]), this];
     case 2:
         if (this.do_next.result.toBool()) {
             this.phase = 1;
-            if (!this.loop_block) {
+            if (this.block_override) {
+                this.loop_block = dupe(this.block_override);
+            } else if (!this.loop_block) {
                 if (this.xblock && this.xblock.pblock.blockoid && this.xblock.pblock.blockoid
                     && this.xblock.pblock.blockoid.statementlist) {
                     this.loop_block = new p6builtin.Sub(
@@ -884,9 +903,9 @@ function interp(obj,context) {
         } else {
             if (global_trace) say('returning to '+act.T);
             //if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
-            if (last.invoker && last.invoker===act) {
-                doPostDo(last);
-            }
+            //if (last.invoker && last.invoker===act) {
+            //    doPostDo(last);
+            //}
         }
         if (disp[act.T]) {
             if (act.args && !act.eval_args && !__lazyarg_Types[act.T]) {
@@ -943,7 +962,7 @@ function dupe(act){ // shallow clone
         newact[i] = act[i];
     }
     newact.phase = 0;
-    newact.postDo = undefined;
+    //newact.postDo = undefined;
     newact.eval_args = null;
     return newact;
 }
