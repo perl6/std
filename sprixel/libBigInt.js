@@ -1187,6 +1187,73 @@ function bnpMillerRabin(t) {
   return true;
 }
 
+function bnpIncrement() {
+  var a = BigInteger.ONE, r = this;
+  var i = 0, c = 0, m = Math.min(1,this.t);
+  while(i < m) {
+    c += this[i]+a[i];
+    r[i++] = c&this.DM;
+    c >>= this.DB;
+  }
+  if(a.t < this.t) {
+    c += a.s;
+    while(i < this.t) {
+      c += this[i];
+      r[i++] = c&this.DM;
+      c >>= this.DB;
+    }
+    c += this.s;
+  }
+  else {
+    c += this.s;
+    while(i < a.t) {
+      c += a[i];
+      r[i++] = c&this.DM;
+      c >>= this.DB;
+    }
+    c += a.s;
+  }
+  r.s = (c<0)?-1:0;
+  if(c > 0) r[i++] = c;
+  else if(c < -1) r[i++] = this.DV+c;
+  r.t = i;
+  r.clamp();
+}
+
+// (protected) r = this - a
+function bnpDecrement() {
+  var a = BigInteger.ONE, r = this;
+  var i = 0, c = 0, m = Math.min(1,this.t);
+  while(i < m) {
+    c += this[i]-a[i];
+    r[i++] = c&this.DM;
+    c >>= this.DB;
+  }
+  if(a.t < this.t) {
+    c -= a.s;
+    while(i < this.t) {
+      c += this[i];
+      r[i++] = c&this.DM;
+      c >>= this.DB;
+    }
+    c += this.s;
+  }
+  else {
+    c += this.s;
+    while(i < a.t) {
+      c -= a[i];
+      r[i++] = c&this.DM;
+      c >>= this.DB;
+    }
+    c -= a.s;
+  }
+  r.s = (c<0)?-1:0;
+  if(c < -1) r[i++] = this.DV+c;
+  else if(c > 0) r[i++] = c;
+  r.t = i;
+  r.clamp();
+}
+
 // protected
 BigInteger.prototype.chunkSize = bnpChunkSize;
 BigInteger.prototype.toRadix = bnpToRadix;
@@ -1237,6 +1304,8 @@ BigInteger.prototype.pow = bnPow;
 BigInteger.prototype.gcd = bnGCD;
 BigInteger.prototype.lcm = bnLCM;
 BigInteger.prototype.isProbablePrime = bnIsProbablePrime;
+BigInteger.prototype.increment = bnpIncrement;
+BigInteger.prototype.decrement = bnpDecrement;
 
 // BigInteger interfaces not implemented in jsbn:
 

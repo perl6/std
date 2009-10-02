@@ -23,6 +23,9 @@ toString: function(){
 toBool: function(){
     return this.v.signum() != 0;
 },
+increment: function(){
+    this.v.increment();
+},
 succ: function(){
     return new p6builtin.Int(this.v.add(bigInt.ONE));
 },
@@ -528,11 +531,19 @@ toString:function(){
     return this.value.toString();
 },
 increment:function(){
-    this.value = this.value.succ();
+    if (this.value.increment) {
+        this.value.increment();
+    } else {
+        this.value = this.value.succ();
+    }
     return this;
 },
 decrement:function(){
-    this.value = this.value.pred();
+    if (this.value.decrement) {
+        this.value.decrement();
+    } else {
+        this.value = this.value.pred();
+    }
     return this;
 },
 do_Additive:function(right, subtract){
