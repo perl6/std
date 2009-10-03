@@ -344,4 +344,8 @@ my proto wait { }
 my proto kill { }
 my proto sleep { }
 
+my package PROCESS {
+    my %ENV is export;
+}
+
 YOU_ARE_HERE;

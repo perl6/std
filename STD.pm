@@ -3429,6 +3429,7 @@ token dottyop {
     :dba('dotty method or postfix')
     [
     | <methodop>
+    | <colonpair>
     | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
     ]
 }

@@ -2578,7 +2578,7 @@ sub add_enum { my $self = shift;
     return unless $expr;
     local $::SCOPE = 'constant';
     # XXX complete kludge, really need to eval EXPR
-    $expr =~ s/<\S+>//g;  # handle :name<string>
+    $expr =~ s/:(\w+)<\S+>/$1/g;  # handle :name<string>
     for ($expr =~ m/([a-zA-Z_]\w*)/g) {
         $self->add_name($type . "::$_");
         $self->add_name($_);
