@@ -716,6 +716,7 @@ token blockoid {
         { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
     | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
     ]
+    <.check_placeholders>
 }
 
 token regex_block {
@@ -1341,6 +1342,7 @@ rule regex_def () {
         { $*IN_DECL = 0; }
         <.finishpad>
         <regex_block>:!s
+        <.check_placeholders>
     ] || <.panic: "Malformed regex">
 }
 
@@ -3051,7 +3053,7 @@ token signature {
     <.ws>
     { $*IN_DECL = 0; }
     [ '-->' <.ws> <typename> ]?
-    {{ $*LEFTSIGIL = '@'; $*CURPAD.{'$?GOTSIG'} ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')'; }}
+    {{ $*LEFTSIGIL = '@'; $*CURPAD.{'$?SIGNATURE'} ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')'; }}
 }
 
 token type_declarator:subset {
@@ -5142,6 +5144,17 @@ method finishpad {
     self;
 }
 
+method check_placeholders {
+    my $pv = $*CURPAD.{'%?PLACEHOLDERS'};
+    my $h = $pv.<%_>:delete;
+    my $a = $pv.<@_>:delete;
+    my $sig = join ', ', sort keys %$pv;
+    $sig ~= ', *@_' if $a;
+    $sig ~= ', *%_' if $h;
+    $*CURPAD.{'$?SIGNATURE'} = $sig;
+    self;
+}
+
 method is_name ($n, $curpad = $*CURPAD) {
     my $name = $n;
     say "is_name $name" if $*DEBUG +& DEBUG::symtab;
@@ -5294,7 +5307,7 @@ method add_my_name ($n, $d, $p) {
     # This may just be a lexical alias to "our" and such,
     # so reuse $*DECLARAND pointer if it's there.
     my $declaring = $d // NAME.new(
-        xpad => $curstash,
+        xpad => $curstash.idref,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
@@ -5382,7 +5395,7 @@ method add_our_name ($n) {
     return self unless defined $name and $name ne '';
 
     my $declaring = $*DECLARAND // NAME.new(
-        xpad => $curstash,
+        xpad => $curstash.idref,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
@@ -5511,8 +5524,8 @@ method is_known ($n, $curpad = $*CURPAD) {
             if $outer { # fake up an alias to outer symbol to catch reclaration
                 my $n = $pad.{$name};
                 $curpad.{$name} = NAME.new(
-                    xpad => $pad,
-                    opad => $pad,
+                    xpad => $pad.idref,
+                    opad => $pad.idref,
                     name => ("OUTER::" x $outer) ~ "<$name>",
                     file => $*FILE, line => self.line,
                     mult => 'only',
@@ -5580,9 +5593,11 @@ method check_variable ($variable) {
             $ok ||= self.is_known($name);
             if not $ok {
                 if $name eq '@_' or $name eq '%_' {
-                    my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
-                    if $siggy { $variable.panic("Placeholder variable $name cannot override existing signature $siggy"); }
+                    if my $siggy = $*CURPAD.{'$?SIGNATURE'} {
+                        $variable.panic("Placeholder variable $name cannot override existing signature $siggy");
+                    }
                     self.add_my_variable($name);
+                    $*CURPAD.{'%?PLACEHOLDERS'}{$name}++;
                 }
                 else {
                     $variable.worry("Variable $name is not predeclared");
@@ -5591,9 +5606,12 @@ method check_variable ($variable) {
         }
         when '^' {
             my $*MULTINESS = 'multi';
-            my $siggy = $*CURPAD.{'$?GOTSIG'}//'';
-            if $siggy { $variable.panic("Placeholder variable $name cannot override existing signature $siggy"); }
+            if my $siggy = $*CURPAD.{'$?SIGNATURE'} {
+                $variable.panic("Placeholder variable $name cannot override existing signature $siggy");
+            }
             self.add_my_variable($name);
+            $name ~~ s/\^//;
+            $*CURPAD.{'%?PLACEHOLDERS'}{$name}++;
         }
         when ':' {
             my $*MULTINESS = 'multi';

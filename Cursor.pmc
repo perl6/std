@@ -281,9 +281,11 @@ sub you_were_here {
     else {
         $::UNIT->{'$?SETTING_ID'} = $STD::ALL->{SETTING}->id;
         $::UNIT->{'$?CORE_ID'} = $STD::ALL->{CORE}->id;
-        $STD::ALL = {
-            UNIT => $::UNIT,
-        };
+        for my $key (keys %{$STD::ALL}) {
+            delete $STD::ALL->{$key} if $key =~ /^MY:file<\w+\.setting>/;
+        }
+        delete $STD::ALL->{CORE};
+        delete $STD::ALL->{SETTING};
     }
 
     open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
@@ -2332,7 +2334,7 @@ sub set_export {
     my $text = shift;
     my $textpkg = $text . '::';
     my $name = $::DECLARAND->{name};
-    my $xpad = delete $::DECLARAND->{xpad};
+    my $xpad = $STD::ALL->{ (delete $::DECLARAND->{xpad})->[0] };
     $::DECLARAND->{export} = $text;
     my $sid = $::CURPAD->idref;
     my $x = $xpad->{'EXPORT::'} //= STASH::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
