@@ -639,13 +639,14 @@ function List_flatten(js_list){
     for(var i=0,l=js_list.length;i<l;++i){
         Array.prototype.splice.apply(result, [result.length, 0].concat(
             (Type(list = js_list[i])=='List()')
-                ? List_flatten(list.items)
+                ? List_flatten(list.value ? list.value.items : list.items)
                 : list));
     }
     return result;
 }
 
 p6builtin.List = function(items){
+    say('gh1');
     if (items && items.length==1 && Type(items[0])=='List()') {
         return items[0];
     }
@@ -707,7 +708,9 @@ function do_die(msg){
     throw 'ENOERRORMESSAGE';
 }
 
-function do_map(block,list){
+function do_map(block){
+    var list = Array.prototype.slice.call(arguments, 1);
+    list = list.length > 1 ? new p6builtin.List(list) : list[0];
     return {
         T: 'do_iterate_map',
         block: block.value || block,
