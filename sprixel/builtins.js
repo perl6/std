@@ -646,7 +646,6 @@ function List_flatten(js_list){
 }
 
 p6builtin.List = function(items){
-    say('gh1');
     if (items && items.length==1 && Type(items[0])=='List()') {
         return items[0];
     }
