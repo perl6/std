@@ -420,7 +420,7 @@ variable:function(){
     return this.invoker;
 },
 Item_assignment:function(){
-    this.eval_args[0].set(this.result = this.eval_args[1]);
+    (this.result = this.eval_args[0]).set(this.eval_args[1].value || this.eval_args[1]);
     return this.invoker;
 },
 noun__S_variable:function(){
@@ -489,8 +489,7 @@ Multiplicative:function(){
     return this.invoker;
 },
 List_assignment:function(){
-    this.result = this.eval_args[0];
-    this.result.value = new p6builtin.List(this.eval_args.slice(1));
+    (this.result = this.eval_args[0]).value = new p6builtin.List(this.eval_args.slice(1));
     return this.invoker;
 },
 routine_declarator__S_sub:function(){
@@ -587,6 +586,10 @@ Methodcall:function(){
         // fall through
     case 1:
         this.phase = 2;
+        if (this.M[1].M.T && this.M[1].M.T == 'postcircumfix__S_Bra_Ket') {
+            this.phase = 3;
+            return dupe(this.do_next = this.M[1].M.semilist, this);
+        }
         if (this.M && this.M[1] && this.M[1].dotty
                 && this.M[1].dotty.dottyop) {
             // it's a full blown method call.  this.subr becomes the responding
@@ -597,10 +600,10 @@ Methodcall:function(){
                     methodop.longname.name.identifier.TEXT);
             if (Type(this.subr)=='Undef()') {
                 this.subr = symbol_lookup(this.context, sym);
-            }
-            if (this.subr && this.subr.isUndefined) { // it's a Type object
-                this.result = this.invocant['to'+sym]();
-                return this.invoker;
+                if (this.subr && this.subr.isUndefined) { // it's a Type object
+                    this.result = this.invocant['to'+sym]();
+                    return this.invoker;
+                }
             }
             this.subr.invocant = this.invocant;
             throw 'real method calls NYI';
@@ -614,9 +617,15 @@ Methodcall:function(){
             this.do_next.arg_array = this.eval_args;
             return this.do_next;
         }
+        throw keys(this.M[1].M);
         throw keys(this.subr) + ' cannot be invoked';
     case 2:
         this.result = this.do_next.result;
+        return this.invoker;
+    case 3:
+        //throw keys(this.subr.value.items);
+        //throw this.eval_args[0].toString();
+        this.result = this.subr.get(+this.eval_args[0].toString());
         return this.invoker;
     }
 },
@@ -839,7 +848,19 @@ circumfix__S_Bra_Ket:function(){
 },
 package_declarator: function(){
     throw keys(this);
+},
+Structural:function(){
+    var lazy_list = new p6builtin.List(), val;
+    lazy_list.direction = (val = (lazy_list.rightTip = this.eval_args[1]).
+        v.compareTo((lazy_list.leftTip = this.eval_args[0]).v)) > 0 ? 1 : val < 0 ? -1 : 0;
+    lazy_list.get = lazy_list.direction == 0
+        ? function(index){ return this.items[index] = this.leftTip }
+        : Structural_iterator_increment_Int;
+    this.result = lazy_list;
+    //throw lazy_list.get;
+    return this.invoker;
 }
+
 };
 // aliases (nodes with identical semantics)
 disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
@@ -885,6 +906,20 @@ function doPostDo(act){
     }
 }
 
+function Structural_iterator_increment_Int(index){ // populating accessor
+    var index_Int = p6builtin.Int.bigInt.nbv(index);
+    if (index_Int.compareTo(p6builtin.Int.bigInt.ZERO) < 0 ||
+        (this.direction == 1
+        ? (index_Int.compareTo(this.rightTip.v.subtract(this.leftTip.v)) > 0)
+        : (index_Int.compareTo(this.leftTip.v.subtract(this.rightTip.v)) > 0))) {
+        throw 'use of uninitialized value';
+    }
+    return this.items[index] || (this.items[index] = new p6builtin.Int(
+        this.direction == 1
+            ? this.leftTip.v.add(index_Int)
+            : this.leftTip.v.subtract(index_Int)));
+}
+
 var __lazyarg_Types = {
     Tight_and : 1,
     Tight_or : 1,
@@ -892,15 +927,6 @@ var __lazyarg_Types = {
     Loose_or: 1,
     Conditional: 1
 };
-/*
-var __lazyarg_Identifiers = {
-    'ok' : 1,
-    'is' : 1,
-    'isnt' : 1,
-    'is_deeply' : 1,
-    'isa_ok' : 1
-};
-*/
 
 var JSI=0;
 function JSIND(n) {
@@ -908,27 +934,12 @@ function JSIND(n) {
 }
 
 function interp(obj,context) {
-    var act = obj,
-    //result = Array(1), 
-    empty = [0], last = act, continuation;
+    var act = obj, empty = [0], last = act, continuation;
     act.phase = 0; act.context = context;
     do {
-        //if (result.length > 1) {
-        //    act.invoker = result[1];
-        //    act.phase = 0;
-        //    act.eval_args = null;
-        //    act.context = result[1].context;
-            if (global_trace) {
-                say((act.phase ? 'returning to ' : 'trying ')+ act.T);
-            }
-            //say(keys(act), act.SYM);
-        //} else {
-            //if (global_trace) say('returning to '+act.T);
-            //if (global_trace) say('\tresult type was '+Type(last.result)+' .toString() is '+last.result+' and the members are: '+keys(last.result));
-            //if (last.invoker && last.invoker===act) {
-            //    doPostDo(last);
-            //}
-        //}
+        if (global_trace) {
+            say((act.phase ? 'returning to ' : 'trying ')+ act.T);
+        }
         var func, T;
         if (func = disp[T = act.T]) {
             if (act.args && !act.eval_args && !__lazyarg_Types[T]) {
@@ -941,8 +952,6 @@ function interp(obj,context) {
                     invoker : act,
                     context : act.context
                 };
-                //result = empty;
-                //continue;
             } else if (act.arg && !act.eval_args) {
                 act = {
                     T : "eval_args",
@@ -951,7 +960,6 @@ function interp(obj,context) {
                     invoker : act,
                     context : act.context
                 };
-                //result = empty;
             } else {
                 act = func.call(last = act);
                 if (last.result instanceof p6builtin.jssub && last.eval_args) {
@@ -964,7 +972,6 @@ function interp(obj,context) {
                         }
                         continuation.last_op = last;
                         act = continuation;
-                        //result = empty;
                     }
                 }
             }
@@ -973,7 +980,6 @@ function interp(obj,context) {
                 + keys(act).join(',');
             last = act;
             act = last.invoker;
-            //result = [null, null];
         }
     } while (typeof(act) != 'undefined');
     return obj.result;
@@ -981,15 +987,11 @@ function interp(obj,context) {
 
 function dupe(act,invoker){ // shallow clone
     var newact = {};
-    //newact.__proto__ = act;
     for (var i in act) {
         newact[i] = act[i];
     }
     newact.phase = 0;
-    //if (!newact.context || invoker.context!==newact.context) {
-        newact.context = (newact.invoker = invoker).context;
-    //}
-    //newact.postDo = undefined;
+    newact.context = (newact.invoker = invoker).context;
     newact.eval_args = null;
     return newact;
 }

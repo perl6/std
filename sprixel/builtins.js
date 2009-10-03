@@ -628,13 +628,15 @@ toNum:function(){
 },
 do_Exponentiation:function(){
     return this.do_Exponentiation(right.value || right);
+},
+get:function(){
+    return this.value.get.apply(this.value, arguments);
 }
 };
 
 function List_flatten(js_list){
     var result = [], list;
     for(var i=0,l=js_list.length;i<l;++i){
-        //say('CCCCCCCCCCCC  '+(js_list[i].items ? ToJS(js_list[i].items) : 'NOT A LIST: '+js_list[i]));
         Array.prototype.splice.apply(result, [result.length, 0].concat(
             (Type(list = js_list[i])=='List()')
                 ? List_flatten(list.items)
@@ -644,8 +646,11 @@ function List_flatten(js_list){
 }
 
 p6builtin.List = function(items){
+    if (items && items.length==1 && Type(items[0])=='List()') {
+        return items[0];
+    }
     this.count = (this.items = items ? List_flatten(items) : []).length;
-    //S(this.items);
+        
 };
 p6builtin.List.prototype = {
 toString:function(){
@@ -663,6 +668,15 @@ toBool:function(){
 },
 WHAT:function(){
     return 'List()';
+},
+get:function(index){
+    // default get is for non-lazy lists.
+    // This isn't the Perl 6 .get method, per se... each iteration call-site
+    // knows to send in the index it wants.
+    if (index >= this.count) {
+        throw 'use of uninitialized value';
+    }
+    return this.items[index];
 }
 };
 
@@ -721,7 +735,7 @@ function do_next(){
             return parent;
         }
     }
-    throw 'last() not inside an iteration block';
+    throw 'next() not inside an iteration block';
 }
 
 var p6toplevel = new Scope();
