@@ -1,5 +1,5 @@
 var global_trace = 0
- + 1;
+// + 1;
 
 var disp = { // "bytecode" dispatch - by name of grammar node.
 statementlist:function(){
