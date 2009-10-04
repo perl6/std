@@ -1,6 +1,48 @@
 var global_trace = 0
 // + 1;
 
+function eval_args(){
+    switch(this.phase) {
+    case 0:
+        this.idx=-1;
+        if (!this.M) {
+            this.invoker.eval_args = this.invoker.eval_args || [];
+            this.phase = 4;
+            return this.invoker;
+        }
+        if (!this.M.length) {
+            this.M = [this.M];
+        }
+        this.len=this.M.length;
+        this.invoker.eval_args = [];
+        ++this.phase;
+    case 1:
+        if (this.idx > -1) {
+            this.invoker.eval_args.push(this.do_next.result);
+        }
+        if (this.idx < this.len - 1) {
+            return this.do_next = dupe(this.M[++this.idx], this);
+        } else {
+            this.result = this.invoker.eval_args;
+            return this.invoker;
+        }
+    case 2:
+        if (disp[this.invoker.T]===eval_args
+                || this.invoker.T=='List_assignment') {
+            for (var i=0;i<this.eval_args.length;++i) {
+                this.invoker.eval_args.push(this.eval_args[i]);
+            }
+            this.invoker.phase = 2;
+        } else {
+            this.invoker.eval_args = this.result = this.eval_args;
+        }
+        return this.invoker;
+    case 3:
+        this.result = this.do_next.result;
+        return this.invoker;
+    }
+}
+
 var disp = { // "bytecode" dispatch - by name of grammar node.
 statementlist:function(){
     switch(this.phase) {
@@ -253,7 +295,18 @@ SYMBOL__:function(){
     switch(this.phase) {
     case 0:
         this.phase = 1;
-        return this.do_next = dupe(this[this.SYM], this);
+        var act = dupe(this[this.SYM], this);
+        if (typeof(__symbolic_traverse[act.T])!='undefined') {
+            var child = act;
+            do {
+                child = child[child.SYM];
+            } while (typeof(__symbolic_traverse[child.T])!='undefined');
+            for (var i in child) { act[i] = child[i] }
+            act.invoker = this;
+            act.context = this.context;
+            act.phase = 0;
+        }
+        return this.do_next = act;
     case 1:
         this.result = this.do_next.result;
         return this.invoker;
@@ -323,6 +376,7 @@ Concatenation:function(){
 Replication:function(){
     // this is partly working  - "A" x 3 gives "AAA", but so does
     // "A" xx 3 - should give "A","A","A"
+    throw keys(this);
     this.result = '';
     for ( var i=0;  i<this.eval_args[1]; i++ ) {
         this.result = this.result + this.eval_args[0];
@@ -333,47 +387,7 @@ Str:function(){
     this.result = new p6builtin.Str(this.TEXT);
     return this.invoker;
 },
-eval_args:function eval_args(){
-    switch(this.phase) {
-    case 0:
-        this.idx=-1;
-        if (!this.M) {
-            this.invoker.eval_args = this.invoker.eval_args || [];
-            this.phase = 4;
-            return this.invoker;
-        }
-        if (!this.M.length) {
-            this.M = [this.M];
-        }
-        this.len=this.M.length;
-        this.invoker.eval_args = [];
-        ++this.phase;
-    case 1:
-        if (this.idx > -1) {
-            this.invoker.eval_args.push(this.do_next.result);
-        }
-        if (this.idx < this.len - 1) {
-            return this.do_next = dupe(this.M[++this.idx], this);
-        } else {
-            this.result = this.invoker.eval_args;
-            return this.invoker;
-        }
-    case 2:
-        if (disp[this.invoker.T]===eval_args
-                || this.invoker.T=='List_assignment') {
-            for (var i=0;i<this.eval_args.length;++i) {
-                this.invoker.eval_args.push(this.eval_args[i]);
-            }
-            this.invoker.phase = 2;
-        } else {
-            this.invoker.eval_args = this.result = this.eval_args;
-        }
-        return this.invoker;
-    case 3:
-        this.result = this.do_next.result;
-        return this.invoker;
-    }
-},
+eval_args:eval_args,
 Comma:function(){
     if (this.invoker.eval_args) {
         for (var i=0;i<this.eval_args.length;++i) {
@@ -405,7 +419,6 @@ scope_declarator__S_my:function(){
     }
 },
 Autoincrement:function(){
-    //throw keys(this.eval_args[0])
     if (!(this.eval_args[0] instanceof p6builtin.p6var)) { // check num role
         throw "Can't modify read-only value at "+this.BEG;
     }
@@ -433,18 +446,7 @@ variable:function(){
 },
 Item_assignment:function(){
     (this.result = this.eval_args[0]).set(this.eval_args[1].value || this.eval_args[1]);
-    //say(this.eval_args[1]);
     return this.invoker;
-},
-noun__S_variable:function(){
-    switch(this.phase) {
-    case 0:
-        ++this.phase;
-        return this.do_next = dupe(this.variable, this);
-    case 1:
-        this.result = this.do_next.result;
-        return this.invoker;
-    }
 },
 statement_control__S_use:function(){
     // only require/BEGIN the fake Test.pm
@@ -523,7 +525,6 @@ routine_def:function(){
         var arg_slots = [], signature;
         if (this.multisig && this.multisig.length) {
             var param_var, parameter;
-            //say(keys(this.multisig[0].signature[0]));
             for (var i in (parameter = this.
                     multisig[0].signature[0].parameter)) {
                 arg_slots[i] = [(param_var =
@@ -585,18 +586,15 @@ Sub_invocation:function(){
     }
 },
 Methodcall:function(){
-    //throw keys(this.M[1].M.semiarglist);
     switch(this.phase) {
     case 0:
         this.subr = this.eval_args[0];
-        //throw keys(this.M[1].dotty.dottyop.methodop.longname.name.identifier);
         if (this.M && this.M[1] && this.M[1].M.semiarglist) {
             this.phase = 1;
             // replaces eval_args with the sub's args
             return this.do_next = dupe(this.M[1].M.semiarglist, this);
         } if (this.M && this.M[1] && this.M[1].dotty
                 && this.M[1].dotty.dottyop.methodop.arglist.length) {
-            //throw keys(this.M[1].dotty.dottyop.methodop.arglist);
             return this.do_next = dupe(
                 this.M[1].dotty.dottyop.methodop.arglist, this);
         } else {
@@ -637,14 +635,11 @@ Methodcall:function(){
             this.do_next.arg_array = this.eval_args;
             return this.do_next;
         }
-        //throw keys(this.M[1].M);
         throw keys(this.subr) + ' cannot be invoked';
     case 2:
         this.result = this.do_next.result;
         return this.invoker;
     case 3:
-        //throw keys(this.subr.value.items);
-        //throw this.eval_args[0].toString();
         this.result = this.subr.get(+this.eval_args[0].toString());
         return this.invoker;
     }
@@ -682,7 +677,6 @@ Tight_or:function(){
 rad_number:function(){
     switch(this.phase) {
     case 0:
-        //throw keys(this.circumfix);
         this.int_radix = +this.radix.TEXT;
         if (this.int_radix > 36 || this.int_radix < 2)
             throw 'radix out of range (2..36)';
@@ -694,7 +688,6 @@ rad_number:function(){
         return this.invoker;
     case 1:
         var int_str = this.do_next.result.toString(), res;
-        //throw [int_str, /^0([dbox])/i.exec(int_str)];
         if ((/^0[dbox]/i.test(int_str) && this.int_radix==10) || (
             (res = /^0([dbox])/i.exec(int_str))
                 && DBOX[res[1]] == this.int_radix
@@ -709,7 +702,6 @@ rad_number:function(){
     }
 },
 Symbolic_unary:function(){
-    // yes, yes, it currently treats all Symbolic_unary as the negation sign.
     var sym;
     switch(sym = this.M[0].prefix.T) {
     case 'prefix__S_Minus':
@@ -752,7 +744,6 @@ termish:function(){
         }
         // handle chained operators
         this.last_index = -1;
-        //throw keys(this);
         this.MM = Array(this.chain.length);
         this.do_next = null;
         this.phase = 1;
@@ -775,7 +766,6 @@ termish:function(){
         } else if (this.last_index == 1) { // skip "first" comparison
             return this.do_next = dupe(this.chain[++this.last_index], this);
         } else { // ready for a comparison
-            //throw keys(this.chain[this.last_index - 2].infix.T);
             return this.do_next = dupe({
                 T: 'comparison_op',
                 comp_node: this.chain[this.last_index - 2].infix.T,
@@ -889,11 +879,54 @@ term__S_rand:function(){
 },
 terminator__S_while:function(){
     return this.invoker;
+},
+term__S_identifier:function(){
+    var continuation;
+    switch(this.phase) {
+    case 0:
+        this.phase = 1;
+        this.result = null;
+        return this.do_next = dupe(this.identifier, this);
+    case 1:
+        if (this.do_next.result instanceof p6builtin.jssub) {
+            if (typeof(this.eval_args.length)!='undefined') {
+                this.eval_args = Array.flatten.call(this.eval_args);
+            }
+            if (continuation // must be a built-in op that is flattened
+                    = this.do_next.result.func.apply(this, this.eval_args)) {
+                if (!continuation.invoker) {
+                    // sometimes the invoker is set by the subroutine
+                    continuation.invoker = this;
+                    continuation.context = this.context;
+                }
+                this.phase = 2;
+                continuation.last_op = this;
+                return this.do_next = continuation;
+            }
+        } else if (this.do_next.result instanceof p6builtin.Sub) {// Perl sub invocation
+            continuation = dupe(this.do_next.result, this);
+            continuation.arg_array = Array.flatten.call(this.eval_args || []);
+            // TODO: I don't know why the following is necessary...
+            for (var i in continuation.arg_array) {
+                continuation.arg_array[i] = [continuation.arg_array[i]];
+            }
+            this.phase = 2;
+            return this.do_next = continuation;
+        }
+        this.result = this.do_next.result;
+        return this.invoker;
+    case 2:
+        this.result = this.result || this.do_next.result;
+        return this.invoker;
+    }
+},
+compilation_unit:function(){
+    throw 'program done';
 }
 
 };
 // aliases (nodes with identical semantics)
-disp.term__S_identifier = disp.noun__S_term = disp.number__S_numish =
+disp.noun__S_variable = disp.noun__S_term = disp.number__S_numish =
     disp.value__S_number = disp.noun__S_value = disp.value__S_quote =
     disp.noun__S_circumfix = disp.noun__S_package_declarator =
     disp.noun__S_scope_declarator = disp.noun__S_routine_declarator =
@@ -913,7 +946,16 @@ function keys(o) {
 }
 
 function top_interp(obj,context) {
-    interp(obj.M,context);
+    obj.M.invoker = {
+        T: 'compilation_unit'
+    };
+    try{
+        interp(obj.M,context);
+    } catch(e) {
+        if (!/program\sdone/.test(e.toString())) {
+            throw e;
+        }
+    }
     return '';
 }
 
@@ -958,22 +1000,32 @@ var __lazyarg_Types = {
     Conditional: 1
 };
 
+var __symbolic_traverse = {
+    noun__S_term: 1,
+    number__S_numish: 1,
+    value__S_number: 1,
+    noun__S_value: 1,
+    value__S_quote: 1,
+    noun__S_circumfix: 1,
+    noun__S_package_declarator: 1,
+    noun__S_scope_declarator: 1,
+    noun__S_routine_declarator: 1
+}
+
 var JSI=0;
 function JSIND(n) {
     return Array((JSI += n || 0) + 1).join(' ');
 }
 
 function interp(obj,context) {
-    var act = obj, empty = [0], last = act, continuation;
-    act.phase = 0; act.context = context;
-    do {
-        if (global_trace) {
-            say((act.phase ? 'returning to ' : 'trying ')+ act.T);
-        }
-        var func, T;
-        if (func = disp[T = act.T]) {
+    obj.phase = 0; obj.context = context;
+    for (var act = obj, T = act.T, last;;T = act.T) {
+        //if (global_trace) {
+        //    say((act.phase ? 'returning to ' : 'trying ')+ act.T);
+        //}
+        if (act.phase == 0) {
             if (act.args && !act.eval_args && !__lazyarg_Types[T]) {
-                act = {
+                act = eval_args.call({
                     T : "eval_args",
                     M : typeof(act.args.length)!='undefined'
                         ? dupe_array(act.args, act)
@@ -981,46 +1033,22 @@ function interp(obj,context) {
                     phase : 0,
                     invoker : act,
                     context : act.context
-                };
+                });
             } else if (act.arg && !act.eval_args) {
-                act = {
+                act = eval_args.call({
                     T : "eval_args",
                     M : [dupe(act.arg, act)],
                     phase : 0,
                     invoker : act,
                     context : act.context
-                };
+                });
             } else {
-                act = func.call(last = act);
-                if (last.result instanceof p6builtin.jssub && last.eval_args) {
-                    if (continuation // must be a built-in op that is flattened
-                            = last.result.func.apply(last, last.eval_args)) {
-                        if (!continuation.invoker) {
-                            // sometimes the invoker is set by the subroutine
-                            continuation.invoker = act;
-                            continuation.context = act.context;
-                        }
-                        continuation.last_op = last;
-                        act = continuation;
-                    }
-                } else if (last.result instanceof p6builtin.Sub
-                        && last.T=='identifier' && act.eval_args) { // Perl sub invocation
-                    continuation = dupe(last.result, act);
-                    continuation.arg_array = Array.flatten.call(act.eval_args);
-                    // TODO: I don't know why the following is necessary...
-                    for (var i in continuation.arg_array) {
-                        continuation.arg_array[i] = [continuation.arg_array[i]];
-                    }
-                    (last.invoker.do_next = act = continuation).context = last.context;
-                }
+                act = disp[T].call(act);
             }
         } else {
-            throw T+' not yet implemented; srsly!!?!?\nlast: '+last.T+'\n'
-                + keys(act).join(',');
-            last = act;
-            act = last.invoker;
+            act = disp[T].call(act);
         }
-    } while (typeof(act) != 'undefined');
+    }
     return obj.result;
 }
 

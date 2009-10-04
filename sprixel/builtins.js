@@ -752,8 +752,13 @@ function do_return(RETVAL){
     throw '`return\' not inside a routine';
 }
 
+function do_what(obj){
+    say(Type(obj));
+}
+
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
+p6toplevel.what = new p6builtin.jssub(do_what,'what');
 p6toplevel.map = new p6builtin.jssub(do_map,'map');
 p6toplevel.die = new p6builtin.jssub(do_die,'die');
 p6toplevel.next = new p6builtin.jssub(do_next,'next');
