@@ -388,6 +388,7 @@ Comma:function(){
 new_variable:function(){
     this.result = new p6builtin.p6var(this.sigil.TEXT,
         this.desigilname.longname.name.identifier.TEXT, this.context, true);
+    this.result.value = new p6builtin.Undef();
     return this.invoker;
 },
 scope_declarator__S_my:function(){
