@@ -668,12 +668,14 @@ token pblock () {
     ]
     [
     | <lambda>
-        <.newpad>
-        <signature>
+        <.newpad(1)>
+        <signature(1)>
         <blockoid>
+        <.getsig>
     | <?before '{'>
-        <.newpad>
+        <.newpad(1)>
         <blockoid>
+        <.getsig>
     ]
 }
 
@@ -716,7 +718,6 @@ token blockoid {
         { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
     | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
     ]
-    <.check_placeholders>
 }
 
 token regex_block {
@@ -945,7 +946,7 @@ token statement_control:repeat {
     [
         | ('while'|'until')
           <xblock>
-        | <block>                      {*}                      #= block wu
+        | <pblock>                      {*}                      #= block wu
           ('while'|'until') <EXPR>         {*}                      #= expr wu
     ]
 }
@@ -1275,7 +1276,7 @@ token regex_declarator:rule  { <sym>       <regex_def> }
 rule multisig {
     :dba('signature')
     [
-        ':'?'(' ~ ')' <signature>
+        ':'?'(' ~ ')' <signature(1)>
     ]
     ** '|'
 }
@@ -1296,13 +1297,14 @@ rule routine_def () {
     :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad>
+        <.newpad(1)>
         [ <multisig> | <trait> ]*
         <!{
             $*IN_DECL = 0;
         }>
         <blockoid>:!s
         <.checkyada>
+        <.getsig>
     ] || <.panic: "Malformed routine">
 }
 
@@ -1310,7 +1312,7 @@ rule method_def () {
     :temp $*CURPAD;
     :my $*IN_DECL = 1;
     :my $*DECLARAND;
-    <.newpad>
+    <.newpad(1)>
     [
         [
         | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
@@ -1328,6 +1330,7 @@ rule method_def () {
         ]
         <blockoid>:!s
         <.checkyada>
+        <.getsig>
     ] || <.panic: "Malformed method">
 }
 
@@ -1337,12 +1340,12 @@ rule regex_def () {
     :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad>
-        [ [ ':'?'(' <signature> ')'] | <trait> ]*
+        <.newpad(1)>
+        [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
         { $*IN_DECL = 0; }
         <.finishpad>
         <regex_block>:!s
-        <.check_placeholders>
+        <.getsig>
     ] || <.panic: "Malformed regex">
 }
 
@@ -1352,13 +1355,14 @@ rule macro_def () {
     :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad>
+        <.newpad(1)>
         [ <multisig> | <trait> ]*
         <!{
             $*IN_DECL = 0;
         }>
         <blockoid>:!s
         <.checkyada>
+        <.getsig>
     ] || <.panic: "Malformed macro">
 }
 
@@ -1388,7 +1392,7 @@ token trait_mod:does {
     <sym>:s <module_name>
 }
 token trait_mod:will {
-    <sym>:s <identifier> <block>
+    <sym>:s <identifier> <pblock>
 }
 
 token trait_mod:of      { <sym>:s <typename> }
@@ -3040,7 +3044,7 @@ token fakesignature() {
     <signature>
 }
 
-token signature {
+token signature ($padsig = 0) {
     # XXX incorrectly scopes &infix:<x> parameters to outside following block
     :my $*IN_DECL = 1;
     :my $*zone = 'posreq';
@@ -3053,7 +3057,13 @@ token signature {
     <.ws>
     { $*IN_DECL = 0; }
     [ '-->' <.ws> <typename> ]?
-    {{ $*LEFTSIGIL = '@'; $*CURPAD.{'$?SIGNATURE'} ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')'; }}
+    {{
+        $*LEFTSIGIL = '@';
+        if $padsig {
+            $*CURPAD.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
+            $*CURPAD.<!NEEDSIG>:delete;
+        }
+    }}
 }
 
 token type_declarator:subset {
@@ -5114,7 +5124,7 @@ grammar P5Regex is STD {
 # Symbol tables #
 #################
 
-method newpad {
+method newpad ($needsig = 0) {
     my $oid = $*CURPAD.id;
     $ALL.{$oid} === $*CURPAD or die "internal error: current pad id is invalid";
     my $line = self.lineof(self.pos);
@@ -5133,6 +5143,7 @@ method newpad {
             '!id' => [$id],
         );
     }
+    $*CURPAD.<!NEEDSIG> = 1 if $needsig;
     $ALL.{$id} = $*CURPAD;
     self;
 }
@@ -5145,14 +5156,26 @@ method finishpad {
     self;
 }
 
-method check_placeholders {
+method getsig {
     my $pv = $*CURPAD.{'%?PLACEHOLDERS'};
-    my $h = $pv.<%_>:delete;
-    my $a = $pv.<@_>:delete;
-    my $sig = join ', ', sort keys %$pv;
-    $sig ~= ', *@_' if $a;
-    $sig ~= ', *%_' if $h;
-    $*CURPAD.{'$?SIGNATURE'} = $sig;
+    my $sig;
+    if $*CURPAD.<!NEEDSIG>:delete {
+        if $pv {
+            my $h = $pv.<%_>:delete;
+            my $a = $pv.<@_>:delete;
+            $sig = join ', ', sort keys %$pv;
+            $sig ~= ', *@_' if $a;
+            $sig ~= ', *%_' if $h;
+        }
+        else {
+            $sig = '$_ is rw = OUTER::<$_>';
+        }
+        $*CURPAD.<$?SIGNATURE> = $sig;
+    }
+    else {
+        $sig = $*CURPAD.<$?SIGNATURE>;
+    }
+    self.<sig> = self.makestr(TEXT => $sig);
     self;
 }
 
@@ -5580,6 +5603,19 @@ method add_our_variable ($name) {
     self;
 }
 
+method add_placeholder($name) {
+    if my $siggy = $*CURPAD.<$?SIGNATURE> {
+        self.panic("Placeholder variable $name cannot override existing signature $siggy");
+    }
+    if not $*CURPAD.<!NEEDSIG> {
+        self.panic("Placeholder variable $name cannot be used in this kind of block");
+    }
+    self.add_my_variable($name);
+    $name ~~ s/\^//;
+    $*CURPAD.{'%?PLACEHOLDERS'}{$name}++;
+    self;
+}
+
 method check_variable ($variable) {
     my $name = $variable.Str;
     say "check_variable $name" if $*DEBUG +& DEBUG::symtab;
@@ -5594,11 +5630,7 @@ method check_variable ($variable) {
             $ok ||= self.is_known($name);
             if not $ok {
                 if $name eq '@_' or $name eq '%_' {
-                    if my $siggy = $*CURPAD.{'$?SIGNATURE'} {
-                        $variable.panic("Placeholder variable $name cannot override existing signature $siggy");
-                    }
-                    self.add_my_variable($name);
-                    $*CURPAD.{'%?PLACEHOLDERS'}{$name}++;
+                    $variable.add_placeholder($name);
                 }
                 else {
                     $variable.worry("Variable $name is not predeclared");
@@ -5607,12 +5639,7 @@ method check_variable ($variable) {
         }
         when '^' {
             my $*MULTINESS = 'multi';
-            if my $siggy = $*CURPAD.{'$?SIGNATURE'} {
-                $variable.panic("Placeholder variable $name cannot override existing signature $siggy");
-            }
-            self.add_my_variable($name);
-            $name ~~ s/\^//;
-            $*CURPAD.{'%?PLACEHOLDERS'}{$name}++;
+            $variable.add_placeholder($name);
         }
         when ':' {
             my $*MULTINESS = 'multi';
