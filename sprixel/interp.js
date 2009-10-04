@@ -1,5 +1,5 @@
 var global_trace = 0
-// + 1;
+ + 1;
 
 var disp = { // "bytecode" dispatch - by name of grammar node.
 statementlist:function(){
@@ -858,6 +858,13 @@ Structural:function(){
         : Structural_iterator_increment_Int;
     this.result = lazy_list;
     //throw lazy_list.get;
+    return this.invoker;
+},
+Sequencer:function(){
+    throw keys(this.eval_args[0]);
+},
+term__S_rand:function(){
+    this.result = new p6builtin.Num(Math.random());
     return this.invoker;
 }
 
