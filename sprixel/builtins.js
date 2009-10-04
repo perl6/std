@@ -726,18 +726,30 @@ function do_last(){
             return parent;
         }
     }
-    throw 'last() not inside an iteration block';
+    throw '`last\' not inside an iteration block';
 }
 
 function do_next(){
     var parent = this;
     while(typeof(parent = parent.invoker)!='undefined' && parent!==null) {
-        if (parent.catch_last) {
+        if (parent.catch_next) {
             parent.phase = 15;
             return parent;
         }
     }
-    throw 'next() not inside an iteration block';
+    throw '`next\' not inside an iteration block';
+}
+
+function do_return(RETVAL){
+    var parent = this;
+    while(typeof(parent = parent.invoker)!='undefined' && parent!==null) {
+        if (parent.catch_return) {
+            parent.phase = 17;
+            parent.result = RETVAL;
+            return parent;
+        }
+    }
+    throw '`return\' not inside a routine';
 }
 
 var p6toplevel = new Scope();
@@ -746,6 +758,7 @@ p6toplevel.map = new p6builtin.jssub(do_map,'map');
 p6toplevel.die = new p6builtin.jssub(do_die,'die');
 p6toplevel.next = new p6builtin.jssub(do_next,'next');
 p6toplevel.last = new p6builtin.jssub(do_last,'last');
+p6toplevel['return'] = new p6builtin.jssub(do_return,'return');
 p6toplevel["Bool::True"] = p6toplevel.True = new p6builtin.Bool(true);
 p6toplevel["Bool::False"] = p6toplevel.False = new p6builtin.Bool(false);
 var tmp1;

@@ -6,14 +6,20 @@ statementlist:function(){
     switch(this.phase) {
     case 0:
         this.idx = -1;
+        if (this.invoker && (this.invoker.T == 'Sub_invocation')) {
+            this.catch_return = true;
+        }
         if (this.M) {
             this.MM = Array(this.len = this.M.length);
             this.phase = 1;
-        } else {
+        } else if (this.statement && Type(this.statement)!='Array') {
             this.phase = 2;
             this.len = 1;
             this.MM = Array(1);
             return this.do_next = dupe(this.statement, this);
+        } else {
+            this.result = new p6builtin.Undef();
+            return this.invoker;
         }
     case 1:
         while (++this.idx < this.len) {
@@ -39,6 +45,11 @@ statementlist:function(){
         this.result = this.do_next.result;
         if (typeof(this.result)=='undefined') {
             this.result = new p6builtin.Undef();
+        }
+        return this.invoker;
+    case 17:
+        if (Type(this.result)=='Array') {
+            this.result = Array.flatten.call(this.result)[0];
         }
         return this.invoker;
     }
@@ -413,14 +424,15 @@ variable:function(){
     this.result = new p6builtin.p6var(this.sigil.TEXT,
         this.desigilname.longname.name.identifier.TEXT, this.context);
     if (!this.result.value) {
-        throw keys(this.context);
         throw this.sigil.TEXT+this.desigilname.longname.name.identifier.TEXT+
             ' is not defined';
     }
+    //say('VARIABLE '+this.sigil.TEXT+this.desigilname.longname.name.identifier.TEXT+' : '+Type(this.result.value));
     return this.invoker;
 },
 Item_assignment:function(){
     (this.result = this.eval_args[0]).set(this.eval_args[1].value || this.eval_args[1]);
+    //say(this.eval_args[1]);
     return this.invoker;
 },
 noun__S_variable:function(){
@@ -509,11 +521,12 @@ routine_def:function(){
         this.do_next = dupe(this.blockoid, this);
         var arg_slots = [], signature;
         if (this.multisig && this.multisig.length) {
-            var param_var;
-            for (var i in (signature = this.multisig[0].signature)) {
+            var param_var, parameter;
+            //say(keys(this.multisig[0].signature[0]));
+            for (var i in (parameter = this.
+                    multisig[0].signature[0].parameter)) {
                 arg_slots[i] = [(param_var =
-                    signature[i].parameter[0].param_var).sigil.TEXT,
-                    param_var.name[0].TEXT];
+                    parameter[i].param_var).sigil.TEXT, param_var.name[0].TEXT];
             }
         }
         this.do_next.arg_slots = arg_slots;
@@ -562,6 +575,8 @@ Sub_invocation:function(){
                 : new p6builtin.Undef();
         }
         this.do_next.phase = 0;
+        this.do_next.context = ctx;
+        //S(ctx['$b'].value);
         return this.do_next;
     case 1:
         this.result = this.do_next.result;
@@ -621,7 +636,7 @@ Methodcall:function(){
             this.do_next.arg_array = this.eval_args;
             return this.do_next;
         }
-        throw keys(this.M[1].M);
+        //throw keys(this.M[1].M);
         throw keys(this.subr) + ' cannot be invoked';
     case 2:
         this.result = this.do_next.result;
@@ -872,9 +887,6 @@ term__S_rand:function(){
     return this.invoker;
 },
 terminator__S_while:function(){
-    throw keys(this);
-},
-terminator__S_while:function(){
     return this.invoker;
 }
 
@@ -991,10 +1003,14 @@ function interp(obj,context) {
                         act = continuation;
                     }
                 } else if (last.result instanceof p6builtin.Sub
-                        && last.T=='identifier') { // Perl sub invocation
+                        && last.T=='identifier' && act.eval_args) { // Perl sub invocation
                     continuation = dupe(last.result, act);
-                    continuation.context = last.context;
-                    act = continuation;
+                    continuation.arg_array = Array.flatten.call(act.eval_args);
+                    // TODO: I don't know why the following is necessary...
+                    for (var i in continuation.arg_array) {
+                        continuation.arg_array[i] = [continuation.arg_array[i]];
+                    }
+                    (last.invoker.do_next = act = continuation).context = last.context;
                 }
             }
         } else {
@@ -1039,7 +1055,7 @@ function Type(obj){
     var type;
     switch(type = typeof obj) {
     case 'object':
-        if (typeof(obj.T)!='undefined') {
+        if (typeof(obj.T)!='undefined' && !obj.WHAT) {
             return obj.T;
         }
         return obj.WHAT ? obj.WHAT() : obj.constructor.name;

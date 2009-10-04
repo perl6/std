@@ -255,21 +255,21 @@ return function topEmit(obj) {
 };
 
 })();
-/*
-Array.prototype.flatten = function(includeUndefined) {
+
+Array.flatten = function() {
   var result = [];
   var len = this.length;
   for (var i = 0; i < len; i++) {
     var el = this[i];
-    if (typeof(el)!='undefined' && el.isArray) {
-      result = result.concat(el.flatten(includeUndefined));
-    } else if (includeUndefined || el !== undefined) {
+    if (typeof(el)!='undefined' && el.constructor.name=='Array') {
+      result = result.concat(Array.flatten.call(el));
+    } else if (el !== undefined) {
       result.push(el);
     }
   }
   return result;
 };
-
+/*
 Array.prototype.flattenOnce = function() {
   var result = [];
   var len = this.length;
