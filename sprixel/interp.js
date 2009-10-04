@@ -520,6 +520,10 @@ routine_def:function(){
         return this.do_next;
     case 1:
         this.result = this.do_next.result;
+        if (this.deflongname && this.deflongname[0] && this.deflongname[0].name
+                && this.deflongname[0].name.M) {
+            this.context[this.deflongname[0].name.M.TEXT] = this.result;
+        }
         return this.invoker;
     }
 },
@@ -980,6 +984,11 @@ function interp(obj,context) {
                         continuation.last_op = last;
                         act = continuation;
                     }
+                } else if (last.result instanceof p6builtin.Sub
+                        && last.T=='identifier') { // Perl sub invocation
+                    continuation = dupe(last.result, act);
+                    continuation.context = last.context;
+                    act = continuation;
                 }
             }
         } else {
