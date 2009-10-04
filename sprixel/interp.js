@@ -870,6 +870,12 @@ Sequencer:function(){
 term__S_rand:function(){
     this.result = new p6builtin.Num(Math.random());
     return this.invoker;
+},
+terminator__S_while:function(){
+    throw keys(this);
+},
+terminator__S_while:function(){
+    return this.invoker;
 }
 
 };
