@@ -17,6 +17,17 @@ function say() { // javascript say
     this.result = new p6builtin.Int(1);
 }
 
+function do_print() {
+    for (var s_args=[], i=-1, j=-1, a, l=arguments.length; i<l;)
+        if (typeof(a=arguments[++i])!='undefined') {
+            s_args[++j] = typeof(a)==='string' ? a : a.toString();
+        }
+    if (s_args.length) {
+        print_them.apply(this.context, s_args);
+    }
+    this.result = new p6builtin.Int(1);
+}
+
 var Derive = (function(){
     function F(){};
     return function(obj){

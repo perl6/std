@@ -99,7 +99,6 @@ statementlist:function(){
 statement:function(){
     switch(this.phase) {
     case 0:
-        //say(keys(this.statement_mod_loop[0].modifier_expr));
         if (this.statement_mod_loop
                 && typeof(this.statement_mod_loop.length)!='undefined'
                 && this.statement_mod_loop.length) {
@@ -139,6 +138,24 @@ statement_mod_cond__S_if:function(){
         ++this.phase;
         return this.do_next = dupe(this.modifier_expr, this);
     case 1:
+        this.result = this.do_next.result;
+        return this.invoker;
+    }
+},
+statement_control__S_repeat:function(){
+    switch(this.phase) {
+    case 0:
+        this.phase = 1;
+        return this.do_next = dupe(this.pblock, this);
+    case 1:
+        this.phase = 2;
+        return this.do_next = dupe({
+            // TODO: statement_control__S_while when std/viv provide which info
+            T: 'statement_control__S_while',
+            block_override: this.pblock,
+            M: { M: [this.EXPR] }
+        }, this);
+    case 2:
         this.result = this.do_next.result;
         return this.invoker;
     }
@@ -203,7 +220,6 @@ statement_control__S_loop:function(){
     case 0:
         this.phase = 1;
         this.catch_next = this.catch_last = true;
-        //this.context = new Scope(this.context); // derive scope for ctrl exprs
         this.loop_block = null;
         this.result = new p6builtin.List();
         if (this.eee && this.eee.e1) {
@@ -258,6 +274,43 @@ statement_control__S_while:function(){
         return this.do_next = dupe(this.M.M[0], this);
     case 2:
         if (this.do_next.result.toBool()) {
+            this.phase = 1;
+            if (!this.loop_block) {
+                if (this.block_override) {
+                    this.loop_block = this.block_override;
+                } else if (this.xblock && this.xblock.pblock.blockoid && this.xblock.pblock.blockoid
+                    && this.xblock.pblock.blockoid.statementlist) {
+                    this.loop_block = new p6builtin.Sub(
+                        this.xblock.pblock.blockoid.statementlist, this.context, []);
+                } else {
+                    return this.invoker;
+                }
+            }
+            return this.do_next = dupe(this.loop_block, this);
+        }
+        return this.invoker;
+    case 13: // interrupt "last"
+        return this.invoker;
+    case 15: // interrupt "next"
+        this.do_next = { result : new p6builtin.Bool(true) };
+        this.phase = 1;
+        return this;
+    }
+},
+statement_control__S_until:function(){
+    switch(this.phase) {
+    case 0:
+        this.phase = 1;
+        this.catch_next = this.catch_last = true;
+        this.loop_block = null;
+        if (this.block_override) {
+            this.block_override.context = this.context;
+        }
+    case 1:
+        this.phase = 2;
+        return this.do_next = dupe(this.M.M[0], this);
+    case 2:
+        if (!this.do_next.result.toBool()) {
             this.phase = 1;
             if (!this.loop_block) {
                 if (this.block_override) {
@@ -952,8 +1005,11 @@ function top_interp(obj,context) {
     try{
         interp(obj.M,context);
     } catch(e) {
-        if (!/program\sdone/.test(e.toString())) {
-            throw e;
+        if (/Cannot\scall\smethod\s'call'\sof\sundefined/.test(e.toString())) {
+            say('Sprixel Error: /\_'+last_T+
+                '_/\ not yet implemented; apologies from the crew!');
+        } else if (!/program\sdone/.test(e.toString())) {
+            say('Sprixel Error: '+e);
         }
     }
     return '';
@@ -1013,9 +1069,12 @@ var __symbolic_traverse = {
 }
 
 var JSI=0;
+
 function JSIND(n) {
     return Array((JSI += n || 0) + 1).join(' ');
 }
+
+var last_T;
 
 function interp(obj,context) {
     obj.phase = 0; obj.context = context;
@@ -1043,10 +1102,10 @@ function interp(obj,context) {
                     context : act.context
                 });
             } else {
-                act = disp[T].call(act);
+                act = disp[last_T = T].call(act);
             }
         } else {
-            act = disp[T].call(act);
+            act = disp[last_T = T].call(act);
         }
     }
     return obj.result;

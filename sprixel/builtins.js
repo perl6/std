@@ -758,6 +758,7 @@ function do_what(obj){
 
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
+p6toplevel.print = new p6builtin.jssub(do_print,'print');
 p6toplevel.what = new p6builtin.jssub(do_what,'what');
 p6toplevel.map = new p6builtin.jssub(do_map,'map');
 p6toplevel.die = new p6builtin.jssub(do_die,'die');

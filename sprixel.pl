@@ -82,6 +82,7 @@ sub run_js_interpreter {
     require V8;
     my $ctx = V8::Context->new();
     $ctx->register_method_by_name("say_them");
+    $ctx->register_method_by_name("print_them");
     $ctx->execute(scalar(read_file($_))) for @js;
     my $ast = ToJS::emit_js($_[0], $pos);
     say $ast if $_[1];
@@ -93,4 +94,8 @@ sub run_js_interpreter {
 sub say_them {
     # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)
     say map { Encode::decode_utf8($_) } @_;
+}
+sub print_them {
+    # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)
+    print map { Encode::decode_utf8($_) } @_;
 }
