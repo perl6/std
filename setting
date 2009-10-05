@@ -11,7 +11,7 @@ for my $file (@ARGV) {
     warn $file,"\n" if @ARGV > 1;
     next unless -f $file;
     my $setting = "CORE";
-    $setting = "NULL" if $file eq 'CORE.setting';
+    $setting = "NULL" if $file =~ /CORE/;
     eval {
 	warn "Undefined\n" unless defined STD->parsefile($file, setting => $setting);
     };
