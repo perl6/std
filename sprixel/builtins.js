@@ -763,11 +763,11 @@ function do_return(RETVAL){
 }
 
 function do_what(obj){
-    say(Type(obj));
+    this.result = new p6builtin.Str(Type(obj));
 }
 
-function do_derive_context(){
-    this.result = new Scope(this.context);
+function do_derive_context(obj){
+    this.result = new Scope(obj || this.context);
 }
 
 function do_member(obj,key,val){
