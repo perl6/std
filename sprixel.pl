@@ -33,7 +33,7 @@ help if $help;
 my $setting;
 if ($test_mode) {
     $setting = 'sprixelCORETEST';
-    unless (-f 'sprixelCORETEST.setting') {
+    unless (-f 'sprixelCORETEST.syml') {
         my $s_c = scalar(read_file('lib/Test.pm'));
         $s_c =~ s/proto/my proto/g;
         $s_c =~ s/^class\sTest;//g;
@@ -45,12 +45,13 @@ if ($test_mode) {
 }
 else {
     $setting = 'sprixelCORE';
-    unless (-f 'sprixelCORE.setting') {
+    unless (-f 'sprixelCORE.syml') {
         my $s_c = scalar(read_file('lib/Test.pm'));
         $s_c =~ s/^proto/my proto/g;
         $s_c =~ s/^class\sTest;//g;
         $s_c .= "\n  \nproto derive_context is export { }\n".
-            "proto get_core is export { }\nproto member is export { } \n";
+            "proto get_core is export { }\nproto member is export { }\n".
+            "proto what is export { }\nproto jseval is export { }\n";
         my $c_c = scalar(read_file('CORE.setting'));
         $c_c =~ s/YOU_ARE_HERE;//;
         write_file( 'sprixelCORE.setting', $c_c.$s_c."YOU_ARE_HERE;\n");

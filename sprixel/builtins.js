@@ -766,6 +766,10 @@ function do_what(obj){
     this.result = new p6builtin.Str(Type(obj));
 }
 
+function do_jseval(js_source){
+    eval('function(){'+js_source.toString()+'}').call(this);
+}
+
 function do_derive_context(obj){
     this.result = new Scope(obj || this.context);
 }
@@ -790,15 +794,16 @@ function do_get_core(){
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
 p6toplevel.print = new p6builtin.jssub(do_print,'print');
-p6toplevel.what = new p6builtin.jssub(do_what,'what');
 p6toplevel.map = new p6builtin.jssub(do_map,'map');
 p6toplevel.die = new p6builtin.jssub(do_die,'die');
 p6toplevel.next = new p6builtin.jssub(do_next,'next');
 p6toplevel.last = new p6builtin.jssub(do_last,'last');
 p6toplevel['return'] = new p6builtin.jssub(do_return,'return');
-p6toplevel['member'] = new p6builtin.jssub(do_member,'member');
-p6toplevel['get_core'] = new p6builtin.jssub(do_get_core,'get_core');
-p6toplevel['derive_context'] =
+p6toplevel.member = new p6builtin.jssub(do_member,'member');
+p6toplevel.what = new p6builtin.jssub(do_what,'what');
+p6toplevel.jseval = new p6builtin.jssub(do_jseval,'jseval');
+p6toplevel.get_core = new p6builtin.jssub(do_get_core,'get_core');
+p6toplevel.derive_context =
     new p6builtin.jssub(do_derive_context,'derive_context');
 p6toplevel["Bool::True"] = p6toplevel.True = new p6builtin.Bool(true);
 p6toplevel["Bool::False"] = p6toplevel.False = new p6builtin.Bool(false);
