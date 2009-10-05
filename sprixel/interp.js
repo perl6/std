@@ -630,7 +630,6 @@ Sub_invocation:function(){
         }
         this.do_next.phase = 0;
         this.do_next.context = ctx;
-        //S(ctx['$b'].value);
         return this.do_next;
     case 1:
         this.result = this.do_next.result;
@@ -864,7 +863,7 @@ Exponentiation:function(){
     return this.invoker;
 },
 quote__S_Slash_Slash:function(){
-    throw keys(this.M.M[0]);
+    throw keys(this.quote.nibble.M.quantified_atom);
 },
 do_iterate_map:function(){
     switch(this.phase) {
@@ -885,7 +884,7 @@ do_iterate_map:function(){
             this.do_next.topic = this.list.items[++this.idx];
             return this.do_next;
         } else {
-            this.last_op.result = this.result;
+            //this.last_op.result = this.result;
             return this.invoker;
         }
     }
@@ -919,7 +918,6 @@ Structural:function(){
         ? function(index){ return this.items[index] = this.leftTip }
         : Structural_iterator_increment_Int;
     this.result = lazy_list;
-    //throw lazy_list.get;
     return this.invoker;
 },
 Sequencer:function(){
@@ -945,14 +943,14 @@ term__S_identifier:function(){
                 this.eval_args = Array.flatten.call(this.eval_args);
             }
             if (continuation // must be a built-in op that is flattened
-                    = this.do_next.result.func.apply(this, this.eval_args)) {
+                    = this.do_next.result.func.apply(this.do_next, this.eval_args)) {
                 if (!continuation.invoker) {
                     // sometimes the invoker is set by the subroutine
                     continuation.invoker = this;
                     continuation.context = this.context;
                 }
                 this.phase = 2;
-                continuation.last_op = this;
+                //continuation.last_op = this;
                 return this.do_next = continuation;
             }
         } else if (this.do_next.result instanceof p6builtin.Sub) {// Perl sub invocation
@@ -968,7 +966,7 @@ term__S_identifier:function(){
         this.result = this.do_next.result;
         return this.invoker;
     case 2:
-        this.result = this.result || this.do_next.result;
+        this.result = this.do_next.result;
         return this.invoker;
     }
 },
@@ -1079,13 +1077,14 @@ function interp(obj,context) {
     obj.phase = 0; obj.context = context;
     for (var act = obj, T = act.T, last;;T = act.T) {
         //if (global_trace) {
-        //    say((act.phase ? 'returning to ' : 'trying ')+ act.T);
+        //    if (last) say('                   Typeof result: '+Type(last.result));
+        //    if (act) say((act.phase ? 'returning to ' : 'trying ')+ act.T);
         //}
         if (act.phase == 0) {
             if (act.args && !act.eval_args && !__lazyarg_Types[T]) {
                 act = eval_args.call({
                     T : "eval_args",
-                    M : typeof(act.args.length)!='undefined'
+                    M : typeof((last = act).args.length)!='undefined'
                         ? dupe_array(act.args, act)
                         : [dupe(act.args, act)],
                     phase : 0,
@@ -1095,16 +1094,16 @@ function interp(obj,context) {
             } else if (act.arg && !act.eval_args) {
                 act = eval_args.call({
                     T : "eval_args",
-                    M : [dupe(act.arg, act)],
+                    M : [dupe((last = act).arg, act)],
                     phase : 0,
                     invoker : act,
                     context : act.context
                 });
             } else {
-                act = disp[last_T = T].call(act);
+                act = disp[last_T = T].call(last = act);
             }
         } else {
-            act = disp[last_T = T].call(act);
+            act = disp[last_T = T].call(last = act);
         }
     }
     return obj.result;
@@ -1142,10 +1141,20 @@ function Type(obj){
     var type;
     switch(type = typeof obj) {
     case 'object':
+        if (obj===null) {
+            return 'null';
+        }
+        if (typeof(obj.length)!='undefined') {
+            var res = [];
+            for (var i in obj) {
+                res.push(Type(obj[i]));
+            }
+            return '[ '+res.join(', ')+' ]';
+        }
         if (typeof(obj.T)!='undefined' && !obj.WHAT) {
             return obj.T;
         }
-        return obj.WHAT ? obj.WHAT() : obj.constructor.name;
+        return typeof(obj.WHAT)=='function' ? obj.WHAT() : obj.constructor.name;
     default:
         return type;
     }

@@ -17,7 +17,6 @@ function do_ok(expr,msg){
 }
 
 function do_is(left,right,msg){
-    say(left.WHAT());
     say(((this.result = new p6builtin.Bool(
         right.WHAT()=='Str()' ? left.toString()==right.v
       : left.WHAT()=='Int()' ? (left.do_infix__S_EqualEqual(right).v

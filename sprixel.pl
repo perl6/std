@@ -32,19 +32,30 @@ help if $help;
 
 my $setting;
 if ($test_mode) {
-    $setting = 'sprixelTEST';
-    unless (-f 'sprixelTEST.setting') {
+    $setting = 'sprixelCORETEST';
+    unless (-f 'sprixelCORETEST.setting') {
         my $s_c = scalar(read_file('lib/Test.pm'));
-        $s_c =~ s/^proto/my proto/g;
-        $s_c =~ s/^class\sTest/ /g;
+        $s_c =~ s/proto/my proto/g;
+        $s_c =~ s/^class\sTest;//g;
         my $c_c = scalar(read_file('CORE.setting'));
-        $c_c =~ s/YOU_ARE_HERE;/ /;
-        write_file( 'sprixelTEST.setting', $s_c.$c_c.'YOU_ARE_HERE;');
-        my $out = `./setting sprixelTEST.setting 2>&1`;
+        $c_c =~ s/YOU_ARE_HERE;//;
+        write_file( 'sprixelCORETEST.setting', $c_c.$s_c."YOU_ARE_HERE;\n");
+        my $out = `./setting sprixelCORETEST.setting 2>&1`;
     }
 }
 else {
-    $setting = 'CORE';
+    $setting = 'sprixelCORE';
+    unless (-f 'sprixelCORE.setting') {
+        my $s_c = scalar(read_file('lib/Test.pm'));
+        $s_c =~ s/^proto/my proto/g;
+        $s_c =~ s/^class\sTest;//g;
+        $s_c .= "\n  \nproto derive_context is export { }\n".
+            "proto get_core is export { }\nproto member is export { } \n";
+        my $c_c = scalar(read_file('CORE.setting'));
+        $c_c =~ s/YOU_ARE_HERE;//;
+        write_file( 'sprixelCORE.setting', $c_c.$s_c."YOU_ARE_HERE;\n");
+        my $out = `./setting sprixelCORE.setting 2>&1`;
+    }
 }
 my $r;
 if (@ARGV and -f $ARGV[0]) {

@@ -540,8 +540,9 @@ p6builtin.p6var = function(sigil,name,context,forceDeclare){
     }
 };
 p6builtin.p6var.prototype = {
+isP6VAR:true,
 WHAT: function(){
-    return this.value.WHAT();
+    return this.value ? this.value.WHAT() : 'EMPTY_P6VAR';
 },
 set:function(value){
     this.value = value;
@@ -686,10 +687,20 @@ get:function(index){
 var Scope = (function(){
     function Deriver(){}
     var contextId = 0;
-    return function(parentScope){
+    var scope_constructor = function(parentScope){
         if (!parentScope) {
             this.constructor = Scope;
             this.contextId = contextId++;
+            this.WHAT = function(){ return 'Scope' };
+            this.toString = function(){
+                var res = [];
+                for (var i in this) {
+                    if (!/^(?:constructor|contextId|WHAT|toString)$/.test(i)) {
+                        res.push(i+' ('+Type(this[i])+')')
+                    }
+                }
+                return 'Scope with keys: [ '+res.join(' , ')+' ]';
+            };
             return this;
         }
         Deriver.prototype = parentScope;
@@ -698,13 +709,12 @@ var Scope = (function(){
         newScope.contextId = contextId++;
         return newScope;
     };
+    //scope_constructor.T = 'Scope';
+    return scope_constructor;
 })();
 
 function do_die(msg){
-    if (typeof(msg)!='undefined') {
-        throw msg.toString();
-    }
-    throw 'ENOERRORMESSAGE';
+    throw typeof(msg)!='undefined' ? msg.toString() : 'ENOERRORMESSAGE';
 }
 
 function do_map(block){
@@ -756,6 +766,27 @@ function do_what(obj){
     say(Type(obj));
 }
 
+function do_derive_context(){
+    this.result = new Scope(this.context);
+}
+
+function do_member(obj,key,val){
+    //say('        MEMBER on type: '+Type(obj));
+    //if (Type(obj)=='Scope') say(' with contextId: '+obj.contextId);
+    if (obj.isP6VAR) obj = obj.value;
+    if (typeof(val)!='undefined') {
+        //say('val defined; setting '+key);
+        this.result = obj[key] = val;
+    } else {
+        //say('val undefined; retrieving '+key);
+        this.result = obj[key] || new p6builtin.Undef();
+    }
+}
+
+function do_get_core(){
+    this.result = this.context.Core || (this.context.Core = new Scope());
+}
+
 var p6toplevel = new Scope();
 p6toplevel.say = new p6builtin.jssub(say,'say');
 p6toplevel.print = new p6builtin.jssub(do_print,'print');
@@ -765,6 +796,10 @@ p6toplevel.die = new p6builtin.jssub(do_die,'die');
 p6toplevel.next = new p6builtin.jssub(do_next,'next');
 p6toplevel.last = new p6builtin.jssub(do_last,'last');
 p6toplevel['return'] = new p6builtin.jssub(do_return,'return');
+p6toplevel['member'] = new p6builtin.jssub(do_member,'member');
+p6toplevel['get_core'] = new p6builtin.jssub(do_get_core,'get_core');
+p6toplevel['derive_context'] =
+    new p6builtin.jssub(do_derive_context,'derive_context');
 p6toplevel["Bool::True"] = p6toplevel.True = new p6builtin.Bool(true);
 p6toplevel["Bool::False"] = p6toplevel.False = new p6builtin.Bool(false);
 var tmp1;
