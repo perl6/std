@@ -944,10 +944,10 @@ token statement_control:until {
 token statement_control:repeat {
     <sym> :s
     [
-        | ('while'|'until')
+        | $<wu>=['while'|'until']<.spacey>
           <xblock>
-        | <pblock>                      {*}                      #= block wu
-          ('while'|'until') <EXPR>         {*}                      #= expr wu
+        | <pblock>
+          $<wu>=['while'|'until'][<.spacey>||<.panic: "Whitespace required after keyword">] <EXPR>
     ]
 }
 
@@ -4650,11 +4650,14 @@ grammar Regex is STD {
     token termish {
         <.ws>
         [
-        || <noun=quantified_atom>+
+        || <noun=quant_atom_list>
         || <?before <stopper> | <[&|~]>  >  <.panic: "Null pattern not allowed">
         || <?before <[ \] \) \> ]> > <.panic: "Unmatched closing bracket">
         || <.panic: "Unrecognized regex metacharacter (must be quoted to match literally)">
         ]
+    }
+    token quant_atom_list {
+        <quantified_atom>+
     }
     token infixish {
         <!infixstopper>
@@ -5766,7 +5769,7 @@ method panic (Str $s) {
             $m ~= "\n    expecting @keys" unless @keys[0] eq 'whitespace';
         }
     }
-    if $m ~~ /infix|nofun/ {
+    if $m ~~ /infix|nofun/ and not $m ~~ /regex/ {
         my @t = try { $here.termish };
         if @t {
             $m ~~ s|Confused|Two terms in a row| if @t;
