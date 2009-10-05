@@ -150,8 +150,7 @@ statement_control__S_repeat:function(){
     case 1:
         this.phase = 2;
         return this.do_next = dupe({
-            // TODO: statement_control__S_while when std/viv provide which info
-            T: 'statement_control__S_while',
+            T: 'statement_control__S_'+this.wu.TEXT,
             block_override: this.pblock,
             M: { M: [this.EXPR] }
         }, this);
