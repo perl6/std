@@ -787,7 +787,7 @@ END
 				$which = \@does;
 			    }
 			    else {
-				push @$which, $pkg_really{$next} || "${PKG}::$next";
+				push @$which, $pkg_really{$next} || $next;
 			    }
 			}
 			push(@PKG, $PKG);
