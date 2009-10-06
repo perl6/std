@@ -1,15 +1,14 @@
 #!/usr/local/bin/perl -w
 
 use Getopt::Long;
-# GetOptions
-#my $execute_command = shift; # eg 'perl sprixel.pl'
-#my $spectest_data   = shift; # eg 'sprixel/spectest.data'
-#my $spectest_base   = shift; # eg '~/pugs/t/spec'
+my $execute_command = 'perl sprixel.pl';
+my $spectest_data   = 'sprixel/spectest.data';
+my $spectest_base   = '~/pugs/t/spec';
+my $result = GetOptions(
+    "execute_command=s"=>\$execute_command,
+    "spectest_data=s"  =>\$spectest_data,
+    "spectest_base=s"  =>\$spectest_base );
 
-# Get parameters from @ARGV
-my $execute_command = shift; # eg 'perl sprixel.pl'
-my $spectest_data   = shift; # eg 'sprixel/spectest.data'
-my $spectest_base   = shift; # eg '~/pugs/t/spec'
 my @spectests = lines($spectest_data);
 my %stats;
 all_tests_begin(\%stats);
@@ -23,7 +22,7 @@ for my $spectest (@spectests) {
     my @script = lines($scriptname); # read test script as array
     my @skips = get_skip_list($2); # process the optional skip directive
     apply_skips(\@script,\@skips); # "fudge" tests we cannot run ;)
-    my $tap_out = execute_script(\@script,$scriptname); # run tests
+    my $tap_out = execute_script(\@script,$testname); # run tests
     my %result = read_tap($tap_out); # look for 1..3/ok 1/ok 2/ok 3 etc
     one_test_end(%result);
     update_stats(\%stats,%result);
@@ -50,8 +49,8 @@ sub lines {
 sub all_tests_begin {
     my $stats = shift;
     %$stats = (plan=>0, pass=>0, fail=>0, todopass=>0, todofail=>0,
-               skip=>0, start=>time);
-    print " " x 41, "plan pass fail todo(p/f) skip\n";
+               skip=>0, miss=>0, files=>0, start=>time);
+    print " " x 41, "plan pass fail todo(p f) skip miss\n";
 }
 
 # Show the test name and wait on the same line to print the results
@@ -134,24 +133,25 @@ sub apply_skips {
 
 sub execute_script {
     my $refscript = shift; # reference to array of test script lines
-    my $scriptpath =  shift; # for diagnostics and reporting
+    my $testname =  shift; # for diagnostics and reporting
     my $script = join( "\n", @$refscript );
     # DEBUG: save $script to a file to show which tests will be run
-    my $scriptpath_fudged = $scriptpath;
+    $testname =~ s{/}{_}g;
+    my $scriptpath_fudged = '/tmp/sprixel_'.$testname;
     $scriptpath_fudged =~ s/ \. t $ /\.sprixel/x;
-    unlink $scriptpath_fudged;
-#   open my $handle, '>', $scriptpath_fudged or die "cannot open $filename: $!";
-#   print $handle $script;
-#   close $handle;
+#   unlink $scriptpath_fudged;
+    open my $handle, '>', $scriptpath_fudged or die "cannot open $scriptpath_fudged: $!";
+    print $handle $script;
+    close $handle;
     # run the test script in a child process
     my $tap_out = qx{$execute_command <<'SCRIPT_TEXT'\n$script\nSCRIPT_TEXT};
     # DEBUG: save $tap_out to a file to show test results
-    my $temp_name = $scriptpath;
+    my $temp_name = '/tmp/sprixel_'.$testname;
     $temp_name =~ s/ \. t $ /\.sprixel\.out/x;
-    unlink $temp_name;
-#   open $handle, '>', $temp_name or die "cannot open $filename: $!";
-#   print $handle $tap_out;
-#   close $handle;
+#   unlink $temp_name;
+    open $handle, '>', $temp_name or die "cannot open $temp_name: $!";
+    print $handle $tap_out;
+    close $handle;
     return $tap_out;
 }
 
@@ -160,7 +160,8 @@ sub read_tap {
     my @tap_out = split("\n",$tap_out);
     my $test_number = 0;
     my( $time1, $time2 );
-    my %result = (plan=>0,pass=>0,fail=>0,todopass=>0,todofail=>0,skip=>0,time=>-1);
+    my %result = ( plan=>0, pass=>0, fail=>0, todopass=>0, todofail=>0,
+                   skip=>0, miss=>0, files=>1, time=>-1);
     # Predefine patterns that appear in the TAP output, so that the code
     # below can be more compact and easier to read. 
     my $plan     = '^ 1 \.\. (\d+) $';
@@ -181,29 +182,33 @@ sub read_tap {
         elsif ( $tap_line =~ m/$time/x     ) { $time2 = $1; }
         elsif ( $tap_line =~ m/$comment/x  ) { ; }
     }
+    $result{'miss'} = $result{'plan'} - $result{'pass'} - $result{'fail'}
+        - $result{'todopass'} - $result{'todofail'} - $result{'skip'};
     return %result;
 }
 
 sub one_test_end {
     my %result = @_;
-    printf( "%5d%5d%5d%5d%5d%5d\n", $result{'plan'}, $result{'pass'},
+    printf( "%5d%5d%5d%5d%5d%5d%5d\n", $result{'plan'}, $result{'pass'},
         $result{'fail'}, $result{'todopass'}, $result{'todofail'},
-        $result{'skip'}, );
+        $result{'skip'}, $result{'miss'} );
 }
 
 sub update_stats {
     my $refstats = shift;
     my %results = @_;
-    for my $key ( qw[plan pass fail todopass todofail skip] ) {
+    for my $key ( qw[plan pass fail todopass todofail skip miss files] ) {
         $refstats->{$key} += $results{$key};
     }
 }
 
 sub all_tests_end {
     my $refstats = shift;
-    print " " x 40 . " ----" x 6 . "\n";
-    print "Total" . "." x 35;
-    printf( "%5d%5d%5d%5d%5d%5d\n", $refstats->{'plan'}, $refstats->{'pass'}, $refstats->{'fail'}, $refstats->{'todopass'},$refstats->{'todofail'},$refstats->{'skip'});
+    print " " x 40 . " ----" x 7 . "\n";
+    printf "Total from%4d files" . "." x 20, $refstats->{'files'};
+    printf( "%5d%5d%5d%5d%5d%5d%5d\n", $refstats->{'plan'},
+        $refstats->{'pass'}, $refstats->{'fail'}, $refstats->{'todopass'},
+        $refstats->{'todofail'}, $refstats->{'skip'}, $refstats->{'miss'});
     print "Result:".($refstats->{'fail'}==0 ? 'PASS' : 'FAIL')."\n";
 }
 
@@ -244,4 +249,3 @@ and executed by Google's V8 JavaScript compiler. It is written for easy
 translation to Perl 6.
 
 =cut
-

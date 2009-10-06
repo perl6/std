@@ -12,6 +12,7 @@ test:
 
 # usage: make -f sprixel.mk spectest
 spectest:
-	perl sprixel/harness-fudging.pl 'perl sprixel.pl' sprixel/spectest.data ../../t/spec
+    perl sprixel.pl --execute='perl sprixel.pl'\
+       --spectest_data=sprixel/spectest.data --spectest_base=../../t/spec/
 	@echo Q.E.D.
 
