@@ -4927,6 +4927,7 @@ grammar Regex is STD {
 
 method require_P5 {
     require STD_P5;
+    self;
 }
 
 #################
