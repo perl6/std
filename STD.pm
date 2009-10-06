@@ -4971,7 +4971,10 @@ grammar P5Regex is STD {
 
     token termish {
         <.ws>  # XXX assuming old /x here?
-        <noun=quantified_atom>+
+        <noun=quant_atom_list>
+    }
+    token quant_atom_list {
+        <quantified_atom>+
     }
     token infixish {
         <!infixstopper>
