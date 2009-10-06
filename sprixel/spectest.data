@@ -1,5 +1,17 @@
 # spectest.data - sprixel version
-# to fudge tests write the test numbers after the file name.
-../01-sanity/04-if.t
 S02-builtin_data_types/num.t
+S02-builtin_data_types/array.t skip 1..5 9..100
 S02-literals/radix.t skip 87 94..97 109..127
+S03-operators/equality.t skip 5..9 14 15
+S03-operators/ternary.t skip 14..16
+# S04-statement-modifiers/if.t skip 3..12
+# S04-statements/do.t skip 7..24
+# S04-statements/for.t skip 3..57
+# S04-statements/if.t skip 5..20
+S04-statements/redo.t skip 2..10
+S04-statements/repeat.t skip 3..16
+S04-statements/return.t skip 4..15
+S04-statements/terminator.t skip 10..14
+S04-statements/until.t
+# S04-statements/while.t skip 6..9
+

@@ -1,23 +1,38 @@
 
-vijs - STD.pm parsing Perl 6, emitting the AST to JavaScript, where the AST is
-    walked by a trampolined/stackless/continuation-returning interpreter.
+sprixel - an anagram of perlsix. viv and STD.pm parse Perl 6 source,
+    emitting the Abstract Syntax Tree in YAML, then sprixel walks the
+    AST using its trampolined, stackless, continuation-returning
+    interpreter written in JavaScript and executed by Google's V8
+    compiler and runtime.
 
 requirements:
- - have Perl 5 installed and all of STD5.pmc's and viv's dependencies; 
+ - have Perl 5 installed and all of STD5.pmc's and viv's dependencies
+   (see pugs/src/perl6/README, you may need to install YAML::Syck,
+   YAML::XS (aka libyaml-libyaml-perl) Module::Install, File::Slurp
+   and Moose. You may need to perform your local equivalent of
+   'sudo ln -s /usr/bin/perl /usr/local/bin/perl')
+   Verify that viv produces a valid AST, eg: ./viv -e 'say "hello";'
  - build V8 (Google's BSD-licensed JS engine) from source (optionally install)
-    - see http://code.google.com/p/v8/wiki/Source
+    - see http://code.google.com/p/v8/ (download bleeding or trunk)
     - you'll need g++, Python 2.5, scons (latest release candidate)
+    - 32-bit: scons
+    - 64-bit: export CFLAGS=-fPIC; scons arch=x64
+    - sudo ln -s /path/to/my/v8/libv8.a /usr/lib/
     - ********** See detailed installation instructions below **********
  - install the Perl 5 extension for V8 (originally named Acme::JavaScript::V8)
     - see http://github.com/fictorial/perl-v8
     - original: http://d.hatena.ne.jp/dayflower/20080905/1220592409
- - install File::Slurp (or write your own to do what it does, or whatever :)
+    - make -f bridge.mk; perl Makefile.PL; make; make test
+    - sudo make install
+    - perl sample.pl
  - accept some draconian EULA (kidding)
 
 usage:
- - ./viv --js -e 'say()'
- - ./viv --js -e 'say(23)'
- - ./viv --js -e 'say(421,510, 3333875928739872 * 5534775873878723587)'
+ - perl sprixel.pl -e 'say "Perl 6 powered by a V8";'
+ - perl sprixel.pl ../../t/01-sanity/
+ - perl -f sprixel.mk test
+ - perl -f sprixel.mk spectest
+ - perl sprixel.pl -e 'say(421,510, 3333875928739872 * 5534775873878723587)'
  - etc.
 
 vision:
@@ -25,8 +40,8 @@ vision:
    initially to make use of STD5.pmc.
  - may eventually extend/fork V8 to add Perl 6 features/semantics natively, but
    writing the runtime in JavaScript initially (lots of boxing/unboxing, yes).
- - the interpreter will not emit JavaScript source yet... perhaps when it's time
-   to make it an optimizing compiler.
+ - the interpreter will not emit JavaScript source yet... perhaps when it's
+   time to make it an optimizing compiler.
 
 plans:
  - write a custom Actions package so 'BEGIN{}' and 'use OtherPackage;' can tell

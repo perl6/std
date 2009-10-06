@@ -57,9 +57,13 @@ function do_flunk(msg){
     say('not ok ' + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
+function do_skip(msg,expr){
+    say('ok ' + ++test_number + ' # skip ' + msg);
+}
+
 function test_stub(left,right,msg){
     this.result = new p6builtin.Bool(false);
-    say(('ok ') + ++test_number + ' TODO '+(msg ? ' - ' + msg : ''));
+    say(('not ok ') + ++test_number + ' # TODO '+(msg ? ' - ' + msg : ''));
 }
 
 // install the JSSUBS in place of the p6subs for which they're standing in
@@ -71,10 +75,10 @@ p6toplevel["isnt"]          = new p6builtin.jssub(do_isnt,   'isnt');
 p6toplevel["pass"]          = new p6builtin.jssub(do_pass,   'pass');
 p6toplevel["flunk"]         = new p6builtin.jssub(do_flunk,  'flunk');
 p6toplevel["isa_ok"]        = new p6builtin.jssub(do_isa_ok, 'isa_ok');
+p6toplevel["skip"]          = new p6builtin.jssub(do_skip,   'skip');
 // install standin fakes for the test routines not implemented
 p6toplevel["dies_ok"]       = new p6builtin.jssub(test_stub, 'dies_ok');
 p6toplevel["lives_ok"]      = new p6builtin.jssub(test_stub, 'lives_ok');
-p6toplevel["skip"]          = new p6builtin.jssub(test_stub, 'skip');
 p6toplevel["todo"]          = new p6builtin.jssub(test_stub, 'todo');
 p6toplevel["dies_ok"]       = new p6builtin.jssub(test_stub, 'dies_ok');
 p6toplevel["force_todo"]    = new p6builtin.jssub(test_stub, 'force_todo');
