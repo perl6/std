@@ -279,8 +279,10 @@ sub you_were_here {
         $STD::ALL->{SETTING} = $::YOU_WERE_HERE;
     }
     else {
-        $::UNIT->{'$?SETTING_ID'} = $STD::ALL->{SETTING}->id;
-        $::UNIT->{'$?CORE_ID'} = $STD::ALL->{CORE}->id;
+        eval { $::UNIT->{'$?SETTING_ID'} = $STD::ALL->{SETTING}->id };
+        warn $@ if $@;
+        eval { $::UNIT->{'$?CORE_ID'} = $STD::ALL->{CORE}->id };
+        warn $@ if $@;
         for my $key (keys %{$STD::ALL}) {
             delete $STD::ALL->{$key} if $key =~ /^MY:file<\w+\.setting>/;
         }

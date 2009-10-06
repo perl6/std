@@ -4,66 +4,63 @@ use DEBUG;
 use NAME;
 use STASH;
 
-# per parse
-my $*ACTIONS;         # class or object which defines reduce actions
-my $*SETTINGNAME;     # name of core setting
-my $*TMP_PREFIX;      # where to put tmp files
-my $*ORIG;            # the original program string
-my @*ORIG;            # same thing as individual chars
-my @*MEMOS;           # per-position info such as ws and line number
-my $*HIGHWATER;      # where we were last looking for things
-my $*HIGHMESS;       # current parse failure message
-my $*HIGHEXPECT;     # things we were looking for at the bleeding edge
+our $ALL;
 
-# symbol table management
-our $ALL;            # all the stashes, keyed by id
-my $*CORE;            # the CORE scope
-my $*SETTING;         # the SETTING scope
-my $*GLOBAL;          # the GLOBAL scope
-my $*PROCESS;         # the PROCESS scope
-my $*UNIT;            # the UNIT scope
-my $*CURPAD;      # current lexical scope
-my $*CURPKG;          # current package scope
+=begin comment
 
-my %*MYSTERY;     # names we assume may be post-declared functions
+    Contextuals used in STD
+    =======================
+    # per parse
+    my $*ACTIONS;         # class or object which defines reduce actions
+    my $*SETTINGNAME;     # name of core setting
+    my $*TMP_PREFIX;      # where to put tmp files
+    my $*ORIG;            # the original program string
+    my @*ORIG;            # same thing as individual chars
+    my @*MEMOS;           # per-position info such as ws and line number
+    my $*HIGHWATER;      # where we were last looking for things
+    my $*HIGHMESS;       # current parse failure message
+    my $*HIGHEXPECT;     # things we were looking for at the bleeding edge
 
-# tree attributes, marked as propagating up (u) down (d) or up-and-down (u/d)
-my %*LANG;            # (d) braided languages: MAIN, Q, Regex, etc
+    # symbol table management
+    our $ALL;            # all the stashes, keyed by id
+    my $*CORE;            # the CORE scope
+    my $*SETTING;         # the SETTING scope
+    my $*GLOBAL;          # the GLOBAL scope
+    my $*PROCESS;         # the PROCESS scope
+    my $*UNIT;            # the UNIT scope
+    my $*CURPAD;      # current lexical scope
+    my $*CURPKG;          # current package scope
 
-my $*IN_DECL;     # (d) a declarator is looking for a name to declare
-my $*SCOPE = "";      # (d) which scope declarator we're under
-my $*MULTINESS;       # (d) which multi declarator we're under
-my $*PKGDECL ::= "";         # (d) current package declarator
-my $*NEWPKG;      # (u/d) new package being declared
-my $*NEWPAD;      # (u/d) new lexpad being declared
-my $*DECLARAND;   # (u/d) new object associated with declaration
+    my %*MYSTERY;     # names we assume may be post-declared functions
 
-my $*GOAL ::= "(eof)";  # (d) which special terminator we're most wanting
-my $*IN_REDUCE;   # (d) attempting to parse an [op] construct
-my $*IN_META;     # (d) parsing a metaoperator like [..]
-my $*QUASIMODO;   # (d) don't carp about quasi variables
-my $*LEFTSIGIL;   # (u) sigil of LHS for item vs list assignment
-my $*QSIGIL;      # (d) sigil of current interpolation
+    # tree attributes, marked as propagating up (u) down (d) or up-and-down (u/d)
+    my %*LANG;            # (d) braided languages: MAIN, Q, Regex, etc
 
-my $*INVOCANT_OK; # (d) parsing a list that allows an invocant
-my $*INVOCANT_IS; # (u) invocant of args match
+    my $*IN_DECL;     # (d) a declarator is looking for a name to declare
+    my $*SCOPE = "";      # (d) which scope declarator we're under
+    my $*MULTINESS;       # (d) which multi declarator we're under
+    my $*PKGDECL ::= "";         # (d) current package declarator
+    my $*NEWPKG;      # (u/d) new package being declared
+    my $*NEWPAD;      # (u/d) new lexpad being declared
+    my $*DECLARAND;   # (u/d) new object associated with declaration
 
-my $*BORG;            # (u/d) who to blame if we're missing a block
+    my $*GOAL ::= "(eof)";  # (d) which special terminator we're most wanting
+    my $*IN_REDUCE;   # (d) attempting to parse an [op] construct
+    my $*IN_META;     # (d) parsing a metaoperator like [..]
+    my $*QUASIMODO;   # (d) don't carp about quasi variables
+    my $*LEFTSIGIL;   # (u) sigil of LHS for item vs list assignment
+    my $*QSIGIL;      # (d) sigil of current interpolation
 
-    =begin comment overview
+    my $*INVOCANT_OK; # (d) parsing a list that allows an invocant
+    my $*INVOCANT_IS; # (u) invocant of args match
 
-    This file is designed to be either preprocessed into a grammar with
-    action statements or used as-is without any preprocessing.  The {*}
-    notation is a no-op action block, but can be identified uniquely via a
-    combination of the preceding token or rule name plus any additional text
-    following a #= comment.  We put this into a comment rather than using
-    a macro so that bootstrap compilers don't have to worry about macros
-    yet, and to keep the main grammar relatively uncluttered by action
-    statements.  Note that the preprocessor can certainly generate accesses
-    to the match state within the action block, so we need not mention it
-    explicitly.
+    my $*BORG;            # (u/d) who to blame if we're missing a block
 
-    Also, some rules are named by syntactic category plus an additonal symbol
+=end comment
+
+=begin notes
+
+    Some rules are named by syntactic category plus an additional symbol
     specified in adverbial form, either in bare :name form or in :sym<name>
     form.  (It does not matter which form you use for identifier symbols,
     except that to specify a symbol "sym" you must use the :sym<sym> form
@@ -74,19 +71,17 @@ my $*BORG;            # (u/d) who to blame if we're missing a block
     for disambiguating the name.  However, if no $sym is set, the original
     symbol will be used by default.
 
-    Note that rules automatically get an implicit {*} at their return, so
-    for the TOP rule the implicit action name is also simply "TOP".
-
-    Another nod toward preprocessing is that blocks that contain nested braces
-    are delimited by double braces so that the preprocessor does not need to
-    understand Perl 6 code.
+    Note that some of these rules are written strangely because we're
+    still bootstrapping via a preprocessor, gimme5.  For instance,
+    blocks that contain nested braces are delimited by double braces
+    so that the preprocessor does not need to parse Perl 6 code.
 
     This grammar relies on transitive longest-token semantics, though
     initially we made a feeble attempt to order rules so a procedural
     interpretation of alternation could usually produce a correct parse.
     (This is becoming less true over time.)
 
-    =end comment overview
+=end notes
 
 method TOP ($STOP = undef) {
     if defined $STOP {
@@ -441,8 +436,8 @@ token unsp {
     \\ <?before [\s|'#'] >
     :dba('unspace')
     [
-    | <.vws>                     {*}                             #= vwhite
-    | <.unv>                  {*}                                #= unv
+    | <.vws>
+    | <.unv>
     | $ { $¢.moreinput }
     ]*
 }
@@ -463,8 +458,8 @@ method moreinput () {
 token unv {
    :dba('horizontal whitespace')
    [
-   | \h+                 {*}                                    #= hwhite
-   | <?before \h* '=' [ \w | '\\'] > ^^ <.pod_comment>  {*}                    #= pod
+   | \h+
+   | <?before \h* '=' [ \w | '\\'] > ^^ <.pod_comment>
    | \h* <comment>
    ]
 }
@@ -511,19 +506,19 @@ token pod_comment {
     [
     | 'begin' \h+ <identifier> ::
         [
-        ||  .*? "\n" \h* '=' <.unsp>? 'end' \h+ $<identifier> » \N*          {*} #= tagged
-        ||  <?{ $<identifier>.Str eq 'END'}> .*                           {*} #= end
+        ||  .*? "\n" \h* '=' <.unsp>? 'end' \h+ $<identifier> » \N*
+        ||  <?{ $<identifier>.Str eq 'END'}> .*
         || { my $id = $<identifier>.Str; self.panic("=begin $id without matching =end $id"); }
         ]
     | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
-        [ .*? "\n" \h* '=' <.unsp>? 'end' » \N* || { self.panic("=begin without matching =end"); } ]   {*}       #= anon
+        [ .*? "\n" \h* '=' <.unsp>? 'end' » \N* || { self.panic("=begin without matching =end"); } ]
         
     | 'for' » :: \h* [ <identifier> || $$ || '#' || <.panic: "Unrecognized token after =for"> ]
         [.*?  ^^ \h* $$ || .*]
     | :: 
         [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
         [<alpha>||\s||<.panic: "Illegal pod directive">]
-        \N*                                           {*}       #= misc
+        \N*
     ]
 }
 
@@ -712,11 +707,11 @@ token blockoid {
 
     [
     | <?before \h* $$>  # (usual case without comments)
-        { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
-    | \h* <?before <[\\,:]>> {*}                         #= normal 
+        { @*MEMOS[$¢.pos]<endstmt> = 2; }
+    | \h* <?before <[\\,:]>>
     | <.unv>? $$
-        { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; } {*}             #= endargs
+        { @*MEMOS[$¢.pos]<endstmt> = 2; }
+    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
     ]
 }
 
@@ -741,11 +736,11 @@ token regex_block {
 
     [
     | <?before \h* $$>  # (usual case without comments)
-        { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt simple 
-    | \h* <?before <[\\,:]>> {*}                         #= normal 
+        { @*MEMOS[$¢.pos]<endstmt> = 2; }
+    | \h* <?before <[\\,:]>>
     | <.unv>? $$
-        { @*MEMOS[$¢.pos]<endstmt> = 2; } {*}                    #= endstmt complex
-    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }   {*}           #= endargs
+        { @*MEMOS[$¢.pos]<endstmt> = 2; }
+    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
     ]
 }
 
@@ -795,9 +790,9 @@ token statement {
     <!!{ $¢ = %*LANG<MAIN>.bless($¢); }>
 
     [
-    | <label> <statement>                        {*}            #= label
-    | <statement_control>                        {*}            #= control
-    | <EXPR> {*}                                                #= expr
+    | <label> <statement>
+    | <statement_control>
+    | <EXPR>
         :dba('statement end')
         [
         || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
@@ -805,7 +800,7 @@ token statement {
             :dba('statement modifier')
             <.ws>
             [
-            | <statement_mod_loop> {*}                              #= mod loop
+            | <statement_mod_loop>
                 {{
                     my $sp = $<EXPR><statement_prefix>;
                     if $sp and $sp<sym> eq 'do' {
@@ -813,16 +808,15 @@ token statement {
                        $¢.obs("do...$s" ,"repeat...$s");
                     }
                 }}
-            | <statement_mod_cond> {*}                              #= mod cond
+            | <statement_mod_cond>
                 :dba('statement modifier loop')
                 [
                 || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>
-                || <.ws> <statement_mod_loop>? {*}                  #= mod condloop
+                || <.ws> <statement_mod_loop>?
                 ]
             ]?
         ]
-        {*}                                                     #= modexpr
-    | <?before ';'> {*}                                         #= null
+    | <?before ';'>
     ]
 
     # Is there more on same line after a block?
@@ -912,10 +906,10 @@ token statement_control:if {
     <xblock>
     [
         [ <!before 'else'\s*'if'> || <.panic: "Please use 'elsif'"> ]
-        'elsif'<?spacey> <elsif=xblock>       {*}                #= elsif
+        'elsif'<?spacey> <elsif=xblock>
     ]*
     [
-        'else'<?spacey> <else=pblock>       {*}             #= else
+        'else'<?spacey> <else=pblock>
     ]?
 }
 
@@ -1206,7 +1200,6 @@ rule package_def {
             }}
             <block>
             ]
-            {*}                                                     #= block
         || <?before ';'>
             [
             || <?{ $*begin_compunit }>
@@ -1228,7 +1221,6 @@ rule package_def {
                         };
                     }
                 }}
-                {*}                                                     #= semi
             || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
             ]
         || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
@@ -1481,7 +1473,6 @@ token colonpair {
     [
     | '!' <identifier>
         { $key = $<identifier>.Str; $value = 0; }
-        {*}                                                     #= false
     | $<num> = [\d+] <identifier>
     | <identifier>
         { $key = $<identifier>.Str; }
@@ -1489,14 +1480,11 @@ token colonpair {
         || <.unsp>? <circumfix> { $value = $<circumfix>; }
         || { $value = 1; }
         ]
-        {*}                                                     #= value
     | :dba('signature') '(' ~ ')' <fakesignature>
     | <circumfix>
         { $key = ""; $value = $<circumfix>; }
-        {*}                                                     #= structural
     | $<var> = (<sigil> {} <twigil>? <desigilname>)
         { $key = $<var><desigilname>.Str; $value = $<var>; }
-        {*}                                                     #= varname
     ]
     { $<k> = $key; $<v> = $value; }
 }
@@ -1510,17 +1498,14 @@ token quotepair {
     [
     | '!' <identifier>
         { $key = $<identifier>.Str; $value = 0; }
-        {*}                                                     #= false
     | <identifier>
         { $key = $<identifier>.Str; }
         [
         || <.unsp>? <?before '('> <circumfix> { $value = $<circumfix>; }
         || { $value = 1; }
         ]
-        {*}                                                     #= value
     | $<n>=(\d+) $<id>=(<[a..z]>+)
         { $key = $<id>.Str; $value = $<n>.Str; }
-        {*}                                                     #= nth
     ]
     { $<k> = $key; $<v> = $value; }
 }
@@ -1827,18 +1812,18 @@ token variable {
     || <sigil> <twigil>? <?before '::' [ '{' | '<' | '(' ]> <longname> # XXX
     || '&'
         [
-        | <twigil>? <sublongname> { $name = $<sublongname>.Str } {*}                                   #= subnoun
+        | <twigil>? <sublongname> { $name = $<sublongname>.Str }
         | :dba('infix noun') '[' ~ ']' <infixish(1)>
         ]
     || '$::' <name>? # XXX
     || '$:' <name> # XXX
     || [
-        | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str } {*}                                    #= desigilname
-        | <special_variable> {*}                                    #= special
-        | <sigil> $<index>=[\d+] {*}                                #= $0
+        | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str }
+        | <special_variable>
+        | <sigil> $<index>=[\d+]
         # Note: $() can also parse as contextualizer in an expression; should have same effect
-        | <sigil> <?before '<' | '('> <postcircumfix> {*}           #= $()
-        | <sigil> <?{ $*IN_DECL }> {*}                              #= anondecl
+        | <sigil> <?before '<' | '('> <postcircumfix>
+        | <sigil> <?{ $*IN_DECL }>
         | <?> {{
             if $*QSIGIL {
                 return ();
@@ -1852,7 +1837,7 @@ token variable {
 
     { my $t = $<twigil>; $twigil = $t.[0].Str if @$t; }
     [ <?{ $twigil eq '.' }>
-        [<.unsp> | '\\' | <?> ] <?before '('> <postcircumfix> {*}          #= methcall
+        [<.unsp> | '\\' | <?> ] <?before '('> <postcircumfix>
     ]?
 }
 
@@ -2043,7 +2028,7 @@ class Herestub {
 } # end class
 
 role herestop {
-    token stopper { ^^ {*} $<ws>=(\h*?) $*DELIM \h* <.unv>?? $$ \v? }
+    token stopper { ^^ {} $<ws>=(\h*?) $*DELIM \h* <.unv>?? $$ \v? }
 } # end role
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
@@ -3374,14 +3359,12 @@ token PRE {
     [
     | <prefix>
         { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
-                                                    {*}         #= prefix
     | <prefix_circumfix_meta_operator>
         { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.Str }
-                                                    {*}         #= precircum
     ]
     # XXX assuming no precedence change
     
-    <prefix_postfix_meta_operator>*                 {*}         #= prepost
+    <prefix_postfix_meta_operator>*
     <.ws>
 }
 
@@ -4134,9 +4117,9 @@ token args ($istype = 0) {
     :my $*INVOCANT_OK = 1;
     :my $*INVOCANT_IS;
     [
-#    | :dba('argument list') '.(' ~ ')' <semiarglist> {*}             #= func args
-    | :dba('argument list') '(' ~ ')' <semiarglist> {*}              #= func args
-    | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist> {*} #= func args
+#    | :dba('argument list') '.(' ~ ')' <semiarglist>
+    | :dba('argument list') '(' ~ ')' <semiarglist>
+    | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist>
     |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
     ]
     { $<invocant> = $*INVOCANT_IS; }
@@ -4170,9 +4153,7 @@ token term:name ( --> Term)
         [
             '::'
             <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
-            {*}                                                 #= packagevar 
         ]?
-        {*}                                                     #= typename
 
     # unrecognized names are assumed to be post-declared listops.
     || <args> { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
@@ -4209,13 +4190,13 @@ token infix:sym« <== » ( --> Sequencer)
     { <sym> }
 
 token infix:sym« ==> » ( --> Sequencer)
-    { <sym> {*} }              #'
+    { <sym> }
 
 token infix:sym« <<== » ( --> Sequencer)
     { <sym> }
 
 token infix:sym« ==>> » ( --> Sequencer)
-    { <sym> {*} }              #'
+    { <sym> }
 
 ## expression terminator
 # Note: must always be called as <?terminator> or <?before ...<terminator>...>
@@ -4245,7 +4226,7 @@ token terminator:sym<when> ( --> Terminator)
     { 'when' » <.nofun> }
 
 token terminator:sym« --> » ( --> Terminator)
-    { '-->' {*} }              #'
+    { '-->' }
 
 token terminator:sym<)> ( --> Terminator)
     { <sym> }
@@ -5396,7 +5377,7 @@ method add_our_name ($n) {
     say "add_our_name $name in " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPKG;
-    say "curstash $curstash global $GLOBAL ", join ' ', %$*GLOBAL if $*DEBUG +& DEBUG::symtab;
+    say "curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL if $*DEBUG +& DEBUG::symtab;
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
     my @components = self.canonicalize_name($name);
@@ -5844,14 +5825,14 @@ method worryobs (Str $old, Str $new, Str $when = ' in Perl 6') {
     self;
 }
 
+method badinfix (Str $bad = $*sym) {
+    self.panic("Preceding context expects a term, but found infix $bad instead");
+}
+
 # Since most keys are valid prefix operators or terms, this rule is difficult
 # to reach ('say »+«' works), but it's okay as a last-ditch default anyway.
 token term:sym<miscbad> {
     {} <!{ $*QSIGIL }> <infixish> <.badinfix($<infixish>.Str)>
-}
-
-method badinfix (Str $bad = $*sym) {
-    self.panic("Preceding context expects a term, but found infix $bad instead");
 }
 
 ## vim: expandtab sw=4 ft=perl6
