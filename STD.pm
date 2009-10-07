@@ -3154,10 +3154,11 @@ token parameter {
 
     [
     | <type_constraint>+
-        {
+        {{
             my $t = $<type_constraint>;
-            @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
-        }
+            my @t = grep { substr($_.Str,0,2) ne '::' }, @$t;
+            @t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
+        }}
         [
         | '*' <param_var>   { $quant = '*'; $kind = '*'; }
         | '|' <param_var>   { $quant = '|'; $kind = '*'; }

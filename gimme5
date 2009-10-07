@@ -194,6 +194,8 @@ sub un6 {
         $f =~ s/^(\s):?:=(\s)/$2/           	and $t .= qq/$1=/, next; # XXX fake binding with assignment
         $f =~ s/^(\s)\?\?(\s)/$2/         	and $t .= qq/$1?/, next;
         $f =~ s/^(\s)!!(\s)/$2/           	and $t .= qq/$1:/, next;
+        $f =~ s/^\bmap( \{.*?\}),/$1/           and $t .= qq/map/, next;
+        $f =~ s/^\bgrep( \{.*?\}),/$1/          and $t .= qq/grep/, next;
         $f =~ s/^\btry \{//                     and $t .= qq/eval {/, next;
         $f =~ s/^\bloop \{//                    and $t .= qq/for (;;) {/, next;
         $f =~ s/^\bwhen\s+\*\s+\{//             and $t .= qq/default {/, next;
