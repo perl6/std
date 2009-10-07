@@ -90,11 +90,13 @@ if (defined $C and $C eq 'html') {
     run_js_interpreter($r, $verbose);
 }
 
+my $ctxs = [];
+my $ctx_id = 0;
+
 sub run_js_interpreter {
     require V8;
-    my $ctx = V8::Context->new();
-    $ctx->register_method_by_name("say_them");
-    $ctx->register_method_by_name("print_them");
+    my $ctx_id = new_ctx();
+    my $ctx = $ctxs->[$ctx_id];
     $ctx->execute(scalar(read_file($_))) for @js;
     my $ast = ToJS::emit_js($_[0], $pos);
     say $ast if $_[1];
@@ -104,10 +106,24 @@ sub run_js_interpreter {
     #say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
 }
 sub say_them {
-    # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)
     say map { Encode::decode_utf8($_) } @_;
 }
 sub print_them {
-    # TODO: put this in C++ instead as a V8 plugin (or use Print() from d8.cc)
     print map { Encode::decode_utf8($_) } @_;
 }
+sub new_ctx {
+    my $ctx = $ctxs->[$ctx_id || 0] = V8::Context->new();
+    $ctx->register_method_by_name("say_them");
+    $ctx->register_method_by_name("print_them");
+    $ctx->register_method_by_name("new_ctx");
+    $ctx->register_method_by_name("eval_ctx");
+    return $ctx_id++;
+}
+sub eval_ctx {
+    $ctxs->[$_[0]]->execute(Encode::decode_utf8($_[1]))."";
+}
+sub load_file {
+    $ctxs->[$_[0]]->execute(scalar(read_file(Encode::decode_utf8($_[1]))))."";
+}
+
+1;

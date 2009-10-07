@@ -211,11 +211,11 @@ function emit_js(self) {
     if (typeof(id = self.__INTERNAL__TOJS__SEEN)!='undefined') {
         if (seen[id]) { // inside it...
             r[id] = 1;
-            app_act += 'o' + this_js_parent + '['
-                + this_js_member + ']=o' + id + ';\n';
+            app_act += '\no[' + this_js_parent + ']['
+                + this_js_member + ']=o[' + id + '];';
             return 'null'; // the circular reference will be injected later
         }
-        return 'o' + id; // it's a reference to a closed object
+        return 'o[' + id + ']'; // it's a reference to a closed object
     }
     seen[id = self.__INTERNAL__TOJS__SEEN = ++o] = 1;
     objs[id] = self;
@@ -242,11 +242,11 @@ function emit_js(self) {
             text += (first ? (first = 0, '') : ',' + jsind())
                 + (this_js_member = tps(prop)) + ': ' + emit_js(self[prop]);
         }
-        text += jsind(-1) + '}';
+        text += jsind(-1) + '}\n';
     }
     seen[id] = 0; // unmark "inside"
     this_js_parent = last_js_parent; // reset the parent
-    return /*r[id] ? */'(var o' + id + ' = ' + text + ' )'/* : text*/;
+    return /*r[id] ? */'(o[' + id + ']=' + text + ')'/* : text*/;
 }
 
 return function topEmit(obj) {
