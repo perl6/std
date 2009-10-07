@@ -428,7 +428,6 @@ Concatenation:function(){
 Replication:function(){
     // this is partly working  - "A" x 3 gives "AAA", but so does
     // "A" xx 3 - should give "A","A","A"
-    throw keys(this);
     this.result = '';
     for ( var i=0;  i<this.eval_args[1]; i++ ) {
         this.result = this.result + this.eval_args[0];
@@ -863,7 +862,7 @@ Exponentiation:function(){
     return this.invoker;
 },
 quote__S_Slash_Slash:function(){
-    throw keys(this.quote.nibble.M.quantified_atom);
+    //throw keys(this.quote.nibble.M.quantified_atom);
 },
 do_iterate_map:function(){
     switch(this.phase) {
@@ -908,7 +907,7 @@ circumfix__S_Bra_Ket:function(){
     return this.invoker;
 },
 package_declarator: function(){
-    throw keys(this);
+    //throw keys(this);
 },
 Structural:function(){
     var lazy_list = new p6builtin.List(), val;
@@ -921,7 +920,7 @@ Structural:function(){
     return this.invoker;
 },
 Sequencer:function(){
-    throw keys(this.eval_args[0]);
+    //throw keys(this.eval_args[0]);
 },
 term__S_rand:function(){
     this.result = new p6builtin.Num(Math.random());
@@ -1075,36 +1074,23 @@ var last_T;
 
 function interp(obj,context) {
     obj.phase = 0; obj.context = context;
-    for (var act = obj, T = act.T, last;;T = act.T) {
+    for (var act = obj, T = act.T, last, args;;T = act.T) {
         //if (global_trace) {
         //    if (last) say('                   Typeof result: '+Type(last.result));
         //    if (act) say((act.phase ? 'returning to ' : 'trying ')+ act.T);
         //}
-        if (act.phase == 0) {
-            if (act.args && !act.eval_args && !__lazyarg_Types[T]) {
-                act = eval_args.call({
-                    T : "eval_args",
-                    M : typeof((last = act).args.length)!='undefined'
-                        ? dupe_array(act.args, act)
-                        : [dupe(act.args, act)],
-                    phase : 0,
-                    invoker : act,
-                    context : act.context
-                });
-            } else if (act.arg && !act.eval_args) {
-                act = eval_args.call({
-                    T : "eval_args",
-                    M : [dupe((last = act).arg, act)],
-                    phase : 0,
-                    invoker : act,
-                    context : act.context
-                });
-            } else {
-                act = disp[last_T = T].call(last = act);
-            }
-        } else {
-            act = disp[last_T = T].call(last = act);
-        }
+        act = (act.phase == 0 && !act.eval_args && !__lazyarg_Types[T]
+                && (args = (last = act).args || act.arg))
+            ? eval_args.call({
+                T : "eval_args",
+                M : typeof(args.length)!='undefined'
+                    ? dupe_array(args, act)
+                    : [dupe(args, act)],
+                phase : 0,
+                invoker : act,
+                context : act.context
+            })
+            : act = disp[last_T = T].call(last = act);
     }
     return obj.result;
 }
