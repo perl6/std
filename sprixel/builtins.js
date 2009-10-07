@@ -337,7 +337,7 @@ toNum:function(){
 };
 
 p6builtin.Bool = function(bool) {
-    this.v = typeof(bool)=='boolean' ? bool : !!bool;
+    this.v = typeof(bool)=='boolean' ? bool : bool ? true : false;
 };
 p6builtin.Bool.prototype = {
 WHAT: function(){
@@ -358,6 +358,12 @@ do_infix__S_TildeTilde:function(right,swapped){
     }
     return new p6builtin.Bool(this.isUndefined ? right instanceof p6builtin.Bool
         : this.v == right.toBool());
+},
+succ: function(){
+    return this.v ? this : new p6builtin.Bool(true);
+},
+pred: function(){
+    return this.v ? new p6builtin.Bool(false) : this;
 }
 };
 

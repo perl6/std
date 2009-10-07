@@ -21,7 +21,7 @@ function do_is(left,right,msg){
         right.WHAT()=='Str()' ? left.toString()==right.v
       : left.WHAT()=='Int()' ? (left.do_infix__S_EqualEqual(right).v
             || left.toString() == right.toString())
-      : (left.WHAT()=='Bool()' && right.toBool) ? left.v === right.toBool().v
+      : (left.WHAT()=='Bool()' && right.toBool) ? left.v === right.toBool()
       : left.WHAT()=='Str()' ? left.do_infix__S_eq(right).v
       : left.WHAT()=='Num()' ? left.do_infix__S_EqualEqual(right).v : false
     )).v
@@ -50,14 +50,17 @@ function do_isnt(left,right,msg){
 }
 
 function do_pass(msg){
+    this.result = new p6builtin.Bool(true);
     say('ok ' + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
 function do_flunk(msg){
+    this.result = new p6builtin.Bool(false);
     say('not ok ' + ++test_number + (msg ? ' - ' + msg : ''));
 }
 
 function do_skip(msg,expr){
+    this.result = new p6builtin.Bool(true);
     say('ok ' + ++test_number + ' # skip ' + msg);
 }
 

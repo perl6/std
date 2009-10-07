@@ -471,7 +471,7 @@ scope_declarator__S_my:function(){
 },
 Autoincrement:function(){
     if (!(this.eval_args[0] instanceof p6builtin.p6var)) { // check num role
-        throw "Can't modify read-only value at "+this.BEG;
+        throw "Can't modify read-only value"// at "+this.BEG;
     }
     if(this.M[1].T == 'POST') { // post-increment/decrement
         this.result = this.eval_args[0].value;
@@ -829,8 +829,15 @@ termish:function(){
     }
 },
 term__S_name:function(){
+    var id = this.longname.name.identifier.TEXT;
+    if (this.longname.M && this.longname.M.morename
+            && this.longname.M.morename[0]
+            && this.longname.M.morename[0].identifier
+            && this.longname.M.morename[0].identifier[0].TEXT) {
+        id += '::'+this.longname.M.morename[0].identifier[0].TEXT;
+    };
     this.result = new p6builtin.p6var('',
-        this.longname.name.identifier.TEXT, this.context);
+        id, this.context);
     return this.invoker;
 },
 circumfix__S_Cur_Ly:function(){
@@ -942,7 +949,7 @@ term__S_identifier:function(){
                 this.eval_args = Array.flatten.call(this.eval_args);
             }
             if (continuation // must be a built-in op that is flattened
-                    = this.do_next.result.func.apply(this.do_next, this.eval_args)) {
+                    = this.do_next.result.func.apply(this, this.eval_args)) {
                 if (!continuation.invoker) {
                     // sometimes the invoker is set by the subroutine
                     continuation.invoker = this;
@@ -952,6 +959,7 @@ term__S_identifier:function(){
                 //continuation.last_op = this;
                 return this.do_next = continuation;
             }
+            return this.invoker;
         } else if (this.do_next.result instanceof p6builtin.Sub) {// Perl sub invocation
             continuation = dupe(this.do_next.result, this);
             continuation.arg_array = Array.flatten.call(this.eval_args || []);
