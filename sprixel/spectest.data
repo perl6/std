@@ -20,10 +20,10 @@ S03-operators/relational.t
 S03-operators/scalar-assign.t
 S03-operators/short-circuit.t
 S03-operators/ternary.t skip 14..16
-# S04-statement-modifiers/if.t skip 3..12
-# S04-statements/do.t skip 7..24
-# S04-statements/for.t skip 3..57
-# S04-statements/if.t skip 5..20
+S04-statement-modifiers/if.t skip 3..12
+S04-statements/do.t skip 7..24
+S04-statements/for.t skip 3..57
+S04-statements/if.t skip 5..20
 S04-statements/redo.t skip 2..10
 S04-statements/repeat.t skip 3..16
 S04-statements/return.t skip 4..15
