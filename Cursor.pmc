@@ -271,27 +271,29 @@ sub you_are_here {
 sub you_were_here {
     my $self = shift;
     my $file = $::FILE->{name};
+    my $all;
     $file =~ s/(\.setting)?$/.syml/;
     $file =~ s!.*/!!;
 
     # setting?
     if ($::YOU_WERE_HERE) {
-        $STD::ALL->{SETTING} = $::YOU_WERE_HERE;
+        $all = $::YOU_WERE_HERE;
     }
     else {
         eval { $::UNIT->{'$?SETTING_ID'} = $STD::ALL->{SETTING}->id };
         warn $@ if $@;
         eval { $::UNIT->{'$?CORE_ID'} = $STD::ALL->{CORE}->id };
         warn $@ if $@;
+
+        $all = {};
         for my $key (keys %{$STD::ALL}) {
-            delete $STD::ALL->{$key} if $key =~ /^MY:file<\w+\.setting>/;
+            next if $key =~ /^MY:file<\w+\.setting>/ or $key eq 'CORE' or $key eq 'SETTING';
+            $all->{$key} = $STD::ALL->{$key};
         }
-        delete $STD::ALL->{CORE};
-        delete $STD::ALL->{SETTING};
     }
 
     open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
-    print SETTING Dump($STD::ALL);
+    print SETTING Dump($all);
     close SETTING;
     $self;
 }
