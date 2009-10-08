@@ -277,7 +277,8 @@ sub you_were_here {
 
     # setting?
     if ($::YOU_WERE_HERE) {
-        $all = $::YOU_WERE_HERE;
+        $all = $STD::ALL;
+        $all->{SETTING} = $::YOU_WERE_HERE;
     }
     else {
         eval { $::UNIT->{'$?SETTING_ID'} = $STD::ALL->{SETTING}->id };

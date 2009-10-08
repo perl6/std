@@ -693,6 +693,7 @@ token block () {
     [ <?before '{' > || <.panic: "Missing block"> ]
     <.newpad>
     <blockoid>
+    <.checkyada>
 }
 
 token blockoid {
