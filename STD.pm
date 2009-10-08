@@ -1292,7 +1292,7 @@ rule routine_def () {
     :my $*IN_DECL = 'routine';
     :my $*DECLARAND;
     [
-        [ '&'<deflongname>? | <deflongname> ]?
+        [ $<sigil>=['&''*'?] <deflongname>? | <deflongname> ]?
         <.newpad(1)>
         [ <multisig> | <trait> ]*
         <!{
@@ -1483,7 +1483,7 @@ token colonpair {
     | <identifier>
         { $key = $<identifier>.Str; }
         [
-        || <.unsp>? <circumfix> { $value = $<circumfix>; }
+        || <.unsp>? :dba('pair value') <circumfix> { $value = $<circumfix>; }
         || { $value = 1; }
         ]
     | :dba('signature') '(' ~ ')' <fakesignature>
@@ -3200,7 +3200,7 @@ token parameter {
         | '!'           { $quant = '!'; $kind //= '!' }
         | <?>
         ]
-    | {} <name> <.panic("Invalid typename " ~ $<name>.Str)>
+    | {} <longname> <.panic("Invalid typename " ~ $<longname>.Str)>
     ]
 
     <trait>*
@@ -5009,6 +5009,7 @@ method is_name ($n, $curpad = $*CURPAD) {
 
     my $curpkg = $*CURPKG;
     return True if $name ~~ /\:\:\(/;
+    $name ~~ s/\:(U|D|_)$//;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
         return True if @components[0] eq 'COMPILING::';
