@@ -2435,7 +2435,7 @@ method truly ($bool,$opt) {
 grammar Q is STD {
 
     role b1 {
-        token p5escape:sym<\\> { <sym> <item=backslash> }
+        token p5escape:sym<\\> { <sym> <item=p5backslash> }
         token p5backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
         token p5backslash:sym<\\> { <text=sym> }
         token p5backslash:stopper { <text=stopper> }
@@ -2539,7 +2539,7 @@ grammar Q is STD {
     role q {
         token stopper { \' }
 
-        token p5escape:sym<\\> { <sym> <item=backslash> }
+        token p5escape:sym<\\> { <sym> <item=p5backslash> }
 
         token p5backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
         token p5backslash:sym<\\> { <text=sym> }
@@ -3557,20 +3557,20 @@ grammar Regex is STD {
     multi method tweak (:ignorecase(:$i)!) { self }
     # end tweaks (DO NOT ERASE)
 
-    token p5category:metachar { <sym> }
-    proto token metachar { <...> }
+    token category:p5metachar { <sym> }
+    proto token p5metachar { <...> }
 
-    token p5category:backslash { <sym> }
-    proto token backslash { <...> }
+    token category:p5backslash { <sym> }
+    proto token p5backslash { <...> }
 
-    token p5category:assertion { <sym> }
-    proto token assertion { <...> }
+    token category:p5assertion { <sym> }
+    proto token p5assertion { <...> }
 
-    token p5category:quantifier { <sym> }
-    proto token quantifier { <...> }
+    token category:p5quantifier { <sym> }
+    proto token p5quantifier { <...> }
 
-    token p5category:mod_internal { <sym> }
-    proto token mod_internal { <...> }
+    token category:p5mod_internal { <sym> }
+    proto token p5mod_internal { <...> }
 
     proto token p5regex_infix { <...> }
 
@@ -3601,7 +3601,7 @@ grammar Regex is STD {
     token infixish {
         <!infixstopper>
         <!stdstopper>
-        <regex_infix>
+        <regex_infix=p5regex_infix>
         {
             $<O> = $<regex_infix><O>;
             $<sym> = $<regex_infix><sym>;
@@ -3612,9 +3612,9 @@ grammar Regex is STD {
 
     token quantified_atom {
         <!stopper>
-        <!regex_infix>
+        <!p5regex_infix>
         <atom>
-        [ <.ws> <quantifier>
+        [ <.ws> <quantifier=p5quantifier>
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Can't quantify zero-width atom">
         ]?
@@ -3624,7 +3624,7 @@ grammar Regex is STD {
     token atom {
         [
         | \w
-        | <metachar>
+        | <metachar=p5metachar>
         | '\\' :: .
         ]
     }
@@ -3633,7 +3633,7 @@ grammar Regex is STD {
     token p5metachar:sym<|>   { '|'  :: <fail> }
     token p5metachar:sym<)>   { ')'  :: <fail> }
 
-    token p5metachar:quant { <quantifier> <.panic: "quantifier quantifies nothing"> }
+    token p5metachar:quant { <quantifier=p5quantifier> <.panic: "quantifier quantifies nothing"> }
 
     # "normal" metachars
 
@@ -3642,7 +3642,7 @@ grammar Regex is STD {
     }
 
     token p5metachar:sym«(? )» {
-        '(?' {} <assertion>
+        '(?' {} <assertion=p5assertion>
         [ ')' || <.panic: "Perl 5 regex assertion not terminated by parenthesis"> ]
     }
 
@@ -3652,7 +3652,7 @@ grammar Regex is STD {
         { $/<sym> := <( )> }
     }
 
-    token p5metachar:sym<\\> { <sym> <backslash> }
+    token p5metachar:sym<\\> { <sym> <backslash=p5backslash> }
     token p5metachar:sym<.>  { <sym> }
     token p5metachar:sym<^>  { <sym> }
     token p5metachar:sym<$>  {
@@ -3693,7 +3693,7 @@ grammar Regex is STD {
     token p5assertion:sym<?> { <sym> <codeblock> }
     token p5assertion:sym<{ }> { <codeblock> }
 
-    token p5assertion:sym«<» { <sym> <?before '=' | '!'> <assertion> }
+    token p5assertion:sym«<» { <sym> <?before '=' | '!'> <assertion=p5assertion> }
     token p5assertion:sym<=> { <sym> [ <?before ')'> | <rx> ] }
     token p5assertion:sym<!> { <sym> [ <?before ')'> | <rx> ] }
     token p5assertion:sym«>» { <sym> <rx> }

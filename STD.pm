@@ -835,6 +835,7 @@ token eat_terminator {
     || <?{ @*MEMOS[$¢.pos]<endstmt> }> <.ws>
     || <?terminator>
     || $
+    || <?stopper>
     || {{ if @*MEMOS[$¢.pos]<ws> { $¢.pos = @*MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
         <.panic: "Confused">
     ]
@@ -2135,14 +2136,19 @@ token tribble ($l, $lang2 = $l) {
 }
 
 token quasiquibble ($l) {
+    :temp %*LANG;
     :my ($lang, $start, $stop);
     :my $*QUASIMODO = 0; # :COMPILING sets true
     <babble($l)>
-    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
+    {
+        my $B = $<babble><B>;
+        ($lang,$start,$stop) = @$B;
+        %*LANG<MAIN> = $lang;
+    }
 
     [
     || <?{ $start eq '{' }> [ :lang($lang) <block> ]
-    || $start [ :lang($lang) <statementlist> ] [$stop || <.panic: "Couldn't find terminator $stop"> ]
+    || [ :lang($lang) <starter> <statementlist> [ <stopper> || <.panic: "Couldn't find terminator $stop"> ] ]
     ]
 }
 
@@ -2986,7 +2992,8 @@ grammar Q is STD {
 grammar Quasi is STD {
     token term:unquote {
         :my $*QUASIMODO = 0;
-        <starter><starter><starter> <EXPR> <stopper><stopper><stopper>
+        <starter><starter><starter> <.ws>
+        [ <EXPR> <stopper><stopper><stopper> || <.panic: "Confused"> ]
     }
 
     # begin tweaks (DO NOT ERASE)
