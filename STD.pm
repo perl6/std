@@ -97,7 +97,6 @@ method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', 
     my $*TMP_PREFIX ::= $tmp_prefix;
     my $*SETTINGNAME ::= $setting;
     my $*ACTIONS ::= $actions;
-    my $*DEBUG ::= $DEBUG;
     temp @*MEMOS;
 
     # various bits of info useful for error messages
@@ -547,6 +546,7 @@ rule comp_unit {
     :my $*INVOCANT_IS;
     :my $*CURPAD;
     :my $*MULTINESS = '';
+    :my $*SIGNUM = 0;
 
     :my $*CURPKG;
     {{
@@ -1025,7 +1025,7 @@ token def_module_name {
         <?{ ($*PKGDECL//'') eq 'role' }>
         <.newpad>
         '[' ~ ']' <signature>
-        { $*IN_DECL = 0; }
+        { $*IN_DECL = ''; }
         <.finishpad>
     ]?
 }
@@ -1050,20 +1050,20 @@ token version:sym<v> {
 ###############
 
 token constant_declarator {
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'constant';
     :my $*DECLARAND;
     <?{ $*SCOPE eq 'constant' }>
     <identifier> <.ws> <?before '='|'is'\s>
-    { $*IN_DECL = 0; self.add_name($<identifier>.Str) }
+    { self.add_name($<identifier>.Str); $*IN_DECL = ''; }
 
     <trait>*
 }
 
 token variable_declarator {
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'variable';
     :my $*DECLARAND;
     <variable>
-    { $*IN_DECL = 0; $¢.add_variable($<variable>.Str) }
+    { $¢.add_variable($<variable>.Str); $*IN_DECL = ''; }
     [   # Is it a shaped array or hash declaration?
       #  <?{ $<sigil> eq '@' | '%' }>
         <.unsp>?
@@ -1168,7 +1168,7 @@ token package_declarator:does {
 
 rule package_def {
     :my $longname;
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'package';
     :my $*DECLARAND;
     :my $*NEWPKG;
     :my $*NEWPAD;
@@ -1267,9 +1267,10 @@ token regex_declarator:token { <sym>       <regex_def> }
 token regex_declarator:rule  { <sym>       <regex_def> }
 
 rule multisig {
+    :my $signum = 0;
     :dba('signature')
     [
-        ':'?'(' ~ ')' <signature(1)>
+        ':'?'(' ~ ')' <signature(++$signum)>
     ]
     ** '|'
 }
@@ -1286,14 +1287,14 @@ method checkyada {
 
 rule routine_def () {
     :temp $*CURPAD;
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'routine';
     :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad(1)>
         [ <multisig> | <trait> ]*
         <!{
-            $*IN_DECL = 0;
+            $*IN_DECL = '';
         }>
         <blockoid>:!s
         <.checkyada>
@@ -1303,7 +1304,7 @@ rule routine_def () {
 
 rule method_def () {
     :temp $*CURPAD;
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'method';
     :my $*DECLARAND;
     <.newpad(1)>
     [
@@ -1321,6 +1322,7 @@ rule method_def () {
             <trait>*
         | <?>
         ]
+        { $*IN_DECL = ''; }
         <blockoid>:!s
         <.checkyada>
         <.getsig>
@@ -1329,13 +1331,13 @@ rule method_def () {
 
 rule regex_def () {
     :temp $*CURPAD;
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'regex';
     :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad(1)>
         [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
-        { $*IN_DECL = 0; }
+        { $*IN_DECL = ''; }
         <.finishpad>
         <regex_block>:!s
         <.getsig>
@@ -1344,15 +1346,16 @@ rule regex_def () {
 
 rule macro_def () {
     :temp $*CURPAD;
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'macro';
     :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad(1)>
         [ <multisig> | <trait> ]*
         <!{
-            $*IN_DECL = 0;
+            $*IN_DECL = '';
         }>
+        { $*IN_DECL = ''; }
         <blockoid>:!s
         <.checkyada>
         <.getsig>
@@ -3031,21 +3034,23 @@ token fakesignature() {
 }
 
 token signature ($padsig = 0) {
-    # XXX incorrectly scopes &infix:<x> parameters to outside following block
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'sig';
     :my $*zone = 'posreq';
     :my $startpos = self.pos;
+    :my $*MULTINESS = 'only';
+    :my $*SIGNUM = $padsig;
     <.ws>
     [
     | <?before '-->' | ')' | ']' | '{' | ':'\s >
     | [ <parameter> || <.panic: "Malformed parameter"> ]
     ] ** <param_sep>
     <.ws>
-    { $*IN_DECL = 0; }
+    { $*IN_DECL = ''; }
     [ '-->' <.ws> <typename> ]?
     {{
         $*LEFTSIGIL = '@';
         if $padsig {
+            $*CURPAD.<$?SIGNATURE> ~= '|' if $padsig > 1;
             $*CURPAD.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
             $*CURPAD.<!NEEDSIG>:delete;
         }
@@ -3240,7 +3245,7 @@ $¢.panic("Can't put optional positional parameter after variadic parameters");
 }
 
 rule default_value {
-    :my $*IN_DECL = 0;
+    :my $*IN_DECL = '';
     '=' <EXPR(item %item_assignment)>
 }
 
@@ -5156,6 +5161,9 @@ method add_my_name ($n, $d, $p) {
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
         elsif $omult eq 'proto' {}
         elsif $*PKGDECL eq 'role' {}
+        elsif $*SIGNUM and $old<signum> and $*SIGNUM != $old<signum> {
+            $old<signum> = $*SIGNUM;
+        }
         else {
             my $ofile = $old.file // 0;
             my $oline = $old.line // '???';
@@ -5186,6 +5194,7 @@ method add_my_name ($n, $d, $p) {
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
         $*DECLARAND<inpad> = $curstash.idref;
+        $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
         $*DECLARAND<const> ||= 1 if $*SCOPE eq 'constant';
         if !$*DECLARAND<const> and $name ~~ /^\w+$/ {
             $curstash.{"&$name"} //= $curstash.{$name};
