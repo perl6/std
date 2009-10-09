@@ -541,6 +541,7 @@ rule comp_unit {
     :my $*QUASIMODO;
     :my $*SCOPE = "";
     :my $*LEFTSIGIL;
+    :my $*PRECLIM;
     :my %*MYSTERY = ();
     :my $*INVOCANT_OK;
     :my $*INVOCANT_IS;
@@ -3228,7 +3229,10 @@ token parameter {
             }
             $kind = '?' if $kind eq '!';
         }}
+        [<?before ':' > <.panic: "Can't put a default on the invocant parameter">]?
+        [<!before <[,)-]> > <.panic: "Default expression must come last">]?
     ]?
+    [<?before ':'> <?{ $kind ne '!' }> <.panic: "Invocant is too exotic">]?
 
     {
         $<quant> = $quant;
@@ -4089,7 +4093,7 @@ token infix:sym<,> ( --> Comma)
 
 token infix:sym<:> ( --> Comma)
     { <sym> <?before \s | <terminator> >
-        { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK--; }
+        { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec; }
     }
 
 token infix:sym« p5=> » ( --> Comma)
@@ -4306,6 +4310,7 @@ method EXPR ($preclvl) {
     }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $*LEFTSIGIL = '';
+    my $*PRECLIM = $preclim;
     my @termstack;
     my @opstack;
     my $termish = 'termish';

@@ -17,6 +17,7 @@ my class HyperWhatever { }
 my class Capture { }
 my class Match { }
 my class Signature { }
+my class Parameter { }
 my class Proxy { }
 my class Matcher { }
 my class Package { }
