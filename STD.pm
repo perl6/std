@@ -699,6 +699,7 @@ token block () {
 token blockoid {
     # encapsulate braided languages
     :temp %*LANG;
+    :my $*SIGNUM;
 
     <.finishpad>
     [
@@ -4987,6 +4988,7 @@ method finishpad {
     $*CURPAD<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line );
     $*CURPAD<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line );
     $*CURPAD<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line );
+    $*SIGNUM = 0;
     self;
 }
 
