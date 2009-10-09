@@ -84,9 +84,9 @@ sub MAIN {
 	$r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
     }
     $::ORIG =~ s/\n;\z//;
-    unless ($OPT_stab) {
-	delete $r->{CORE};
-	delete $r->{MATCH}{CORE};
+    if ($OPT_stab) {
+        no warnings;
+        $r->{stabs} = $STD::ALL;
     }
     if ($output eq 'ast') {
 	my $x = Dump($r);
