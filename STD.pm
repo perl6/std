@@ -5002,11 +5002,11 @@ method getsig {
     my $sig;
     if $*CURPAD.<!NEEDSIG>:delete {
         if $pv {
-            my $h = $pv.<%_>:delete;
-            my $a = $pv.<@_>:delete;
-            $sig = join ', ', sort keys %$pv;
-            $sig ~= ', *@_' if $a;
-            $sig ~= ', *%_' if $h;
+            my $h_ = $pv.<%_>:delete;
+            my $a_ = $pv.<@_>:delete;
+            $sig = join ', ', sort { substr($^a,1) leg substr($^b,1) }, keys %$pv;
+            $sig ~= ', *@_' if $a_;
+            $sig ~= ', *%_' if $h_;
         }
         else {
             $sig = '$_ is rw = OUTER::<$_>';
