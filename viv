@@ -155,6 +155,10 @@ sub indent {
 	my $r = hoistast($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
 	$class =~ s/__S_\d\d\d/__S_/ and $r->{_specific} = 1;
+	if ($class =~ /::(infix|prefix|postfix)__S_/) {
+	    $r->{_op} = $class;
+	    $class =~ s/::(infix|prefix|postfix)__S_/::SYM_$1__S_/;
+	}
 	gen_class($class);
 	bless $r, $class unless ref($r) =~ /^VAST/;
 	$r->{MATCH} = $match if $OPT_match;
@@ -314,10 +318,8 @@ sub indent {
 	my $match = shift;
 	my $r = hoistast($match);
 
-	my $class = $match->{O}{kind} // $match->{sym} // 'termish';
-	$class =~ s/^STD:://;
-	$class =~ s/^/VAST::/;
-#	print STDERR ::Dump($r);
+	my $class = 'VAST::Chaining';
+
 	gen_class($class);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
@@ -344,11 +346,12 @@ sub indent {
 	$r->{END} = $all[-1]{END} // $r->{BEG};
 	$r->{'.'} = \@all;
 
-	my $class = $match->{O}{kind} // $match->{sym} // 'termish';
-	$class =~ s/^STD:://;
-	$class =~ s/^/VAST::/;
-#	print STDERR ::Dump($r);
-	gen_class($class);
+	my $base = $match->{O}{kind} // $match->{sym} // 'termish';
+	$base =~ s/^STD:://;
+	$base =~ s/^/VAST::/;
+
+	my $class = $match->{delims}[0]{_ast}{infix}{_op} // warn ::Dump($match);
+	gen_class($class, $base);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
     }
@@ -363,11 +366,12 @@ sub indent {
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
 
-	my $class = $match->{O}{kind} // $match->{sym} // 'termish';
-	$class =~ s/^STD:://;
-	$class =~ s/^/VAST::/;
-#	print STDERR ::Dump($r);
-	gen_class($class);
+	my $base = $match->{O}{kind} // $match->{sym} // 'termish';
+	$base =~ s/^STD:://;
+	$base =~ s/^/VAST::/;
+
+	my $class = $match->{_ast}{postop}{postfix}{_op} // warn ::Dump($match);
+	gen_class($class, $base);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
     }
@@ -383,11 +387,12 @@ sub indent {
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
 
-	my $class = $match->{O}{kind} // $match->{sym} // 'termish';
-	$class =~ s/^STD:://;
-	$class =~ s/^/VAST::/;
-#	print STDERR ::Dump($r);
-	gen_class($class);
+	my $base = $match->{O}{kind} // $match->{sym} // 'termish';
+	$base =~ s/^STD:://;
+	$base =~ s/^/VAST::/;
+
+	my $class = $match->{_ast}{prefix}{_op} // warn ::Dump($match);
+	gen_class($class,$base);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
     }
@@ -409,11 +414,12 @@ sub indent {
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
 
-	my $class = $match->{O}{kind} // $match->{sym} // 'termish';
-	$class =~ s/^STD:://;
-	$class =~ s/^/VAST::/;
-#	print STDERR ::Dump($r);
-	gen_class($class);
+	my $base = $match->{O}{kind} // $match->{sym} // 'termish';
+	$base =~ s/^STD:://;
+	$base =~ s/^/VAST::/;
+
+	my $class = $match->{_ast}{infix}{_op} // warn ::Dump($match);
+	gen_class($class, $base);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
     }
@@ -468,6 +474,7 @@ sub indent {
 
     sub gen_class {
 	my $class = shift;
+	my $base = shift() // 'VAST::Base';
 	# say $class;
 	no strict 'refs';
 	if (@{$class . '::ISA'}) {
@@ -475,7 +482,7 @@ sub indent {
 	    return;
 	}
 	print STDERR "Creating class $class\n" if $OPT_log;
-	@{$class . '::ISA'} = 'VAST::Base';
+	@{$class . '::ISA'} = $base;
     }
 
 }
