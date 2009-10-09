@@ -1054,11 +1054,13 @@ token version:sym<v> {
 token constant_declarator {
     :my $*IN_DECL = 'constant';
     :my $*DECLARAND;
+    <.getdecl>
     <?{ $*SCOPE eq 'constant' }>
     <identifier> <.ws> <?before '='|'is'\s>
     { self.add_name($<identifier>.Str); $*IN_DECL = ''; }
 
     <trait>*
+    <.getdecl>
 }
 
 token variable_declarator {
@@ -1079,6 +1081,7 @@ token variable_declarator {
     <.ws>
 
     <trait>*
+    <.getdecl>
 }
 
 rule scoped($*SCOPE) {
@@ -1183,6 +1186,7 @@ rule package_def {
             }
         ]?
         <trait>*
+        <.getdecl>
         [
         || <?before '{'>
             [
@@ -1301,6 +1305,7 @@ rule routine_def () {
         <blockoid>:!s
         <.checkyada>
         <.getsig>
+        <.getdecl>
     ] || <.panic: "Malformed routine">
 }
 
@@ -1328,6 +1333,7 @@ rule method_def () {
         <blockoid>:!s
         <.checkyada>
         <.getsig>
+        <.getdecl>
     ] || <.panic: "Malformed method">
 }
 
@@ -1343,6 +1349,7 @@ rule regex_def () {
         <.finishpad>
         <regex_block>:!s
         <.getsig>
+        <.getdecl>
     ] || <.panic: "Malformed regex">
 }
 
@@ -1361,6 +1368,7 @@ rule macro_def () {
         <blockoid>:!s
         <.checkyada>
         <.getsig>
+        <.getdecl>
     ] || <.panic: "Malformed macro">
 }
 
@@ -3163,7 +3171,7 @@ token parameter {
     :my $kind;
     :my $quant = '';
     :my $q;
-
+    :my $*DECLARAND;
 
     [
     | <type_constraint>+
@@ -3206,6 +3214,8 @@ token parameter {
     <trait>*
 
     <post_constraint>*
+
+    <.getdecl>
 
     [
         <default_value> {{
@@ -5000,6 +5010,12 @@ method getsig {
         $sig = $*CURPAD.<$?SIGNATURE>;
     }
     self.<sig> = self.makestr(TEXT => $sig);
+    self.<pad> = $*CURPAD.idref;
+    self;
+}
+
+method getdecl {
+    self.<decl> = $*DECLARAND;
     self;
 }
 
@@ -5433,7 +5449,10 @@ method add_our_variable ($name) {
 }
 
 method add_placeholder($name) {
-    if my $siggy = $*CURPAD.<$?SIGNATURE> {
+    if $*SIGNUM {
+        self.panic("Placeholder variable $name not allowed in signature");
+    }
+    elsif my $siggy = $*CURPAD.<$?SIGNATURE> {
         self.panic("Placeholder variable $name cannot override existing signature $siggy");
     }
     if not $*CURPAD.<!NEEDSIG> {
@@ -5441,6 +5460,7 @@ method add_placeholder($name) {
     }
     self.add_my_variable($name);
     $name ~~ s/\^//;
+    $name = ':' ~ $name if $name ~~ s/\://;
     $*CURPAD.{'%?PLACEHOLDERS'}{$name}++;
     self;
 }
@@ -5448,7 +5468,7 @@ method add_placeholder($name) {
 method check_variable ($variable) {
     my $name = $variable.Str;
     say "check_variable $name" if $*DEBUG +& DEBUG::symtab;
-    my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W?)(.?)/;
+    my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W*)(.?)/;
     given $twigil {
         when '' {
             my $ok = 0;
@@ -5472,7 +5492,7 @@ method check_variable ($variable) {
         }
         when ':' {
             my $*MULTINESS = 'multi';
-            self.add_my_variable($name);
+            $variable.add_placeholder($name);
         }
         when '~' {
             return %*LANG.{substr($name,2)};
