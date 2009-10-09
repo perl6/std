@@ -3230,7 +3230,7 @@ token parameter {
             $kind = '?' if $kind eq '!';
         }}
         [<?before ':' > <.panic: "Can't put a default on the invocant parameter">]?
-        [<!before <[,)-]> > <.panic: "Default expression must come last">]?
+        [<!before <[,;)\]\{\-]> > <.panic: "Default expression must come last">]?
     ]?
     [<?before ':'> <?{ $kind ne '!' }> <.panic: "Invocant is too exotic">]?
 
