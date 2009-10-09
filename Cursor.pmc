@@ -2711,6 +2711,7 @@ sub do_import_aliases {
 sub canonicalize_name { my $self = shift;
     my $name = shift;
     $name =~ s/^([\$\@\%\&])(\^|:(?!:))/$1/;
+    $name =~ s/\b:[UD_]$//;
     return $name unless $name =~ /::/;
     $self->panic("Can't canonicalize a run-time name at compile time: $name") if $name =~ /::\(/;
     $name =~ s/^([\$\@%&][!*=?:^.]?)(.*::)(.*)$/$2<$1$3>/;

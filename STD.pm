@@ -5032,7 +5032,6 @@ method is_name ($n, $curpad = $*CURPAD) {
 
     my $curpkg = $*CURPKG;
     return True if $name ~~ /\:\:\(/;
-    $name ~~ s/\:(U|D|_)$//;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
         return True if @components[0] eq 'COMPILING::';
