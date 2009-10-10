@@ -755,7 +755,7 @@ rule statementlist {
 
     [
     | $
-    | <?before <[\)\]\}]> >
+    | <?before <[\)\]\}]>>
     | [<statement><eat_terminator> ]*
     ]
 }
@@ -765,7 +765,7 @@ rule semilist {
     :my $*INVOCANT_OK = 0;
     :dba('semicolon list')
     [
-    | <?before <[\)\]\}]> >
+    | <?before <[\)\]\}]>>
     | [<statement><eat_terminator> ]*
     ]
 }
@@ -3125,7 +3125,7 @@ token param_var {
     [
     | '[' ~ ']' <signature>
     | '(' ~ ')' <signature>
-    | <sigil> [<?before <.twigil>\w> <twigil>]?
+    | <sigil> [<twigil> <?before \w>]?
         [
             # Is it a longname declaration?
         || <?{ $<sigil>.Str eq '&' }> <?ident> {}
