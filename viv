@@ -155,9 +155,9 @@ sub indent {
 	my $r = hoistast($match);
 	(my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
 	$class =~ s/__S_\d\d\d/__S_/ and $r->{_specific} = 1;
-	if ($class =~ /::(infix|prefix|postfix|postcircumfix|dotty)__S_/) {
+	if ($class =~ /::(infix|prefix|postfix|postcircumfix|dotty|regex_infix)__S_/) {
 	    $r->{_op} = $class;
-	    $class =~ s/::(infix|prefix|postfix|postcircumfix|dotty)__S_/::SYM_$1__S_/;
+	    $class =~ s/::(infix|prefix|postfix|postcircumfix|dotty|regex_infix)__S_/::SYM_$1__S_/;
 	}
 	gen_class($class);
 	bless $r, $class unless ref($r) =~ /^VAST/;
@@ -265,7 +265,9 @@ sub indent {
 			$r{$k}{TEXT} = $v->Str;
 		    }
 		    else {
+			# NAME or decl or sig or...
 			$r{$k} = $v;
+			next;
 		    }
 #		    $r{zygs}{$k} = $SEQ++;
 		    unless (ref($r{$k}) =~ /^VAST/) {
@@ -350,7 +352,10 @@ sub indent {
 	$base =~ s/^STD:://;
 	$base =~ s/^/VAST::/;
 
-	my $class = $match->{delims}[0]{_ast}{infix}{_op} // warn ::Dump($match);
+	my $class =
+	    $match->{delims}[0]{_ast}{infix}{_op} //
+	    $match->{delims}[0]{_ast}{regex_infix}{_op} //
+	    warn ::Dump($match);
 	gen_class($class, $base);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
@@ -370,11 +375,19 @@ sub indent {
 	$base =~ s/^STD:://;
 	$base =~ s/^/VAST::/;
 
-	my $class =
-	    $match->{_ast}{postop}{postfix}{_op} //
-	    $match->{_ast}{postop}{postcircumfix}{_op} //
-	    $match->{_ast}{dotty}{_op} //
-	    warn ::Dump($match);
+	my $class;
+	if ($match->{fake}) {
+	    $class = $base;
+	    $base = '';
+	}
+	else {
+	    $class =
+		$match->{_ast}{postop}{postfix}{_op} //
+		$match->{_ast}{postop}{postcircumfix}{_op} //
+		$match->{_ast}{dotty}{_op} //
+		warn ::Dump($match);
+	}
+
 	gen_class($class, $base);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
@@ -395,7 +408,15 @@ sub indent {
 	$base =~ s/^STD:://;
 	$base =~ s/^/VAST::/;
 
-	my $class = $match->{_ast}{prefix}{_op} // warn ::Dump($match);
+	my $class;
+	if ($match->{fake}) {
+	    $class = $base;
+	    $base = '';
+	}
+	else {
+	    $class = $match->{_ast}{prefix}{_op} // warn ::Dump($match);
+	}
+
 	gen_class($class,$base);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
@@ -422,7 +443,18 @@ sub indent {
 	$base =~ s/^STD:://;
 	$base =~ s/^/VAST::/;
 
-	my $class = $match->{_ast}{infix}{_op} // warn ::Dump($match);
+	my $class;
+	if ($match->{fake}) {
+	    $class = $base;
+	    $base = '';
+	}
+	else {
+	    $class =
+		$match->{_ast}{infix}{_op} //
+		$match->{_ast}{regex_infix}{_op} //
+		warn ::Dump($match);
+	}
+
 	gen_class($class, $base);
 	$r = bless $r, $class;
 	$match->{'_ast'} = $r;
@@ -1343,10 +1375,6 @@ sub indent {
 }
 
 
-{ package VAST::Nonchaining; our @ISA = 'VAST::Base';
-}
-
-
 { package VAST::normspace; our @ISA = 'VAST::Base';
 }
 
@@ -1977,6 +2005,10 @@ END
 
 
 { package VAST::stopper; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::Structural; our @ISA = 'VAST::Base';
 }
 
 
