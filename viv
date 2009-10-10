@@ -871,6 +871,10 @@ sub indent {
 }
 
 
+{ package VAST::dotty__S_Dot; our @ISA = 'VAST::Methodcall';
+}
+
+
 { package VAST::SYM_dotty__S_Dot; our @ISA = 'VAST::Base';
 }
 
@@ -940,6 +944,14 @@ sub indent {
 
 
 { package VAST::SYM_infix__S_ColonEqual; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+        my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] = '=';	# XXX oversimplified
+        $self->ret(@t);
+    }
+}
+
+{ package VAST::SYM_infix__S_ColonColonEqual; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '=';	# XXX oversimplified
@@ -1229,29 +1241,6 @@ sub indent {
 
 
 { package VAST::Methodcall; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::method_def; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @b = $self->SUPER::emit_p5($lvl+1);
-	my @e = '';
-	while (@b) {
-	    my $t = pop(@b);
-	    if ($t =~ s/^\{//) {
-		$t = "{\n    my \$self = shift;\n" . pop(@b) . $t;
-		unshift(@e,$t);
-		last;
-	    }
-	    unshift(@e,$t);
-	}
-        $self->ret(@b,@e);
-    }
-}
-
-
-
-{ package VAST::dotty__S_Dot; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my @t = $self->SUPER::emit_p5($lvl+1);
 	if (@t > 2) {
@@ -1285,6 +1274,25 @@ sub indent {
 	$self->ret($t);
     }
 }
+
+
+{ package VAST::method_def; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+        my @b = $self->SUPER::emit_p5($lvl+1);
+	my @e = '';
+	while (@b) {
+	    my $t = pop(@b);
+	    if ($t =~ s/^\{//) {
+		$t = "{\n    my \$self = shift;\n" . pop(@b) . $t;
+		unshift(@e,$t);
+		last;
+	    }
+	    unshift(@e,$t);
+	}
+        $self->ret(@b,@e);
+    }
+}
+
 
 { package VAST::methodop; our @ISA = 'VAST::Base';
 }
@@ -1845,7 +1853,7 @@ END
         my @t = $self->SUPER::emit_p5($lvl+1);
 	my $t = join('', @t);
 	$t =~ s/my(\s+)&(\w+)/my$1\$$2/;
-	$t =~ s/my(\s+)([\$@%])(\w+)\s+is\s+context(?:\{'rw'})?/local$1${2}::$3/;
+	$t =~ s/my(\s+)([\$@%])::(\w+)/local$1${2}::$3/;
         $self->ret($t);
     }
 }
@@ -2144,6 +2152,13 @@ END
 
 
 { package VAST::typename; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my @t;
+	if (ref $context[-1] ne 'VAST::scoped') {
+	    @t = $self->SUPER::emit_p5($lvl+1);
+	}
+        $self->ret(@t);
+    }
 }
 
 

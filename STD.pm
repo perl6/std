@@ -1086,7 +1086,7 @@ token variable_declarator {
     <.getdecl>
 }
 
-rule scoped($*SCOPE) {
+rule scoped ($*SCOPE) {
     :dba('scoped declarator')
     [
     | <declarator>

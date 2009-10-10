@@ -870,7 +870,12 @@ sub before { my $self = shift;
     my @all = $block->($self);
     if (@all and $all[0]) {
         $all[0]->{'~CAPS'} = \@caps;
-        $all[0]->{'_ast'} = $self->{_ast} if $self->{_ast};
+        if ($self->{_ast}) {
+            $all[0]->{'_ast'} = $self->{_ast};
+        }
+        else {
+            delete $all[0]->{'_ast'};
+        }
         return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
     }
     return ();
@@ -886,7 +891,12 @@ sub after { my $self = shift;
     my @all = $block->($end);          # Make sure $_->{_from} == $_->{_pos}
     if (@all and $all[0]) {
         $all[0]->{'~CAPS'} = \@caps;
-        $all[0]->{'_ast'} = $self->{_ast} if $self->{_ast};
+        if ($self->{_ast}) {
+            $all[0]->{'_ast'} = $self->{_ast};
+        }
+        else {
+            delete $all[0]->{'_ast'};
+        }
         return $all[0]->cursor_all(($self->{_pos}) x 2)->retm();
     }
     return ();
