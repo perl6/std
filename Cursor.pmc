@@ -39,7 +39,7 @@ package Cursor;
 
 use Carp;
 use File::Copy;
-use YAML::Syck;
+use YAML::XS;
 use Storable;
 use Encode;
 
@@ -242,6 +242,14 @@ sub load_perl_pad {
         store($PADS{$setting}, $store);
     }
     $PADS{$setting};
+}
+
+sub LoadFile {
+    my $file = shift;
+    open my $fh, $file or die "Can't open $file: $!";
+    my $text = do { local $/; <$fh>; };
+    close $fh;
+    Load($text);
 }
 
 sub load_yaml_pad {

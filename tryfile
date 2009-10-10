@@ -6,7 +6,7 @@ use utf8;
 my $failures = 0;
 
 if (not @ARGV) {
-    chomp(@ARGV = <STDIN>);
+    @ARGV = grep { s/\.t\n/.t/} <STDIN>;
     s/^\s*[AU]*\s+// for @ARGV;
 }
 
