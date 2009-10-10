@@ -15,16 +15,16 @@ all_tests_begin(\%stats);
 # Test harness outer loop
 for my $spectest (@spectests) {
     next if $spectest =~ m/ ^ \s* ( \# .* )? $ /x; # no blanks / comments
-    $spectest =~ m/ ^ (\S+) (\s+ skip .+)? $ /x; # get name, directive
+    $spectest =~ m/ ^ (\S+) (\s+ .+)? $ /x; # extract name, directives
     my $testname = $1;
     my $scriptname = "$spectest_base/$testname";
-    one_test_begin($testname);
+    one_test_begin($testname); # display the test name and ......
     my @script = lines($scriptname); # read test script as array
-    my @skips = get_skip_list($2); # process the optional skip directive
-    apply_skips(\@script,\@skips); # "fudge" tests we cannot run ;)
+    my ($todos,$skips) = get_directives($2); # process the optional directives
+    apply_directives(\@script,$todos,$skips); # "fudge" tests known to fail
     my $tap_out = execute_script(\@script,$testname); # run tests
     my %result = read_tap($tap_out); # look for 1..3/ok 1/ok 2/ok 3 etc
-    one_test_end(%result);
+    one_test_end(%result); # display the counts from plan .. miss
     update_stats(\%stats,%result);
 }
 all_tests_end(\%stats);
@@ -50,36 +50,48 @@ sub all_tests_begin {
     my $stats = shift;
     %$stats = (plan=>0, pass=>0, fail=>0, todopass=>0, todofail=>0,
                skip=>0, miss=>0, files=>0, start=>time);
-    print " " x 41, "plan pass fail todo(p f) skip miss\n";
+    print " " x 45, "plan pass fail todo(p f) skip miss\n";
 }
 
 # Show the test name and wait on the same line to print the results
 sub one_test_begin {
     my $testname = shift;
-    print $testname . "." x (40 - length($testname));
+    print $testname . "." x (44 - length($testname));
 }
 
-# Convert for example an optional "skip 2 5..8 10" into (2,5,6,7,8,10)
-sub get_skip_list {
-    my $skip_directive = shift;
-    return () unless defined($skip_directive);
-    my @skip_numbers;
-    my @skip_words = split ' ', $2;
-#   print "SKIP_WORDS:",join( ",", @skip_words ), "\n";
-    # TODO: check that the first word is 'skip' and deal with errors
-    shift @skip_words;
-    for my $skip_word (@skip_words) {
-        if ( $skip_word =~ / ^ \d+ $ /x ) { # a single number
-            push @skip_numbers, 0 + $skip_word;
-        }
-        elsif ( $skip_word =~ / ^ (\d+) \.\. (\d+) $ /x ) { # range m..n
-            push @skip_numbers, $1..$2;
+# Convert a string of directives such as "todo(4,8) skip(2,5..8,10) todo(3)"
+# into ( [3,4,8], [2,5,6,7,8,10] )
+sub get_directives {
+    my $directives = shift;
+    return () unless defined($directives);
+    my %numbers = ( 'todo'=>{}, 'skip'=>{} );
+    for my $directive (split ' ', $directives) {
+        if ( $directive =~ / ^ (skip|todo) \( (.*) \) $ /x ) {
+            my $todo_or_skip = $1;
+            my $ranges = $2;
+            for my $range (split ',', $ranges) {
+                my ($num1,$num2) = ($range,$range);
+                if ( $range =~ / ^ (\d+) \.\. (\d+) $ /x ) { # range m..n
+                    ($num1,$num2) = ($1,$2);
+                }
+                elsif ( $range !~ / ^ \d+ $ /x ) { # a single number
+                    die "bad line range: $range\n";
+                }
+                for my $num ($num1 .. $num2) {
+                    $numbers{$todo_or_skip}{$num} = 1;
+                }
+            }
         }
         else {
-            print "BAD SKIP WORD: $skip_word\n";
+            die "bad directive: $directive";
         }
     }
-    return @skip_numbers;
+    # delete the todo number for tests that also appear in skip
+    for my $num (keys %{$numbers{'skip'}}) {
+        delete $numbers{'todo'}{$num} if exists $numbers{'todo'}{$num};
+    }
+    return( [sort {$a<=>$b} keys %{$numbers{'todo'}}],
+            [sort {$a<=>$b} keys %{$numbers{'skip'}}] );
 }
 
 # Given a reference to an array of script lines, and a reference to an
@@ -92,41 +104,100 @@ sub get_skip_list {
 # lines not headed with a test function. Rakudo and Pugs have a fudging
 # solution that can skip a compound statement enclosed in curly braces.
 # This can be applied here as well, but is not yet implemented.
-sub apply_skips {
+sub apply_directives {
     my $refscript = shift; # reference to array of test script lines
-    my $refskip = shift; # reference to array of test numbers to skip
-    return unless defined($refskip); # no skip list is ok, just a no-op
-    my @testline;
+    my $todos = shift; # reference to array of test numbers to todo
+    my $skips = shift; # reference to array of test numbers to skip
+    $todos = [] unless $todos;
+    $skips = [] unless $skips;
+    my @todos = @$todos; #print "todos:@todos\n";
+    my @skips = @$skips; #print "skips:@skips\n";
+#   return if (@todos==0 and @skips==0); # short circuit
+    my @testindex;
+    my $current_block = -1;
+    my @block;
+    my %block_for_test;
     my $linenumber = 1;
     my $testnumber = 1;
     my $testfunctions = join('|', qw{ok is isnt pass flunk isa_ok
         dies_ok lives_ok skip todo force_todo use_ok cmp_ok is_deeply
         like skip_rest unlike eval_dies_ok eval_lives_ok approx
         is_approx throws_ok});
-    # Identify the line number for each test number
+    # Identify the line index for each test number
     for ( $lineindex=0; $lineindex<@$refscript; ++$lineindex ) {
         my $linetext = $$refscript[$lineindex];
-#       print "LINE$lineindex:";
-        if ( $linetext =~ / ^ \s* ($testfunctions) (\(|\s) /x ) {
-            $testline[$testnumber] = $lineindex;
-#           print "TEST $testnumber:";
+        if ( $linetext =~ / ^ \{ $ /x ) {
+            if ( $current_block == -1 ) { # if not already in a block
+                push @block, [$lineindex+1,-1];
+                $current_block = $#block;
+            }
+        }
+        elsif ( $linetext =~ / ^ \} $ /x ) {
+            if ( $current_block >= 0 ) { # if still in a block
+                $block[$current_block][1] = $lineindex-1;
+                $current_block = -1;
+            }
+        }
+        elsif ( $linetext =~ / ^ \s* ($testfunctions) (\(|\s) /x ) {
+            $testindex[$testnumber] = $lineindex;
+            $block_for_test{$testnumber} = $current_block if $current_block>=0;
             $testnumber++;
         }
-#       print "$linetext\n";
     }
-    # Replace the tests in the skip list
-    if ( defined($refskip) ) {
-        for $testnumber (@$refskip) {
-            if ( $testnumber <= $#testline ) {
-                $lineindex = $testline[$testnumber];
-                my $linetext = $$refscript[$lineindex];
-                # TODO: rewrite to not remove single quotes
-                $linetext =~ s/\'//g; # this crashes Test.pm.js :(
-                $$refscript[$lineindex] = "skip('$testnumber',1);";
+#print "BLOCK:\n";
+#for my $p (@block) { printf "%d:%d\n", $p->[0], $p->[1]; }
+#print "BLOCK:\n";
+    # Identify the blocks containing tests to skip, and tests not in blocks
+    my %blocks_to_skip;
+    my %single_tests_to_skip;
+    for $testnumber (@skips) {
+        if ( exists $block_for_test{$testnumber} ) {
+            $blocks_to_skip{$block_for_test{$testnumber}} = 1;
+        }
+        else {
+            $single_tests_to_skip{$testnumber} = 1;
+        }
+    }
+    # Within each block to skip, replace every test line with an ok
+    # followed by a skip comment, and comment out all the other lines.
+    for $current_block (keys %blocks_to_skip) {
+        my ( $index1, $index2 ) = @{$block[$current_block]};
+#       printf "SKIP BLOCK: %d:%d\n", $index1, $index2;
+        for $lineindex ($index1..$index2) {
+            $$refscript[$lineindex] =~ / ^ (\s*) (.*) $ /x;
+            my $spaces = $1;
+            my $text = $2;
+            $linetext = $$refscript[$lineindex];
+            
+            if ( $linetext =~ / ^ \s* ($testfunctions) (\(|\s) /x ) {
+                $$refscript[$lineindex] = $spaces . "ok(1,'skip');";
+                # this line contains a test
+            }
+            elsif ( $linetext =~ / ^ \s* $ /x ) {
+                # this is a blank line, leave it alone
+            }
+            elsif ( $linetext =~ / ^ \s* \# /x ) {
+                # this line is already a comment, leave it alone
             }
             else {
-                warn "cannot skip test $testnumber - highest is $#testline";
+                # this line contains other code, comment it out
+                $$refscript[$lineindex] = $spaces . '# ' . $text;
             }
+#           printf "SKIP LINE: %d: %s\n", $lineindex, $$refscript[$lineindex];
+        }
+#       printf "SKIP BLOCK: %d:%d\n", $index1, $index2;
+    }
+    # Replace the tests in the skip list
+    for $testnumber (keys %single_tests_to_skip) {
+        if ( $testnumber <= $#testindex ) {
+            $lineindex = $testindex[$testnumber];
+            my $linetext = $$refscript[$lineindex];
+            # TODO: rewrite to not remove single quotes
+            $linetext =~ s/\'//g; # this crashes Test.pm.js :(
+            $$refscript[$lineindex] = "skip('$testnumber',1);";
+        }
+        else {
+            warn "cannot skip test $testnumber - highest is $#testindex";
         }
     }
 }
@@ -204,8 +275,8 @@ sub update_stats {
 
 sub all_tests_end {
     my $refstats = shift;
-    print " " x 40 . " ----" x 7 . "\n";
-    printf "Total from%4d files" . "." x 20, $refstats->{'files'};
+    print " " x 43 . " ----" x 7 . "\n";
+    printf "Total from%4d files" . "." x 23, $refstats->{'files'};
     printf( "%5d%5d%5d%5d%5d%5d%5d\n", $refstats->{'plan'},
         $refstats->{'pass'}, $refstats->{'fail'}, $refstats->{'todopass'},
         $refstats->{'todofail'}, $refstats->{'skip'}, $refstats->{'miss'});
@@ -218,6 +289,16 @@ sub all_tests_end {
 
 harness-fudging - run all or selected specification tests from scripts
 
+=head1 SYNOPSIS
+
+    perl harness-fudging.pl [options]
+
+=head2 OPTIONS
+
+ --execute_command='perl sprixel.pl'
+ --spectest_data='sprixel/spectest.data'
+ --spectest_base='../../t/spec'
+
 =head1 DESCRIPTION
 
 This Perl 5 script takes three command line arguments. First, the
@@ -227,11 +308,11 @@ Third, the base directory of the suite to test.
 
 =head1 METADATA
 
-The second command line argument is the name of the metadata file, for
-example F<sprixel/spectest.data>. Comment lines beginning with # are
-ignored. Regular lines begin with the pathname of a test script,
-relative to the base directory of the test suite, and optionally a list
-of test numbers to skip.
+The --spectest_data option is the name of the metadata file, for example
+F<sprixel/spectest.data>. In this file comment lines beginning with #
+are ignored. Regular lines begin with the pathname of a test script,
+relative to the base directory of the test suite, and optionally contain
+todo or skip directives.
 
 =head1 BUGS / LIMITATIONS
 
