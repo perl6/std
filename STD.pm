@@ -1870,8 +1870,8 @@ token sigil:sym<&>  { <sym> }
 
 token twigil:sym<.> { <sym> }
 token twigil:sym<!> { <sym> }
-token twigil:sym<^> { <sym> }
-token twigil:sym<:> { <sym> <!before ':'> }
+token twigil:sym<^> { <sym> <?before \w> }
+token twigil:sym<:> { <sym> <?before \w> }
 token twigil:sym<*> { <sym> }
 token twigil:sym<+> { <sym> <!!worry: "The + twigil is deprecated, use the * twigil instead"> }
 token twigil:sym<?> { <sym> }
@@ -3125,7 +3125,7 @@ token param_var {
     [
     | '[' ~ ']' <signature>
     | '(' ~ ')' <signature>
-    | <sigil> [<twigil> <?before \w>]?
+    | <sigil> <twigil>?
         [
             # Is it a longname declaration?
         || <?{ $<sigil>.Str eq '&' }> <?ident> {}
