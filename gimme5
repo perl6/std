@@ -379,7 +379,7 @@ sub $name {
 	    push \@gather, \$C->\$try(\@_);
             last if \@gather;
 	}
-	\$self->_MATCHIFY(\$S, "$name", \@gather);
+	\$self->_MATCHIFYr(\$S, "$name", \@gather);
     };
     if (\$@) {
 	return () if \$@ =~ /^ABORTRULE/;
@@ -1196,7 +1196,7 @@ sub atom {
 	my $nest = quantified_atom();
 
 	@STUFFED = ($nest, $checkbrack);
-        return bless { text => '::', min => 0, extra => "local \$::GOAL = $goaltext", %adverbs }, "RE_meta";
+        return bless { text => ':', min => 0, extra => "local \$::GOAL = $goaltext", %adverbs }, "RE_meta";
     }
     if (s/^ (\w+) (?! \s* [*+?]) //x) {
         my $word = $1;
@@ -1830,7 +1830,8 @@ sub unbalanced {
 #            $code = "\$C->_EOL$REV()";
         }
         elsif ($text eq ':') {
-            $code = "\$C->_COMMITATOM$REV()";
+	    my $extra = $self->{extra} || '';
+            $code = "(($extra), \$C)[-1]";
         }
         elsif ($text eq '::') {
             $PURE = 0;
