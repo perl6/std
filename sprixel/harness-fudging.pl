@@ -1,23 +1,13 @@
 #!/usr/local/bin/perl -w
 
-use Getopt::Long;
-my $execute_command = 'perl sprixel.pl';
-my $spectest_data   = 'sprixel/spectest.data';
-my $spectest_base   = '~/pugs/t/spec';
-my $result = GetOptions(
-    "execute_command=s"=>\$execute_command,
-    "spectest_data=s"  =>\$spectest_data,
-    "spectest_base=s"  =>\$spectest_base );
-
-my @spectests = lines($spectest_data);
+my %option = get_options();
 my %stats;
 all_tests_begin(\%stats);
 # Test harness outer loop
-for my $spectest (@spectests) {
-    next if $spectest =~ m/ ^ \s* ( \# .* )? $ /x; # no blanks / comments
+for my $spectest (@{$option{'tests'}}) {
     $spectest =~ m/ ^ (\S+) (\s+ .+)? $ /x; # extract name, directives
     my $testname = $1;
-    my $scriptname = "$spectest_base/$testname";
+    my $scriptname = "$option{spectest_base}/$testname";
     one_test_begin($testname); # display the test name and ......
     my @script = lines($scriptname); # read test script as array
     my ($todos,$skips) = get_directives($2); # process the optional directives
@@ -27,10 +17,32 @@ for my $spectest (@spectests) {
     one_test_end(%result); # display the counts from plan .. miss
     update_stats(\%stats,%result);
 }
-all_tests_end(\%stats);
-exit( $stats{'fail'}==0 ? 0 : 1 );
+all_tests_end(\%stats); # exits
 
-# Subroutines, in the order of appearance in the main program
+# Subroutines, in order of first call
+
+sub get_options {
+    use Getopt::Long;
+    my %option = (
+        'exec'          => 'perl sprixel.pl',
+        'spectest_data' => 'sprixel/spectest.data',
+        'spectest_base' => '../../t/spec');
+    my $result = GetOptions(
+        "exec=s"          => \$option{'exec'},
+        "spectest_data=s" => \$option{'spectest_data'},
+        "spectest_base=s" => \$option{'spectest_base'} );
+    # after the options, any remaining arguments are test names and directives
+    my @spectest_lines;
+    if ( @ARGV ) {
+        @spectest_lines = "@ARGV";
+    }
+    else {
+        @spectest_lines = grep { / ^ [^#] /x }
+            lines($option{'spectest_data'});
+    }
+    $option{'tests'} = \@spectest_lines;
+    return %option;
+}
 
 # Imitate the Perl 6 lines() built in function
 sub lines {
@@ -66,7 +78,8 @@ sub get_directives {
     return () unless defined($directives);
     my %numbers = ( 'todo'=>{}, 'skip'=>{} );
     for my $directive (split ' ', $directives) {
-        if ( $directive =~ / ^ (skip|todo) \( (.*) \) $ /x ) {
+        if ( $directive =~ / ^ (skip|todo) \= (.*) $ /x ) {
+#       if ( $directive =~ / ^ (skip|todo) \( (.*) \) $ /x ) {
             my $todo_or_skip = $1;
             my $ranges = $2;
             for my $range (split ',', $ranges) {
@@ -100,10 +113,6 @@ sub get_directives {
 # Bug 1: this does a static numbering of test calls, whilst test output
 # is numbered dynamically. Tests called within loops will cause the two
 # number sequences to differ. There is no proposed remedy for this bug.
-# Bug 2: some test scripts perform statements that should be skipped, on
-# lines not headed with a test function. Rakudo and Pugs have a fudging
-# solution that can skip a compound statement enclosed in curly braces.
-# This can be applied here as well, but is not yet implemented.
 sub apply_directives {
     my $refscript = shift; # reference to array of test script lines
     my $todos = shift; # reference to array of test numbers to todo
@@ -112,7 +121,7 @@ sub apply_directives {
     $skips = [] unless $skips;
     my @todos = @$todos; #print "todos:@todos\n";
     my @skips = @$skips; #print "skips:@skips\n";
-#   return if (@todos==0 and @skips==0); # short circuit
+    return if (@todos==0 and @skips==0); # short circuit
     my @testindex;
     my $current_block = -1;
     my @block;
@@ -144,9 +153,6 @@ sub apply_directives {
             $testnumber++;
         }
     }
-#print "BLOCK:\n";
-#for my $p (@block) { printf "%d:%d\n", $p->[0], $p->[1]; }
-#print "BLOCK:\n";
     # Identify the blocks containing tests to skip, and tests not in blocks
     my %blocks_to_skip;
     my %single_tests_to_skip;
@@ -162,15 +168,13 @@ sub apply_directives {
     # followed by a skip comment, and comment out all the other lines.
     for $current_block (keys %blocks_to_skip) {
         my ( $index1, $index2 ) = @{$block[$current_block]};
-#       printf "SKIP BLOCK: %d:%d\n", $index1, $index2;
         for $lineindex ($index1..$index2) {
             $$refscript[$lineindex] =~ / ^ (\s*) (.*) $ /x;
             my $spaces = $1;
             my $text = $2;
             $linetext = $$refscript[$lineindex];
-            
             if ( $linetext =~ / ^ \s* ($testfunctions) (\(|\s) /x ) {
-                $$refscript[$lineindex] = $spaces . "ok(1,'skip');";
+                $$refscript[$lineindex] = $spaces . "skip('block',1);";
                 # this line contains a test
             }
             elsif ( $linetext =~ / ^ \s* $ /x ) {
@@ -183,9 +187,7 @@ sub apply_directives {
                 # this line contains other code, comment it out
                 $$refscript[$lineindex] = $spaces . '# ' . $text;
             }
-#           printf "SKIP LINE: %d: %s\n", $lineindex, $$refscript[$lineindex];
         }
-#       printf "SKIP BLOCK: %d:%d\n", $index1, $index2;
     }
     # Replace the tests in the skip list
     for $testnumber (keys %single_tests_to_skip) {
@@ -215,7 +217,7 @@ sub execute_script {
     print $handle $script;
     close $handle;
     # run the test script in a child process
-    my $tap_out = qx{$execute_command <<'SCRIPT_TEXT'\n$script\nSCRIPT_TEXT};
+    my $tap_out = qx{$option{exec} <<'SCRIPT_TEXT'\n$script\nSCRIPT_TEXT};
     # DEBUG: save $tap_out to a file to show test results
     my $temp_name = '/tmp/sprixel_'.$testname;
     $temp_name =~ s/ \. t $ /\.sprixel\.out/x;
@@ -260,9 +262,16 @@ sub read_tap {
 
 sub one_test_end {
     my %result = @_;
-    printf( "%5d%5d%5d%5d%5d%5d%5d\n", $result{'plan'}, $result{'pass'},
-        $result{'fail'}, $result{'todopass'}, $result{'todofail'},
-        $result{'skip'}, $result{'miss'} );
+    if ( $result{'plan'} > 0 and $result{'plan'} == $result{'pass'} ) {
+        my @emoticons = ("\\o/", ":-)");
+        printf( "%5d%5d  %s\n", $result{'plan'}, $result{'pass'},
+            $emoticons[2 * rand] );
+    }
+    else {
+        printf( "%5d%5d%5d%5d%5d%5d%5d\n", $result{'plan'},
+            $result{'pass'}, $result{'fail'}, $result{'todopass'},
+            $result{'todofail'}, $result{'skip'}, $result{'miss'} );
+    }
 }
 
 sub update_stats {
@@ -275,12 +284,21 @@ sub update_stats {
 
 sub all_tests_end {
     my $refstats = shift;
-    print " " x 43 . " ----" x 7 . "\n";
-    printf "Total from%4d files" . "." x 23, $refstats->{'files'};
+    print " " x 44 . " ----" x 7 . "\n";
+    my $seconds = time - $refstats->{'start'};
+    my $duration;
+    if ( $seconds < 120 ) { $duration = sprintf "%d seconds", $seconds; }
+    else { $duration = sprintf "%d minutes", $seconds/60; }
+    my $label = sprintf "Totals from %d files in %s",
+        $refstats->{'files'}, $duration;
+    print $label . '.' x (44 - length($label));
     printf( "%5d%5d%5d%5d%5d%5d%5d\n", $refstats->{'plan'},
         $refstats->{'pass'}, $refstats->{'fail'}, $refstats->{'todopass'},
         $refstats->{'todofail'}, $refstats->{'skip'}, $refstats->{'miss'});
-    print "Result:".($refstats->{'fail'}==0 ? 'PASS' : 'FAIL')."\n";
+    my $all_pass = ($refstats->{'plan'}==$refstats->{'pass'} and
+        $refstats->{'plan'}>0);
+    print "Result:".($all_pass ? 'PASS' : 'FAIL')."\n";
+    exit( $all_pass ? 0 : 1 );
 }
 
 =pod
@@ -291,20 +309,39 @@ harness-fudging - run all or selected specification tests from scripts
 
 =head1 SYNOPSIS
 
-    perl harness-fudging.pl [options]
+    perl harness-fudging.pl [options] [tests]
+
+Options are described below. The optional [tests] parameters are
+formatted like lines out of spectest.data: a relative file name followed
+by optional skip and todo directives. For example:
+
+    perl harness-fudging.pl S03-operators/equality.t skip=5..9,14,15
 
 =head2 OPTIONS
 
- --execute_command='perl sprixel.pl'
+All options have default values ideal for sprixel testing.
+
+ --exec='perl sprixel.pl'
  --spectest_data='sprixel/spectest.data'
  --spectest_base='../../t/spec'
 
+The C<--exec> option specifies how to start the script interpreter.
+
 =head1 DESCRIPTION
 
-This Perl 5 script takes three command line arguments. First, the
+The harness-fudging.pl script runs test programs using TAP (Test
+Anything Protocol).
+takes three command line arguments. First, the
 command that works like C<perl>, accepting a script via standard input.
 Second, the name of a metadata file, see details below.
 Third, the base directory of the suite to test.
+
+=head1 DESIGN
+
+This script was written in Perl 5 to help the initial testing of sprixel.
+Sprixel is an interpreter for STD parsed Perl 6 written in JavaScript,
+and executed by Google's V8 JavaScript compiler. It is written for easy
+translation to Perl 6.
 
 =head1 METADATA
 
@@ -314,19 +351,34 @@ are ignored. Regular lines begin with the pathname of a test script,
 relative to the base directory of the test suite, and optionally contain
 todo or skip directives.
 
+Directives to todo or skip follow the test name, for example:
+
+ S03-operators/equality.t skip=5..9,14,15
+
 =head1 BUGS / LIMITATIONS
 
-The fudge operation is the simplest thing that could possibly work, so
-there will be fudge situations that other harnesses can handle, that
-do not work here. Improving that is an ongoing task ;)
+The apply_directives() is rather simple, so there will be fudge
+situations that other harnesses can handle, that do not work here.
+Improving that is an ongoing task ;)
 
-See Bug 1 and Bug 2 at sub apply_skips().
+See Bug 1 by sub apply_directives().
 
-=head1 DESIGN
+The semantics of the Test.pm.js version of skip() are probably
+incompatible with other implementations - see skip in Test::Tutorial.
 
-This script was written in Perl 5 to help the initial testing of sprixel.
-Sprixel is an interpreter for STD parsed Perl 6 written in JavaScript,
-and executed by Google's V8 JavaScript compiler. It is written for easy
-translation to Perl 6.
+=head1 TODO
+
+Devise better skip formats, for example to skip a single test within a
+code block. Trying keying skip positions on test script content.
+
+Scan test scripts for passes not yet in spectest.data.
+
+Try to selectively unskip skipped tests to get more passes or fails.
+
+Support comments at the end of test lines in spectest.data.
+
+=head1 SEE ALSO
+
+Test::Tutorial, Test::More, TAP::Harness
 
 =cut
