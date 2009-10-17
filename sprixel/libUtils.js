@@ -14,7 +14,7 @@ function say() { // javascript say
     } else {
         say_them('');
     }
-    this.result = new p6builtin.Int(1);
+    this.result = 1;//new p6builtin.Int(1);
 }
 
 function do_print() {
@@ -39,6 +39,38 @@ var Derive = (function(){
 var DBOX={b:2,B:2,x:16,X:16,o:8,O:8,d:10,D:10};
 
 function F__() { }
+
+var p6toplevel = {};
+
+function Type(obj){
+    var type;
+    switch(type = typeof obj) {
+    case 'object':
+        if (obj===null) {
+            return 'null';
+        }
+        if (typeof(obj.length)!='undefined') {
+            var res = [];
+            for (var i in obj) {
+                res.push(Type(obj[i]));
+            }
+            return '[ '+res.join(', ')+' ]';
+        }
+        if (typeof(obj.T)!='undefined' && !obj.WHAT) {
+            return obj.T;
+        }
+        return typeof(obj.WHAT)=='function' ? obj.WHAT() : obj.constructor.name;
+    default:
+        return type;
+    }
+}
+
+function keys(o) {
+    var res = [], j=-1;
+    for (var i in o) res[++j] = i;
+    return res;
+}
+
 /*
 function Beget(parent) {
   F__.prototype = parent;
@@ -206,6 +238,7 @@ function jsind(n) {
 }
 
 function emit_js(self) {
+    if (typeof(self)=='function') return 'js_function';
     if (typeof(self)!='object') return tps(self);
     var last_js_parent = this_js_parent, text = '', id;
     if (typeof(id = self.__INTERNAL__TOJS__SEEN)!='undefined') {
@@ -220,14 +253,14 @@ function emit_js(self) {
     seen[id = self.__INTERNAL__TOJS__SEEN = ++o] = 1;
     objs[id] = self;
     this_js_parent = id;
-    if (typeof(self.length)!='undefined') {
+    if (typeof(self.push)!='undefined') {
         var idx = 0;
         var array_text = '[' + jsind(1);
         for (var i=0; i<self.length; ++i) {
             if (typeof(self[i])=='undefined' || self[i]===null) continue;
             idx++ && (array_text += ',' + jsind());
             this_js_member = idx;
-            array_text += emit_js(i);
+            array_text += emit_js(self[i]);
         }
         var close_indent = jsind(-1);
         text += /^\[\s+$/m.test(array_text)
@@ -242,7 +275,7 @@ function emit_js(self) {
             text += (first ? (first = 0, '') : ',' + jsind())
                 + (this_js_member = tps(prop)) + ': ' + emit_js(self[prop]);
         }
-        text += jsind(-1) + '}\n';
+        text += jsind(-1) + '}';
     }
     seen[id] = 0; // unmark "inside"
     this_js_parent = last_js_parent; // reset the parent
@@ -258,7 +291,7 @@ return function topEmit(obj) {
     app_act = '';
     this_js_parent = '';
     this_js_member = '';
-    var out = '(function(){return '+emit_js(obj)+app_act + '})()';
+    var out = '(function(){var o={};return '+emit_js(obj)+app_act + '})()';
     for (var i=0; i<objs.length; ++i){ // clean up the markers
         delete objs[i].__INTERNAL__TOJS__SEEN;
     }
@@ -745,7 +778,7 @@ Array.prototype.reduce = function(f, z) {
     r = f(r, this[idx])
   return r
 }
-
+*/
 var escapeStringFor = new Object()
 for (var c = 0; c < 256; c++)
   escapeStringFor[c] = String.fromCharCode(c)
@@ -789,7 +822,7 @@ String.prototype.toProgramString = function String_prototype_toProgramString() {
   //result.programified = true;
   return result;
 }
-
+/*
 // C-style tempnam function
 
 function tempnam(s) { return (s ? s : "_tmpnam_") + tempnam.n++ }

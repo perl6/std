@@ -17,6 +17,9 @@ p6builtin.Int.prototype = {
 WHAT: function(){
     return 'Int()';
 },
+hasMember: function(member){
+    return !!this[member];
+},
 toString: function(){
     return this.v.toString();
 },
@@ -141,6 +144,9 @@ p6builtin.Num = function(num) {
 p6builtin.Num.prototype = {
 WHAT: function(){
     return 'Num()';
+},
+hasMember: function(member){
+    return !!this[member];
 },
 toString: function(){
     return this.v.toString();
@@ -269,6 +275,9 @@ p6builtin.Rat.prototype = {
 WHAT: function(){
     return 'Rat()';
 },
+hasMember: function(member){
+    return !!this[member];
+},
 toString: function(){
     return this.toNum().toString();
 },
@@ -343,6 +352,9 @@ p6builtin.Bool.prototype = {
 WHAT: function(){
     return 'Bool()';
 },
+hasMember: function(member){
+    return !!this[member];
+},
 toString: function(){
     return this.v ? '1' : '0';
 },
@@ -375,6 +387,9 @@ p6builtin.Str = function(str) {
 p6builtin.Str.prototype = {
 WHAT: function(){
     return 'Str()';
+},
+hasMember: function(member){
+    return !!this[member];
 },
 toString: function(){
     return this.v;
@@ -456,6 +471,9 @@ p6builtin.Undef.prototype = {
 WHAT: function(){
     return 'Undef()';
 },
+hasMember: function(member){
+    return !!this[member];
+},
 toString: function(){
     return 'Undef';
 },
@@ -474,6 +492,9 @@ p6builtin.Nil = function(){},
 p6builtin.Nil.prototype = {
 WHAT: function(){
     return 'Nil()';
+},
+hasMember: function(member){
+    return !!this[member];
 },
 toString: function(){
     return 'Nil';
@@ -497,6 +518,9 @@ p6builtin.jssub = function(func,name,source){
 p6builtin.jssub.prototype = {
 WHAT: function(){
     return 'JSSUB';
+},
+hasMember: function(member){
+    return !!this[member];
 },
 toString:function(){
     return this.source.toString();
@@ -547,8 +571,14 @@ p6builtin.p6var = function(sigil,name,context,forceDeclare){
 };
 p6builtin.p6var.prototype = {
 isP6VAR:true,
+do_invoke:function(method_name,arg_array){
+    return this.value[method_name].apply(this.value, arg_array);
+},
 WHAT: function(){
     return this.value ? this.value.WHAT() : 'EMPTY_P6VAR';
+},
+hasMember: function(member){
+    return !!this.value[member];
 },
 set:function(value){
     this.value = value;
@@ -582,7 +612,7 @@ do_Multiplicative:function(right, divide){
         this.value, right, divide);
 },
 toBool:function(){
-    return this.v.toBool();
+    return this.value.toBool();
 },
 do_infix__S_Lt:function(right){
     return this.value.do_infix__S_Lt(right.value || right);
@@ -676,6 +706,9 @@ toBool:function(){
 WHAT:function(){
     return 'List()';
 },
+hasMember: function(member){
+    return !!this[member];
+},
 get:function(index){
     // default get is for non-lazy lists.
     // This isn't the Perl 6 .get method, per se... each iteration call-site
@@ -765,7 +798,7 @@ function do_return(RETVAL){
             return parent;
         }
     }
-    throw '`return\' not inside a routine';
+    throw '`return\' not inside a Routine';
 }
 
 function do_what(obj){
@@ -773,7 +806,10 @@ function do_what(obj){
 }
 
 function do_jseval(js_source){
-    eval('function(){'+js_source.toString()+'}').call(this);
+    if (typeof(this.Func)!='function') {
+        this.Func = new Function('ctx', 'args', js_source);
+    }
+    return this.Func.call(this, this.context, this.eval_args);
 }
 
 function do_derive_context(obj){

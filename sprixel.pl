@@ -7,7 +7,9 @@ use ToJS;
 use Time::HiRes qw( gettimeofday );
 use Encode;
 use File::Slurp;
+use File::Find;
 do 'viv';
+no warnings;
 
 sub help {
 print <<'HELP';
@@ -70,10 +72,13 @@ else {
     $PROG = $PROG;
     $r = STD->parse($PROG, actions => 'Actions', setting => $setting)->{'_ast'};
 }
+$r->{'stabs'} = $STD::ALL;
 
-my @js = qw[sprixel/libUtils.js sprixel/json2.js sprixel/libBigInt.js
-    sprixel/interp.js sprixel/builtins.js
-    sprixel/Test.pm.js];
+# sprixel/json2.js  sprixel/builtins.js sprixel/Test.pm.js
+my @js = qw[sprixel/libBigInt.js sprixel/libUtils.js sprixel/Act.js];
+
+find sub { push @js, $File::Find::name unless /^\.$/}, 'sprixel/control_flow',
+    'sprixel/misc';
 
 if (defined $C and $C eq 'html') {
     say "<html><head></head><body>";
@@ -82,8 +87,7 @@ if (defined $C and $C eq 'html') {
     }
     say "<script>";
     say "say_them = console.debug;";
-    
-    say 'top_interp('.ToJS::emit_js($r).',p6toplevel);';
+    say 'Act.interpret('.ToJS::emit_js($r).');';
     say "</script>";
     say "</body></html>";
 } else {
@@ -97,13 +101,15 @@ sub run_js_interpreter {
     require V8;
     my $ctx_id = new_ctx();
     my $ctx = $ctxs->[$ctx_id];
-    $ctx->execute(scalar(read_file($_))) for @js;
+    my $js_code = '';
+    $js_code .= scalar(read_file($_)) for @js;
+    $ctx->execute($js_code);
     my $ast = ToJS::emit_js($_[0], $pos);
     say $ast if $_[1];
     my $start = gettimeofday();
-    eval { $ctx->execute('top_interp('.$ast.',p6toplevel);') };
+    eval { $ctx->execute('Act.interpret('.$ast.');') };
     warn $@ if $@;
-    #say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
+    say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
 }
 sub say_them {
     say map { Encode::decode_utf8($_) } @_;
