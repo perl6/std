@@ -12,10 +12,7 @@ var node_types = {};
 // an activation is an object that carries state about a Node, Context pair.
 var act_ctor = function(node, invoker){
     this.node = node;
-    if (typeof invoker != 'undefined') {
-        this.invoker = invoker;
-        this.context = invoker.context;
-    }
+    this.context = (this.invoker = invoker).context;
 };
 
 act_ctor.prototype.phase = 0;
@@ -28,8 +25,7 @@ act_ctor.prototype.exec = function(T){
 };
 
 act_ctor.interpret = function(ast) {
-    var act = new act_ctor(ast);
-    act.context = {};
+    var act = new act_ctor(ast, { context: { /* TODO: new context goes here */ } });
     try{
         for (;(global_trace&&say(act.node.T))||true;act = act.exec());
     } catch(e) {

@@ -77,7 +77,7 @@ $r->{'stabs'} = $STD::ALL;
 # sprixel/json2.js  sprixel/builtins.js sprixel/Test.pm.js
 my @js = qw[sprixel/libBigInt.js sprixel/libUtils.js sprixel/Act.js];
 
-find sub { push @js, $File::Find::name unless /^\.$/}, 'sprixel/control_flow',
+find sub { push @js, $File::Find::name if !/\/\./ && /\.js$/ }, 'sprixel/control_flow',
     'sprixel/misc';
 
 if (defined $C and $C eq 'html') {
