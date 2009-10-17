@@ -3092,6 +3092,7 @@ token type_declarator:enum {
 }
 
 token type_constraint {
+    :my $*IN_DECL = '';
     [
     | <value>
     | <typename>
@@ -3101,6 +3102,7 @@ token type_constraint {
 }
 
 rule post_constraint {
+    :my $*IN_DECL = '';
     :dba('constraint')
     [
     | '[' ~ ']' <signature>
