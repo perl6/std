@@ -1,11 +1,13 @@
 var trace_on, trace_off;
 
+
+
 var Act = (function(){
 
-var global_trace = 1;
+var global_trace = false;
 
-trace_on = function(){ global_trace = 1 };
-trace_off = function(){ global_trace = 0 };
+trace_on = function(){ global_trace = true };
+trace_off = function(){ global_trace = false };
 
 var node_types = {};
 
@@ -17,17 +19,18 @@ var act_ctor = function(node, invoker){
 
 act_ctor.prototype.phase = 0;
 
-act_ctor.prototype.exec = function(T){
-    if (T = node_types[this.node.T]) {
+act_ctor.prototype.exec = function(){
+    var T;
+    if (typeof(T = node_types[this.node.T]) != 'undefined') {
         return T.call(this);
     }
     throw 'NYI: '+this.node.T;
 };
 
 act_ctor.interpret = function(ast) {
-    var act = new act_ctor(ast, { context: { /* TODO: new context goes here */ } });
+    var act = new act_ctor(ast, { context: { symbols: {} } });
     try{
-        for (;(global_trace&&say(act.node.T))||true;act = act.exec());
+        for (;;(global_trace && say(act.node.T)),(act = act.exec()));
     } catch(e) {
         if (/^NYI:/.test(e)) {
             //delete ast.stabs;
