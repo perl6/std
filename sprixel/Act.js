@@ -32,10 +32,17 @@ var Act = (function(){
     };
 
     // entry point to interpret an entire Abstract Syntax Tree
-    act_ctor.interpret = function(ast) {
+    act_ctor.interpret = function(ast, setting) {
         // start with one Activation object for the initial node
         // of the Abstact Syntax Tree.
-        var act = new act_ctor(ast, { new Context({ symbols: {} }) });
+        var context = new Context({ symbols: {} });
+        if (setting) {
+            var act = new act_ctor(setting, { context: context });
+            try { // load the setting into the context
+                for (;;(global_trace && say(act.node.T)),(act = act.exec()));
+            } catch(e) {}
+        }
+        var act = new act_ctor(ast, { context: context });
         try {
             // Runloop for the interpreter. Optionally tracing the
             // nodes it executes, each exec() call returns the next
