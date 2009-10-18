@@ -1,0 +1,7 @@
+my module CORE;
+
+use lib sprixel/setting;
+use Int;
+
+
+YOU_ARE_HERE;
