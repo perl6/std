@@ -8,17 +8,23 @@ use Time::HiRes qw( gettimeofday );
 use Encode;
 use File::Slurp;
 use File::Find;
-do 'viv';
+do 'viv'; # load the Perl 5 based parser for STD.pm: the Perl 6 Grammar
 no warnings;
 
+# put this script's usage hints up front, to also serve as documentation
 sub help {
-print <<'HELP';
+    print <<'HELP';
 Usage: perl sprixel.pl [switches] [--] [programfile] [arguments]
-  -Cbackend       compile using the compiler backend
-                  (valid backends are: html)
+options:
+  -C<backend>     use a compiler backend (currently valid backend: html)
+  -e 'program'    execute Perl 6 code passed as a command line argument
+  -h --help       display this help
+  -t --test_mode  use setting library in sprixelCORETEST instead of CORE
+  -v --verbose    er, say more stuff
 HELP
-exit;
+    exit;
 }
+
 my $PROG = '';
 my ($help,$C,$test_mode,$verbose,$pos);
 $pos = 0;
@@ -33,8 +39,9 @@ Getopt::Long::Parser->new( config => [qw( bundling no_ignore_case pass_through r
 help if $help;
 
 my $setting;
-if ($test_mode) {
+if ($test_mode) { # here when run with -t
     $setting = 'sprixelCORETEST';
+    # (re-)build the setting library if necessary
     unless (-f 'sprixelCORETEST.syml') {
         my $s_c = scalar(read_file('lib/Test.pm'));
         $s_c =~ s/proto/my proto/g;
@@ -45,8 +52,9 @@ if ($test_mode) {
         my $out = `./setting sprixelCORETEST.setting 2>&1`;
     }
 }
-else {
+else { # here when run without -t
     $setting = 'sprixelCORE';
+    # (re-)build the setting library if necessary
     unless (-f 'sprixelCORE.syml') {
         my $s_c = scalar(read_file('lib/Test.pm'));
         $s_c =~ s/^proto/my proto/g;
@@ -60,8 +68,10 @@ else {
         my $out = `./setting sprixelCORE.setting 2>&1`;
     }
 }
-my $r;
+
+my $r; # receives the result of viv having parsed the Perl 6 code 
 if (@ARGV and -f $ARGV[0]) {
+    # run the viv parser on Perl 6 code in a file
     $r = STD->parsefile($ARGV[0], actions => 'Actions', setting => $setting)->{'_ast'};
 }
 else {
@@ -70,18 +80,21 @@ else {
         $PROG = <>;
     }
     $PROG = $PROG;
+    # run the viv parser on Perl 6 code in a string
     $r = STD->parse($PROG, actions => 'Actions', setting => $setting)->{'_ast'};
 }
 $r->{'stabs'} = $STD::ALL;
 
+# Start building the list of source files to compile into the setting.
 # sprixel/json2.js  sprixel/builtins.js sprixel/Test.pm.js
 my @js = qw[sprixel/libBigInt.js sprixel/libUtils.js sprixel/Context.js
     sprixel/Act.js];
-
+# Continue building the setting source file list with some directories
 find sub { push @js, $File::Find::name if !/\/\./ && /\.js$/ },
     'sprixel/control_flow',
     'sprixel/misc';
 
+# Interpret the AST, either in a browser(html) or console(text) environment
 if (defined $C and $C eq 'html') {
     say "<html><head></head><body>";
     for (@js) {
