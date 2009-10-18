@@ -1,8 +1,7 @@
+sub jseval {}
 
 sub say {
-    jseval '
-say("PK FIRE");
-';
+    jseval 'say(ToJS(this.invoker.invoker.arg_array[0]));';
 }
 
 class Int {
@@ -20,7 +19,7 @@ this.invoker.invoker.invoker.invoker.invoker.class_obj.ctor = function(integer, 
 }';
 }
 
-say 4,5
+say 4;
 
 #multi sub infix:<+>(Int $a, Int $b) { jseval '
 #    this.result = new c.Int(c["$a"].v.add(c["$b"]))

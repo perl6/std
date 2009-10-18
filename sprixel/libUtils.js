@@ -4,6 +4,10 @@
   and available under the Artistic License 2 ("AL2")
 */
 
+function filt__(str){
+    return str.replace(/_/g,'');
+}
+
 function say() { // javascript say
     if (typeof(arguments)!='undefined') {
         for (var s_args=[], i=-1, j=-1, a, l=arguments.length; i<l;)

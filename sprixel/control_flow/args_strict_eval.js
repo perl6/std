@@ -16,7 +16,11 @@ Act.types.args_strict_eval = function(){
         while (++this.idx < this.len) {
             return this.MM[this.idx] = new Act(this.node.M[this.idx], this);
         }
-        this.result = Array.flatten.call(this.MM);
+        this.result = [];
+        for (var i=0,l=this.MM.length;i<l;++i){
+            this.result[i] = this.MM[i].result;
+        }
+        this.result = Array.flatten.call(this.result);
         break;
     } } while (false);
     return this.invoker;
