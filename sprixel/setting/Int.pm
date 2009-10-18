@@ -1,8 +1,6 @@
-sub jseval {}
+sub jseval is export {}
 
-sub say {
-    jseval 'say(ToJS(this.invoker.invoker.arg_array[0]));';
-}
+sub say is export { jseval 'say(this.invoker.invoker.arg_array.join(""))' }
 
 class Int {
     # install constructor
@@ -15,11 +13,10 @@ this.invoker.invoker.invoker.invoker.invoker.class_obj.ctor = function(integer, 
     } else {
         o.v = integer instanceof libBigInt ? integer : libBigInt.nbv(integer);
     }
+    o.toString = function(){ return this.v.toString() };
     return o;
 }';
 }
-
-say 4;
 
 #multi sub infix:<+>(Int $a, Int $b) { jseval '
 #    this.result = new c.Int(c["$a"].v.add(c["$b"]))
