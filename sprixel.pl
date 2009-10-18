@@ -26,48 +26,23 @@ HELP
 }
 
 my $PROG = '';
-my ($help,$C,$test_mode,$verbose,$pos);
-$pos = 0;
+my ($help,$C,$test_mode,$verbose);
 Getopt::Long::Parser->new( config => [qw( bundling no_ignore_case pass_through require_order)], )->getoptions(
     "C=s" => \$C,
     "e=s" => \$PROG,
     'h|help' => \$help,
     't|test_mode' => \$test_mode,
     'v|verbose' => \$verbose,
-    'pos' => \$pos,
 ) || help;
 help if $help;
 
-my $setting;
-if ($test_mode) { # here when run with -t
-    $setting = 'sprixelCORETEST';
-    # (re-)build the setting library if necessary
-    unless (-f 'sprixelCORETEST.syml') {
-        my $s_c = scalar(read_file('lib/Test.pm'));
-        $s_c =~ s/proto/my proto/g;
-        $s_c =~ s/^class\sTest;//g;
-        my $c_c = scalar(read_file('CORE.setting'));
-        $c_c =~ s/YOU_ARE_HERE;//;
-        write_file( 'sprixelCORETEST.setting', $c_c.$s_c."YOU_ARE_HERE;\n");
-        my $out = `./setting sprixelCORETEST.setting 2>&1`;
-    }
-}
-else { # here when run without -t
-    $setting = 'sprixelCORE';
-    # (re-)build the setting library if necessary
-    unless (-f 'sprixelCORE.syml') {
-        my $s_c = scalar(read_file('lib/Test.pm'));
-        $s_c =~ s/^proto/my proto/g;
-        $s_c =~ s/^class\sTest;//g;
-        $s_c .= "\n  \nproto derive_context is export { }\n".
-            "proto get_core is export { }\nproto member is export { }\n".
-            "proto what is export { }\nproto jseval is export { }\n";
-        my $c_c = scalar(read_file('CORE.setting'));
-        $c_c =~ s/YOU_ARE_HERE;//;
-        write_file( 'sprixelCORE.setting', $c_c.$s_c."YOU_ARE_HERE;\n");
-        my $out = `./setting sprixelCORE.setting 2>&1`;
-    }
-}
+my $setting = 'sprixelCORE';
+$ENV{'PERL6LIB'} = qw{ ./sprixel/setting };
+my $out = `./setting sprixelCORE.setting 2>&1`;
+
+# reparse the setting files, temporarily until ./setting persists the ASTs
+my $s = STD->parsefile('sprixel/setting/Int.pm', actions => 'Actions',
+    setting => $setting)->{'_ast'};
 
 my $r; # receives the result of viv having parsed the Perl 6 code 
 if (@ARGV and -f $ARGV[0]) {
@@ -119,12 +94,12 @@ sub run_js_interpreter {
     my $js_code = '';
     $js_code .= scalar(read_file($_)) for @js;
     $ctx->execute($js_code);
-    my $ast = ToJS::emit_js($_[0], $pos);
+    my $ast = ToJS::emit_js($_[0]);
     say $ast if $_[1];
     my $start = gettimeofday();
-    eval { $ctx->execute('Act.interpret('.$ast.');') };
+    eval { $ctx->execute('Act.interpret('.$ast.','.ToJS::emit_js($s).');') };
     warn $@ if $@;
-    say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
+    #say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
 }
 sub say_them {
     say map { Encode::decode_utf8($_) } @_;
