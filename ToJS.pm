@@ -40,6 +40,17 @@ sub jsind {
 }
 
 sub emit_js {
+    $seen = {};
+    $jsi = 0;
+    $app_act = '';
+    $has_top = 0;
+    $this_js_parent = '';
+    $this_js_member = '';
+    $pos_props = {'BEG' => 1, 'END' => 1, 'WS' => 1, 'LAST' => 1};
+    emit_js_recurse($_[0]);
+}
+
+sub emit_js_recurse {
     my $self = shift;
     $include_pos = shift || 0;
     return tps($self,1) unless ref $self;
@@ -67,7 +78,7 @@ sub emit_js {
             next if (!defined $item);
             $idx++ && ($array_text .= ','.jsind());
             $this_js_member = $idx;
-            $array_text .= emit_js($item);
+            $array_text .= emit_js_recurse($item);
         }
         my $close_indent = jsind(-1);
         $text .= $array_text =~ /^\[\s+$/m
@@ -82,12 +93,12 @@ sub emit_js {
                 (!$include_pos && exists $pos_props->{$prop});
             $text .= ','.jsind().tps($prop).': ';
             $this_js_member = tps($prop);
-            $text .= emit_js($self->{$prop});
+            $text .= emit_js_recurse($self->{$prop});
         }
         if (defined $self->{'.'}) { # not *exists*, *defined*.
             $text .= ','.jsind().'M: ';
             $this_js_member = '"M"';
-            $text .= emit_js($self->{'.'});
+            $text .= emit_js_recurse($self->{'.'});
         }
         $text .= jsind(-1).'} /* '.tps(ref($self)).' */';
     }
