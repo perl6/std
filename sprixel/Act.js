@@ -21,7 +21,11 @@ var Act = (function(){
         this.context = (this.invoker = invoker).context;
     };
 
-    act_ctor.prototype.phase = 0; // used 
+    act_ctor.prototype.phase = 0; // used to implement Continuation
+    // Passing Style, keeping intermediate results in an Activation
+    // object instead of on the stack, letting the runloop evaluate
+    // subnodes (eg expressions) and then Continuing with more phases
+    // until the node result is complete.
 
     act_ctor.prototype.exec = function() {
         var T;

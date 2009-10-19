@@ -65,7 +65,7 @@ $r->{'stabs'} = $STD::ALL;
 # sprixel/json2.js  sprixel/builtins.js sprixel/Test.pm.js
 my @js = qw[sprixel/libBigInt.js sprixel/libUtils.js sprixel/Context.js
     sprixel/Act.js];
-# Continue building the setting source file list with some directories
+# Continue building the setting source file list from some directories
 find sub { push @js, $File::Find::name if !/\/\./ && /\.js$/ },
     'sprixel/control_flow',
     'sprixel/misc';
@@ -81,7 +81,7 @@ if (defined $C and $C eq 'html') {
     say 'Act.interpret('.ToJS::emit_js($r).');';
     say "</script>";
     say "</body></html>";
-} else {
+} else { # no html, therefore output to a text console
     run_js_interpreter($r, $verbose);
 }
 
