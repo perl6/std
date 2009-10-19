@@ -9,23 +9,27 @@ use Encode;
 use File::Slurp;
 use File::Find;
 do 'viv'; # load the Perl 5 based parser for STD.pm: the Perl 6 Grammar
+          # do instead of use because viv is a Perl 5 script, not a module
 no warnings;
 
 # put this script's usage hints up front, to also serve as documentation
 sub help {
     print <<'HELP';
-Usage: perl sprixel.pl [switches] [--] [programfile] [arguments]
+Usage: perl sprixel.pl [options] [--] [programfile] [arguments]
 options:
   -C<backend>     use a compiler backend (currently valid backend: html)
   -e 'program'    execute Perl 6 code passed as a command line argument
   -h --help       display this help
-  -t --test_mode  use setting library in sprixelCORETEST instead of CORE
-  -v --verbose    er, say more stuff
+with no programfile and no -e option, sprixel.pl reads code from stdin
 HELP
     exit;
 }
+# TODO: decide to either retain or drop --test_mode and --verbose,
+#       they currently do nothing.
 
-my $PROG = '';
+my $PROG = ''; # the Perl 6 program to execute, assigned either via the
+               # -e option here or from standard input.
+               # Not used when sprixel.pl runs a program from a file.
 my ($help,$C,$test_mode,$verbose);
 Getopt::Long::Parser->new( config => [qw( bundling no_ignore_case pass_through require_order)], )->getoptions(
     "C=s" => \$C,
@@ -36,14 +40,17 @@ Getopt::Long::Parser->new( config => [qw( bundling no_ignore_case pass_through r
 ) || help;
 help if $help;
 
+# Run the setting script to build sprixelCORE.syml and
+# sprixelCORE.syml.store from sprixelCORE.setting
 my $setting = 'sprixelCORE';
 $ENV{'PERL6LIB'} = './sprixel/setting';
 my $out = `./setting sprixelCORE.setting 2>&1`;
 
-# reparse the setting files, temporarily until ./setting persists the ASTs
+# concatenate the setting files, temporarily until ./setting persists the ASTs
 my $s = '';
-find sub { $s .= scalar(read_file($_)).";\n"
-    if !/\/\./ && /\.pm$/ }, 'sprixel/setting';
+find sub { $s .= scalar(read_file($_)).";\n" if !/\/\./ && /\.pm$/ },
+    'sprixel/setting';
+# temporarily the $s will be passed to the eval in run_js_interpreter().
 
 my $r; # receives the result of viv having parsed the Perl 6 code 
 if (@ARGV and -f $ARGV[0]) {
@@ -52,7 +59,8 @@ if (@ARGV and -f $ARGV[0]) {
 }
 else {
     if (not $PROG) {
-        local $/;
+        local $/; # replace default input record separator with undef,
+                  # causing the following <> to slurp the entire file
         $PROG = <>;
     }
     $PROG = $PROG;
@@ -72,12 +80,14 @@ find sub { push @js, $File::Find::name if !/\/\./ && /\.js$/ },
 
 # Interpret the AST, either in a browser(html) or console(text) environment
 if (defined $C and $C eq 'html') {
+    # TODO: put a comment and script elements and inside head element
     say "<html><head></head><body>";
     for (@js) {
         say "<script src=\"$_\"></script>";
     }
     say "<script>";
     say "say_them = console.debug;";
+    # TODO: handle setting the same way as is done in run_js_interpreter
     say 'Act.interpret('.ToJS::emit_js($r).');';
     say "</script>";
     say "</body></html>";
@@ -85,19 +95,21 @@ if (defined $C and $C eq 'html') {
     run_js_interpreter($r, $verbose);
 }
 
-my $ctxs = [];
-my $ctx_id = 0;
+my $ctxs = [];  # multiple V8 JavaScript engine contexts
+my $ctx_id = 0; # a "handle" for a JavaScript engine context
 
 sub run_js_interpreter {
     require V8;
-    my $ctx_id = new_ctx();
-    my $ctx = $ctxs->[$ctx_id];
-    my $js_code = '';
-    $js_code .= scalar(read_file($_)) for @js;
-    $ctx->execute($js_code);
-    my $ast = ToJS::emit_js($_[0]);
-    say $ast if $_[1];
-    my $start = gettimeofday();
+    my $ctx_id = new_ctx(); # from the V8
+    my $ctx = $ctxs->[$ctx_id]; # autovivify - initially undef
+    my $js_code = ''; # to contain source from all setting files
+    $js_code .= scalar(read_file($_)) for @js; # concatenate the .js source
+    $ctx->execute($js_code); # load all setting functions into the context
+    my $ast = ToJS::emit_js($_[0]); # convert the program AST from YAML format to JavaScript
+    say $ast if $_[1]; # the verbose flag controls debug output
+    my $start = gettimeofday(); # prepare to measure execution time
+    # Run the Perl 6 interpreter on the AST of the user program.
+    # TODO: integrate $s into the setting instead of appending it here.
     eval { $ctx->execute('Act.interpret('.$ast.','.ToJS::emit_js(
         STD->parse($s, actions => 'Actions', setting => $setting)->{'_ast'}
     ).');') };

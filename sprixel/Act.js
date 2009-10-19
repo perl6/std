@@ -51,7 +51,7 @@ var Act = (function(){
             // Runloop for the interpreter. Optionally tracing the
             // nodes it executes, each exec() call returns the next
             // node that must be executed (this implements the
-            // Continuation Passing Style (CPS) which is alternative
+            // Continuation Passing Style (CPS) which is an alternative
             // to stack-based preservation of execution state).
             for (;;(global_trace && say(act.node.T)),(act = act.exec()));
             // when it throws an exception, program execution has ended.
