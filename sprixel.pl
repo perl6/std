@@ -37,12 +37,13 @@ Getopt::Long::Parser->new( config => [qw( bundling no_ignore_case pass_through r
 help if $help;
 
 my $setting = 'sprixelCORE';
-$ENV{'PERL6LIB'} = qw{ ./sprixel/setting };
+$ENV{'PERL6LIB'} = './sprixel/setting';
 my $out = `./setting sprixelCORE.setting 2>&1`;
 
 # reparse the setting files, temporarily until ./setting persists the ASTs
-my $s = STD->parsefile('sprixel/setting/Int.pm', actions => 'Actions',
-    setting => $setting)->{'_ast'};
+my $s = '';
+find sub { $s .= scalar(read_file($_)).";\n"
+    if !/\/\./ && /\.pm$/ }, 'sprixel/setting';
 
 my $r; # receives the result of viv having parsed the Perl 6 code 
 if (@ARGV and -f $ARGV[0]) {
@@ -97,7 +98,9 @@ sub run_js_interpreter {
     my $ast = ToJS::emit_js($_[0]);
     say $ast if $_[1];
     my $start = gettimeofday();
-    eval { $ctx->execute('Act.interpret('.$ast.','.ToJS::emit_js($s).');') };
+    eval { $ctx->execute('Act.interpret('.$ast.','.ToJS::emit_js(
+        STD->parse($s, actions => 'Actions', setting => $setting)->{'_ast'}
+    ).');') };
     warn $@ if $@;
     #say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
 }
