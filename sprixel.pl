@@ -50,9 +50,9 @@ my $out = `./setting sprixelCORE.setting 2>&1`;
 my $s = '';
 find sub { $s .= scalar(read_file($_)).";\n" if !/\/\./ && /\.pm$/ },
     'sprixel/setting';
-# temporarily the $s will be passed to the eval in run_js_interpreter().
+# temporarily the $s will be passed to the eval in sub run_js_interpreter.
 
-my $r; # receives the result of viv having parsed the Perl 6 code 
+my $r; # receives a Perl 5 object (the AST) from viv having parsed the Perl 6 program
 if (@ARGV and -f $ARGV[0]) {
     # run the viv parser on Perl 6 code in a file
     $r = STD->parsefile($ARGV[0], actions => 'Actions', setting => $setting)->{'_ast'};
@@ -69,18 +69,19 @@ else {
 }
 $r->{'stabs'} = $STD::ALL;
 
-# Start building the list of source files to compile into the setting.
+# Start building the list of JavaScript files to use as runtime library.
 # sprixel/json2.js  sprixel/builtins.js sprixel/Test.pm.js
 my @js = qw[sprixel/libBigInt.js sprixel/libUtils.js sprixel/Context.js
     sprixel/Act.js];
-# Continue building the setting source file list from some directories
+# Continue building the runtime library file list from some directories
 find sub { push @js, $File::Find::name if !/\/\./ && /\.js$/ },
     'sprixel/control_flow',
     'sprixel/misc';
 
 # Interpret the AST, either in a browser(html) or console(text) environment
 if (defined $C and $C eq 'html') {
-    # TODO: put a comment and script elements and inside head element
+    # TODO: put a comment and the runtime library script elements inside
+    # the html <head></head> element.
     say "<html><head></head><body>";
     for (@js) {
         say "<script src=\"$_\"></script>";
@@ -102,17 +103,18 @@ sub run_js_interpreter {
     require V8;
     my $ctx_id = new_ctx(); # from the V8
     my $ctx = $ctxs->[$ctx_id]; # autovivify - initially undef
-    my $js_code = ''; # to contain source from all setting files
-    $js_code .= scalar(read_file($_)) for @js; # concatenate the .js source
-    $ctx->execute($js_code); # load all setting functions into the context
-    my $ast = ToJS::emit_js($_[0]); # convert the program AST from YAML format to JavaScript
-    say $ast if $_[1]; # the verbose flag controls debug output
+    my $runtime_js = ''; # to contain source from all runtime library files
+    $runtime_js .= scalar(read_file($_)) for @js; # concatenate the .js source
+    $ctx->execute($runtime_js); # load the runtime library functions into the context
+    my $setting_js = ToJS::emit_js(
+        STD->parse($s, actions => 'Actions', setting => $setting)->{'_ast'}
+    );
+    my $ast_js = ToJS::emit_js($_[0]); # convert the program AST object to JavaScript
+    say $ast_js if $_[1]; # the verbose flag controls debug output
     my $start = gettimeofday(); # prepare to measure execution time
     # Run the Perl 6 interpreter on the AST of the user program.
-    # TODO: integrate $s into the setting instead of appending it here.
-    eval { $ctx->execute('Act.interpret('.$ast.','.ToJS::emit_js(
-        STD->parse($s, actions => 'Actions', setting => $setting)->{'_ast'}
-    ).');') };
+    # TODO: integrate $setting_js into the setting instead of appending it here.
+    eval { $ctx->execute('Act.interpret('.$ast_js.','.$setting_js.');') };
     warn $@ if $@;
     #say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
 }
