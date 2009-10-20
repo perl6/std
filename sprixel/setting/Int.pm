@@ -1,6 +1,3 @@
-sub jseval is export {}
-
-sub say is export { jseval 'say(this.invoker.invoker.arg_array.join(""))' }
 
 class Int {
     # install constructor
@@ -18,8 +15,7 @@ this.invoker.invoker.invoker.invoker.invoker.class_obj.ctor = function(integer, 
 }';
 }
 
-#multi sub infix:<+>(Int $a, Int $b) { jseval '
-#    this.result = new c.Int(c["$a"].v.add(c["$b"]))
-#';
-#}
-#1;
+multi sub infix:<+> { jseval '
+    this.result = new ctx.classes.Int.ctor(args[0].v.add(args[1].v));
+';
+}

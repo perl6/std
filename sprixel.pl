@@ -116,7 +116,7 @@ sub run_js_interpreter {
     # TODO: integrate $setting_js into the setting instead of appending it here.
     eval { $ctx->execute('Act.interpret('.$ast_js.','.$setting_js.');') };
     warn $@ if $@;
-    #say sprintf "\n\ttime in interpreter: %.6f s", gettimeofday()-$start;
+    #printf "\n\ttime in interpreter: %.6f s\n", gettimeofday()-$start;
 }
 sub say_them {
     say map { Encode::decode_utf8($_) } @_;
@@ -130,6 +130,7 @@ sub new_ctx {
     $ctx->register_method_by_name("print_them");
     $ctx->register_method_by_name("new_ctx");
     $ctx->register_method_by_name("eval_ctx");
+    $ctx->register_method_by_name("mangle");
     return $ctx_id++;
 }
 sub eval_ctx {

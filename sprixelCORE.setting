@@ -1,5 +1,6 @@
 my module CORE;
 
+use IO;
 use Int;
 use Str;
 

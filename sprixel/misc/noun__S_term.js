@@ -10,7 +10,8 @@ Act.types.noun__S_term = function(){
             if ((id = this.node.term.identifier.TEXT) == 'jseval') {
                 if (typeof this.node.js_func == 'undefined') {
                     this.node.js_func = new Function('ctx',
-                        this.node.term.args.arglist[0].
+                        'var args = this.invoker.invoker.arg_array;'
+                        +this.node.term.args.arglist[0].
                             EXPR.value.quote.nibble.M[0].TEXT);
                 }
                 this.node.js_func.call(this, this.context);
@@ -18,7 +19,7 @@ Act.types.noun__S_term = function(){
             } else { // non jseval sub call
             }
         } catch(e) {
-            //say('eee: '+e);
+            this.eee = e;
         }
         if (this.node.term.args && this.node.term.args.arglist &&
                 this.node.term.args.arglist.length > 0) {
@@ -32,8 +33,9 @@ Act.types.noun__S_term = function(){
         }
     case 3:
         var sub;
-        if (typeof (sub = this.context.symbols[
-                this.node.term.identifier.TEXT]) != 'undefined') {
+        if ((id = this.node.term.identifier.TEXT) == 'jseval') {
+            throw 'jseval error: '+this.eee;
+        } else if (typeof (sub = this.context.symbols[id]) != 'undefined') {
             this.phase = 4;
             var args = this.next.result || [];
             this.next = new Act(sub, this);

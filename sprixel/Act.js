@@ -31,21 +31,31 @@ var Act = (function(){
         var T;
         if (typeof(T = node_types[this.node.T]) != 'undefined') {
             return T.call(this);
+        } else if (/^infix/.test(T = this.node.T)) {
+            this.node = {
+                T: 'operator_invocation',
+                op: T,
+                args: this.node.args
+            };
+            return this;
         }
+        //say(keys(this));
         throw 'NYI: '+this.node.T;
     };
 
     // entry point to interpret an entire Abstract Syntax Tree
     act_ctor.interpret = function(ast, setting) {
-        // start with one Activation object for the initial node
-        // of the Abstact Syntax Tree.
         var context = new Context({ symbols: {} });
         if (setting) {
+        // execute the setting on each run.
             var act = new act_ctor(setting, { context: context });
             try { // load the setting into the context
                 for (;;(global_trace && say(act.node.T)),(act = act.exec()));
             } catch(e) {}
         }
+        //say(ToJS(context));
+        // start with one Activation object for the initial node
+        // of the Abstact Syntax Tree.
         var act = new act_ctor(ast, { context: context });
         try {
             // Runloop for the interpreter. Optionally tracing the
