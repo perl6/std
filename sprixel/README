@@ -1,30 +1,34 @@
 
-sprixel - an anagram of perlsix. viv and STD.pm parse Perl 6 source,
-    emitting the Abstract Syntax Tree in YAML, then sprixel walks the
-    AST using its trampolined, stackless, continuation-returning
+sprixel (anagram of perlsix): viv and STD.pm parse Perl 6 source,
+    emitting an Abstract Syntax Tree in YAML, then sprixel walks the
+    AST using its trampolined, stackless, continuation passing style
     interpreter written in JavaScript and executed by Google's V8
-    compiler and runtime.
+    JavaScript compiler and runtime engine.
 
-requirements:
- - have Perl 5 installed and all of STD5.pmc's and viv's dependencies
-   (see pugs/src/perl6/README, you may need to install YAML::Syck,
+installation:
+
+ - have Perl 5 installed and all of STD5.pmc's and viv's dependencies.
+   See pugs/src/perl6/README. You may need to install YAML::Syck,
    YAML::XS (aka libyaml-libyaml-perl) Module::Install, File::Slurp
-   and Moose. You may need to perform your local equivalent of
-   'sudo ln -s /usr/bin/perl /usr/local/bin/perl')
+   and Moose. You may also need to perform your local equivalent of
+   'sudo ln -s /usr/bin/perl /usr/local/bin/perl'.
    Verify that viv produces a valid AST, eg: ./viv -e 'say "hello";'
- - build V8 (Google's BSD-licensed JS engine) from source (optionally install)
+
+ - build V8 (Google's BSD-licensed JS engine) from source
     - see http://code.google.com/p/v8/ (download bleeding or trunk)
     - you'll need g++, Python 2.5, scons (latest release candidate)
     - 32-bit: scons
-    - 64-bit: export CFLAGS=-fPIC; scons arch=x64
-    - sudo ln -s /path/to/my/v8/libv8.a /usr/lib/
-    - ********** See detailed installation instructions below **********
+    - 64-bit: export CXXFLAGS=-fPIC; scons arch=x64
+    - sudo ln -s /path/to/v8/libv8.a /usr/lib/       # or /usr/local/lib
+    - sudo ln -s /path/to/v8/include/v8.h /usr/include/
+
  - install the Perl 5 extension for V8 (originally named Acme::JavaScript::V8)
-    - see http://github.com/fictorial/perl-v8
-    - original: http://d.hatena.ne.jp/dayflower/20080905/1220592409
+    - git clone http://github.com/fictorial/perl-v8.git perl-v8
     - make -f bridge.mk; perl Makefile.PL; make; make test
     - sudo make install
     - perl sample.pl
+    - japanese docs: http://d.hatena.ne.jp/dayflower/20080905/1220592409
+
  - accept some draconian EULA (kidding)
 
 usage:
@@ -50,27 +54,3 @@ plans:
  - implement all the builtins. :) or do I repeat myself?
     - note: borrow lots from all the other Perl 6 implementations, of course.
 
-last updated 2009-09-22 - diakopter
-
-If your perl is 64-bit, you'll want to export CFLAGS=-fPIC before building v8
-and perl-v8, and build v8 with:  scons arch=x64
-
-
-07:41 <@diakopter> check out the /bleeding_edge (or /trunk they're both
-    very stable) branch from the v8 repo
-07:42 <@diakopter> have scons & python 2.5
-07:42 <@diakopter> and g++
-07:42 < pmurias> diakopter: i saw the readme
-07:43 <@diakopter> pmurias: is your perl 64-bit or 32
-07:43 < pmurias> i can built it with typing scons, but
-    i don't know how to install it
-07:43 < pmurias> 32-bit
-07:44 <@diakopter> copy or ln -s the libv8.a to /usr/local/lib/
-07:44 <@diakopter> easiest
-07:44 < pmurias> that could be put in the readme
-07:44 <@diakopter> then git clone the perl-v8 repo
-07:44 <@diakopter> it's a few KB
-07:45 <@diakopter> cd perl-v8 ; make -f bridge.mk
-07:45 <@diakopter> perl Makefile.PL
-07:45 <@diakopter> make && make test && make install
-07:46  * diakopter pastes into README

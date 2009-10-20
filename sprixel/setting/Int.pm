@@ -19,3 +19,8 @@ multi sub infix:<+> { jseval '
     this.result = new ctx.classes.Int.ctor(args[0].v.add(args[1].v));
 ';
 }
+
+multi sub infix:<-> { jseval '
+    this.result = new ctx.classes.Int.ctor(args[0].v.subtract(args[1].v));
+';
+}
