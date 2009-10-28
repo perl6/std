@@ -644,6 +644,7 @@ sub _SCANg { my $self = shift;
 
 sub _STARf { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
@@ -654,6 +655,7 @@ sub _STARf { my $self = shift;
 
 sub _STARg { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
@@ -666,6 +668,7 @@ sub _STARg { my $self = shift;
 
 sub _STARr { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $pos = $self;
@@ -688,6 +691,7 @@ sub _STARr { my $self = shift;
 
 sub _PLUSf { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $x = $self;
@@ -708,6 +712,7 @@ sub _PLUSf { my $self = shift;
 
 sub _PLUSg { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
@@ -716,6 +721,7 @@ sub _PLUSg { my $self = shift;
 
 sub _PLUSr { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
@@ -737,6 +743,7 @@ sub _PLUSr { my $self = shift;
 sub _REPSEPf { my $self = shift;
     my $sep = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $x = $self;
@@ -757,6 +764,7 @@ sub _REPSEPf { my $self = shift;
 sub _REPSEPg { my $self = shift;
     my $sep = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
@@ -766,6 +774,7 @@ sub _REPSEPg { my $self = shift;
 sub _REPSEPr { my $self = shift;
     my $sep = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $to = $self;
@@ -789,6 +798,7 @@ sub _REPSEPr { my $self = shift;
 
 sub _OPTr { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
@@ -799,6 +809,7 @@ sub _OPTr { my $self = shift;
 
 sub _OPTg { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @x = $block->($self);
@@ -809,6 +820,7 @@ sub _OPTg { my $self = shift;
 
 sub _OPTf { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     lazymap(sub { $_[0]->retm() },
@@ -818,6 +830,7 @@ sub _OPTf { my $self = shift;
 
 sub _BRACKET { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     lazymap(sub { bless($_[0],ref($self))->retm() },
@@ -826,6 +839,7 @@ sub _BRACKET { my $self = shift;
 
 sub _BRACKETr { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my ($val) = $block->($self) or return ();
@@ -834,6 +848,7 @@ sub _BRACKETr { my $self = shift;
 
 sub _PAREN { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     lazymap(sub { $_[0]->retm() },
@@ -842,6 +857,7 @@ sub _PAREN { my $self = shift;
 
 sub _NOTBEFORE { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @caps;
@@ -854,6 +870,7 @@ sub _NOTBEFORE { my $self = shift;
 
 sub _NOTCHAR { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @all = $block->($self);
@@ -863,6 +880,7 @@ sub _NOTCHAR { my $self = shift;
 
 sub before { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @caps;
@@ -883,6 +901,7 @@ sub before { my $self = shift;
 
 sub after { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $end = $self->cursor($self->{_pos});
@@ -952,6 +971,7 @@ sub ws {
 
 sub _ASSERT { my $self = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my @all = $block->($self);
@@ -964,6 +984,7 @@ sub _ASSERT { my $self = shift;
 sub _BINDVAR { my $self = shift;
     my $var = shift;
     my $block = shift;
+    no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     lazymap(sub { $$var = $_[0]; $_[0]->retm() },
@@ -973,6 +994,8 @@ sub _BINDVAR { my $self = shift;
 sub _SUBSUME { my $self = shift;
     my $names = shift;
     my $block = shift;
+    no warnings 'recursion';
+    no warnings 'recursion';
 
     local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
     lazymap(sub { $self->cursor_bind($names, $_[0])->retm() },
@@ -982,6 +1005,8 @@ sub _SUBSUME { my $self = shift;
 sub _SUBSUMEr { my $self = shift;
     my $names = shift;
     my $block = shift;
+    no warnings 'recursion';
+    no warnings 'recursion';
 
     local $CTX = $self->callm($names ? "@$names" : "") if $DEBUG & DEBUG::trace_call;
     my ($var) = $block->($self->cursor_fresh()) or return ();
