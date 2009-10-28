@@ -301,9 +301,6 @@ proto token version { <...> }
 token category:module_name { <sym> }
 proto token module_name { <...> }
 
-token category:noun { <sym> }
-proto token noun { <...> }
-
 token category:value { <sym> }
 proto token value { <...> }
 
@@ -866,13 +863,13 @@ token statement_control:import {
     :my $longname;
     :my $*SCOPE = 'use';
     <sym> <.ws>
-    <noun>
+    <term>
     [
     || <.spacey> <arglist>
         {{
-            $¢.do_import($<noun>, $<arglist>);
+            $¢.do_import($<term>, $<arglist>);
         }}
-    || {{ $¢.do_import($<noun>, ''); }}
+    || {{ $¢.do_import($<term>, ''); }}
     ]
     <.ws>
 }
@@ -1406,7 +1403,7 @@ token trait_mod:will {
 token trait_mod:of      { <sym>:s <typename> }
 token trait_mod:as      { <sym>:s <typename> }
 token trait_mod:returns { <sym>:s <typename> }
-token trait_mod:handles { <sym>:s <noun> }
+token trait_mod:handles { <sym>:s <term> }
 
 #########
 # Nouns #
@@ -1421,11 +1418,11 @@ token nulltermish {
     :dba('null term')
     [
     | <?stdstopper>
-    | <noun=termish>
+    | <term=termish>
         {
-            $¢.<PRE>  = $<noun><PRE>:delete;
-            $¢.<POST> = $<noun><POST>:delete;
-            $¢.<~CAPS> = $<noun><~CAPS>;
+            $¢.<PRE>  = $<term><PRE>:delete;
+            $¢.<POST> = $<term><POST>:delete;
+            $¢.<~CAPS> = $<term><~CAPS>;
         }
     | <?>
     ]
@@ -1434,11 +1431,11 @@ token nulltermish {
 token termish {
     :my $*SCOPE = "";
     :my $*VAR;
-    :dba('prefix or noun')
+    :dba('prefix or term')
     [
-    | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><noun> and $<noun> = pop @$p }> <PRE> ]*
-        [ <?{ $<noun> }> || <noun> ]
-    | <noun>
+    | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
+        [ <?{ $<term> }> || <term> ]
+    | <term>
     ]
 
     # also queue up any postfixes
@@ -1455,26 +1452,25 @@ token termish {
     ]
     {
         self.check_variable($*VAR) if $*VAR;
-        $¢.<~CAPS> = $<noun><~CAPS>;
+        $¢.<~CAPS> = $<term><~CAPS>;
     }
 }
 
-token noun:fatarrow           { <fatarrow> }
-token noun:variable           { <variable> { $*VAR = $<variable> } }
-token noun:package_declarator { <package_declarator> }
-token noun:scope_declarator   { <scope_declarator> }
-token noun:multi_declarator   { <?before 'multi'|'proto'|'only'> <multi_declarator> }
-token noun:routine_declarator { <routine_declarator> }
-token noun:regex_declarator   { <regex_declarator> }
-token noun:type_declarator    { <type_declarator> }
-token noun:circumfix          { <circumfix> }
-token noun:dotty              { <dotty> }
-token noun:value              { <value> }
-token noun:capterm            { <capterm> }
-token noun:sigterm            { <sigterm> }
-token noun:term               { <term> }
-token noun:statement_prefix   { <statement_prefix> }
-token noun:colonpair          { [ <colonpair> <.ws> ]+ }
+token term:fatarrow           { <fatarrow> }
+token term:variable           { <variable> { $*VAR = $<variable> } }
+token term:package_declarator { <package_declarator> }
+token term:scope_declarator   { <scope_declarator> }
+token term:multi_declarator   { <?before 'multi'|'proto'|'only'> <multi_declarator> }
+token term:routine_declarator { <routine_declarator> }
+token term:regex_declarator   { <regex_declarator> }
+token term:type_declarator    { <type_declarator> }
+token term:circumfix          { <circumfix> }
+token term:dotty              { <dotty> }
+token term:value              { <value> }
+token term:capterm            { <capterm> }
+token term:sigterm            { <sigterm> }
+token term:statement_prefix   { <statement_prefix> }
+token term:colonpair          { [ <colonpair> <.ws> ]+ }
 
 token fatarrow {
     <key=identifier> \h* '=>' <.ws> <val=EXPR(item %item_assignment)>
@@ -3087,8 +3083,8 @@ token type_declarator:subset {
 
 token type_declarator:enum {
     <sym> <.ws>
-    <longname> <.ws> <trait>* <?before <[ < ( « ]> > <noun> <.ws>
-        { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<noun>.Str); }
+    <longname> <.ws> <trait>* <?before <[ < ( « ]> > <term> <.ws>
+        { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<term>.Str); }
 }
 
 token type_constraint {
@@ -3447,7 +3443,7 @@ token privop ( --> Methodcall) {
 }
 
 token dottyopish {
-    <noun=dottyop>
+    <term=dottyop>
 }
 
 token dottyop {
@@ -3511,7 +3507,7 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
     { $<O> = $<s><op><O>; $<O><prec>:delete; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
     { $<sym> = $<s>.Str; }
 
-    [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><noun> = 1 } ]? > || { $<O><noun> = 1 } ]
+    [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><term> = 1 } ]? > || { $<O><term> = 1 } ]
 }
 
 token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
@@ -4499,7 +4495,7 @@ method EXPR ($preclvl) {
         }
         push @opstack, @PRE,@POST;
 
-        push @termstack, $here.<noun>;
+        push @termstack, $here.<term>;
         @termstack[*-1].<POST>:delete;
         self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
 
@@ -4664,7 +4660,7 @@ grammar Regex is STD {
     token termish {
         <.ws>
         [
-        || <noun=quant_atom_list>
+        || <term=quant_atom_list>
         || <?before <stopper> | <[&|~]>  >  <.panic: "Null pattern not allowed">
         || <?before <[ \] \) \> ]> > <.panic: "Unmatched closing bracket">
         || <.panic: "Unrecognized regex metacharacter (must be quoted to match literally)">

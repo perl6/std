@@ -180,9 +180,6 @@ proto token p5version { <...> }
 token category:p5module_name { <sym> }
 proto token p5module_name { <...> }
 
-token category:p5noun { <sym> }
-proto token p5noun { <...> }
-
 token category:p5value { <sym> }
 proto token p5value { <...> }
 
@@ -1061,7 +1058,7 @@ token p5trait_mod:will {
 token p5trait_mod:of      { <sym>:s <typename> }
 token p5trait_mod:as      { <sym>:s <typename> }
 token p5trait_mod:returns { <sym>:s <typename> }
-token p5trait_mod:handles { <sym>:s <noun=p5noun> }
+token p5trait_mod:handles { <sym>:s <term=p5term> }
 
 #########
 # Nouns #
@@ -1076,11 +1073,11 @@ token nulltermish {
     :dba('null term')
     [
     | <?stdstopper>
-    | <noun=termish>
+    | <term=termish>
         {
-            $¢.<PRE>  = $<noun><PRE>:delete;
-            $¢.<POST> = $<noun><POST>:delete;
-            $¢.<~CAPS> = $<noun><~CAPS>;
+            $¢.<PRE>  = $<term><PRE>:delete;
+            $¢.<POST> = $<term><POST>:delete;
+            $¢.<~CAPS> = $<term><~CAPS>;
         }
     | <?>
     ]
@@ -1089,11 +1086,11 @@ token nulltermish {
 token termish {
     :my $*SCOPE = "";
     :my $*VAR;
-    :dba('prefix or noun')
+    :dba('prefix or term')
     [
-    | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><noun> and $<noun> = pop @$p }> <PRE> ]*
-        [ <?{ $<noun> }> || <noun> ]
-    | <noun=p5noun>
+    | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
+        [ <?{ $<term> }> || <term> ]
+    | <term=p5term>
     ]
 
     # also queue up any postfixes
@@ -1110,25 +1107,24 @@ token termish {
     ]
     {
         self.check_variable($*VAR) if $*VAR;
-        $¢.<~CAPS> = $<noun><~CAPS>;
+        $¢.<~CAPS> = $<term><~CAPS>;
     }
 }
 
-token p5noun:fatarrow           { <fatarrow> }
-token p5noun:variable           { <variable> { $*VAR = $<variable> } }
-token p5noun:package_declarator { <package_declarator=p5package_declarator> }
-token p5noun:scope_declarator   { <scope_declarator=p5scope_declarator> }
-token p5noun:routine_declarator { <routine_declarator=p5routine_declarator> }
-token p5noun:regex_declarator   { <regex_declarator=p5regex_declarator> }
-token p5noun:type_declarator    { <type_declarator=p5type_declarator> }
-token p5noun:circumfix          { <circumfix=p5circumfix> }
-token p5noun:dotty              { <dotty=p5dotty> }
-token p5noun:value              { <value=p5value> }
-token p5noun:capterm            { <capterm> }
-token p5noun:sigterm            { <sigterm> }
-token p5noun:term               { <term=p5term> }
-token p5noun:statement_prefix   { <statement_prefix=p5statement_prefix> }
-token p5noun:colonpair          { [ <colonpair> <.ws> ]+ }
+token p5term:fatarrow           { <fatarrow> }
+token p5term:variable           { <variable> { $*VAR = $<variable> } }
+token p5term:package_declarator { <package_declarator=p5package_declarator> }
+token p5term:scope_declarator   { <scope_declarator=p5scope_declarator> }
+token p5term:routine_declarator { <routine_declarator=p5routine_declarator> }
+token p5term:regex_declarator   { <regex_declarator=p5regex_declarator> }
+token p5term:type_declarator    { <type_declarator=p5type_declarator> }
+token p5term:circumfix          { <circumfix=p5circumfix> }
+token p5term:dotty              { <dotty=p5dotty> }
+token p5term:value              { <value=p5value> }
+token p5term:capterm            { <capterm> }
+token p5term:sigterm            { <sigterm> }
+token p5term:statement_prefix   { <statement_prefix=p5statement_prefix> }
+token p5term:colonpair          { [ <colonpair> <.ws> ]+ }
 
 token fatarrow {
     <key=identifier> \h* '=>' <.ws> <val=EXPR(item %assignment)>
@@ -2811,7 +2807,7 @@ token p5dotty:sym«->» ( --> Methodcall) {
 }
 
 token dottyopish {
-    <noun=dottyop>
+    <term=dottyop>
 }
 
 token dottyop {
@@ -3593,7 +3589,7 @@ grammar Regex is STD {
 
     token termish {
         <.ws>  # XXX assuming old /x here?
-        <noun=quant_atom_list>
+        <term=quant_atom_list>
     }
     token quant_atom_list {
         <quantified_atom>+
