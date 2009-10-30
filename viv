@@ -622,6 +622,14 @@ sub indent {
 	$self->ret(@text);
     }
 
+    sub gap { my $self = shift;
+	my $after = shift;
+	my $beg = $self->{END};
+	my $end = $after->{BEG};
+	return '' unless $beg && $end;
+	return substr($::ORIG, $beg, $end - $beg);
+    }
+
 }
 
 { package VAST::Str; our @ISA = 'VAST::Base';
@@ -1486,7 +1494,7 @@ sub indent {
 { package VAST::package_declarator__S_class; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-	$t[0] = '';
+	$t[0] =~ s/\S.*//s;
         $self->ret(@t);
     }
 }
@@ -1495,7 +1503,7 @@ sub indent {
 { package VAST::package_declarator__S_grammar; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-	$t[0] = '';
+	$t[0] =~ s/\S.*//s;
         $self->ret(@t);
     }
 }
@@ -1504,7 +1512,7 @@ sub indent {
 { package VAST::package_declarator__S_role; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-	$t[0] = '';
+	$t[0] =~ s/\S.*//s;
         $self->ret(@t);
     }
 }
@@ -1549,6 +1557,14 @@ END
 	    $b =~ s/{//;
 	    $out .= ::indent($moose);
 	    $out .= $b;
+	    my $comment = $self->{comment};
+	    if ($comment) {
+		$out .= $block->gap($comment);
+		$out .= $comment->emit_p5($lvl+1);
+	    }
+	    else {
+		$out .= "\n";
+	    }
 	}
 	else {
 	    $out .= $moose;
@@ -1930,6 +1946,10 @@ END
 
 
 { package VAST::statement; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+        my @t = $self->SUPER::emit_p5($lvl+1);
+        $self->ret(@t);
+    }
 }
 
 

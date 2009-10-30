@@ -1898,11 +1898,12 @@ token morename {
     :my $*QSIGIL ::= '';
     '::'
     [
-        <?before '(' | <alpha> >
+    ||  <?before '(' | <alpha> >
         [
         | <identifier>
         | :dba('indirect name') '(' ~ ')' <EXPR>
         ]
+    || <?before '::'> <.panic: "Name component may not be null">
     ]?
 }
 
@@ -3310,7 +3311,7 @@ token term:sym<::?IDENT> ( --> Term) {
 }
 
 token term:sym<undef> ( --> Term) {
-    <sym> »
+    <sym> » {}
     [ <?before \h*'$/' >
         <.obs('$/ variable as input record separator',
              "the filehandle's .slurp method")>
@@ -3519,7 +3520,7 @@ token postfix_prefix_meta_operator:sym< » >    {
 }
 
 token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
-    <sym> <!before '!'> {} <infixish(1)>
+    <sym> <!before '!'> {} [ <infixish(1)> || <.panic: "Negation metaoperator not followed by valid infix"> ]
 
     [
     || <?{ $<infixish>.Str eq '=' }>
@@ -3538,11 +3539,6 @@ token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
     <.can_meta($<infixish>, "reverse")>
     <?{ $<O> = $<infixish><O>; }>
 }
-
-#method lex1 (Str $s) {
-#    self.<O>{$s}++ and self.panic("Nested $s metaoperators not allowed");
-#    self;
-#}
 
 token infix_prefix_meta_operator:sym<X> ( --> List_infix) {
     <sym> {}
@@ -4276,7 +4272,7 @@ regex infixstopper {
     :dba('infix stopper')
     [
     | <?before <stopper> >
-    | <?before '!!' > <?{ $*GOAL eq '!!' }>
+    | <?before '!!' > [ <?{ $*GOAL eq '!!' }> || <.panic: "Ternary !! seems to be missing its ??"> ]
     | <?before '{' | <lambda> > <?{ ($*GOAL eq '{' or $*GOAL eq 'endargs') and @*MEMOS[$¢.pos]<ws> }>
     | <?{ $*GOAL eq 'endargs' and @*MEMOS[$¢.pos]<endargs> }>
     ]
@@ -4384,12 +4380,12 @@ method EXPR ($preclvl) {
                 $nop<_pos> = $endpos;
                 if @list {
                     my @caps;
-                    push @caps, @list[0].caps if @list[0];
+                    push @caps, 'elem', @list[0] if @list[0];
                     for 0..@delims-1 {
                         my $d = @delims[$_];
                         my $l = @list[$_+1];
-                        push @caps, $d;
-                        push @caps, $l;  # nullterm?
+                        push @caps, 'delim', $d;
+                        push @caps, 'elem', $l if $l;  # nullterm?
                     }
                     $nop<~CAPS> = \@caps;
                 }
@@ -4410,7 +4406,7 @@ method EXPR ($preclvl) {
                 if $arg<_from> < $op<_from> { # postfix
                     $op<_from> = $arg<_from>;   # extend from to include arg
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
-                    unshift @$a, $arg;
+                    unshift @$a, 'arg', $arg;
                     push @termstack, $op._REDUCE($op<_from>, 'POSTFIX');
                     @termstack[*-1].<PRE>:delete;
                     @termstack[*-1].<POST>:delete;
@@ -4418,7 +4414,7 @@ method EXPR ($preclvl) {
                 elsif $arg<_pos> > $op<_pos> {   # prefix
                     $op<_pos> = $arg<_pos>;     # extend pos to include arg
 #                    warn "OOPS ", $arg.Str, "\n" if @acaps > 1;
-                    push @$a, $arg;
+                    push @$a, 'arg', $arg;
                     push @termstack, $op._REDUCE($op<_from>, 'PREFIX');
                     @termstack[*-1].<PRE>:delete;
                     @termstack[*-1].<POST>:delete;
@@ -4437,8 +4433,8 @@ method EXPR ($preclvl) {
                 $op<_arity> = 'BINARY';
 
                 my $a = $op<~CAPS>;
-                unshift @$a, $left;
-                push @$a, $right;
+                unshift @$a, 'left', $left;
+                push @$a, 'right', $right;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
                 my $ck;
@@ -4677,6 +4673,10 @@ grammar Regex is STD {
             $<O> = $<regex_infix><O>;
             $<sym> = $<regex_infix><sym>;
         }
+    }
+    regex infixstopper {
+        :dba('infix stopper')
+        <?before <stopper> >
     }
 
     token regex_infix:sym<||> ( --> Tight_or ) { <sym> }
@@ -5569,8 +5569,6 @@ method lookup_compiler_var($name) {
 # Service Routines #
 ####################
 
-# token panic (Str $s) { <commit> <fail($s)> }
-
 method panic (Str $s) {
     my $m;
     my $here = self;
@@ -5620,7 +5618,11 @@ method panic (Str $s) {
         }
     }
     if $m ~~ /infix|nofun/ and not $m ~~ /regex/ {
+        state $in_panic = 0;
+        die "Recursive panic" if $in_panic;
+        $in_panic++;
         my @t = try { $here.termish };
+        $in_panic--;
         if @t {
             $m ~~ s|Confused|Two terms in a row| if @t;
         }
