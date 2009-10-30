@@ -3603,6 +3603,10 @@ grammar Regex is STD {
             $<sym> = $<regex_infix><sym>;
         }
     }
+    regex infixstopper {
+        :dba('infix stopper')
+        <?before <stopper> >
+    }
 
     token p5regex_infix:sym<|> ( --> Junctive_or ) { <sym> }
 
