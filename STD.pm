@@ -20,6 +20,7 @@ our $ALL;
     my $*HIGHWATER;      # where we were last looking for things
     my $*HIGHMESS;       # current parse failure message
     my $*HIGHEXPECT;     # things we were looking for at the bleeding edge
+    my $*IN_PANIC;       # don't panic recursively
 
     # symbol table management
     our $ALL;            # all the stashes, keyed by id
@@ -4339,7 +4340,13 @@ method EXPR ($preclvl) {
                 $nop<_arity> = 'CHAIN';
                 $nop<_from> = $startpos;
                 $nop<_pos> = $endpos;
-                $nop<~CAPS> = \@chain;
+                my @caps;
+                my $i = 0;
+                for @chain {
+                    push(@caps, $i++ % 2 ?? 'op' !! 'term' );
+                    push(@caps, $_);
+                }
+                $nop<~CAPS> = \@caps;
                 push @termstack, $nop._REDUCE($startpos, 'CHAIN');
                 @termstack[*-1].<PRE>:delete;
                 @termstack[*-1].<POST> :delete;
@@ -4522,9 +4529,8 @@ method EXPR ($preclvl) {
                 if $preclim ne $LOOSEST {
                     my $dba = $preclvl.<dba>;
                     my $h = $*HIGHEXPECT;
-                    my $k = 'infix or meta-infix';
-                    $h.{$k}:delete;
-                    $h.{"infix or meta-infix (with precedence tighter than $dba)"} = 1;
+                    %$h = ();
+                    $h.{"an infix operator with precedence tighter than $dba"} = 1;
                 }
                 last TERM;
             }
@@ -5323,6 +5329,7 @@ method add_our_name ($n) {
 }
 
 method add_mystery ($name,$pos,$ctx) {
+    return self if $*IN_PANIC;
     if not self.is_known($name) {
         say "add_mystery $name $*CURPAD" if $*DEBUG +& DEBUG::symtab;
         %*MYSTERY{$name}.<pad> = $*CURPAD;
@@ -5618,11 +5625,10 @@ method panic (Str $s) {
         }
     }
     if $m ~~ /infix|nofun/ and not $m ~~ /regex/ {
-        state $in_panic = 0;
-        die "Recursive panic" if $in_panic;
-        $in_panic++;
+        die "Recursive panic" if $*IN_PANIC;
+        $*IN_PANIC++;
         my @t = try { $here.termish };
-        $in_panic--;
+        $*IN_PANIC--;
         if @t {
             $m ~~ s|Confused|Two terms in a row| if @t;
         }
