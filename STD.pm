@@ -5013,7 +5013,7 @@ method getsig {
             $sig ~= ', *%_' if $h_;
         }
         else {
-            $sig = '$_ is rw = OUTER::<$_>';
+            $sig = '$_ is ref = OUTER::<$_>';
         }
         $*CURPAD.<$?SIGNATURE> = $sig;
     }
