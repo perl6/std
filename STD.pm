@@ -819,6 +819,7 @@ token statement {
             ]?
         ]
     | <?before ';'>
+    | {} <.panic: "Bogus statement">
     ]
 
     # Is there more on same line after a block?
@@ -3028,6 +3029,7 @@ token capterm {
     [
     | '(' <capture>? ')'
     | <?before \S> <termish>
+    | {} <.panic: "You can't backslash that">
     ]
 }
 
