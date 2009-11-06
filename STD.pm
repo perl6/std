@@ -159,110 +159,6 @@ constant $LOOSEST = "a=!"; # XXX preceding line is busted
 constant $item_assignment_prec = 'i=';
 constant $methodcall_prec = 'y=';
 
-
-role PrecOp {
-
-    # This is hopefully called on a match to mix in operator info by type.
-    method coerce (Match $m) {
-        # $m but= ::?CLASS;
-        my $var = self.WHAT ~ '::o';
-        my $d = %::($var); 
-        if not $d<transparent> {
-            for keys(%$d) { $m<O>{$_} //= $d.{$_} };
-            $m.deb("coercing to " ~ self) if $*DEBUG +& DEBUG::EXPR;
-        }
-        $m<O><kind> = self.WHAT;
-        return $m;
-    }
-
-} # end role
-
-class Transparent does PrecOp {
- our %o = (:transparent);
-} # end class
-
-class Term does PrecOp {
-    our %o = %term;
-} # end class
-class Methodcall does PrecOp {
-    our %o = %methodcall;
-} # end class
-class Autoincrement does PrecOp {
-    our %o = %autoincrement;
-} # end class
-class Exponentiation does PrecOp {
-    our %o = %exponentiation;
-} # end class
-class Symbolic_unary does PrecOp {
-    our %o = %symbolic_unary;
-} # end class
-class Multiplicative does PrecOp {
-    our %o = %multiplicative;
-} # end class
-class Additive does PrecOp {
-    our %o = %additive;
-} # end class
-class Replication does PrecOp {
-    our %o = %replication;
-} # end class
-class Concatenation does PrecOp {
-    our %o = %concatenation;
-} # end class
-class Junctive_and does PrecOp {
-    our %o = %junctive_and;
-} # end class
-class Junctive_or does PrecOp {
-    our %o = %junctive_or;
-} # end class
-class Named_unary does PrecOp {
-    our %o = %named_unary;
-} # end class
-class Structural does PrecOp {
-    our %o = %structural;
-} # end class
-class Chaining does PrecOp {
-    our %o = %chaining;
-} # end class
-class Tight_and does PrecOp {
-    our %o = %tight_and;
-} # end class
-class Tight_or does PrecOp {
-    our %o = %tight_or;
-} # end class
-class Conditional does PrecOp {
-    our %o = %conditional;
-} # end class
-class Item_assignment does PrecOp {
-    our %o = %item_assignment;
-} # end class
-class Loose_unary does PrecOp {
-    our %o = %loose_unary;
-} # end class
-class Comma does PrecOp {
-    our %o = %comma;
-} # end class
-class List_infix does PrecOp {
-    our %o = %list_infix;
-} # end class
-class List_assignment does PrecOp {
-    our %o = %list_assignment;
-} # end class
-class List_prefix does PrecOp {
-    our %o = %list_prefix;
-} # end class
-class Loose_and does PrecOp {
-    our %o = %loose_and;
-} # end class
-class Loose_or does PrecOp {
-    our %o = %loose_or;
-} # end class
-class Sequencer does PrecOp {
-    our %o = %sequencer;
-} # end class
-class Terminator does PrecOp {
-    our %o = %terminator;
-} # end class
-
 ##############
 # Categories #
 ##############
@@ -3301,19 +3197,21 @@ token blorst {
 #########
 
 # start playing with the setting stubber
-token term:YOU_ARE_HERE ( --> Term) {
+token term:YOU_ARE_HERE {
     <sym> <.you_are_here>
+    <O(|%term)>
 }
 
-token term:new ( --> Term) {
+token term:new {
     'new' \h+ <longname> \h* <!before ':'> <.obs("C++ constructor syntax", "method call syntax")>
 }
 
-token term:sym<::?IDENT> ( --> Term) {
+token term:sym<::?IDENT> {
     $<sym> = [ '::?' <identifier> ] »
+    <O(|%term)>
 }
 
-token term:sym<undef> ( --> Term) {
+token term:sym<undef> {
     <sym> » {}
     [ <?before \h*'$/' >
         <.obs('$/ variable as input record separator',
@@ -3322,36 +3220,38 @@ token term:sym<undef> ( --> Term) {
     [ <?before \h*<sigil><twigil>?\w >
         <.obs('undef as a verb', 'undefine function')>
     ]?
+    <O(|%term)>
 }
 
-token term:sym<continue> ( --> Term)
-    { <sym> » }
+token term:sym<continue>
+    { <sym> » <O(|%term)> }
 
-token term:sym<self> ( --> Term)
-    { <sym> » }
+token term:sym<self>
+    { <sym> » <O(|%term)> }
 
-token term:sym<defer> ( --> Term)
-    { <sym> » }
+token term:sym<defer>
+    { <sym> » <O(|%term)> }
 
-token term:rand ( --> Term) {
+token term:rand {
     <sym> »
     [ <?before '('? \h* [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]?
     [ <?before '()'> <.obs('rand()', 'rand')> ]?
+    <O(|%term)>
 }
 
-token term:Inf ( --> Term)
-    { <sym> » }
+token term:Inf
+    { <sym> » <O(|%term)> }
 
-token term:NaN ( --> Term)
-    { <sym> » }
+token term:NaN
+    { <sym> » <O(|%term)> }
 
-token term:sym<*> ( --> Term)
-    { <sym> }
+token term:sym<*>
+    { <sym> <O(|%term)> }
 
-token term:sym<**> ( --> Term)
-    { <sym> }
+token term:sym<**>
+    { <sym> <O(|%term)> }
 
-token infix:lambda ( --> Term) {
+token infix:lambda {
     <?before '{' | '->' > <!{ $*IN_META }> {{
         my $line = $¢.lineof($¢.pos);
         for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when', 'sub' {
@@ -3371,16 +3271,17 @@ token infix:lambda ( --> Term) {
         return () if $*IN_REDUCE;
         $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
     }}
+    <O(|%term)>
 }
 
-token circumfix:sigil ( --> Term)
-    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } }
+token circumfix:sigil
+    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> }
 
-token circumfix:sym<( )> ( --> Term)
-    { :dba('parenthesized expression') '(' ~ ')' <semilist> }
+token circumfix:sym<( )>
+    { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
 
-token circumfix:sym<[ ]> ( --> Term)
-    { :dba('array composer') '[' ~ ']' <semilist> }
+token circumfix:sym<[ ]>
+    { :dba('array composer') '[' ~ ']' <semilist> <O(|%term)> }
 
 #############
 # Operators #
@@ -3412,7 +3313,7 @@ token infixish ($in_meta = $*IN_META) {
             $<sym> = ':';
             %<O><prec> = %item_assignment<prec>;  # actual test is non-inclusive!
             %<O><assoc> = 'unary';
-            %<O><kind> = 'ADVERB';
+            %<O><dba> = 'adverb';
         }
     | :dba('bracketed infix') '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
     | <infix_circumfix_meta_operator>
@@ -3433,17 +3334,20 @@ token infixish ($in_meta = $*IN_META) {
 #   other than dot will conflict with some other prefix.
 
 # doing fancy as one rule simplifies LTM
-token dotty:sym<.*> ( --> Methodcall) {
+token dotty:sym<.*> {
     ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
     { $<sym> = $0.Str; }
+    <O(%methodcall)>
 }
 
-token dotty:sym<.> ( --> Methodcall) {
+token dotty:sym<.> {
     <sym> <dottyop>
+    <O(%methodcall)>
 }
 
-token privop ( --> Methodcall) {
+token privop {
     '!' <methodop>
+    <O(%methodcall)>
 }
 
 token dottyopish {
@@ -3487,8 +3391,9 @@ method can_meta ($op, $meta) {
     self;
 }
 
-regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
+regex prefix_circumfix_meta_operator:reduce {
     :my $*IN_REDUCE = 1;
+    :my $op;
     <?before '['\S+']'>
     $<s> = (
         '['
@@ -3497,18 +3402,19 @@ regex prefix_circumfix_meta_operator:reduce (--> List_prefix) {
         || \\<op=infixish(1)> <?before ']'>
         || <!>
         ]
+        ']' ['«'|<?>]
     )
-    [ <?> || <.worry: "Malformed reduce"> <!> ] ']' ['«'|<?>]
+    { $op = $<s><op>; }
 
-    <.can_meta($<s><op>, "reduce")>
+    <.can_meta($op, "reduce")>
 
     [
-    || <!{ $<s><op><O><diffy> }>
-    || <?{ $<s><op><O><assoc> eq 'chain' }>
-    || <.panic("Can't reduce " ~ $<s><op><sym> ~ " because " ~ $<s><op><O><dba> ~ " operators are diffy and not chaining")>
+    || <!{ $op<O><diffy> }>
+    || <?{ $op<O><assoc> eq 'chain' }>
+    || <.panic("Can't reduce " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
     ]
 
-    { $<O> = $<s><op><O>; $<O><prec>:delete; $<O><assoc> = 'unary'; $<O><uassoc> = 'left'; }
+    <O($op.Opairs, |%list_prefix, assoc => 'unary', uassoc => 'left')>
     { $<sym> = $<s>.Str; }
 
     [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><term> = 1 } ]? > || { $<O><term> = 1 } ]
@@ -3522,12 +3428,12 @@ token postfix_prefix_meta_operator:sym< » >    {
     [<!{ $*QSIGIL }> || <!before '('> ]
 }
 
-token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
+token infix_prefix_meta_operator:sym<!> {
     <sym> <!before '!'> {} [ <infixish(1)> || <.panic: "Negation metaoperator not followed by valid infix"> ]
 
     [
     || <?{ $<infixish>.Str eq '=' }>
-       { $¢ = ::Chaining.coerce($¢); }
+       <O(|%chaining)>
        
     || <.can_meta($<infixish>, "negate")>    
        <?{ $<infixish><O><iffy> }>
@@ -3537,22 +3443,23 @@ token infix_prefix_meta_operator:sym<!> ( --> Transparent) {
     ]
 }
 
-token infix_prefix_meta_operator:sym<R> ( --> Transparent) {
+token infix_prefix_meta_operator:sym<R> {
     <sym> {} <infixish(1)>
     <.can_meta($<infixish>, "reverse")>
     <?{ $<O> = $<infixish><O>; }>
 }
 
-token infix_prefix_meta_operator:sym<X> ( --> List_infix) {
+token infix_prefix_meta_operator:sym<X> {
     <sym> {}
     [ <infixish(1)>
         [X <.panic: "Old form of XopX found">]?
         <.can_meta($<infixish>[0], "cross")>
         <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
     ]?
+    <O(|%list_infix, self.Opairs)>
 }
 
-token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
+token infix_circumfix_meta_operator:sym<« »> {
     [
     | '«'
     | '»'
@@ -3562,7 +3469,7 @@ token infix_circumfix_meta_operator:sym<« »> ( --> Transparent) {
     <?{ $<O> := $<infixish><O>; }>
 }
 
-token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
+token infix_circumfix_meta_operator:sym«<< >>» {
     [
     | '<<'
     | '>>'
@@ -3572,23 +3479,24 @@ token infix_circumfix_meta_operator:sym«<< >>» ( --> Transparent) {
     <?{ $<O> := $<infixish><O>; }>
 }
 
-token infix_postfix_meta_operator:sym<=> ($op --> Item_assignment) {
+token infix_postfix_meta_operator:sym<=> ($op) {
     '='
     <.can_meta($op, "make assignment out of")>
     [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
-    { $<O> = $op<O>; $<sym> = $op<sym> ~ '='; $<O><dba> = "assignment"; $<O><prec>:delete; $<O><iffy> = 0; }
+    { $<sym> = $op<sym> ~ '='; }
+    <O(|%item_assignment, $op.Opairs, dba => 'assignment', iffy => 0)>
 }
 
-token postcircumfix:sym<( )> ( --> Methodcall)
-    { :dba('argument list') '(' ~ ')' <semiarglist> }
+token postcircumfix:sym<( )>
+    { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
 
-token postcircumfix:sym<[ ]> ( --> Methodcall)
-    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } }
+token postcircumfix:sym<[ ]>
+    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
 
-token postcircumfix:sym<{ }> ( --> Methodcall)
-    { :dba('subscript') '{' ~ '}' <semilist> }
+token postcircumfix:sym<{ }>
+    { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> }
 
-token postcircumfix:sym«< >» ( --> Methodcall) {
+token postcircumfix:sym«< >» {
     :my $pos;
     '<'
     { $pos = $¢.pos }
@@ -3598,13 +3506,14 @@ token postcircumfix:sym«< >» ( --> Methodcall) {
        { $¢.cursor_force($pos).panic("Whitespace required before < operator") }
     || { $¢.cursor_force($pos).panic("Unable to parse quote-words subscript; couldn't find right angle quote") }
     ]
+    <O(|%methodcall)>
 }
 
-token postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
+token postcircumfix:sym«<< >>»
+    { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
 
-token postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
+token postcircumfix:sym<« »>
+    { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
 
 token postop {
     | <postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
@@ -3656,7 +3565,7 @@ token arglist {
     ]
 }
 
-token term:lambda ( --> Term) {
+token term:lambda {
     <?before <.lambda> >
     <pblock>
     {{
@@ -3664,9 +3573,10 @@ token term:lambda ( --> Term) {
             $*BORG.<block> = $<pblock>;
         }
     }}
+    <O(|%term)>
 }
 
-token circumfix:sym<{ }> ( --> Term) {
+token circumfix:sym<{ }> {
     <?before '{' >
     <pblock>
     {{
@@ -3674,12 +3584,13 @@ token circumfix:sym<{ }> ( --> Term) {
             $*BORG.<block> = $<pblock>;
         }
     }}
+    <O(|%term)>
 }
 
 ## methodcall
 
-token postfix:sym<i> ( --> Methodcall)
-    { <sym> » }
+token postfix:sym<i>
+    { <sym> » <O(|%methodcall)> }
 
 token infix:sym<.> ()
     { '.' <[\]\)\},:\s\$"']> <.obs('. to concatenate strings', '~')> }
@@ -3688,295 +3599,295 @@ token postfix:sym['->'] ()
     { '->' <.obs('-> to call a method', '.')> }
 
 ## autoincrement
-token postfix:sym<++> ( --> Autoincrement)
-    { <sym> }
+token postfix:sym<++>
+    { <sym> <O(|%autoincrement)> }
 
-token postfix:sym<--> ( --> Autoincrement)
-    { <sym> }
+token postfix:sym«--» ()
+    { <sym> <O(|%autoincrement)> }
 
-token prefix:sym<++> ( --> Autoincrement)
-    { <sym> }
+token prefix:sym<++>
+    { <sym> <O(|%autoincrement)> }
 
-token prefix:sym<--> ( --> Autoincrement)
-    { <sym> }
+token prefix:sym«--» ()
+    { <sym> <O(|%autoincrement)> }
 
 ## exponentiation
-token infix:sym<**> ( --> Exponentiation)
-    { <sym> }
+token infix:sym<**>
+    { <sym> <O(|%exponentiation)> }
 
 ## symbolic unary
-token prefix:sym<!> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<!>
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<+> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<+>
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<-> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<->
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<~~> ( --> Symbolic_unary)
-    { <sym> <.badinfix> }
+token prefix:sym<~~>
+    { <sym> <.badinfix> <O(|%symbolic_unary)> }
 
-token prefix:sym<~> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<~>
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<??> ( --> Symbolic_unary)
-    { <sym> <.badinfix> }
+token prefix:sym<??>
+    { <sym> <.badinfix> <O(|%symbolic_unary)> }
 
-token prefix:sym<?> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<?>
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<~^> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<~^>
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<+^> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<+^>
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<?^> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<?^>
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<^^> ( --> Symbolic_unary)
-    { <sym> <.badinfix> }
+token prefix:sym<^^>
+    { <sym> <.badinfix> <O(|%symbolic_unary)> }
 
-token prefix:sym<^> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<^>
+    { <sym> <O(|%symbolic_unary)> }
 
-token prefix:sym<||> ( --> Symbolic_unary)
-    { <sym> <.badinfix> }
+token prefix:sym<||>
+    { <sym> <.badinfix> <O(|%symbolic_unary)> }
 
-token prefix:sym<|> ( --> Symbolic_unary)
-    { <sym> }
+token prefix:sym<|>
+    { <sym> <O(|%symbolic_unary)> }
 
 
 ## multiplicative
-token infix:sym<*> ( --> Multiplicative)
-    { <sym> }
+token infix:sym<*>
+    { <sym> <O(|%multiplicative)> }
 
-token infix:sym</> ( --> Multiplicative)
-    { <sym> }
+token infix:sym</>
+    { <sym> <O(|%multiplicative)> }
 
-token infix:sym<div> ( --> Multiplicative)
-    { <sym> }
+token infix:sym<div>
+    { <sym> <O(|%multiplicative)> }
 
-token infix:sym<%> ( --> Multiplicative)
-    { <sym> <?{ $<O><iffy> = 1; }> }   # Allow !% operator
+token infix:sym<%>
+    { <sym> <O(|%multiplicative, iffy => 1)> }   # Allow !% operator
 
-token infix:sym<mod> ( --> Multiplicative)
-    { <sym> }
+token infix:sym<mod>
+    { <sym> <O(|%multiplicative)> }
 
-token infix:sym<+&> ( --> Multiplicative)
-    { <sym> }
+token infix:sym<+&>
+    { <sym> <O(|%multiplicative)> }
 
-token infix:sym« +< » ( --> Multiplicative)
-    { <sym> <!before '<'> }
+token infix:sym« +< »
+    { <sym> <!before '<'> <O(|%multiplicative)> }
 
-token infix:sym« << » ( --> Multiplicative)
-    { <sym> \s <.obs('<< to do left shift', '+< or ~<')> }
+token infix:sym« << »
+    { <sym> \s <.obs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
 
-token infix:sym« >> » ( --> Multiplicative)
-    { <sym> \s <.obs('>> to do right shift', '+> or ~>')> }
+token infix:sym« >> »
+    { <sym> \s <.obs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
 
-token infix:sym« +> » ( --> Multiplicative)
-    { <sym> <!before '>'> }
+token infix:sym« +> »
+    { <sym> <!before '>'> <O(|%multiplicative)> }
 
-token infix:sym<~&> ( --> Multiplicative)
-    { <sym> }
+token infix:sym<~&>
+    { <sym> <O(|%multiplicative)> }
 
-token infix:sym<?&> ( --> Multiplicative)
-    { <sym> }
+token infix:sym<?&>
+    { <sym> <O(|%multiplicative)> }
 
-token infix:sym« ~< » ( --> Multiplicative)
-    { <sym> <!before '<'> }
+token infix:sym« ~< »
+    { <sym> <!before '<'> <O(|%multiplicative)> }
 
-token infix:sym« ~> » ( --> Multiplicative)
-    { <sym> <!before '>'> }
+token infix:sym« ~> »
+    { <sym> <!before '>'> <O(|%multiplicative)> }
 
 
 ## additive
-token infix:sym<+> ( --> Additive)
-    { <sym> }
+token infix:sym<+>
+    { <sym> <O(|%additive)> }
 
-token infix:sym<-> ( --> Additive)
-    { <sym> }
+token infix:sym<->
+    { <sym> <O(|%additive)> }
 
-token infix:sym<+|> ( --> Additive)
-    { <sym> }
+token infix:sym<+|>
+    { <sym> <O(|%additive)> }
 
-token infix:sym<+^> ( --> Additive)
-    { <sym> }
+token infix:sym<+^>
+    { <sym> <O(|%additive)> }
 
-token infix:sym<~|> ( --> Additive)
-    { <sym> }
+token infix:sym<~|>
+    { <sym> <O(|%additive)> }
 
-token infix:sym<~^> ( --> Additive)
-    { <sym> }
+token infix:sym<~^>
+    { <sym> <O(|%additive)> }
 
-token infix:sym<?|> ( --> Additive)
-    { <sym> }
+token infix:sym<?|>
+    { <sym> <O(|%additive)> }
 
-token infix:sym<?^> ( --> Additive)
-    { <sym> }
+token infix:sym<?^>
+    { <sym> <O(|%additive)> }
 
 ## replication
 # Note: no word boundary check after x, relies on longest token for x2 xx2 etc
-token infix:sym<x> ( --> Replication)
-    { <sym> }
+token infix:sym<x>
+    { <sym> <O(|%replication)> }
 
-token infix:sym<xx> ( --> Replication)
-    { <sym> }
+token infix:sym<xx>
+    { <sym> <O(|%replication)> }
 
 ## concatenation
-token infix:sym<~> ( --> Concatenation)
-    { <sym> }
+token infix:sym<~>
+    { <sym> <O(|%concatenation)> }
 
 
 ## junctive and (all)
-token infix:sym<&> ( --> Junctive_and)
-    { <sym> }
+token infix:sym<&>
+    { <sym> <O(|%junctive_and)> }
 
-token infix:sym<also> ( --> Junctive_and)
-    { <sym> }
+token infix:sym<also>
+    { <sym> <O(|%junctive_and)> }
 
 
 ## junctive or (any)
-token infix:sym<|> ( --> Junctive_or)
-    { <sym> }
+token infix:sym<|>
+    { <sym> <O(|%junctive_or)> }
 
-token infix:sym<^> ( --> Junctive_or)
-    { <sym> }
+token infix:sym<^>
+    { <sym> <O(|%junctive_or)> }
 
 
 ## named unary examples
 # (need \s* to win LTM battle with listops)
-token prefix:sleep ( --> Named_unary)
-    { <sym> » <?before \s*> }
+token prefix:sleep
+    { <sym> » <?before \s*> <O(|%named_unary)> }
 
-token prefix:abs ( --> Named_unary)
-    { <sym> » <?before \s*> }
+token prefix:abs
+    { <sym> » <?before \s*> <O(|%named_unary)> }
 
-token prefix:let ( --> Named_unary)
-    { <sym> » <?before \s*> }
+token prefix:let
+    { <sym> » <?before \s*> <O(|%named_unary)> }
 
-token prefix:temp ( --> Named_unary)
-    { <sym> » <?before \s*> }
+token prefix:temp
+    { <sym> » <?before \s*> <O(|%named_unary)> }
 
 
 ## structural infix
-token infix:sym« <=> » ( --> Structural)
-    { <sym> <?{ $<O><returns> = "Order"; }> }
+token infix:sym« <=> »
+    { <sym> <O(|%structural, returns => 'Order')> }
 
-token infix:cmp ( --> Structural)
-    { <sym> <?{ $<O><returns> = "Order"; }> }
+token infix:cmp
+    { <sym> <O(|%structural, returns => 'Order')> }
 
-token infix:leg ( --> Structural)
-    { <sym> <?{ $<O><returns> = "Order"; }> }
+token infix:leg
+    { <sym> <O(|%structural, returns => 'Order')> }
 
-token infix:but ( --> Structural)
-    { <sym> }
+token infix:but
+    { <sym> <O(|%structural)> }
 
-token infix:does ( --> Structural)
-    { <sym> }
+token infix:does
+    { <sym> <O(|%structural)> }
 
-token infix:sym<..> ( --> Structural)
-    { <sym> [<!{ $*IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
+token infix:sym<..>
+    { <sym> [<!{ $*IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? <O(|%structural)> }
 
-token infix:sym<^..> ( --> Structural)
-    { <sym> }
+token infix:sym<^..>
+    { <sym> <O(|%structural)> }
 
-token infix:sym<..^> ( --> Structural)
-    { <sym> }
+token infix:sym<..^>
+    { <sym> <O(|%structural)> }
 
-token infix:sym<^..^> ( --> Structural)
-    { <sym> }
+token infix:sym<^..^>
+    { <sym> <O(|%structural)> }
 
 
 ## chaining binary
-token infix:sym<==> ( --> Chaining)
-    { <sym> <!before '=' > }
+token infix:sym<==>
+    { <sym> <!before '=' > <O(|%chaining)> }
 
-token infix:sym<!=> ( --> Chaining)
-    { <sym> <?before \s> }
+token infix:sym<!=>
+    { <sym> <?before \s> <O(|%chaining)> }
 
-token infix:sym« < » ( --> Chaining)
-    { <sym> }
+token infix:sym« < »
+    { <sym> <O(|%chaining)> }
 
-token infix:sym« <= » ( --> Chaining)
-    { <sym> }
+token infix:sym« <= »
+    { <sym> <O(|%chaining)> }
 
-token infix:sym« > » ( --> Chaining)
-    { <sym> }
+token infix:sym« > »
+    { <sym> <O(|%chaining)> }
 
-token infix:sym« >= » ( --> Chaining)
-    { <sym> }
+token infix:sym« >= »
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<~~> ( --> Chaining)
-    { <sym> }
+token infix:sym<~~>
+    { <sym> <O(|%chaining)> }
 
 # XXX should move to inside meta !
-token infix:sym<!~> ( --> Chaining)
-    { <sym> \s <.obs('!~ to do negated pattern matching', '!~~')> }
+token infix:sym<!~>
+    { <sym> \s <.obs('!~ to do negated pattern matching', '!~~')> <O(|%chaining)> }
 
-token infix:sym<=~> ( --> Chaining)
-    { <sym> <.obs('=~ to do pattern matching', '~~')> }
+token infix:sym<=~>
+    { <sym> <.obs('=~ to do pattern matching', '~~')> <O(|%chaining)> }
 
-token infix:sym<eq> ( --> Chaining)
-    { <sym> }
+token infix:sym<eq>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<ne> ( --> Chaining)
-    { <sym> }
+token infix:sym<ne>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<lt> ( --> Chaining)
-    { <sym> }
+token infix:sym<lt>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<le> ( --> Chaining)
-    { <sym> }
+token infix:sym<le>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<gt> ( --> Chaining)
-    { <sym> }
+token infix:sym<gt>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<ge> ( --> Chaining)
-    { <sym> }
+token infix:sym<ge>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<=:=> ( --> Chaining)
-    { <sym> }
+token infix:sym<=:=>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<===> ( --> Chaining)
-    { <sym> }
+token infix:sym<===>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<eqv> ( --> Chaining)
-    { <sym> }
+token infix:sym<eqv>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<before> ( --> Chaining)
-    { <sym> }
+token infix:sym<before>
+    { <sym> <O(|%chaining)> }
 
-token infix:sym<after> ( --> Chaining)
-    { <sym> }
+token infix:sym<after>
+    { <sym> <O(|%chaining)> }
 
 
 ## tight and
-token infix:sym<&&> ( --> Tight_and)
-    { <sym> }
+token infix:sym<&&>
+    { <sym> <O(|%tight_and)> }
 
 
 ## tight or
-token infix:sym<||> ( --> Tight_or)
-    { <sym> }
+token infix:sym<||>
+    { <sym> <O(|%tight_or)> }
 
-token infix:sym<^^> ( --> Tight_or)
-    { <sym> }
+token infix:sym<^^>
+    { <sym> <O(|%tight_or)> }
 
-token infix:sym<//> ( --> Tight_or)
-    { <sym> }
+token infix:sym<//>
+    { <sym> <O(|%tight_or)> }
 
-token infix:sym<min> ( --> Tight_or)
-    { <sym> }
+token infix:sym<min>
+    { <sym> <O(|%tight_or)> }
 
-token infix:sym<max> ( --> Tight_or)
-    { <sym> }
+token infix:sym<max>
+    { <sym> <O(|%tight_or)> }
 
 
 ## conditional
-token infix:sym<?? !!> ( --> Conditional) {
+token infix:sym<?? !!> {
     :my $*GOAL ::= '!!';
     '??'
     <.ws>
@@ -3990,7 +3901,7 @@ token infix:sym<?? !!> ( --> Conditional) {
         || <.panic: "Found ?? but no !!; possible precedence problem">
         ]
     ]
-    { $<O><_reducecheck> = 'raise_middle'; }
+    <O(|%conditional, _reducecheck => 'raise_middle')>
 }
 
 method raise_middle {
@@ -3998,32 +3909,32 @@ method raise_middle {
     self;
 }
 
-token infix:sym<?> ( --> Conditional)
-    { <sym> {} <!before '?'> <?before <-[;]>*?':'> <.obs('?: for the conditional operator', '??!!')> }
+token infix:sym<?>
+    { <sym> {} <!before '?'> <?before <-[;]>*?':'> <.obs('?: for the conditional operator', '??!!')> <O(|%conditional)> }
 
-token infix:sym<ff> ( --> Conditional)
-    { <sym> }
+token infix:sym<ff>
+    { <sym> <O(|%conditional)> }
 
-token infix:sym<^ff> ( --> Conditional)
-    { <sym> }
+token infix:sym<^ff>
+    { <sym> <O(|%conditional)> }
 
-token infix:sym<ff^> ( --> Conditional)
-    { <sym> }
+token infix:sym<ff^>
+    { <sym> <O(|%conditional)> }
 
-token infix:sym<^ff^> ( --> Conditional)
-    { <sym> }
+token infix:sym<^ff^>
+    { <sym> <O(|%conditional)> }
 
-token infix:sym<fff> ( --> Conditional)
-    { <sym> }
+token infix:sym<fff>
+    { <sym> <O(|%conditional)> }
 
-token infix:sym<^fff> ( --> Conditional)
-    { <sym> }
+token infix:sym<^fff>
+    { <sym> <O(|%conditional)> }
 
-token infix:sym<fff^> ( --> Conditional)
-    { <sym> }
+token infix:sym<fff^>
+    { <sym> <O(|%conditional)> }
 
-token infix:sym<^fff^> ( --> Conditional)
-    { <sym> }
+token infix:sym<^fff^>
+    { <sym> <O(|%conditional)> }
 
 ## assignment
 # There is no "--> type" because assignment may be coerced to either
@@ -4032,24 +3943,25 @@ token infix:sym<^fff^> ( --> Conditional)
 token infix:sym<=> ()
 {
     <sym>
-    { $¢ = $*LEFTSIGIL eq '$' 
-        ?? ::Item_assignment.coerce($¢)
-        !! ::List_assignment.coerce($¢);
-    }
+    [
+    || <?{ $*LEFTSIGIL eq '$' }>
+        <O(|%item_assignment)>
+    ||  <O(|%list_assignment)>
+    ]
 }
 
-token infix:sym<:=> ( --> Item_assignment)
-    { <sym> }
+token infix:sym<:=>
+    { <sym> <O(|%item_assignment)> }
 
-token infix:sym<::=> ( --> Item_assignment)
-    { <sym> }
+token infix:sym<::=>
+    { <sym> <O(|%item_assignment)> }
 
-token infix:sym<.=> ( --> Item_assignment) {
+token infix:sym<.=> {
     <sym>
-    {
-        $<O><nextterm> = 'dottyopish';
-        $<O><_reducecheck> = 'check_doteq';
-    }
+    <O(|%item_assignment,
+        nextterm => 'dottyopish',
+        _reducecheck => 'check_doteq'
+    )>
 }
 
 method check_doteq {
@@ -4072,50 +3984,50 @@ method check_doteq {
     self;
 }
 
-token infix:sym« => » ( --> Item_assignment)
-    { <sym> { $<O><fiddly> = 0; } }
+token infix:sym« => »
+    { <sym> <O(|%item_assignment, fiddly => 0)> }
 
 # Note, other assignment ops generated by infix_postfix_meta_operator rule
 
 ## loose unary
-token prefix:sym<true> ( --> Loose_unary)
-    { <sym> » }
+token prefix:sym<true>
+    { <sym> » <O(|%loose_unary)> }
 
-token prefix:sym<not> ( --> Loose_unary)
-    { <sym> » }
+token prefix:sym<not>
+    { <sym> » <O(|%loose_unary)> }
 
 ## list item separator
-token infix:sym<,> ( --> Comma)
-    { <sym> { $<O><fiddly> = 0; } }
+token infix:sym<,>
+    { <sym> <O(|%comma, fiddly => 0)> }
 
-token infix:sym<:> ( --> Comma)
+token infix:sym<:>
     { <sym> <?before \s | <terminator> >
         { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec; }
-    }
+    <O(|%comma)> }
 
-token infix:sym« p5=> » ( --> Comma)
-    { <sym> }
+token infix:sym« p5=> »
+    { <sym> <O(|%comma)> }
 
-token infix:sym<Z> ( --> List_infix)
-    { <sym> }
+token infix:sym<Z>
+    { <sym> <O(|%list_infix)> }
 
-token infix:sym<minmax> ( --> List_infix)
-    { <sym> }
+token infix:sym<minmax>
+    { <sym> <O(|%list_infix)> }
 
-token infix:sym<...> ( --> List_infix)
-    { <sym> }
+token infix:sym<...>
+    { <sym> <O(|%list_infix)> }
 
-token term:sym<...> ( --> List_prefix)
-    { <sym> <args>? }
+token term:sym<...>
+    { <sym> <args>? <O(|%list_prefix)> }
 
-token term:sym<???> ( --> List_prefix)
-    { <sym> <args>? }
+token term:sym<???>
+    { <sym> <args>? <O(|%list_prefix)> }
 
-token term:sym<!!!> ( --> List_prefix)
-    { <sym> <args>? }
+token term:sym<!!!>
+    { <sym> <args>? <O(|%list_prefix)> }
 
 # force identifier(), identifier.(), etc. to be a function call always
-token term:identifier ( --> Term )
+token term:identifier
 {
     :my $name;
     :my $pos;
@@ -4131,11 +4043,12 @@ token term:identifier ( --> Term )
             }
         }
     }}
+    <O(|%term)>
 }
 
-token term:opfunc ( --> Term )
+token term:opfunc
 {
-    <category> <colonpair>+ <args>
+    <category> <colonpair>+ <args> <O(|%term)>
 }
 
 token args ($istype = 0) {
@@ -4161,7 +4074,7 @@ token args ($istype = 0) {
 
 # names containing :: may or may not be function calls
 # bare identifier without parens also handled here if no other rule parses it
-token term:name ( --> Term)
+token term:name
 {
     :my $name;
     :my $pos;
@@ -4193,83 +4106,80 @@ token term:name ( --> Term)
             }
         }}
     ]
+    <O(%term)>
 }
 
 ## loose and
-token infix:sym<and> ( --> Loose_and)
-    { <sym> }
+token infix:sym<and>
+    { <sym> <O(|%loose_and)> }
 
-token infix:sym<andthen> ( --> Loose_and)
-    { <sym> }
+token infix:sym<andthen>
+    { <sym> <O(|%loose_and)> }
 
 ## loose or
-token infix:sym<or> ( --> Loose_or)
-    { <sym> }
+token infix:sym<or>
+    { <sym> <O(|%loose_or)> }
 
-token infix:sym<orelse> ( --> Loose_or)
-    { <sym> }
+token infix:sym<orelse>
+    { <sym> <O(|%loose_or)> }
 
-token infix:sym<xor> ( --> Loose_or)
-    { <sym> }
+token infix:sym<xor>
+    { <sym> <O(|%loose_or)> }
 
 ## sequencer
-token infix:sym« <== » ( --> Sequencer)
-    { <sym> }
+token infix:sym« <== »
+    { <sym> <O(|%sequencer)> }
 
-token infix:sym« ==> » ( --> Sequencer)
-    { <sym> }
+token infix:sym« ==> »
+    { <sym> <O(|%sequencer)> }
 
-token infix:sym« <<== » ( --> Sequencer)
-    { <sym> }
+token infix:sym« <<== »
+    { <sym> <O(|%sequencer)> }
 
-token infix:sym« ==>> » ( --> Sequencer)
-    { <sym> }
+token infix:sym« ==>> »
+    { <sym> <O(|%sequencer)> }
 
 ## expression terminator
 # Note: must always be called as <?terminator> or <?before ...<terminator>...>
 
-token terminator:sym<;> ( --> Terminator)
-    { ';' }
+token terminator:sym<;>
+    { ';' <O(|%terminator)> }
 
-token terminator:sym<if> ( --> Terminator)
-    { 'if' » <.nofun> }
+token terminator:sym<if>
+    { 'if' » <.nofun> <O(|%terminator)> }
 
-token terminator:sym<unless> ( --> Terminator)
-    { 'unless' » <.nofun> }
+token terminator:sym<unless>
+    { 'unless' » <.nofun> <O(|%terminator)> }
 
-token terminator:sym<while> ( --> Terminator)
-    { 'while' » <.nofun> }
+token terminator:sym<while>
+    { 'while' » <.nofun> <O(|%terminator)> }
 
-token terminator:sym<until> ( --> Terminator)
-    { 'until' » <.nofun> }
+token terminator:sym<until>
+    { 'until' » <.nofun> <O(|%terminator)> }
 
-token terminator:sym<for> ( --> Terminator)
-    { 'for' » <.nofun> }
+token terminator:sym<for>
+    { 'for' » <.nofun> <O(|%terminator)> }
 
-token terminator:sym<given> ( --> Terminator)
-    { 'given' » <.nofun> }
+token terminator:sym<given>
+    { 'given' » <.nofun> <O(|%terminator)> }
 
-token terminator:sym<when> ( --> Terminator)
-    { 'when' » <.nofun> }
+token terminator:sym<when>
+    { 'when' » <.nofun> <O(|%terminator)> }
 
-token terminator:sym« --> » ( --> Terminator)
-    { '-->' }
+token terminator:sym« --> »
+    { '-->' <O(|%terminator)> }
 
-token terminator:sym<)> ( --> Terminator)
-    { <sym> }
+token terminator:sym<)>
+    { <sym> <O(|%terminator)> }
 
-token terminator:sym<]> ( --> Terminator)
-    { ']' }
+token terminator:sym<]>
+    { ']' <O(|%terminator)> }
 
-token terminator:sym<}> ( --> Terminator)
-    { '}' }
+token terminator:sym<}>
+    { '}' <O(|%terminator)> }
 
-token terminator:sym<!!> ( --> Terminator)
-    { '!!' <?{ $*GOAL eq '!!' }> }
-
-# disallow &[] and such as infix
-# token infix:sigil ( --> Term )
-#     { <sigil><-[&]> <.worry: "Sigiled form not allowed where infix expected"> <!> }
+token terminator:sym<!!>
+    { '!!' <?{ $*GOAL eq '!!' }> <O(|%terminator)> }
 
 regex infixstopper {
     :dba('infix stopper')
@@ -4687,11 +4597,11 @@ grammar Regex is STD {
         <?before <stopper> >
     }
 
-    token regex_infix:sym<||> ( --> Tight_or ) { <sym> }
-    token regex_infix:sym<&&> ( --> Tight_and ) { <sym> }
-    token regex_infix:sym<|> ( --> Junctive_or ) { <sym> }
-    token regex_infix:sym<&> ( --> Junctive_and ) { <sym> }
-    token regex_infix:sym<~> ( --> Additive ) { <sym> }
+    token regex_infix:sym<||> { <sym> <O(|%tight_or)>  }
+    token regex_infix:sym<&&> { <sym> <O(|%tight_and)>  }
+    token regex_infix:sym<|> { <sym> <O(|%junctive_or)>  }
+    token regex_infix:sym<&> { <sym> <O(|%junctive_and)>  }
+    token regex_infix:sym<~> { <sym> <O(|%additive)>  }
 
     token quantified_atom {
         <!stopper>

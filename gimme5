@@ -770,6 +770,7 @@ END
 			$line .= "$ws    moose_extends(qw(@is)); " if @is;
 			$line .= "$ws    moose_with(qw(@does));" if @does;
 			$pkg_really{$1} = $PKG = "${PKG}::$1";
+			$ENDMATTER = '}';
 		    };
 
             $line =~ s/^(\s*)grammar (\w+)\s+(.*?)\{/${1}{ package ${PKG}::$2;\n$1    use Moose ':all' => { -prefix => "moose_" };\n$1     my \$retree;/

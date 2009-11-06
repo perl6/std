@@ -2349,6 +2349,23 @@ sub _AUTOLEXgen { my $self = shift;
 # Parser service routines
 #############################################################
 
+sub O {
+    my $self = shift;
+    my %args = @_;
+    @$self{keys %args} = values %args;
+    $self;
+}
+
+sub Opairs {
+    my $self = shift;
+    my $O = $self->{O} or return ();
+    my @ret;
+    for (my ($k,$v) = each %$O) {
+        push @ret, $k, $v;
+    }
+    @ret;
+}
+
 sub gettrait {
     my $self = shift;
     my $traitname = shift;
@@ -2535,24 +2552,22 @@ sub add_macro { my $lang = shift;
         # this should be delayed till the block start is seen
         my $coercion = '';
         if ($name =~ /^infix:/) {
-            $coercion = 'Additive';
+            $coercion = 'additive';
         }
         elsif ($name =~ /^prefix:/) {
             if ($sym =~ /^\W/) {
-                $coercion = 'Symbolic_unary';
+                $coercion = 'symbolic_unary';
             }
             else {
-                $coercion = 'Named_unary';
+                $coercion = 'named_unary';
             }
         }
         elsif ($name =~ /^postfix:/) {
-            $coercion = 'Methodcall';
+            $coercion = 'methodcall';
         }
         elsif ($name =~ /^term:/) {
-            $coercion = 'Term';
+            $coercion = 'term';
         }
-        my $COERCE = '';
-        $COERCE = " Cursor::lazymap sub { STD::$coercion->coerce(\$_[0]) }," if $coercion;
 
         state $genpkg = 'ANON000';
         $genpkg++;
@@ -2591,8 +2606,18 @@ sub $mangle {
     my \$S = \$self->{_pos};
     \$C->{'sym'} = \$sym;
 
-    \$self->_MATCHIFY(\$S, '$mangle',$COERCE
-        \$C->_SYM(\$sym, 0)
+    \$self->_MATCHIFY(\$S, '$mangle',
+        do {
+            if (my (\$C) = (\$C->_SYM(\$sym, 0))) {
+                \$C->_SUBSUMEr(['O'], sub {
+                    my \$C = shift;
+                    \$C->O(%STD::$coercion)
+                });
+            }
+            else {
+                ();
+            }
+        }
     );
 }
 1;

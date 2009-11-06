@@ -348,8 +348,8 @@ sub indent {
 	$r->{END} = $all[-1]{END} // $r->{BEG};
 	$r->{'.'} = \@all;
 
-	my $base = $match->{O}{kind} // $match->{sym} // 'termish';
-	$base =~ s/^STD:://;
+	my $base = ucfirst $match->{O}{dba} // $match->{sym} // 'termish';
+	$base =~ s/ /_/g;
 	$base =~ s/^/VAST::/;
 
 	my $class =
@@ -371,8 +371,8 @@ sub indent {
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
 
-	my $base = $match->{O}{kind} // $match->{sym} // 'termish';
-	$base =~ s/^STD:://;
+	my $base = ucfirst $match->{O}{dba} // $match->{sym} // 'termish';
+	$base =~ s/ /_/g;
 	$base =~ s/^/VAST::/;
 
 	my $class;
@@ -404,8 +404,8 @@ sub indent {
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
 
-	my $base = $match->{O}{kind} // $match->{sym} // 'termish';
-	$base =~ s/^STD:://;
+	my $base = ucfirst $match->{O}{dba} // $match->{sym} // 'termish';
+	$base =~ s/ /_/g;
 	$base =~ s/^/VAST::/;
 
 	my $class;
@@ -439,8 +439,8 @@ sub indent {
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
 
-	my $base = $match->{O}{kind} // $match->{sym} // 'termish';
-	$base =~ s/^STD:://;
+	my $base = ucfirst $match->{O}{dba} // $match->{sym} // 'termish';
+	$base =~ s/ /_/g;
 	$base =~ s/^/VAST::/;
 
 	my $class;
