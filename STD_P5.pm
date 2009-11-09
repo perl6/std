@@ -25,19 +25,20 @@ constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>,
 constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>);
 constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>);
 constant %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>);
-constant %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>);
-constant %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>);
-constant %shift           = (:dba('shift')           , :prec<s=>, :assoc<left>);
-constant %named_unary     = (:dba('named unary')     , :prec<r=>, :assoc<unary>, :uassoc<left>);
-constant %comparison      = (:dba('comparison')      , :prec<q=>, :assoc<non>, :diffy);
-constant %equality        = (:dba('equality')        , :prec<p=>, :assoc<chain>, :diffy, :iffy);
-constant %bitwise_and     = (:dba('bitwise and')     , :prec<o=>, :assoc<left>);
-constant %bitwise_or      = (:dba('bitwise or')      , :prec<n=>, :assoc<left>);
-constant %tight_and       = (:dba('tight and')       , :prec<m=>, :assoc<left>);
-constant %tight_or        = (:dba('tight or')        , :prec<l=>, :assoc<left>);
-constant %range           = (:dba('range')           , :prec<k=>, :assoc<right>, :fiddly);
-constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :fiddly);
-constant %assignment      = (:dba('assignment')      , :prec<i=>, :assoc<right>);
+constant %binding         = (:dba('binding')         , :prec<u=>, :assoc<unary>, :uassoc<left>);
+constant %multiplicative  = (:dba('multiplicative')  , :prec<t=>, :assoc<left>);
+constant %additive        = (:dba('additive')        , :prec<s=>, :assoc<left>);
+constant %shift           = (:dba('shift')           , :prec<r=>, :assoc<left>);
+constant %named_unary     = (:dba('named unary')     , :prec<q=>, :assoc<unary>, :uassoc<left>);
+constant %comparison      = (:dba('comparison')      , :prec<p=>, :assoc<non>, :diffy);
+constant %equality        = (:dba('equality')        , :prec<o=>, :assoc<chain>, :diffy, :iffy);
+constant %bitwise_and     = (:dba('bitwise and')     , :prec<n=>, :assoc<left>);
+constant %bitwise_or      = (:dba('bitwise or')      , :prec<m=>, :assoc<left>);
+constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<left>);
+constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<left>);
+constant %range           = (:dba('range')           , :prec<j=>, :assoc<right>, :fiddly);
+constant %conditional     = (:dba('conditional')     , :prec<i=>, :assoc<right>, :fiddly);
+constant %assignment      = (:dba('assignment')      , :prec<h=>, :assoc<right>);
 constant %comma           = (:dba('comma operator')  , :prec<g=>, :assoc<left>, :nextterm<nulltermish>, :fiddly);
 constant %listop          = (:dba('list operator')   , :prec<f=>, :assoc<unary>, :uassoc<left>);
 constant %loose_not       = (:dba('not operator')    , :prec<e=>, :assoc<unary>, :uassoc<left>);
@@ -2696,19 +2697,8 @@ rule p5statement_prefix:eval    {<sym> <block> }
 #########
 
 # start playing with the setting stubber
-token p5term:YOU_ARE_HERE ( --> Term) {
-    <sym> <.you_are_here>
-}
 
-token p5term:new ( --> Term) {
-    'new' \h+ <longname> \h* <!before ':'> <.obs("C++ constructor syntax", "method call syntax")>
-}
-
-token p5term:sym<::?IDENT> ( --> Term) {
-    $<sym> = [ '::?' <identifier> ] »
-}
-
-token p5term:sym<undef> ( --> Term) {
+token p5term:sym<undef> {
     <sym> »
     [ <?before \h*'$/' >
         <.obs('$/ variable as input record separator',
@@ -2717,65 +2707,20 @@ token p5term:sym<undef> ( --> Term) {
     [ <?before \h*<sigil=p5sigil>\w >
         <.obs('undef as a verb', 'undefine function')>
     ]?
+    <O(|%term)>
 }
 
-token p5term:sym<continue> ( --> Term)
-    { <sym> » }
+token p5term:sym<continue>
+    { <sym> » <O(|%term)> }
 
-token p5term:sym<self> ( --> Term)
-    { <sym> » }
+token p5circumfix:sigil
+    { :dba('contextualizer') <sigil=p5sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> }
 
-token p5term:sym<defer> ( --> Term)
-    { <sym> » }
+token p5circumfix:sym<( )>
+    { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
 
-token p5term:rand ( --> Term) {
-    <sym> »
-    [ <?before '('? \h* [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]?
-    [ <?before '()'> <.obs('rand()', 'rand')> ]?
-}
-
-token p5term:Inf ( --> Term)
-    { <sym> » }
-
-token p5term:NaN ( --> Term)
-    { <sym> » }
-
-token p5term:sym<*> ( --> Term)
-    { <sym> }
-
-token p5term:sym<**> ( --> Term)
-    { <sym> }
-
-token p5infix:lambda ( --> Term) {
-    <?before '{' | '->' > <!{ $*IN_META }> {{
-        my $line = $¢.lineof($¢.pos);
-        for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when', 'sub' {
-            my $m = %*MYSTERY{$_};
-            next unless $m;
-            if $line - ($m.<line>//-123) < 5 {
-                if $m.<ctx> eq '(' {
-                    $¢.panic($_ ~ '() interpreted as postdeclared function call at line ' ~ $m.<line> ~
-                    "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
-                }
-                else {
-                    $¢.panic("'$_' interpreted as postdeclared listop at line " ~ $m.<line> ~
-                    "; please use 'do' to introduce statement_control:<$_>.\nUnexpected block in infix position (two terms in a row)");
-                }
-            }
-        }
-        return () if $*IN_REDUCE;
-        $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
-    }}
-}
-
-token p5circumfix:sigil ( --> Term)
-    { :dba('contextualizer') <sigil=p5sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } }
-
-token p5circumfix:sym<( )> ( --> Term)
-    { :dba('parenthesized expression') '(' ~ ')' <semilist> }
-
-token p5circumfix:sym<[ ]> ( --> Term)
-    { :dba('array composer') '[' ~ ']' <semilist> }
+token p5circumfix:sym<[ ]>
+    { :dba('array composer') '[' ~ ']' <semilist> <O(|%term)> }
 
 #############
 # Operators #
@@ -2802,9 +2747,9 @@ token infixish ($in_meta = $*IN_META) {
     { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
 }
 
-token p5dotty:sym«->» ( --> Methodcall) {
+token p5dotty:sym«->» {
     <sym> <dottyop>
-}
+<O(|%methodcall)> }
 
 token dottyopish {
     <term=dottyop>
@@ -2834,16 +2779,16 @@ token POST {
     ]
 }
 
-token p5postcircumfix:sym<( )> ( --> Methodcall)
-    { :dba('argument list') '(' ~ ')' <semiarglist> }
+token p5postcircumfix:sym<( )>
+    { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
 
-token p5postcircumfix:sym<[ ]> ( --> Methodcall)
-    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } }
+token p5postcircumfix:sym<[ ]>
+    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
 
-token p5postcircumfix:sym<{ }> ( --> Methodcall)
-    { :dba('subscript') '{' ~ '}' <semilist> }
+token p5postcircumfix:sym<{ }>
+    { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> }
 
-token p5postcircumfix:sym«< >» ( --> Methodcall) {
+token p5postcircumfix:sym«< >» {
     :my $pos;
     '<'
     { $pos = $¢.pos }
@@ -2853,13 +2798,13 @@ token p5postcircumfix:sym«< >» ( --> Methodcall) {
        { $¢.cursor_force($pos).panic("Whitespace required before < operator") }
     || { $¢.cursor_force($pos).panic("Unable to parse quote-words subscript; couldn't find right angle quote") }
     ]
-}
+<O(|%methodcall)> }
 
-token p5postcircumfix:sym«<< >>» ( --> Methodcall)
-    { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
+token p5postcircumfix:sym«<< >>»
+    { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
 
-token p5postcircumfix:sym<« »> ( --> Methodcall)
-    { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] }
+token p5postcircumfix:sym<« »>
+    { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
 
 token postop {
     | <postfix=p5postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
@@ -2905,7 +2850,7 @@ token arglist {
     ]
 }
 
-token p5term:lambda ( --> Term) {
+token p5term:lambda {
     <?before <.lambda> >
     <pblock>
     {{
@@ -2913,9 +2858,9 @@ token p5term:lambda ( --> Term) {
             $*BORG.<block> = $<pblock>;
         }
     }}
-}
+<O(|%term)> }
 
-token p5circumfix:sym<{ }> ( --> Term) {
+token p5circumfix:sym<{ }> {
     <?before '{' >
     <pblock>
     {{
@@ -2923,12 +2868,12 @@ token p5circumfix:sym<{ }> ( --> Term) {
             $*BORG.<block> = $<pblock>;
         }
     }}
-}
+<O(|%term)> }
 
 ## methodcall
 
-token p5postfix:sym<i> ( --> Methodcall)
-    { <sym> » }
+token p5postfix:sym<i>
+    { <sym> » <O(|%methodcall)> }
 
 token p5infix:sym<.> ()
     { '.' <[\]\)\},:\s\$"']> <.obs('. to concatenate strings', '~')> }
@@ -2937,295 +2882,256 @@ token p5postfix:sym['->'] ()
     { '->' <.obs('-> to call a method', '.')> }
 
 ## autoincrement
-token p5postfix:sym<++> ( --> Autoincrement)
-    { <sym> }
+token p5postfix:sym<++>
+    { <sym> <O(|%autoincrement)> }
 
-token p5postfix:sym<--> ( --> Autoincrement)
-    { <sym> }
+token p5postfix:sym«--»
+    { <sym> <O(|%autoincrement)> }
 
-token p5prefix:sym<++> ( --> Autoincrement)
-    { <sym> }
+token p5prefix:sym<++>
+    { <sym> <O(|%autoincrement)> }
 
-token p5prefix:sym<--> ( --> Autoincrement)
-    { <sym> }
+token p5prefix:sym«--»
+    { <sym> <O(|%autoincrement)> }
 
 ## exponentiation
-token p5infix:sym<**> ( --> Exponentiation)
-    { <sym> }
+token p5infix:sym<**>
+    { <sym> <O(|%exponentiation)> }
 
 ## symbolic unary
-token p5prefix:sym<!> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<!>
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<+> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<+>
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<-> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<->
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<~~> ( --> Symbolic_unary)
-    { <sym> <.badinfix> }
+token p5prefix:sym<~~>
+    { <sym> <.badinfix> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<~> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<~>
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<??> ( --> Symbolic_unary)
-    { <sym> <.badinfix> }
+token p5prefix:sym<??>
+    { <sym> <.badinfix> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<?> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<?>
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<~^> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<~^>
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<+^> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<+^>
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<?^> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<?^>
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<^^> ( --> Symbolic_unary)
-    { <sym> <.badinfix> }
+token p5prefix:sym<^^>
+    { <sym> <.badinfix> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<^> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<^>
+    { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<||> ( --> Symbolic_unary)
-    { <sym> <.badinfix> }
+token p5prefix:sym<||>
+    { <sym> <.badinfix> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<|> ( --> Symbolic_unary)
-    { <sym> }
+token p5prefix:sym<|>
+    { <sym> <O(|%symbolic_unary)> }
+
+
+## binding
+token p5infix:sym<!~>
+    { <sym> <O(|%binding)> }
+
+token p5infix:sym<=~>
+    { <sym> <.obs('=~ to do pattern matching', '~~')> <O(|%binding)> }
 
 
 ## multiplicative
-token p5infix:sym<*> ( --> Multiplicative)
-    { <sym> }
+token p5infix:sym<*>
+    { <sym> <O(|%multiplicative)> }
 
-token p5infix:sym</> ( --> Multiplicative)
-    { <sym> }
+token p5infix:sym</>
+    { <sym> <O(|%multiplicative)> }
 
-token p5infix:sym<div> ( --> Multiplicative)
-    { <sym> }
+token p5infix:sym<div>
+    { <sym> <O(|%multiplicative)> }
 
-token p5infix:sym<%> ( --> Multiplicative)
-    { <sym> <?{ $<O><iffy> = 1; }> }   # Allow !% operator
+token p5infix:sym<%>
+    { <sym> <?{ $<O><iffy> = 1; }> <O(|%multiplicative)> }   # Allow !% operator
 
-token p5infix:sym<mod> ( --> Multiplicative)
-    { <sym> }
+token p5infix:sym<mod>
+    { <sym> <O(|%multiplicative)> }
 
-token p5infix:sym<+&> ( --> Multiplicative)
-    { <sym> }
+token p5infix:sym<+&>
+    { <sym> <O(|%multiplicative)> }
 
-token p5infix:sym« +< » ( --> Multiplicative)
-    { <sym> <!before '<'> }
+token p5infix:sym« +< »
+    { <sym> <!before '<'> <O(|%multiplicative)> }
 
-token p5infix:sym« << » ( --> Multiplicative)
-    { <sym> \s <.obs('<< to do left shift', '+< or ~<')> }
+token p5infix:sym« << »
+    { <sym> \s <.obs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
 
-token p5infix:sym« >> » ( --> Multiplicative)
-    { <sym> \s <.obs('>> to do right shift', '+> or ~>')> }
+token p5infix:sym« >> »
+    { <sym> \s <.obs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
 
-token p5infix:sym« +> » ( --> Multiplicative)
-    { <sym> <!before '>'> }
+token p5infix:sym« +> »
+    { <sym> <!before '>'> <O(|%multiplicative)> }
 
-token p5infix:sym<~&> ( --> Multiplicative)
-    { <sym> }
+token p5infix:sym<~&>
+    { <sym> <O(|%multiplicative)> }
 
-token p5infix:sym<?&> ( --> Multiplicative)
-    { <sym> }
+token p5infix:sym<?&>
+    { <sym> <O(|%multiplicative)> }
 
-token p5infix:sym« ~< » ( --> Multiplicative)
-    { <sym> <!before '<'> }
+token p5infix:sym« ~< »
+    { <sym> <!before '<'> <O(|%multiplicative)> }
 
-token p5infix:sym« ~> » ( --> Multiplicative)
-    { <sym> <!before '>'> }
+token p5infix:sym« ~> »
+    { <sym> <!before '>'> <O(|%multiplicative)> }
+
+token p5infix:sym<x>
+    { <sym> <O(|%multiplicative)> }
 
 
 ## additive
-token p5infix:sym<+> ( --> Additive)
-    { <sym> }
+token p5infix:sym<+>
+    { <sym> <O(|%additive)> }
 
-token p5infix:sym<-> ( --> Additive)
-    { <sym> }
+token p5infix:sym<->
+    { <sym> <O(|%additive)> }
 
-token p5infix:sym<+|> ( --> Additive)
-    { <sym> }
+token p5infix:sym<+|>
+    { <sym> <O(|%additive)> }
 
-token p5infix:sym<+^> ( --> Additive)
-    { <sym> }
+token p5infix:sym<+^>
+    { <sym> <O(|%additive)> }
 
-token p5infix:sym<~|> ( --> Additive)
-    { <sym> }
+token p5infix:sym<~|>
+    { <sym> <O(|%additive)> }
 
-token p5infix:sym<~^> ( --> Additive)
-    { <sym> }
+token p5infix:sym<~^>
+    { <sym> <O(|%additive)> }
 
-token p5infix:sym<?|> ( --> Additive)
-    { <sym> }
+token p5infix:sym<?|>
+    { <sym> <O(|%additive)> }
 
-token p5infix:sym<?^> ( --> Additive)
-    { <sym> }
+token p5infix:sym<?^>
+    { <sym> <O(|%additive)> }
 
-## replication
-# Note: no word boundary check after x, relies on longest token for x2 xx2 etc
-token p5infix:sym<x> ( --> Replication)
-    { <sym> }
+token p5infix:sym<~>
+    { <sym> <O(|%additive)> }
 
-token p5infix:sym<xx> ( --> Replication)
-    { <sym> }
+## bitwise and (all)
+token p5infix:sym<&>
+    { <sym> <O(|%bitwise_and)> }
 
-## concatenation
-token p5infix:sym<~> ( --> Concatenation)
-    { <sym> }
+token p5infix:sym<also>
+    { <sym> <O(|%bitwise_and)> }
 
 
-## junctive and (all)
-token p5infix:sym<&> ( --> Junctive_and)
-    { <sym> }
+## bitwise or (any)
+token p5infix:sym<|>
+    { <sym> <O(|%bitwise_or)> }
 
-token p5infix:sym<also> ( --> Junctive_and)
-    { <sym> }
-
-
-## junctive or (any)
-token p5infix:sym<|> ( --> Junctive_or)
-    { <sym> }
-
-token p5infix:sym<^> ( --> Junctive_or)
-    { <sym> }
+token p5infix:sym<^>
+    { <sym> <O(|%bitwise_or)> }
 
 
 ## named unary examples
 # (need \s* to win LTM battle with listops)
-token p5prefix:sleep ( --> Named_unary)
-    { <sym> » <?before \s*> }
+token p5prefix:sleep
+    { <sym> » <?before \s*> <O(|%named_unary)> }
 
-token p5prefix:abs ( --> Named_unary)
-    { <sym> » <?before \s*> }
+token p5prefix:abs
+    { <sym> » <?before \s*> <O(|%named_unary)> }
 
-token p5prefix:let ( --> Named_unary)
-    { <sym> » <?before \s*> }
+token p5prefix:let
+    { <sym> » <?before \s*> <O(|%named_unary)> }
 
-token p5prefix:temp ( --> Named_unary)
-    { <sym> » <?before \s*> }
+token p5prefix:temp
+    { <sym> » <?before \s*> <O(|%named_unary)> }
 
+token p5infix:sym« <=> »
+    { <sym> <?{ $<O><returns> = "Order"; }> <O(|%comparison)> }
 
-## structural infix
-token p5infix:sym« <=> » ( --> Structural)
-    { <sym> <?{ $<O><returns> = "Order"; }> }
-
-token p5infix:cmp ( --> Structural)
-    { <sym> <?{ $<O><returns> = "Order"; }> }
-
-token p5infix:leg ( --> Structural)
-    { <sym> <?{ $<O><returns> = "Order"; }> }
-
-token p5infix:but ( --> Structural)
-    { <sym> }
-
-token p5infix:does ( --> Structural)
-    { <sym> }
-
-token p5infix:sym<..> ( --> Structural)
-    { <sym> [<!{ $*IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? }
-
-token p5infix:sym<^..> ( --> Structural)
-    { <sym> }
-
-token pp55infix:sym<..^> ( --> Structural)
-    { <sym> }
-
-token p5infix:sym<^..^> ( --> Structural)
-    { <sym> }
+token p5infix:cmp
+    { <sym> <?{ $<O><returns> = "Order"; }> <O(|%comparison)> }
 
 
-## chaining binary
-token p5infix:sym<==> ( --> Chaining)
-    { <sym> <!before '=' > }
+token p5infix:sym« < »
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym<!=> ( --> Chaining)
-    { <sym> <?before \s> }
+token p5infix:sym« <= »
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym« < » ( --> Chaining)
-    { <sym> }
+token p5infix:sym« > »
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym« <= » ( --> Chaining)
-    { <sym> }
+token p5infix:sym« >= »
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym« > » ( --> Chaining)
-    { <sym> }
+token p5infix:sym<~~>
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym« >= » ( --> Chaining)
-    { <sym> }
+token p5infix:sym<eq>
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym<~~> ( --> Chaining)
-    { <sym> }
+token p5infix:sym<ne>
+    { <sym> <O(|%comparison)> }
 
-# XXX should move to inside meta !
-token p5infix:sym<!~> ( --> Chaining)
-    { <sym> \s <.obs('!~ to do negated pattern matching', '!~~')> }
+token p5infix:sym<lt>
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym<=~> ( --> Chaining)
-    { <sym> <.obs('=~ to do pattern matching', '~~')> }
+token p5infix:sym<le>
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym<eq> ( --> Chaining)
-    { <sym> }
+token p5infix:sym<gt>
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym<ne> ( --> Chaining)
-    { <sym> }
+token p5infix:sym<ge>
+    { <sym> <O(|%comparison)> }
 
-token p5infix:sym<lt> ( --> Chaining)
-    { <sym> }
+## equality
+token p5infix:sym<==>
+    { <sym> <!before '=' > <O(|%equality)> }
 
-token p5infix:sym<le> ( --> Chaining)
-    { <sym> }
-
-token p5infix:sym<gt> ( --> Chaining)
-    { <sym> }
-
-token p5infix:sym<ge> ( --> Chaining)
-    { <sym> }
-
-token p5infix:sym<=:=> ( --> Chaining)
-    { <sym> }
-
-token p5infix:sym<===> ( --> Chaining)
-    { <sym> }
-
-token p5infix:sym<eqv> ( --> Chaining)
-    { <sym> }
-
-token p5infix:sym<before> ( --> Chaining)
-    { <sym> }
-
-token p5infix:sym<after> ( --> Chaining)
-    { <sym> }
-
+token p5infix:sym<!=>
+    { <sym> <?before \s> <O(|%equality)> }
 
 ## tight and
-token p5infix:sym<&&> ( --> Tight_and)
-    { <sym> }
+token p5infix:sym<&&>
+    { <sym> <O(|%tight_and)> }
 
 
 ## tight or
-token p5infix:sym<||> ( --> Tight_or)
-    { <sym> }
+token p5infix:sym<||>
+    { <sym> <O(|%tight_or)> }
 
-token p5infix:sym<^^> ( --> Tight_or)
-    { <sym> }
+token p5infix:sym<^^>
+    { <sym> <O(|%tight_or)> }
 
-token p5infix:sym<//> ( --> Tight_or)
-    { <sym> }
+token p5infix:sym<//>
+    { <sym> <O(|%tight_or)> }
 
-token p5infix:sym<min> ( --> Tight_or)
-    { <sym> }
+token p5infix:sym<min>
+    { <sym> <O(|%tight_or)> }
 
-token p5infix:sym<max> ( --> Tight_or)
-    { <sym> }
+token p5infix:sym<max>
+    { <sym> <O(|%tight_or)> }
 
+
+token p5infix:sym<..>
+    { <sym> <O(|%range)> }
+
+token p5infix:sym<...>
+    { <sym> <O(|%range)> }
 
 ## conditional
-token p5infix:sym<?? !!> ( --> Conditional) {
+token p5infix:sym<?? !!> {
     :my $*GOAL ::= '!!';
     '??'
     <.ws>
@@ -3240,66 +3146,46 @@ token p5infix:sym<?? !!> ( --> Conditional) {
         ]
     ]
     { $<O><_reducecheck> = 'raise_middle'; }
-}
+<O(|%conditional)> }
 
 method raise_middle {
     self.<middle> = self.<infix><EXPR>;
     self;
 }
 
-token p5infix:sym<?> ( --> Conditional)
-    { <sym> {} <!before '?'> <?before <-[;]>*?':'> <.obs('?: for the conditional operator', '??!!')> }
+token p5infix:sym<?>
+    { <sym> {} <!before '?'> <?before <-[;]>*?':'> <.obs('?: for the conditional operator', '??!!')> <O(|%conditional)> }
 
-token p5infix:sym<ff> ( --> Conditional)
-    { <sym> }
+token p5infix:sym<ff>
+    { <sym> <O(|%conditional)> }
 
-token p5infix:sym<^ff> ( --> Conditional)
-    { <sym> }
+token p5infix:sym<^ff>
+    { <sym> <O(|%conditional)> }
 
-token p5infix:sym<ff^> ( --> Conditional)
-    { <sym> }
+token p5infix:sym<ff^>
+    { <sym> <O(|%conditional)> }
 
-token p5infix:sym<^ff^> ( --> Conditional)
-    { <sym> }
+token p5infix:sym<^ff^>
+    { <sym> <O(|%conditional)> }
 
-token p5infix:sym<fff> ( --> Conditional)
-    { <sym> }
+token p5infix:sym<fff>
+    { <sym> <O(|%conditional)> }
 
-token p5infix:sym<^fff> ( --> Conditional)
-    { <sym> }
+token p5infix:sym<^fff>
+    { <sym> <O(|%conditional)> }
 
-token p5infix:sym<fff^> ( --> Conditional)
-    { <sym> }
+token p5infix:sym<fff^>
+    { <sym> <O(|%conditional)> }
 
-token p5infix:sym<^fff^> ( --> Conditional)
-    { <sym> }
+token p5infix:sym<^fff^>
+    { <sym> <O(|%conditional)> }
 
 ## assignment
 # There is no "--> type" because assignment may be coerced to either
 # item assignment or list assignment at "make" time.
 
 token p5infix:sym<=> ()
-{
-    <sym>
-    { $¢ = $*LEFTSIGIL eq '$' 
-        ?? ::Item_assignment.coerce($¢)
-        !! ::List_assignment.coerce($¢);
-    }
-}
-
-token p5infix:sym<:=> ( --> Item_assignment)
-    { <sym> }
-
-token p5infix:sym<::=> ( --> Item_assignment)
-    { <sym> }
-
-token p5infix:sym<.=> ( --> Item_assignment) {
-    <sym>
-    {
-        $<O><nextterm> = 'dottyopish';
-        $<O><_reducecheck> = 'check_doteq';
-    }
-}
+    { <sym> <O(|%assignment)> }
 
 method check_doteq {
     # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || ]
@@ -3321,48 +3207,15 @@ method check_doteq {
     self;
 }
 
-token p5infix:sym« => » ( --> Item_assignment)
-    { <sym> { $<O><fiddly> = 0; } }
-
-## loose unary
-token p5prefix:sym<true> ( --> Loose_unary)
-    { <sym> » }
-
-token p5prefix:sym<not> ( --> Loose_unary)
-    { <sym> » }
-
 ## list item separator
-token p5infix:sym<,> ( --> Comma)
-    { <sym> { $<O><fiddly> = 0; } }
+token p5infix:sym<,>
+    { <sym> { $<O><fiddly> = 0; } <O(|%comma)> }
 
-token p5infix:sym<:> ( --> Comma)
-    { <sym> <?before \s | <p5terminator> >
-        { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK--; }
-    }
-
-token p5infix:sym« p5=> » ( --> Comma)
-    { <sym> }
-
-token p5infix:sym<Z> ( --> List_infix)
-    { <sym> }
-
-token p5infix:sym<minmax> ( --> List_infix)
-    { <sym> }
-
-token p5infix:sym<...> ( --> List_infix)
-    { <sym> }
-
-token p5term:sym<...> ( --> List_prefix)
-    { <sym> <args>? }
-
-token p5term:sym<???> ( --> List_prefix)
-    { <sym> <args>? }
-
-token p5term:sym<!!!> ( --> List_prefix)
-    { <sym> <args>? }
+token p5infix:sym« => »
+    { <sym> { $<O><fiddly> = 0; } <O(|%comma)> }
 
 # force identifier(), identifier.(), etc. to be a function call always
-token p5term:identifier ( --> Term )
+token p5term:identifier
 {
     :my $name;
     :my $pos;
@@ -3378,12 +3231,12 @@ token p5term:identifier ( --> Term )
             }
         }
     }}
-}
+<O(|%term)>  }
 
-token p5term:opfunc ( --> Term )
+token p5term:opfunc
 {
     <category> <colonpair>+ <args>
-}
+<O(|%term)>  }
 
 token args ($istype = 0) {
     :my $listopish = 0;
@@ -3408,7 +3261,7 @@ token args ($istype = 0) {
 
 # names containing :: may or may not be function calls
 # bare identifier without parens also handled here if no other rule parses it
-token p5term:name ( --> Term)
+token p5term:name
 {
     :my $name;
     :my $pos;
@@ -3440,83 +3293,70 @@ token p5term:name ( --> Term)
             }
         }}
     ]
-}
+<O(|%term)> }
 
 ## loose and
-token p5infix:sym<and> ( --> Loose_and)
-    { <sym> }
+token p5infix:sym<and>
+    { <sym> <O(|%loose_and)> }
 
-token p5infix:sym<andthen> ( --> Loose_and)
-    { <sym> }
+token p5infix:sym<andthen>
+    { <sym> <O(|%loose_and)> }
 
 ## loose or
-token p5infix:sym<or> ( --> Loose_or)
-    { <sym> }
+token p5infix:sym<or>
+    { <sym> <O(|%loose_or)> }
 
-token p5infix:sym<orelse> ( --> Loose_or)
-    { <sym> }
+token p5infix:sym<orelse>
+    { <sym> <O(|%loose_or)> }
 
-token p5infix:sym<xor> ( --> Loose_or)
-    { <sym> }
-
-## sequencer
-token p5infix:sym« <== » ( --> Sequencer)
-    { <sym> }
-
-token p5infix:sym« ==> » ( --> Sequencer)
-    { <sym> }
-
-token p5infix:sym« <<== » ( --> Sequencer)
-    { <sym> }
-
-token p5infix:sym« ==>> » ( --> Sequencer)
-    { <sym> }
+token p5infix:sym<xor>
+    { <sym> <O(|%loose_or)> }
 
 ## expression terminator
 # Note: must always be called as <?terminator> or <?before ...<p5terminator>...>
 
-token p5terminator:sym<;> ( --> Terminator)
-    { ';' }
+token p5terminator:sym<;>
+    { ';' <O(|%terminator)> }
 
-token p5terminator:sym<if> ( --> Terminator)
-    { 'if' » <.nofun> }
+token p5terminator:sym<if>
+    { 'if' » <.nofun> <O(|%terminator)> }
 
-token p5terminator:sym<unless> ( --> Terminator)
-    { 'unless' » <.nofun> }
+token p5terminator:sym<unless>
+    { 'unless' » <.nofun> <O(|%terminator)> }
 
-token p5terminator:sym<while> ( --> Terminator)
-    { 'while' » <.nofun> }
+token p5terminator:sym<while>
+    { 'while' » <.nofun> <O(|%terminator)> }
 
-token p5terminator:sym<until> ( --> Terminator)
-    { 'until' » <.nofun> }
+token p5terminator:sym<until>
+    { 'until' » <.nofun> <O(|%terminator)> }
 
-token p5terminator:sym<for> ( --> Terminator)
-    { 'for' » <.nofun> }
+token p5terminator:sym<for>
+    { 'for' » <.nofun> <O(|%terminator)> }
 
-token p5terminator:sym<given> ( --> Terminator)
-    { 'given' » <.nofun> }
+token p5terminator:sym<given>
+    { 'given' » <.nofun> <O(|%terminator)> }
 
-token p5terminator:sym<when> ( --> Terminator)
-    { 'when' » <.nofun> }
+token p5terminator:sym<when>
+    { 'when' » <.nofun> <O(|%terminator)> }
 
-token p5terminator:sym« --> » ( --> Terminator)
-    { '-->' }
+token p5terminator:sym« --> »
+    { '-->' <O(|%terminator)> }
 
-token p5terminator:sym<)> ( --> Terminator)
-    { <sym> }
+token p5terminator:sym<)>
+    { <sym> <O(|%terminator)> }
 
-token p5terminator:sym<]> ( --> Terminator)
-    { ']' }
+token p5terminator:sym<]>
+    { ']' <O(|%terminator)> }
 
-token p5terminator:sym<}> ( --> Terminator)
-    { '}' }
+token p5terminator:sym<}>
+    { '}' <O(|%terminator)> }
 
-token p5terminator:sym<!!> ( --> Terminator)
-    { '!!' <?{ $*GOAL eq '!!' }> }
+token p5terminator:sym<!!>
+    { '!!' <?{ $*GOAL eq '!!' }> <O(|%terminator)> }
 
 # disallow &[] and such as infix
-# token p5infix:sigil ( --> Term )
-#     { <sigil=p5sigil><-[&]> <.worry: "Sigiled form not allowed where infix expected"> <!> }
+# token p5infix:sigil
+#     { <sigil=p5sigil><-[&]> <.worry: "Sigiled form not allowed where infix expected"> <!> <O(|%term)>  }
 
 regex infixstopper {
     :dba('infix stopper')
@@ -3608,7 +3448,7 @@ grammar Regex is STD {
         <?before <stopper> >
     }
 
-    token p5regex_infix:sym<|> ( --> Junctive_or ) { <sym> }
+    token p5regex_infix:sym<|> { <sym> <O(|%tight_or)>  }
 
     token quantified_atom {
         <!stopper>
