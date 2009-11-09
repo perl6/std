@@ -1101,6 +1101,7 @@ rule package_def {
                         say "added my " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
                     }
                 }
+                $*begin_compunit = 0;
             }}
             <block>
             ]
