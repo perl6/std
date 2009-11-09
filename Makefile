@@ -22,11 +22,11 @@ snap: $(FIXINS) check lex/STD/termish
 	mv snap.new snap
 
 STD_P5.pmc: STD_P5.pm gimme5
-	./gimme5 $< >STD_P5.pm5
+	perl gimme5 $< >STD_P5.pm5
 	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD_P5.pm5 >$@
 
 STD.pmc: STD.pm gimme5
-	./gimme5 $< >STD.pm5
+	perl gimme5 $< >STD.pm5
 	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD.pm5 >$@
 	rm -rf lex *.pad.store
 
