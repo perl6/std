@@ -51,100 +51,6 @@ constant %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
 #constant $LOOSEST = %LOOSEST<prec>;
 constant $LOOSEST = "a=!"; # XXX preceding line is busted
 
-role PrecOp {
-
-    # This is hopefully called on a match to mix in operator info by type.
-    method coerce (Match $m) {
-        # $m but= ::?CLASS;
-        my $var = self.WHAT ~ '::o';
-        my $d = %::($var); 
-        if not $d<transparent> {
-            for keys(%$d) { $m<O>{$_} //= $d.{$_} };
-            $m.deb("coercing to " ~ self) if $*DEBUG +& DEBUG::EXPR;
-        }
-        $m<O><kind> = self.WHAT;
-        return $m;
-    }
-
-} # end role
-
-class Transparent does PrecOp {
- our %o = (:transparent);
-} # end class
-
-class Term does PrecOp {
-    our %o = %term;
-} # end class
-class Methodcall does PrecOp {
-    our %o = %methodcall;
-} # end class
-class Autoincrement does PrecOp {
-    our %o = %autoincrement;
-} # end class
-class Exponentiation does PrecOp {
-    our %o = %exponentiation;
-} # end class
-class Symbolic_unary does PrecOp {
-    our %o = %symbolic_unary;
-} # end class
-class Multiplicative does PrecOp {
-    our %o = %multiplicative;
-} # end class
-class Additive does PrecOp {
-    our %o = %additive;
-} # end class
-class Shift does PrecOp {
-    our %o = %shift;
-} # end class
-class Named_unary does PrecOp {
-    our %o = %named_unary;
-} # end class
-class Comparison does PrecOp {
-    our %o = %comparison;
-} # end class
-class Equality does PrecOp {
-    our %o = %equality;
-} # end class
-class Bitwise_and does PrecOp {
-    our %o = %bitwise_and;
-} # end class
-class Bitwise_or does PrecOp {
-    our %o = %bitwise_or;
-} # end class
-class Tight_and does PrecOp {
-    our %o = %tight_and;
-} # end class
-class Tight_or does PrecOp {
-    our %o = %tight_or;
-} # end class
-class Range does PrecOp {
-    our %o = %range;
-} # end class
-class Conditional does PrecOp {
-    our %o = %conditional;
-} # end class
-class Assignment does PrecOp {
-    our %o = %assignment;
-} # end class
-class Comma does PrecOp {
-    our %o = %comma;
-} # end class
-class Listop does PrecOp {
-    our %o = %listop;
-} # end class
-class Loose_not does PrecOp {
-    our %o = %loose_not;
-} # end class
-class Loose_and does PrecOp {
-    our %o = %loose_and;
-} # end class
-class Loose_or does PrecOp {
-    our %o = %loose_or;
-} # end class
-class Terminator does PrecOp {
-    our %o = %terminator;
-} # end class
-
 ##############
 # Categories #
 ##############
@@ -210,9 +116,6 @@ proto token p5circumfix { <...> }
 
 token category:p5postcircumfix { <sym> }
 proto token p5postcircumfix is unary { <...> }  # unary as far as EXPR knows...
-
-token category:p5trait_mod { <sym> }
-proto token p5trait_mod (:$*endsym = 'spacey') { <...> }
 
 token category:p5type_declarator { <sym> }
 proto token p5type_declarator (:$*endsym = 'spacey') { <...> }
@@ -376,7 +279,6 @@ rule comp_unit {
 
         %*LANG<MAIN>    = ::STD ;
         %*LANG<Q>       = ::STD::Q ;
-        %*LANG<Quasi>   = ::STD::Quasi ;
         %*LANG<Regex>   = ::STD::Regex ;
         %*LANG<Trans>   = ::STD::Trans ;
         %*LANG<P5>      = ::STD::P5 ;
@@ -455,62 +357,15 @@ method explain_mystery() {
     $m;
 }
 
-# Note: because of the possibility of placeholders we can't determine arity of
-# the block syntactically, so this must be determined via semantic analysis.
-# Also, pblocks used in an if/unless statement do not treat $_ as a placeholder,
-# while most other blocks treat $_ as equivalent to $^x.  Therefore the first
-# possible place to check arity is not here but in the rule that calls this
-# rule.  (Could also be done in a later pass.)
-
-token pblock () {
-    :temp $*CURPAD;
-    :dba('parameterized block')
-    [<?before <.lambda> | '{' > ||
-        {{
-            if $*BORG and $*BORG.<block> {
-                if $*BORG.<name> {
-                    my $m = "Function '" ~ $*BORG.<name> ~ "' needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
-                    $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by '" ~ $*BORG.<name> ~ "')");
-                }
-                else {
-                    my $m = "Expression needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
-                    $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by expression)");
-                }
-            }
-            elsif %*MYSTERY {
-                $¢.panic("Missing block (apparently gobbled by undeclared routine?)");
-            }
-            else {
-                $¢.panic("Missing block");
-            }
-        }}
-    ]
-    [
-    | <lambda>
-        <.newpad(1)>
-        <signature(1)>
-        <blockoid>
-        <.getsig>
-    | <?before '{'>
-        <.newpad(1)>
-        <blockoid>
-        <.getsig>
-    ]
-}
-
-token lambda { '->' | '<->' }
-
 # Look for an expression followed by a required lambda.
 token xblock {
     :my $*GOAL ::= '{';
-    :my $*BORG = {};
-    <EXPR>
-    { $*BORG.<culprit> //= $<EXPR>.cursor(self.pos) }
+    :dba('block expression') '(' ~ ')' <EXPR>
     <.ws>
-    <pblock>
+    <block>
 }
 
-token block () {
+token block {
     :temp $*CURPAD;
     :dba('scoped block')
     [ <?before '{' > || <.panic: "Missing block"> ]
@@ -709,15 +564,6 @@ token p5statement_control:for {
     <block>
 }
 
-token p5statement_control:foreach {
-    ['for'|'foreach'] :s
-    [ <?before 'my'? '$'\w+ '(' >
-        <.panic: "This appears to be Perl 5 code"> ]?
-    [ <?before '(' <.EXPR>? ';' <.EXPR>? ';' <.EXPR>? ')' >
-        <.obs('C-style "for (;;)" loop', '"loop (;;)"')> ]?
-    <xblock>
-}
-
 token p5statement_control:given {
     <sym> :s
     <xblock>
@@ -851,50 +697,13 @@ rule package_def {
                 $¢.add_name($longname.Str);
             }
         ]?
-        <trait>*
         [
-        || <?before '{'>
-            [
-            :temp $*CURPKG;
-            {{
-                # figure out the actual full package name (nested in outer package)
-                if $longname and $*NEWPKG {
-                    my $shortname = $longname.<name>.Str;
-                    if $*SCOPE eq 'our' {
-                        $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                        say "added our " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
-                    }
-                    else {
-                        $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                        say "added my " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
-                    }
-                }
-            }}
-            <block>
-            ]
         || <?before ';'>
-            [
-            || <?{ $*begin_compunit }>
-                {{
-                    $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-                    my $shortname = $longname.<name>.Str;
-                    $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                    $*begin_compunit = 0;
-
-                    # throw out null core when compiling the real CORE
-                    if $shortname eq 'CORE' and $*CORE.id ~~ /NULL/ {
-                        $*UNIT<OUTER::> = [''];
-                        $*CORE = $*UNIT;
-                        $*SETTING = $*UNIT;
-                        $STD::ALL = {
-                            CORE => $*UNIT,
-                            SETTING => $*UNIT,
-                            $*UNIT.id => $*UNIT,
-                        };
-                    }
-                }}
-            || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
-            ]
+	    {{
+		$longname orelse $¢.panic("Package cannot be anonymous");
+		my $shortname = $longname.<name>.Str;
+		$*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+	    }}
         || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
         ]
     ] || <.panic: "Malformed $*PKGDECL">
@@ -911,38 +720,16 @@ token declarator {
     ]
 }
 
-token p5multi_declarator:multi {
-    :my $*MULTINESS = 'multi';
-    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed multi'> ]
-}
-token p5multi_declarator:proto {
-    :my $*MULTINESS = 'proto';
-    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed proto'> ]
-}
-token p5multi_declarator:only {
-    :my $*MULTINESS = 'only';
-    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed only'> ]
-}
 token p5multi_declarator:null {
     :my $*MULTINESS = '';
     <declarator>
 }
 
 token p5routine_declarator:sub       { <sym> <routine_def> }
-token p5routine_declarator:method    { <sym> <method_def> }
-token p5routine_declarator:submethod { <sym> <method_def> }
-token p5routine_declarator:macro     { <sym> <macro_def> }
 
-token p5regex_declarator:regex { <sym>       <regex_def> }
-token p5regex_declarator:token { <sym>       <regex_def> }
-token p5regex_declarator:rule  { <sym>       <regex_def> }
-
-rule multisig {
+rule parensig {
     :dba('signature')
-    [
-        ':'?'(' ~ ')' <signature(1)>
-    ]
-    ** '|'
+    '(' ~ ')' <signature(1)>
 }
 
 method checkyada {
@@ -962,7 +749,8 @@ rule routine_def () {
     [
         [ '&'<deflongname>? | <deflongname> ]?
         <.newpad(1)>
-        [ <multisig> | <trait> ]*
+        <parensig>?
+	<trait>*
         <!{
             $*IN_DECL = 0;
         }>
@@ -972,94 +760,10 @@ rule routine_def () {
     ] || <.panic: "Malformed routine">
 }
 
-rule method_def () {
-    :temp $*CURPAD;
-    :my $*IN_DECL = 1;
-    :my $*DECLARAND;
-    <.newpad(1)>
-    [
-        [
-        | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
-        | <multisig> <trait>*
-        | <sigil=p5sigil> '.'
-            :dba('subscript signature')
-            [
-            | '(' ~ ')' <signature>
-            | '[' ~ ']' <signature>
-            | '{' ~ '}' <signature>
-            | <?before '<'> <postcircumfix=p5postcircumfix>
-            ]
-            <trait>*
-        | <?>
-        ]
-        <blockoid>:!s
-        <.checkyada>
-        <.getsig>
-    ] || <.panic: "Malformed method">
-}
-
-rule regex_def () {
-    :temp $*CURPAD;
-    :my $*IN_DECL = 1;
-    :my $*DECLARAND;
-    [
-        [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad(1)>
-        [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
-        { $*IN_DECL = 0; }
-        <.finishpad>
-        <regex_block>:!s
-        <.getsig>
-    ] || <.panic: "Malformed regex">
-}
-
-rule macro_def () {
-    :temp $*CURPAD;
-    :my $*IN_DECL = 1;
-    :my $*DECLARAND;
-    [
-        [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad(1)>
-        [ <multisig> | <trait> ]*
-        <!{
-            $*IN_DECL = 0;
-        }>
-        <blockoid>:!s
-        <.checkyada>
-        <.getsig>
-    ] || <.panic: "Malformed macro">
-}
-
 rule trait {
     :my $*IN_DECL = 0;
-    <colonpair>
+    ':' <EXPR(item %comma)>
 }
-
-token p5trait_mod:is {
-    <sym>:s <longname><circumfix=p5circumfix>?  # e.g. context<rw> and Array[Int]
-    {{
-        if $*DECLARAND {
-            my $traitname = $<longname>.Str;
-            # XXX eventually will use multiple dispatch
-            $*DECLARAND{$traitname} = self.gettrait($traitname, $<circumfix>);
-        }
-    }}
-}
-token p5trait_mod:hides {
-    <sym>:s <module_name=p5module_name>
-}
-token p5trait_mod:does {
-    :my $*PKGDECL ::= 'role';
-    <sym>:s <module_name=p5module_name>
-}
-token p5trait_mod:will {
-    <sym>:s <identifier> <pblock>
-}
-
-token p5trait_mod:of      { <sym>:s <typename> }
-token p5trait_mod:as      { <sym>:s <typename> }
-token p5trait_mod:returns { <sym>:s <typename> }
-token p5trait_mod:handles { <sym>:s <term=p5term> }
 
 #########
 # Nouns #
@@ -1117,69 +821,17 @@ token p5term:variable           { <variable> { $*VAR = $<variable> } }
 token p5term:package_declarator { <package_declarator=p5package_declarator> }
 token p5term:scope_declarator   { <scope_declarator=p5scope_declarator> }
 token p5term:routine_declarator { <routine_declarator=p5routine_declarator> }
-token p5term:regex_declarator   { <regex_declarator=p5regex_declarator> }
-token p5term:type_declarator    { <type_declarator=p5type_declarator> }
 token p5term:circumfix          { <circumfix=p5circumfix> }
 token p5term:dotty              { <dotty=p5dotty> }
 token p5term:value              { <value=p5value> }
 token p5term:capterm            { <capterm> }
-token p5term:sigterm            { <sigterm> }
 token p5term:statement_prefix   { <statement_prefix=p5statement_prefix> }
-token p5term:colonpair          { [ <colonpair> <.ws> ]+ }
 
 token fatarrow {
     <key=identifier> \h* '=>' <.ws> <val=EXPR(item %assignment)>
 }
 
-token colonpair {
-    :my $key;
-    :my $value;
-
-    ':'
-    :dba('colon pair')
-    [
-    | '!' <identifier>
-        { $key = $<identifier>.Str; $value = 0; }
-    | $<num> = [\d+] <identifier>
-    | <identifier>
-        { $key = $<identifier>.Str; }
-        [
-        || <.unsp>? <circumfix=p5circumfix> { $value = $<circumfix>; }
-        || { $value = 1; }
-        ]
-    | :dba('signature') '(' ~ ')' <fakesignature>
-    | <circumfix=p5circumfix>
-        { $key = ""; $value = $<circumfix>; }
-    | $<var> = (<sigil=p5sigil> {} <desigilname>)
-        { $key = $<var><desigilname>.Str; $value = $<var>; }
-    ]
-    { $<k> = $key; $<v> = $value; }
-}
-
-token quotepair {
-    :my $key;
-    :my $value;
-
-    ':'
-    :dba('colon pair (restricted)')
-    [
-    | '!' <identifier>
-        { $key = $<identifier>.Str; $value = 0; }
-    | <identifier>
-        { $key = $<identifier>.Str; }
-        [
-        || <.unsp>? <?before '('> <circumfix=p5circumfix> { $value = $<circumfix>; }
-        || { $value = 1; }
-        ]
-    | $<n>=(\d+) $<id>=(<[a..z]>+)
-        { $key = $<id>.Str; $value = $<n>.Str; }
-    ]
-    { $<k> = $key; $<v> = $value; }
-}
-
 # Most of these special variable rules are there simply to catch old p5 brainos
-
-token p5special_variable:sym<$¢> { <sym> }
 
 token p5special_variable:sym<$!> { <sym> <!before \w> }
 
@@ -1324,50 +976,6 @@ token p5special_variable:sym<${^ }> {
     <.obscaret($<sigil>.Str ~ '{^' ~ $<text>.Str ~ '}', $<sigil>.Str, $<text>.Str)>
 }
 
-# XXX should eventually rely on multi instead of nested cases here...
-method obscaret (Str $var, Str $sigil, Str $name) {
-    my $repl;
-    given $sigil {
-        when '$' {
-            given $name {
-                when 'MATCH'         { $repl = '$/' }
-                when 'PREMATCH'      { $repl = 'an explicit pattern before <(' }
-                when 'POSTMATCH'     { $repl = 'an explicit pattern after )>' }
-                when 'ENCODING'      { $repl = '$?ENCODING' }
-                when 'UNICODE'       { $repl = '$?UNICODE' }  # XXX ???
-                when 'TAINT'         { $repl = '$*TAINT' }
-                when 'OPEN'          { $repl = 'filehandle introspection' }
-                when 'N'             { $repl = '$-1' } # XXX ???
-                when 'L'             { $repl = 'Form module' }
-                when 'A'             { $repl = 'Form module' }
-                when 'E'             { $repl = '$!.extended_os_error' }
-                when 'C'             { $repl = 'COMPILING namespace' }
-                when 'D'             { $repl = '$*DEBUGGING' }
-                when 'F'             { $repl = '$*SYSTEM_FD_MAX' }
-                when 'H'             { $repl = '$?FOO variables' }
-                when 'I'             { $repl = '$*INPLACE' } # XXX ???
-                when 'O'             { $repl = '$?OS or $*OS' }
-                when 'P'             { $repl = 'whatever debugger Perl 6 comes with' }
-                when 'R'             { $repl = 'an explicit result variable' }
-                when 'S'             { $repl = 'the context function' } # XXX ???
-                when 'T'             { $repl = '$*BASETIME' }
-                when 'V'             { $repl = '$*PERL_VERSION' }
-                when 'W'             { $repl = '$*WARNING' }
-                when 'X'             { $repl = '$*EXECUTABLE_NAME' }
-                when *               { $repl = "a global form such as $sigil*$name" }
-            }
-        }
-        when '%' {
-            given $name {
-                when 'H'             { $repl = '$?FOO variables' }
-                when *               { $repl = "a global form such as $sigil*$name" }
-            }
-        }
-        when * { $repl = "a global form such as $sigil*$name" }
-    };
-    return self.obs("$var variable", $repl);
-}
-
 token p5special_variable:sym<::{ }> {
     '::' <?before '{'>
 }
@@ -1457,7 +1065,7 @@ token p5special_variable:sym<$?> {
     <.obs('$? variable as child error', '$!')>
 }
 
-# desigilname should only follow a sigil/twigil
+# desigilname should only follow a sigil
 
 token desigilname {
     [
@@ -1469,7 +1077,6 @@ token desigilname {
 token variable {
     :my $*IN_META = 0;
     :my $sigil = '';
-    :my $twigil = '';
     :my $name;
     <?before <sigil=p5sigil> {
         $sigil = $<sigil>.Str;
@@ -1502,24 +1109,12 @@ token variable {
 
 
 
-# Note, don't reduce on a bare sigil unless you don't want a twigil or
-# you otherwise don't care what the longest token is.
+# Note, don't reduce on a bare sigil unless you don't care what the longest token is.
 
 token p5sigil:sym<$>  { <sym> }
-token p5sigil:sym<@@> { <sym> }
 token p5sigil:sym<@>  { <sym> }
 token p5sigil:sym<%>  { <sym> }
 token p5sigil:sym<&>  { <sym> }
-
-token p5twigil:sym<.> { <sym> }
-token p5twigil:sym<!> { <sym> }
-token p5twigil:sym<^> { <sym> }
-token p5twigil:sym<:> { <sym> <!before ':'> }
-token p5twigil:sym<*> { <sym> }
-token p5twigil:sym<+> { <sym> <!!worry: "The + twigil is deprecated, use the * twigil instead"> }
-token p5twigil:sym<?> { <sym> }
-token p5twigil:sym<=> { <sym> }
-token p5twigil:sym<~> { <sym> }
 
 token deflongname {
     :dba('new name to be defined')
@@ -1601,8 +1196,6 @@ token numish {
     ]
 }
 
-token number:rational { <nu=integer>'/'<de=integer> }
-token number:complex { <re=numish>'+'<im=numish>'\\'?'i' | <im=numish>'\\'?'i' }
 token number:numish { <numish> }
 
 token integer {
@@ -1873,7 +1466,7 @@ token p5quote:sym<//>   {
 
 token p5quote:sym</ />   {
     '/' <nibble( $¢.cursor_fresh( %*LANG<Regex> ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
-    <.old_rx_mods>?
+    <p5rx_mods>?
 }
 
 # handle composite forms like qww
@@ -1892,71 +1485,36 @@ token quote:q {
     ]
 }
 
-token quote:rx {
+token quote:qr {
     <sym> » <!before '('>
     <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
-    <!old_rx_mods>
+    <p5rx_mods>
 }
 
 token quote:m  {
     <sym> » <!before '('>
     <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
-    <!old_rx_mods>
-}
-
-token quote:mm {
-    <sym> » <!before '('>
-    <quibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s))>
-    <!old_rx_mods>
+    <p5rx_mods>
 }
 
 token quote:s {
     <sym> » <!before '('>
     <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
-    <!old_rx_mods>
+    <p5rx_mods>
 }
 
-token quote:ss {
-    <sym> » <!before '('>
-    <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
-    <!old_rx_mods>
-}
 token quote:tr {
     <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
-    <!old_tr_mods>
+    <p5tr_mods>
 }
 
-token old_rx_mods {
+token p5rx_mods {
     <!after \s>
     (< i g s m x c e >+) 
-    {{
-        given $0.Str {
-            $_ ~~ /i/ and $¢.worryobs('/i',':i');
-            $_ ~~ /g/ and $¢.worryobs('/g',':g');
-            $_ ~~ /s/ and $¢.worryobs('/s','^^ and $$ anchors');
-            $_ ~~ /m/ and $¢.worryobs('/m','. or \N');
-            $_ ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
-            $_ ~~ /c/ and $¢.worryobs('/c',':c or :p');
-            $_ ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
-            $¢.obs('suffix regex modifiers','prefix adverbs');
-        }
-    }}
 }
 
-token old_tr_mods {
+token p5tr_mods {
     (< c d s ] >+) 
-    {{
-        given $0.Str {
-            $_ ~~ /c/ and $¢.worryobs('/c',':c');
-            $_ ~~ /d/ and $¢.worryobs('/g',':d');
-            $_ ~~ /s/ and $¢.worryobs('/s',':s');
-            $¢.obs('suffix transliteration modifiers','prefix adverbs');
-        }
-    }}
-}
-
-token quote:quasi {
-    <sym> » <!before '('> <quasiquibble($¢.cursor_fresh( %*LANG<Quasi> ))>
 }
 
 # XXX should eventually be derived from current Unicode tables.
@@ -2612,26 +2170,6 @@ grammar Q is STD {
 
 } # end grammar
 
-grammar Quasi is STD {
-    token p5term:unquote {
-        :my $*QUASIMODO = 0;
-        <starter><starter><starter> <EXPR> <stopper><stopper><stopper>
-    }
-
-    # begin tweaks (DO NOT ERASE)
-    multi method tweak (:$ast!) { self; } # XXX some transformer operating on the normal AST?
-    multi method tweak (:$lang!) { self.cursor_fresh( $lang ); }
-    multi method tweak (:$unquote!) { self; } # XXX needs to override unquote
-    multi method tweak (:$COMPILING!) { $*QUASIMODO = 1; self; } # XXX needs to lazify the lexical lookups somehow
-
-    multi method tweak (*%x) {
-        my @k = keys(%x);
-        self.panic("Unrecognized quasiquote modifier: " ~ join('',@k));
-    }
-    # end tweaks (DO NOT ERASE)
-
-} # end grammar
-
 ###########################
 # Captures and Signatures #
 ###########################
@@ -2649,18 +2187,7 @@ rule capture {
     <EXPR>
 }
 
-token sigterm {
-    :dba('signature')
-    ':(' ~ ')' <fakesignature>
-}
-
 rule param_sep { [','|':'|';'|';;'] }
-
-token fakesignature() {
-    :temp $*CURPAD;
-    <.newpad>
-    <signature>
-}
 
 token signature ($padsig = 0) {
     # XXX incorrectly scopes &infix:<x> parameters to outside following block
@@ -2783,28 +2310,10 @@ token p5postcircumfix:sym<( )>
     { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
 
 token p5postcircumfix:sym<[ ]>
-    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
+    { :dba('subscript') '[' ~ ']' <semilist>  <O(|%methodcall)> }
 
 token p5postcircumfix:sym<{ }>
     { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> }
-
-token p5postcircumfix:sym«< >» {
-    :my $pos;
-    '<'
-    { $pos = $¢.pos }
-    [
-    || <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>'
-    || <?before \h* [ \d | <sigil=p5sigil> | ':' ] >
-       { $¢.cursor_force($pos).panic("Whitespace required before < operator") }
-    || { $¢.cursor_force($pos).panic("Unable to parse quote-words subscript; couldn't find right angle quote") }
-    ]
-<O(|%methodcall)> }
-
-token p5postcircumfix:sym«<< >>»
-    { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
-
-token p5postcircumfix:sym<« »>
-    { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
 
 token postop {
     | <postfix=p5postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
@@ -2850,33 +2359,12 @@ token arglist {
     ]
 }
 
-token p5term:lambda {
-    <?before <.lambda> >
-    <pblock>
-    {{
-        if $*BORG {
-            $*BORG.<block> = $<pblock>;
-        }
-    }}
-<O(|%term)> }
-
 token p5circumfix:sym<{ }> {
     <?before '{' >
     <pblock>
-    {{
-        if $*BORG {
-            $*BORG.<block> = $<pblock>;
-        }
-    }}
 <O(|%term)> }
 
 ## methodcall
-
-token p5postfix:sym<i>
-    { <sym> » <O(|%methodcall)> }
-
-token p5infix:sym<.> ()
-    { '.' <[\]\)\},:\s\$"']> <.obs('. to concatenate strings', '~')> }
 
 token p5postfix:sym['->'] ()
     { '->' <.obs('-> to call a method', '.')> }
@@ -2908,37 +2396,7 @@ token p5prefix:sym<+>
 token p5prefix:sym<->
     { <sym> <O(|%symbolic_unary)> }
 
-token p5prefix:sym<~~>
-    { <sym> <.badinfix> <O(|%symbolic_unary)> }
-
 token p5prefix:sym<~>
-    { <sym> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<??>
-    { <sym> <.badinfix> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<?>
-    { <sym> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<~^>
-    { <sym> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<+^>
-    { <sym> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<?^>
-    { <sym> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<^^>
-    { <sym> <.badinfix> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<^>
-    { <sym> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<||>
-    { <sym> <.badinfix> <O(|%symbolic_unary)> }
-
-token p5prefix:sym<|>
     { <sym> <O(|%symbolic_unary)> }
 
 
@@ -2957,72 +2415,27 @@ token p5infix:sym<*>
 token p5infix:sym</>
     { <sym> <O(|%multiplicative)> }
 
-token p5infix:sym<div>
-    { <sym> <O(|%multiplicative)> }
-
 token p5infix:sym<%>
-    { <sym> <?{ $<O><iffy> = 1; }> <O(|%multiplicative)> }   # Allow !% operator
-
-token p5infix:sym<mod>
     { <sym> <O(|%multiplicative)> }
-
-token p5infix:sym<+&>
-    { <sym> <O(|%multiplicative)> }
-
-token p5infix:sym« +< »
-    { <sym> <!before '<'> <O(|%multiplicative)> }
 
 token p5infix:sym« << »
-    { <sym> \s <.obs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
+    { <sym> <O(|%multiplicative)> }
 
 token p5infix:sym« >> »
-    { <sym> \s <.obs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
-
-token p5infix:sym« +> »
-    { <sym> <!before '>'> <O(|%multiplicative)> }
-
-token p5infix:sym<~&>
     { <sym> <O(|%multiplicative)> }
-
-token p5infix:sym<?&>
-    { <sym> <O(|%multiplicative)> }
-
-token p5infix:sym« ~< »
-    { <sym> <!before '<'> <O(|%multiplicative)> }
-
-token p5infix:sym« ~> »
-    { <sym> <!before '>'> <O(|%multiplicative)> }
 
 token p5infix:sym<x>
     { <sym> <O(|%multiplicative)> }
 
 
 ## additive
+token p5infix:sym<.> ()
+    { <sym> <O(|%additive)> }
+
 token p5infix:sym<+>
     { <sym> <O(|%additive)> }
 
 token p5infix:sym<->
-    { <sym> <O(|%additive)> }
-
-token p5infix:sym<+|>
-    { <sym> <O(|%additive)> }
-
-token p5infix:sym<+^>
-    { <sym> <O(|%additive)> }
-
-token p5infix:sym<~|>
-    { <sym> <O(|%additive)> }
-
-token p5infix:sym<~^>
-    { <sym> <O(|%additive)> }
-
-token p5infix:sym<?|>
-    { <sym> <O(|%additive)> }
-
-token p5infix:sym<?^>
-    { <sym> <O(|%additive)> }
-
-token p5infix:sym<~>
     { <sym> <O(|%additive)> }
 
 ## bitwise and (all)
@@ -3055,6 +2468,7 @@ token p5prefix:let
 token p5prefix:temp
     { <sym> » <?before \s*> <O(|%named_unary)> }
 
+## comparisons
 token p5infix:sym« <=> »
     { <sym> <?{ $<O><returns> = "Order"; }> <O(|%comparison)> }
 
@@ -3074,14 +2488,11 @@ token p5infix:sym« > »
 token p5infix:sym« >= »
     { <sym> <O(|%comparison)> }
 
-token p5infix:sym<~~>
-    { <sym> <O(|%comparison)> }
-
 token p5infix:sym<eq>
-    { <sym> <O(|%comparison)> }
+    { <sym> <O(|%equality)> }
 
 token p5infix:sym<ne>
-    { <sym> <O(|%comparison)> }
+    { <sym> <O(|%equality)> }
 
 token p5infix:sym<lt>
     { <sym> <O(|%comparison)> }
@@ -3117,13 +2528,7 @@ token p5infix:sym<^^>
 token p5infix:sym<//>
     { <sym> <O(|%tight_or)> }
 
-token p5infix:sym<min>
-    { <sym> <O(|%tight_or)> }
-
-token p5infix:sym<max>
-    { <sym> <O(|%tight_or)> }
-
-
+## range
 token p5infix:sym<..>
     { <sym> <O(|%range)> }
 
@@ -3131,18 +2536,18 @@ token p5infix:sym<...>
     { <sym> <O(|%range)> }
 
 ## conditional
-token p5infix:sym<?? !!> {
-    :my $*GOAL ::= '!!';
-    '??'
+token p5infix:sym<? :> {
+    :my $*GOAL ::= ':';
+    '?'
     <.ws>
     <EXPR(item %assignment)>
-    [ '!!' ||
+    [ ':' ||
         [
-        || <?before '='> <.panic: "Assignment not allowed within ??!!">
-        || <?before '::'> <.panic: "Please use !! rather than ::">
+        || <?before '='> <.panic: "Assignment not allowed within ?:">
+        || <?before '!!'> <.panic: "Please use : rather than !!">
         || <?before <infixish>>    # Note: a tight infix would have parsed right
-            <.panic: "Precedence too loose within ??!!; use ??()!! instead ">
-        || <.panic: "Found ?? but no !!; possible precedence problem">
+            <.panic: "Precedence too loose within ?:; use ?(): instead ">
+        || <.panic: "Found ? but no :; possible precedence problem">
         ]
     ]
     { $<O><_reducecheck> = 'raise_middle'; }
@@ -3153,59 +2558,8 @@ method raise_middle {
     self;
 }
 
-token p5infix:sym<?>
-    { <sym> {} <!before '?'> <?before <-[;]>*?':'> <.obs('?: for the conditional operator', '??!!')> <O(|%conditional)> }
-
-token p5infix:sym<ff>
-    { <sym> <O(|%conditional)> }
-
-token p5infix:sym<^ff>
-    { <sym> <O(|%conditional)> }
-
-token p5infix:sym<ff^>
-    { <sym> <O(|%conditional)> }
-
-token p5infix:sym<^ff^>
-    { <sym> <O(|%conditional)> }
-
-token p5infix:sym<fff>
-    { <sym> <O(|%conditional)> }
-
-token p5infix:sym<^fff>
-    { <sym> <O(|%conditional)> }
-
-token p5infix:sym<fff^>
-    { <sym> <O(|%conditional)> }
-
-token p5infix:sym<^fff^>
-    { <sym> <O(|%conditional)> }
-
-## assignment
-# There is no "--> type" because assignment may be coerced to either
-# item assignment or list assignment at "make" time.
-
 token p5infix:sym<=> ()
     { <sym> <O(|%assignment)> }
-
-method check_doteq {
-    # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || ]
-    return self if self.<left><scope_declarator=p5scope_declarator>;
-    my $ok = 0;
-
-    try {
-        my $methop = self.<right><methodop>;
-        my $name = $methop.<longname>.Str;
-        if $name eq 'new' or $name eq 'sort' or $name eq 'subst' or $name eq 'trans' or $name eq 'reverse' or $name eq 'uniq' or $name eq 'map' or $name eq 'samecase' or $name eq 'substr' or $name eq 'flip' or $name eq 'fmt' {
-            $ok = 1;
-        }
-        elsif not $methop.<args>[0] {
-            $ok = 1;
-        }
-    };
-
-    self.cursor_force(self.<infix><_pos>).worryobs('.= as append operator', '~=') unless $ok;
-    self;
-}
 
 ## list item separator
 token p5infix:sym<,>
@@ -3223,14 +2577,6 @@ token p5term:identifier
     { $name = $<identifier>.Str; $pos = $¢.pos; }
     <args( $¢.is_name($name) )>
     { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
-    {{
-        if $*BORG and $*BORG.<block> {
-            if not $*BORG.<name> {
-                $*BORG.<culprit> = $<identifier>.cursor($pos);
-                $*BORG.<name> = $name;
-            }
-        }
-    }}
 <O(|%term)>  }
 
 token p5term:opfunc
@@ -3284,14 +2630,6 @@ token p5term:name
 
     # unrecognized names are assumed to be post-declared listops.
     || <args> { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
-        {{
-            if $*BORG and $*BORG.<block> {
-                if not $*BORG.<name> {
-                    $*BORG.<culprit> = $<longname>.cursor($pos);
-                    $*BORG.<name> //= $name;
-                }
-            }
-        }}
     ]
 <O(|%term)> }
 
@@ -3339,9 +2677,6 @@ token p5terminator:sym<given>
 token p5terminator:sym<when>
     { 'when' » <.nofun> <O(|%terminator)> }
 
-token p5terminator:sym« --> »
-    { '-->' <O(|%terminator)> }
-
 token p5terminator:sym<)>
     { <sym> <O(|%terminator)> }
 
@@ -3351,19 +2686,14 @@ token p5terminator:sym<]>
 token p5terminator:sym<}>
     { '}' <O(|%terminator)> }
 
-token p5terminator:sym<!!>
-    { '!!' <?{ $*GOAL eq '!!' }> <O(|%terminator)> }
-
-# disallow &[] and such as infix
-# token p5infix:sigil
-#     { <sigil=p5sigil><-[&]> <.worry: "Sigiled form not allowed where infix expected"> <!> <O(|%term)>  }
+token p5terminator:sym<:>
+    { ':' <?{ $*GOAL eq ':' }> <O(|%terminator)> }
 
 regex infixstopper {
     :dba('infix stopper')
     [
     | <?before <stopper> >
-    | <?before '!!' > <?{ $*GOAL eq '!!' }>
-    | <?before '{' | <lambda> > <?{ ($*GOAL eq '{' or $*GOAL eq 'endargs') and @*MEMOS[$¢.pos]<ws> }>
+    | <?before ':' > <?{ $*GOAL eq ':' }>
     | <?{ $*GOAL eq 'endargs' and @*MEMOS[$¢.pos]<endargs> }>
     ]
 }
