@@ -85,12 +85,14 @@ our $ALL;
 =end notes
 
 method TOP ($STOP = undef) {
+    my $lang = self.cursor_fresh( ::STD::P6 );
+
     if defined $STOP {
         my $*GOAL ::= $STOP;
-        self.unitstop($STOP).comp_unit;
+        $lang.unitstop($STOP).comp_unit;
     }
     else {
-        self.comp_unit;
+        $lang.comp_unit;
     }
 }
 
@@ -142,10 +144,10 @@ constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>);
 constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>);
 constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :fiddly);
 constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>);
+constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>, :fiddly);
 constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>);
 constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>, :fiddly);
 constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>);
-constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>, :fiddly);
 constant %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
 constant %loose_and       = (:dba('loose and')       , :prec<d=>, :assoc<list>);
 constant %loose_or        = (:dba('loose or')        , :prec<c=>, :assoc<list>);
@@ -290,1470 +292,6 @@ token endid { <?before <-[ \- \' \w ]> > }
 token spacey { <?before <[ \s \# ]> > }
 token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
 
-##################
-# Lexer routines #
-##################
-
-token ws {
-    :my @stub = return self if @*MEMOS[self.pos]<ws> :exists;
-    :my $startpos = self.pos;
-
-    :dba('whitespace')
-    [
-        | \h+ <![#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
-        | <?before \w> <?after \w> :::
-            { @*MEMOS[$startpos]<ws> = undef; }
-            <.panic: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
-    ]
-    ||
-    [
-    | <.unsp>
-    | <.vws> <.heredoc>
-    | <.unv>
-    | $ { $¢.moreinput }
-    ]*
-
-    {{
-        if ($¢.pos == $startpos) {
-            @*MEMOS[$¢.pos]<ws> = undef;
-        }
-        else {
-            @*MEMOS[$¢.pos]<ws> = $startpos;
-            @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
-                if @*MEMOS[$startpos]<endstmt> :exists;
-        }
-    }}
-}
-
-token unsp {
-    \\ <?before [\s|'#'] >
-    :dba('unspace')
-    [
-    | <.vws>
-    | <.unv>
-    | $ { $¢.moreinput }
-    ]*
-}
-
-token vws {
-    :dba('vertical whitespace')
-    \v
-    [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
-}
-
-# We provide two mechanisms here:
-# 1) define $*moreinput, or
-# 2) override moreinput method
-method moreinput () {
-    $*moreinput.() if $*moreinput;
-}
-
-token unv {
-   :dba('horizontal whitespace')
-   [
-   | \h+
-   | <?before \h* '=' [ \w | '\\'] > ^^ <.pod_comment>
-   | \h* <comment>
-   ]
-}
-
-token comment:sym<#`( )> {
-    '#`' [ <?opener> || <.panic: "Opening bracket is required for #` comment"> ]
-    <.quibble($¢.cursor_fresh( %*LANG<Q> ))>
-}
-
-token comment:sym<#( )> {
-    '#' <?opener> <.worry: "Embedded comment without backtick is deprecated">
-    <.quibble($¢.cursor_fresh( %*LANG<Q> ))>
-}
-
-token comment:sym<#=( )> {
-    '#=' <?opener>
-    <quibble($¢.cursor_fresh( %*LANG<Q> ))>
-}
-
-token comment:sym<#=> {
-   '#=' {} $<attachment> = [\N*]
-}
-
-token comment:sym<#> {
-   '#' {} \N*
-}
-
-token ident {
-    <.alpha> \w*
-}
-
-token apostrophe {
-    <[ ' \- ]>
-}
-
-token identifier {
-    <.ident> [ <.apostrophe> <.ident> ]*
-}
-
-# XXX We need to parse the pod eventually to support $= variables.
-
-token pod_comment {
-    ^^ \h* '=' <.unsp>?
-    [
-    | 'begin' \h+ <identifier> ::
-        [
-        ||  .*? "\n" \h* '=' <.unsp>? 'end' \h+ $<identifier> » \N*
-        ||  <?{ $<identifier>.Str eq 'END'}> .*
-        || { my $id = $<identifier>.Str; self.panic("=begin $id without matching =end $id"); }
-        ]
-    | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
-        [ .*? "\n" \h* '=' <.unsp>? 'end' » \N* || { self.panic("=begin without matching =end"); } ]
-        
-    | 'for' » :: \h* [ <identifier> || $$ || '#' || <.panic: "Unrecognized token after =for"> ]
-        [.*?  ^^ \h* $$ || .*]
-    | :: 
-        [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
-        [<alpha>||\s||<.panic: "Illegal pod directive">]
-        \N*
-    ]
-}
-
-###################
-# Top-level rules #
-###################
-
-# Note: we only check for the stopper.  We don't check for ^ because
-# we might be embedded in something else.
-rule comp_unit {
-    :my $*begin_compunit = 1;
-    :my $*endargs = -1;
-    :my %*LANG;
-    :my $*PKGDECL ::= "";
-    :my $*IN_DECL;
-    :my $*DECLARAND;
-    :my $*NEWPKG;
-    :my $*NEWPAD;
-    :my $*QSIGIL ::= '';
-    :my $*IN_META = 0;
-    :my $*QUASIMODO;
-    :my $*SCOPE = "";
-    :my $*LEFTSIGIL;
-    :my $*PRECLIM;
-    :my %*MYSTERY = ();
-    :my $*INVOCANT_OK;
-    :my $*INVOCANT_IS;
-    :my $*CURPAD;
-    :my $*MULTINESS = '';
-    :my $*SIGNUM = 0;
-
-    :my $*CURPKG;
-    {{
-
-        %*LANG<MAIN>    = ::STD ;
-        %*LANG<Q>       = ::STD::Q ;
-        %*LANG<Quasi>   = ::STD::Quasi ;
-        %*LANG<Regex>   = ::STD::Regex ;
-        %*LANG<Trans>   = ::STD::Trans ;
-        %*LANG<P5>      = ::STD::P5 ;
-        %*LANG<P5Regex> = ::STD::P5::Regex ;
-
-        @*WORRIES = ();
-        self.load_setting($*SETTINGNAME);
-        my $oid = $*SETTING.id;
-        my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
-        $*CURPAD = STASH.new(
-            'OUTER::' => [$oid],
-            '!file' => $*FILE, '!line' => 0,
-            '!id' => [$id],
-        );
-        $ALL.{$id} = $*CURPAD;
-        $*UNIT = $*CURPAD;
-        $ALL.<UNIT> = $*UNIT;
-        self.finishpad;
-    }}
-    <statementlist>
-    [ <?unitstopper> || <.panic: "Confused"> ]
-    # "CHECK" time...
-    {{
-        if @*WORRIES {
-            warn "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
-        }
-        my $m = $¢.explain_mystery();
-        warn $m if $m;
-    }}
-}
-
-method explain_mystery() {
-    my %post_types;
-    my %unk_types;
-    my %unk_routines;
-    my $m = '';
-    for keys(%*MYSTERY) {
-        my $p = %*MYSTERY{$_}.<pad>;
-        if self.is_name($_, $p) {
-            # types may not be post-declared
-            %post_types{$_} = %*MYSTERY{$_};
-            next;
-        }
-
-        next if self.is_known($_, $p) or self.is_known('&' ~ $_, $p);
-
-        # just a guess, but good enough to improve error reporting
-        if $_ lt 'a' {
-            %unk_types{$_} = %*MYSTERY{$_};
-        }
-        else {
-            %unk_routines{$_} = %*MYSTERY{$_};
-        }
-    }
-    if %post_types {
-        my @tmp = sort keys(%post_types);
-        $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
-        for @tmp {
-            $m ~= "\t$_ used at line " ~ %post_types{$_}.<line> ~ "\n";
-        }
-    }
-    if %unk_types {
-        my @tmp = sort keys(%unk_types);
-        $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
-        for @tmp {
-            $m ~= "\t$_ used at line " ~ %unk_types{$_}.<line> ~ "\n";
-        }
-    }
-    if %unk_routines {
-        my @tmp = sort keys(%unk_routines);
-        $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
-        for @tmp {
-            $m ~= "\t$_ used at line " ~ %unk_routines{$_}.<line> ~ "\n";
-        }
-    }
-    $m;
-}
-
-# Note: because of the possibility of placeholders we can't determine arity of
-# the block syntactically, so this must be determined via semantic analysis.
-# Also, pblocks used in an if/unless statement do not treat $_ as a placeholder,
-# while most other blocks treat $_ as equivalent to $^x.  Therefore the first
-# possible place to check arity is not here but in the rule that calls this
-# rule.  (Could also be done in a later pass.)
-
-token pblock () {
-    :temp $*CURPAD;
-    :dba('parameterized block')
-    [<?before <.lambda> | '{' > ||
-        {{
-            if $*BORG and $*BORG.<block> {
-                if $*BORG.<name> {
-                    my $m = "Function '" ~ $*BORG.<name> ~ "' needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
-                    $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by '" ~ $*BORG.<name> ~ "')");
-                }
-                else {
-                    my $m = "Expression needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
-                    $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by expression)");
-                }
-            }
-            elsif %*MYSTERY {
-                $¢.panic("Missing block (apparently gobbled by undeclared routine?)");
-            }
-            else {
-                $¢.panic("Missing block");
-            }
-        }}
-    ]
-    [
-    | <lambda>
-        <.newpad(1)>
-        <signature(1)>
-        <blockoid>
-        <.getsig>
-    | <?before '{'>
-        <.newpad(1)>
-        <blockoid>
-        <.getsig>
-    ]
-}
-
-token lambda { '->' | '<->' }
-
-# Look for an expression followed by a required lambda.
-token xblock {
-    :my $*GOAL ::= '{';
-    :my $*BORG = {};
-    <EXPR>
-    { $*BORG.<culprit> //= $<EXPR>.cursor(self.pos) }
-    <.ws>
-    <pblock>
-}
-
-token block () {
-    :temp $*CURPAD;
-    :dba('scoped block')
-    [ <?before '{' > || <.panic: "Missing block"> ]
-    <.newpad>
-    <blockoid>
-    <.checkyada>
-}
-
-token blockoid {
-    # encapsulate braided languages
-    :temp %*LANG;
-    :my $*SIGNUM;
-
-    <.finishpad>
-    [
-    | :dba('block') '{' ~ '}' <statementlist>
-    | <?terminator> <.panic: 'Missing block'>
-    | <?> <.panic: "Malformed block">
-    ]
-
-    [
-    | <?before \h* $$>  # (usual case without comments)
-        { @*MEMOS[$¢.pos]<endstmt> = 2; }
-    | \h* <?before <[\\,:]>>
-    | <.unv>? $$
-        { @*MEMOS[$¢.pos]<endstmt> = 2; }
-    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
-    ]
-}
-
-token regex_block {
-    # encapsulate braided languages
-    :temp %*LANG;
-
-    :my $lang = %*LANG<Regex>;
-    :my $*GOAL ::= '}';
-
-    [ <quotepair> <.ws>
-        {
-            my $kv = $<quotepair>[*-1];
-            $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-        }
-    ]*
-
-    '{'
-    <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
-    [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
-
-    [
-    | <?before \h* $$>  # (usual case without comments)
-        { @*MEMOS[$¢.pos]<endstmt> = 2; }
-    | \h* <?before <[\\,:]>>
-    | <.unv>? $$
-        { @*MEMOS[$¢.pos]<endstmt> = 2; }
-    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
-    ]
-}
-
-# statement semantics
-rule statementlist {
-    :my $*INVOCANT_OK = 0;
-    :dba('statement list')
-
-    [
-    | $
-    | <?before <[\)\]\}]>>
-    | [<statement><eat_terminator> ]*
-    ]
-}
-
-# embedded semis, context-dependent semantics
-rule semilist {
-    :my $*INVOCANT_OK = 0;
-    :dba('semicolon list')
-    [
-    | <?before <[\)\]\}]>>
-    | [<statement><eat_terminator> ]*
-    ]
-}
-
-
-token label {
-    :my $label;
-    <identifier> ':' <?before \s> <.ws>
-
-    [ <?{ $¢.is_name($label = $<identifier>.Str) }>
-      <.panic("Illegal redeclaration of '$label'")>
-    ]?
-
-    # add label as a pseudo type
-    {{ $¢.add_my_name($label); }}
-
-}
-
-token statement {
-    :my $*endargs = -1;
-    :my $*QSIGIL ::= 0;
-    <!before <[\)\]\}]> >
-
-    # this could either be a statement that follows a declaration
-    # or a statement that is within the block of a code declaration
-    <!!{ $¢ = %*LANG<MAIN>.bless($¢); }>
-
-    [
-    | <label> <statement>
-    | <statement_control>
-    | <EXPR>
-        :dba('statement end')
-        [
-        || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
-        ||
-            :dba('statement modifier')
-            <.ws>
-            [
-            | <statement_mod_loop>
-                {{
-                    my $sp = $<EXPR><statement_prefix>;
-                    if $sp and $sp<sym> eq 'do' {
-                       my $s = $<statement_mod_loop>[0]<sym>;
-                       $¢.obs("do...$s" ,"repeat...$s");
-                    }
-                }}
-            | <statement_mod_cond>
-                :dba('statement modifier loop')
-                [
-                || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>
-                || <.ws> <statement_mod_loop>?
-                ]
-            ]?
-        ]
-    | <?before ';'>
-    | {} <.panic: "Bogus statement">
-    ]
-
-    # Is there more on same line after a block?
-    [ <?{ (@*MEMOS[@*MEMOS[$¢.pos]<ws>//$¢.pos]<endargs>//0) == 1 }>
-        \h*
-        <!before ';' | ')' | ']' | '}' >
-        <!infixstopper>
-        <.panic: "Missing semicolon or comma after block">
-    ]?
-}
-
-token eat_terminator {
-    [
-    || ';' [ <?before $> { $*ORIG ~~ s/\;$/ /; } ]?
-    || <?{ @*MEMOS[$¢.pos]<endstmt> }> <.ws>
-    || <?terminator>
-    || $
-    || <?stopper>
-    || {{ if @*MEMOS[$¢.pos]<ws> { $¢.pos = @*MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
-        <.panic: "Confused">
-    ]
-}
-
-#####################
-# statement control #
-#####################
-
-token statement_control:need {
-    :my $longname;
-    <sym>:s
-    [
-    |<version>
-    |<module_name>
-        {{
-            my $*SCOPE = 'use';
-            $longname = $<module_name>[*-1]<longname>;
-            $¢.do_need($longname);
-        }}
-    ] ** ','
-}
-
-token statement_control:import {
-    :my $longname;
-    :my $*SCOPE = 'use';
-    <sym> <.ws>
-    <term>
-    [
-    || <.spacey> <arglist>
-        {{
-            $¢.do_import($<term>, $<arglist>);
-        }}
-    || {{ $¢.do_import($<term>, ''); }}
-    ]
-    <.ws>
-}
-
-token statement_control:use {
-    :my $longname;
-    :my $*SCOPE = 'use';
-    <sym> <.ws>
-    [
-    | <version>
-    | <module_name>
-        {{
-            $longname = $<module_name><longname>;
-        }}
-        [
-        || <.spacey> <arglist>
-            {{
-                $¢.do_use($longname, $<arglist>);
-            }}
-        || {{ $¢.do_use($longname, ''); }}
-        ]
-    ]
-    <.ws>
-}
-
-
-token statement_control:no {
-    <sym> <.ws>
-    <module_name>[<.spacey><arglist>]?
-    <.ws>
-}
-
-
-token statement_control:if {
-    <sym> :s
-    <xblock>
-    [
-        [ <!before 'else'\s*'if'> || <.panic: "Please use 'elsif'"> ]
-        'elsif'<?spacey> <elsif=xblock>
-    ]*
-    [
-        'else'<?spacey> <else=pblock>
-    ]?
-}
-
-
-token statement_control:unless {
-    <sym> :s
-    <xblock>
-    [ <!before 'else'> || <.panic: "unless does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
-}
-
-
-token statement_control:while {
-    <sym> :s
-    [ <?before '(' ['my'? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
-        <.panic: "This appears to be Perl 5 code"> ]?
-    <xblock>
-}
-
-
-token statement_control:until {
-    <sym> :s
-    <xblock>
-}
-
-
-token statement_control:repeat {
-    <sym> :s
-    [
-        | $<wu>=['while'|'until']<.spacey>
-          <xblock>
-        | <pblock>
-          $<wu>=['while'|'until'][<.spacey>||<.panic: "Whitespace required after keyword">] <EXPR>
-    ]
-}
-
-token statement_control:loop {
-    <sym> <.ws>
-    $<eee> = (
-        '(' [ :s
-            <e1=EXPR>? ';'
-            <e2=EXPR>? ';'
-            <e3=EXPR>?
-        ')'||<.panic: "Malformed loop spec">]
-        [ <?before '{' > <.panic: "Whitespace required before block"> ]?
-    )? <.ws>
-    <block>
-}
-
-
-token statement_control:for {
-    <sym> :s
-    [ <?before 'my'? '$'\w+ '(' >
-        <.panic: "This appears to be Perl 5 code"> ]?
-    [ <?before '(' <.EXPR>? ';' <.EXPR>? ';' <.EXPR>? ')' >
-        <.obs('C-style "for (;;)" loop', '"loop (;;)"')> ]?
-    <xblock>
-}
-
-token statement_control:given {
-    <sym> :s
-    <xblock>
-}
-token statement_control:when {
-    <sym> :s
-    <xblock>
-}
-rule statement_control:default {<sym> <block> }
-
-token statement_prefix:BEGIN   { <sym> <blorst> }
-token statement_prefix:CHECK   { <sym> <blorst> }
-token statement_prefix:INIT    { <sym> <blorst> }
-token statement_prefix:START   { <sym> <blorst> }
-token statement_prefix:ENTER   { <sym> <blorst> }
-token statement_prefix:FIRST   { <sym> <blorst> }
-
-rule statement_control:END     {<sym> <block> }
-rule statement_control:LEAVE   {<sym> <block> }
-rule statement_control:KEEP    {<sym> <block> }
-rule statement_control:UNDO    {<sym> <block> }
-rule statement_control:NEXT    {<sym> <block> }
-rule statement_control:LAST    {<sym> <block> }
-rule statement_control:PRE     {<sym> <block> }
-rule statement_control:POST    {<sym> <block> }
-rule statement_control:CATCH   {<sym> <block> }
-rule statement_control:CONTROL {<sym> <block> }
-rule statement_control:TEMP    {<sym> <block> }
-
-#######################
-# statement modifiers #
-#######################
-
-rule modifier_expr { <EXPR> }
-
-rule statement_mod_cond:if     {<sym> <modifier_expr> }
-rule statement_mod_cond:unless {<sym> <modifier_expr> }
-rule statement_mod_cond:when   {<sym> <modifier_expr> }
-
-rule statement_mod_loop:while {<sym> <modifier_expr> }
-rule statement_mod_loop:until {<sym> <modifier_expr> }
-
-rule statement_mod_loop:for   {<sym> <modifier_expr> }
-rule statement_mod_loop:given {<sym> <modifier_expr> }
-
-################
-# module names #
-################
-
-token def_module_name {
-    <longname>
-    [ :dba('generic role')
-        <?before '['>
-        <?{ ($*PKGDECL//'') eq 'role' }>
-        <.newpad>
-        '[' ~ ']' <signature>
-        { $*IN_DECL = ''; }
-        <.finishpad>
-    ]?
-}
-
-token module_name:normal {
-    <longname>
-    [ <?before '['> :dba('generic role') '[' ~ ']' <arglist> ]?
-}
-
-token module_name:deprecated { 'v6-alpha' }
-
-token vnum {
-    \d+ | '*'
-}
-
-token version:sym<v> {
-    'v' <?before \d+> :: <vnum> ** '.' '+'?
-}
-
-###############
-# Declarators #
-###############
-
-token constant_declarator {
-    :my $*IN_DECL = 'constant';
-    :my $*DECLARAND;
-    <.getdecl>
-    <?{ $*SCOPE eq 'constant' }>
-    <identifier> <.ws> <?before '='|'is'\s>
-    { self.add_name($<identifier>.Str); $*IN_DECL = ''; }
-
-    <trait>*
-    <.getdecl>
-}
-
-token variable_declarator {
-    :my $*IN_DECL = 'variable';
-    :my $*DECLARAND;
-    <variable>
-    { $¢.add_variable($<variable>.Str); $*IN_DECL = ''; }
-    [   # Is it a shaped array or hash declaration?
-      #  <?{ $<sigil> eq '@' | '%' }>
-        <.unsp>?
-        $<shape> = [
-        | '(' ~ ')' <signature>
-        | :dba('shape definition') '[' ~ ']' <semilist>
-        | :dba('shape definition') '{' ~ '}' <semilist>
-        | <?before '<'> <postcircumfix>
-        ]*
-    ]?
-    <.ws>
-
-    <trait>*
-    <.getdecl>
-}
-
-rule scoped ($*SCOPE) {
-    :dba('scoped declarator')
-    [
-    | <declarator>
-    | <regex_declarator>
-    | <package_declarator>
-    | <typename>+
-        {
-            my $t = $<typename>;
-            @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
-        }
-        <multi_declarator>
-    | <multi_declarator>
-    ]
-    || <?before <[A..Z]>><longname>{{
-            my $t = $<longname>.Str;
-            if not $¢.is_known($t) {
-                $¢.panic("In \"$*SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
-            }
-        }}
-        <!> # drop through
-    || <.panic: "Malformed $*SCOPE">
-}
-
-
-token scope_declarator:my        { <sym> <scoped('my')> }
-token scope_declarator:our       { <sym> <scoped('our')> }
-token scope_declarator:state     { <sym> <scoped('state')> }
-token scope_declarator:constant  { <sym> <scoped('constant')> }
-token scope_declarator:has       { <sym> <scoped('has')> }
-token scope_declarator:augment   { <sym> <scoped('augment')> }
-token scope_declarator:supersede { <sym> <scoped('supersede')> }
-
-
-token package_declarator:class {
-    :my $*PKGDECL ::= 'class';
-    <sym> <package_def>
-}
-
-token package_declarator:grammar {
-    :my $*PKGDECL ::= 'grammar';
-    <sym> <package_def>
-}
-
-token package_declarator:module {
-    :my $*PKGDECL ::= 'module';
-    <sym> <package_def>
-}
-
-token package_declarator:package {
-    :my $*PKGDECL ::= 'package';
-    <sym> <package_def>
-}
-
-token package_declarator:role {
-    :my $*PKGDECL ::= 'role';
-    <sym> <package_def>
-}
-
-token package_declarator:knowhow {
-    :my $*PKGDECL ::= 'knowhow';
-    <sym> <package_def>
-}
-
-token package_declarator:slang {
-    :my $*PKGDECL ::= 'slang';
-    <sym> <package_def>
-}
-
-token package_declarator:require {   # here because of declarational aspects
-    <sym> <.ws>
-    [
-    || <module_name> <EXPR>?
-    || <EXPR>
-    ]
-}
-
-token package_declarator:trusts {
-    <sym> <.ws>
-    <module_name>
-}
-
-token package_declarator:does {
-    <sym> <.ws>
-    <typename>
-}
-
-rule package_def {
-    :my $longname;
-    :my $*IN_DECL = 'package';
-    :my $*DECLARAND;
-    :my $*NEWPKG;
-    :my $*NEWPAD;
-    { $*SCOPE ||= 'our'; }
-    [
-        [
-            <def_module_name>{
-                $longname = $<def_module_name>[0]<longname>;
-                $¢.add_name($longname.Str);
-            }
-        ]?
-        <trait>*
-        <.getdecl>
-        [
-        || <?before '{'>
-            [
-            :temp $*CURPKG;
-            {{
-                # figure out the actual full package name (nested in outer package)
-                if $longname and $*NEWPKG {
-                    my $shortname = $longname.<name>.Str;
-                    if $*SCOPE eq 'our' {
-                        $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                        say "added our " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
-                    }
-                    else {
-                        $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                        say "added my " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
-                    }
-                }
-                $*begin_compunit = 0;
-            }}
-            <block>
-            ]
-        || <?before ';'>
-            [
-            || <?{ $*begin_compunit }>
-                {{
-                    $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-                    my $shortname = $longname.<name>.Str;
-                    $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                    $*begin_compunit = 0;
-
-                    # throw out null core when compiling the real CORE
-                    if $shortname eq 'CORE' and $*CORE.id ~~ /NULL/ {
-                        $*UNIT<OUTER::> = [''];
-                        $*CORE = $*UNIT;
-                        $*SETTING = $*UNIT;
-                        $ALL = {
-                            CORE => $*UNIT,
-                            SETTING => $*UNIT,
-                            $*UNIT.id => $*UNIT,
-                        };
-                    }
-                }}
-            || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
-            ]
-        || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
-        ]
-    ] || <.panic: "Malformed $*PKGDECL">
-}
-
-token declarator {
-    [
-    | <constant_declarator>
-    | <variable_declarator>
-    | '(' ~ ')' <signature> <trait>*
-    | <routine_declarator>
-    | <regex_declarator>
-    | <type_declarator>
-    ]
-}
-
-token multi_declarator:multi {
-    :my $*MULTINESS = 'multi';
-    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed multi'> ]
-}
-token multi_declarator:proto {
-    :my $*MULTINESS = 'proto';
-    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed proto'> ]
-}
-token multi_declarator:only {
-    :my $*MULTINESS = 'only';
-    <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed only'> ]
-}
-token multi_declarator:null {
-    :my $*MULTINESS = '';
-    <declarator>
-}
-
-token routine_declarator:sub       { <sym> <routine_def> }
-token routine_declarator:method    { <sym> <method_def> }
-token routine_declarator:submethod { <sym> <method_def> }
-token routine_declarator:macro     { <sym> <macro_def> }
-
-token regex_declarator:regex { <sym>       <regex_def> }
-token regex_declarator:token { <sym>       <regex_def> }
-token regex_declarator:rule  { <sym>       <regex_def> }
-
-rule multisig {
-    :my $signum = 0;
-    :dba('signature')
-    [
-        ':'?'(' ~ ')' <signature(++$signum)>
-    ]
-    ** '|'
-}
-
-method checkyada {
-    try {
-        my $startsym = self.<blockoid><statementlist><statement>[0]<EXPR><term><sym> // '';
-        if $startsym eq '...' or $startsym eq '!!!' or $startsym eq '???' {
-            $*DECLARAND<stub> = 1;
-        }
-    };
-    return self;
-}
-
-rule routine_def () {
-    :temp $*CURPAD;
-    :my $*IN_DECL = 'routine';
-    :my $*DECLARAND;
-    [
-        [ $<sigil>=['&''*'?] <deflongname>? | <deflongname> ]?
-        <.newpad(1)>
-        [ <multisig> | <trait> ]*
-        <!{
-            $*IN_DECL = '';
-        }>
-        <blockoid>:!s
-        <.checkyada>
-        <.getsig>
-        <.getdecl>
-    ] || <.panic: "Malformed routine">
-}
-
-rule method_def () {
-    :temp $*CURPAD;
-    :my $*IN_DECL = 'method';
-    :my $*DECLARAND;
-    <.newpad(1)>
-    [
-        [
-        | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
-        | <multisig> <trait>*
-        | <sigil> '.'
-            :dba('subscript signature')
-            [
-            | '(' ~ ')' <signature>
-            | '[' ~ ']' <signature>
-            | '{' ~ '}' <signature>
-            | <?before '<'> <postcircumfix>
-            ]
-            <trait>*
-        | <?>
-        ]
-        { $*IN_DECL = ''; }
-        <blockoid>:!s
-        <.checkyada>
-        <.getsig>
-        <.getdecl>
-    ] || <.panic: "Malformed method">
-}
-
-rule regex_def () {
-    :temp $*CURPAD;
-    :my $*IN_DECL = 'regex';
-    :my $*DECLARAND;
-    [
-        [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad(1)>
-        [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
-        { $*IN_DECL = ''; }
-        <.finishpad>
-        <regex_block>:!s
-        <.getsig>
-        <.getdecl>
-    ] || <.panic: "Malformed regex">
-}
-
-rule macro_def () {
-    :temp $*CURPAD;
-    :my $*IN_DECL = 'macro';
-    :my $*DECLARAND;
-    [
-        [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad(1)>
-        [ <multisig> | <trait> ]*
-        <!{
-            $*IN_DECL = '';
-        }>
-        { $*IN_DECL = ''; }
-        <blockoid>:!s
-        <.checkyada>
-        <.getsig>
-        <.getdecl>
-    ] || <.panic: "Malformed macro">
-}
-
-rule trait {
-    :my $*IN_DECL = 0;
-    [
-    | <trait_mod>
-    | <colonpair>
-    ]
-}
-
-token trait_mod:is {
-    <sym>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
-    {{
-        if $*DECLARAND {
-            my $traitname = $<longname>.Str;
-            # XXX eventually will use multiple dispatch
-            $*DECLARAND{$traitname} = self.gettrait($traitname, $<circumfix>);
-        }
-    }}
-}
-token trait_mod:hides {
-    <sym>:s <module_name>
-}
-token trait_mod:does {
-    :my $*PKGDECL ::= 'role';
-    <sym>:s <module_name>
-}
-token trait_mod:will {
-    <sym>:s <identifier> <pblock>
-}
-
-token trait_mod:of      { <sym>:s <typename> }
-token trait_mod:as      { <sym>:s <typename> }
-token trait_mod:returns { <sym>:s <typename> }
-token trait_mod:handles { <sym>:s <term> }
-
-#########
-# Nouns #
-#########
-
-# (for when you want to tell EXPR that infix already parsed the term)
-token nullterm {
-    <?>
-}
-
-token nulltermish {
-    :dba('null term')
-    [
-    | <?stdstopper>
-    | <term=termish>
-        {
-            $¢.<PRE>  = $<term><PRE>:delete;
-            $¢.<POST> = $<term><POST>:delete;
-            $¢.<~CAPS> = $<term><~CAPS>;
-        }
-    | <?>
-    ]
-}
-
-token termish {
-    :my $*SCOPE = "";
-    :my $*VAR;
-    :dba('prefix or term')
-    [
-    | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
-        [ <?{ $<term> }> || <term> ]
-    | <term>
-    ]
-
-    # also queue up any postfixes
-    :dba('postfix')
-    [
-    || <?{ $*QSIGIL }>
-        [
-        || <?{ $*QSIGIL eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
-        ||                          <POST>+! <?after <[ \] } > ) ]> > 
-        || { $*VAR = 0; }
-        ]
-    || <!{ $*QSIGIL }>
-        <POST>*
-    ]
-    {
-        self.check_variable($*VAR) if $*VAR;
-        $¢.<~CAPS> = $<term><~CAPS>;
-    }
-}
-
-token term:fatarrow           { <fatarrow> }
-token term:variable           { <variable> { $*VAR = $<variable> } }
-token term:package_declarator { <package_declarator> }
-token term:scope_declarator   { <scope_declarator> }
-token term:multi_declarator   { <?before 'multi'|'proto'|'only'> <multi_declarator> }
-token term:routine_declarator { <routine_declarator> }
-token term:regex_declarator   { <regex_declarator> }
-token term:type_declarator    { <type_declarator> }
-token term:circumfix          { <circumfix> }
-token term:dotty              { <dotty> }
-token term:value              { <value> }
-token term:capterm            { <capterm> }
-token term:sigterm            { <sigterm> }
-token term:statement_prefix   { <statement_prefix> }
-token term:colonpair          { [ <colonpair> <.ws> ]+ }
-
-token fatarrow {
-    <key=identifier> \h* '=>' <.ws> <val=EXPR(item %item_assignment)>
-}
-
-token colonpair {
-    :my $key;
-    :my $value;
-
-    ':'
-    :dba('colon pair')
-    [
-    | '!' <identifier>
-        { $key = $<identifier>.Str; $value = 0; }
-    | $<num> = [\d+] <identifier>
-    | <identifier>
-        { $key = $<identifier>.Str; }
-        [
-        || <.unsp>? :dba('pair value') <circumfix> { $value = $<circumfix>; }
-        || { $value = 1; }
-        ]
-    | :dba('signature') '(' ~ ')' <fakesignature>
-    | <circumfix>
-        { $key = ""; $value = $<circumfix>; }
-    | $<var> = (<sigil> {} <twigil>? <desigilname>)
-        { $key = $<var><desigilname>.Str; $value = $<var>; }
-    ]
-    { $<k> = $key; $<v> = $value; }
-}
-
-token quotepair {
-    :my $key;
-    :my $value;
-
-    ':'
-    :dba('colon pair (restricted)')
-    [
-    | '!' <identifier>
-        { $key = $<identifier>.Str; $value = 0; }
-    | <identifier>
-        { $key = $<identifier>.Str; }
-        [
-        || <.unsp>? <?before '('> <circumfix> { $value = $<circumfix>; }
-        || { $value = 1; }
-        ]
-    | $<n>=(\d+) $<id>=(<[a..z]>+)
-        { $key = $<id>.Str; $value = $<n>.Str; }
-    ]
-    { $<k> = $key; $<v> = $value; }
-}
-
-# Most of these special variable rules are there simply to catch old p5 brainos
-
-token special_variable:sym<$¢> { <sym> }
-
-token special_variable:sym<$!> { <sym> <!before \w> }
-
-token special_variable:sym<$!{ }> {
-    ( '$!{' :: (.*?) '}' )
-    <.obs($0.Str ~ " variable", 'smart match against $!')>
-}
-
-token special_variable:sym<$/> {
-    <sym>
-    # XXX assuming nobody ever wants to assign $/ directly anymore...
-    [ <?before \h* '=' <![=]> >
-        <.obs('$/ variable as input record separator',
-             "filehandle's :irs attribute")>
-    ]?
-}
-
-token special_variable:sym<$~> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$~ variable', 'Form module')>
-}
-
-token special_variable:sym<$`> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$` variable', 'explicit pattern before <(')>
-}
-
-token special_variable:sym<$@> {
-    <sym> ::
-    <.obs('$@ variable as eval error', '$!')>
-}
-
-token special_variable:sym<$#> {
-    <sym> ::
-    [
-    || (\w+) <.obs("\$#" ~ $0.Str ~ " variable", '@' ~ $0.Str ~ '.end')>
-    || <.obs('$# variable', '.fmt')>
-    ]
-}
-token special_variable:sym<$$> {
-    <sym> <!alpha> :: <?before \s | ',' | <terminator> >
-    <.obs('$$ variable', '$*PID')>
-}
-token special_variable:sym<$%> {
-    <sym> ::
-    <.obs('$% variable', 'Form module')>
-}
-
-# Note: this works because placeholders are restricted to lowercase
-token special_variable:sym<$^X> {
-    <sigil> '^' $<letter> = [<[A..Z]>] \W
-    <.obscaret($<sigil>.Str ~ '^' ~ $<letter>.Str, $<sigil>.Str, $<letter>.Str)>
-}
-
-token special_variable:sym<$^> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$^ variable', 'Form module')>
-}
-
-token special_variable:sym<$&> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$& variable', '$/ or $()')>
-}
-
-token special_variable:sym<$*> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$* variable', '^^ and $$')>
-}
-
-token special_variable:sym<$)> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$) variable', '$*EGID')>
-}
-
-token special_variable:sym<$-> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$- variable', 'Form module')>
-}
-
-token special_variable:sym<$=> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$= variable', 'Form module')>
-}
-
-token special_variable:sym<@+> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('@+ variable', '.to method')>
-}
-
-token special_variable:sym<%+> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('%+ variable', '.to method')>
-}
-
-token special_variable:sym<$+[ ]> {
-    '$+['
-    <.obs('@+ variable', '.to method')>
-}
-
-token special_variable:sym<@+[ ]> {
-    '@+['
-    <.obs('@+ variable', '.to method')>
-}
-
-token special_variable:sym<@+{ }> {
-    '@+{'
-    <.obs('%+ variable', '.to method')>
-}
-
-token special_variable:sym<@-> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('@- variable', '.from method')>
-}
-
-token special_variable:sym<%-> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('%- variable', '.from method')>
-}
-
-token special_variable:sym<$-[ ]> {
-    '$-['
-    <.obs('@- variable', '.from method')>
-}
-
-token special_variable:sym<@-[ ]> {
-    '@-['
-    <.obs('@- variable', '.from method')>
-}
-
-token special_variable:sym<%-{ }> {
-    '@-{'
-    <.obs('%- variable', '.from method')>
-}
-
-token special_variable:sym<$+> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$+ variable', 'Form module')>
-}
-
-token special_variable:sym<${^ }> {
-    <sigil> '{^' :: $<text>=[.*?] '}'
-    <.obscaret($<sigil>.Str ~ '{^' ~ $<text>.Str ~ '}', $<sigil>.Str, $<text>.Str)>
-}
-
-# XXX should eventually rely on multi instead of nested cases here...
-method obscaret (Str $var, Str $sigil, Str $name) {
-    my $repl;
-    given $sigil {
-        when '$' {
-            given $name {
-                when 'MATCH'         { $repl = '$/' }
-                when 'PREMATCH'      { $repl = 'an explicit pattern before <(' }
-                when 'POSTMATCH'     { $repl = 'an explicit pattern after )>' }
-                when 'ENCODING'      { $repl = '$?ENCODING' }
-                when 'UNICODE'       { $repl = '$?UNICODE' }  # XXX ???
-                when 'TAINT'         { $repl = '$*TAINT' }
-                when 'OPEN'          { $repl = 'filehandle introspection' }
-                when 'N'             { $repl = '$-1' } # XXX ???
-                when 'L'             { $repl = 'Form module' }
-                when 'A'             { $repl = 'Form module' }
-                when 'E'             { $repl = '$!.extended_os_error' }
-                when 'C'             { $repl = 'COMPILING namespace' }
-                when 'D'             { $repl = '$*DEBUGGING' }
-                when 'F'             { $repl = '$*SYSTEM_FD_MAX' }
-                when 'H'             { $repl = '$?FOO variables' }
-                when 'I'             { $repl = '$*INPLACE' } # XXX ???
-                when 'O'             { $repl = '$?OS or $*OS' }
-                when 'P'             { $repl = 'whatever debugger Perl 6 comes with' }
-                when 'R'             { $repl = 'an explicit result variable' }
-                when 'S'             { $repl = 'the context function' } # XXX ???
-                when 'T'             { $repl = '$*BASETIME' }
-                when 'V'             { $repl = '$*PERL_VERSION' }
-                when 'W'             { $repl = '$*WARNING' }
-                when 'X'             { $repl = '$*EXECUTABLE_NAME' }
-                when *               { $repl = "a global form such as $sigil*$name" }
-            }
-        }
-        when '%' {
-            given $name {
-                when 'H'             { $repl = '$?FOO variables' }
-                when *               { $repl = "a global form such as $sigil*$name" }
-            }
-        }
-        when * { $repl = "a global form such as $sigil*$name" }
-    };
-    return self.obs("$var variable", $repl);
-}
-
-token special_variable:sym<::{ }> {
-    '::' <?before '{'>
-}
-
-regex special_variable:sym<${ }> {
-    <sigil> '{' {} $<text>=[.*?] '}'
-    {{
-        my $sigil = $<sigil>.Str;
-        my $text = $<text>.Str;
-        my $bad = $sigil ~ '{' ~ $text ~ '}';
-        $text = $text - 1 if $text ~~ /^\d+$/;
-        if $text !~~ /^(\w|\:)+$/ {
-            $¢.obs($bad, $sigil ~ '(' ~ $text ~ ')');
-        }
-        elsif $*QSIGIL {
-            $¢.obs($bad, '{' ~ $sigil ~ $text ~ '}');
-        }
-        else {
-            $¢.obs($bad, $sigil ~ $text);
-        }
-    }}
-}
-
-token special_variable:sym<$[> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$[ variable', 'user-defined array indices')>
-}
-
-token special_variable:sym<$]> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$] variable', '$*PERL_VERSION')>
-}
-
-token special_variable:sym<$\\> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$\\ variable', "the filehandle's :ors attribute")>
-}
-
-token special_variable:sym<$|> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$| variable', ':autoflush on open')>
-}
-
-token special_variable:sym<$:> {
-    <sym> <?before <[\x20\t\n\],=)}]> >
-    <.obs('$: variable', 'Form module')>
-}
-
-token special_variable:sym<$;> {
-    <sym> :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$; variable', 'real multidimensional hashes')>
-}
-
-token special_variable:sym<$'> { #'
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
-}
-
-token special_variable:sym<$"> {
-    <sym> <!{ $*QSIGIL }>
-    :: <?before \s | ',' | '=' | <terminator> >
-    <.obs('$" variable', '.join() method')>
-}
-
-token special_variable:sym<$,> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$, variable', ".join() method")>
-}
-
-token special_variable:sym['$<'] {
-    <sym> :: <!before \s* \w+ \s* '>' >
-    <.obs('$< variable', '$*UID')>
-}
-
-token special_variable:sym«\$>» {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$> variable', '$*EUID')>
-}
-
-token special_variable:sym<$.> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$. variable', "filehandle's .line method")>
-}
-
-token special_variable:sym<$?> {
-    <sym> :: <?before \s | ',' | <terminator> >
-    <.obs('$? variable as child error', '$!')>
-}
-
-# desigilname should only follow a sigil/twigil
-
-token desigilname {
-    [
-    | <?before '$' > <variable> { $*VAR = $<variable> }
-    | <longname>
-    ]
-}
-
-token variable {
-    :my $*IN_META = 0;
-    :my $sigil = '';
-    :my $twigil = '';
-    :my $name;
-    <?before <sigil> {
-        $sigil = $<sigil>.Str;
-        $*LEFTSIGIL ||= $sigil;
-    }> {}
-    [
-    || <sigil> <twigil>? <?before '::' [ '{' | '<' | '(' ]> <longname> # XXX
-    || '&'
-        [
-        | <twigil>? <sublongname> { $name = $<sublongname>.Str }
-        | :dba('infix noun') '[' ~ ']' <infixish(1)>
-        ]
-    || '$::' <name>? # XXX
-    || '$:' <name> # XXX
-    || [
-        | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str }
-        | <special_variable>
-        | <sigil> $<index>=[\d+]
-        # Note: $() can also parse as contextualizer in an expression; should have same effect
-        | <sigil> <?before '<' | '('> <postcircumfix>
-        | <sigil> <?{ $*IN_DECL }>
-        | <?> {{
-            if $*QSIGIL {
-                return ();
-            }
-            else {
-                $¢.panic("Anonymous variable requires declarator");
-            }
-          }}
-        ]
-    ]
-
-    { my $t = $<twigil>; $twigil = $t.[0].Str if @$t; }
-    [ <?{ $twigil eq '.' }>
-        [<.unsp> | '\\' | <?> ] <?before '('> <postcircumfix>
-    ]?
-}
-
-
-
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
 # you otherwise don't care what the longest token is.
 
@@ -1773,13 +311,19 @@ token twigil:sym<?> { <sym> }
 token twigil:sym<=> { <sym> }
 token twigil:sym<~> { <sym> }
 
-token deflongname {
-    :dba('new name to be defined')
-    <name>
+# overridden in subgrammars
+token stopper { <!> }
+
+# hopefully we can include these tokens in any outer LTM matcher
+regex stdstopper {
+    :my @stub = return self if @*MEMOS[self.pos]<endstmt> :exists;
+    :dba('standard stopper')
     [
-    | <colonpair>+ { $¢.add_macro($<name>) if $*IN_DECL; }
-    | { $¢.add_routine($<name>.Str) if $*IN_DECL; }
+    | <?terminator>
+    | <?unitstopper>
+    | $                                 # unlikely, check last (normal LTM behavior)
     ]
+    { @*MEMOS[$¢.pos]<endstmt> ||= 1; }
 }
 
 token longname {
@@ -1806,442 +350,9 @@ token morename {
     ]?
 }
 
-token subshortname {
-    [
-    | <category>
-        [ <colonpair>+ { $¢.add_macro($<category>) if $*IN_DECL; } ]?
-    | <desigilname>
-    ]
-}
-
-token sublongname {
-    <subshortname> <sigterm>?
-}
-
-token value:quote   { <quote> }
-token value:number  { <number> }
-token value:version { <version> }
-
-# Note: call this only to use existing type, not to declare type
-token typename {
-    [
-    | '::?'<identifier>                 # parse ::?CLASS as special case
-    | <longname>
-      <?{{
-        my $longname = $<longname>.Str;
-        if substr($longname, 0, 2) eq '::' {
-            $¢.add_my_name(substr($longname, 2));
-        }
-        else {
-            $¢.is_name($longname)
-        }
-      }}>
-    ]
-    # parametric type?
-    <.unsp>? [ <?before '['> <postcircumfix> ]?
-    <.ws> [ 'of' <.ws> <typename> ]?
-}
-
-token numish {
-    [
-    | <integer>
-    | <dec_number>
-    | <rad_number>
-    | 'NaN' »
-    | 'Inf' »
-    | '+Inf' »
-    | '-Inf' »
-    ]
-}
-
-token number:rational { <nu=integer>'/'<de=integer> }
-token number:complex { <re=numish>'+'<im=numish>'\\'?'i' | <im=numish>'\\'?'i' }
-token number:numish { <numish> }
-
-token integer {
-    [
-    | 0 [ b <[01]>+           [ _ <[01]>+ ]*
-        | o <[0..7]>+         [ _ <[0..7]>+ ]*
-        | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
-        | d \d+               [ _ \d+]*
-        | \d+[_\d+]*
-            <!!{ $¢.worry("Leading 0 does not indicate octal in Perl 6") }>
-        ]
-    | \d+[_\d+]*
-    ]
-    <!!before ['.' <?before \s | ',' | '=' | <terminator> > <.panic: "Decimal point must be followed by digit">]? >
-}
-
-token radint {
-    [
-    | <integer>
-    | <?before ':'> <rad_number> <?{
-                        defined $<rad_number><intpart>
-                        and
-                        not defined $<rad_number><fracpart>
-                    }>
-    ]
-}
-
-token escale {
-    <[Ee]> <[+\-]>? \d+[_\d+]*
-}
-
-# careful to distinguish from both integer and 42.method
-token dec_number {
-    :dba('decimal number')
-    [
-    | $<coeff> = [           '.' \d+[_\d+]* ] <escale>?
-    | $<coeff> = [\d+[_\d+]* '.' \d+[_\d+]* ] <escale>?
-    | $<coeff> = [\d+[_\d+]*                ] <escale>
-    ]
-    <!!before [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)">]? >
-}
-
-token rad_number {
-    ':' $<radix> = [\d+] <.unsp>?      # XXX optional dot here?
-    {}           # don't recurse in lexer
-    :dba('number in radix notation')
-    [
-    || '<'
-            $<intpart> = [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
-            $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]?
-            [ '*' <base=radint> '**' <exp=radint> ]?
-       '>'
-#      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
-    || <?before '['> <circumfix>
-    || <?before '('> <circumfix>
-    || <.panic: "Malformed radix number">
-    ]
-}
-
-token octints { [<.ws><octint><.ws>] ** ',' }
-
-token octint {
-    <[ 0..7 ]>+ [ _ <[ 0..7 ]>+ ]*
-}
-
-token hexints { [<.ws><hexint><.ws>] ** ',' }
-
-token hexint {
-    <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
-}
-
-##########
-# Quotes #
-##########
-
-our @herestub_queue;
-
-class Herestub {
-    has Str $.delim;
-    has $.orignode;
-    has $.lang;
-} # end class
-
-role herestop {
-    token stopper { ^^ {} $<ws>=(\h*?) $*DELIM \h* <.unv>?? $$ \v? }
-} # end role
-
-# XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
-
-method heredoc () {
-    my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
-    return if self.peek;
-    my $here = self;
-    while my $herestub = shift @herestub_queue {
-        my $*DELIM = $herestub.delim;
-        my $lang = $herestub.lang.mixin( ::herestop );
-        my $doc;
-        if ($doc) = $here.nibble($lang) {
-            $here = $doc.trim_heredoc();
-            $herestub.orignode<doc> = $doc;
-        }
-        else {
-            self.panic("Ending delimiter $*DELIM not found");
-        }
-    }
-    return self.cursor($here.pos);  # return to initial type
-}
-
-proto token backslash { <...> }
-proto token escape { <...> }
-token starter { <!> }
-token escape:none { <!> }
-
-token babble ($l) {
-    :my $lang = $l;
-    :my $start;
-    :my $stop;
-
-    <.ws>
-    [ <quotepair> <.ws>
-        {
-            my $kv = $<quotepair>[*-1];
-            $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-        }
-    ]*
-
-    {
-        ($start,$stop) = $¢.peek_delimiters();
-        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
-                                !! $lang.unbalanced($stop);
-        $<B> = [$lang,$start,$stop];
-    }
-}
-
-token quibble ($l) {
-    :my ($lang, $start, $stop);
-    <babble($l)>
-    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
-
-    $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
-
-    {{
-        if $lang<_herelang> {
-            push @herestub_queue,
-                ::Herestub.new(
-                    delim => $<nibble><nibbles>[0]<TEXT>,
-                    orignode => $¢,
-                    lang => $lang<_herelang>,
-                );
-        }
-    }}
-}
-
-token sibble ($l, $lang2) {
-    :my ($lang, $start, $stop);
-    <babble($l)>
-    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
-
-    $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
-    [ <?{ $start ne $stop }>
-        <.ws>
-        [ <infixish> || <panic: "Missing assignment operator"> ]
-        [ <?{ $<infixish>.Str eq '=' || $<infixish>.<infix_postfix_meta_operator> }> || <.panic: "Malformed assignment operator"> ]
-        <.ws>
-        <right=EXPR(item %item_assignment)>
-    || 
-        { $lang = $lang2.unbalanced($stop); }
-        <right=nibble($lang)> $stop
-    ]
-}
-
-token tribble ($l, $lang2 = $l) {
-    :my ($lang, $start, $stop);
-    <babble($l)>
-    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
-
-    $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
-    [ <?{ $start ne $stop }>
-        <.ws> <quibble($lang2)>
-    || 
-        { $lang = $lang2.unbalanced($stop); }
-        <right=nibble($lang)> $stop
-    ]
-}
-
-token quasiquibble ($l) {
-    :temp %*LANG;
-    :my ($lang, $start, $stop);
-    :my $*QUASIMODO = 0; # :COMPILING sets true
-    <babble($l)>
-    {
-        my $B = $<babble><B>;
-        ($lang,$start,$stop) = @$B;
-        %*LANG<MAIN> = $lang;
-    }
-
-    [
-    || <?{ $start eq '{' }> [ :lang($lang) <block> ]
-    || [ :lang($lang) <starter> <statementlist> [ <stopper> || <.panic: "Couldn't find terminator $stop"> ] ]
-    ]
-}
-
-# note: polymorphic over many quote languages, we hope
-token nibbler {
-    :my $text = '';
-    :my $from = self.pos;
-    :my $to = $from;
-    :my @nibbles = ();
-    :my $multiline = 0;
-    :my $nibble;
-    { $<_from> = self.pos; }
-    [ <!before <stopper> >
-        [
-        || <starter> <nibbler> <stopper>
-                        {{
-                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
-
-                            my $n = $<nibbler>[*-1]<nibbles>;
-                            my @n = @$n;
-
-                            push @nibbles, $<starter>;
-                            push @nibbles, @n;
-                            push @nibbles, $<stopper>;
-
-                            $text = '';
-                            $to = $from = $¢.pos;
-                        }}
-        || <escape>     {{
-                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
-                            push @nibbles, $<escape>[*-1];
-                            $text = '';
-                            $to = $from = $¢.pos;
-                        }}
-        || .
-                        {{
-                            my $ch = substr($*ORIG, $¢.pos-1, 1);
-                            $text ~= $ch;
-                            $to = $¢.pos;
-                            if $ch ~~ "\n" {
-                                $multiline++;
-                            }
-                        }}
-        ]
-    ]*
-    {{
-        push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to or !@nibbles;
-        $<nibbles> = \@nibbles;
-        $<_pos> = $¢.pos;
-        $<nibbler> :delete;
-        $<escape> :delete;
-        $<starter> :delete;
-        $<stopper> :delete;
-        $*LAST_NIBBLE = $¢;
-        $*LAST_NIBBLE_MULTILINE = $¢ if $multiline;
-    }}
-}
-
-# and this is what makes nibbler polymorphic...
-method nibble ($lang) {
-    self.cursor_fresh($lang).nibbler;
-}
-
-token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> "'" }
-token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> '"' }
-
-token circumfix:sym<« »>   { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
-token circumfix:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
-token circumfix:sym«< >»   { '<'
-                              [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
-                              [ <?before '>' > <.obs('<>', 'lines() or ()')> ]?
-                              <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
-
-token quote:sym<//>   {
-    '/'\s*'/' <.panic: "Null regex not allowed">
-}
-
-token quote:sym</ />   {
-    '/' <nibble( $¢.cursor_fresh( %*LANG<Regex> ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
-    <.old_rx_mods>?
-}
-
-# handle composite forms like qww
-token quote:qq {
-    :my $qm;
-    'qq'
-    [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
-    ]
-}
-token quote:q {
-    :my $qm;
-    'q'
-    [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
-    ]
-}
-
-token quote:Q {
-    :my $qm;
-    'Q'
-    [
-    | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak($qm => 1))>
-    | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ))>
-    ]
-}
-
-token quote_mod:w  { <sym> }
-token quote_mod:ww { <sym> }
-token quote_mod:x  { <sym> }
-token quote_mod:to { <sym> }
-token quote_mod:s  { <sym> }
-token quote_mod:a  { <sym> }
-token quote_mod:h  { <sym> }
-token quote_mod:f  { <sym> }
-token quote_mod:c  { <sym> }
-token quote_mod:b  { <sym> }
-
-token quote:rx {
-    <sym> » <!before '('>
-    <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
-    <!old_rx_mods>
-}
-
-token quote:m  {
-    <sym> » <!before '('>
-    <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
-    <!old_rx_mods>
-}
-
-token quote:mm {
-    <sym> » <!before '('>
-    <quibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s))>
-    <!old_rx_mods>
-}
-
-token quote:s {
-    <sym> » <!before '('>
-    <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
-    <!old_rx_mods>
-}
-
-token quote:ss {
-    <sym> » <!before '('>
-    <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
-    <!old_rx_mods>
-}
-token quote:tr {
-    <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
-    <!old_tr_mods>
-}
-
-token old_rx_mods {
-    <!after \s>
-    (< i g s m x c e >+) 
-    {{
-        given $0.Str {
-            $_ ~~ /i/ and $¢.worryobs('/i',':i');
-            $_ ~~ /g/ and $¢.worryobs('/g',':g');
-            $_ ~~ /s/ and $¢.worryobs('/s','^^ and $$ anchors');
-            $_ ~~ /m/ and $¢.worryobs('/m','. or \N');
-            $_ ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
-            $_ ~~ /c/ and $¢.worryobs('/c',':c or :p');
-            $_ ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
-            $¢.obs('suffix regex modifiers','prefix adverbs');
-        }
-    }}
-}
-
-token old_tr_mods {
-    (< c d s ] >+) 
-    {{
-        given $0.Str {
-            $_ ~~ /c/ and $¢.worryobs('/c',':c');
-            $_ ~~ /d/ and $¢.worryobs('/g',':d');
-            $_ ~~ /s/ and $¢.worryobs('/s',':s');
-            $¢.obs('suffix transliteration modifiers','prefix adverbs');
-        }
-    }}
-}
-
-token quote:quasi {
-    <sym> » <!before '('> <quasiquibble($¢.cursor_fresh( %*LANG<Quasi> ))>
-}
+##############################
+# Quote primitives           #
+##############################
 
 # XXX should eventually be derived from current Unicode tables.
 constant %open2close = (
@@ -2690,6 +801,11 @@ method balanced ($start,$stop) { self.mixin( ::startstop[$start,$stop] ); }
 method unbalanced ($stop) { self.mixin( ::stop[$stop] ); }
 method unitstop ($stop) { self.mixin( ::unitstop[$stop] ); }
 
+method truly ($bool,$opt) {
+    return self if $bool;
+    self.panic("Can't negate $opt adverb");
+}
+
 token charname {
     [
     | <radint>
@@ -2708,10 +824,3147 @@ token charspec {
     ]
 }
 
-method truly ($bool,$opt) {
-    return self if $bool;
-    self.panic("Can't negate $opt adverb");
+proto token backslash { <...> }
+proto token escape { <...> }
+token starter { <!> }
+token escape:none { <!> }
+
+# and this is what makes nibbler polymorphic...
+method nibble ($lang) {
+    self.cursor_fresh($lang).nibbler;
 }
+
+# note: polymorphic over many quote languages, we hope
+token nibbler {
+    :my $text = '';
+    :my $from = self.pos;
+    :my $to = $from;
+    :my @nibbles = ();
+    :my $multiline = 0;
+    :my $nibble;
+    { $<_from> = self.pos; }
+    [ <!before <stopper> >
+        [
+        || <starter> <nibbler> <stopper>
+                        {{
+                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
+
+                            my $n = $<nibbler>[*-1]<nibbles>;
+                            my @n = @$n;
+
+                            push @nibbles, $<starter>;
+                            push @nibbles, @n;
+                            push @nibbles, $<stopper>;
+
+                            $text = '';
+                            $to = $from = $¢.pos;
+                        }}
+        || <escape>     {{
+                            push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
+                            push @nibbles, $<escape>[*-1];
+                            $text = '';
+                            $to = $from = $¢.pos;
+                        }}
+        || .
+                        {{
+                            my $ch = substr($*ORIG, $¢.pos-1, 1);
+                            $text ~= $ch;
+                            $to = $¢.pos;
+                            if $ch ~~ "\n" {
+                                $multiline++;
+                            }
+                        }}
+        ]
+    ]*
+    {{
+        push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to or !@nibbles;
+        $<nibbles> = \@nibbles;
+        $<_pos> = $¢.pos;
+        $<nibbler> :delete;
+        $<escape> :delete;
+        $<starter> :delete;
+        $<stopper> :delete;
+        $*LAST_NIBBLE = $¢;
+        $*LAST_NIBBLE_MULTILINE = $¢ if $multiline;
+    }}
+}
+
+token babble ($l) {
+    :my $lang = $l;
+    :my $start;
+    :my $stop;
+
+    <.ws>
+    [ <quotepair> <.ws>
+        {
+            my $kv = $<quotepair>[*-1];
+            $lang = $lang.tweak($kv.<k>, $kv.<v>)
+                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
+        }
+    ]*
+
+    {
+        ($start,$stop) = $¢.peek_delimiters();
+        $lang = $start ne $stop ?? $lang.balanced($start,$stop)
+                                !! $lang.unbalanced($stop);
+        $<B> = [$lang,$start,$stop];
+    }
+}
+
+our @herestub_queue;
+
+class Herestub {
+    has Str $.delim;
+    has $.orignode;
+    has $.lang;
+} # end class
+
+role herestop {
+    token stopper { ^^ {} $<ws>=(\h*?) $*DELIM \h* <.unv>?? $$ \v? }
+} # end role
+
+# XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
+
+method heredoc () {
+    my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
+    return if self.peek;
+    my $here = self;
+    while my $herestub = shift @herestub_queue {
+        my $*DELIM = $herestub.delim;
+        my $lang = $herestub.lang.mixin( ::herestop );
+        my $doc;
+        if ($doc) = $here.nibble($lang) {
+            $here = $doc.trim_heredoc();
+            $herestub.orignode<doc> = $doc;
+        }
+        else {
+            self.panic("Ending delimiter $*DELIM not found");
+        }
+    }
+    return self.cursor($here.pos);  # return to initial type
+}
+
+token quibble ($l) {
+    :my ($lang, $start, $stop);
+    <babble($l)>
+    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
+
+    $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
+
+    {{
+        if $lang<_herelang> {
+            push @herestub_queue,
+                ::Herestub.new(
+                    delim => $<nibble><nibbles>[0]<TEXT>,
+                    orignode => $¢,
+                    lang => $lang<_herelang>,
+                );
+        }
+    }}
+}
+
+token quotepair {
+    :my $key;
+    :my $value;
+
+    ':'
+    :dba('colon pair (restricted)')
+    [
+    | '!' <identifier>
+        { $key = $<identifier>.Str; $value = 0; }
+    | <identifier>
+        { $key = $<identifier>.Str; }
+        [
+        || <.unsp>? <?before '('> <circumfix> { $value = $<circumfix>; }
+        || { $value = 1; }
+        ]
+    | $<n>=(\d+) $<id>=(<[a..z]>+)
+        { $key = $<id>.Str; $value = $<n>.Str; }
+    ]
+    { $<k> = $key; $<v> = $value; }
+}
+
+token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> "'" }
+token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> '"' }
+
+token circumfix:sym<« »>   { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
+token circumfix:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
+token circumfix:sym«< >»   { '<'
+                              [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
+                              [ <?before '>' > <.obs('<>', 'lines() or ()')> ]?
+                              <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
+
+##################
+# Lexer routines #
+##################
+
+token ws {
+    :my @stub = return self if @*MEMOS[self.pos]<ws> :exists;
+    :my $startpos = self.pos;
+
+    :dba('whitespace')
+    [
+        | \h+ <![#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
+        | <?before \w> <?after \w> :::
+            { @*MEMOS[$startpos]<ws> = undef; }
+            <.panic: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
+    ]
+    ||
+    [
+    | <.unsp>
+    | <.vws> <.heredoc>
+    | <.unv>
+    | $ { $¢.moreinput }
+    ]*
+
+    {{
+        if ($¢.pos == $startpos) {
+            @*MEMOS[$¢.pos]<ws> = undef;
+        }
+        else {
+            @*MEMOS[$¢.pos]<ws> = $startpos;
+            @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
+                if @*MEMOS[$startpos]<endstmt> :exists;
+        }
+    }}
+}
+
+token unsp {
+    \\ <?before [\s|'#'] >
+    :dba('unspace')
+    [
+    | <.vws>
+    | <.unv>
+    | $ { $¢.moreinput }
+    ]*
+}
+
+token vws {
+    :dba('vertical whitespace')
+    \v
+    [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
+}
+
+# We provide two mechanisms here:
+# 1) define $*moreinput, or
+# 2) override moreinput method
+method moreinput () {
+    $*moreinput.() if $*moreinput;
+}
+
+token unv {
+   :dba('horizontal whitespace')
+   [
+   | \h+
+   | <?before \h* '=' [ \w | '\\'] > ^^ <.pod_comment>
+   | \h* <comment>
+   ]
+}
+
+token comment:sym<#`(...)> {
+    '#`' [ <?opener> || <.panic: "Opening bracket is required for #` comment"> ]
+    <.quibble($¢.cursor_fresh( %*LANG<Q> ))>
+}
+
+token comment:sym<#(...)> {
+    '#' <?opener> <.worry: "Embedded comment without backtick is deprecated">
+    <.quibble($¢.cursor_fresh( %*LANG<Q> ))>
+}
+
+token comment:sym<#=(...)> {
+    '#=' <?opener>
+    <quibble($¢.cursor_fresh( %*LANG<Q> ))>
+}
+
+token comment:sym<#=> {
+   '#=' {} $<attachment> = [\N*]
+}
+
+token comment:sym<#> {
+   '#' {} \N*
+}
+
+token ident {
+    <.alpha> \w*
+}
+
+token apostrophe {
+    <[ ' \- ]>
+}
+
+token identifier {
+    <.ident> [ <.apostrophe> <.ident> ]*
+}
+
+# XXX We need to parse the pod eventually to support $= variables.
+
+token pod_comment {
+    ^^ \h* '=' <.unsp>?
+    [
+    | 'begin' \h+ <identifier> ::
+        [
+        ||  .*? "\n" \h* '=' <.unsp>? 'end' \h+ $<identifier> » \N*
+        ||  <?{ $<identifier>.Str eq 'END'}> .*
+        || { my $id = $<identifier>.Str; self.panic("=begin $id without matching =end $id"); }
+        ]
+    | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
+        [ .*? "\n" \h* '=' <.unsp>? 'end' » \N* || { self.panic("=begin without matching =end"); } ]
+        
+    | 'for' » :: \h* [ <identifier> || $$ || '#' || <.panic: "Unrecognized token after =for"> ]
+        [.*?  ^^ \h* $$ || .*]
+    | :: 
+        [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
+        [<alpha>||\s||<.panic: "Illegal pod directive">]
+        \N*
+    ]
+}
+
+token octints { [<.ws><octint><.ws>] ** ',' }
+
+token octint {
+    <[ 0..7 ]>+ [ _ <[ 0..7 ]>+ ]*
+}
+
+token hexints { [<.ws><hexint><.ws>] ** ',' }
+
+token hexint {
+    <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
+}
+
+token integer {
+    [
+    | 0 [ b <[01]>+           [ _ <[01]>+ ]*
+        | o <[0..7]>+         [ _ <[0..7]>+ ]*
+        | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
+        | d \d+               [ _ \d+]*
+        | \d+[_\d+]*
+            <!!{ $¢.worry("Leading 0 does not indicate octal in Perl 6") }>
+        ]
+    | \d+[_\d+]*
+    ]
+    <!!before ['.' <?before \s | ',' | '=' | <terminator> > <.panic: "Decimal point must be followed by digit">]? >
+}
+
+token radint {
+    [
+    | <integer>
+    | <?before ':'> <rad_number> <?{
+                        defined $<rad_number><intpart>
+                        and
+                        not defined $<rad_number><fracpart>
+                    }>
+    ]
+}
+
+token escale {
+    <[Ee]> <[+\-]>? \d+[_\d+]*
+}
+
+# careful to distinguish from both integer and 42.method
+token dec_number {
+    :dba('decimal number')
+    [
+    | $<coeff> = [           '.' \d+[_\d+]* ] <escale>?
+    | $<coeff> = [\d+[_\d+]* '.' \d+[_\d+]* ] <escale>?
+    | $<coeff> = [\d+[_\d+]*                ] <escale>
+    ]
+    <!!before [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)">]? >
+}
+
+token rad_number {
+    ':' $<radix> = [\d+] <.unsp>?      # XXX optional dot here?
+    {}           # don't recurse in lexer
+    :dba('number in radix notation')
+    [
+    || '<'
+            $<intpart> = [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
+            $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]?
+            [ '*' <base=radint> '**' <exp=radint> ]?
+       '>'
+#      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
+    || <?before '['> <circumfix>
+    || <?before '('> <circumfix>
+    || <.panic: "Malformed radix number">
+    ]
+}
+
+token terminator:sym<)>
+    { <sym> <O(|%terminator)> }
+
+token terminator:sym<]>
+    { ']' <O(|%terminator)> }
+
+token terminator:sym<}>
+    { '}' <O(|%terminator)> }
+
+grammar P6 is STD {
+
+    ###################
+    # Top-level rules #
+    ###################
+
+    # Note: we only check for the stopper.  We don't check for ^ because
+    # we might be embedded in something else.
+    rule comp_unit {
+        :my $*begin_compunit = 1;
+        :my $*endargs = -1;
+        :my %*LANG;
+        :my $*PKGDECL ::= "";
+        :my $*IN_DECL;
+        :my $*DECLARAND;
+        :my $*NEWPKG;
+        :my $*NEWPAD;
+        :my $*QSIGIL ::= '';
+        :my $*IN_META = 0;
+        :my $*QUASIMODO;
+        :my $*SCOPE = "";
+        :my $*LEFTSIGIL;
+        :my $*PRECLIM;
+        :my %*MYSTERY = ();
+        :my $*INVOCANT_OK;
+        :my $*INVOCANT_IS;
+        :my $*CURPAD;
+        :my $*MULTINESS = '';
+        :my $*SIGNUM = 0;
+
+        :my $*CURPKG;
+        {{
+
+            %*LANG<MAIN>    = ::STD::P6 ;
+            %*LANG<Q>       = ::STD::Q ;
+            %*LANG<Quasi>   = ::STD::Quasi ;
+            %*LANG<Regex>   = ::STD::Regex ;
+            %*LANG<Trans>   = ::STD::Trans ;
+            %*LANG<P5>      = ::STD::P5 ;
+            %*LANG<P5Regex> = ::STD::P5::Regex ;
+
+            @*WORRIES = ();
+            self.load_setting($*SETTINGNAME);
+            my $oid = $*SETTING.id;
+            my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
+            $*CURPAD = STASH.new(
+                'OUTER::' => [$oid],
+                '!file' => $*FILE, '!line' => 0,
+                '!id' => [$id],
+            );
+            $ALL.{$id} = $*CURPAD;
+            $*UNIT = $*CURPAD;
+            $ALL.<UNIT> = $*UNIT;
+            self.finishpad;
+        }}
+        <statementlist>
+        [ <?unitstopper> || <.panic: "Confused"> ]
+        # "CHECK" time...
+        {{
+            if @*WORRIES {
+                warn "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
+            }
+            my $m = $¢.explain_mystery();
+            warn $m if $m;
+        }}
+    }
+
+    # Note: because of the possibility of placeholders we can't determine arity of
+    # the block syntactically, so this must be determined via semantic analysis.
+    # Also, pblocks used in an if/unless statement do not treat $_ as a placeholder,
+    # while most other blocks treat $_ as equivalent to $^x.  Therefore the first
+    # possible place to check arity is not here but in the rule that calls this
+    # rule.  (Could also be done in a later pass.)
+
+    token pblock () {
+        :temp $*CURPAD;
+        :dba('parameterized block')
+        [<?before <.lambda> | '{' > ||
+            {{
+                if $*BORG and $*BORG.<block> {
+                    if $*BORG.<name> {
+                        my $m = "Function '" ~ $*BORG.<name> ~ "' needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
+                        $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by '" ~ $*BORG.<name> ~ "')");
+                    }
+                    else {
+                        my $m = "Expression needs parens to avoid gobbling block" ~ $*BORG.<culprit>.locmess;
+                        $*BORG.<block>.panic($m ~ "\nMissing block (apparently gobbled by expression)");
+                    }
+                }
+                elsif %*MYSTERY {
+                    $¢.panic("Missing block (apparently gobbled by undeclared routine?)");
+                }
+                else {
+                    $¢.panic("Missing block");
+                }
+            }}
+        ]
+        [
+        | <lambda>
+            <.newpad(1)>
+            <signature(1)>
+            <blockoid>
+            <.getsig>
+        | <?before '{'>
+            <.newpad(1)>
+            <blockoid>
+            <.getsig>
+        ]
+    }
+
+    token lambda { '->' | '<->' }
+
+    # Look for an expression followed by a required lambda.
+    token xblock {
+        :my $*GOAL ::= '{';
+        :my $*BORG = {};
+        <EXPR>
+        { $*BORG.<culprit> //= $<EXPR>.cursor(self.pos) }
+        <.ws>
+        <pblock>
+    }
+
+    token block () {
+        :temp $*CURPAD;
+        :dba('scoped block')
+        [ <?before '{' > || <.panic: "Missing block"> ]
+        <.newpad>
+        <blockoid>
+        <.checkyada>
+    }
+
+    token blockoid {
+        # encapsulate braided languages
+        :temp %*LANG;
+        :my $*SIGNUM;
+
+        <.finishpad>
+        [
+        | :dba('block') '{' ~ '}' <statementlist>
+        | <?terminator> <.panic: 'Missing block'>
+        | <?> <.panic: "Malformed block">
+        ]
+
+        [
+        | <?before \h* $$>  # (usual case without comments)
+            { @*MEMOS[$¢.pos]<endstmt> = 2; }
+        | \h* <?before <[\\,:]>>
+        | <.unv>? $$
+            { @*MEMOS[$¢.pos]<endstmt> = 2; }
+        | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
+        ]
+    }
+
+    token regex_block {
+        # encapsulate braided languages
+        :temp %*LANG;
+
+        :my $lang = %*LANG<Regex>;
+        :my $*GOAL ::= '}';
+
+        [ <quotepair> <.ws>
+            {
+                my $kv = $<quotepair>[*-1];
+                $lang = $lang.tweak($kv.<k>, $kv.<v>)
+                    or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
+            }
+        ]*
+
+        '{'
+        <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
+        [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
+
+        [
+        | <?before \h* $$>  # (usual case without comments)
+            { @*MEMOS[$¢.pos]<endstmt> = 2; }
+        | \h* <?before <[\\,:]>>
+        | <.unv>? $$
+            { @*MEMOS[$¢.pos]<endstmt> = 2; }
+        | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
+        ]
+    }
+
+    # statement semantics
+    rule statementlist {
+        :my $*INVOCANT_OK = 0;
+        :dba('statement list')
+
+        [
+        | $
+        | <?before <[\)\]\}]>>
+        | [<statement><eat_terminator> ]*
+        ]
+    }
+
+    # embedded semis, context-dependent semantics
+    rule semilist {
+        :my $*INVOCANT_OK = 0;
+        :dba('semicolon list')
+        [
+        | <?before <[\)\]\}]>>
+        | [<statement><eat_terminator> ]*
+        ]
+    }
+
+
+    token label {
+        :my $label;
+        <identifier> ':' <?before \s> <.ws>
+
+        [ <?{ $¢.is_name($label = $<identifier>.Str) }>
+          <.panic("Illegal redeclaration of '$label'")>
+        ]?
+
+        # add label as a pseudo type
+        {{ $¢.add_my_name($label); }}
+
+    }
+
+    token statement {
+        :my $*endargs = -1;
+        :my $*QSIGIL ::= 0;
+        <!before <[\)\]\}]> >
+
+        # this could either be a statement that follows a declaration
+        # or a statement that is within the block of a code declaration
+        <!!{ $¢ = %*LANG<MAIN>.bless($¢); }>
+
+        [
+        | <label> <statement>
+        | <statement_control>
+        | <EXPR>
+            :dba('statement end')
+            [
+            || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>   # no mod after end-line curly
+            ||
+                :dba('statement modifier')
+                <.ws>
+                [
+                | <statement_mod_loop>
+                    {{
+                        my $sp = $<EXPR><statement_prefix>;
+                        if $sp and $sp<sym> eq 'do' {
+                           my $s = $<statement_mod_loop>[0]<sym>;
+                           $¢.obs("do...$s" ,"repeat...$s");
+                        }
+                    }}
+                | <statement_mod_cond>
+                    :dba('statement modifier loop')
+                    [
+                    || <?{ (@*MEMOS[$¢.pos]<endstmt> // 0) == 2 }>
+                    || <.ws> <statement_mod_loop>?
+                    ]
+                ]?
+            ]
+        | <?before ';'>
+        | {} <.panic: "Bogus statement">
+        ]
+
+        # Is there more on same line after a block?
+        [ <?{ (@*MEMOS[@*MEMOS[$¢.pos]<ws>//$¢.pos]<endargs>//0) == 1 }>
+            \h*
+            <!before ';' | ')' | ']' | '}' >
+            <!infixstopper>
+            <.panic: "Missing semicolon or comma after block">
+        ]?
+    }
+
+    token eat_terminator {
+        [
+        || ';' [ <?before $> { $*ORIG ~~ s/\;$/ /; } ]?
+        || <?{ @*MEMOS[$¢.pos]<endstmt> }> <.ws>
+        || <?terminator>
+        || $
+        || <?stopper>
+        || {{ if @*MEMOS[$¢.pos]<ws> { $¢.pos = @*MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
+            <.panic: "Confused">
+        ]
+    }
+
+    #####################
+    # statement control #
+    #####################
+
+    token statement_control:need {
+        :my $longname;
+        <sym>:s
+        [
+        |<version>
+        |<module_name>
+            {{
+                my $*SCOPE = 'use';
+                $longname = $<module_name>[*-1]<longname>;
+                $¢.do_need($longname);
+            }}
+        ] ** ','
+    }
+
+    token statement_control:import {
+        :my $longname;
+        :my $*SCOPE = 'use';
+        <sym> <.ws>
+        <term>
+        [
+        || <.spacey> <arglist>
+            {{
+                $¢.do_import($<term>, $<arglist>);
+            }}
+        || {{ $¢.do_import($<term>, ''); }}
+        ]
+        <.ws>
+    }
+
+    token statement_control:use {
+        :my $longname;
+        :my $*SCOPE = 'use';
+        <sym> <.ws>
+        [
+        | <version>
+        | <module_name>
+            {{
+                $longname = $<module_name><longname>;
+            }}
+            [
+            || <.spacey> <arglist>
+                {{
+                    $¢.do_use($longname, $<arglist>);
+                }}
+            || {{ $¢.do_use($longname, ''); }}
+            ]
+        ]
+        <.ws>
+    }
+
+
+    token statement_control:no {
+        <sym> <.ws>
+        <module_name>[<.spacey><arglist>]?
+        <.ws>
+    }
+
+
+    token statement_control:if {
+        <sym> :s
+        <xblock>
+        [
+            [ <!before 'else'\s*'if'> || <.panic: "Please use 'elsif'"> ]
+            'elsif'<?spacey> <elsif=xblock>
+        ]*
+        [
+            'else'<?spacey> <else=pblock>
+        ]?
+    }
+
+
+    token statement_control:unless {
+        <sym> :s
+        <xblock>
+        [ <!before 'else'> || <.panic: "unless does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
+    }
+
+
+    token statement_control:while {
+        <sym> :s
+        [ <?before '(' ['my'? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
+            <.panic: "This appears to be Perl 5 code"> ]?
+        <xblock>
+    }
+
+
+    token statement_control:until {
+        <sym> :s
+        <xblock>
+    }
+
+
+    token statement_control:repeat {
+        <sym> :s
+        [
+            | $<wu>=['while'|'until']<.spacey>
+              <xblock>
+            | <pblock>
+              $<wu>=['while'|'until'][<.spacey>||<.panic: "Whitespace required after keyword">] <EXPR>
+        ]
+    }
+
+    token statement_control:loop {
+        <sym> <.ws>
+        $<eee> = (
+            '(' [ :s
+                <e1=EXPR>? ';'
+                <e2=EXPR>? ';'
+                <e3=EXPR>?
+            ')'||<.panic: "Malformed loop spec">]
+            [ <?before '{' > <.panic: "Whitespace required before block"> ]?
+        )? <.ws>
+        <block>
+    }
+
+
+    token statement_control:for {
+        <sym> :s
+        [ <?before 'my'? '$'\w+ '(' >
+            <.panic: "This appears to be Perl 5 code"> ]?
+        [ <?before '(' <.EXPR>? ';' <.EXPR>? ';' <.EXPR>? ')' >
+            <.obs('C-style "for (;;)" loop', '"loop (;;)"')> ]?
+        <xblock>
+    }
+
+    token statement_control:given {
+        <sym> :s
+        <xblock>
+    }
+    token statement_control:when {
+        <sym> :s
+        <xblock>
+    }
+    rule statement_control:default {<sym> <block> }
+
+    token statement_prefix:BEGIN   { <sym> <blorst> }
+    token statement_prefix:CHECK   { <sym> <blorst> }
+    token statement_prefix:INIT    { <sym> <blorst> }
+    token statement_prefix:START   { <sym> <blorst> }
+    token statement_prefix:ENTER   { <sym> <blorst> }
+    token statement_prefix:FIRST   { <sym> <blorst> }
+
+    rule statement_control:END     {<sym> <block> }
+    rule statement_control:LEAVE   {<sym> <block> }
+    rule statement_control:KEEP    {<sym> <block> }
+    rule statement_control:UNDO    {<sym> <block> }
+    rule statement_control:NEXT    {<sym> <block> }
+    rule statement_control:LAST    {<sym> <block> }
+    rule statement_control:PRE     {<sym> <block> }
+    rule statement_control:POST    {<sym> <block> }
+    rule statement_control:CATCH   {<sym> <block> }
+    rule statement_control:CONTROL {<sym> <block> }
+    rule statement_control:TEMP    {<sym> <block> }
+
+    #######################
+    # statement modifiers #
+    #######################
+
+    rule modifier_expr { <EXPR> }
+
+    rule statement_mod_cond:if     {<sym> <modifier_expr> }
+    rule statement_mod_cond:unless {<sym> <modifier_expr> }
+    rule statement_mod_cond:when   {<sym> <modifier_expr> }
+
+    rule statement_mod_loop:while {<sym> <modifier_expr> }
+    rule statement_mod_loop:until {<sym> <modifier_expr> }
+
+    rule statement_mod_loop:for   {<sym> <modifier_expr> }
+    rule statement_mod_loop:given {<sym> <modifier_expr> }
+
+    ################
+    # module names #
+    ################
+
+    token def_module_name {
+        <longname>
+        [ :dba('generic role')
+            <?before '['>
+            <?{ ($*PKGDECL//'') eq 'role' }>
+            <.newpad>
+            '[' ~ ']' <signature>
+            { $*IN_DECL = ''; }
+            <.finishpad>
+        ]?
+    }
+
+    token module_name:normal {
+        <longname>
+        [ <?before '['> :dba('generic role') '[' ~ ']' <arglist> ]?
+    }
+
+    token module_name:deprecated { 'v6-alpha' }
+
+    token vnum {
+        \d+ | '*'
+    }
+
+    token version:sym<v> {
+        'v' <?before \d+> :: <vnum> ** '.' '+'?
+    }
+
+    ###############
+    # Declarators #
+    ###############
+
+    token constant_declarator {
+        :my $*IN_DECL = 'constant';
+        :my $*DECLARAND;
+        <.getdecl>
+        <?{ $*SCOPE eq 'constant' }>
+        <identifier> <.ws> <?before '='|'is'\s>
+        { self.add_name($<identifier>.Str); $*IN_DECL = ''; }
+
+        <trait>*
+        <.getdecl>
+    }
+
+    token variable_declarator {
+        :my $*IN_DECL = 'variable';
+        :my $*DECLARAND;
+        <variable>
+        { $¢.add_variable($<variable>.Str); $*IN_DECL = ''; }
+        [   # Is it a shaped array or hash declaration?
+          #  <?{ $<sigil> eq '@' | '%' }>
+            <.unsp>?
+            $<shape> = [
+            | '(' ~ ')' <signature>
+            | :dba('shape definition') '[' ~ ']' <semilist>
+            | :dba('shape definition') '{' ~ '}' <semilist>
+            | <?before '<'> <postcircumfix>
+            ]*
+        ]?
+        <.ws>
+
+        <trait>*
+        <.getdecl>
+    }
+
+    rule scoped ($*SCOPE) {
+        :dba('scoped declarator')
+        [
+        | <declarator>
+        | <regex_declarator>
+        | <package_declarator>
+        | <typename>+
+            {
+                my $t = $<typename>;
+                @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
+            }
+            <multi_declarator>
+        | <multi_declarator>
+        ]
+        || <?before <[A..Z]>><longname>{{
+                my $t = $<longname>.Str;
+                if not $¢.is_known($t) {
+                    $¢.panic("In \"$*SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
+                }
+            }}
+            <!> # drop through
+        || <.panic: "Malformed $*SCOPE">
+    }
+
+
+    token scope_declarator:my        { <sym> <scoped('my')> }
+    token scope_declarator:our       { <sym> <scoped('our')> }
+    token scope_declarator:state     { <sym> <scoped('state')> }
+    token scope_declarator:constant  { <sym> <scoped('constant')> }
+    token scope_declarator:has       { <sym> <scoped('has')> }
+    token scope_declarator:augment   { <sym> <scoped('augment')> }
+    token scope_declarator:supersede { <sym> <scoped('supersede')> }
+
+
+    token package_declarator:class {
+        :my $*PKGDECL ::= 'class';
+        <sym> <package_def>
+    }
+
+    token package_declarator:grammar {
+        :my $*PKGDECL ::= 'grammar';
+        <sym> <package_def>
+    }
+
+    token package_declarator:module {
+        :my $*PKGDECL ::= 'module';
+        <sym> <package_def>
+    }
+
+    token package_declarator:package {
+        :my $*PKGDECL ::= 'package';
+        <sym> <package_def>
+    }
+
+    token package_declarator:role {
+        :my $*PKGDECL ::= 'role';
+        <sym> <package_def>
+    }
+
+    token package_declarator:knowhow {
+        :my $*PKGDECL ::= 'knowhow';
+        <sym> <package_def>
+    }
+
+    token package_declarator:slang {
+        :my $*PKGDECL ::= 'slang';
+        <sym> <package_def>
+    }
+
+    token package_declarator:require {   # here because of declarational aspects
+        <sym> <.ws>
+        [
+        || <module_name> <EXPR>?
+        || <EXPR>
+        ]
+    }
+
+    token package_declarator:trusts {
+        <sym> <.ws>
+        <module_name>
+    }
+
+    token package_declarator:does {
+        <sym> <.ws>
+        <typename>
+    }
+
+    rule package_def {
+        :my $longname;
+        :my $*IN_DECL = 'package';
+        :my $*DECLARAND;
+        :my $*NEWPKG;
+        :my $*NEWPAD;
+        { $*SCOPE ||= 'our'; }
+        [
+            [
+                <def_module_name>{
+                    $longname = $<def_module_name>[0]<longname>;
+                    $¢.add_name($longname.Str);
+                }
+            ]?
+            <trait>*
+            <.getdecl>
+            [
+            || <?before '{'>
+                [
+                :temp $*CURPKG;
+                {{
+                    # figure out the actual full package name (nested in outer package)
+                    if $longname and $*NEWPKG {
+                        my $shortname = $longname.<name>.Str;
+                        if $*SCOPE eq 'our' {
+                            $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+                            say "added our " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
+                        }
+                        else {
+                            $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+                            say "added my " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
+                        }
+                    }
+                    $*begin_compunit = 0;
+                }}
+                <block>
+                ]
+            || <?before ';'>
+                [
+                || <?{ $*begin_compunit }>
+                    {{
+                        $longname orelse $¢.panic("Compilation unit cannot be anonymous");
+                        my $shortname = $longname.<name>.Str;
+                        $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+                        $*begin_compunit = 0;
+
+                        # throw out null core when compiling the real CORE
+                        if $shortname eq 'CORE' and $*CORE.id ~~ /NULL/ {
+                            $*UNIT<OUTER::> = [''];
+                            $*CORE = $*UNIT;
+                            $*SETTING = $*UNIT;
+                            $ALL = {
+                                CORE => $*UNIT,
+                                SETTING => $*UNIT,
+                                $*UNIT.id => $*UNIT,
+                            };
+                        }
+                    }}
+                || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
+                ]
+            || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
+            ]
+        ] || <.panic: "Malformed $*PKGDECL">
+    }
+
+    token declarator {
+        [
+        | <constant_declarator>
+        | <variable_declarator>
+        | '(' ~ ')' <signature> <trait>*
+        | <routine_declarator>
+        | <regex_declarator>
+        | <type_declarator>
+        ]
+    }
+
+    token multi_declarator:multi {
+        :my $*MULTINESS = 'multi';
+        <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed multi'> ]
+    }
+    token multi_declarator:proto {
+        :my $*MULTINESS = 'proto';
+        <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed proto'> ]
+    }
+    token multi_declarator:only {
+        :my $*MULTINESS = 'only';
+        <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed only'> ]
+    }
+    token multi_declarator:null {
+        :my $*MULTINESS = '';
+        <declarator>
+    }
+
+    token routine_declarator:sub       { <sym> <routine_def> }
+    token routine_declarator:method    { <sym> <method_def> }
+    token routine_declarator:submethod { <sym> <method_def> }
+    token routine_declarator:macro     { <sym> <macro_def> }
+
+    token regex_declarator:regex { <sym>       <regex_def> }
+    token regex_declarator:token { <sym>       <regex_def> }
+    token regex_declarator:rule  { <sym>       <regex_def> }
+
+    rule multisig {
+        :my $signum = 0;
+        :dba('signature')
+        [
+            ':'?'(' ~ ')' <signature(++$signum)>
+        ]
+        ** '|'
+    }
+
+    method checkyada {
+        try {
+            my $startsym = self.<blockoid><statementlist><statement>[0]<EXPR><term><sym> // '';
+            if $startsym eq '...' or $startsym eq '!!!' or $startsym eq '???' {
+                $*DECLARAND<stub> = 1;
+            }
+        };
+        return self;
+    }
+
+    rule routine_def () {
+        :temp $*CURPAD;
+        :my $*IN_DECL = 'routine';
+        :my $*DECLARAND;
+        [
+            [ $<sigil>=['&''*'?] <deflongname>? | <deflongname> ]?
+            <.newpad(1)>
+            [ <multisig> | <trait> ]*
+            <!{
+                $*IN_DECL = '';
+            }>
+            <blockoid>:!s
+            <.checkyada>
+            <.getsig>
+            <.getdecl>
+        ] || <.panic: "Malformed routine">
+    }
+
+    rule method_def () {
+        :temp $*CURPAD;
+        :my $*IN_DECL = 'method';
+        :my $*DECLARAND;
+        <.newpad(1)>
+        [
+            [
+            | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
+            | <multisig> <trait>*
+            | <sigil> '.'
+                :dba('subscript signature')
+                [
+                | '(' ~ ')' <signature>
+                | '[' ~ ']' <signature>
+                | '{' ~ '}' <signature>
+                | <?before '<'> <postcircumfix>
+                ]
+                <trait>*
+            | <?>
+            ]
+            { $*IN_DECL = ''; }
+            <blockoid>:!s
+            <.checkyada>
+            <.getsig>
+            <.getdecl>
+        ] || <.panic: "Malformed method">
+    }
+
+    rule regex_def () {
+        :temp $*CURPAD;
+        :my $*IN_DECL = 'regex';
+        :my $*DECLARAND;
+        [
+            [ '&'<deflongname>? | <deflongname> ]?
+            <.newpad(1)>
+            [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
+            { $*IN_DECL = ''; }
+            <.finishpad>
+            <regex_block>:!s
+            <.getsig>
+            <.getdecl>
+        ] || <.panic: "Malformed regex">
+    }
+
+    rule macro_def () {
+        :temp $*CURPAD;
+        :my $*IN_DECL = 'macro';
+        :my $*DECLARAND;
+        [
+            [ '&'<deflongname>? | <deflongname> ]?
+            <.newpad(1)>
+            [ <multisig> | <trait> ]*
+            <!{
+                $*IN_DECL = '';
+            }>
+            { $*IN_DECL = ''; }
+            <blockoid>:!s
+            <.checkyada>
+            <.getsig>
+            <.getdecl>
+        ] || <.panic: "Malformed macro">
+    }
+
+    rule trait {
+        :my $*IN_DECL = 0;
+        [
+        | <trait_mod>
+        | <colonpair>
+        ]
+    }
+
+    token trait_mod:is {
+        <sym>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
+        {{
+            if $*DECLARAND {
+                my $traitname = $<longname>.Str;
+                # XXX eventually will use multiple dispatch
+                $*DECLARAND{$traitname} = self.gettrait($traitname, $<circumfix>);
+            }
+        }}
+    }
+    token trait_mod:hides {
+        <sym>:s <module_name>
+    }
+    token trait_mod:does {
+        :my $*PKGDECL ::= 'role';
+        <sym>:s <module_name>
+    }
+    token trait_mod:will {
+        <sym>:s <identifier> <pblock>
+    }
+
+    token trait_mod:of      { <sym>:s <typename> }
+    token trait_mod:as      { <sym>:s <typename> }
+    token trait_mod:returns { <sym>:s <typename> }
+    token trait_mod:handles { <sym>:s <term> }
+
+    #########
+    # Nouns #
+    #########
+
+    # (for when you want to tell EXPR that infix already parsed the term)
+    token nullterm {
+        <?>
+    }
+
+    token nulltermish {
+        :dba('null term')
+        [
+        | <?stdstopper>
+        | <term=termish>
+            {
+                $¢.<PRE>  = $<term><PRE>:delete;
+                $¢.<POST> = $<term><POST>:delete;
+                $¢.<~CAPS> = $<term><~CAPS>;
+            }
+        | <?>
+        ]
+    }
+
+    token termish {
+        :my $*SCOPE = "";
+        :my $*VAR;
+        :dba('prefix or term')
+        [
+        | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
+            [ <?{ $<term> }> || <term> ]
+        | <term>
+        ]
+
+        # also queue up any postfixes
+        :dba('postfix')
+        [
+        || <?{ $*QSIGIL }>
+            [
+            || <?{ $*QSIGIL eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
+            ||                          <POST>+! <?after <[ \] } > ) ]> > 
+            || { $*VAR = 0; }
+            ]
+        || <!{ $*QSIGIL }>
+            <POST>*
+        ]
+        {
+            self.check_variable($*VAR) if $*VAR;
+            $¢.<~CAPS> = $<term><~CAPS>;
+        }
+    }
+
+    token term:fatarrow           { <fatarrow> }
+    token term:variable           { <variable> { $*VAR = $<variable> } }
+    token term:package_declarator { <package_declarator> }
+    token term:scope_declarator   { <scope_declarator> }
+    token term:multi_declarator   { <?before 'multi'|'proto'|'only'> <multi_declarator> }
+    token term:routine_declarator { <routine_declarator> }
+    token term:regex_declarator   { <regex_declarator> }
+    token term:type_declarator    { <type_declarator> }
+    token term:circumfix          { <circumfix> }
+    token term:dotty              { <dotty> }
+    token term:value              { <value> }
+    token term:capterm            { <capterm> }
+    token term:sigterm            { <sigterm> }
+    token term:statement_prefix   { <statement_prefix> }
+    token term:colonpair          { [ <colonpair> <.ws> ]+ }
+
+    token fatarrow {
+        <key=identifier> \h* '=>' <.ws> <val=EXPR(item %item_assignment)>
+    }
+
+    token colonpair {
+        :my $key;
+        :my $value;
+
+        ':'
+        :dba('colon pair')
+        [
+        | '!' <identifier>
+            { $key = $<identifier>.Str; $value = 0; }
+        | $<num> = [\d+] <identifier>
+        | <identifier>
+            { $key = $<identifier>.Str; }
+            [
+            || <.unsp>? :dba('pair value') <circumfix> { $value = $<circumfix>; }
+            || { $value = 1; }
+            ]
+        | :dba('signature') '(' ~ ')' <fakesignature>
+        | <circumfix>
+            { $key = ""; $value = $<circumfix>; }
+        | $<var> = (<sigil> {} <twigil>? <desigilname>)
+            { $key = $<var><desigilname>.Str; $value = $<var>; }
+        ]
+        { $<k> = $key; $<v> = $value; }
+    }
+
+    # Most of these special variable rules are there simply to catch old p5 brainos
+
+    token special_variable:sym<$¢> { <sym> }
+
+    token special_variable:sym<$!> { <sym> <!before \w> }
+
+    token special_variable:sym<$!{ }> {
+        ( '$!{' :: (.*?) '}' )
+        <.obs($0.Str ~ " variable", 'smart match against $!')>
+    }
+
+    token special_variable:sym<$/> {
+        <sym>
+        # XXX assuming nobody ever wants to assign $/ directly anymore...
+        [ <?before \h* '=' <![=]> >
+            <.obs('$/ variable as input record separator',
+                 "filehandle's :irs attribute")>
+        ]?
+    }
+
+    token special_variable:sym<$~> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$~ variable', 'Form module')>
+    }
+
+    token special_variable:sym<$`> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$` variable', 'explicit pattern before <(')>
+    }
+
+    token special_variable:sym<$@> {
+        <sym> ::
+        <.obs('$@ variable as eval error', '$!')>
+    }
+
+    token special_variable:sym<$#> {
+        <sym> ::
+        [
+        || (\w+) <.obs("\$#" ~ $0.Str ~ " variable", '@' ~ $0.Str ~ '.end')>
+        || <.obs('$# variable', '.fmt')>
+        ]
+    }
+    token special_variable:sym<$$> {
+        <sym> <!alpha> :: <?before \s | ',' | <terminator> >
+        <.obs('$$ variable', '$*PID')>
+    }
+    token special_variable:sym<$%> {
+        <sym> ::
+        <.obs('$% variable', 'Form module')>
+    }
+
+    # Note: this works because placeholders are restricted to lowercase
+    token special_variable:sym<$^X> {
+        <sigil> '^' $<letter> = [<[A..Z]>] \W
+        <.obscaret($<sigil>.Str ~ '^' ~ $<letter>.Str, $<sigil>.Str, $<letter>.Str)>
+    }
+
+    token special_variable:sym<$^> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$^ variable', 'Form module')>
+    }
+
+    token special_variable:sym<$&> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$& variable', '$/ or $()')>
+    }
+
+    token special_variable:sym<$*> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$* variable', '^^ and $$')>
+    }
+
+    token special_variable:sym<$)> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$) variable', '$*EGID')>
+    }
+
+    token special_variable:sym<$-> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$- variable', 'Form module')>
+    }
+
+    token special_variable:sym<$=> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$= variable', 'Form module')>
+    }
+
+    token special_variable:sym<@+> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('@+ variable', '.to method')>
+    }
+
+    token special_variable:sym<%+> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('%+ variable', '.to method')>
+    }
+
+    token special_variable:sym<$+[ ]> {
+        '$+['
+        <.obs('@+ variable', '.to method')>
+    }
+
+    token special_variable:sym<@+[ ]> {
+        '@+['
+        <.obs('@+ variable', '.to method')>
+    }
+
+    token special_variable:sym<@+{ }> {
+        '@+{'
+        <.obs('%+ variable', '.to method')>
+    }
+
+    token special_variable:sym<@-> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('@- variable', '.from method')>
+    }
+
+    token special_variable:sym<%-> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('%- variable', '.from method')>
+    }
+
+    token special_variable:sym<$-[ ]> {
+        '$-['
+        <.obs('@- variable', '.from method')>
+    }
+
+    token special_variable:sym<@-[ ]> {
+        '@-['
+        <.obs('@- variable', '.from method')>
+    }
+
+    token special_variable:sym<%-{ }> {
+        '@-{'
+        <.obs('%- variable', '.from method')>
+    }
+
+    token special_variable:sym<$+> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$+ variable', 'Form module')>
+    }
+
+    token special_variable:sym<${^ }> {
+        <sigil> '{^' :: $<text>=[.*?] '}'
+        <.obscaret($<sigil>.Str ~ '{^' ~ $<text>.Str ~ '}', $<sigil>.Str, $<text>.Str)>
+    }
+
+    # XXX should eventually rely on multi instead of nested cases here...
+    method obscaret (Str $var, Str $sigil, Str $name) {
+        my $repl;
+        given $sigil {
+            when '$' {
+                given $name {
+                    when 'MATCH'         { $repl = '$/' }
+                    when 'PREMATCH'      { $repl = 'an explicit pattern before <(' }
+                    when 'POSTMATCH'     { $repl = 'an explicit pattern after )>' }
+                    when 'ENCODING'      { $repl = '$?ENCODING' }
+                    when 'UNICODE'       { $repl = '$?UNICODE' }  # XXX ???
+                    when 'TAINT'         { $repl = '$*TAINT' }
+                    when 'OPEN'          { $repl = 'filehandle introspection' }
+                    when 'N'             { $repl = '$-1' } # XXX ???
+                    when 'L'             { $repl = 'Form module' }
+                    when 'A'             { $repl = 'Form module' }
+                    when 'E'             { $repl = '$!.extended_os_error' }
+                    when 'C'             { $repl = 'COMPILING namespace' }
+                    when 'D'             { $repl = '$*DEBUGGING' }
+                    when 'F'             { $repl = '$*SYSTEM_FD_MAX' }
+                    when 'H'             { $repl = '$?FOO variables' }
+                    when 'I'             { $repl = '$*INPLACE' } # XXX ???
+                    when 'O'             { $repl = '$?OS or $*OS' }
+                    when 'P'             { $repl = 'whatever debugger Perl 6 comes with' }
+                    when 'R'             { $repl = 'an explicit result variable' }
+                    when 'S'             { $repl = 'the context function' } # XXX ???
+                    when 'T'             { $repl = '$*BASETIME' }
+                    when 'V'             { $repl = '$*PERL_VERSION' }
+                    when 'W'             { $repl = '$*WARNING' }
+                    when 'X'             { $repl = '$*EXECUTABLE_NAME' }
+                    when *               { $repl = "a global form such as $sigil*$name" }
+                }
+            }
+            when '%' {
+                given $name {
+                    when 'H'             { $repl = '$?FOO variables' }
+                    when *               { $repl = "a global form such as $sigil*$name" }
+                }
+            }
+            when * { $repl = "a global form such as $sigil*$name" }
+        };
+        return self.obs("$var variable", $repl);
+    }
+
+    token special_variable:sym<::{ }> {
+        '::' <?before '{'>
+    }
+
+    regex special_variable:sym<${ }> {
+        <sigil> '{' {} $<text>=[.*?] '}'
+        {{
+            my $sigil = $<sigil>.Str;
+            my $text = $<text>.Str;
+            my $bad = $sigil ~ '{' ~ $text ~ '}';
+            $text = $text - 1 if $text ~~ /^\d+$/;
+            if $text !~~ /^(\w|\:)+$/ {
+                $¢.obs($bad, $sigil ~ '(' ~ $text ~ ')');
+            }
+            elsif $*QSIGIL {
+                $¢.obs($bad, '{' ~ $sigil ~ $text ~ '}');
+            }
+            else {
+                $¢.obs($bad, $sigil ~ $text);
+            }
+        }}
+    }
+
+    token special_variable:sym<$[> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$[ variable', 'user-defined array indices')>
+    }
+
+    token special_variable:sym<$]> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$] variable', '$*PERL_VERSION')>
+    }
+
+    token special_variable:sym<$\\> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$\\ variable', "the filehandle's :ors attribute")>
+    }
+
+    token special_variable:sym<$|> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$| variable', ':autoflush on open')>
+    }
+
+    token special_variable:sym<$:> {
+        <sym> <?before <[\x20\t\n\],=)}]> >
+        <.obs('$: variable', 'Form module')>
+    }
+
+    token special_variable:sym<$;> {
+        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$; variable', 'real multidimensional hashes')>
+    }
+
+    token special_variable:sym<$'> { #'
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
+    }
+
+    token special_variable:sym<$"> {
+        <sym> <!{ $*QSIGIL }>
+        :: <?before \s | ',' | '=' | <terminator> >
+        <.obs('$" variable', '.join() method')>
+    }
+
+    token special_variable:sym<$,> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$, variable', ".join() method")>
+    }
+
+    token special_variable:sym['$<'] {
+        <sym> :: <!before \s* \w+ \s* '>' >
+        <.obs('$< variable', '$*UID')>
+    }
+
+    token special_variable:sym«\$>» {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$> variable', '$*EUID')>
+    }
+
+    token special_variable:sym<$.> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$. variable', "filehandle's .line method")>
+    }
+
+    token special_variable:sym<$?> {
+        <sym> :: <?before \s | ',' | <terminator> >
+        <.obs('$? variable as child error', '$!')>
+    }
+
+    # desigilname should only follow a sigil/twigil
+
+    token desigilname {
+        [
+        | <?before '$' > <variable> { $*VAR = $<variable> }
+        | <longname>
+        ]
+    }
+
+    token variable {
+        :my $*IN_META = 0;
+        :my $sigil = '';
+        :my $twigil = '';
+        :my $name;
+        <?before <sigil> {
+            $sigil = $<sigil>.Str;
+            $*LEFTSIGIL ||= $sigil;
+        }> {}
+        [
+        || <sigil> <twigil>? <?before '::' [ '{' | '<' | '(' ]> <longname> # XXX
+        || '&'
+            [
+            | <twigil>? <sublongname> { $name = $<sublongname>.Str }
+            | :dba('infix noun') '[' ~ ']' <infixish(1)>
+            ]
+        || '$::' <name>? # XXX
+        || '$:' <name> # XXX
+        || [
+            | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str }
+            | <special_variable>
+            | <sigil> $<index>=[\d+]
+            # Note: $() can also parse as contextualizer in an expression; should have same effect
+            | <sigil> <?before '<' | '('> <postcircumfix>
+            | <sigil> <?{ $*IN_DECL }>
+            | <?> {{
+                if $*QSIGIL {
+                    return ();
+                }
+                else {
+                    $¢.panic("Anonymous variable requires declarator");
+                }
+              }}
+            ]
+        ]
+
+        { my $t = $<twigil>; $twigil = $t.[0].Str if @$t; }
+        [ <?{ $twigil eq '.' }>
+            [<.unsp> | '\\' | <?> ] <?before '('> <postcircumfix>
+        ]?
+    }
+
+
+
+    token deflongname {
+        :dba('new name to be defined')
+        <name>
+        [
+        | <colonpair>+ { $¢.add_macro($<name>) if $*IN_DECL; }
+        | { $¢.add_routine($<name>.Str) if $*IN_DECL; }
+        ]
+    }
+
+    token subshortname {
+        [
+        | <category>
+            [ <colonpair>+ { $¢.add_macro($<category>) if $*IN_DECL; } ]?
+        | <desigilname>
+        ]
+    }
+
+    token sublongname {
+        <subshortname> <sigterm>?
+    }
+
+    token value:quote   { <quote> }
+    token value:number  { <number> }
+    token value:version { <version> }
+
+    # Note: call this only to use existing type, not to declare type
+    token typename {
+        [
+        | '::?'<identifier>                 # parse ::?CLASS as special case
+        | <longname>
+          <?{{
+            my $longname = $<longname>.Str;
+            if substr($longname, 0, 2) eq '::' {
+                $¢.add_my_name(substr($longname, 2));
+            }
+            else {
+                $¢.is_name($longname)
+            }
+          }}>
+        ]
+        # parametric type?
+        <.unsp>? [ <?before '['> <postcircumfix> ]?
+        <.ws> [ 'of' <.ws> <typename> ]?
+    }
+
+    token numish {
+        [
+        | <integer>
+        | <dec_number>
+        | <rad_number>
+        | 'NaN' »
+        | 'Inf' »
+        | '+Inf' »
+        | '-Inf' »
+        ]
+    }
+
+    token number:rational { <nu=integer>'/'<de=integer> }
+    token number:complex { <re=numish>'+'<im=numish>'\\'?'i' | <im=numish>'\\'?'i' }
+    token number:numish { <numish> }
+
+    ##########
+    # Quotes #
+    ##########
+
+    token sibble ($l, $lang2) {
+        :my ($lang, $start, $stop);
+        <babble($l)>
+        { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
+
+        $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
+        [ <?{ $start ne $stop }>
+            <.ws>
+            [ <infixish> || <panic: "Missing assignment operator"> ]
+            [ <?{ $<infixish>.Str eq '=' || $<infixish>.<infix_postfix_meta_operator> }> || <.panic: "Malformed assignment operator"> ]
+            <.ws>
+            <right=EXPR(item %item_assignment)>
+        || 
+            { $lang = $lang2.unbalanced($stop); }
+            <right=nibble($lang)> $stop
+        ]
+    }
+
+    token tribble ($l, $lang2 = $l) {
+        :my ($lang, $start, $stop);
+        <babble($l)>
+        { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
+
+        $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
+        [ <?{ $start ne $stop }>
+            <.ws> <quibble($lang2)>
+        || 
+            { $lang = $lang2.unbalanced($stop); }
+            <right=nibble($lang)> $stop
+        ]
+    }
+
+    token quasiquibble ($l) {
+        :temp %*LANG;
+        :my ($lang, $start, $stop);
+        :my $*QUASIMODO = 0; # :COMPILING sets true
+        <babble($l)>
+        {
+            my $B = $<babble><B>;
+            ($lang,$start,$stop) = @$B;
+            %*LANG<MAIN> = $lang;
+        }
+
+        [
+        || <?{ $start eq '{' }> [ :lang($lang) <block> ]
+        || [ :lang($lang) <starter> <statementlist> [ <stopper> || <.panic: "Couldn't find terminator $stop"> ] ]
+        ]
+    }
+
+    token quote:sym<//>   {
+        '/'\s*'/' <.panic: "Null regex not allowed">
+    }
+
+    token quote:sym</ />   {
+        '/' <nibble( $¢.cursor_fresh( %*LANG<Regex> ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
+        <.old_rx_mods>?
+    }
+
+    # handle composite forms like qww
+    token quote:qq {
+        :my $qm;
+        'qq'
+        [
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak($qm => 1))>
+        | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
+        ]
+    }
+    token quote:q {
+        :my $qm;
+        'q'
+        [
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak($qm => 1))>
+        | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
+        ]
+    }
+
+    token quote:Q {
+        :my $qm;
+        'Q'
+        [
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak($qm => 1))>
+        | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ))>
+        ]
+    }
+
+    token quote_mod:w  { <sym> }
+    token quote_mod:ww { <sym> }
+    token quote_mod:x  { <sym> }
+    token quote_mod:to { <sym> }
+    token quote_mod:s  { <sym> }
+    token quote_mod:a  { <sym> }
+    token quote_mod:h  { <sym> }
+    token quote_mod:f  { <sym> }
+    token quote_mod:c  { <sym> }
+    token quote_mod:b  { <sym> }
+
+    token quote:rx {
+        <sym> » <!before '('>
+        <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
+        <!old_rx_mods>
+    }
+
+    token quote:m  {
+        <sym> » <!before '('>
+        <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
+        <!old_rx_mods>
+    }
+
+    token quote:mm {
+        <sym> » <!before '('>
+        <quibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s))>
+        <!old_rx_mods>
+    }
+
+    token quote:s {
+        <sym> » <!before '('>
+        <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
+        <!old_rx_mods>
+    }
+
+    token quote:ss {
+        <sym> » <!before '('>
+        <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
+        <!old_rx_mods>
+    }
+    token quote:tr {
+        <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
+        <!old_tr_mods>
+    }
+
+    token old_rx_mods {
+        <!after \s>
+        (< i g s m x c e >+) 
+        {{
+            given $0.Str {
+                $_ ~~ /i/ and $¢.worryobs('/i',':i');
+                $_ ~~ /g/ and $¢.worryobs('/g',':g');
+                $_ ~~ /s/ and $¢.worryobs('/s','^^ and $$ anchors');
+                $_ ~~ /m/ and $¢.worryobs('/m','. or \N');
+                $_ ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
+                $_ ~~ /c/ and $¢.worryobs('/c',':c or :p');
+                $_ ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
+                $¢.obs('suffix regex modifiers','prefix adverbs');
+            }
+        }}
+    }
+
+    token old_tr_mods {
+        (< c d s ] >+) 
+        {{
+            given $0.Str {
+                $_ ~~ /c/ and $¢.worryobs('/c',':c');
+                $_ ~~ /d/ and $¢.worryobs('/g',':d');
+                $_ ~~ /s/ and $¢.worryobs('/s',':s');
+                $¢.obs('suffix transliteration modifiers','prefix adverbs');
+            }
+        }}
+    }
+
+    token quote:quasi {
+        <sym> » <!before '('> <quasiquibble($¢.cursor_fresh( %*LANG<Quasi> ))>
+    }
+
+    ###########################
+    # Captures and Signatures #
+    ###########################
+
+    token capterm {
+        '\\'
+        [
+        | '(' <capture>? ')'
+        | <?before \S> <termish>
+        | {} <.panic: "You can't backslash that">
+        ]
+    }
+
+    rule capture {
+        :my $*INVOCANT_OK = 1;
+        <EXPR>
+    }
+
+    token sigterm {
+        :dba('signature')
+        ':(' ~ ')' <fakesignature>
+    }
+
+    rule param_sep { [','|':'|';'|';;'] }
+
+    token fakesignature() {
+        :temp $*CURPAD;
+        <.newpad>
+        <signature>
+    }
+
+    token signature ($padsig = 0) {
+        :my $*IN_DECL = 'sig';
+        :my $*zone = 'posreq';
+        :my $startpos = self.pos;
+        :my $*MULTINESS = 'only';
+        :my $*SIGNUM = $padsig;
+        <.ws>
+        [
+        | <?before '-->' | ')' | ']' | '{' | ':'\s >
+        | [ <parameter> || <.panic: "Malformed parameter"> ]
+        ] ** <param_sep>
+        <.ws>
+        { $*IN_DECL = ''; }
+        [ '-->' <.ws> <typename> ]?
+        {{
+            $*LEFTSIGIL = '@';
+            if $padsig {
+                $*CURPAD.<$?SIGNATURE> ~= '|' if $padsig > 1;
+                $*CURPAD.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
+                $*CURPAD.<!NEEDSIG>:delete;
+            }
+        }}
+    }
+
+    token type_declarator:subset {
+        <sym> :s
+        [
+            <longname> { $¢.add_name($<longname>.Str); }
+            [ of <.ws> <typename> ]?
+            <trait>*
+            [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
+        ] || <.panic: "Malformed subset">
+    }
+
+    token type_declarator:enum {
+        <sym> <.ws>
+        <longname> <.ws> <trait>* <?before <[ < ( « ]> > <term> <.ws>
+            { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<term>.Str); }
+    }
+
+    token type_constraint {
+        :my $*IN_DECL = '';
+        [
+        | <value>
+        | <typename>
+        | where <.ws> <EXPR(item %chaining)>
+        ]
+        <.ws>
+    }
+
+    rule post_constraint {
+        :my $*IN_DECL = '';
+        :dba('constraint')
+        [
+        | '[' ~ ']' <signature>
+        | '(' ~ ')' <signature>
+        | where <EXPR(item %chaining)>
+        ]
+    }
+
+    token named_param {
+        :my $*GOAL ::= ')';
+        ':'
+        [
+        | <name=identifier> '(' <.ws>
+            [ <named_param> | <param_var> <.ws> ]
+            [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
+        | <param_var>
+        ]
+    }
+
+    token param_var {
+        :dba('formal parameter')
+        [
+        | '[' ~ ']' <signature>
+        | '(' ~ ')' <signature>
+        | <sigil> <twigil>?
+            [
+                # Is it a longname declaration?
+            || <?{ $<sigil>.Str eq '&' }> <?ident> {}
+                <name=sublongname>
+
+            ||  # Is it a shaped array or hash declaration?
+                <?{ $<sigil>.Str eq '@' || $<sigil>.Str eq '%' }>
+                <name=identifier>?
+                <?before <[ \< \( \[ \{ ]> >
+                <postcircumfix>
+
+                # ordinary parameter name
+            || <name=identifier>
+            || $<name> = [<[/!]>]
+
+                # bare sigil?
+            ]?
+            {{
+                my $vname = $<sigil>.Str;
+                my $t = $<twigil>;
+                my $twigil = '';
+                $twigil = $t.[0].Str if @$t;
+                $vname ~= $twigil;
+                my $n = try { $<name>[0].Str } // '';
+                $vname ~= $n;
+                given $twigil {
+                    when '' {
+                        self.add_my_variable($vname) if $n ne '';
+                    }
+                    when '.' {
+                    }
+                    when '!' {
+                    }
+                    when '*' {
+                    }
+                    default {
+                        self.worry("Illegal to use $twigil twigil in signature");
+                    }
+                }
+            }}
+        ]
+    }
+
+    token parameter {
+        :my $kind;
+        :my $quant = '';
+        :my $q;
+        :my $*DECLARAND;
+
+        [
+        | <type_constraint>+
+            {{
+                my $t = $<type_constraint>;
+                my @t = grep { substr($_.Str,0,2) ne '::' }, @$t;
+                @t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
+            }}
+            [
+            | '*' <param_var>   { $quant = '*'; $kind = '*'; }
+            | '|' <param_var>   { $quant = '|'; $kind = '*'; }
+            | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
+            |   [
+                | <param_var>   { $quant = ''; $kind = '!'; }
+                | <named_param> { $quant = ''; $kind = '*'; }
+                ]
+                [
+                | '?'           { $quant = '?'; $kind = '?' }
+                | '!'           { $quant = '!'; $kind //= '!' }
+                | <?>
+                ]
+            | <?> { $quant = ''; $kind = '!' }
+            ]
+
+        | '*' <param_var>   { $quant = '*'; $kind = '*'; }
+        | '|' <param_var>   { $quant = '|'; $kind = '*'; }
+        | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
+        |   [
+            | <param_var>   { $quant = ''; $kind = '!'; }
+            | <named_param> { $quant = ''; $kind = '*'; }
+            ]
+            [
+            | '?'           { $quant = '?'; $kind = '?' }
+            | '!'           { $quant = '!'; $kind //= '!' }
+            | <?>
+            ]
+        | {} <longname> <.panic("Invalid typename " ~ $<longname>.Str)>
+        ]
+
+        <trait>*
+
+        <post_constraint>*
+
+        <.getdecl>
+
+        [
+            <default_value> {{
+                given $quant {
+                  when '!' { $¢.panic("Can't put a default on a required parameter") }
+                  when '*' { $¢.panic("Can't put a default on a slurpy parameter") }
+                  when '|' { $¢.panic("Can't put a default on an slurpy capture parameter") }
+                  when '\\' { $¢.panic("Can't put a default on a capture parameter") }
+                }
+                $kind = '?' if $kind eq '!';
+            }}
+            [<?before ':' > <.panic: "Can't put a default on the invocant parameter">]?
+            [<!before <[,;)\]\{\-]> > <.panic: "Default expression must come last">]?
+        ]?
+        [<?before ':'> <?{ $kind ne '!' }> <.panic: "Invocant is too exotic">]?
+
+        {
+            $<quant> = $quant;
+            $<kind> = $kind;
+        }
+
+        # enforce zone constraints
+        {{
+            given $kind {
+                when '!' {
+                    given $*zone {
+                        when 'posopt' {
+    $¢.panic("Can't put required parameter after optional parameters");
+                        }
+                        when 'var' {
+    $¢.panic("Can't put required parameter after variadic parameters");
+                        }
+                    }
+                }
+                when '?' {
+                    given $*zone {
+                        when 'posreq' { $*zone = 'posopt' }
+                        when 'var' {
+    $¢.panic("Can't put optional positional parameter after variadic parameters");
+                        }
+                    }
+                }
+                when '*' {
+                    $*zone = 'var';
+                }
+            }
+        }}
+    }
+
+    rule default_value {
+        :my $*IN_DECL = '';
+        '=' <EXPR(item %item_assignment)>
+    }
+
+    token statement_prefix:try     { <sym> <blorst> }
+    token statement_prefix:quietly { <sym> <blorst> }
+    token statement_prefix:gather  { <sym> <blorst> }
+    token statement_prefix:contend { <sym> <blorst> }
+    token statement_prefix:async   { <sym> <blorst> }
+    token statement_prefix:maybe   { <sym> <blorst> }
+    token statement_prefix:lazy    { <sym> <blorst> }
+    token statement_prefix:do      { <sym> <blorst> }
+
+    token statement_prefix:lift    {
+        :my $*QUASIMODO = 1;
+        <sym> <blorst>
+    }
+
+    token blorst {
+        <?before \s> <.ws>
+        [
+        | <block>
+        | <statement>  # creates a dynamic scope but not lexical scope
+        ]
+    }
+
+    #########
+    # Terms #
+    #########
+
+    # start playing with the setting stubber
+    token term:YOU_ARE_HERE {
+        <sym> <.you_are_here>
+        <O(|%term)>
+    }
+
+    token term:new {
+        'new' \h+ <longname> \h* <!before ':'> <.obs("C++ constructor syntax", "method call syntax")>
+    }
+
+    token term:sym<::?IDENT> {
+        $<sym> = [ '::?' <identifier> ] »
+        <O(|%term)>
+    }
+
+    token term:sym<undef> {
+        <sym> » {}
+        [ <?before \h*'$/' >
+            <.obs('$/ variable as input record separator',
+                 "the filehandle's .slurp method")>
+        ]?
+        [ <?before \h*<sigil><twigil>?\w >
+            <.obs('undef as a verb', 'undefine function')>
+        ]?
+        <O(|%term)>
+    }
+
+    token term:sym<continue>
+        { <sym> » <O(|%term)> }
+
+    token term:sym<self>
+        { <sym> » <O(|%term)> }
+
+    token term:sym<defer>
+        { <sym> » <O(|%term)> }
+
+    token term:rand {
+        <sym> »
+        [ <?before '('? \h* [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]?
+        [ <?before '()'> <.obs('rand()', 'rand')> ]?
+        <O(|%term)>
+    }
+
+    token term:Inf
+        { <sym> » <O(|%term)> }
+
+    token term:NaN
+        { <sym> » <O(|%term)> }
+
+    token term:sym<*>
+        { <sym> <O(|%term)> }
+
+    token term:sym<**>
+        { <sym> <O(|%term)> }
+
+    token infix:lambda {
+        <?before '{' | '->' > <!{ $*IN_META }> {{
+            my $line = $¢.lineof($¢.pos);
+            for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when', 'sub' {
+                my $m = %*MYSTERY{$_};
+                next unless $m;
+                if $line - ($m.<line>//-123) < 5 {
+                    if $m.<ctx> eq '(' {
+                        $¢.panic($_ ~ '() interpreted as postdeclared function call at line ' ~ $m.<line> ~
+                        "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
+                    }
+                    else {
+                        $¢.panic("'$_' interpreted as postdeclared listop at line " ~ $m.<line> ~
+                        "; please use 'do' to introduce statement_control:<$_>.\nUnexpected block in infix position (two terms in a row)");
+                    }
+                }
+            }
+            return () if $*IN_REDUCE;
+            $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
+        }}
+        <O(|%term)>
+    }
+
+    token circumfix:sigil
+        { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> }
+
+    token circumfix:sym<( )>
+        { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
+
+    token circumfix:sym<[ ]>
+        { :dba('array composer') '[' ~ ']' <semilist> <O(|%term)> }
+
+    #############
+    # Operators #
+    #############
+
+    token PRE {
+        :dba('prefix or meta-prefix')
+        [
+        | <prefix>
+            { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
+        | <prefix_circumfix_meta_operator>
+            { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.Str }
+        ]
+        # XXX assuming no precedence change
+        
+        <prefix_postfix_meta_operator>*
+        <.ws>
+    }
+
+    token infixish ($in_meta = $*IN_META) {
+        :my $infix;
+        :my $*IN_META = $in_meta;
+        <!stdstopper>
+        <!infixstopper>
+        :dba('infix or meta-infix')
+        [
+        | <colonpair> {
+                $<fake> = 1;
+                $<sym> = ':';
+                %<O><prec> = %item_assignment<prec>;  # actual test is non-inclusive!
+                %<O><assoc> = 'unary';
+                %<O><dba> = 'adverb';
+            }
+        | :dba('bracketed infix') '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
+        | <infix_circumfix_meta_operator>
+            { $<O> = $<infix_circumfix_meta_operator><O>;
+              $<sym> = $<infix_circumfix_meta_operator><sym>; }
+        | <infix_prefix_meta_operator>
+            { $<O> = $<infix_prefix_meta_operator><O>;
+              $<sym> = $<infix_prefix_meta_operator><sym>; }
+        | <infix> <!before '='>
+               { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
+        | <infix> <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
+               { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
+        ]
+    }
+
+    # NOTE: Do not add dotty ops beginning with anything other than dot!
+    #   Dotty ops have to parse as .foo terms as well, and almost anything
+    #   other than dot will conflict with some other prefix.
+
+    # doing fancy as one rule simplifies LTM
+    token dotty:sym<.*> {
+        ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
+        { $<sym> = $0.Str; }
+        <O(%methodcall)>
+    }
+
+    token dotty:sym<.> {
+        <sym> <dottyop>
+        <O(%methodcall)>
+    }
+
+    token privop {
+        '!' <methodop>
+        <O(%methodcall)>
+    }
+
+    token dottyopish {
+        <term=dottyop>
+    }
+
+    token dottyop {
+        :dba('dotty method or postfix')
+        [
+        | <methodop>
+        | <colonpair>
+        | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
+        ]
+    }
+
+    # Note, this rule mustn't do anything irreversible because it's used
+    # as a lookahead by the quote interpolator.
+
+    token POST {
+        <!stdstopper>
+
+        # last whitespace didn't end here
+        <!{ @*MEMOS[$¢.pos]<ws> }>
+
+        [ <.unsp> | '\\' ]?
+
+        [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
+
+        :dba('postfix')
+        [
+        | <dotty>  { $<O> = $<dotty><O>;  $<sym> = $<dotty><sym>;  $<~CAPS> = $<dotty><~CAPS>; }
+        | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; $<~CAPS> = $<privop><~CAPS>; }
+        | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; $<~CAPS> = $<postop><~CAPS>; }
+        ]
+        { $*LEFTSIGIL = '@'; }
+    }
+
+    method can_meta ($op, $meta) {
+        !$op<O><fiddly> ||
+            self.panic("Can't " ~ $meta ~ " " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are too fiddly");
+        self;
+    }
+
+    regex prefix_circumfix_meta_operator:reduce {
+        :my $*IN_REDUCE = 1;
+        :my $op;
+        <?before '['\S+']'>
+        $<s> = (
+            '['
+            [
+            || <op=infixish(1)> <?before ']'>
+            || \\<op=infixish(1)> <?before ']'>
+            || <!>
+            ]
+            ']' ['«'|<?>]
+        )
+        { $op = $<s><op>; }
+
+        <.can_meta($op, "reduce")>
+
+        [
+        || <!{ $op<O><diffy> }>
+        || <?{ $op<O><assoc> eq 'chain' }>
+        || <.panic("Can't reduce " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
+        ]
+
+        <O($op.Opairs, |%list_prefix, assoc => 'unary', uassoc => 'left')>
+        { $<sym> = $<s>.Str; }
+
+        [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><term> = 1 } ]? > || { $<O><term> = 1 } ]
+    }
+
+    token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
+
+    token postfix_prefix_meta_operator:sym< » >    {
+        [ <sym> | '>>' ]
+        # require >>.( on interpolated hypercall so infix:«$s»($a,$b) {...} dwims
+        [<!{ $*QSIGIL }> || <!before '('> ]
+    }
+
+    token infix_prefix_meta_operator:sym<!> {
+        <sym> <!before '!'> {} [ <infixish(1)> || <.panic: "Negation metaoperator not followed by valid infix"> ]
+
+        [
+        || <?{ $<infixish>.Str eq '=' }>
+           <O(|%chaining)>
+           
+        || <.can_meta($<infixish>, "negate")>    
+           <?{ $<infixish><O><iffy> }>
+           <?{ $<O> = $<infixish><O>; }>
+            
+        || <.panic("Can't negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
+        ]
+    }
+
+    token infix_prefix_meta_operator:sym<R> {
+        <sym> {} <infixish(1)>
+        <.can_meta($<infixish>, "reverse")>
+        <?{ $<O> = $<infixish><O>; }>
+    }
+
+    token infix_prefix_meta_operator:sym<X> {
+        <sym> {}
+        [ <infixish(1)>
+            [X <.panic: "Old form of XopX found">]?
+            <.can_meta($<infixish>[0], "cross")>
+            <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
+        ]?
+        <O(|%list_infix, self.Opairs)>
+    }
+
+    token infix_circumfix_meta_operator:sym<« »> {
+        [
+        | '«'
+        | '»'
+        ]
+        {} <infixish(1)> [ '«' | '»' || <.panic: "Missing « or »"> ]
+        <.can_meta($<infixish>, "hyper")>
+        <?{ $<O> := $<infixish><O>; }>
+    }
+
+    token infix_circumfix_meta_operator:sym«<< >>» {
+        [
+        | '<<'
+        | '>>'
+        ]
+        {} <infixish(1)> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
+        <.can_meta($<infixish>, "hyper")>
+        <?{ $<O> := $<infixish><O>; }>
+    }
+
+    token infix_postfix_meta_operator:sym<=> ($op) {
+        '='
+        <.can_meta($op, "make assignment out of")>
+        [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
+        { $<sym> = $op<sym> ~ '='; }
+        <O(|%item_assignment, $op.Opairs, dba => 'assignment', iffy => 0)>
+    }
+
+    token postcircumfix:sym<( )>
+        { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
+
+    token postcircumfix:sym<[ ]>
+        { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
+
+    token postcircumfix:sym<{ }>
+        { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> }
+
+    token postcircumfix:sym«< >» {
+        :my $pos;
+        '<'
+        { $pos = $¢.pos }
+        [
+        || <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>'
+        || <?before \h* [ \d | <sigil> | ':' ] >
+           { $¢.cursor_force($pos).panic("Whitespace required before < operator") }
+        || { $¢.cursor_force($pos).panic("Unable to parse quote-words subscript; couldn't find right angle quote") }
+        ]
+        <O(|%methodcall)>
+    }
+
+    token postcircumfix:sym«<< >>»
+        { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
+
+    token postcircumfix:sym<« »>
+        { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
+
+    token postop {
+        | <postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
+        | <postcircumfix>   { $<O> := $<postcircumfix><O>; $<sym> := $<postcircumfix><sym>; }
+    }
+
+    token methodop {
+        [
+        | <longname>
+        | <?before '$' | '@' | '&' > <variable> { $*VAR = $<variable> }
+        | <?before <[ ' " ]> >
+            [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
+            <quote>
+            [ <?before '(' | '.(' | '\\'> || <.panic: "Quoted method name requires parenthesized arguments"> ]
+            { my $t = $<quote><nibble>.Str; $t ~~ /\W/ or $t ~~ /^(WHO|WHAT|WHERE|WHEN|WHY|HOW)$/ or $¢.worry("Useless use of quotes") }
+        ] <.unsp>? 
+
+        :dba('method arguments')
+        [
+        | ':' <?before \s> <!{ $*QSIGIL }> <arglist>
+        | <?[\\(]> <args>
+        ]?
+    }
+
+    token semiarglist {
+        <arglist> ** ';'
+        <.ws>
+    }
+
+    token arglist {
+        :my $inv_ok = $*INVOCANT_OK;
+        :my StrPos $*endargs = 0;
+        :my $*GOAL ::= 'endargs';
+        :my $*QSIGIL ::= '';
+        <.ws>
+        :dba('argument list')
+        [
+        | <?stdstopper>
+        | <EXPR(item %list_infix)> {{
+                my $delims = $<EXPR><delims>;
+                for @$delims {
+                    if ($_.<sym> // '') eq ':' {
+                        if $inv_ok {
+                            $*INVOCANT_IS = $<EXPR><list>[0];
+                        }
+                    }
+                }
+            }}
+        ]
+    }
+
+    token term:lambda {
+        <?before <.lambda> >
+        <pblock>
+        {{
+            if $*BORG {
+                $*BORG.<block> = $<pblock>;
+            }
+        }}
+        <O(|%term)>
+    }
+
+    token circumfix:sym<{ }> {
+        <?before '{' >
+        <pblock>
+        {{
+            if $*BORG {
+                $*BORG.<block> = $<pblock>;
+            }
+        }}
+        <O(|%term)>
+    }
+
+    ## methodcall
+
+    token postfix:sym<i>
+        { <sym> » <O(|%methodcall)> }
+
+    token infix:sym<.> ()
+        { '.' <[\]\)\},:\s\$"']> <.obs('. to concatenate strings', '~')> }
+
+    token postfix:sym['->'] ()
+        { '->' <.obs('-> to call a method', '.')> }
+
+    ## autoincrement
+    token postfix:sym<++>
+        { <sym> <O(|%autoincrement)> }
+
+    token postfix:sym«--» ()
+        { <sym> <O(|%autoincrement)> }
+
+    token prefix:sym<++>
+        { <sym> <O(|%autoincrement)> }
+
+    token prefix:sym«--» ()
+        { <sym> <O(|%autoincrement)> }
+
+    ## exponentiation
+    token infix:sym<**>
+        { <sym> <O(|%exponentiation)> }
+
+    ## symbolic unary
+    token prefix:sym<!>
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<+>
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<->
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<~~>
+        { <sym> <.badinfix> <O(|%symbolic_unary)> }
+
+    token prefix:sym<~>
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<??>
+        { <sym> <.badinfix> <O(|%symbolic_unary)> }
+
+    token prefix:sym<?>
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<~^>
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<+^>
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<?^>
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<^^>
+        { <sym> <.badinfix> <O(|%symbolic_unary)> }
+
+    token prefix:sym<^>
+        { <sym> <O(|%symbolic_unary)> }
+
+    token prefix:sym<||>
+        { <sym> <.badinfix> <O(|%symbolic_unary)> }
+
+    token prefix:sym<|>
+        { <sym> <O(|%symbolic_unary)> }
+
+
+    ## multiplicative
+    token infix:sym<*>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym</>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym<div>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym<%>
+        { <sym> <O(|%multiplicative, iffy => 1)> }   # Allow !% operator
+
+    token infix:sym<mod>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym<+&>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym« +< »
+        { <sym> <!before '<'> <O(|%multiplicative)> }
+
+    token infix:sym« << »
+        { <sym> \s <.obs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
+
+    token infix:sym« >> »
+        { <sym> \s <.obs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
+
+    token infix:sym« +> »
+        { <sym> <!before '>'> <O(|%multiplicative)> }
+
+    token infix:sym<~&>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym<?&>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym« ~< »
+        { <sym> <!before '<'> <O(|%multiplicative)> }
+
+    token infix:sym« ~> »
+        { <sym> <!before '>'> <O(|%multiplicative)> }
+
+
+    ## additive
+    token infix:sym<+>
+        { <sym> <O(|%additive)> }
+
+    token infix:sym<->
+        { <sym> <O(|%additive)> }
+
+    token infix:sym<+|>
+        { <sym> <O(|%additive)> }
+
+    token infix:sym<+^>
+        { <sym> <O(|%additive)> }
+
+    token infix:sym<~|>
+        { <sym> <O(|%additive)> }
+
+    token infix:sym<~^>
+        { <sym> <O(|%additive)> }
+
+    token infix:sym<?|>
+        { <sym> <O(|%additive)> }
+
+    token infix:sym<?^>
+        { <sym> <O(|%additive)> }
+
+    ## replication
+    # Note: no word boundary check after x, relies on longest token for x2 xx2 etc
+    token infix:sym<x>
+        { <sym> <O(|%replication)> }
+
+    token infix:sym<xx>
+        { <sym> <O(|%replication)> }
+
+    ## concatenation
+    token infix:sym<~>
+        { <sym> <O(|%concatenation)> }
+
+
+    ## junctive and (all)
+    token infix:sym<&>
+        { <sym> <O(|%junctive_and)> }
+
+    token infix:sym<also>
+        { <sym> <O(|%junctive_and)> }
+
+
+    ## junctive or (any)
+    token infix:sym<|>
+        { <sym> <O(|%junctive_or)> }
+
+    token infix:sym<^>
+        { <sym> <O(|%junctive_or)> }
+
+
+    ## named unary examples
+    # (need \s* to win LTM battle with listops)
+    token prefix:sleep
+        { <sym> » <?before \s*> <O(|%named_unary)> }
+
+    token prefix:abs
+        { <sym> » <?before \s*> <O(|%named_unary)> }
+
+    token prefix:let
+        { <sym> » <?before \s*> <O(|%named_unary)> }
+
+    token prefix:temp
+        { <sym> » <?before \s*> <O(|%named_unary)> }
+
+
+    ## structural infix
+    token infix:sym« <=> »
+        { <sym> <O(|%structural, returns => 'Order')> }
+
+    token infix:cmp
+        { <sym> <O(|%structural, returns => 'Order')> }
+
+    token infix:leg
+        { <sym> <O(|%structural, returns => 'Order')> }
+
+    token infix:but
+        { <sym> <O(|%structural)> }
+
+    token infix:does
+        { <sym> <O(|%structural)> }
+
+    token infix:sym<..>
+        { <sym> [<!{ $*IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? <O(|%structural)> }
+
+    token infix:sym<^..>
+        { <sym> <O(|%structural)> }
+
+    token infix:sym<..^>
+        { <sym> <O(|%structural)> }
+
+    token infix:sym<^..^>
+        { <sym> <O(|%structural)> }
+
+
+    ## chaining binary
+    token infix:sym<==>
+        { <sym> <!before '=' > <O(|%chaining)> }
+
+    token infix:sym<!=>
+        { <sym> <?before \s> <O(|%chaining)> }
+
+    token infix:sym« < »
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym« <= »
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym« > »
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym« >= »
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<~~>
+        { <sym> <O(|%chaining)> }
+
+    # XXX should move to inside meta !
+    token infix:sym<!~>
+        { <sym> \s <.obs('!~ to do negated pattern matching', '!~~')> <O(|%chaining)> }
+
+    token infix:sym<=~>
+        { <sym> <.obs('=~ to do pattern matching', '~~')> <O(|%chaining)> }
+
+    token infix:sym<eq>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<ne>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<lt>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<le>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<gt>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<ge>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<=:=>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<===>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<eqv>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<before>
+        { <sym> <O(|%chaining)> }
+
+    token infix:sym<after>
+        { <sym> <O(|%chaining)> }
+
+
+    ## tight and
+    token infix:sym<&&>
+        { <sym> <O(|%tight_and)> }
+
+
+    ## tight or
+    token infix:sym<||>
+        { <sym> <O(|%tight_or)> }
+
+    token infix:sym<^^>
+        { <sym> <O(|%tight_or)> }
+
+    token infix:sym<//>
+        { <sym> <O(|%tight_or)> }
+
+    token infix:sym<min>
+        { <sym> <O(|%tight_or)> }
+
+    token infix:sym<max>
+        { <sym> <O(|%tight_or)> }
+
+
+    ## conditional
+    token infix:sym<?? !!> {
+        :my $*GOAL ::= '!!';
+        '??'
+        <.ws>
+        <EXPR(item %item_assignment)>
+        [ '!!' ||
+            [
+            || <?before '='> <.panic: "Assignment not allowed within ??!!">
+            || <?before '::'> <.panic: "Please use !! rather than ::">
+            || <?before <infixish>>    # Note: a tight infix would have parsed right
+                <.panic: "Precedence too loose within ??!!; use ??()!! instead ">
+            || <.panic: "Found ?? but no !!; possible precedence problem">
+            ]
+        ]
+        <O(|%conditional, _reducecheck => 'raise_middle')>
+    }
+
+    method raise_middle {
+        self.<middle> = self.<infix><EXPR>;
+        self;
+    }
+
+    token infix:sym<?>
+        { <sym> {} <!before '?'> <?before <-[;]>*?':'> <.obs('?: for the conditional operator', '??!!')> <O(|%conditional)> }
+
+    token infix:sym<ff>
+        { <sym> <O(|%conditional)> }
+
+    token infix:sym<^ff>
+        { <sym> <O(|%conditional)> }
+
+    token infix:sym<ff^>
+        { <sym> <O(|%conditional)> }
+
+    token infix:sym<^ff^>
+        { <sym> <O(|%conditional)> }
+
+    token infix:sym<fff>
+        { <sym> <O(|%conditional)> }
+
+    token infix:sym<^fff>
+        { <sym> <O(|%conditional)> }
+
+    token infix:sym<fff^>
+        { <sym> <O(|%conditional)> }
+
+    token infix:sym<^fff^>
+        { <sym> <O(|%conditional)> }
+
+    ## assignment
+    # There is no "--> type" because assignment may be coerced to either
+    # item assignment or list assignment at "make" time.
+
+    token infix:sym<=> ()
+    {
+        <sym>
+        [
+        || <?{ $*LEFTSIGIL eq '$' }>
+            <O(|%item_assignment)>
+        ||  <O(|%list_assignment)>
+        ]
+    }
+
+    token infix:sym<:=>
+        { <sym> <O(|%item_assignment)> }
+
+    token infix:sym<::=>
+        { <sym> <O(|%item_assignment)> }
+
+    token infix:sym<.=> {
+        <sym>
+        <O(|%item_assignment,
+            nextterm => 'dottyopish',
+            _reducecheck => 'check_doteq'
+        )>
+    }
+
+    method check_doteq {
+        # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || ]
+        return self if self.<left><scope_declarator>;
+        my $ok = 0;
+
+        try {
+            my $methop = self.<right><methodop>;
+            my $name = $methop.<longname>.Str;
+            if $name eq 'new' or $name eq 'sort' or $name eq 'subst' or $name eq 'trans' or $name eq 'reverse' or $name eq 'uniq' or $name eq 'map' or $name eq 'samecase' or $name eq 'substr' or $name eq 'flip' or $name eq 'fmt' {
+                $ok = 1;
+            }
+            elsif not $methop.<args>[0] {
+                $ok = 1;
+            }
+        };
+
+        self.cursor_force(self.<infix><_pos>).worryobs('.= as append operator', '~=') unless $ok;
+        self;
+    }
+
+    token infix:sym« => »
+        { <sym> <O(|%item_assignment, fiddly => 0)> }
+
+    # Note, other assignment ops generated by infix_postfix_meta_operator rule
+
+    ## loose unary
+    token prefix:sym<true>
+        { <sym> » <O(|%loose_unary)> }
+
+    token prefix:sym<not>
+        { <sym> » <O(|%loose_unary)> }
+
+    ## list item separator
+    token infix:sym<,>
+        { <sym> <O(|%comma, fiddly => 0)> }
+
+    token infix:sym<:>
+        { <sym> <?before \s | <terminator> >
+            { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec; }
+        <O(|%comma)> }
+
+    token infix:sym« p5=> »
+        { <sym> <O(|%comma)> }
+
+    token infix:sym<Z>
+        { <sym> <O(|%list_infix)> }
+
+    token infix:sym<minmax>
+        { <sym> <O(|%list_infix)> }
+
+    token infix:sym<...>
+        { <sym> <O(|%list_infix)> }
+
+    token term:sym<...>
+        { <sym> <args>? <O(|%list_prefix)> }
+
+    token term:sym<???>
+        { <sym> <args>? <O(|%list_prefix)> }
+
+    token term:sym<!!!>
+        { <sym> <args>? <O(|%list_prefix)> }
+
+    # force identifier(), identifier.(), etc. to be a function call always
+    token term:identifier
+    {
+        :my $name;
+        :my $pos;
+        <identifier> <?before [<unsp>|'(']? >
+        { $name = $<identifier>.Str; $pos = $¢.pos; }
+        <args( $¢.is_name($name) )>
+        { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
+        {{
+            if $*BORG and $*BORG.<block> {
+                if not $*BORG.<name> {
+                    $*BORG.<culprit> = $<identifier>.cursor($pos);
+                    $*BORG.<name> = $name;
+                }
+            }
+        }}
+        <O(|%term)>
+    }
+
+    token term:opfunc
+    {
+        <category> <colonpair>+ <args> <O(|%term)>
+    }
+
+    token args ($istype = 0) {
+        :my $listopish = 0;
+        :my $*GOAL ::= '';
+        :my $*INVOCANT_OK = 1;
+        :my $*INVOCANT_IS;
+        [
+    #    | :dba('argument list') '.(' ~ ')' <semiarglist>
+        | :dba('argument list') '(' ~ ')' <semiarglist>
+        | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist>
+        |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
+        ]
+        { $<invocant> = $*INVOCANT_IS; }
+
+        :dba('extra arglist after (...):')
+        [
+        || <?{ $listopish }>
+        || ':' <?before \s> <moreargs=arglist>    # either switch to listopiness
+        || {{ $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
+        ]
+    }
+
+    # names containing :: may or may not be function calls
+    # bare identifier without parens also handled here if no other rule parses it
+    token term:name
+    {
+        :my $name;
+        :my $pos;
+        <longname>
+        {
+            $name = $<longname>.Str;
+            $pos = $¢.pos;
+        }
+        [
+        ||  <?{
+                $¢.is_name($<longname>.Str) or substr($<longname>.Str,0,2) eq '::'
+            }>
+            # parametric type?
+            <.unsp>? [ <?before '['> <postcircumfix> ]?
+            :dba('type parameter')
+            [
+                '::'
+                <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
+            ]?
+
+        # unrecognized names are assumed to be post-declared listops.
+        || <args> { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
+            {{
+                if $*BORG and $*BORG.<block> {
+                    if not $*BORG.<name> {
+                        $*BORG.<culprit> = $<longname>.cursor($pos);
+                        $*BORG.<name> //= $name;
+                    }
+                }
+            }}
+        ]
+        <O(%term)>
+    }
+
+    ## loose and
+    token infix:sym<and>
+        { <sym> <O(|%loose_and)> }
+
+    token infix:sym<andthen>
+        { <sym> <O(|%loose_and)> }
+
+    ## loose or
+    token infix:sym<or>
+        { <sym> <O(|%loose_or)> }
+
+    token infix:sym<orelse>
+        { <sym> <O(|%loose_or)> }
+
+    token infix:sym<xor>
+        { <sym> <O(|%loose_or)> }
+
+    ## sequencer
+    token infix:sym« <== »
+        { <sym> <O(|%sequencer)> }
+
+    token infix:sym« ==> »
+        { <sym> <O(|%sequencer)> }
+
+    token infix:sym« <<== »
+        { <sym> <O(|%sequencer)> }
+
+    token infix:sym« ==>> »
+        { <sym> <O(|%sequencer)> }
+
+    ## expression terminator
+    # Note: must always be called as <?terminator> or <?before ...<terminator>...>
+
+    token terminator:sym<;>
+        { ';' <O(|%terminator)> }
+
+    token terminator:sym<if>
+        { 'if' » <.nofun> <O(|%terminator)> }
+
+    token terminator:sym<unless>
+        { 'unless' » <.nofun> <O(|%terminator)> }
+
+    token terminator:sym<while>
+        { 'while' » <.nofun> <O(|%terminator)> }
+
+    token terminator:sym<until>
+        { 'until' » <.nofun> <O(|%terminator)> }
+
+    token terminator:sym<for>
+        { 'for' » <.nofun> <O(|%terminator)> }
+
+    token terminator:sym<given>
+        { 'given' » <.nofun> <O(|%terminator)> }
+
+    token terminator:sym<when>
+        { 'when' » <.nofun> <O(|%terminator)> }
+
+    token terminator:sym« --> »
+        { '-->' <O(|%terminator)> }
+
+    token terminator:sym<!!>
+        { '!!' <?{ $*GOAL eq '!!' }> <O(|%terminator)> }
+
+    regex infixstopper {
+        :dba('infix stopper')
+        [
+        | <?before <stopper> >
+        | <?before '!!' > [ <?{ $*GOAL eq '!!' }> || <.panic: "Ternary !! seems to be missing its ??"> ]
+        | <?before '{' | <lambda> > <?{ ($*GOAL eq '{' or $*GOAL eq 'endargs') and @*MEMOS[$¢.pos]<ws> }>
+        | <?{ $*GOAL eq 'endargs' and @*MEMOS[$¢.pos]<endargs> }>
+        ]
+    }
+
+} # end grammar
 
 grammar Q is STD {
 
@@ -2896,7 +4149,7 @@ grammar Q is STD {
 
 } # end grammar
 
-grammar Quasi is STD {
+grammar Quasi is STD::P6 {
     token term:unquote {
         :my $*QUASIMODO = 0;
         <starter><starter><starter> <.ws>
@@ -2916,1296 +4169,6 @@ grammar Quasi is STD {
     # end tweaks (DO NOT ERASE)
 
 } # end grammar
-
-###########################
-# Captures and Signatures #
-###########################
-
-token capterm {
-    '\\'
-    [
-    | '(' <capture>? ')'
-    | <?before \S> <termish>
-    | {} <.panic: "You can't backslash that">
-    ]
-}
-
-rule capture {
-    :my $*INVOCANT_OK = 1;
-    <EXPR>
-}
-
-token sigterm {
-    :dba('signature')
-    ':(' ~ ')' <fakesignature>
-}
-
-rule param_sep { [','|':'|';'|';;'] }
-
-token fakesignature() {
-    :temp $*CURPAD;
-    <.newpad>
-    <signature>
-}
-
-token signature ($padsig = 0) {
-    :my $*IN_DECL = 'sig';
-    :my $*zone = 'posreq';
-    :my $startpos = self.pos;
-    :my $*MULTINESS = 'only';
-    :my $*SIGNUM = $padsig;
-    <.ws>
-    [
-    | <?before '-->' | ')' | ']' | '{' | ':'\s >
-    | [ <parameter> || <.panic: "Malformed parameter"> ]
-    ] ** <param_sep>
-    <.ws>
-    { $*IN_DECL = ''; }
-    [ '-->' <.ws> <typename> ]?
-    {{
-        $*LEFTSIGIL = '@';
-        if $padsig {
-            $*CURPAD.<$?SIGNATURE> ~= '|' if $padsig > 1;
-            $*CURPAD.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
-            $*CURPAD.<!NEEDSIG>:delete;
-        }
-    }}
-}
-
-token type_declarator:subset {
-    <sym> :s
-    [
-        <longname> { $¢.add_name($<longname>.Str); }
-        [ of <.ws> <typename> ]?
-        <trait>*
-        [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
-    ] || <.panic: "Malformed subset">
-}
-
-token type_declarator:enum {
-    <sym> <.ws>
-    <longname> <.ws> <trait>* <?before <[ < ( « ]> > <term> <.ws>
-        { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<term>.Str); }
-}
-
-token type_constraint {
-    :my $*IN_DECL = '';
-    [
-    | <value>
-    | <typename>
-    | where <.ws> <EXPR(item %chaining)>
-    ]
-    <.ws>
-}
-
-rule post_constraint {
-    :my $*IN_DECL = '';
-    :dba('constraint')
-    [
-    | '[' ~ ']' <signature>
-    | '(' ~ ')' <signature>
-    | where <EXPR(item %chaining)>
-    ]
-}
-
-token named_param {
-    :my $*GOAL ::= ')';
-    ':'
-    [
-    | <name=identifier> '(' <.ws>
-        [ <named_param> | <param_var> <.ws> ]
-        [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
-    | <param_var>
-    ]
-}
-
-token param_var {
-    :dba('formal parameter')
-    [
-    | '[' ~ ']' <signature>
-    | '(' ~ ')' <signature>
-    | <sigil> <twigil>?
-        [
-            # Is it a longname declaration?
-        || <?{ $<sigil>.Str eq '&' }> <?ident> {}
-            <name=sublongname>
-
-        ||  # Is it a shaped array or hash declaration?
-            <?{ $<sigil>.Str eq '@' || $<sigil>.Str eq '%' }>
-            <name=identifier>?
-            <?before <[ \< \( \[ \{ ]> >
-            <postcircumfix>
-
-            # ordinary parameter name
-        || <name=identifier>
-        || $<name> = [<[/!]>]
-
-            # bare sigil?
-        ]?
-        {{
-            my $vname = $<sigil>.Str;
-            my $t = $<twigil>;
-            my $twigil = '';
-            $twigil = $t.[0].Str if @$t;
-            $vname ~= $twigil;
-            my $n = try { $<name>[0].Str } // '';
-            $vname ~= $n;
-            given $twigil {
-                when '' {
-                    self.add_my_variable($vname) if $n ne '';
-                }
-                when '.' {
-                }
-                when '!' {
-                }
-                when '*' {
-                }
-                default {
-                    self.worry("Illegal to use $twigil twigil in signature");
-                }
-            }
-        }}
-    ]
-}
-
-token parameter {
-    :my $kind;
-    :my $quant = '';
-    :my $q;
-    :my $*DECLARAND;
-
-    [
-    | <type_constraint>+
-        {{
-            my $t = $<type_constraint>;
-            my @t = grep { substr($_.Str,0,2) ne '::' }, @$t;
-            @t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
-        }}
-        [
-        | '*' <param_var>   { $quant = '*'; $kind = '*'; }
-        | '|' <param_var>   { $quant = '|'; $kind = '*'; }
-        | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
-        |   [
-            | <param_var>   { $quant = ''; $kind = '!'; }
-            | <named_param> { $quant = ''; $kind = '*'; }
-            ]
-            [
-            | '?'           { $quant = '?'; $kind = '?' }
-            | '!'           { $quant = '!'; $kind //= '!' }
-            | <?>
-            ]
-        | <?> { $quant = ''; $kind = '!' }
-        ]
-
-    | '*' <param_var>   { $quant = '*'; $kind = '*'; }
-    | '|' <param_var>   { $quant = '|'; $kind = '*'; }
-    | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
-    |   [
-        | <param_var>   { $quant = ''; $kind = '!'; }
-        | <named_param> { $quant = ''; $kind = '*'; }
-        ]
-        [
-        | '?'           { $quant = '?'; $kind = '?' }
-        | '!'           { $quant = '!'; $kind //= '!' }
-        | <?>
-        ]
-    | {} <longname> <.panic("Invalid typename " ~ $<longname>.Str)>
-    ]
-
-    <trait>*
-
-    <post_constraint>*
-
-    <.getdecl>
-
-    [
-        <default_value> {{
-            given $quant {
-              when '!' { $¢.panic("Can't put a default on a required parameter") }
-              when '*' { $¢.panic("Can't put a default on a slurpy parameter") }
-              when '|' { $¢.panic("Can't put a default on an slurpy capture parameter") }
-              when '\\' { $¢.panic("Can't put a default on a capture parameter") }
-            }
-            $kind = '?' if $kind eq '!';
-        }}
-        [<?before ':' > <.panic: "Can't put a default on the invocant parameter">]?
-        [<!before <[,;)\]\{\-]> > <.panic: "Default expression must come last">]?
-    ]?
-    [<?before ':'> <?{ $kind ne '!' }> <.panic: "Invocant is too exotic">]?
-
-    {
-        $<quant> = $quant;
-        $<kind> = $kind;
-    }
-
-    # enforce zone constraints
-    {{
-        given $kind {
-            when '!' {
-                given $*zone {
-                    when 'posopt' {
-$¢.panic("Can't put required parameter after optional parameters");
-                    }
-                    when 'var' {
-$¢.panic("Can't put required parameter after variadic parameters");
-                    }
-                }
-            }
-            when '?' {
-                given $*zone {
-                    when 'posreq' { $*zone = 'posopt' }
-                    when 'var' {
-$¢.panic("Can't put optional positional parameter after variadic parameters");
-                    }
-                }
-            }
-            when '*' {
-                $*zone = 'var';
-            }
-        }
-    }}
-}
-
-rule default_value {
-    :my $*IN_DECL = '';
-    '=' <EXPR(item %item_assignment)>
-}
-
-token statement_prefix:try     { <sym> <blorst> }
-token statement_prefix:quietly { <sym> <blorst> }
-token statement_prefix:gather  { <sym> <blorst> }
-token statement_prefix:contend { <sym> <blorst> }
-token statement_prefix:async   { <sym> <blorst> }
-token statement_prefix:maybe   { <sym> <blorst> }
-token statement_prefix:lazy    { <sym> <blorst> }
-token statement_prefix:do      { <sym> <blorst> }
-
-token statement_prefix:lift    {
-    :my $*QUASIMODO = 1;
-    <sym> <blorst>
-}
-
-token blorst {
-    <?before \s> <.ws>
-    [
-    | <block>
-    | <statement>  # creates a dynamic scope but not lexical scope
-    ]
-}
-
-#########
-# Terms #
-#########
-
-# start playing with the setting stubber
-token term:YOU_ARE_HERE {
-    <sym> <.you_are_here>
-    <O(|%term)>
-}
-
-token term:new {
-    'new' \h+ <longname> \h* <!before ':'> <.obs("C++ constructor syntax", "method call syntax")>
-}
-
-token term:sym<::?IDENT> {
-    $<sym> = [ '::?' <identifier> ] »
-    <O(|%term)>
-}
-
-token term:sym<undef> {
-    <sym> » {}
-    [ <?before \h*'$/' >
-        <.obs('$/ variable as input record separator',
-             "the filehandle's .slurp method")>
-    ]?
-    [ <?before \h*<sigil><twigil>?\w >
-        <.obs('undef as a verb', 'undefine function')>
-    ]?
-    <O(|%term)>
-}
-
-token term:sym<continue>
-    { <sym> » <O(|%term)> }
-
-token term:sym<self>
-    { <sym> » <O(|%term)> }
-
-token term:sym<defer>
-    { <sym> » <O(|%term)> }
-
-token term:rand {
-    <sym> »
-    [ <?before '('? \h* [\d|'$']> <.obs('rand(N)', 'N.rand or (1..N).pick')> ]?
-    [ <?before '()'> <.obs('rand()', 'rand')> ]?
-    <O(|%term)>
-}
-
-token term:Inf
-    { <sym> » <O(|%term)> }
-
-token term:NaN
-    { <sym> » <O(|%term)> }
-
-token term:sym<*>
-    { <sym> <O(|%term)> }
-
-token term:sym<**>
-    { <sym> <O(|%term)> }
-
-token infix:lambda {
-    <?before '{' | '->' > <!{ $*IN_META }> {{
-        my $line = $¢.lineof($¢.pos);
-        for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when', 'sub' {
-            my $m = %*MYSTERY{$_};
-            next unless $m;
-            if $line - ($m.<line>//-123) < 5 {
-                if $m.<ctx> eq '(' {
-                    $¢.panic($_ ~ '() interpreted as postdeclared function call at line ' ~ $m.<line> ~
-                    "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
-                }
-                else {
-                    $¢.panic("'$_' interpreted as postdeclared listop at line " ~ $m.<line> ~
-                    "; please use 'do' to introduce statement_control:<$_>.\nUnexpected block in infix position (two terms in a row)");
-                }
-            }
-        }
-        return () if $*IN_REDUCE;
-        $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
-    }}
-    <O(|%term)>
-}
-
-token circumfix:sigil
-    { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> }
-
-token circumfix:sym<( )>
-    { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
-
-token circumfix:sym<[ ]>
-    { :dba('array composer') '[' ~ ']' <semilist> <O(|%term)> }
-
-#############
-# Operators #
-#############
-
-token PRE {
-    :dba('prefix or meta-prefix')
-    [
-    | <prefix>
-        { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
-    | <prefix_circumfix_meta_operator>
-        { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.Str }
-    ]
-    # XXX assuming no precedence change
-    
-    <prefix_postfix_meta_operator>*
-    <.ws>
-}
-
-token infixish ($in_meta = $*IN_META) {
-    :my $infix;
-    :my $*IN_META = $in_meta;
-    <!stdstopper>
-    <!infixstopper>
-    :dba('infix or meta-infix')
-    [
-    | <colonpair> {
-            $<fake> = 1;
-            $<sym> = ':';
-            %<O><prec> = %item_assignment<prec>;  # actual test is non-inclusive!
-            %<O><assoc> = 'unary';
-            %<O><dba> = 'adverb';
-        }
-    | :dba('bracketed infix') '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
-    | <infix_circumfix_meta_operator>
-        { $<O> = $<infix_circumfix_meta_operator><O>;
-          $<sym> = $<infix_circumfix_meta_operator><sym>; }
-    | <infix_prefix_meta_operator>
-        { $<O> = $<infix_prefix_meta_operator><O>;
-          $<sym> = $<infix_prefix_meta_operator><sym>; }
-    | <infix> <!before '='>
-           { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
-    | <infix> <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
-           { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
-    ]
-}
-
-# NOTE: Do not add dotty ops beginning with anything other than dot!
-#   Dotty ops have to parse as .foo terms as well, and almost anything
-#   other than dot will conflict with some other prefix.
-
-# doing fancy as one rule simplifies LTM
-token dotty:sym<.*> {
-    ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
-    { $<sym> = $0.Str; }
-    <O(%methodcall)>
-}
-
-token dotty:sym<.> {
-    <sym> <dottyop>
-    <O(%methodcall)>
-}
-
-token privop {
-    '!' <methodop>
-    <O(%methodcall)>
-}
-
-token dottyopish {
-    <term=dottyop>
-}
-
-token dottyop {
-    :dba('dotty method or postfix')
-    [
-    | <methodop>
-    | <colonpair>
-    | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
-    ]
-}
-
-# Note, this rule mustn't do anything irreversible because it's used
-# as a lookahead by the quote interpolator.
-
-token POST {
-    <!stdstopper>
-
-    # last whitespace didn't end here
-    <!{ @*MEMOS[$¢.pos]<ws> }>
-
-    [ <.unsp> | '\\' ]?
-
-    [ ['.' <.unsp>?]? <postfix_prefix_meta_operator> <.unsp>? ]*
-
-    :dba('postfix')
-    [
-    | <dotty>  { $<O> = $<dotty><O>;  $<sym> = $<dotty><sym>;  $<~CAPS> = $<dotty><~CAPS>; }
-    | <privop> { $<O> = $<privop><O>; $<sym> = $<privop><sym>; $<~CAPS> = $<privop><~CAPS>; }
-    | <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; $<~CAPS> = $<postop><~CAPS>; }
-    ]
-    { $*LEFTSIGIL = '@'; }
-}
-
-method can_meta ($op, $meta) {
-    !$op<O><fiddly> ||
-        self.panic("Can't " ~ $meta ~ " " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are too fiddly");
-    self;
-}
-
-regex prefix_circumfix_meta_operator:reduce {
-    :my $*IN_REDUCE = 1;
-    :my $op;
-    <?before '['\S+']'>
-    $<s> = (
-        '['
-        [
-        || <op=infixish(1)> <?before ']'>
-        || \\<op=infixish(1)> <?before ']'>
-        || <!>
-        ]
-        ']' ['«'|<?>]
-    )
-    { $op = $<s><op>; }
-
-    <.can_meta($op, "reduce")>
-
-    [
-    || <!{ $op<O><diffy> }>
-    || <?{ $op<O><assoc> eq 'chain' }>
-    || <.panic("Can't reduce " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
-    ]
-
-    <O($op.Opairs, |%list_prefix, assoc => 'unary', uassoc => 'left')>
-    { $<sym> = $<s>.Str; }
-
-    [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><term> = 1 } ]? > || { $<O><term> = 1 } ]
-}
-
-token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
-
-token postfix_prefix_meta_operator:sym< » >    {
-    [ <sym> | '>>' ]
-    # require >>.( on interpolated hypercall so infix:«$s»($a,$b) {...} dwims
-    [<!{ $*QSIGIL }> || <!before '('> ]
-}
-
-token infix_prefix_meta_operator:sym<!> {
-    <sym> <!before '!'> {} [ <infixish(1)> || <.panic: "Negation metaoperator not followed by valid infix"> ]
-
-    [
-    || <?{ $<infixish>.Str eq '=' }>
-       <O(|%chaining)>
-       
-    || <.can_meta($<infixish>, "negate")>    
-       <?{ $<infixish><O><iffy> }>
-       <?{ $<O> = $<infixish><O>; }>
-        
-    || <.panic("Can't negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
-    ]
-}
-
-token infix_prefix_meta_operator:sym<R> {
-    <sym> {} <infixish(1)>
-    <.can_meta($<infixish>, "reverse")>
-    <?{ $<O> = $<infixish><O>; }>
-}
-
-token infix_prefix_meta_operator:sym<X> {
-    <sym> {}
-    [ <infixish(1)>
-        [X <.panic: "Old form of XopX found">]?
-        <.can_meta($<infixish>[0], "cross")>
-        <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
-    ]?
-    <O(|%list_infix, self.Opairs)>
-}
-
-token infix_circumfix_meta_operator:sym<« »> {
-    [
-    | '«'
-    | '»'
-    ]
-    {} <infixish(1)> [ '«' | '»' || <.panic: "Missing « or »"> ]
-    <.can_meta($<infixish>, "hyper")>
-    <?{ $<O> := $<infixish><O>; }>
-}
-
-token infix_circumfix_meta_operator:sym«<< >>» {
-    [
-    | '<<'
-    | '>>'
-    ]
-    {} <infixish(1)> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
-    <.can_meta($<infixish>, "hyper")>
-    <?{ $<O> := $<infixish><O>; }>
-}
-
-token infix_postfix_meta_operator:sym<=> ($op) {
-    '='
-    <.can_meta($op, "make assignment out of")>
-    [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
-    { $<sym> = $op<sym> ~ '='; }
-    <O(|%item_assignment, $op.Opairs, dba => 'assignment', iffy => 0)>
-}
-
-token postcircumfix:sym<( )>
-    { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
-
-token postcircumfix:sym<[ ]>
-    { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
-
-token postcircumfix:sym<{ }>
-    { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> }
-
-token postcircumfix:sym«< >» {
-    :my $pos;
-    '<'
-    { $pos = $¢.pos }
-    [
-    || <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>'
-    || <?before \h* [ \d | <sigil> | ':' ] >
-       { $¢.cursor_force($pos).panic("Whitespace required before < operator") }
-    || { $¢.cursor_force($pos).panic("Unable to parse quote-words subscript; couldn't find right angle quote") }
-    ]
-    <O(|%methodcall)>
-}
-
-token postcircumfix:sym«<< >>»
-    { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
-
-token postcircumfix:sym<« »>
-    { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
-
-token postop {
-    | <postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
-    | <postcircumfix>   { $<O> := $<postcircumfix><O>; $<sym> := $<postcircumfix><sym>; }
-}
-
-token methodop {
-    [
-    | <longname>
-    | <?before '$' | '@' | '&' > <variable> { $*VAR = $<variable> }
-    | <?before <[ ' " ]> >
-        [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
-        <quote>
-        [ <?before '(' | '.(' | '\\'> || <.panic: "Quoted method name requires parenthesized arguments"> ]
-        { my $t = $<quote><nibble>.Str; $t ~~ /\W/ or $t ~~ /^(WHO|WHAT|WHERE|WHEN|WHY|HOW)$/ or $¢.worry("Useless use of quotes") }
-    ] <.unsp>? 
-
-    :dba('method arguments')
-    [
-    | ':' <?before \s> <!{ $*QSIGIL }> <arglist>
-    | <?[\\(]> <args>
-    ]?
-}
-
-token semiarglist {
-    <arglist> ** ';'
-    <.ws>
-}
-
-token arglist {
-    :my $inv_ok = $*INVOCANT_OK;
-    :my StrPos $*endargs = 0;
-    :my $*GOAL ::= 'endargs';
-    :my $*QSIGIL ::= '';
-    <.ws>
-    :dba('argument list')
-    [
-    | <?stdstopper>
-    | <EXPR(item %list_infix)> {{
-            my $delims = $<EXPR><delims>;
-            for @$delims {
-                if ($_.<sym> // '') eq ':' {
-                    if $inv_ok {
-                        $*INVOCANT_IS = $<EXPR><list>[0];
-                    }
-                }
-            }
-        }}
-    ]
-}
-
-token term:lambda {
-    <?before <.lambda> >
-    <pblock>
-    {{
-        if $*BORG {
-            $*BORG.<block> = $<pblock>;
-        }
-    }}
-    <O(|%term)>
-}
-
-token circumfix:sym<{ }> {
-    <?before '{' >
-    <pblock>
-    {{
-        if $*BORG {
-            $*BORG.<block> = $<pblock>;
-        }
-    }}
-    <O(|%term)>
-}
-
-## methodcall
-
-token postfix:sym<i>
-    { <sym> » <O(|%methodcall)> }
-
-token infix:sym<.> ()
-    { '.' <[\]\)\},:\s\$"']> <.obs('. to concatenate strings', '~')> }
-
-token postfix:sym['->'] ()
-    { '->' <.obs('-> to call a method', '.')> }
-
-## autoincrement
-token postfix:sym<++>
-    { <sym> <O(|%autoincrement)> }
-
-token postfix:sym«--» ()
-    { <sym> <O(|%autoincrement)> }
-
-token prefix:sym<++>
-    { <sym> <O(|%autoincrement)> }
-
-token prefix:sym«--» ()
-    { <sym> <O(|%autoincrement)> }
-
-## exponentiation
-token infix:sym<**>
-    { <sym> <O(|%exponentiation)> }
-
-## symbolic unary
-token prefix:sym<!>
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<+>
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<->
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<~~>
-    { <sym> <.badinfix> <O(|%symbolic_unary)> }
-
-token prefix:sym<~>
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<??>
-    { <sym> <.badinfix> <O(|%symbolic_unary)> }
-
-token prefix:sym<?>
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<~^>
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<+^>
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<?^>
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<^^>
-    { <sym> <.badinfix> <O(|%symbolic_unary)> }
-
-token prefix:sym<^>
-    { <sym> <O(|%symbolic_unary)> }
-
-token prefix:sym<||>
-    { <sym> <.badinfix> <O(|%symbolic_unary)> }
-
-token prefix:sym<|>
-    { <sym> <O(|%symbolic_unary)> }
-
-
-## multiplicative
-token infix:sym<*>
-    { <sym> <O(|%multiplicative)> }
-
-token infix:sym</>
-    { <sym> <O(|%multiplicative)> }
-
-token infix:sym<div>
-    { <sym> <O(|%multiplicative)> }
-
-token infix:sym<%>
-    { <sym> <O(|%multiplicative, iffy => 1)> }   # Allow !% operator
-
-token infix:sym<mod>
-    { <sym> <O(|%multiplicative)> }
-
-token infix:sym<+&>
-    { <sym> <O(|%multiplicative)> }
-
-token infix:sym« +< »
-    { <sym> <!before '<'> <O(|%multiplicative)> }
-
-token infix:sym« << »
-    { <sym> \s <.obs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
-
-token infix:sym« >> »
-    { <sym> \s <.obs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
-
-token infix:sym« +> »
-    { <sym> <!before '>'> <O(|%multiplicative)> }
-
-token infix:sym<~&>
-    { <sym> <O(|%multiplicative)> }
-
-token infix:sym<?&>
-    { <sym> <O(|%multiplicative)> }
-
-token infix:sym« ~< »
-    { <sym> <!before '<'> <O(|%multiplicative)> }
-
-token infix:sym« ~> »
-    { <sym> <!before '>'> <O(|%multiplicative)> }
-
-
-## additive
-token infix:sym<+>
-    { <sym> <O(|%additive)> }
-
-token infix:sym<->
-    { <sym> <O(|%additive)> }
-
-token infix:sym<+|>
-    { <sym> <O(|%additive)> }
-
-token infix:sym<+^>
-    { <sym> <O(|%additive)> }
-
-token infix:sym<~|>
-    { <sym> <O(|%additive)> }
-
-token infix:sym<~^>
-    { <sym> <O(|%additive)> }
-
-token infix:sym<?|>
-    { <sym> <O(|%additive)> }
-
-token infix:sym<?^>
-    { <sym> <O(|%additive)> }
-
-## replication
-# Note: no word boundary check after x, relies on longest token for x2 xx2 etc
-token infix:sym<x>
-    { <sym> <O(|%replication)> }
-
-token infix:sym<xx>
-    { <sym> <O(|%replication)> }
-
-## concatenation
-token infix:sym<~>
-    { <sym> <O(|%concatenation)> }
-
-
-## junctive and (all)
-token infix:sym<&>
-    { <sym> <O(|%junctive_and)> }
-
-token infix:sym<also>
-    { <sym> <O(|%junctive_and)> }
-
-
-## junctive or (any)
-token infix:sym<|>
-    { <sym> <O(|%junctive_or)> }
-
-token infix:sym<^>
-    { <sym> <O(|%junctive_or)> }
-
-
-## named unary examples
-# (need \s* to win LTM battle with listops)
-token prefix:sleep
-    { <sym> » <?before \s*> <O(|%named_unary)> }
-
-token prefix:abs
-    { <sym> » <?before \s*> <O(|%named_unary)> }
-
-token prefix:let
-    { <sym> » <?before \s*> <O(|%named_unary)> }
-
-token prefix:temp
-    { <sym> » <?before \s*> <O(|%named_unary)> }
-
-
-## structural infix
-token infix:sym« <=> »
-    { <sym> <O(|%structural, returns => 'Order')> }
-
-token infix:cmp
-    { <sym> <O(|%structural, returns => 'Order')> }
-
-token infix:leg
-    { <sym> <O(|%structural, returns => 'Order')> }
-
-token infix:but
-    { <sym> <O(|%structural)> }
-
-token infix:does
-    { <sym> <O(|%structural)> }
-
-token infix:sym<..>
-    { <sym> [<!{ $*IN_META }> <?before ')' | ']'> <.panic: "Please use ..* for indefinite range">]? <O(|%structural)> }
-
-token infix:sym<^..>
-    { <sym> <O(|%structural)> }
-
-token infix:sym<..^>
-    { <sym> <O(|%structural)> }
-
-token infix:sym<^..^>
-    { <sym> <O(|%structural)> }
-
-
-## chaining binary
-token infix:sym<==>
-    { <sym> <!before '=' > <O(|%chaining)> }
-
-token infix:sym<!=>
-    { <sym> <?before \s> <O(|%chaining)> }
-
-token infix:sym« < »
-    { <sym> <O(|%chaining)> }
-
-token infix:sym« <= »
-    { <sym> <O(|%chaining)> }
-
-token infix:sym« > »
-    { <sym> <O(|%chaining)> }
-
-token infix:sym« >= »
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<~~>
-    { <sym> <O(|%chaining)> }
-
-# XXX should move to inside meta !
-token infix:sym<!~>
-    { <sym> \s <.obs('!~ to do negated pattern matching', '!~~')> <O(|%chaining)> }
-
-token infix:sym<=~>
-    { <sym> <.obs('=~ to do pattern matching', '~~')> <O(|%chaining)> }
-
-token infix:sym<eq>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<ne>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<lt>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<le>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<gt>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<ge>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<=:=>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<===>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<eqv>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<before>
-    { <sym> <O(|%chaining)> }
-
-token infix:sym<after>
-    { <sym> <O(|%chaining)> }
-
-
-## tight and
-token infix:sym<&&>
-    { <sym> <O(|%tight_and)> }
-
-
-## tight or
-token infix:sym<||>
-    { <sym> <O(|%tight_or)> }
-
-token infix:sym<^^>
-    { <sym> <O(|%tight_or)> }
-
-token infix:sym<//>
-    { <sym> <O(|%tight_or)> }
-
-token infix:sym<min>
-    { <sym> <O(|%tight_or)> }
-
-token infix:sym<max>
-    { <sym> <O(|%tight_or)> }
-
-
-## conditional
-token infix:sym<?? !!> {
-    :my $*GOAL ::= '!!';
-    '??'
-    <.ws>
-    <EXPR(item %item_assignment)>
-    [ '!!' ||
-        [
-        || <?before '='> <.panic: "Assignment not allowed within ??!!">
-        || <?before '::'> <.panic: "Please use !! rather than ::">
-        || <?before <infixish>>    # Note: a tight infix would have parsed right
-            <.panic: "Precedence too loose within ??!!; use ??()!! instead ">
-        || <.panic: "Found ?? but no !!; possible precedence problem">
-        ]
-    ]
-    <O(|%conditional, _reducecheck => 'raise_middle')>
-}
-
-method raise_middle {
-    self.<middle> = self.<infix><EXPR>;
-    self;
-}
-
-token infix:sym<?>
-    { <sym> {} <!before '?'> <?before <-[;]>*?':'> <.obs('?: for the conditional operator', '??!!')> <O(|%conditional)> }
-
-token infix:sym<ff>
-    { <sym> <O(|%conditional)> }
-
-token infix:sym<^ff>
-    { <sym> <O(|%conditional)> }
-
-token infix:sym<ff^>
-    { <sym> <O(|%conditional)> }
-
-token infix:sym<^ff^>
-    { <sym> <O(|%conditional)> }
-
-token infix:sym<fff>
-    { <sym> <O(|%conditional)> }
-
-token infix:sym<^fff>
-    { <sym> <O(|%conditional)> }
-
-token infix:sym<fff^>
-    { <sym> <O(|%conditional)> }
-
-token infix:sym<^fff^>
-    { <sym> <O(|%conditional)> }
-
-## assignment
-# There is no "--> type" because assignment may be coerced to either
-# item assignment or list assignment at "make" time.
-
-token infix:sym<=> ()
-{
-    <sym>
-    [
-    || <?{ $*LEFTSIGIL eq '$' }>
-        <O(|%item_assignment)>
-    ||  <O(|%list_assignment)>
-    ]
-}
-
-token infix:sym<:=>
-    { <sym> <O(|%item_assignment)> }
-
-token infix:sym<::=>
-    { <sym> <O(|%item_assignment)> }
-
-token infix:sym<.=> {
-    <sym>
-    <O(|%item_assignment,
-        nextterm => 'dottyopish',
-        _reducecheck => 'check_doteq'
-    )>
-}
-
-method check_doteq {
-    # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || ]
-    return self if self.<left><scope_declarator>;
-    my $ok = 0;
-
-    try {
-        my $methop = self.<right><methodop>;
-        my $name = $methop.<longname>.Str;
-        if $name eq 'new' or $name eq 'sort' or $name eq 'subst' or $name eq 'trans' or $name eq 'reverse' or $name eq 'uniq' or $name eq 'map' or $name eq 'samecase' or $name eq 'substr' or $name eq 'flip' or $name eq 'fmt' {
-            $ok = 1;
-        }
-        elsif not $methop.<args>[0] {
-            $ok = 1;
-        }
-    };
-
-    self.cursor_force(self.<infix><_pos>).worryobs('.= as append operator', '~=') unless $ok;
-    self;
-}
-
-token infix:sym« => »
-    { <sym> <O(|%item_assignment, fiddly => 0)> }
-
-# Note, other assignment ops generated by infix_postfix_meta_operator rule
-
-## loose unary
-token prefix:sym<true>
-    { <sym> » <O(|%loose_unary)> }
-
-token prefix:sym<not>
-    { <sym> » <O(|%loose_unary)> }
-
-## list item separator
-token infix:sym<,>
-    { <sym> <O(|%comma, fiddly => 0)> }
-
-token infix:sym<:>
-    { <sym> <?before \s | <terminator> >
-        { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec; }
-    <O(|%comma)> }
-
-token infix:sym« p5=> »
-    { <sym> <O(|%comma)> }
-
-token infix:sym<Z>
-    { <sym> <O(|%list_infix)> }
-
-token infix:sym<minmax>
-    { <sym> <O(|%list_infix)> }
-
-token infix:sym<...>
-    { <sym> <O(|%list_infix)> }
-
-token term:sym<...>
-    { <sym> <args>? <O(|%list_prefix)> }
-
-token term:sym<???>
-    { <sym> <args>? <O(|%list_prefix)> }
-
-token term:sym<!!!>
-    { <sym> <args>? <O(|%list_prefix)> }
-
-# force identifier(), identifier.(), etc. to be a function call always
-token term:identifier
-{
-    :my $name;
-    :my $pos;
-    <identifier> <?before [<unsp>|'(']? >
-    { $name = $<identifier>.Str; $pos = $¢.pos; }
-    <args( $¢.is_name($name) )>
-    { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
-    {{
-        if $*BORG and $*BORG.<block> {
-            if not $*BORG.<name> {
-                $*BORG.<culprit> = $<identifier>.cursor($pos);
-                $*BORG.<name> = $name;
-            }
-        }
-    }}
-    <O(|%term)>
-}
-
-token term:opfunc
-{
-    <category> <colonpair>+ <args> <O(|%term)>
-}
-
-token args ($istype = 0) {
-    :my $listopish = 0;
-    :my $*GOAL ::= '';
-    :my $*INVOCANT_OK = 1;
-    :my $*INVOCANT_IS;
-    [
-#    | :dba('argument list') '.(' ~ ')' <semiarglist>
-    | :dba('argument list') '(' ~ ')' <semiarglist>
-    | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist>
-    |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
-    ]
-    { $<invocant> = $*INVOCANT_IS; }
-
-    :dba('extra arglist after (...):')
-    [
-    || <?{ $listopish }>
-    || ':' <?before \s> <moreargs=arglist>    # either switch to listopiness
-    || {{ $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
-    ]
-}
-
-# names containing :: may or may not be function calls
-# bare identifier without parens also handled here if no other rule parses it
-token term:name
-{
-    :my $name;
-    :my $pos;
-    <longname>
-    {
-        $name = $<longname>.Str;
-        $pos = $¢.pos;
-    }
-    [
-    ||  <?{
-            $¢.is_name($<longname>.Str) or substr($<longname>.Str,0,2) eq '::'
-        }>
-        # parametric type?
-        <.unsp>? [ <?before '['> <postcircumfix> ]?
-        :dba('type parameter')
-        [
-            '::'
-            <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
-        ]?
-
-    # unrecognized names are assumed to be post-declared listops.
-    || <args> { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
-        {{
-            if $*BORG and $*BORG.<block> {
-                if not $*BORG.<name> {
-                    $*BORG.<culprit> = $<longname>.cursor($pos);
-                    $*BORG.<name> //= $name;
-                }
-            }
-        }}
-    ]
-    <O(%term)>
-}
-
-## loose and
-token infix:sym<and>
-    { <sym> <O(|%loose_and)> }
-
-token infix:sym<andthen>
-    { <sym> <O(|%loose_and)> }
-
-## loose or
-token infix:sym<or>
-    { <sym> <O(|%loose_or)> }
-
-token infix:sym<orelse>
-    { <sym> <O(|%loose_or)> }
-
-token infix:sym<xor>
-    { <sym> <O(|%loose_or)> }
-
-## sequencer
-token infix:sym« <== »
-    { <sym> <O(|%sequencer)> }
-
-token infix:sym« ==> »
-    { <sym> <O(|%sequencer)> }
-
-token infix:sym« <<== »
-    { <sym> <O(|%sequencer)> }
-
-token infix:sym« ==>> »
-    { <sym> <O(|%sequencer)> }
-
-## expression terminator
-# Note: must always be called as <?terminator> or <?before ...<terminator>...>
-
-token terminator:sym<;>
-    { ';' <O(|%terminator)> }
-
-token terminator:sym<if>
-    { 'if' » <.nofun> <O(|%terminator)> }
-
-token terminator:sym<unless>
-    { 'unless' » <.nofun> <O(|%terminator)> }
-
-token terminator:sym<while>
-    { 'while' » <.nofun> <O(|%terminator)> }
-
-token terminator:sym<until>
-    { 'until' » <.nofun> <O(|%terminator)> }
-
-token terminator:sym<for>
-    { 'for' » <.nofun> <O(|%terminator)> }
-
-token terminator:sym<given>
-    { 'given' » <.nofun> <O(|%terminator)> }
-
-token terminator:sym<when>
-    { 'when' » <.nofun> <O(|%terminator)> }
-
-token terminator:sym« --> »
-    { '-->' <O(|%terminator)> }
-
-token terminator:sym<)>
-    { <sym> <O(|%terminator)> }
-
-token terminator:sym<]>
-    { ']' <O(|%terminator)> }
-
-token terminator:sym<}>
-    { '}' <O(|%terminator)> }
-
-token terminator:sym<!!>
-    { '!!' <?{ $*GOAL eq '!!' }> <O(|%terminator)> }
-
-regex infixstopper {
-    :dba('infix stopper')
-    [
-    | <?before <stopper> >
-    | <?before '!!' > [ <?{ $*GOAL eq '!!' }> || <.panic: "Ternary !! seems to be missing its ??"> ]
-    | <?before '{' | <lambda> > <?{ ($*GOAL eq '{' or $*GOAL eq 'endargs') and @*MEMOS[$¢.pos]<ws> }>
-    | <?{ $*GOAL eq 'endargs' and @*MEMOS[$¢.pos]<endargs> }>
-    ]
-}
-
-# overridden in subgrammars
-token stopper { <!> }
-
-# hopefully we can include these tokens in any outer LTM matcher
-regex stdstopper {
-    :my @stub = return self if @*MEMOS[self.pos]<endstmt> :exists;
-    :dba('standard stopper')
-    [
-    | <?terminator>
-    | <?unitstopper>
-    | $                                 # unlikely, check last (normal LTM behavior)
-    ]
-    { @*MEMOS[$¢.pos]<endstmt> ||= 1; }
-}
 
 ##############################
 # Operator Precedence Parser #
@@ -4570,6 +4533,7 @@ grammar Regex is STD {
         :temp $*ignoreaccent;
         [ \s* < || | && & > ]?
         <EXPR>
+        [ <?before <stopper> || $*GOAL > || <.panic: "Unrecognized regex metacharacter (must be quoted to match literally)"> ]
     }
 
     token termish {
@@ -4697,8 +4661,7 @@ grammar Regex is STD {
     }
 
     token metachar:sym«< >» {
-        '<' <unsp>? {} <assertion>
-        [ '>' || <.panic: "regex assertion not terminated by angle bracket"> ]
+        '<' ~ '>' <assertion>
     }
 
     token metachar:sym<\\> { <sym> <backslash> }
@@ -4816,7 +4779,7 @@ grammar Regex is STD {
         <.normspace>?
     }
 
-    token mod_arg { :dba('modifier argument') '(' ~ ')' <semilist> }
+    token mod_arg { :dba('modifier argument') '(' ~ ')' [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <semilist> ] }
 
     token mod_internal:sym<:my>    { ':' <?before ['my'|'state'|'our'|'constant'|'temp'|'let'] \s > [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <statement> <eat_terminator> ] }
 
@@ -4874,6 +4837,11 @@ grammar Regex is STD {
 
 method require_P5 {
     require STD_P5;
+    self;
+}
+
+method require_P6 {
+    require STD_P6;
     self;
 }
 
@@ -5254,6 +5222,53 @@ method add_mystery ($name,$pos,$ctx) {
         say "$name is known" if $*DEBUG +& DEBUG::symtab;
     }
     self;
+}
+
+method explain_mystery() {
+    my %post_types;
+    my %unk_types;
+    my %unk_routines;
+    my $m = '';
+    for keys(%*MYSTERY) {
+        my $p = %*MYSTERY{$_}.<pad>;
+        if self.is_name($_, $p) {
+            # types may not be post-declared
+            %post_types{$_} = %*MYSTERY{$_};
+            next;
+        }
+
+        next if self.is_known($_, $p) or self.is_known('&' ~ $_, $p);
+
+        # just a guess, but good enough to improve error reporting
+        if $_ lt 'a' {
+            %unk_types{$_} = %*MYSTERY{$_};
+        }
+        else {
+            %unk_routines{$_} = %*MYSTERY{$_};
+        }
+    }
+    if %post_types {
+        my @tmp = sort keys(%post_types);
+        $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t$_ used at line " ~ %post_types{$_}.<line> ~ "\n";
+        }
+    }
+    if %unk_types {
+        my @tmp = sort keys(%unk_types);
+        $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t$_ used at line " ~ %unk_types{$_}.<line> ~ "\n";
+        }
+    }
+    if %unk_routines {
+        my @tmp = sort keys(%unk_routines);
+        $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        for @tmp {
+            $m ~= "\t$_ used at line " ~ %unk_routines{$_}.<line> ~ "\n";
+        }
+    }
+    $m;
 }
 
 method load_setting ($setting) {

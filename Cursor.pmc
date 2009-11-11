@@ -1847,7 +1847,7 @@ sub _AUTOLEXgen { my $self = shift;
             if ($file eq 'termish') {
                 copy("$dir/termish.store","$dir/EXPR.store")
                 or croak "Could not copy $dir/termish.store";
-        }
+            }
         }
 
         open(my $cache, '>:utf8', "$dir/$file") // die "Can't print: $!";

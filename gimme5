@@ -298,7 +298,6 @@ sub BUILD {
 END
 
 	$out .= <<'END' if $TOP eq 'STD';
-    $self->_AUTOLEXpeek('termish',$retree);
 END
 
 	$out .= <<'END';
