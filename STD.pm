@@ -1622,14 +1622,15 @@ grammar P6 is STD {
     token statement_prefix:ENTER   { <sym> <blorst> }
     token statement_prefix:FIRST   { <sym> <blorst> }
 
-    rule statement_control:END     {<sym> <block> }
-    rule statement_control:LEAVE   {<sym> <block> }
-    rule statement_control:KEEP    {<sym> <block> }
-    rule statement_control:UNDO    {<sym> <block> }
-    rule statement_control:NEXT    {<sym> <block> }
-    rule statement_control:LAST    {<sym> <block> }
-    rule statement_control:PRE     {<sym> <block> }
-    rule statement_control:POST    {<sym> <block> }
+    token statement_prefix:END     { <sym> <blorst> }
+    token statement_prefix:LEAVE   { <sym> <blorst> }
+    token statement_prefix:KEEP    { <sym> <blorst> }
+    token statement_prefix:UNDO    { <sym> <blorst> }
+    token statement_prefix:NEXT    { <sym> <blorst> }
+    token statement_prefix:LAST    { <sym> <blorst> }
+    token statement_prefix:PRE     { <sym> <blorst> }
+    token statement_prefix:POST    { <sym> <blorst> }
+
     rule statement_control:CATCH   {<sym> <block> }
     rule statement_control:CONTROL {<sym> <block> }
     rule statement_control:TEMP    {<sym> <block> }
@@ -5094,13 +5095,13 @@ method add_my_name ($n, $d, $p) {
                 }
             }
             if $old.opad {
-                self.panic("Lexical symbol $name$loc is already bound to an outer scope implicitly\n  and must therefore be rewritten explicitly as " ~ $old.name ~ " before you can\n  unambiguously declare a new $name in the same scope");
+                self.panic("Lexical symbol '$name'$loc is already bound to an outer scope implicitly\n  and must therefore be rewritten explicitly as '" ~ $old.name ~ "' before you can\n  unambiguously declare a new '$name' in the same scope");
             }
             elsif $name ~~ /^\w/ {
-                self.panic("Illegal redeclaration of symbol $name$loc");
+                self.panic("Illegal redeclaration of symbol '$name'$loc");
             }
             elsif $name ~~ s/^\&// {
-                self.panic("Illegal redeclaration of routine $name$loc");
+                self.panic("Illegal redeclaration of routine '$name'$loc");
             }
             else {  # XXX eventually check for conformant arrays here
                 self.worry("Useless redeclaration of variable $name$loc");
@@ -5183,10 +5184,10 @@ method add_our_name ($n) {
             }
             $sid = self.clean_id($sid, $name);
             if $name ~~ /^\w/ {
-                self.panic("Illegal redeclaration of symbol $sid$loc");
+                self.panic("Illegal redeclaration of symbol '$sid'$loc");
             }
             elsif $name ~~ /^\&/ {
-                self.panic("Illegal redeclaration of routine $sid$loc");
+                self.panic("Illegal redeclaration of routine '$sid'$loc");
             }
             else {  # XXX eventually check for conformant arrays here
                 # (redeclaration of identical package vars is not useless)
@@ -5251,21 +5252,21 @@ method explain_mystery() {
         my @tmp = sort keys(%post_types);
         $m ~= "Illegally post-declared type" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
-            $m ~= "\t$_ used at line " ~ %post_types{$_}.<line> ~ "\n";
+            $m ~= "\t'$_' used at line " ~ %post_types{$_}.<line> ~ "\n";
         }
     }
     if %unk_types {
         my @tmp = sort keys(%unk_types);
         $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
-            $m ~= "\t$_ used at line " ~ %unk_types{$_}.<line> ~ "\n";
+            $m ~= "\t'$_' used at line " ~ %unk_types{$_}.<line> ~ "\n";
         }
     }
     if %unk_routines {
         my @tmp = sort keys(%unk_routines);
         $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
-            $m ~= "\t$_ used at line " ~ %unk_routines{$_}.<line> ~ "\n";
+            $m ~= "\t'$_' used at line " ~ %unk_routines{$_}.<line> ~ "\n";
         }
     }
     $m;
