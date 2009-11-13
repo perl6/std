@@ -1119,6 +1119,12 @@ token pod_comment {
     ]
 }
 
+token binints { [<.ws><binint><.ws>] ** ',' }
+
+token binint {
+    <[ 0..1 ]>+ [ _ <[ 0..1 ]>+ ]*
+}
+
 token octints { [<.ws><octint><.ws>] ** ',' }
 
 token octint {
@@ -1131,16 +1137,22 @@ token hexint {
     <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
 }
 
+token decints { [<.ws><decint><.ws>] ** ',' }
+
+token decint {
+    \d+ [ _ \d+ ]*
+}
+
 token integer {
     [
-    | 0 [ b <[01]>+           [ _ <[01]>+ ]*
-        | o <[0..7]>+         [ _ <[0..7]>+ ]*
-        | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
-        | d \d+               [ _ \d+]*
-        | \d+[_\d+]*
+    | 0 [ b <binint>
+        | o <octint>
+        | x <hexint>
+        | d <decint>
+        | <decint>
             <!!{ $¢.worry("Leading 0 does not indicate octal in Perl 6") }>
         ]
-    | \d+[_\d+]*
+    | <decint>
     ]
     <!!before ['.' <?before \s | ',' | '=' | <terminator> > <.panic: "Decimal point must be followed by digit">]? >
 }
@@ -1157,16 +1169,16 @@ token radint {
 }
 
 token escale {
-    <[Ee]> <[+\-]>? \d+[_\d+]*
+    <[Ee]> <[+\-]>? <decint>
 }
 
 # careful to distinguish from both integer and 42.method
 token dec_number {
     :dba('decimal number')
     [
-    | $<coeff> = [           '.' \d+[_\d+]* ] <escale>?
-    | $<coeff> = [\d+[_\d+]* '.' \d+[_\d+]* ] <escale>?
-    | $<coeff> = [\d+[_\d+]*                ] <escale>
+    | $<coeff> = [              '.' <frac=.decint> ] <escale>?
+    | $<coeff> = [<int=.decint> '.' <frac=.decint> ] <escale>?
+    | $<coeff> = [<int=.decint>                    ] <escale>
     ]
     <!!before [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)">]? >
 }
@@ -1179,7 +1191,7 @@ token rad_number {
     || '<'
             $<intpart> = [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
             $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]?
-            [ '*' <base=radint> '**' <exp=radint> ]?
+            [ '*' <base=.radint> '**' <exp=.radint> ]?
        '>'
 #      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
     || <?before '['> <circumfix>
@@ -1543,10 +1555,10 @@ grammar P6 is STD {
         <xblock>
         [
             [ <!before 'else'\s*'if'> || <.panic: "Please use 'elsif'"> ]
-            'elsif'<?spacey> <elsif=xblock>
+            'elsif'<?spacey> <elsif=.xblock>
         ]*
         [
-            'else'<?spacey> <else=pblock>
+            'else'<?spacey> <else=.pblock>
         ]?
     }
 
@@ -1586,9 +1598,9 @@ grammar P6 is STD {
         <sym> <.ws>
         $<eee> = (
             '(' [ :s
-                <e1=EXPR>? ';'
-                <e2=EXPR>? ';'
-                <e3=EXPR>?
+                <e1=.EXPR>? ';'
+                <e2=.EXPR>? ';'
+                <e3=.EXPR>?
             ')'||<.panic: "Malformed loop spec">]
             [ <?before '{' > <.panic: "Whitespace required before block"> ]?
         )? <.ws>
@@ -2055,7 +2067,7 @@ grammar P6 is STD {
         :dba('null term')
         [
         | <?stdstopper>
-        | <term=termish>
+        | <term=.termish>
             {
                 $¢.<PRE>  = $<term><PRE>:delete;
                 $¢.<POST> = $<term><POST>:delete;
@@ -2110,7 +2122,7 @@ grammar P6 is STD {
     token term:colonpair          { [ <colonpair> <.ws> ]+ }
 
     token fatarrow {
-        <key=identifier> \h* '=>' <.ws> <val=EXPR(item %item_assignment)>
+        <key=.identifier> \h* '=>' <.ws> <val=.EXPR(item %item_assignment)>
     }
 
     token colonpair {
@@ -2528,8 +2540,8 @@ grammar P6 is STD {
         ]
     }
 
-    token number:rational { <nu=integer>'/'<de=integer> }
-    token number:complex { <re=numish>'+'<im=numish>'\\'?'i' | <im=numish>'\\'?'i' }
+    token number:rational { <nu=.integer>'/'<de=.integer> }
+    token number:complex { <re=.numish>'+'<im=.numish>'\\'?'i' | <im=.numish>'\\'?'i' }
     token number:numish { <numish> }
 
     ##########
@@ -2541,7 +2553,7 @@ grammar P6 is STD {
         <babble($l)>
         { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
-        $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
+        $start <left=.nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
         [ <?{ $start ne $stop }>
             <.ws>
             [ <infixish> || <panic: "Missing assignment operator"> ]
@@ -2550,7 +2562,7 @@ grammar P6 is STD {
             <right=EXPR(item %item_assignment)>
         || 
             { $lang = $lang2.unbalanced($stop); }
-            <right=nibble($lang)> $stop
+            <right=.nibble($lang)> $stop
         ]
     }
 
@@ -2559,12 +2571,12 @@ grammar P6 is STD {
         <babble($l)>
         { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
-        $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
+        $start <left=.nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
         [ <?{ $start ne $stop }>
             <.ws> <quibble($lang2)>
         || 
             { $lang = $lang2.unbalanced($stop); }
-            <right=nibble($lang)> $stop
+            <right=.nibble($lang)> $stop
         ]
     }
 
@@ -2652,17 +2664,17 @@ grammar P6 is STD {
 
     token quote:s {
         <sym> » <!before '('>
-        <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
+        <pat=.sibble( $¢.cursor_fresh( %*LANG<Regex> ), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
         <!old_rx_mods>
     }
 
     token quote:ss {
         <sym> » <!before '('>
-        <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
+        <pat=.sibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
         <!old_rx_mods>
     }
     token quote:tr {
-        <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
+        <sym> » <!before '('> <pat=.tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
         <!old_tr_mods>
     }
 
@@ -2794,7 +2806,7 @@ grammar P6 is STD {
         :my $*GOAL ::= ')';
         ':'
         [
-        | <name=identifier> '(' <.ws>
+        | <name=.identifier> '(' <.ws>
             [ <named_param> | <param_var> <.ws> ]
             [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
         | <param_var>
@@ -2810,16 +2822,16 @@ grammar P6 is STD {
             [
                 # Is it a longname declaration?
             || <?{ $<sigil>.Str eq '&' }> <?ident> {}
-                <name=sublongname>
+                <name=.sublongname>
 
             ||  # Is it a shaped array or hash declaration?
                 <?{ $<sigil>.Str eq '@' || $<sigil>.Str eq '%' }>
-                <name=identifier>?
+                <name=.identifier>?
                 <?before <[ \< \( \[ \{ ]> >
                 <postcircumfix>
 
                 # ordinary parameter name
-            || <name=identifier>
+            || <name=.identifier>
             || $<name> = [<[/!]>]
 
                 # bare sigil?
@@ -3134,7 +3146,7 @@ grammar P6 is STD {
     }
 
     token dottyopish {
-        <term=dottyop>
+        <term=.dottyop>
     }
 
     token dottyop {
@@ -3181,8 +3193,8 @@ grammar P6 is STD {
         $<s> = (
             '['
             [
-            || <op=infixish(1)> <?before ']'>
-            || \\<op=infixish(1)> <?before ']'>
+            || <op=.infixish(1)> <?before ']'>
+            || \\<op=.infixish(1)> <?before ']'>
             || <!>
             ]
             ']' ['«'|<?>]
@@ -3850,7 +3862,7 @@ grammar P6 is STD {
         :dba('extra arglist after (...):')
         [
         || <?{ $listopish }>
-        || ':' <?before \s> <moreargs=arglist>    # either switch to listopiness
+        || ':' <?before \s> <moreargs=.arglist>    # either switch to listopiness
         || {{ $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
         ]
     }
@@ -3970,10 +3982,10 @@ grammar P6 is STD {
 grammar Q is STD {
 
     role b1 {
-        token escape:sym<\\> { <sym> <item=backslash> }
+        token escape:sym<\\> { <sym> <item=.backslash> }
         token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
-        token backslash:sym<\\> { <text=sym> }
-        token backslash:stopper { <text=stopper> }
+        token backslash:sym<\\> { <text=.sym> }
+        token backslash:stopper { <text=.stopper> }
         token backslash:a { <sym> }
         token backslash:b { <sym> }
         token backslash:c { <sym> <charspec> }
@@ -4074,11 +4086,11 @@ grammar Q is STD {
     role q {
         token stopper { \' }
 
-        token escape:sym<\\> { <sym> <item=backslash> }
+        token escape:sym<\\> { <sym> <item=.backslash> }
 
         token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
-        token backslash:sym<\\> { <text=sym> }
-        token backslash:stopper { <text=stopper> }
+        token backslash:sym<\\> { <text=.sym> }
+        token backslash:stopper { <text=.stopper> }
 
         # in single quotes, keep backslash on random character by default
         token backslash:misc { {} (.) { $<text> = "\\" ~ $0.Str; } }
@@ -4540,7 +4552,7 @@ grammar Regex is STD {
     token termish {
         <.ws>
         [
-        || <term=quant_atom_list>
+        || <term=.quant_atom_list>
         || <?before <stopper> | <[&|~]>  >  <.panic: "Null pattern not allowed">
         || <?before <[ \] \) \> ]> > <.panic: "Unmatched closing bracket">
         || <.panic: "Unrecognized regex metacharacter (must be quoted to match literally)">
@@ -4736,7 +4748,7 @@ grammar Regex is STD {
 
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        [:lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <variable=EXPR(item %LOOSEST)>]
+        [:lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <variable=.EXPR(item %LOOSEST)>]
     }
 
     token assertion:method {
