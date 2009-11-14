@@ -1361,7 +1361,6 @@ sub atom {
                 ws();
                 local $PARSEBIND = 1;
                 my $atom = quantified_atom(@_);
-                $atom->{nobind} = 1;
                 ws();
                 if ($code =~ /[\$\@%]<(.*?)>/) {
                     return bless { var => $1,
