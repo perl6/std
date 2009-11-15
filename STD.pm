@@ -1931,7 +1931,7 @@ grammar P6 is STD {
 
     method checkyada {
         try {
-            my $startsym = self.<blockoid><statementlist><statement>[0]<EXPR><term><sym> // '';
+            my $startsym = self.<blockoid><statementlist><statement>[0]<EXPR><sym> // '';
             if $startsym eq '...' or $startsym eq '!!!' or $startsym eq '???' {
                 $*DECLARAND<stub> = 1;
             }
