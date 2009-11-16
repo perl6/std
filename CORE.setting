@@ -15,6 +15,7 @@ my class Whatever { }
 my class WhateverCode { }
 my class HyperWhatever { }
 my class Capture { }
+my class Parcel { }
 my class Match { }
 my class Signature { }
 my class Parameter { }
