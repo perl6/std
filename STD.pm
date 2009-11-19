@@ -1160,7 +1160,7 @@ token integer {
 token radint {
     [
     | <integer>
-    | <?before ':'> <rad_number> <?{
+    | <?before ':'\d> <rad_number> <?{
                         defined $<rad_number><intpart>
                         and
                         not defined $<rad_number><fracpart>
@@ -1627,21 +1627,21 @@ grammar P6 is STD {
     }
     rule statement_control:default {<sym> <block> }
 
-    token statement_prefix:BEGIN   { <sym> <blorst> }
-    token statement_prefix:CHECK   { <sym> <blorst> }
-    token statement_prefix:INIT    { <sym> <blorst> }
-    token statement_prefix:START   { <sym> <blorst> }
-    token statement_prefix:ENTER   { <sym> <blorst> }
-    token statement_prefix:FIRST   { <sym> <blorst> }
+    token statement_prefix:BEGIN   { <sym> <blast> }
+    token statement_prefix:CHECK   { <sym> <blast> }
+    token statement_prefix:INIT    { <sym> <blast> }
+    token statement_prefix:START   { <sym> <blast> }
+    token statement_prefix:ENTER   { <sym> <blast> }
+    token statement_prefix:FIRST   { <sym> <blast> }
 
-    token statement_prefix:END     { <sym> <blorst> }
-    token statement_prefix:LEAVE   { <sym> <blorst> }
-    token statement_prefix:KEEP    { <sym> <blorst> }
-    token statement_prefix:UNDO    { <sym> <blorst> }
-    token statement_prefix:NEXT    { <sym> <blorst> }
-    token statement_prefix:LAST    { <sym> <blorst> }
-    token statement_prefix:PRE     { <sym> <blorst> }
-    token statement_prefix:POST    { <sym> <blorst> }
+    token statement_prefix:END     { <sym> <blast> }
+    token statement_prefix:LEAVE   { <sym> <blast> }
+    token statement_prefix:KEEP    { <sym> <blast> }
+    token statement_prefix:UNDO    { <sym> <blast> }
+    token statement_prefix:NEXT    { <sym> <blast> }
+    token statement_prefix:LAST    { <sym> <blast> }
+    token statement_prefix:PRE     { <sym> <blast> }
+    token statement_prefix:POST    { <sym> <blast> }
 
     rule statement_control:CATCH   {<sym> <block> }
     rule statement_control:CONTROL {<sym> <block> }
@@ -2530,18 +2530,31 @@ grammar P6 is STD {
 
     token numish {
         [
-        | <integer>
-        | <dec_number>
-        | <rad_number>
         | 'NaN' »
-        | 'Inf' »
-        | '+Inf' »
-        | '-Inf' »
+        | <[+\-]>?
+            [
+            | <integer>
+            | <dec_number>
+            | <rad_number>
+            | 'Inf' »
+            ]
+        ]
+    }
+
+    token intish {
+        [
+        | 'NaN' »
+        | <[+\-]>?
+            [
+            | <integer>
+            | <radint>
+            | 'Inf' »
+            ]
         ]
     }
 
     token number:rational { <nu=.integer>'/'<de=.integer> }
-    token number:complex { <re=.numish>'+'<im=.numish>'\\'?'i' | <im=.numish>'\\'?'i' }
+    token number:complex { <re=.numish><?before <[+\-]>\d><im=.numish>'\\'?'i' | <im=.numish>'\\'?'i' }
     token number:numish { <numish> }
 
     ##########
@@ -2965,21 +2978,22 @@ grammar P6 is STD {
         '=' <EXPR(item %item_assignment)>
     }
 
-    token statement_prefix:try     { <sym> <blorst> }
-    token statement_prefix:quietly { <sym> <blorst> }
-    token statement_prefix:gather  { <sym> <blorst> }
-    token statement_prefix:contend { <sym> <blorst> }
-    token statement_prefix:async   { <sym> <blorst> }
-    token statement_prefix:maybe   { <sym> <blorst> }
-    token statement_prefix:lazy    { <sym> <blorst> }
-    token statement_prefix:do      { <sym> <blorst> }
+    token statement_prefix:try     { <sym> <blast> }
+    token statement_prefix:quietly { <sym> <blast> }
+    token statement_prefix:gather  { <sym> <blast> }
+    token statement_prefix:contend { <sym> <blast> }
+    token statement_prefix:async   { <sym> <blast> }
+    token statement_prefix:maybe   { <sym> <blast> }
+    token statement_prefix:lazy    { <sym> <blast> }
+    token statement_prefix:do      { <sym> <blast> }
 
     token statement_prefix:lift    {
         :my $*QUASIMODO = 1;
-        <sym> <blorst>
+        <sym> <blast>
     }
 
-    token blorst {
+    # accepts blocks and statements
+    token blast {
         <?before \s> <.ws>
         [
         | <block>
@@ -3034,10 +3048,10 @@ grammar P6 is STD {
         <O(|%term)>
     }
 
-    token term:Inf
+    token value:Inf
         { <sym> » <O(|%term)> }
 
-    token term:NaN
+    token value:NaN
         { <sym> » <O(|%term)> }
 
     token term:sym<*>
@@ -3110,17 +3124,16 @@ grammar P6 is STD {
                 %<O><assoc> = 'unary';
                 %<O><dba> = 'adverb';
             }
-        | :dba('bracketed infix') '[' ~ ']' <infixish(1)> { $<O> = $<infixish><O>; $<sym> = $<infixish><sym>; }
-        | <infix_circumfix_meta_operator>
-            { $<O> = $<infix_circumfix_meta_operator><O>;
-              $<sym> = $<infix_circumfix_meta_operator><sym>; }
-        | <infix_prefix_meta_operator>
-            { $<O> = $<infix_prefix_meta_operator><O>;
-              $<sym> = $<infix_prefix_meta_operator><sym>; }
-        | <infix> <!before '='>
-               { $<O> = $<infix>.<O>; $<sym> = $<infix>.<sym>; }
-        | <infix> <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
-               { $<O> = $<infix_postfix_meta_operator>.<O>; $<sym> = $<infix_postfix_meta_operator>.<sym>; }
+        |   [
+            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish(1)> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            | <infix=infix_circumfix_meta_operator> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            | <infix=infix_prefix_meta_operator>    { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            | <infix>                               { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            ]
+            [ <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
+                   { $<O> = $<infix_postfix_meta_operator>[0]<O>; $<sym> = $<infix_postfix_meta_operator>[0]<sym>; }
+            ]?
+
         ]
     }
 

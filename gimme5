@@ -629,7 +629,7 @@ END
 	    }
 	    if ($SYM and $meat !~ /->_SYM\(\$sym\)/) {
 		$body .= <<"END";
-    \$C->{'sym'} = \$sym;
+    \$C->{'sym'} = ref \$sym ? join(' ', @\$sym) : \$sym;
 END
 	    }
 
