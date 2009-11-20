@@ -3090,11 +3090,13 @@ grammar P6 is STD {
                 next unless $m;
                 if $line - ($m.<line>//-123) < 5 {
                     if $m.<ctx> eq '(' {
-                        $¢.panic($_ ~ '() interpreted as postdeclared function call at line ' ~ $m.<line> ~
-                        "; please use whitespace instead of parens\nUnexpected block in infix position (two terms in a row)");
+                        $¢.panic($_ ~ '() interpreted as function call at line ' ~ $m.<line> ~
+                        "; please use whitespace " ~
+                        ($_ eq 'loop' ?? 'around' !! 'instead of') ~
+                        " parens\nUnexpected block in infix position (two terms in a row)");
                     }
                     else {
-                        $¢.panic("'$_' interpreted as postdeclared listop at line " ~ $m.<line> ~
+                        $¢.panic("'$_' interpreted as listop at line " ~ $m.<line> ~
                         "; please use 'do' to introduce statement_control:<$_>.\nUnexpected block in infix position (two terms in a row)");
                     }
                 }
