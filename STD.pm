@@ -3585,6 +3585,9 @@ grammar P6 is STD {
     token infix:sym<|>
         { <sym> <O(|%junctive_or)> }
 
+    token infix:sym<else>
+        { <sym> <O(|%junctive_or)> }
+
     token infix:sym<^>
         { <sym> <O(|%junctive_or)> }
 
