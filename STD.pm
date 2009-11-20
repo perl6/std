@@ -3281,6 +3281,12 @@ grammar P6 is STD {
         <?{ $<O> = $<infixish><O>; }>
     }
 
+    token infix_prefix_meta_operator:sym<S> {
+        <sym> {} <infixish(1)>
+        <.can_meta($<infixish>, "sequence")>
+        <?{ $<O> = $<infixish><O>; }>
+    }
+
     token infix_prefix_meta_operator:sym<X> {
         <sym> {}
         [ <infixish(1)>
@@ -3577,15 +3583,9 @@ grammar P6 is STD {
     token infix:sym<&>
         { <sym> <O(|%junctive_and)> }
 
-    token infix:sym<also>
-        { <sym> <O(|%junctive_and)> }
-
 
     ## junctive or (any)
     token infix:sym<|>
-        { <sym> <O(|%junctive_or)> }
-
-    token infix:sym<else>
         { <sym> <O(|%junctive_or)> }
 
     token infix:sym<^>
