@@ -2406,7 +2406,7 @@ sub set_export {
     $x->{$textpkg} //= STASH::->new( 'PARENT::' => $x->idref, '!id' => [$sid->[0] . '::EXPORT::' . $text] );
     $x->{$textpkg}->{$name} = $::DECLARAND;
     $x->{$textpkg}->{'&'.$name} = $::DECLARAND
-            if $name =~ /^\w/ and $::SCOPE ne 'constant';
+            if $name =~ /^\w/ and $::IN_DECL ne 'constant';
     $self;
 }
 
@@ -2649,7 +2649,7 @@ sub add_enum { my $self = shift;
     my $type = shift;
     my $expr = shift;
     return unless $expr;
-    local $::SCOPE = 'constant';
+    local $::IN_DECL = 'constant';
     # XXX complete kludge, really need to eval EXPR
     $expr =~ s/:(\w+)<\S+>/$1/g;  # handle :name<string>
     for ($expr =~ m/([a-zA-Z_]\w*)/g) {
@@ -2723,7 +2723,7 @@ sub do_import { my $self = shift;
     if ($args) {
         my $text = $args->Str;
         return $self unless $text;
-        while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|CONSTANT|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
+        while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
             my $scope = lc($1) || 'my';
             my $imports = $2;
             local $::SCOPE = $scope;

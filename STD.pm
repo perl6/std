@@ -106,6 +106,7 @@ method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', 
     my $*HIGHWATER = 0;
     my $*HIGHMESS = '';
     my $*HIGHEXPECT = {};
+    my $*LASTSTATE;
     my $*LAST_NIBBLE = { firstline => 0, lastline => 0 };
     my $*LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
     my $*GOAL ::= "(eof)";
@@ -1434,7 +1435,7 @@ grammar P6 is STD {
 
         # this could either be a statement that follows a declaration
         # or a statement that is within the block of a code declaration
-        <!!{ $¢ = %*LANG<MAIN>.bless($¢); }>
+        <!!{ $*LASTSTATE = $¢.pos; $¢ = %*LANG<MAIN>.bless($¢); }>
 
         [
         | <label> <statement>
@@ -1499,6 +1500,7 @@ grammar P6 is STD {
         |<version>
         |<module_name>
             {{
+                my $*IN_DECL = 'use';
                 my $*SCOPE = 'use';
                 $longname = $<module_name>[*-1]<longname>;
                 $¢.do_need($longname);
@@ -1508,6 +1510,7 @@ grammar P6 is STD {
 
     token statement_control:import {
         :my $longname;
+        :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
         <sym> <.ws>
         <term>
@@ -1523,6 +1526,7 @@ grammar P6 is STD {
 
     token statement_control:use {
         :my $longname;
+        :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
         <sym> <.ws>
         [
@@ -1698,18 +1702,6 @@ grammar P6 is STD {
     # Declarators #
     ###############
 
-    token constant_declarator {
-        :my $*IN_DECL = 'constant';
-        :my $*DECLARAND;
-        <.getdecl>
-        <?{ $*SCOPE eq 'constant' }>
-        <identifier> <.ws> <?before '='|'is'\s>
-        { self.add_name($<identifier>.Str); $*IN_DECL = ''; }
-
-        <trait>*
-        <.getdecl>
-    }
-
     token variable_declarator {
         :my $*IN_DECL = 'variable';
         :my $*DECLARAND;
@@ -1759,7 +1751,6 @@ grammar P6 is STD {
     token scope_declarator:my        { <sym> <scoped('my')> }
     token scope_declarator:our       { <sym> <scoped('our')> }
     token scope_declarator:state     { <sym> <scoped('state')> }
-    token scope_declarator:constant  { <sym> <scoped('constant')> }
     token scope_declarator:has       { <sym> <scoped('has')> }
     token scope_declarator:augment   { <sym> <scoped('augment')> }
     token scope_declarator:supersede { <sym> <scoped('supersede')> }
@@ -1885,7 +1876,6 @@ grammar P6 is STD {
 
     token declarator {
         [
-        | <constant_declarator>
         | <variable_declarator>
         | '(' ~ ')' <signature> <trait>*
         | <routine_declarator>
@@ -2780,6 +2770,8 @@ grammar P6 is STD {
     }
 
     token type_declarator:subset {
+        :my $*IN_DECL = 'subset';
+        :my $*DECLARAND;
         <sym> :s
         [
             <longname> { $¢.add_name($<longname>.Str); }
@@ -2790,10 +2782,40 @@ grammar P6 is STD {
     }
 
     token type_declarator:enum {
+        :my $*IN_DECL = 'enum';
+        :my $*DECLARAND;
         <sym> <.ws>
         <longname> <.ws> <trait>* <?before <[ < ( « ]> > <term> <.ws>
             { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<term>.Str); }
     }
+
+    token type_declarator:constant {
+        :my $*IN_DECL = 'constant';
+        :my $*DECLARAND;
+        <sym>
+
+        <.ws>
+        <typename>*
+
+        [
+        | <identifier> { $¢.add_name($<identifier>.Str); }
+        | <variable> { $¢.add_variable($<variable>.Str); }
+        | <?>
+        ]
+        { $*IN_DECL = ''; }
+        <.ws>
+
+        <trait>*
+
+        [
+        || <?before '='>
+        || <?before \N*'='> <.panic: "Malformed constant"> # probable initializer later
+        || <.panic: "Missing initializer on constant declaration">
+        ]
+
+        <.getdecl>
+    }
+
 
     token type_constraint {
         :my $*IN_DECL = '';
@@ -5137,7 +5159,7 @@ method add_my_name ($n, $d, $p) {
         $*DECLARAND = $curstash.{$name} = $declaring;
         $*DECLARAND<inpad> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
-        $*DECLARAND<const> ||= 1 if $*SCOPE eq 'constant';
+        $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
         if !$*DECLARAND<const> and $name ~~ /^\w+$/ {
             $curstash.{"&$name"} //= $curstash.{$name};
             $sid ~= "::$name";
@@ -5222,7 +5244,7 @@ method add_our_name ($n) {
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
         $*DECLARAND<inpkg> = $curstash.idref;
-        if $name ~~ /^\w+$/ and $*SCOPE ne 'constant' {
+        if $name ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
             $curstash.{"&$name"} //= $declaring;
             $sid ~= "::$name";
             $*NEWPAD = $curstash.{$name ~ '::'} //= STASH.new(
@@ -5414,6 +5436,7 @@ method add_our_variable ($name) {
 }
 
 method add_placeholder($name) {
+    my $*IN_DECL = 'variable';
     if $*SIGNUM {
         self.panic("Placeholder variable $name not allowed in signature");
     }

@@ -47,7 +47,7 @@ cat:
 	cat try5.out
 
 clean:
-	rm -rf lex try5.* *.pad.store *.syml.store *.syml STD.pmc STD_P5.pmc STD.pm5
+	rm -rf lex try5.* *.pad.store *.syml.store *.syml STD.pmc STD_P5.pmc STD.pm5 STD_P5.pm5
 
 distclean purge: clean
 	rm -rf STD.pmc STD_P5.pmc STD.pm5

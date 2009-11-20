@@ -305,6 +305,8 @@ END
 
 use YAML::XS;
 
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "\n" } if $::DEBUG;
+
 END
     }
 
