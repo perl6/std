@@ -1424,7 +1424,7 @@ grammar P6 is STD {
         ]?
 
         # add label as a pseudo type
-        {{ $¢.add_my_name($label); }}
+        {{ my $*IN_DECL = 'label'; $¢.add_my_name($label); }}
 
     }
 
@@ -2531,18 +2531,6 @@ grammar P6 is STD {
         ]
     }
 
-    token intish {
-        [
-        | 'NaN' »
-        | <[+\-]>?
-            [
-            | <integer>
-            | <radint>
-            | 'Inf' »
-            ]
-        ]
-    }
-
     token number:rational { <nu=.integer>'/'<de=.integer> }
     token number:complex { <re=.numish><?before <[+\-]>\d><im=.numish>'\\'?'i' | <im=.numish>'\\'?'i' }
     token number:numish { <numish> }
@@ -3069,12 +3057,6 @@ grammar P6 is STD {
         [ <?before '()'> <.obs('rand()', 'rand')> ]?
         <O(|%term)>
     }
-
-    token value:Inf
-        { <sym> » <O(|%term)> }
-
-    token value:NaN
-        { <sym> » <O(|%term)> }
 
     token term:sym<*>
         { <sym> <O(|%term)> }
@@ -3866,7 +3848,7 @@ grammar P6 is STD {
     {
         :my $name;
         :my $pos;
-        <identifier> <?before [<unsp>|'(']? >
+        <identifier> <?before [<unsp>|'(']? > <![:]>
         { $name = $<identifier>.Str; $pos = $¢.pos; }
         <args( $¢.is_name($name) )>
         { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
@@ -3879,11 +3861,6 @@ grammar P6 is STD {
             }
         }}
         <O(|%term)>
-    }
-
-    token term:opfunc
-    {
-        <category> <colonpair>+ <args> <O(|%term)>
     }
 
     token args ($istype = 0) {
