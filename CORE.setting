@@ -38,6 +38,7 @@ my class Pair { }
 my class List { }
 my class Seq { }
 my class Range { }
+my class RangeIterator { }
 my class Set { }
 my class Bag { }
 my class Mapping { }
