@@ -2,7 +2,7 @@ grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 use DEBUG;
 use NAME;
-use STASH;
+use Stash;
 
 our $ALL;
 
@@ -1255,7 +1255,7 @@ grammar P6 is STD {
             self.load_setting($*SETTINGNAME);
             my $oid = $*SETTING.id;
             my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
-            $*CURPAD = STASH.new(
+            $*CURPAD = Stash.new(
                 'OUTER::' => [$oid],
                 '!file' => $*FILE, '!line' => 0,
                 '!id' => [$id],
@@ -1750,6 +1750,7 @@ grammar P6 is STD {
 
     token scope_declarator:my        { <sym> <scoped('my')> }
     token scope_declarator:our       { <sym> <scoped('our')> }
+    token scope_declarator:anon      { <sym> <scoped('anon')> }
     token scope_declarator:state     { <sym> <scoped('state')> }
     token scope_declarator:has       { <sym> <scoped('has')> }
     token scope_declarator:augment   { <sym> <scoped('augment')> }
@@ -2988,6 +2989,7 @@ grammar P6 is STD {
         '=' <EXPR(item %item_assignment)>
     }
 
+    token statement_prefix:sink    { <sym> <blast> }
     token statement_prefix:try     { <sym> <blast> }
     token statement_prefix:quietly { <sym> <blast> }
     token statement_prefix:gather  { <sym> <blast> }
@@ -4811,7 +4813,7 @@ grammar Regex is STD {
 
     token mod_arg { :dba('modifier argument') '(' ~ ')' [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <semilist> ] }
 
-    token mod_internal:sym<:my>    { ':' <?before ['my'|'state'|'our'|'constant'|'temp'|'let'] \s > [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <statement> <eat_terminator> ] }
+    token mod_internal:sym<:my>    { ':' <?before ['my'|'state'|'our'|'anon'|'constant'|'temp'|'let'] \s > [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <statement> <eat_terminator> ] }
 
     # XXX needs some generalization
 
@@ -4892,7 +4894,7 @@ method newpad ($needsig = 0) {
     }
     else {
         $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
-        $*CURPAD = STASH.new(
+        $*CURPAD = Stash.new(
             'OUTER::' => [$oid],
             '!file' => $*FILE, '!line' => $line,
             '!id' => [$id],
@@ -5054,6 +5056,7 @@ method find_top_pkg ($name) {
 
 method add_name ($name) {
     my $scope = $*SCOPE || 'my';
+    return self if $scope eq 'anon';
     say "Adding $scope $name" if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
@@ -5079,7 +5082,7 @@ method add_my_name ($n, $d, $p) {
     while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= STASH.new(
+        my $newstash = $curstash.{$pkg} //= Stash.new(
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
@@ -5145,7 +5148,7 @@ method add_my_name ($n, $d, $p) {
         if !$*DECLARAND<const> and $name ~~ /^\w+$/ {
             $curstash.{"&$name"} //= $curstash.{$name};
             $sid ~= "::$name";
-            $*NEWPAD = $curstash.{$name ~ '::'} //= ($p // STASH.new(
+            $*NEWPAD = $curstash.{$name ~ '::'} //= ($p // Stash.new(
                 'PARENT::' => $curstash.idref,
                 '!file' => $*FILE, '!line' => self.line,
                 '!id' => [$sid] ));
@@ -5174,7 +5177,7 @@ method add_our_name ($n) {
     while @components > 1 {
         my $pkg = shift @components;
         $sid ~= "::$pkg";
-        my $newstash = $curstash.{$pkg} //= STASH.new(
+        my $newstash = $curstash.{$pkg} //= Stash.new(
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
@@ -5229,7 +5232,7 @@ method add_our_name ($n) {
         if $name ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
             $curstash.{"&$name"} //= $declaring;
             $sid ~= "::$name";
-            $*NEWPAD = $curstash.{$name ~ '::'} //= STASH.new(
+            $*NEWPAD = $curstash.{$name ~ '::'} //= Stash.new(
                 'PARENT::' => $curstash.idref,
                 '!file' => $*FILE, '!line' => self.line,
                 '!id' => [$sid] );
@@ -5310,7 +5313,7 @@ method load_setting ($setting) {
     $*SETTING = $ALL<SETTING>;
     $*CURPAD = $*SETTING;
 
-    $*GLOBAL = $*CORE.<GLOBAL::> = STASH.new(
+    $*GLOBAL = $*CORE.<GLOBAL::> = Stash.new(
         '!file' => $*FILE, '!line' => 1,
         '!id' => ['GLOBAL'],
     );
@@ -5389,7 +5392,9 @@ method add_routine ($name) {
 }
 
 method add_variable ($name) {
-    if ($*SCOPE||'') eq 'our' {
+    my $scope = $*SCOPE || 'our';
+    return self if $scope eq 'anon';
+    if $scope eq 'our' {
         self.add_our_variable($name);
     }
     else {
@@ -5500,9 +5505,9 @@ method lookup_compiler_var($name) {
         when '$?LINE'     { return self.lineof(self.pos); }
         when '$?POSITION' { return self.pos; }
 
-        when '$?LANG'    { return item %*LANG; }
+        when '$?LANG'     { return item %*LANG; }
 
-        when '$?STASH'    { return $*CURPAD; }
+        when '$?LEXPAD'   { return $*CURPAD; }
 
         when '$?PACKAGE'  { return $*CURPKG; }
         when '$?MODULE'   { return $*CURPKG; } #  XXX should scan

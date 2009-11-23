@@ -6,6 +6,13 @@ my enum Bool <False True>;
 
 my enum Order < Increase Same Decrease >;
 
+my role Stash { }
+my role Role does Stash { }
+my role Package does Stash { }
+my role Module does Stash { }
+my role Class does Module { }
+my role Grammar does Class { }
+
 my class P6opaque { }
 my class Object { }
 my class Any { }
@@ -21,11 +28,6 @@ my class Signature { }
 my class Parameter { }
 my class Proxy { }
 my class Matcher { }
-my class Package { }
-my class Module { }
-my class Class { }
-my class Role { }
-my class Grammar { }
 my class Scalar { }
 my class Array { }
 my class Hash { }
@@ -39,7 +41,7 @@ my class Range { }
 my class Set { }
 my class Bag { }
 my class Mapping { }
-my class Void { }
+my class Sink { }
 my class Undef { }
 my class Failure { }
 my class Exception { }
@@ -53,6 +55,7 @@ my class Submethod { }
 my class Regex { }
 my class Multi { }
 
+my role Stringy { }
 my class Str { }
 my class Cat { }
 my class Blob { }
@@ -66,7 +69,9 @@ my class StrPos { }
 my class StrLen { }
 my class Version { }
 
+my role Numeric { }
 my class Num { 
+    # XXX, would these generate FatRats, and is that bad?
     constant pi is export = 3.14159_26535_89793_23846_26433_83279_50288;
     constant e  is export = 2.71828_18284_59045_23536_02874_71352_66249;
     constant i  is export = 1i;
@@ -88,6 +93,7 @@ my class complex32 { }
 my class complex64 { }
 my class complex128 { }
 
+my role Integral { }
 my class Int { }
 my class int { }
 
@@ -99,6 +105,7 @@ my class int16 { }
 my class int32 { }
 my class int64 { }
 
+my role Rational { }
 my class Rat { }
 my class rat { }
 my class rat8 { }

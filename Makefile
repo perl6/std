@@ -1,7 +1,7 @@
 .PHONY: check try cat clean distclean purge test
 
 FIXINS=Cursor.pmc LazyMap.pm lib/DEBUG.pm DEBUG.pmc lib/Test.pm CORE.setting NULL.pad \
-std mangle.pl CORE.pad lib/NAME.pm NAME.pmc lib/STASH.pm STASH.pmc sprixel.pl ToJS.pm \
+std mangle.pl CORE.pad lib/NAME.pm NAME.pmc lib/Stash.pm Stash.pmc sprixel.pl ToJS.pm \
 viv sprixelCORE.setting
 
 all: $(FIXINS) check lex/STD/termish

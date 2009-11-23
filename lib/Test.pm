@@ -3,6 +3,7 @@ proto plan is export { }
 proto done_testing is export { }
 proto is is export { }
 proto ok is export { }
+proto nok is export { }
 proto dies_ok is export { }
 proto lives_ok is export { }
 proto skip is export { }

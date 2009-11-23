@@ -1,28 +1,28 @@
 my $id = 'MY:file<CORE.pad>:line(1):pos(0)';
 use strict;
-use STASH;
+use Stash;
 use NAME;
 my $file = { name => 'CORE.pad' };
-my $core = STASH::->new( _file => $file, _line => __LINE__,
+my $core = Stash::->new( _file => $file, _line => __LINE__,
     '!id' => [$id],
     Bool => NAME::->new( name => 'Bool', file => $file, line => __LINE__ ),
-    'Bool::' => STASH::->new( _file => $file, _line => __LINE__,
+    'Bool::' => Stash::->new( _file => $file, _line => __LINE__,
 	True => NAME::->new( name => 'True', file => $file, line => __LINE__ ),
 	False => NAME::->new( name => 'False', file => $file, line => __LINE__ ),
     ),
     Num => NAME::->new( name => 'Num', file => $file, line => __LINE__),
-    'Num::' => STASH::->new( _file => $file, _line => __LINE__,
+    'Num::' => Stash::->new( _file => $file, _line => __LINE__,
 	pi => NAME::->new( name => 'pi', value => atan2(1,1)*4, file => $file, line => __LINE__ ),
 	e => NAME::->new( name => 'e', value => exp(1), file => $file, line => __LINE__ ),
     ),
     Order => NAME::->new( name => 'Order', file => $file, line => __LINE__),
-    'Order::' => STASH::->new( _file => $file, _line => __LINE__,
+    'Order::' => Stash::->new( _file => $file, _line => __LINE__,
 	Increase => NAME::->new( name => 'Increase', file => $file, line => __LINE__ ),
 	Same => NAME::->new( name => 'Same', file => $file, line => __LINE__ ),
 	Decrease => NAME::->new( name => 'Decrease', file => $file, line => __LINE__ ),
     ),
     DEBUG => NAME::->new( name => 'DEBUG', file => $file, line => __LINE__),
-    'DEBUG::' => STASH::->new( _file => $file, _line => __LINE__,
+    'DEBUG::' => Stash::->new( _file => $file, _line => __LINE__,
 	EXPR => NAME::->new( name => 'Increase', file => $file, line => __LINE__, export => 'DEFAULT' ),
 	trace_call => NAME::->new( name => 'Increase', file => $file, line => __LINE__, export => 'DEFAULT' ),
     ),

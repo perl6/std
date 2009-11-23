@@ -4,7 +4,7 @@ use warnings;
 no warnings 'recursion';
 use utf8;
 use NAME;
-use STASH;
+use Stash;
 
 my $TRIE = 1;
 my $STORABLE = 1;
@@ -220,10 +220,10 @@ sub load_pad {
     my $setting = shift;
     my $file = "$setting.syml";
     if (-e $file) {
-        bless($self->load_yaml_pad($setting),'STASH');
+        bless($self->load_yaml_pad($setting),'Stash');
     }
     else {
-        bless($self->load_perl_pad($setting),'STASH');
+        bless($self->load_perl_pad($setting),'Stash');
     }
 }
 
@@ -2402,8 +2402,8 @@ sub set_export {
     my $xpad = $STD::ALL->{ (delete $::DECLARAND->{xpad})->[0] };
     $::DECLARAND->{export} = $text;
     my $sid = $::CURPAD->idref;
-    my $x = $xpad->{'EXPORT::'} //= STASH::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
-    $x->{$textpkg} //= STASH::->new( 'PARENT::' => $x->idref, '!id' => [$sid->[0] . '::EXPORT::' . $text] );
+    my $x = $xpad->{'EXPORT::'} //= Stash::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
+    $x->{$textpkg} //= Stash::->new( 'PARENT::' => $x->idref, '!id' => [$sid->[0] . '::EXPORT::' . $text] );
     $x->{$textpkg}->{$name} = $::DECLARAND;
     $x->{$textpkg}->{'&'.$name} = $::DECLARAND
             if $name =~ /^\w/ and $::IN_DECL ne 'constant';

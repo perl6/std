@@ -1,5 +1,5 @@
 use 5.010;
-package STASH;
+package Stash;
 sub new {
     my $class = shift;
     my %attrs = @_;
