@@ -84,10 +84,10 @@ our $ALL;
 
 =end notes
 
-method TOP ($STOP = undef) {
+method TOP ($STOP = '') {
     my $lang = self.cursor_fresh( ::STD::P6 );
 
-    if defined $STOP {
+    if $STOP {
         my $*GOAL ::= $STOP;
         $lang.unitstop($STOP).comp_unit;
     }
@@ -1007,7 +1007,7 @@ token ws {
     [
         | \h+ <![#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
         | <?before \w> <?after \w> :::
-            { @*MEMOS[$startpos]<ws> = undef; }
+            { @*MEMOS[$startpos]<ws>:delete; }
             <.panic: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
     ]
     ||
@@ -1020,7 +1020,7 @@ token ws {
 
     {{
         if ($¢.pos == $startpos) {
-            @*MEMOS[$¢.pos]<ws> = undef;
+            @*MEMOS[$¢.pos]<ws>:delete;
         }
         else {
             @*MEMOS[$¢.pos]<ws> = $startpos;
@@ -3041,7 +3041,7 @@ grammar P6 is STD {
         [ <?before \h*<sigil><twigil>?\w >
             <.obs('undef as a verb', 'undefine function')>
         ]?
-        <O(|%term)>
+        <.obs('undef as a value', "one of:\n  Object or Nil as an empty value,\n  !*.defined as a matcher,\n  Any:U as a type constraint\n  or fail() as a failure return\n")>
     }
 
     token term:sym<continue>
