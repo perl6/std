@@ -201,6 +201,7 @@ my proto nextsame { }
 my proto nextwith { }
 my proto lastcall { }
 my proto defined { }
+my proto notdef { }
 my proto undefine { }
 my proto item { }
 my proto list { }
