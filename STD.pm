@@ -3032,6 +3032,11 @@ grammar P6 is STD {
         <O(|%term)>
     }
 
+    token term:sym<Object> {
+        <sym> » {}
+        <.obs('Object', 'Mu as the "most universal" object type')>
+    }
+
     token term:sym<undef> {
         <sym> » {}
         [ <?before \h*'$/' >
@@ -3041,7 +3046,7 @@ grammar P6 is STD {
         [ <?before [ '(' || \h*<sigil><twigil>?\w ] >
             <.obs('undef as a verb', 'undefine function or assignment of Nil')>
         ]?
-        <.obs('undef as a value', "one of:\n\tMu (the \"most undefined\" type object),\n\ta more specific undefined type object such as Int,\n\tNil as an empty list,\n\t!*.defined as a matcher,\n\tAny:U as a type constraint\n\tor fail() as a failure return\n\t   ")>
+        <.obs('undef as a value', "the most appropriate of:\n\tMu (the \"most undefined\" type object),\n\ta more specific undefined type object such as Int,\n\tNil as an empty list,\n\t*.notdef as a matcher or method,\n\tAny:U as a type constraint\n\tor fail() as a failure return\n\t   ")>
     }
 
     token term:sym<continue>
