@@ -13,8 +13,11 @@ my role Module does Stash { }
 my role Class does Module { }
 my role Grammar does Class { }
 
+# XXX does this mean anything?
+my role Matcher { }
+
 my class P6opaque { }
-my class Object { }
+my class Mu { }
 my class Any { }
 my class Junction { }
 my class junction { }
@@ -27,7 +30,6 @@ my class Match { }
 my class Signature { }
 my class Parameter { }
 my class Proxy { }
-my class Matcher { }
 my class Scalar { }
 my class Array { }
 my class Hash { }
@@ -154,7 +156,7 @@ my role ContainerDeclarand { }
 my subset Comparator   of Code where { .signature === :(Any, Any --> Int ) };
 my subset KeyExtractor of Code where { .signature === :(Any --> Any) };
 my subset OrderingPair of Pair where { .left ~~ KeyExtractor && .right ~~ Comparator };
-my subset Ordering of Object where Signature | KeyExtractor | Comparator | OrderingPair | Whatever;
+my subset Ordering of Mu where Signature | KeyExtractor | Comparator | OrderingPair | Whatever;
 
 my class Instant { }
 my class Duration { }

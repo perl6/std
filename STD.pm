@@ -3038,10 +3038,10 @@ grammar P6 is STD {
             <.obs('$/ variable as input record separator',
                  "the filehandle's .slurp method")>
         ]?
-        [ <?before \h*<sigil><twigil>?\w >
-            <.obs('undef as a verb', 'undefine function')>
+        [ <?before [ '(' || \h*<sigil><twigil>?\w ] >
+            <.obs('undef as a verb', 'undefine function or assignment of Nil')>
         ]?
-        <.obs('undef as a value', "one of:\n  Object or Nil as an empty value,\n  !*.defined as a matcher,\n  Any:U as a type constraint\n  or fail() as a failure return\n")>
+        <.obs('undef as a value', "one of:\n\tMu (the \"most undefined\" type object),\n\ta more specific undefined type object such as Int,\n\tNil as an empty list,\n\t!*.defined as a matcher,\n\tAny:U as a type constraint\n\tor fail() as a failure return\n\t   ")>
     }
 
     token term:sym<continue>
@@ -4850,7 +4850,8 @@ grammar Regex is STD {
     token quantifier:sym<?>  { <sym> <quantmod> }
     token quantifier:sym<**> { <sym> :: <normspace>? <quantmod> <normspace>?
         [
-        | \d+ [ '..' [ \d+ | '*' ] ]?
+        | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
+        | \d+ [ '..' [ \d+ | '*' | <.panic: "Malformed range"> ] ]?
         | <codeblock>
         | <quantified_atom>
         ]
@@ -5658,11 +5659,11 @@ method FAILGOAL (Str $stop, Str $name) {
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
 method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
     %$*HIGHEXPECT = ();
-    self.panic("Obsolete use of $old;$when please use $new instead");
+    self.panic("Obsolete use of $old; instead,$when please use $new");
 }
 
 method worryobs (Str $old, Str $new, Str $when = ' in Perl 6') {
-    self.worry("Possible obsolete use of $old;$when please use $new instead");
+    self.worry("Possible obsolete use of $old; instead,$when please use $new");
     self;
 }
 
