@@ -2798,7 +2798,7 @@ grammar P6 is STD {
 
         [
         || <?before '='>
-        || <?before \N*'='> <.panic: "Malformed constant"> # probable initializer later
+        || <?before <-[\n=]>*'='> <.panic: "Malformed constant"> # probable initializer later
         || <.panic: "Missing initializer on constant declaration">
         ]
 
