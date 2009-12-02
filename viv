@@ -438,6 +438,7 @@ sub indent {
 	my $a = $r->{'.'} = [$left,$match->{_ast},$right];
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
+	$r->{'infix'} = $a->[1];
 
 	my $base = ucfirst $match->{O}{dba} // $match->{sym} // 'termish';
 	$base =~ s/ /_/g;
