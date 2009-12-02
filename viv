@@ -346,6 +346,7 @@ sub indent {
 	pop @all while @all and not $all[-1]{END};
 	$r->{BEG} = $all[0]{BEG};
 	$r->{END} = $all[-1]{END} // $r->{BEG};
+	$r->{'infix'} = $all[-2];  # assume final one is most representative
 	$r->{'.'} = \@all;
 
 	my $base = ucfirst $match->{O}{dba} // $match->{sym} // 'termish';
