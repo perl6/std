@@ -37,6 +37,9 @@ my class KeyHash { }
 my class KeySet { }
 my class KeyBag { }
 my class Pair { }
+my class PairMap { }
+my class Enum { }
+my class EnumMap { }
 my class List { }
 my class Seq { }
 my class Range { }

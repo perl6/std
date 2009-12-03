@@ -2515,7 +2515,8 @@ grammar P6 is STD {
           }}>
         ]
         # parametric type?
-        <.unsp>? [ <?before '['> <postcircumfix> ]?
+        <.unsp>? [ <?before '['> <param=.postcircumfix> ]?
+        <.unsp>? [ <?before '{'> <whence=.postcircumfix> ]?
         <.ws> [ 'of' <.ws> <typename> ]?
     }
 
