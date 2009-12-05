@@ -1120,6 +1120,22 @@ token pod_comment {
     ]
 }
 
+# suppress fancy end-of-line checking
+token embeddedblock {
+    # encapsulate braided languages
+    :temp %*LANG;
+    :my $*SIGNUM;
+    :my $*GOAL ::= '}';
+    :temp $*CURPAD;
+
+    :dba('embedded block')
+
+    <.newpad>
+    <.finishpad>
+    '{' :: [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <statementlist> ]
+    [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
+}
+
 token binints { [<.ws><binint><.ws>] ** ',' }
 
 token binint {
@@ -4029,7 +4045,7 @@ grammar Q is STD {
     } # end role
 
     role c1 {
-        token escape:sym<{ }> { <?before '{'> [ :lang(%*LANG<MAIN>) <block> ] }
+        token escape:sym<{ }> { <?before '{'> [ :lang(%*LANG<MAIN>) <embeddedblock> ] }
     } # end role
 
     role c0 {
@@ -4557,13 +4573,6 @@ grammar Regex is STD {
 
     token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex (for literal please quote with single quotes)"> }  # no unspace in regexen
 
-    # suppress fancy end-of-line checking
-    token codeblock {
-        :my $*GOAL ::= '}';
-        '{' :: [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <statementlist> ]
-        [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
-    }
-
     rule nibbler {
         :temp $*sigspace;
         :temp $*ratchet;
@@ -4652,7 +4661,7 @@ grammar Regex is STD {
 
     token metachar:sym<{ }> {
         <?before '{'>
-        <codeblock>
+        <embeddedblock>
         {{ $/<sym> := <{ }> }}
     }
 
@@ -4769,7 +4778,7 @@ grammar Regex is STD {
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<*> { <sym> [ <?before '>'> | <.ws> <nibbler> ] }
 
-    token assertion:sym<{ }> { <codeblock> }
+    token assertion:sym<{ }> { <embeddedblock> }
 
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
@@ -4858,7 +4867,7 @@ grammar Regex is STD {
         [
         | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
         | \d+ [ '..' [ \d+ | '*' | <.panic: "Malformed range"> ] ]?
-        | <codeblock>
+        | <embeddedblock>
         | <quantified_atom>
         ]
     }
