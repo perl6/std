@@ -610,6 +610,7 @@ END
             my $body = <<"END";
 sub$ws${NAME}__PEEK { <<PEEK>> }
 sub$ws$NAME {
+    no warnings 'recursion';
     my \$self = shift;
 END
             if ($NEEDORIGARGS) {
