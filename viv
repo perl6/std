@@ -2130,6 +2130,9 @@ END
 { package VAST::Tight_or; our @ISA = 'VAST::Base';
 }
 
+{ package VAST::Tight_and; our @ISA = 'VAST::Base';
+}
+
 
 { package VAST::trait; our @ISA = 'VAST::Base';
 }
