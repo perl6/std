@@ -1114,7 +1114,7 @@ token pod_comment {
     | 'for' » :: \h* [ <identifier> || $$ || '#' || <.panic: "Unrecognized token after =for"> ]
         [.*?  ^^ \h* $$ || .*]
     | :: 
-        [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
+        [ <?before .*? ^^ '=cut' » > <.panic: "Obsolescent pod format, please use =begin/=end instead"> ]?
         [<alpha>||\s||<.panic: "Illegal pod directive">]
         \N*
     ]
@@ -2173,7 +2173,7 @@ grammar P6 is STD {
         # XXX assuming nobody ever wants to assign $/ directly anymore...
         [ <?before \h* '=' <![=]> >
             <.obs('$/ variable as input record separator',
-                 "filehandle's :irs attribute")>
+                 "the filehandle's :irs attribute")>
         ]?
     }
 
@@ -2429,7 +2429,7 @@ grammar P6 is STD {
 
     token special_variable:sym<$.> {
         <sym> :: <?before \s | ',' | <terminator> >
-        <.obs('$. variable', "filehandle's .line method")>
+        <.obs('$. variable', "the filehandle's .line method")>
     }
 
     token special_variable:sym<$?> {
@@ -3063,7 +3063,7 @@ grammar P6 is STD {
         [ <?before [ '(' || \h*<sigil><twigil>?\w ] >
             <.obs('undef as a verb', 'undefine function or assignment of Nil')>
         ]?
-        <.obs('undef as a value', "the most appropriate of:\n\tMu (the \"most undefined\" type object),\n\ta more specific undefined type object such as Int,\n\tNil as an empty list,\n\t*.notdef as a matcher or method,\n\tAny:U as a type constraint\n\tor fail() as a failure return\n\t   ")>
+        <.obs('undef as a value', "something more specific:\n\tMu (the \"most undefined\" type object),\n\tan undefined type object such as Int,\n\tNil as an empty list,\n\t*.notdef as a matcher or method,\n\tAny:U as a type constraint\n\tor fail() as a failure return\n\t   ")>
     }
 
     token term:sym<continue>
@@ -5674,11 +5674,11 @@ method FAILGOAL (Str $stop, Str $name) {
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
 method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
     %$*HIGHEXPECT = ();
-    self.panic("Obsolete use of $old; instead,$when please use $new");
+    self.panic("Unsupported use of $old;$when please use $new");
 }
 
 method worryobs (Str $old, Str $new, Str $when = ' in Perl 6') {
-    self.worry("Possible obsolete use of $old; instead,$when please use $new");
+    self.worry("Unsupported use of $old;$when please use $new");
     self;
 }
 
