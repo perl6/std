@@ -1493,7 +1493,7 @@ sub indent {
 }
 
 
-{ package VAST::package_declarator__S_class; our @ISA = 'VAST::Base';
+{ package VAST::package_declarator__S_class; our @ISA = 'VAST::package_declarator';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/\S.*//s;
@@ -1502,7 +1502,7 @@ sub indent {
 }
 
 
-{ package VAST::package_declarator__S_grammar; our @ISA = 'VAST::Base';
+{ package VAST::package_declarator__S_grammar; our @ISA = 'VAST::package_declarator';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/\S.*//s;
@@ -1511,7 +1511,15 @@ sub indent {
 }
 
 
-{ package VAST::package_declarator__S_role; our @ISA = 'VAST::Base';
+{ package VAST::package_declarator__S_role; our @ISA = 'VAST::package_declarator';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+        my @t = $self->SUPER::emit_p5($lvl+1);
+	$t[0] =~ s/\S.*//s;
+        $self->ret(@t);
+    }
+}
+
+{ package VAST::package_declarator__S_knowhow; our @ISA = 'VAST::package_declarator';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/\S.*//s;
