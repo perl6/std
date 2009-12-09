@@ -3396,7 +3396,7 @@ grammar P6 is STD {
         :dba('argument list')
         [
         | <?stdstopper>
-        | <EXPR(item %list_infix)> {{
+        | <EXPR(item %list_prefix)> {{
                 my $delims = $<EXPR><delims>;
                 for @$delims {
                     if ($_.<sym> // '') eq ':' {
