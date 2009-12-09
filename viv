@@ -368,6 +368,7 @@ sub indent {
 	my $r = hoist($match);
 	my $arg = $match->{arg}->{_ast};
 	$r->{'arg'} = $arg;
+	$r->{postop} = $match->{postop}{_ast} if exists $match->{postop};
 	my $a = $r->{'.'} = [$arg,$match->{_ast}];
 	$r->{BEG} = $a->[0]->{BEG} // $match->{_from};
 	$r->{END} = $a->[-1]->{END} // $match->{_pos};
@@ -399,6 +400,7 @@ sub indent {
 	my $match = shift;
 	my $r = hoist($match);
 	my $arg = $match->{arg}->{_ast};
+	$r->{'postop'} = $match->{postop}->{_ast} if exists $match->{postop};
 	$r->{'arg'} = $arg;
 	my $a = $r->{'.'} = [$match->{_ast},$arg];
 
