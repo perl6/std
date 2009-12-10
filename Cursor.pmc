@@ -215,6 +215,39 @@ sub parsefile {
     $result;
 }
 
+## method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', :$actions = '')
+sub initparse {
+    my $self = shift;
+    my $text = shift;
+    my %args = @_;
+    my $rule = $args{rule} // 'TOP';
+    my $tmp_prefix = $args{tmp_prefix} // '';
+    my $setting = $args{setting} // 'CORE';
+    my $actions = $args{actions} // '';
+
+
+    local $::TMP_PREFIX = $tmp_prefix;
+    local $::SETTINGNAME = $setting;
+    local $::ACTIONS = $actions;
+    local @::MEMOS = @::MEMOS;
+
+    # various bits of info useful for error messages
+    local $::HIGHWATER = 0;
+    local $::HIGHMESS = '';
+    local $::HIGHEXPECT = {};
+    local $::LASTSTATE;
+    local $::LAST_NIBBLE = { firstline => 0, lastline => 0 };
+    local $::LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
+    local $::GOAL = "(eof)";
+    $::ORIG = $text . "\n;";           # original string
+
+    my $result = $self->new($text)->$rule();
+
+    # XXX here attach stuff that will enable :cont
+
+    $result;
+}
+
 sub load_pad {
     my $self = shift;
     my $setting = shift;

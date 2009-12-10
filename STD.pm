@@ -96,29 +96,6 @@ method TOP ($STOP = '') {
     }
 }
 
-method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', :$actions = '') {
-    my $*TMP_PREFIX ::= $tmp_prefix;
-    my $*SETTINGNAME ::= $setting;
-    my $*ACTIONS ::= $actions;
-    temp @*MEMOS;
-
-    # various bits of info useful for error messages
-    my $*HIGHWATER = 0;
-    my $*HIGHMESS = '';
-    my $*HIGHEXPECT = {};
-    my $*LASTSTATE;
-    my $*LAST_NIBBLE = { firstline => 0, lastline => 0 };
-    my $*LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
-    my $*GOAL ::= "(eof)";
-    $*ORIG = $text ~ "\n;";           # original string
-
-    my $result = self.new($text)."$rule"();
-
-    # XXX here attach stuff that will enable :cont
-
-    $result;
-}
-
 ##############
 # Precedence #
 ##############
