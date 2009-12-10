@@ -1,8 +1,9 @@
+# Makefile for STD.pm viv etcetera in pugs/src/perl6
 .PHONY: check try cat clean distclean purge test
 
-FIXINS=Cursor.pmc LazyMap.pm lib/DEBUG.pm DEBUG.pmc lib/Test.pm CORE.setting NULL.pad \
-std mangle.pl CORE.pad lib/NAME.pm NAME.pmc lib/Stash.pm Stash.pmc sprixel.pl ToJS.pm \
-viv sprixelCORE.setting
+FIXINS=Cursor.pmc LazyMap.pm lib/DEBUG.pm DEBUG.pmc lib/Test.pm \
+	CORE.setting NULL.pad std mangle.pl CORE.pad lib/NAME.pm NAME.pmc \
+	lib/Stash.pm Stash.pmc sprixel.pl ToJS.pm viv sprixelCORE.setting
 
 all: $(FIXINS) check lex/STD/termish
 
@@ -11,7 +12,8 @@ fast: $(FIXINS) check
 snap: $(FIXINS) check lex/STD/termish
 	rm -rf snap.new
 	mkdir snap.new
-	svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
+	@#svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
+	svn info |perl -ne 'print "$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
 	cp $(FIXINS)  tryfile STD.pmc STD_P5.pmc *.syml CORE.*.store snap.new
 	-cp -r lib snap.new
 	-cp -r setting snap.new
@@ -49,6 +51,7 @@ cat:
 clean:
 	rm -rf lex try5.* *.pad.store *.syml.store *.syml STD.pmc STD_P5.pmc STD.pm5 STD_P5.pm5
 
+# purge is an alias for distclean
 distclean purge: clean
 	rm -rf STD.pmc STD_P5.pmc STD.pm5
 
@@ -59,3 +62,27 @@ test: all
 	./teststd
 testt: all
 	./teststd ../../t
+
+# List all targets with brief descriptions.
+# Gradual shaving of targets with Occam's Razor would be a Good Thing.
+help:
+	@echo
+	@echo 'In pugs/src/perl6 you can make these targets:'
+	@echo
+	@echo 'all (default)   builds viv'
+	@echo 'fast            same as check'
+	@echo 'snap            copies runnable files and svn revision to snap/'
+	@echo 'STD_P5.pmc      (internal)'
+	@echo 'STD.pmc         (internal)'
+	@echo 'CORE.syml       (internal)'
+	@echo 'check           verifies Perl 5 syntax of STD.pmc and STD_P5.pmc'
+	@echo 'lex/STD/termish (internal)'
+	@echo 'cat             shows the output written by the last tryfile'
+	@echo 'clean           removes many generated files'
+	@echo 'distclean       removes even more generated files'
+	@echo 'purge           alias for distclean'
+	@echo 'snaptest        run snapshot teststd on pugs/t/spec/*'
+	@echo 'test            run teststd on pugs/t/*'
+	@echo 'testt           run teststd on pugs/t/spec/*'
+	@echo 'help            show this list'
+	@echo
