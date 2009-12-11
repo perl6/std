@@ -2621,6 +2621,7 @@ grammar P6 is STD {
 
     token quote_mod:w  { <sym> }
     token quote_mod:ww { <sym> }
+    token quote_mod:p  { <sym> }
     token quote_mod:x  { <sym> }
     token quote_mod:to { <sym> }
     token quote_mod:s  { <sym> }
@@ -4077,6 +4078,14 @@ grammar Q is STD {
         token escape:sym<&> { <!> }
     } # end role
 
+    role p1 {
+        method postprocess ($s) { $s.parsepath }
+    } # end role
+
+    role p0 {
+        method postprocess ($s) { $s }
+    } # end role
+
     role w1 {
         method postprocess ($s) { $s.words }
     } # end role
@@ -4157,6 +4166,7 @@ grammar Q is STD {
     multi method tweak (:function(:$f)!)    { self.mixin($f ?? ::f1 !! ::f0) }
     multi method tweak (:closure(:$c)!)     { self.mixin($c ?? ::c1 !! ::c0) }
 
+    multi method tweak (:path(:$p)!)        { self.mixin($p ?? ::p1 !! ::p0) }
     multi method tweak (:exec(:$x)!)        { self.mixin($x ?? ::x1 !! ::x0) }
     multi method tweak (:words(:$w)!)       { self.mixin($w ?? ::w1 !! ::w0) }
     multi method tweak (:quotewords(:$ww)!) { self.mixin($ww ?? ::ww1 !! ::ww0) }
