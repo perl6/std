@@ -3861,6 +3861,15 @@ grammar P6 is STD {
                     $*BORG.<name> = $name;
                 }
             }
+            if $name eq 'say' or $name eq 'print' {
+                my $al = $<args><arglist>[0];
+                my $ok = 0;
+                $ok = 1 if $al and $al.from != $al.to;
+                $ok = 1 if $<args><semiarglist>;
+                if not $ok {
+                    $<identifier>.worryobs("bare '$name'", ".$name if you want to $name \$_, or use an explicit argument");
+                }
+            }
         }}
         <O(|%term)>
     }
