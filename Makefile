@@ -13,7 +13,7 @@ snap: $(FIXINS) check lex/STD/termish
 	rm -rf snap.new
 	mkdir snap.new
 	@#svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
-	svn info |perl -ne 'print "$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
+	svn info |perl -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
 	cp $(FIXINS)  tryfile STD.pmc STD_P5.pmc *.syml CORE.*.store snap.new
 	-cp -r lib snap.new
 	-cp -r setting snap.new
@@ -75,7 +75,7 @@ help:
 	@echo 'STD_P5.pmc      (internal)'
 	@echo 'STD.pmc         (internal)'
 	@echo 'CORE.syml       (internal)'
-	@echo 'check           verifies Perl 5 syntax of STD.pmc and STD_P5.pmc'
+	@echo 'check           validates STD.pm STD.pmc and STD_P5.pmc in Perl 5'
 	@echo 'lex/STD/termish (internal)'
 	@echo 'cat             shows the output written by the last tryfile'
 	@echo 'clean           removes many generated files'
