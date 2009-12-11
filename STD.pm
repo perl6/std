@@ -3845,6 +3845,13 @@ grammar P6 is STD {
     token term:sym<!!!>
         { <sym> <args>? <O(|%list_prefix)> }
 
+    my %deftrap = (
+        :say, :print, :abs, :alarm, :chomp, :chop, :chr, :chroot, :cos,
+        :defined, :eval, :exp, :glob, :lc, :lcfirst, :log, :lstat, :mkdir,
+        :ord, :readlink, :readpipe, :require, :reverse, :rmdir, :sin,
+        :split, :sqrt, :stat, :uc, :ucfirst, :unlink,
+    );
+
     # force identifier(), identifier.(), etc. to be a function call always
     token term:identifier
     {
@@ -3861,7 +3868,7 @@ grammar P6 is STD {
                     $*BORG.<name> = $name;
                 }
             }
-            if $name eq 'say' or $name eq 'print' {
+            if %deftrap{$name} {
                 my $al = $<args><arglist>[0];
                 my $ok = 0;
                 $ok = 1 if $al and $al.from != $al.to;
