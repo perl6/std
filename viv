@@ -9,6 +9,7 @@ use warnings;
 use STD;
 use utf8;
 use YAML::XS;
+use Encode;
 
 my $OPT_match = 0;
 my $OPT_log = 0;
@@ -43,7 +44,7 @@ sub MAIN {
 	last unless $_[0] =~ /^-/;
 	my $switch = shift @_;
 	if ($switch eq '--eval' or $switch eq '-e') {
-	    $PROG .= shift(@_) . "\n";
+	    $PROG .= Encode::decode_utf8(shift(@_)) . "\n";
 	}
 	elsif ($switch eq '--ast' or $switch eq '-a') {
 	    $output = 'ast';
