@@ -184,11 +184,11 @@ my proto all { }
 my proto none { }
 my proto one { }
 my proto not { }
-my proto true { }
+my proto so { }
 my proto next { }
 my proto last { }
 my proto redo { }
-my proto break { }
+my proto succeed { }
 my proto goto { }
 
 my proto die { }
