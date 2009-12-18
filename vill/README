@@ -1,0 +1,399 @@
+README for vill - a viv+llvm mashup
+
+OVERVIEW
+
+Perl 6 is a new dialect of Perl.  The official grammar for Perl 6 is
+called STD.pm, and it is (self referentially) written in Perl 6.  There
+is a STD.pm based Perl 6 source code parser called 'viv', written in
+Perl 5 to help bootstrap new Perl 6 implementations.  Viv converts
+source code written in Perl 6 into Viv Abstract Syntax Tree (VAST) form.
+See more info at http://perl6.org or chat in #perl6 on irc.freenode.net.
+
+LLVM is an optimizing compiler infrastructure written in C++.  LLVM uses
+an Intermediate Representation (IR) format to express the results of
+compiling any computer language.  LLVM has tools to interpret IR with or
+without a Just In Time (JIT) compiler, and to convert IR to native
+machine language for many processors.  LLVM helps you convert any
+Abstract Syntax Tree into executable code.  Visit http://llvm.org or
+#llvm on irc.oftc.net for the details.
+
+'vill' is the ugly temporary name of this project that connects 'viv' as
+Perl 6 front end to LLVM as code generating back end.  It sounds too
+much like 'vile', or mock German 'will', but it fits.  Unlike other Perl
+implementations such as Pugs, Rakudo, Sprixel and Mildew-js, 'vill'
+produces native executable files.  Thus Perl 6 programs depend on 'vill'
+and LLVM at compile time but are independent at run time.  Linking to
+native code libraries should be fairly easy, but dynamic functions such
+as 'eval' are difficult to do (and they add a run time 'vill' and LLVM
+dependency).  At the very least 'vill' offers a familiar base from which
+to explore LLVM.  Perhaps in time there will be enough functionality to
+make it useful in a similar way to NQP (Not Quite Perl 6).
+
+The slowest part of 'vill' is 'viv', because that runs as a separate
+Perl 5 child process.  The medium term plan will be to use the STD.pm
+grammar, but replace the 'viv' parser with a new one to be written in C.
+This new parser would call a new Perl 6 compatible regex engine (p6re),
+probably also written in C.  Someone known as "pmichaud" gave some maybe
+useful code for that: http://trac.parrot.org/parrot/changeset/7051/ ;-)
+The full Perl 6 regex language is too much to aim for, because action
+methods are allowed to contain arbitrary Perl 6 code.  A particular
+subset of the regex language is needed by STD.pm, and the plan would be
+to fake what cannot be implemented, using STD specific workarounds.
+
+If the dependency on 'viv' can be removed, the ugly 'vill' name will no
+longer be appropriate, and it will be time to think of a better one, and
+also to find a new home outside of pugs.  But not before... ;-)
+
+The short term plan is to build in some vaguely useful functionality in
+order to perform some real world work.  Whilst that is happening, it
+would be nice to execute a bit of the standard Perl 6 test suite using
+the 'viv' parser.  Hopefully some semantics (algorithms, MOP) can be
+translated from Mildew, Rakudo etc to LLVM Intermediate Representation.
+The code geneneration part should remain the same even with different
+parsers.  A very long term plan (after a native parser has been added)
+is to change down from C++ into C to be more portable, because LLVM
+apparently has a C API as well.  Syntax specific to C++ is therefore
+staying at a minimum.
+
+The 'vill' project was inspired by 'vijs', the former name of Sprixel,
+which uses Google's V8 JavaScript runtime engine and JIT compiler.
+Sprixel switched from viv parsing to NQP, but there are no such plans
+for vill.  The use of STD.pm is preferred because STD.pm is the official
+Perl 6 definition, it is being actively developed, and results in fewer
+dependencies on other software.  Some chats in #parrot about possibly
+converting Parrot to be LLVM based gave the idea of 'vill' going that
+route instead of V8.  The migration of Parrot would be a far bigger
+project, because Parrot is a high level virtual machine allowing any
+number of different languages to share code and data.
+
+Much credit is due to the creators of the other tools, namely Larry Wall
+for STD.pm and viv, Chris Lattner for LLVM, and Matthew Wilson for
+Sprixel.  The authors of 'vill' are named in the CREDITS file.
+
+GETTING STARTED
+
+A Unix-ish environment is currently assumed.  See Appendix A of this
+README for ways to get a make utility, Perl 5, a C and a C++ compiler,
+viv and LLVM working.
+
+After everything is installed, build and test vill:
+
+    cd pugs/src/perl6/vill
+    make
+    make help
+    make test
+
+The Makefile has an LLVM version check in it, looking for 2.6. If you
+get a make error about llvm-version2.6, go back and sort that out first.
+Use 'llvm-config --version' to verify that you've got it right.
+
+Now you should be able to run it:
+
+    vill -e 'print "howdy!"'
+
+DESIGN
+
+The main program (main.cpp) is deliberately clean and pretty to draw the
+reader towards the details beyond.  It creates a villCompiler object and
+calls the top level methods in turn.  The load_ast() method reads AST
+from viv (in YAML format) and converts it into vill (C structs) AST
+format.  Every node in the AST has a void pointer member called data.
+In vill, the linkCodegen() method traverses the AST and sets the data
+member of each node to point to an LLVM style *Codegen() function.  All
+such *Codegen() functions use LLVM methods to generate LLVM Intermediate
+Representation (IR) code for particular kinds of AST node.  For example,
+every AST arglist node has its data member pointed to the vill arglist()
+function and every statement node points to the statement() function.
+Straightforward, right?
+
+The codegen() method generates an LLVM Module by calling the *Codegen()
+function in the vill AST root node, which always points to comp_unit().
+The comp_unit() code examines the root node attributes and children, and
+in the order appropriate for a comp_unit, calls LLVM methods to generate
+IR code, and calls potentially recursive *Codegen() functions that the
+children point to.  When comp_unit() returns to compile() it has
+completed the construction of an LLVM Module object.  That's what
+compilers do.
+
+In nested fashion each *Codegen() function called from a parent node in
+the AST generates IR of its own and calls *Codegen() functions for the
+AST nodes of its children.  Eventually the *Codegen() functions of the
+AST leaf nodes (for example Str) generate IR but have no children
+to recurse further.  Each *Codegen() function returns an LLVM Value *
+pointer to the block of code it has generated, which the calling
+*Codegen()  function links appropriately to the code that it is
+generating for the parent node.
+
+The optimize() method does not work yet but is intended to call numerous
+LLVM passes that improve the Module code structure.  For example, LLVM
+code transformations do constant propagation, loop invariant code
+motion, dead code removal and tail call elimination.
+
+The save() method writes the Module to a file and converts that to
+native machine language for the local host.  If you do not specify an
+output file name, it uses "/tmp/a.out".  The run() method then executes
+the output (currently as a child process).  You can also copy the
+executable and run it on other computers that do not have viv, LLVM or
+vill installed.
+
+LLVM has data types useful for building more complex language types, for
+example the arbitrary width integer type specifies from i1 (one bit) to
+i8388607 (a 2^23-1 bit number, or a 2525223 digit decimal number).
+Since a Googol is merely 100 decimal digits, an LLVM based Big Rational
+would seldom approach its limits.
+
+The eval(EXPR) function is particularly challenging, as the expression
+to be executed is not known until run time.  The old eval(BLOCK) is now
+done by the try {... CATCH {...}} construct, and was the most frequently
+documented Perl 5 usage.  Certain other code needs eval(EXPR), but seems
+to be rare enough (subjective opinion) that the majority of programs
+should be spared the high overhead involved (a runtime containing a
+compiler).  In a different but instructive case, many Perl 5 users
+prefer no ithreads capability that causes a reported 15% slowdown for
+all programs (Perl 5 can be built without ithreads).
+
+The 'vill' plan for eval(EXPR) is therefore as follows.  The main
+running program starts a 'vill' subprocess and ask it to produce a
+temporary library file.  The main program dynamically loads the library
+and call the code to be eval'ed, receiving a Parcel with the returned
+results.  The library file is cached and later deleted.  More precise
+details have not even begun to speculate about the possibility of
+crossing the designer's mind.
+
+SOURCE CODE CONVENTIONS
+
+As 'vill' is a C and C++ LLVM based project, it follows the LLVM
+programming guidelines, see http://llvm.org/docs/CodingStandards.html
+
+The source code is divided into many small source files for several
+reasons.  Open Source projects should be simple in structure to engage
+many developers.  Finding the right file must be easy.  There is less
+complexity per source file (but more files of course).  People
+committing changes at the same time get fewer conflict and merge
+problems.  The make utility selectively recompiles small parts faster.
+
+The directory hierarchy is flat (all in src/ and test/) and the file
+name convention is simple: (indentifier name) ~~ (source file name).
+That means every externally linkable function or method should be in its
+own source file based on the same name.  The pugs/v6/mildew tree has a
+very similar approach.
+
+The names of identifiers not intended to be externally linkable begin
+with 'local_'.  That helps determine where every identifier is defined.
+So far the conventions have needed only two exceptions:
+1) The C test source files contain a main() function as entry point in
+addition to the test function whose name matches the source file name.
+2) The destructor ~villCompiler() is in the same file as the constructor
+because the ~ character would be confusing on a file name.
+
+Within each source file, lists of names are sorted alphabetically as
+much as dependencies allow.  That applies to #include file names, cases
+in switch blocks and enumerations.  The #include directives are
+annotated with a (sorted) list of names that the enclosing file depends
+on from that header file.  It is useful to periodically comment
+out #include directives one by one to see (from compiler errors) that
+the header file is still needed, and what for.  If it is not needed, cut
+it out!
+
+As a layout convention the C++ source format declares the return type in
+a separate line before the function or method name.  Indentation of code
+is done with two spaces (never tabs) per level.  Additional spaces are
+used liberally to vertically align similar content in successive lines
+as much as possible.  Curly braces that are optional in flow control
+blocks should be used, to more closely resemble Perl style.  The layout
+conventions may be ignored occasionally if a different style appears
+subjectively to be more readable.
+
+The length of source code lines is limited to 72 characters (like this
+README).  Longer lines are tolerated in the short term for expediency.
+
+Verbose comments and long descriptive identifiers are preferred.  C
+source files should contain only C style comments and C++ files only C++
+comments.  Where C style comments are used, they always begin and end on
+the same line.  Multiline comments are never used.  Where several lines
+of source must be temporarily excluded, use #if 0 and #endif instead.
+
+VIRTUAL MACHINE
+
+Of course LLVM is a virtual machine, but it's such a low level one that
+it virtually (pun intended) disappears.  Code is compiled and optimized
+in Intermediate Representation (IR) format, also referred to as bitcode.
+The IR similar in principle to Parrot's PIR.  LLVM offers a bitcode
+interpreter, a runtime engine with JIT compiler (similar to Google's V8)
+and a linker that produces native executables.
+
+Perl users often ask how to compile to native executables, so 'vill' has
+opted for that LLVM feature from the start.  The code generation process
+generates only as much virtual machine support code as the program being
+compiled needs.  Simple one liners become standalone executables smaller
+than 10KB with quick startup and execution times.  There is currently
+too little functionality in 'vill' to get experience with more complex
+programs.
+
+NATIVE EXECUTABLE CACHE
+
+There are plans to cache the compiled output files in /tmp/vill.  The
+idea comes from Walter Bright, of Zortech C++ and D compiler fame.  When
+a new 'vill' program is started, a 'make' style file and timestamp check
+will allow the time consuming compile process to be skipped if
+appropriate.  Command lines executed with the -e option will enjoy
+similar cacheing, tracked by a suitable checksum or digest.  The -c
+option will probably also purge the cache and force a recompile.
+Eventually a similar approach might compile modules into shared
+libraries, but that concept has not yet been proved.
+
+CONTINUATION PASSING STYLE (CPS)
+
+At the end of http://llvm.org/docs/tutorial/LangImpl8.html in "Garbage
+Collected Stack Frames", the documentation confirms that LLVM supports
+ways to manage stack frames and also tail calls.  CPS is useful when
+implementing lazy evaluation and multithreading, but is not necessary
+for regular procedural code.
+
+The 'vill' project is still a conventional stack based implementation
+(therefore not CPS) for the following reasons.  For a novice LLVM user,
+there are no CPS based examples, only Static Single Assignment (SSA)
+ones instead (using 'Value *' in the code).  Observation of Rakudo
+(which is Parrot CPS based) raises concerns about speed and memory
+leaks.  CPS uses heap memory instead of stack, and heap management
+(garbage collection etc) is a big overhead.  The speed of Parrot and
+Rakudo are far short of Perl 5, which is not CPS based.  However Perl 5
+is not good at concurrency.
+
+CPS is a calling convention.  The plan is to default to stack based, and
+add optional CPS in *Codegen() functions under the control of a 'vill'
+command line argument.  That way the processor and memory overheads of
+CPS and stack based can be compared when running a variety of Perl 6
+programs.  Eventually there might be an automatic switch depending on
+information in the AST.  It may also be possible to associate a calling
+convention with each called routine, so that the appropriate one is
+employed per call.  Presumably Pugs also did such things.
+
+CONTRIBUTING
+
+Anyone with Pugs commit access is welcome to hack on 'vill', generally
+as long as the set of passing tests improves.  Join #perl6 on
+irc.freenode.net to meet other contributors.  Not Yet Implemented (NYI)
+bits of Perl 6 code successfully make it through viv into the AST, only
+to fail because of missing or incomplete *Codegen() functions.  An error
+message such as "!perl/hash:VAST::SYM_infix__S_Tilde is not yet
+implemented" is rather common and points to an obvious hole.  Make a new
+file in src/ and entries in Makefile and src/link_codegen.cpp to fix it.
+
+Beginner hackers can grep for TODO comments, particularly those also
+labelled (LHF) (low hanging fruit).  Experienced hackers are requested
+not to greedily consume all the fruit they can, on the contrary to put
+even more fruit onto the (source) tree to entice others to get involved.
+Perhaps one piece of LHF per person per week/month is a fair ration.
+
+ROADMAP (PARTIAL)
+
+1. Fix src/yaml_compose.c so that all reasonable Perl 6 inputs to
+   test/yaml_compose_roundtrip.c are handled properly.
+2. Do 'print'.  Get ./vill -e 'print "hello"' to work.
+   Leave 'say' TODO as the first LHF, to tempt some collaborators.
+3. Do 'if'.  Get if "1" eq "1" { say "true" } to work.
+   Use the LLVM Tutorial examples Kaleidoscope and BrainF for ideas.
+   Leave 'else' and 'while' as the next LHF, they use similar coding.
+4. Do scalar variables and assignment (this is hard, see LLVM examples).
+   Initially just Str, so that "11" + "12" evaluates to "23" not 23.
+5. Seed a few operators such as ~ and ==, leave others like gt and x as
+   LHF.
+6. Try adding Int alongside Str and if that works, Num.  Leave room for
+   all other built in data types.
+7. Design LLVM based machinery for lists, arrays and hashes.  Connect
+   some AST *Codegen() functions to exercise it, eg @arr[$i] lvalue and
+   rvalue.
+8. Do 'sub'.  Use calling conventions from the LLVM examples.  Initially
+   pass parameters via @_, ignore the more advanced options.  Hard.
+9. Make 'use Test'.  Lots of faking acceptable, the goal is to run some
+   code, any code out of the spectest suite.
+10. Plan how to begin implementing rakudo/docs/metamodel.pod in LLVM IR.
+11. ...
+
+STATUS
+
+Item 1. is blocking the rest of the roadmap, test/yaml_compose_roundtrip
+runs but trips up on some corner cases. The AST integrity of the output
+looks good though.
+
+So far test/yaml_token_roundtrip and test/yaml_parse_roundtrip do work.
+In src/ these work: compile.cpp make_puts.cpp run.cpp and save.cpp.
+There may be some breakage due to fiddling with buggy yaml_compose().
+
+LICENSE
+
+Published by the authors named in the CREDITS files under the same
+terms as Perl 5.x (Artistic License 2.0).
+
+APPENDIX A: Getting Started
+
+How to get the software required to run 'vill':
+
+make:
+
+Supplied as a software development tool for most operating systems.
+The GNU make utility can be found at http://gnu.org .
+On a Debian or Ubuntu system, install make with:
+
+    sudo apt-get install make
+
+Perl 5:
+
+Your computer may have a usable version of Perl 5 installed anyway. You
+can try this command to check:
+
+    perl -v
+
+You need perl version 5.8.0 or higher. Use http://perl.com to get
+information about installing Perl 5.
+
+c++:
+
+Most operating systems have a package to install a c++ compiler. You may
+need to use one of these commands:
+
+    sudo apt-get install g++     # on a Debian style system (eg Ubuntu)
+    yum install g++              # on Fedora or Red Hat
+
+Subversion:
+
+    sudo apt-get install subversion
+
+viv:
+
+Use Subversion to check out either the complete Pugs repository, or just
+the parts that contains viv and vill:
+
+    svn checkout http://svn.pugscode.org/pugs pugs  # the entire repo
+    sudo cpan -i YAML::Syck  # or 'sudo apt-get libyaml-syck-perl'
+    sudo cpan -i YAML::XS
+    sudo cpan -i Moose
+    sudo ln -s /usr/bin/perl /usr/local/bin # if it says '/usr/local/bin/perl' not found
+    cd pugs/src/perl6
+    time make
+
+LLVM:
+
+Currently this project works only with version 2.6, the development
+version (2.7beta) changes too rapidly.
+
+    sudo apt-get install llvm     # Ubuntu 9.10
+
+Version 2.5 included with many other operating systems is too old.  On
+such platforms build LLVM from source:
+
+    wget http://llvm.org/releases/2.6/llvm-2.6.tar.gz
+    tar xzf llvm-2.6.tar.gz
+    cd llvm-2.6
+    ./configure --prefix=/usr --enable-optimized \
+      --enable-targets=host-only
+    time make                     # 25 - 45 minutes
+    sudo make install
+
+APPENDIX B: References
+
+http://llvm.org/docs
+http://llvm.org/docs/tutorial
+http://gnuu.org/2009/09/18/writing-your-own-toy-compiler
+http://compiler-rt.llvm.org

@@ -1,0 +1,111 @@
+--- !!perl/hash:VAST::comp_unit
+.: &1 !!perl/hash:VAST::statementlist
+  .:
+  - &2 !!perl/hash:VAST::statement
+    .: &3 !!perl/hash:VAST::noun__S_term
+      .: &4 !!perl/hash:VAST::term__S_identifier
+        .:
+        - &5 !!perl/hash:VAST::identifier
+          BEG: 0
+          END: 3
+          TEXT: say
+        - &6 !!perl/hash:VAST::args
+          .: &7 !!perl/hash:VAST::arglist
+            .: &8 !!perl/hash:VAST::noun__S_value
+              .: &9 !!perl/hash:VAST::value__S_quote
+                .: &10 !!perl/hash:VAST::quote__S_Double_Double
+                  .: &11 !!perl/hash:VAST::nibbler
+                    .:
+                    - !!perl/hash:VAST::Str
+                      TEXT: '!Hello world!'
+                      _from: 5
+                      _pos: 18
+                    - !!perl/hash:VAST::escape__S_Back
+                      .: &12 !!perl/hash:VAST::backslash__S_n
+                        BEG: 19
+                        END: 20
+                        SYM: n
+                        TEXT: n
+                        _specific: 1
+                      BEG: 18
+                      END: 20
+                      SYM: \
+                      _specific: 1
+                      item: *12
+                    BEG: 5
+                    END: 20
+                  BEG: 4
+                  END: 21
+                  SYM:
+                  - '"'
+                  - '"'
+                  WS: 1
+                  _specific: 1
+                  nibble: *11
+                BEG: 4
+                END: 21
+                SYM: quote
+                WS: 1
+                _specific: 1
+                quote: *10
+              BEG: 4
+              END: 21
+              SYM: value
+              WS: 1
+              _specific: 1
+              value: *9
+            BEG: 4
+            END: 21
+            EXPR: *8
+            WS: 1
+          BEG: 3
+          END: 21
+          arglist:
+          - *7
+          invocant: ~
+        BEG: 0
+        END: 21
+        SYM: identifier
+        _specific: 1
+        args: *6
+        dba: term
+        identifier: *5
+        kind: STD::Term
+        prec: z=
+      BEG: 0
+      END: 21
+      SYM: term
+      _specific: 1
+      term: *4
+    BEG: 0
+    END: 21
+    EXPR: *3
+    statement_mod_cond: []
+    statement_mod_loop: []
+  - &13 !!perl/hash:VAST::eat_terminator
+    BEG: 21
+    END: 22
+    TEXT: ;
+  - &14 !!perl/hash:VAST::statement
+    BEG: 24
+    END: 24
+    TEXT: ''
+    WS: 2
+    statement_mod_cond: []
+    statement_mod_loop: []
+  - &15 !!perl/hash:VAST::eat_terminator
+    BEG: 24
+    END: 25
+    TEXT: ' '
+    WS: 2
+  BEG: 0
+  END: 25
+  eat_terminator:
+  - *13
+  - *15
+  statement:
+  - *2
+  - *14
+BEG: 0
+END: 25
+statementlist: *1

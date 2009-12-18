@@ -1,0 +1,14 @@
+=pod
+
+This file layout retains the format used in the CREDITS files of Linux
+and Rakudo.
+
+Martin Berends designed 'vill' and wrote the initial implementation.
+
+The following people (in alphabetical order) have contributed to 'vill':
+
+N:Martin Berends
+U:mberends
+E:mberends@autoexec.demon.nl
+
+=cut
