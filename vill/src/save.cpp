@@ -1,7 +1,7 @@
 // save.cpp: make a bitcode file, then convert it to native code
 #include <llvm/Bitcode/ReaderWriter.h> // WriteBitcodeToFile
 #include <llvm/Support/raw_ostream.h>  // raw_fd_ostream
-#include <malloc.h>                    // free malloc realloc
+#include <stdlib.h>                    // free malloc realloc
 #include <string.h>                    // strcat strcpy strlen
 #include "villCompiler.h"              // villCompiler villModule
 

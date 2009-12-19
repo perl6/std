@@ -1,7 +1,6 @@
 /* yaml_parse.c */
 #include <assert.h>   /* assert (#define NDEBUG to bypass assertions) */
-#include <malloc.h>     /* free malloc */
-#include <stdlib.h>     /* abort */
+#include <stdlib.h>     /* abort free malloc */
 #include "yaml_parse.h" /* yaml_parse */
 #include "yaml_token.h" /* yaml_token_type yaml_token_struct */
 #undef NDEBUG           /* #undef: assert() on, #define: assert() off */

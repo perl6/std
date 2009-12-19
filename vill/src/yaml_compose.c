@@ -1,7 +1,6 @@
 /* yaml_compose.c */
 #include <assert.h>       /* assert */
-#include <malloc.h>       /* free malloc */
-#include <stdlib.h>       /* abort atoi */
+#include <stdlib.h>       /* abort atoi free malloc */
 #include "yaml_compose_internal.h" /* node_stack_entry yaml_compose */
   /* yaml_compose_mapping yaml_compose_scalar yaml_compose_sequence */
 #include "yaml_parse.h"  /* event_type */

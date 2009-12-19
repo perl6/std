@@ -1,6 +1,6 @@
 // run.cpp
 // execute the program that 'vill' has just compiled and saved
-#include <malloc.h>        // free malloc
+#include <stdlib.h>        // free malloc
 #include <string.h>        // strcat strcpy strlen
 #include "villCompiler.h"
 

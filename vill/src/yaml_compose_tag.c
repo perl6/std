@@ -1,9 +1,8 @@
 /* yaml_compose_tag.c */
 #include <assert.h>
-#include <malloc.h>
-#include <string.h>  /* strncpy */
-//#include "yaml_parser.h" /* graph_node */
-#include "yaml_compose_internal.h"
+#include <stdlib.h>                 /* malloc */
+#include <string.h>                 /* strncpy */
+#include "yaml_compose_internal.h"  /* graph_node */
 
 void
 yaml_compose_tag( struct graph_node * node, const char * tag_str,

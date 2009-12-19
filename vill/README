@@ -1,6 +1,22 @@
 README for vill - a viv+llvm mashup
 
-OVERVIEW
+Contents
+
+1. Overview
+2. Getting started
+3. Design
+4. Source code conventions
+5. Virtual machine
+6. Native executable cache
+7. Continuation passing style (CPS)
+8. Contributing
+9. Roadmap (partial)
+10. Status
+11. License
+A. Required software
+B. References
+
+1. OVERVIEW
 
 Perl 6 is a new dialect of Perl.  The official grammar for Perl 6 is
 called STD.pm, and it is (self referentially) written in Perl 6.  There
@@ -70,7 +86,7 @@ Much credit is due to the creators of the other tools, namely Larry Wall
 for STD.pm and viv, Chris Lattner for LLVM, and Matthew Wilson for
 Sprixel.  The authors of 'vill' are named in the CREDITS file.
 
-GETTING STARTED
+2. GETTING STARTED
 
 A Unix-ish environment is currently assumed.  See Appendix A of this
 README for ways to get a make utility, Perl 5, a C and a C++ compiler,
@@ -91,7 +107,7 @@ Now you should be able to run it:
 
     vill -e 'print "howdy!"'
 
-DESIGN
+3. DESIGN
 
 The main program (main.cpp) is deliberately clean and pretty to draw the
 reader towards the details beyond.  It creates a villCompiler object and
@@ -160,7 +176,7 @@ results.  The library file is cached and later deleted.  More precise
 details have not even begun to speculate about the possibility of
 crossing the designer's mind.
 
-SOURCE CODE CONVENTIONS
+4. SOURCE CODE CONVENTIONS
 
 As 'vill' is a C and C++ LLVM based project, it follows the LLVM
 programming guidelines, see http://llvm.org/docs/CodingStandards.html
@@ -195,6 +211,10 @@ out #include directives one by one to see (from compiler errors) that
 the header file is still needed, and what for.  If it is not needed, cut
 it out!
 
+The location of <malloc.h> is inconsistent across different operating
+systems such as Linux and OS X, so <stdlib.h> should be used as a more
+portable substitute.  Thanks to masak++ and diakopter++ for diagnosing.
+
 As a layout convention the C++ source format declares the return type in
 a separate line before the function or method name.  Indentation of code
 is done with two spaces (never tabs) per level.  Additional spaces are
@@ -213,7 +233,7 @@ comments.  Where C style comments are used, they always begin and end on
 the same line.  Multiline comments are never used.  Where several lines
 of source must be temporarily excluded, use #if 0 and #endif instead.
 
-VIRTUAL MACHINE
+5. VIRTUAL MACHINE
 
 Of course LLVM is a virtual machine, but it's such a low level one that
 it virtually (pun intended) disappears.  Code is compiled and optimized
@@ -230,7 +250,7 @@ than 10KB with quick startup and execution times.  There is currently
 too little functionality in 'vill' to get experience with more complex
 programs.
 
-NATIVE EXECUTABLE CACHE
+6. NATIVE EXECUTABLE CACHE
 
 There are plans to cache the compiled output files in /tmp/vill.  The
 idea comes from Walter Bright, of Zortech C++ and D compiler fame.  When
@@ -242,7 +262,7 @@ option will probably also purge the cache and force a recompile.
 Eventually a similar approach might compile modules into shared
 libraries, but that concept has not yet been proved.
 
-CONTINUATION PASSING STYLE (CPS)
+7. CONTINUATION PASSING STYLE (CPS)
 
 At the end of http://llvm.org/docs/tutorial/LangImpl8.html in "Garbage
 Collected Stack Frames", the documentation confirms that LLVM supports
@@ -269,7 +289,7 @@ information in the AST.  It may also be possible to associate a calling
 convention with each called routine, so that the appropriate one is
 employed per call.  Presumably Pugs also did such things.
 
-CONTRIBUTING
+8. CONTRIBUTING
 
 Anyone with Pugs commit access is welcome to hack on 'vill', generally
 as long as the set of passing tests improves.  Join #perl6 on
@@ -286,7 +306,7 @@ not to greedily consume all the fruit they can, on the contrary to put
 even more fruit onto the (source) tree to entice others to get involved.
 Perhaps one piece of LHF per person per week/month is a fair ration.
 
-ROADMAP (PARTIAL)
+9. ROADMAP (PARTIAL)
 
 1. Fix src/yaml_compose.c so that all reasonable Perl 6 inputs to
    test/yaml_compose_roundtrip.c are handled properly.
@@ -311,7 +331,7 @@ ROADMAP (PARTIAL)
 10. Plan how to begin implementing rakudo/docs/metamodel.pod in LLVM IR.
 11. ...
 
-STATUS
+10. STATUS
 
 Item 1. is blocking the rest of the roadmap, test/yaml_compose_roundtrip
 runs but trips up on some corner cases. The AST integrity of the output
@@ -321,12 +341,17 @@ So far test/yaml_token_roundtrip and test/yaml_parse_roundtrip do work.
 In src/ these work: compile.cpp make_puts.cpp run.cpp and save.cpp.
 There may be some breakage due to fiddling with buggy yaml_compose().
 
-LICENSE
+The LLVM code generator has been hard wired to produce an executable
+that prints "vill compiled A\nvill compiled Z\n" when run.  During early
+testing the output file (test/hello) measured 8437 bytes on x86 or 9014
+bytes on amd64 (Linux).  It runs completely standalone.
+
+11. LICENSE
 
 Published by the authors named in the CREDITS files under the same
 terms as Perl 5.x (Artistic License 2.0).
 
-APPENDIX A: Getting Started
+APPENDIX A: Required software
 
 How to get the software required to run 'vill':
 
@@ -345,7 +370,7 @@ can try this command to check:
 
     perl -v
 
-You need perl version 5.8.0 or higher. Use http://perl.com to get
+You need perl version 5.10.0 or higher. Use http://perl.com to get
 information about installing Perl 5.
 
 c++:

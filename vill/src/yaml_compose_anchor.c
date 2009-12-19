@@ -1,6 +1,6 @@
 /* yaml_compose_anchor.c */
 #include <assert.h>
-#include <malloc.h>
+#include <stdlib.h>                /* malloc */
 #include "yaml_compose_internal.h" /* graph_node */
 
 #ifdef YAML_ANCHORS_ARE_NUMERIC

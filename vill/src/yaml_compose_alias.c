@@ -1,6 +1,6 @@
 /* yaml_compose_alias.c */
 #include <assert.h>
-#include <malloc.h>
+#include <stdlib.h>                /* malloc */
 #include "yaml_compose_internal.h" /* graph_node */
 
 /* Note: a more sophisticated form of anchor storage and searching */
@@ -11,7 +11,7 @@
 #define local_make_sought(str,len) int sought = atoi(str)
 #define local_anchor_cmp(entry,sought) (entry->anchor - sought)
 #else
-#define local_make_sought(str,len)             /* TODO */
+#define local_make_sought(str,len)       /* TODO */
 #define local_anchor_cmp(entry,sought) ( /* TODO */)
 #endif
 
@@ -31,12 +31,10 @@ yaml_compose_alias( struct node_stack_entry * top, const char * str,
       /* Instead, the parent will point to an existing node that is */
       /* labelled with the specified anchor. */
       assert( (top -> node -> flags & YAML_KIND) == 0 );
-//    assert( top -> node -> kind == NOT_YET_ASSIGNED );
       /* (this assert could have been done before the while, but */
       /* this code is also executed only once per function call) */
       struct graph_node * redundant_node = top -> node;
       if ( (top -> prev -> node -> flags & YAML_KIND) == YAML_MAPPING ) {
-//    if ( top -> prev -> node -> kind == MAPPING ) {
         /* This alias appears after a 'key:' as a mapping entry */
         assert( top -> seq_entry == NULL ); /* stack integrity check */
         assert( top -> map_entry -> node == redundant_node );
@@ -46,7 +44,6 @@ yaml_compose_alias( struct node_stack_entry * top, const char * str,
       else {
         /* This alias appears after a '-' as a sequence entry */
         assert( (top -> prev -> node -> flags & YAML_KIND) == YAML_SEQUENCE );
-//      assert( top -> prev -> node -> kind == SEQUENCE );
         assert( top -> map_entry == NULL ); /* stack integrity check */
         assert( top -> seq_entry -> node == redundant_node );
         top -> seq_entry -> node = anchor_search -> node;

@@ -12,9 +12,8 @@
 /* emitter, though not a flexible one. */
 
 #include <assert.h>  /* assert */
-#include <malloc.h>  /* malloc */
 #include <stdio.h>   /* fgets popen pclose fprintf */
-#include <stdlib.h>  /* abort */
+#include <stdlib.h>  /* abort malloc */
 #include <string.h>  /* strlen */
 #include <unistd.h>  /* getcwd */
 #include "../src/yaml_compose_internal.h"  /* graph_node */

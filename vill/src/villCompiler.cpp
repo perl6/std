@@ -1,6 +1,6 @@
 // villCompiler.cpp
 // constructor and destructor of villCompiler object
-#include <malloc.h>                     // malloc
+#include <stdlib.h>                     // malloc
 #include "villCompiler.h"
 #include "llvm/Support/ManagedStatic.h" // llvm_shutdown
 

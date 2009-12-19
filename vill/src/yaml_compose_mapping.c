@@ -1,6 +1,6 @@
 /* yaml_compose_mapping.c */
 #include <assert.h>                 /* assert */
-#include <malloc.h>                 /* malloc */
+#include <stdlib.h>                 /* malloc */
 #include <string.h>                 /* strncpy */
 #include "yaml_parse.h"             /* MAPPING NOT_YET_ASSIGNED */
 #include "yaml_compose_internal.h"  /* graph_node mapping_list_entry */
