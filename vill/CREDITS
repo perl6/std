@@ -1,14 +1,30 @@
 =pod
 
-This file layout retains the format used in the CREDITS files of Linux
-and Rakudo.
+This file layout uses the format (utf8 encoded) also used in the CREDITS
+files of Linux and Rakudo.  Fields (optional, multiple lines ok) are:
 
-Martin Berends designed 'vill' and wrote the initial implementation.
+	N  name
+	U  username (login eg in IRC, svn, git)
+	D  description
+	E  email
+	W  webpage
+	S  snail-mail address
 
-The following people (in alphabetical order) have contributed to 'vill':
+The following people (in first name alphabetical order) have contributed
+to 'vill':
 
-N:Martin Berends
-U:mberends
-E:mberends@autoexec.demon.nl
+----------
+
+N: Martin Berends
+U: mberends
+D: vill project initiator
+E: mberends@autoexec.demon.nl
+W: NYI
+S: NL, UK
+
+N: Pawel Murias
+U: pmurias
+D: Perl 6 core developer
+S: irc.freenode.net#perl6
 
 =cut
