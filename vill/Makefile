@@ -293,7 +293,8 @@ clean:
 	@find . -executable -type f -exec rm {} ';'  # er, executables?
 
 wordcount:
-	@find . -name '*.[ch]*' | grep -v '~$$' | sort | xargs 'wc'
+	@find . -name '*.[ch]*' | grep -v '\.svn' | grep -v '~$$' \
+		| sort | xargs 'wc'
 
 help:
 	@echo
