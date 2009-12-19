@@ -33,7 +33,7 @@ The slowest part of 'vill' is 'viv', because that runs as a separate
 Perl 5 child process.  The medium term plan will be to use the STD.pm
 grammar, but replace the 'viv' parser with a new one to be written in C.
 This new parser would call a new Perl 6 compatible regex engine (p6re),
-probably also written in C.  Someone known as "pmichaud" gave some maybe
+probably also written in C. Patrick R. Michaud gave some maybe
 useful code for that: http://trac.parrot.org/parrot/changeset/7051/ ;-)
 The full Perl 6 regex language is too much to aim for, because action
 methods are allowed to contain arbitrary Perl 6 code.  A particular
