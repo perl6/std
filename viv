@@ -8,7 +8,13 @@ use warnings;
 
 use STD;
 use utf8;
-
+use YAML::XS; # An attempt to replace this with YAML::Syck passed the
+              # tests but produced a different output format that
+              # confused some calling programs.  For example, anchors
+              # are usually numbers ascending from 1, and they became
+              # disjoint sets of descending numbers.  Also, empty
+              # sequences shown as [] became followed by an empty line.
+              # See also: YAML::Syck in package VAST::package_def below.
 use Encode;
 
 my $OPT_match = 0;
@@ -1598,7 +1604,7 @@ END
 	$out .= <<'END';
 }
 
-use YAML::Syck;
+use YAML::Syck; # apparently better than YAML::XS, but nobody knows why
 
 END
 	}
