@@ -18,6 +18,7 @@ if (@ARGV) {
 }
 
 use YAML::Syck;
+$YAML::Syck::ImplicitUnicode = 1;
 
 our $SEQ = 0;
 
