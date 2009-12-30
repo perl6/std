@@ -1604,7 +1604,7 @@ END
 	$out .= <<'END';
 }
 
-use YAML::Syck; # apparently better than YAML::XS, but nobody knows why
+use YAML::XS; # apparently better than YAML::XS, but nobody knows why
 
 END
 	}
