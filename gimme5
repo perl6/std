@@ -922,9 +922,9 @@ END
 
 sub dumpretree {
     if (%$RETREE) {
-	$out .= "BEGIN {\n    \$retree = YAML::XS::Load(<<'RETREE_END');\n";
+	$out .= "BEGIN {\n    \$retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));\n";
 #	$out .= Encode::decode("utf8", Dump($RETREE)); # Syck
-	$out .= Dump($RETREE);
+	$out .= Encode::decode_utf8(Dump($RETREE));
 	$out .= "RETREE_END\n}\n";
     }
 }
