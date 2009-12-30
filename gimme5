@@ -298,8 +298,6 @@ sub BUILD {
     my \$self = shift;
 END
 
-	$out .= <<'END' if $TOP eq 'STD';
-END
 
 	$out .= <<'END';
 }
