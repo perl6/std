@@ -4754,7 +4754,8 @@ grammar Regex is STD {
 
     token backslash:A { <sym> <.obs('\\A as beginning-of-string matcher', '^')> }
     token backslash:a { <sym> <.panic: "\\a is allowed only in strings, not regexes"> }
-    token backslash:b { :i <sym> }
+    token backslash:B { <sym> <.obs('\\B as word non-boundary', '<!wb>')> }
+    token backslash:b { <sym> <.obs('\\b as word boundary', '<?wb> (or either of « or »)')> }
     token backslash:c { :i <sym> <charspec> }
     token backslash:d { :i <sym> }
     token backslash:e { :i <sym> }
