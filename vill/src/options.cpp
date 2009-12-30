@@ -1,8 +1,11 @@
 // options.cpp
 // read options and arguments in the command line
-#include "villCompiler.h"
-//#include <stdio.h>   /* fprintf printf stderr */
-#include <unistd.h>  /* getopt */
+#include "villCompiler.h"  // fprintf printf stderr
+#include <unistd.h>        // getopt
+
+// TODO (LHF): Consider using getpid() to make the output filename
+// unique at a given moment, so that concurrent executions of 'vill' do
+// not clash.
 
 #define USAGE "\nUsage: %s [options] [programfile]\n" \
   "-c       check and compile but do not run\n" \
@@ -24,7 +27,7 @@ local_debug_options( char * letters ) {
   char * letter;
   int flags = 0;
   for ( letter=letters; *letter; ++letter ) {
-    //fprintf( stderr, "Debug flag %c\n", *letter );
+    // fprintf( stderr, "Debug flag %c\n", *letter );
     switch ( * letter ) {
       case 'p': flags |= DEBUG_PARSE;           break;
       case 's': flags |= DEBUG_SYNTAXTREE;      break;

@@ -16,7 +16,8 @@
 #include <stdlib.h>  /* abort malloc */
 #include <string.h>  /* strlen */
 #include <unistd.h>  /* getcwd */
-#include "../src/yaml_compose_internal.h"  /* graph_node */
+#include "../src/graph_traverse.h"  /* graph_node */
+//#include "../src/yaml_compose_internal.h"  /* graph_node */
 
 // show where to find the 'viv' Perl 6 parser
 #define VIV_RELATIVE_PATH ".."
@@ -65,205 +66,58 @@ local_options( int argc, char * argv[] ) {
 }
 
 void
-local_mapping( FILE * stream, struct graph_node * parent,
-    struct graph_node * node ) {
-  ++indent;
-  if ( node -> data != NULL ) {
-    /* This node has an anchor.  Decide whether to print it as an */
-    /* anchor, or as an alias. */
-    struct anchor_list_entry * anchor_entry =
-      (struct anchor_list_entry *) node -> data;
-    if ( ! anchor_entry -> anchor_shown ) {
-      struct anchor_list_entry * anchor_entry =
-        (struct anchor_list_entry *) node -> data;
-        fprintf( stream, " &%d", anchor_entry -> anchor );
-      anchor_entry -> anchor_shown = 1;
+local_yaml_serialize( FILE * outfile, struct graph_node * graph ) {
+  struct graph_traverse_event * spidey;
+  int need_space = 0;
+  int anchor = 0;
+  struct graph_traverse_struct * spider;
+  spider = graph_traverse_begin( graph );
+  while ( (spidey = graph_traverse(spider)) != NULL ) {
+    if ( spidey -> parentnode == NULL ) {
+      fprintf( outfile, "---" );
     }
-  }
-  if ( node -> type_tag != NULL ) {
-    fprintf( stream, " !%s", node -> type_tag );
-  }
-  struct mapping_list_entry * map_entry;
-  map_entry = node -> content.mapping.head;
-  while ( map_entry != NULL ) {
-    fprintf( stream, "\n%*s%s:", indent * 2, "", map_entry -> key );
-    switch ( map_entry -> node -> flags & YAML_KIND ) {
-      case YAML_SCALAR:
-        need_space = 1;
-        assert( map_entry -> node -> content.scalar.text != NULL );
-        local_scalar(   stream, node, map_entry -> node );
-        break;
-      case YAML_SEQUENCE:
-        {
-          if ( node -> data != NULL ) {
-            struct anchor_list_entry * anchor_entry =
-              (struct anchor_list_entry *) node -> data;
-            if ( anchor_entry -> anchor_shown ) {
-              fprintf( stream, " *%d", anchor_entry -> anchor );
-            }
-            else {
-              local_sequence( stream, node, map_entry -> node );
-              anchor_entry -> anchor_shown = 1;
-            }
-          }
-          else {
-            local_sequence( stream, node, map_entry -> node );
-          }
-        }
-        break;
-      case YAML_MAPPING:
-        {
-          if ( node -> data != NULL ) {
-            struct anchor_list_entry * anchor_entry =
-              (struct anchor_list_entry *) node -> data;
-            if ( anchor_entry -> anchor_shown ) {
-              fprintf( stream, " *%d", anchor_entry -> anchor );
-            }
-            else {
-              local_mapping(  stream, node, map_entry -> node );
-              anchor_entry -> anchor_shown = 1;
-            }
-          }
-          else {
-            local_mapping(  stream, node, map_entry -> node );
-          }
-        }
-        break;
-      case 0:
-        fprintf( stream, "\nNOT YET ASSIGNED" );
-        break;
-      default:
-        fprintf( stream, "\nMAPPING_ENTRY_BAD_KIND" );
-        abort();
-        break;
-    }
-    map_entry = map_entry -> next;
-  }
-  --indent;
-}
-
-void
-local_scalar( FILE * stream, struct graph_node * parent,
-    struct graph_node * node ) {
-  if ( need_space ) {
-    fprintf( stream, " " );
-    need_space = 0;
-  }
-  assert( (node -> flags & YAML_KIND) == YAML_SCALAR );
-  /* The text needs quoting in single quotes if it begins or */
-  /* ends with a space or a double quote character, or begins */
-  /* with an exclamation mark, or has zero length. */
-  size_t scalar_len = strlen( node -> content.scalar.text );
-  char first = * ( node -> content.scalar.text );
-  char last  = * ( node -> content.scalar.text + scalar_len - 1 );
-  int need_single_quotes = (
-    first == ' ' || last == ' ' || first == '"' || last == '"' ||
-    first == '!' || first == '#' || scalar_len == 0
-  );
-  fprintf( stream, "%s%s%s",     need_single_quotes?"'":"",
-    node -> content.scalar.text, need_single_quotes?"'":"" );
-  if ( node -> type_tag != NULL ) {
-    fprintf( stream, "\nTYPE_TAG:%s", node -> type_tag );
-    abort();
-  }
-}
-
-void
-local_sequence( FILE * stream, struct graph_node * parent,
-    struct graph_node * node ) {
-  ++indent;
-  if ( node -> data != NULL ) {
-    /* This node has an anchor.  Decide whether to print it as an */
-    /* anchor, or as an alias. */
-    struct anchor_list_entry * anchor_entry =
-      (struct anchor_list_entry *) node -> data;
-    if ( ! anchor_entry -> anchor_shown ) {
-      /* found the anchor occurrence */
-      fprintf( stream, " &%d", anchor_entry -> anchor );
-      anchor_entry -> anchor_shown = 1;
-    }
-  }
-  if ( node -> type_tag != NULL ) {
-    fprintf( stream, "\nTYPE_TAG:%s", node -> type_tag );
-  }
-  struct sequence_list_entry * sequence_entry;
-  sequence_entry = node -> content.sequence.head;
-  if ( (sequence_entry -> node -> flags & YAML_KIND) == 0 ) {
-    fprintf( stream, " []" );
-  }
-  else { /* sequence_entry != NULL */
-    while ( sequence_entry != NULL ) {
-      fprintf( stream, "\n%*s-", (indent - 1) * 2, "" );
-      switch ( sequence_entry -> node -> flags & YAML_KIND ) {
-        case YAML_SCALAR:
+    else {
+      switch ( spidey -> parentnode -> flags & YAML_KIND ) {
+        case YAML_MAPPING:
+          fprintf( outfile, "\n%*s%s:", (spidey -> map_nest_count - 1)
+            * 2, "", spidey -> key );
           need_space = 1;
-          local_scalar(   stream, node, sequence_entry -> node );
           break;
         case YAML_SEQUENCE:
+          fprintf( outfile, "\n%*s-", (spidey -> map_nest_count - 1)
+            * 2, "" );
           need_space = 1;
-          {
-            if ( node -> data != NULL ) {
-              struct anchor_list_entry * anchor_entry =
-                (struct anchor_list_entry *) node -> data;
-              if ( anchor_entry -> anchor_shown ) {
-                fprintf( stream, " *%d", anchor_entry -> anchor );
-              }
-              else {
-                local_sequence( stream, node, sequence_entry -> node );
-                anchor_entry -> anchor_shown = 1;
-              }
-            }
-            else {
-              local_sequence( stream, node, sequence_entry -> node );
-            }
-          }
           break;
-        case YAML_MAPPING:
-          need_space = 1;
-          --indent; /* cheat the nesting because the "- " is 2 columns. */
-          {
-            if ( node -> data != NULL ) {
-              struct anchor_list_entry * anchor_entry =
-                (struct anchor_list_entry *) node -> data;
-              if ( anchor_entry -> anchor_shown ) {
-                fprintf( stream, " *%d", anchor_entry -> anchor );
-              }
-              else {
-                local_mapping( stream, node, sequence_entry -> node );
-                anchor_entry -> anchor_shown = 1;
-              }
-            }
-            else {
-              local_mapping(  stream, node, sequence_entry -> node );
-            }
-          }
-          ++indent; /* the yaml spec says this is ok ;-) so do I. */
-          break;
-        case 0:
-          fprintf( stream, "\nNOT YET ASSIGNED" );
+        case YAML_SCALAR:
+          fprintf( outfile, " SCALAR %s", spidey -> node ->
+            content.scalar.text );
+          need_space = 0;
           break;
         default:
-          fprintf( stream, "\nSEQUENCE_ENTRY_BAD_KIND" );
+          fprintf( stderr, "bad node kind" );
           abort();
           break;
       }
-      sequence_entry = sequence_entry -> next;
-    } /* while ( sequence_entry != NULL ) */
-  } /* sequence_entry != NULL */
-  --indent;
+    }
+    if ( spidey -> node -> flags & YAML_ANCHORED ) {
+      fprintf( outfile, " &%d", ++anchor );
+    }
+    if ( spidey -> node -> type_tag != NULL ) {
+      fprintf( outfile, " !%s", spidey -> node -> type_tag );
+      need_space = 0;
+    }
+  }
+  graph_traverse_end( spider );
 }
 
-
-/* The main body of the test is here, a recursive depth first */
-/* traversal of the graph. */
+/* The main body of the test begins here, to do a depth first */
+/* traversal of the AST graph. */
 void
 yaml_compose_roundtrip( FILE * infile, FILE * outfile ) {
   struct graph_node * graph;
   graph = yaml_compose( infile );
-  fprintf( outfile, "---" );
-  if ( (graph -> flags & YAML_KIND) == YAML_MAPPING ) {
-    local_mapping( outfile, NULL, graph );
-  }
+  assert( (graph -> flags & YAML_KIND) == YAML_MAPPING );
+  local_yaml_serialize( outfile, graph );
   /* Instead of blindly delegating the deletion of all the graph */
   /* nodes to an inefficient garbage collection algorithm, perform */
   /* another traversal that specifically frees each allocation */

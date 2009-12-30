@@ -1,7 +1,7 @@
 # Makefile for vill - a viv+llvm mashup
 # To keep things understandable, use of 'make' variables is avoided
-# except for the 'objects' at the top.  It saves so much time not
-# having to hunt through dozens of trivial abstractions ;-)
+# except for the 'objects' at the beginning.  It reads so much easier
+# not having to hunt through dozens of trivial substitutions ;-)
 
 # Object file names sorted alphabetically, each one comes from a
 # corresponding .cpp or .c source file and some .h files (listed below)
@@ -24,13 +24,44 @@ objects = src/arglist.o src/args.o src/ast_mapentry.o \
 	src/yaml_compose_sequence.o src/yaml_compose_tag.o \
 	src/yaml_decompose.o src/yaml_parse.o src/yaml_token.o
 
+# Executable files sorted aphabetically
+
 # The first target is the default when make is run without arguments.
 # Build the main executable by linking all the object files together.
 vill: $(objects) src/villCompiler.h src/llvm-version2.6 Makefile
-	@echo 'Linking *.o -> ./vill'
+	@echo 'Link *.o -> ./vill'
 	@c++ $(objects) `llvm-config --cxxflags --ldflags --libs bitwriter` \
 	  -O3 -o vill
 	@find src -name 'llvm-version*' -exec rm {} \;
+
+test/yaml_compose_roundtrip: test/yaml_compose_roundtrip.c \
+		src/yaml_compose.h src/graph_traverse.o \
+		src/graph_traverse_begin.o src/graph_traverse_end.o \
+		src/yaml_compose.o src/yaml_compose_alias.o \
+		src/yaml_compose_anchor.o src/yaml_compose_mapping.o \
+		src/yaml_compose_scalar.o src/yaml_compose_sequence.o \
+		src/yaml_compose_tag.o src/yaml_decompose.o src/yaml_parse.o \
+		src/yaml_token.o Makefile
+	@echo 'Compile+link test/yaml_compose_roundtrip'
+	@cc test/yaml_compose_roundtrip.c src/graph_traverse.o \
+		src/graph_traverse_begin.o src/graph_traverse_end.o \
+		src/yaml_compose.o src/yaml_compose_alias.o \
+		src/yaml_compose_anchor.o src/yaml_compose_mapping.o \
+		src/yaml_compose_scalar.o src/yaml_compose_sequence.o \
+		src/yaml_compose_tag.o src/yaml_decompose.o src/yaml_parse.o \
+		src/yaml_token.o -O3 -o test/yaml_compose_roundtrip
+
+test/yaml_parse_roundtrip: test/yaml_parse_roundtrip.c \
+		src/yaml_parse.h src/yaml_parse.o src/yaml_token.o Makefile
+	@echo 'Compile+link test/yaml_parse_roundtrip'
+	@cc test/yaml_parse_roundtrip.c src/yaml_parse.o src/yaml_token.o \
+		-O3 -o test/yaml_parse_roundtrip
+
+test/yaml_token_roundtrip: test/yaml_token_roundtrip.c \
+		src/yaml_token.o Makefile
+	@echo 'Compile+link test/yaml_token_roundtrip'
+	@cc test/yaml_token_roundtrip.c src/yaml_token.o -O3 \
+		-o test/yaml_token_roundtrip
 
 # Object targets listed alphabetically by filename but not by directory
 # separately compile each object file from its corresponding source file
@@ -68,6 +99,18 @@ src/escape__S_Back.o: src/escape__S_Back.cpp src/villCompiler.h Makefile
 	c++ -c src/escape__S_Back.cpp `llvm-config --cxxflags` -O3 \
 		-o src/escape__S_Back.o
 
+src/graph_traverse.o: src/graph_traverse.c src/graph_traverse.h \
+		src/yaml_compose_internal.h Makefile
+	cc -c src/graph_traverse.c -O3 -o src/graph_traverse.o
+
+src/graph_traverse_begin.o: src/graph_traverse_begin.c \
+		src/graph_traverse.h src/yaml_compose_internal.h Makefile
+	cc -c src/graph_traverse_begin.c -O3 -o src/graph_traverse_begin.o
+
+src/graph_traverse_end.o: src/graph_traverse_end.c \
+		src/graph_traverse.h src/yaml_compose_internal.h Makefile
+	cc -c src/graph_traverse_end.c -O3 -o src/graph_traverse_end.o
+
 src/integer.o: src/integer.cpp src/villCompiler.h Makefile
 	c++ -c src/integer.cpp `llvm-config --cxxflags` -O3 -o src/integer.o
 
@@ -87,17 +130,6 @@ src/link_codegen.o: src/link_codegen.cpp src/villCompiler.h \
 		src/yaml_compose.h Makefile
 	c++ -c src/link_codegen.cpp `llvm-config --cxxflags` -O3 \
 		-o src/link_codegen.o
-
-# Cause the make to fail if the LLVM version is not 2.6
-# This (or rather the rm in the vill target) has the unfortunate side
-# effect of causing every plain 'make' to do a top level recompile.
-# A more elegant solution that avoids unnecessary recompiles would be
-# very welcome.
-src/llvm-version2.6:
-	@find src -name 'llvm-version*' -exec rm {} \;
-	@export VERSION=`llvm-config --version`; echo $$VERSION > \
-	  src/llvm-version$$VERSION
-	@test -e src/llvm-version2.6
 
 src/load_ast.o: src/load_ast.cpp src/villCompiler.h src/yaml_compose.h \
 		Makefile
@@ -210,19 +242,6 @@ src/yaml_compose_root.o: src/yaml_compose_root.c \
 		src/yaml_compose_internal.h src/yaml_compose.h Makefile
 	cc -c src/yaml_compose_root.c -O3 -o src/yaml_compose_root.o
 
-test/yaml_compose_roundtrip: test/yaml_compose_roundtrip.c \
-		src/yaml_compose.h src/yaml_compose.o src/yaml_compose_alias.o \
-		src/yaml_compose_anchor.o src/yaml_compose_mapping.o \
-		src/yaml_compose_scalar.o src/yaml_compose_sequence.o \
-		src/yaml_compose_tag.o src/yaml_decompose.o src/yaml_parse.o \
-		src/yaml_token.o Makefile
-	cc test/yaml_compose_roundtrip.c src/yaml_compose.o \
-		src/yaml_compose_alias.o src/yaml_compose_anchor.o \
-		src/yaml_compose_mapping.o src/yaml_compose_scalar.o \
-		src/yaml_compose_sequence.o src/yaml_compose_tag.o \
-		src/yaml_decompose.o src/yaml_parse.o src/yaml_token.o \
-		-O3 -o test/yaml_compose_roundtrip
-
 src/yaml_compose_scalar.o: src/yaml_compose_scalar.c \
 		src/yaml_compose_internal.h src/yaml_compose.h Makefile
 	cc -c src/yaml_compose_scalar.c -O3 -o src/yaml_compose_scalar.o
@@ -243,20 +262,26 @@ src/yaml_parse.o: src/yaml_parse.c src/yaml_parse.h src/yaml_token.h \
 		Makefile
 	cc -c src/yaml_parse.c -O3 -o src/yaml_parse.o
 
-test/yaml_parse_roundtrip: test/yaml_parse_roundtrip.c \
-		src/yaml_parse.h src/yaml_parse.o src/yaml_token.o Makefile
-	cc test/yaml_parse_roundtrip.c src/yaml_parse.o \
-		src/yaml_token.o -O3 -o test/yaml_parse_roundtrip
-
 src/yaml_token.o: src/yaml_token.c src/yaml_token.h Makefile
 	cc -c src/yaml_token.c -O3 -o src/yaml_token.o
 
-test/yaml_token_roundtrip: test/yaml_token_roundtrip.c \
-		src/yaml_token.o Makefile
-	cc test/yaml_token_roundtrip.c src/yaml_token.o -O3 \
-		-o test/yaml_token_roundtrip
-
 # Miscellaneous non object file targets
+
+clean:
+	@find . -name '*~'          -exec rm {} ';'  # editor backup files
+	@find . -name '*.o'         -exec rm {} ';'  # compiled object files
+	@find . -executable -type f -exec rm {} ';'  # er, executables?
+
+# Cause the make to fail if the LLVM version is not 2.6
+# This (or rather the rm in the vill target) has the unfortunate side
+# effect of causing every plain 'make' to do a top level recompile/link.
+# A more elegant solution that avoids unnecessary rebuilds would be very
+# welcome.
+src/llvm-version2.6:
+	@find src -name 'llvm-version*' -exec rm {} \;
+	@export VERSION=`llvm-config --version`; echo $$VERSION > \
+	  src/llvm-version$$VERSION
+	@test -e src/llvm-version2.6
 
 # test does a quick sanity check with some arbitrary example files
 test: vill test/yaml_compose_roundtrip test/yaml_parse_roundtrip \
@@ -287,10 +312,8 @@ parsetest: test/yaml_parse_roundtrip
 		-name '*.t' | sort | \
 		( cd vill; xargs test/yaml_parse_roundtrip )
 
-clean:
-	@find . -name '*~'          -exec rm {} ';'  # editor backup files
-	@find . -name '*.o'         -exec rm {} ';'  # compiled object files
-	@find . -executable -type f -exec rm {} ';'  # er, executables?
+fruit:
+	@grep -nr 'TODO.*LHF' src/* test/*
 
 wordcount:
 	@find . -name '*.[ch]*' | grep -v '\.svn' | grep -v '~$$' \
@@ -306,6 +329,7 @@ help:
 	@echo 'parsetest run yaml_parse_roundtrip on part of pugs/t/spec/*'
 	@echo 'tokentest run yaml_token_roundtrip on part of pugs/t/spec/*'
 	@echo 'clean     delete editor backups and generated files'
+	@echo 'fruit     search for LHF (low hanging fruit) in TODO lines'
 	@echo 'wordcount line, word and byte counts of all source files'
 	@echo 'help      display this help'
 	@echo
