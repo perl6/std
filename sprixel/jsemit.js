@@ -118,10 +118,7 @@ Expr_func.prototype.emit = function() {
     code += this.r[i].emit().toProgramString() + ';';
   if (l > 0) {
     var last = this.r[l-1].emit().toProgramString();
-    if (!/^(?:return|if|while|var)\s/.test(last))
-      code += 'return '+ last;
-    else
-      code += last;
+    code += (/^(?:return|if|while|var|break|continue|default:|case)\s/.test(last) ? '' : 'return ') + last;
   }
   return code + '")';
 };
@@ -193,6 +190,7 @@ infix(top, "le", "<=");
 infix(top, "gt", ">");
 infix(top, "ge", ">=");
 infix(top, "eq", "==");
+infix(top, "ne", "!=");
 infix(top, "bor", "|");
 infix(top, "bxor", "^");
 infix(top, "band", "&");
@@ -221,13 +219,13 @@ postfix(top, "postdec", "--", true);
 ternary(top, "tern", "?", ":");
 
 
-var f = eval(func(["zz","yy"],[assign(val("yy"),add(sub(val("zz"),val(2)),val(8))),val("yy"),cond(lt(val(62),val("yy")),[[val("66")],[val("999")]]),val("99")]).emit());
-print(f);
-print(f(58,44));
+//var f = eval(func(["zz","yy"],[assign(val("yy"),add(sub(val("zz"),val(2)),val(8))),val("yy"),cond(lt(val(62),val("yy")),[[val("66")],[val("999")]]),val("99")]).emit());
+//print(f);
+//print(f(58,44));
 
 
 var gtr = (function() {
-  var count = -1;
+  var count = 0;
   return function() { // grammar transition record constructor.
     this.id = ++count;
   };
@@ -237,16 +235,66 @@ function gts() { // base grammar transition set
   this.fail = new gtr(); // each transition set has a fail label destination
 }
 
+var gl = val("gl"); // the next target goto label variable expression
+var i = val("i"); // the input variable expression
+var o = val("o"); // the offset variable expression
+var t = val("t"); // the State variable expression
+var b = val("break next"); // macro for "break" instruction
+
 function lit(literal) { return new glit(literal) }
 function glit(literal) { // grammar literal parser builder
   gts.call(this); // call the parent constructor
   this.stateful = false;
-  this.v = literal;
+  this.v = utf32str(literal);
 }
 derives(glit, gts);
 glit.prototype.emit = function(c) {
-  // TODO: check if past end of input
-  c.r.push(val("print(44)"));
+  c.r.push(cond(ne(val("i.substr(o,"+this.v.l+")"),val(this.v.str.toQuotedString())),[[
+    assign(gl,val(this.fail.id)),
+    b
+  ],[
+    add_assign(o,val(this.v.l))
+  ]]));
+  // TODO: inline each char check instead of calling substr
+/*  c.r.push(cond(ne(val(0),bxor(val("i[o]"),val(this.v[0]))),[[
+    assign(gl,val(this.fail.id)),
+    b
+  ]]));
+  for (var chars=this.v,k=1,l=chars.l;k<l;++k) {
+    c.r.push(cond(ne(val(0),bxor(val("i[o+"+k+"]"),val(chars[k]))),[[
+      assign(gl,val(this.fail.id)),
+      b
+    ]]));
+  }*/
+};
+
+function gend() { // grammar "end anchor" parser builder
+  gts.call(this); // call the parent constructor
+  this.stateful = false;
+}
+derives(gend, gts);
+gend.prototype.emit = function(c) {
+  c.r.push(cond(ne(o,val("i.l")),[[
+    assign(gl,val(this.fail.id)),
+    b
+  ]]));
+};
+var end = (function() {
+  var ender = new gend();
+  return function() {
+    return ender;
+  }
+})();
+
+function gboth(l, r) { // grammar "stateless both" parser builder
+  gts.call(this, this.l = l, this.r = r); // call the parent constructor
+  this.stateful = false;
+}
+derives(gboth, gts);
+gboth.prototype.emit = function(c) {
+  this.l.fail = this.r.fail = this.fail; // short-circuit the children's fail goto
+  this.l.emit(c);
+  this.r.emit(c);
 };
 
 function both(l,r) {
@@ -265,10 +313,10 @@ function utf32str_charAt(offset) {
 
 function utf32str_substr(offset, length) {
   return offset <= 0
-    ? offset + length > this.l
+    ? offset + length >= this.l
       ? this.str.substring(0)
       : this.str.substring(0, this.breaks[offset + length - 1] + 1)
-    : offset + length > this.l
+    : offset + length >= this.l
       ? this.str.substring(this.breaks[offset - 1] + 1)
       : this.str.substring(this.breaks[offset - 1] + 1, this.breaks[offset + length - 1] + 1);
 }
@@ -279,7 +327,7 @@ function utf32str(str) {
     arr[i] = str.codepoint(j);
     breaks[i++] = wasSurrogatePair ? ++j : j;
   }
-  arr.l = i - 1; // stash length statically since .length is usually an accessor
+  arr.l = i; // stash length statically since .length is usually an accessor
   arr.str = str; // original string (encoded in UTF-16, of course)
   arr.strl = l; // length of original UTF-16 string
   arr.breaks = breaks; // offsets of the final position of the char at each offset
@@ -290,30 +338,35 @@ function utf32str(str) {
   return arr; // array of ints representing the string's unicode codepoints
 }
 
-var gl = val("gl"); // the next target goto label variable expression
-var i = val("i"); // the input variable expression
 
+var routine = func(["i"],[val("var gl=0,o=0;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
-var routine = func(["i"],[val("var gl=0;for(;;){switch(gl){case 0:")]); // empty parser routine
+var grammar = both(lit("hi"),end()); // a grammar expression definition
 
-var grammar = lit("hi"); // a grammar expression definition
+grammar.fail = 1;
 
 grammar.emit(routine); // have the grammar emit its specialize parser code to this routine
 
-routine.r.push(val("}}")); // finalize the routine
-
-var input = utf32str("\uD80C\uDF14\uD80C\uDF15\uD80C\uDF16");
+routine.r.push(val("break last;case 1: print('parse failed');default: break last}}")); // finalize the routine
+/*
+var input = utf32str("\uD80C\uDF14z\uD80C\uDF16");
 print(input.str);
 print(input.substr(0,1));
 print(input.substr(1,1));
 print(input.substr(2,1));
-print("\uD80C\uDF14\uD80C\uDF15\uD80C\uDF16");
+print("\uD80C\uDF14z\uD80C\uDF16");
 print("\uD80C\uDF14");
-print("\uD80C\uDF15");
+print("z");
 print("\uD80C\uDF16");
+*/
 
-var parser = eval(routine.emit());
+var parserf = routine.emit();
 
+print(parserf);
+
+var parser = eval(parserf); // compile the javascript function to machine code
+
+var input = utf32str("hi");
 parser(input);
 
 
