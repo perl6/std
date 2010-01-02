@@ -88,15 +88,14 @@ local_yaml_serialize( FILE * outfile, struct graph_node * graph ) {
             * 2, "" );
           need_space = 1;
           break;
-        case YAML_SCALAR:
-          fprintf( outfile, " SCALAR %s", spidey -> node ->
-            content.scalar.text );
-          need_space = 0;
-          break;
         default:
           fprintf( stderr, "bad node kind" );
           abort();
           break;
+      }
+      if ( (spidey -> node -> flags & YAML_KIND) == YAML_SCALAR ) {
+        fprintf( outfile, " %s", spidey -> node -> content.scalar.text );
+        need_space = 0;
       }
     }
     if ( spidey -> node -> flags & YAML_ANCHORED ) {

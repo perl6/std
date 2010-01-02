@@ -21,32 +21,6 @@ local_traverse_push( struct graph_traverse_struct * spider,
   return new_entry;
 }
 
-/* Move back up the stack */
-struct node_stack_entry *
-local_traverse_pop( struct node_stack_entry * top ) {
-  /* Pop and free node stack entry records until either the stack is */
-  /* empty, or a mapping or sequence node is reached that has more */
-  /* entries. */
-  struct node_stack_entry * parent;
-  /* Accumulate the various looping tests in a flag for more */
-  /* convenient development and testing. */
-  /* This could later be refactored to improve efficiency. */
-  int pop_flag = 1;
-  while ( pop_flag ) {
-#if 0
-    if ( pop_flag && ) { pop_flag = 0; }
-    (top -> node -> flags & YAML_KIND) == YAML_SCALAR ||
-    ((top -> node -> flags & YAML_KIND) == YAML_MAPPING && top -> prev -> node -> ) ||
-    (top -> node -> flags & YAML_KIND) == YAML_SEQUENCE
-#endif
-    if ( pop_flag ) { top = top -> prev; } /* do the pop! */
-//  if ( top == NULL ) {
-      pop_flag = 0;
-//  }
-  }
-  return top;
-}
-
 /* The graph_traverse() function returns the next graph node in depth */
 /* first order.  The first time it is called, it returns the root */
 /* node.  When it returns NULL, it has returned the last node. */
@@ -63,9 +37,11 @@ graph_traverse( struct graph_traverse_struct * spider ) {
     top -> prev      = NULL;
     /* tell the spider about the stack */
     spider -> tail = spider -> head = top;
-    /* 'spidey' is the little critter than crawls all over */
-    /* your web, er, graph.  Thanks for the name, masak :) */
-    /* You can have several spiders and spideys independently */
+    /* 'spidey' is the little critter that conveys messages from the */
+    /* spider to the calling program.  It points to each node of the */
+    /* web, er, graph, in turn, in depth first order. */
+    /* Thanks for the identifier names, masak :) */
+    /* You can have several spiders and their spideys concurrently */
     /* traversing the same graph, and clone them for continuations. */
     spider -> spidey = (struct graph_traverse_event *)
       malloc( sizeof(struct graph_traverse_event) );
@@ -76,7 +52,8 @@ graph_traverse( struct graph_traverse_struct * spider ) {
     spider -> spidey -> seq_nest_count = 0;
   }
   else { /* top != NULL */
-    /* continue an already active traversal */
+    /* Continue an already active traversal. */
+    /* The current node determines where to go next. */
     switch ( top -> node -> flags & YAML_KIND ) {
       case YAML_MAPPING:
         /* If the mapping is empty, ascend the stack to find */
@@ -84,19 +61,19 @@ graph_traverse( struct graph_traverse_struct * spider ) {
         /* node in the mapping's (key => value) pair list. */
         if ( top -> node -> content.mapping.head == NULL ) {
           /* the mapping is empty, ascend via the stack */
-          top = local_traverse_pop( top );
           spider -> spidey = NULL;
         }
         else {
           /* the mapping has entries, descend to the first child */
           struct graph_node * first_child;
           first_child = top -> node -> content.mapping.head -> node;
-          spider -> spidey -> node = first_child;
+          spider -> spidey -> node       = first_child;
           spider -> spidey -> parentnode = top -> node;
           top = local_traverse_push( spider, first_child );
           top -> map_entry = top -> prev -> node -> content.mapping.head;
           top -> seq_entry = NULL;
-          spider -> spidey -> key  = top -> prev -> node -> content.mapping.head -> key;
+          spider -> spidey -> key  =
+            top -> prev -> node -> content.mapping.head -> key;
           ++(spider -> spidey -> map_nest_count);
         }
         break;
@@ -105,7 +82,6 @@ graph_traverse( struct graph_traverse_struct * spider ) {
         /* the first sequence entry, unless the sequence is empty */
         if ( top -> node -> content.sequence.head == NULL ) {
           /* the sequence is empty, ascend via the stack */
-          top = local_traverse_pop( top );
           spider -> spidey = NULL;
         }
         else { /* top -> node -> content.sequence.head != NULL */
@@ -124,22 +100,64 @@ graph_traverse( struct graph_traverse_struct * spider ) {
       case YAML_SCALAR:
         /* when the previous node was a scalar, the next node is the */
         /* next child of the nearest parent that has more children */
-        top = local_traverse_pop( top );
-        spider -> spidey -> node = top -> node;
-        spider -> spidey -> parentnode = top -> prev -> node;
-        switch ( spider -> spidey -> parentnode -> flags & YAML_KIND ) {
-          case YAML_MAPPING:
-            assert( top -> map_entry -> next != NULL );
-            top -> map_entry = top -> map_entry -> next;
-            spider -> spidey -> node = top -> map_entry -> node;
-            spider -> spidey -> key = top -> map_entry -> key;
-            break;
-          case YAML_SEQUENCE:
-            assert( top -> seq_entry -> next != NULL );
+        if ( (spider -> spidey -> parentnode -> flags & YAML_KIND) ==
+            YAML_MAPPING && top -> map_entry -> next != NULL ) {
+          /* Traverse horizontally to the next sibling in a mapping */
+          top -> map_entry = top -> map_entry -> next;
+          spider -> spidey -> node = top -> map_entry -> node;
+          spider -> spidey -> key  = top -> map_entry -> key;
+        }
+        else {
+          if ( (spider -> spidey -> parentnode -> flags & YAML_KIND) ==
+              YAML_SEQUENCE && top -> seq_entry -> next != NULL ) {
+            /* Traverse horizontally to the next sibling in a sequence */
             top -> seq_entry = top -> seq_entry -> next;
             spider -> spidey -> node = top -> seq_entry -> node;
-            spider -> spidey -> key = NULL;
-            break;
+            spider -> spidey -> key  = NULL;
+          }
+          else {
+            /* The sequence or mapping has come to an end.  Ascend to */
+            /* the nearest container node that has a sequence or a */
+            /* mapping containing more entries.  If ascending reaches */
+            /* the root of the graph, the traversal is complete */
+            struct node_stack_entry * removed_entry;
+            do {
+              removed_entry = top;
+              assert( spider -> tail -> prev );
+              free( removed_entry );
+              spider -> tail = spider -> tail -> prev;
+            } while (
+              /* This is the hairiest leg of the spider, */
+              /* so be careful when touching the parentheses! */
+              spider -> tail -> prev != NULL &&
+              ((spider -> tail -> node -> flags & YAML_KIND) ==
+                YAML_MAPPING &&
+                spider -> tail -> map_entry -> next == NULL
+              ) &&
+              ((spider -> tail -> node -> flags & YAML_KIND) ==
+                YAML_SEQUENCE &&
+                spider -> tail -> seq_entry -> next == NULL
+              )
+            );
+            if ( spider -> tail != spider -> head ) {
+              /* the spider's tail points to a node that contains */
+              /* another mapping entry or another sequence entry */
+#if 0
+              if ( (spider -> tail -> node -> flags & YAML_KIND)
+                  == YAML_MAPPING ) {
+                assert( spider -> tail -> map_entry -> next );
+              }
+#endif
+              top = spider -> tail;
+              spider -> spidey -> node       = top -> node;
+              spider -> spidey -> parentnode = top -> prev -> node;
+              spider -> spidey = NULL; /* TODO: backtracking */
+            }
+            else { /* spider -> tail != spider -> head */
+              /* the traversal has finished */
+              spider -> spidey = NULL;
+            }
+          }
         }
         break;
       default:

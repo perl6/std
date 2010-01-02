@@ -329,22 +329,25 @@ Perhaps one piece of LHF per person per week/month is a fair ration.
 9. Make 'use Test'.  Lots of faking acceptable, the goal is to run some
    code, any code out of the spectest suite.
 10. Plan how to begin implementing rakudo/docs/metamodel.pod in LLVM IR.
-11. ...
+11. Add a 'make snapshot' to create an installable archive, including
+    the required subset of the spectest suite at that time.
+12. ...
 
 10. STATUS
-
-Item 1. is blocking the rest of the roadmap, test/yaml_compose_roundtrip
-runs but trips up on some corner cases. The AST integrity of the output
-looks good though.
-
-So far test/yaml_token_roundtrip and test/yaml_parse_roundtrip do work.
-In src/ these work: compile.cpp make_puts.cpp run.cpp and save.cpp.
-There may be some breakage due to fiddling with buggy yaml_compose().
 
 The LLVM code generator has been hard wired to produce an executable
 that prints "vill compiled A\nvill compiled Z\n" when run.  During early
 testing the output file (test/hello) measured 8437 bytes on x86 or 9014
 bytes on amd64 (Linux).  It runs completely standalone.
+
+Currently everything is EXPERIMENTAL.  In src/ these work: compile.cpp
+make_puts.cpp run.cpp and save.cpp.  In test/ these work:
+yaml_token_roundtrip and test/yaml_parse_roundtrip.  There may be some
+breakage due to fiddling with yaml_compose().
+
+Item 1. is blocking the rest of the roadmap, test/yaml_compose_roundtrip
+runs but fails to traverse the entire tree. The integrity of the
+composed AST looks good though.
 
 11. LICENSE
 
