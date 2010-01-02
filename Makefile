@@ -33,6 +33,7 @@ STD.pmc: STD.pm gimme5
 	rm -rf lex *.pad.store
 
 CORE.syml: CORE.setting
+	@touch CORE.syml.store
 	-rm CORE.syml.store
 	-./std CORE.setting
 
