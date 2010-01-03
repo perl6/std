@@ -117,7 +117,7 @@ Expr_func.prototype.emit = function() {
   for(var i=0,l=this.r.length;i<l-1;++i)
     code += this.r[i].emit().toProgramString() + ';';
   if (l > 0) {
-    var last = this.r[l-1].emit().toProgramString();
+    var last = this.r[l-1].emit();
     code += (/^(?:return|if|while|var|break|continue|default:|case)\s/.test(last) ? '' : 'return ') + last;
   }
   return code + '")';
@@ -128,18 +128,18 @@ var Expr_cond = make_binary_ctor();
 Expr_cond.prototype.emit = function() {
   var code = 'if('+this.l.emit()+'){', l=this.r.length;
   for(var i=0,l2=this.r[0].length;i<l2;++i)
-    code += this.r[0][i].emit().toProgramString() + ';';
+    code += this.r[0][i].emit() + ';';
   code += '}';
   for(var i=1;i<l-1;i+=2) {
     code += 'else if('+this.r[i].emit()+'){';
     for(var j=0,l2=this.r[i+1].length;j<l2;++j)
-      code += this.r[i+1][j].emit().toProgramString() + ';';
+      code += this.r[i+1][j].emit() + ';';
     code += '}';
   }
   if (l % 2 == 0) {
     code += 'else{';
     for(var i=0,l2=this.r[l-1].length;i<l2;++i)
-      code += this.r[l-1][i].emit().toProgramString() + ';';
+      code += this.r[l-1][i].emit() + ';';
     code += '}';
   }
   return code;
@@ -150,30 +150,30 @@ function infix(space, name, sym) {
   space[name] = new Function("l","r","return new Expr_"+name+"(l,r)");
   var f = space['Expr_'+name] = make_binary_ctor();
   f.prototype.emit =
-    new Function('return "("+this.l.emit()+"'+sym+'"+this.r.emit()+")"');
+    new Function('return"("+this.l.emit()+"'+sym+'"+this.r.emit()+")"');
 }
 
 function prefix(space, name, sym, noparens) {
   space[name] = new Function("l","return new Expr_"+name+"(l)");
   var f = space['Expr_'+name] = make_unary_ctor();
   f.prototype.emit = noparens
-    ? new Function('return "("+this.l.emit()+"'+sym+')"')
-    : new Function('return "('+sym+'("+this.l.emit()+"))"');
+    ? new Function('return"("+this.l.emit()+"'+sym+')"')
+    : new Function('return"('+sym+'("+this.l.emit()+"))"');
 }
 
 function postfix(space, name, sym, noparens) {
   space[name] = new Function("l","return new Expr_"+name+"(l)");
   var f = space['Expr_'+name] = make_unary_ctor();
   f.prototype.emit = noparens
-    ? new Function('return "'+sym+'("+this.l.emit()+")"')
-    : new Function('return "('+sym+'("+this.l.emit()+"))"');
+    ? new Function('return"'+sym+'("+this.l.emit()+")"')
+    : new Function('return"('+sym+'("+this.l.emit()+"))"');
 }
 
 function ternary(space, name, lsym, rsym) {
   space[name] = new Function("l","m","r","return new Expr_"+name+"(l,m,r)");
   var f = space['Expr_'+name] = make_trinary_ctor();
   f.prototype.emit =
-    new Function('return "("+this.l.emit()+"'+lsym+'"+this.m.emit()+"'+rsym+'"+this.r.emit()+")"');
+    new Function('return"("+this.l.emit()+"'+lsym+'"+this.m.emit()+"'+rsym+'"+this.r.emit()+")"');
 }
 
 // merely some codegen deferred macro-builders.  Eventually each of the emitter
@@ -228,6 +228,7 @@ var gtr = (function() {
   var count = 0;
   return function() { // grammar transition record constructor.
     this.id = ++count;
+    return this;
   };
 })();
 
@@ -240,6 +241,22 @@ var i = val("i"); // the input variable expression
 var o = val("o"); // the offset variable expression
 var t = val("t"); // the State variable expression
 var b = val("break next"); // macro for "break" instruction
+var d = val("t={inv:t,s:o}"); // macro for "descend into new state object"
+var a = val("t=t.inv"); // macro for "ascend to parent state object"
+var dls = val("t.inv.l=t"); // macro for "store the last in my left"
+var dl = val("t=t.l"); // macro for "descend into my left"
+var drs = val("t.inv.r=t");
+var dr = val("t=t.r");
+var 
+
+function gotol(lbl) {
+  return val("gl=\""+lbl.id+"\";break next");
+}
+// string literals as cases are faster than numeric literals, even when
+//   comparing to typeof number!
+function casel(lbl) {
+  return val("case "+lbl.id+":");
+}
 
 function lit(literal) { return new glit(literal) }
 function glit(literal) { // grammar literal parser builder
@@ -250,8 +267,7 @@ function glit(literal) { // grammar literal parser builder
 derives(glit, gts);
 glit.prototype.emit = function(c) {
   c.r.push(cond(ne(val("i.substr(o,"+this.v.l+")"),val(this.v.str.toQuotedString())),[[
-    assign(gl,val(this.fail.id)),
-    b
+    gotol(this.fail)
   ],[
     add_assign(o,val(this.v.l))
   ]]));
@@ -275,8 +291,7 @@ function gend() { // grammar "end anchor" parser builder
 derives(gend, gts);
 gend.prototype.emit = function(c) {
   c.r.push(cond(ne(o,val("i.l")),[[
-    assign(gl,val(this.fail.id)),
-    b
+    gotol(this.fail)
   ]]));
 };
 var end = (function() {
@@ -306,6 +321,36 @@ function both(l,r) {
         : new gbothlrs(l,r) // both stateful
     : new gboth(l,r); // fully stateless; neither stateful (yay, fully inlined)
 }
+
+function geither(l,r) { // grammar "stateless alternation" parser builder
+  gts.call(this, this.l = l, this.r = r); // call the parent constructor
+  this.stateful = true;
+  this.init = new gtr(); // add a transition record for my initial entry point
+  this.bt = new gtr(); // add a transition record for my backtrack entry point
+  this.linit = new gtr();
+  this.rinit = new gtr();
+}
+derives(geither, gts);
+geither.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d
+  );
+  this.l.emit(c);
+  c.r.push( // left succeeded
+    // mark to do right next
+  );
+};
+
+function either(l,r) {
+  return l.stateful || r.stateful
+    ? !r.stateful
+      ? new geitherls(l,r) // only left stateful
+      : !l.stateful
+        ? new geitherrs(l,r) // only right stateful
+        : new geitherlrs(l,r) // both stateful
+    : new geither(l,r); // neither stateful
+}
+
 
 function utf32str_charAt(offset) {
   return String.fromCharCode(this[offset]);
@@ -339,15 +384,16 @@ function utf32str(str) {
 }
 
 
-var routine = func(["i"],[val("var gl=0,o=0;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
+var routine = func(["i"],[val("var gl=\"0\",o=0,t={};last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
 var grammar = both(lit("hi"),end()); // a grammar expression definition
+grammar = either(lit("hi"),lit("ho"));
 
-grammar.fail = 1;
+grammar.fail = {id:1};
 
 grammar.emit(routine); // have the grammar emit its specialize parser code to this routine
 
-routine.r.push(val("break last;case 1: print('parse failed');default: break last}}")); // finalize the routine
+routine.r.push(val("break last;case 1:print('parse failed');default:break last}}")); // finalize the routine
 /*
 var input = utf32str("\uD80C\uDF14z\uD80C\uDF16");
 print(input.str);
