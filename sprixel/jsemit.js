@@ -240,17 +240,17 @@ var gl = val("gl"); // the next target goto label variable expression
 var i = val("i"); // the input variable expression
 var o = val("o"); // the offset variable expression
 var t = val("t"); // the State variable expression
-var b = val("break next"); // macro for "break" instruction
+var b = val("break"); // macro for "break" instruction
 var d = val("t={inv:t,s:o}"); // macro for "descend into new state object"
 var a = val("t=t.inv"); // macro for "ascend to parent state object"
 var dls = val("t.inv.l=t"); // macro for "store the last in my left"
 var dl = val("t=t.l"); // macro for "descend into my left"
 var drs = val("t.inv.r=t");
 var dr = val("t=t.r");
-var 
+var ros = val("o=t.s"); // macro for "reset offset to my start"
 
 function gotol(lbl) {
-  return val("gl=\""+lbl.id+"\";break next");
+  return val("gl="+lbl.id+";break");
 }
 // string literals as cases are faster than numeric literals, even when
 //   comparing to typeof number!
@@ -327,18 +327,43 @@ function geither(l,r) { // grammar "stateless alternation" parser builder
   this.stateful = true;
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
-  this.linit = new gtr();
-  this.rinit = new gtr();
 }
 derives(geither, gts);
 geither.prototype.emit = function(c) {
   c.r.push(
     casel(this.init),d
   );
+  this.l.fail = this.bt; // make left fail directly to our backtrack label
   this.l.emit(c);
   c.r.push( // left succeeded
-    // mark to do right next
+    gotol(this.notd),d, // return "not done"
+    casel(this.bt), // left failed
+    ros // reset to start (TODO: I suspect extraneous)
   );
+  this.r.fail = this.fail; // make right fail directly to our fail
+  this.r.emit(c);
+};
+
+function geitherls(l,r) { // grammar "left stateful alternation" parser builder
+  gts.call(this, this.l = l, this.r = r); // call the parent constructor
+  this.stateful = true;
+  this.init = new gtr(); // add a transition record for my initial entry point
+  this.bt = new gtr(); // add a transition record for my backtrack entry point
+}
+derives(geitherls, gts);
+geitherls.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d
+  );
+  this.l.fail = this.bt; // make left fail directly to our backtrack label
+  this.l.emit(c);
+  c.r.push( // left succeeded
+    gotol(this.notd),d, // return "not done"
+    casel(this.bt), // left failed
+    ros // reset to start (TODO: I suspect extraneous)
+  );
+  this.r.fail = this.fail; // make right fail directly to our fail
+  this.r.emit(c);
 };
 
 function either(l,r) {
@@ -384,16 +409,17 @@ function utf32str(str) {
 }
 
 
-var routine = func(["i"],[val("var gl=\"0\",o=0,t={};last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
+var routine = func(["i"],[val("var gl=0,o=0,t={};last:for(;;print(gl)){next:switch(gl){case 0:")]); // empty parser routine
 
 var grammar = both(lit("hi"),end()); // a grammar expression definition
-grammar = either(lit("hi"),lit("ho"));
+grammar = either(both(both(lit("h"),lit("i")),end()),lit("ho"));
 
 grammar.fail = {id:1};
+grammar.done = grammar.notd = {id:-1};
 
 grammar.emit(routine); // have the grammar emit its specialize parser code to this routine
 
-routine.r.push(val("break last;case 1:print('parse failed');default:break last}}")); // finalize the routine
+routine.r.push(val("case -1:print('parse succeeded');break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
 /*
 var input = utf32str("\uD80C\uDF14z\uD80C\uDF16");
 print(input.str);
@@ -412,7 +438,8 @@ print(parserf);
 
 var parser = eval(parserf); // compile the javascript function to machine code
 
-var input = utf32str("hi");
+var input = utf32str("ho");
+
 parser(input);
 
 
