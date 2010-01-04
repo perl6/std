@@ -126,12 +126,12 @@ function func(args,stmts) { return new Expr_func(args,stmts) }
 
 var Expr_cond = make_binary_ctor();
 Expr_cond.prototype.emit = function() {
-  var code = 'if('+this.l.emit()+'){', l=this.r.length;
+  var code = 'if'+this.l.emit()+'{', l=this.r.length;
   for(var i=0,l2=this.r[0].length;i<l2;++i)
     code += this.r[0][i].emit() + ';';
   code += '}';
   for(var i=1;i<l-1;i+=2) {
-    code += 'else if('+this.r[i].emit()+'){';
+    code += 'else if'+this.r[i].emit()+'{';
     for(var j=0,l2=this.r[i+1].length;j<l2;++j)
       code += this.r[i+1][j].emit() + ';';
     code += '}';
@@ -225,7 +225,7 @@ ternary(top, "tern", "?", ":");
 
 
 var gtr = (function() {
-  var count = 0;
+  var count = 2;
   return function() { // grammar transition record constructor.
     this.id = ++count;
     return this;
@@ -241,20 +241,24 @@ var i = val("i"); // the input variable expression
 var o = val("o"); // the offset variable expression
 var t = val("t"); // the State variable expression
 var b = val("break"); // macro for "break" instruction
-var d = val("t={inv:t,s:o}"); // macro for "descend into new state object"
-var a = val("t=t.inv"); // macro for "ascend to parent state object"
-var dls = val("t.inv.l=t"); // macro for "store the last in my left"
+var d = val("t={i:t,s:o}"); // macro for "descend into new state object"
+var a = val("t=t.i"); // macro for "ascend to parent state object"
+var dls = val("t.i.l=t;t=t.i"); // macro for "store the last in my left"
 var dl = val("t=t.l"); // macro for "descend into my left"
-var drs = val("t.inv.r=t");
+var drs = val("t.i.r=t");
 var dr = val("t=t.r");
 var ros = val("o=t.s"); // macro for "reset offset to my start"
+var bbt = val("gl=t.n;t=t.t;break"); // macro for "goto the next computed goto" (see goton())
 
-function gotol(lbl) {
+function gotol(lbl) { // macro for goto label with id of the transition object
   return val("gl="+lbl.id+";break");
 }
-// string literals as cases are faster than numeric literals, even when
-//   comparing to typeof number!
-function casel(lbl) {
+
+function goton(lbl) { // goto next (set computed goto for next transition)
+  return val("t.n="+lbl.id);
+}
+
+function casel(lbl) { // macro for MARK label with id of the transition object
   return val("case "+lbl.id+":");
 }
 
@@ -312,6 +316,51 @@ gboth.prototype.emit = function(c) {
   this.r.emit(c);
 };
 
+function gbothls(l, r) { // grammar "both left stateful" parser builder
+  gts.call(this, this.l = l, this.r = r); // call the parent constructor
+  this.stateful = true;
+  this.init = new gtr();
+  this.bt = new gtr();
+  l.notd = new gtr(); // give left a "not done" transition
+  l.done = new gtr(); // give left a "done" transition
+}
+derives(gbothls, gts);
+gbothls.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d // initial entry point
+  );
+  this.l.emit(c);
+  var rightinit = new gtr(); // a label for initial right when backtracking
+  c.r.push(
+    casel(this.l.done), // left succeeded with finality
+    a, // ascend; we don't need a reference to left; it's done
+    val("t.ld=true"),
+    gotol(rightinit),
+    casel(this.l.notd),
+    val("t.i.l=t;t=t.i;t.ld=false"),
+    casel(rightinit)
+  );
+  this.r.emit(c);
+  c.r.push(
+    // right succeeded; we're either done or not.
+    cond(val("(t.ld)"),[[
+      gotol(this.done)
+    ],[
+      gotol(this.notd)
+    ]]),
+
+    casel(this.r.fail),
+    cond(val("(t.ld)"),[[
+      a,
+      gotol(this.fail)
+    ],[
+      ros,
+      val("t=t.l"),
+      gotol(this.l.bt)
+    ]])
+  );
+};
+
 function both(l,r) {
   return l.stateful || r.stateful
     ? !r.stateful
@@ -336,34 +385,59 @@ geither.prototype.emit = function(c) {
   this.l.fail = this.bt; // make left fail directly to our backtrack label
   this.l.emit(c);
   c.r.push( // left succeeded
-    gotol(this.notd),d, // return "not done"
+    gotol(this.notd), // return "not done"
+    
+    casel(this.r.fail), // right failed
+    a,
+    gotol(this.fail), // goto our fail
+    
     casel(this.bt), // left failed
     ros // reset to start (TODO: I suspect extraneous)
   );
-  this.r.fail = this.fail; // make right fail directly to our fail
   this.r.emit(c);
 };
 
 function geitherls(l,r) { // grammar "left stateful alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
   this.stateful = true;
+  l.notd = new gtr(); // give left a "not done" transition
+  l.done = new gtr(); // give left a "done" transition
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
+  r.init = new gtr(); // add a transition record for right initial
 }
 derives(geitherls, gts);
 geitherls.prototype.emit = function(c) {
   c.r.push(
-    casel(this.init),d
+    casel(this.init),d // initial entry point
   );
-  this.l.fail = this.bt; // make left fail directly to our backtrack label
   this.l.emit(c);
-  c.r.push( // left succeeded
-    gotol(this.notd),d, // return "not done"
-    casel(this.bt), // left failed
-    ros // reset to start (TODO: I suspect extraneous)
+  c.r.push(
+    casel(this.l.done), // left succeeded with finality
+    a, // ascend
+    val("t.t=t"), // set myself as the next node to which to backtrack
+    goton(this.r.init), // mark to return to the right backtrack point.
+    gotol(this.notd), // return "not done"
+    
+    casel(this.l.notd), // left succeeded, but is not done.
+    val("t.i.t=t;t=t.i"), // stash left in myself; ascend
+    goton(this.l.bt), // mark to return to the left backtrack point.
+    gotol(this.notd), // return "not done"
+    
+    casel(this.bt), // backtrack entry point
+    ros, // reset to start (TODO: I suspect extraneous)
+    bbt,
+    
+    casel(this.r.fail), // right failed
+    a, // ascend
+    gotol(this.fail), // goto our fail
+    
+    casel(this.l.fail), // left failed
+    
+    casel(this.r.init) // right initial entry point
   );
-  this.r.fail = this.fail; // make right fail directly to our fail
   this.r.emit(c);
+  c.r.push(a);
 };
 
 function either(l,r) {
@@ -382,6 +456,7 @@ function utf32str_charAt(offset) {
 }
 
 function utf32str_substr(offset, length) {
+  //print('checking offset at '+offset);
   return offset <= 0
     ? offset + length >= this.l
       ? this.str.substring(0)
@@ -409,10 +484,12 @@ function utf32str(str) {
 }
 
 
-var routine = func(["i"],[val("var gl=0,o=0,t={};last:for(;;print(gl)){next:switch(gl){case 0:")]); // empty parser routine
+var routine = func(["i"],[val("var gl=0,o=0,t={};last:for(;;){next:/*print(gl);*/switch(gl){case 0:")]); // empty parser routine
 
 var grammar = both(lit("hi"),end()); // a grammar expression definition
-grammar = either(both(both(lit("h"),lit("i")),end()),lit("ho"));
+grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
+grammar = both(either(lit("h"),lit("ha")),end());
+//grammar = either(lit("hi"),lit("ho"));
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -434,11 +511,11 @@ print("\uD80C\uDF16");
 
 var parserf = routine.emit();
 
-print(parserf);
+//print(parserf);
 
 var parser = eval(parserf); // compile the javascript function to machine code
 
-var input = utf32str("ho");
+var input = utf32str("ha");
 
 parser(input);
 
