@@ -305,6 +305,24 @@ var end = (function() {
   }
 })();
 
+/* Code block generation conventions/rules:
+ *  - both state-carrying (non-deterministic, possibly-backtracking) nodes and
+      non-state-carrying nodes "fall through" to the end of their code emission
+      block upon "done" success.
+    - state-carrying nodes leave their State object ("t" in the generated code)
+      on the "t" stack (the "t" local) when returning notdone or done, so that
+      its invoker can stash a copy of it if necessary.  When failing, a stateful
+      node must pop itself from the t stack ("t=t.i") (where .i is short for
+      .invoker) to allow for "fastfail" gotos.
+    - the constructors for state-carrying nodes (compile-time) create their own
+      ".bt" (backtrack entry point) and ".init" (initial entry point) transition
+      records, but each's parent will create their .notd (not done return path)
+      and .done (done return path) transition records.
+    - each stateful node creates its own state object, and when backtracking,
+      the parent of a stateful node descends the binary tree into the proper
+      path branch by setting "t=t.l" (or "t=t.r") as the case may be.
+ */
+  
 function gboth(l, r) { // grammar "stateless both" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
   this.stateful = false;
