@@ -241,8 +241,8 @@ var i = val("i"); // the input variable expression
 var o = val("o"); // the offset variable expression
 var t = val("t"); // the State variable expression
 var b = val("break"); // macro for "break" instruction
-var d = val("t={i:t,s:o}"); // macro for "descend into new state object"
-var a = val("t=t.i"); // macro for "ascend to parent state object"
+var d = val("t={i:t,s:o}"); // macro for "descend into new State object"
+var a = val("t=t.i"); // macro for "ascend to parent State object"
 var dls = val("t.i.l=t;t=t.i"); // macro for "store the last in my left"
 var dl = val("t=t.l"); // macro for "descend into my left"
 var drs = val("t.i.r=t");
@@ -265,7 +265,7 @@ function casel(lbl) { // macro for MARK label with id of the transition object
 function lit(literal) { return new glit(literal) }
 function glit(literal) { // grammar literal parser builder
   gts.call(this); // call the parent constructor
-  this.stateful = false;
+  this.b = false;
   this.v = utf32str(literal);
 }
 derives(glit, gts);
@@ -290,7 +290,7 @@ glit.prototype.emit = function(c) {
 
 function gend() { // grammar "end anchor" parser builder
   gts.call(this); // call the parent constructor
-  this.stateful = false;
+  this.b = false;
 }
 derives(gend, gts);
 gend.prototype.emit = function(c) {
@@ -306,26 +306,26 @@ var end = (function() {
 })();
 
 /* Code block generation conventions/rules:
- *  - both state-carrying (non-deterministic, possibly-backtracking) nodes and
-      non-state-carrying nodes "fall through" to the end of their code emission
+ *  - both non-deterministic (possibly-backtracking) nodes and
+      deterministic nodes "fall through" to the end of their code emission
       block upon "done" success.
-    - state-carrying nodes leave their State object ("t" in the generated code)
+    - non-deterministic nodes leave their State object ("t" in the generated code)
       on the "t" stack (the "t" local) when returning notdone or done, so that
-      its invoker can stash a copy of it if necessary.  When failing, a stateful
+      its invoker can stash a copy of it if necessary.  When failing, a nondeterministic
       node must pop itself from the t stack ("t=t.i") (where .i is short for
       .invoker) to allow for "fastfail" gotos.
-    - the constructors for state-carrying nodes (compile-time) create their own
+    - the constructors for non-deterministic nodes (compile-time) create their own
       ".bt" (backtrack entry point) and ".init" (initial entry point) transition
       records, but each's parent will create their .notd (not done return path)
       and .done (done return path) transition records.
-    - each stateful node creates its own state object, and when backtracking,
-      the parent of a stateful node descends the binary tree into the proper
+    - each nondeterministic node creates its own State object, and when backtracking,
+      the parent of a nondeterministic node descends the binary tree into the proper
       path branch by setting "t=t.l" (or "t=t.r") as the case may be.
  */
   
-function gboth(l, r) { // grammar "stateless both" parser builder
+function gboth(l, r) { // grammar "deterministic both" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
-  this.stateful = false;
+  this.b = false;
 }
 derives(gboth, gts);
 gboth.prototype.emit = function(c) {
@@ -334,9 +334,9 @@ gboth.prototype.emit = function(c) {
   this.r.emit(c);
 };
 
-function gbothls(l, r) { // grammar "both left stateful" parser builder
+function gbothls(l, r) { // grammar "both left nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
-  this.stateful = true;
+  this.b = true;
   this.init = new gtr();
   this.bt = new gtr();
   l.notd = new gtr(); // give left a "not done" transition
@@ -380,18 +380,18 @@ gbothls.prototype.emit = function(c) {
 };
 
 function both(l,r) {
-  return l.stateful || r.stateful
-    ? !r.stateful
-      ? new gbothls(l,r) // only left stateful
-      : !l.stateful
-        ? new gbothrs(l,r) // only right stateful
-        : new gbothlrs(l,r) // both stateful
-    : new gboth(l,r); // fully stateless; neither stateful (yay, fully inlined)
+  return l.b || r.b
+    ? !r.b
+      ? new gbothls(l,r) // only left nondeterministic
+      : !l.b
+        ? new gbothrs(l,r) // only right nondeterministic
+        : new gbothlrs(l,r) // both nondeterministic
+    : new gboth(l,r); // fully deterministic; neither      (yay, fully inlined)
 }
 
-function geither(l,r) { // grammar "stateless alternation" parser builder
+function geither(l,r) { // grammar "deterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
-  this.stateful = true;
+  this.b = true;
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
 }
@@ -415,9 +415,9 @@ geither.prototype.emit = function(c) {
   this.r.emit(c);
 };
 
-function geitherls(l,r) { // grammar "left stateful alternation" parser builder
+function geitherls(l,r) { // grammar "left nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
-  this.stateful = true;
+  this.b = true;
   l.notd = new gtr(); // give left a "not done" transition
   l.done = new gtr(); // give left a "done" transition
   this.init = new gtr(); // add a transition record for my initial entry point
@@ -458,14 +458,67 @@ geitherls.prototype.emit = function(c) {
   c.r.push(a);
 };
 
+function geitherrs(l,r) { // grammar "right nondeterministic alternation" parser builder
+  gts.call(this, this.l = l, this.r = r); // call the parent constructor
+  this.b = true;
+  r.notd = new gtr(); // give right a "not done" transition
+  r.done = new gtr(); // give right a "done" transition
+  this.init = new gtr(); // add a transition record for my initial entry point
+  this.bt = new gtr(); // add a transition record for my backtrack entry point
+  r.init = new gtr(); // add a transition record for right initial
+}
+derives(geitherrs, gts);
+geitherrs.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d // initial entry point
+  );
+  this.l.emit(c);
+  c.r.push(
+    casel(this.l.done),
+    val("t.ri=false"), // mark that r has not been inited
+    a,
+    gotol(this.notd),
+    
+    casel(this.l.fail),
+    ros
+  );
+  this.r.emit(c);
+  c.r.push(
+    casel(this.r.done), // right succeeded with finality
+    a, // ascend from right
+    val("t.r=null"), // nullify the reference to help the GC
+    gotol(this.done), // return "done"
+    
+    casel(this.r.notd), // right succeeded, but is not done.
+    val("t.i.r=t;t=t.i"), // stash right in myself; ascend
+    val("t.ri=true"), // mark that r has been inited
+    goton(this.r.bt), // mark to return to the right backtrack point.
+    gotol(this.notd), // return "not done"
+    
+    casel(this.bt), // backtrack entry point
+    ros, // reset to start (TODO: I suspect extraneous)
+    bbt,
+    
+    casel(this.r.fail), // right failed
+    a, // ascend
+    gotol(this.fail), // goto our fail
+    
+    casel(this.l.fail), // left failed
+    
+    casel(this.r.init) // right initial entry point
+  );
+  this.r.emit(c);
+  c.r.push(a);
+};
+
 function either(l,r) {
-  return l.stateful || r.stateful
-    ? !r.stateful
-      ? new geitherls(l,r) // only left stateful
-      : !l.stateful
-        ? new geitherrs(l,r) // only right stateful
-        : new geitherlrs(l,r) // both stateful
-    : new geither(l,r); // neither stateful
+  return l.b || r.b
+    ? !r.b
+      ? new geitherls(l,r) // only left nondeterministic
+      : !l.b
+        ? new geitherrs(l,r) // only right nondeterministic
+        : new geitherlrs(l,r) // both nondeterministic
+    : new geither(l,r); // neither nondeterministic
 }
 
 
