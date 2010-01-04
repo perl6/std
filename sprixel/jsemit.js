@@ -369,6 +369,7 @@ gbothls.prototype.emit = function(c) {
 
     casel(this.r.fail),
     cond(val("(t.ld)"),[[
+      //ros,
       a,
       gotol(this.fail)
     ],[
@@ -451,7 +452,7 @@ geitherls.prototype.emit = function(c) {
     gotol(this.fail), // goto our fail
     
     casel(this.l.fail), // left failed
-    
+    ros,
     casel(this.r.init) // right initial entry point
   );
   this.r.emit(c);
@@ -474,12 +475,11 @@ geitherrs.prototype.emit = function(c) {
   );
   this.l.emit(c);
   c.r.push(
-    casel(this.l.done),
     val("t.ri=false"), // mark that r has not been inited
-    a,
     gotol(this.notd),
     
     casel(this.l.fail),
+    val("t.ri=true"), // mark that r has been inited
     ros
   );
   this.r.emit(c);
@@ -491,24 +491,20 @@ geitherrs.prototype.emit = function(c) {
     
     casel(this.r.notd), // right succeeded, but is not done.
     val("t.i.r=t;t=t.i"), // stash right in myself; ascend
-    val("t.ri=true"), // mark that r has been inited
-    goton(this.r.bt), // mark to return to the right backtrack point.
     gotol(this.notd), // return "not done"
     
     casel(this.bt), // backtrack entry point
-    ros, // reset to start (TODO: I suspect extraneous)
-    bbt,
+    cond(val("(t.ri)"),[[ // if right has been inited before
+      val("t=t.r"),
+      gotol(this.r.bt)
+    ],[
+      gotol(this.l.fail)
+    ]]),
     
     casel(this.r.fail), // right failed
     a, // ascend
-    gotol(this.fail), // goto our fail
-    
-    casel(this.l.fail), // left failed
-    
-    casel(this.r.init) // right initial entry point
+    gotol(this.fail) // goto our fail
   );
-  this.r.emit(c);
-  c.r.push(a);
 };
 
 function either(l,r) {
@@ -557,17 +553,18 @@ function utf32str(str) {
 
 var routine = func(["i"],[val("var gl=0,o=0,t={};last:for(;;){next:/*print(gl);*/switch(gl){case 0:")]); // empty parser routine
 
-var grammar = both(lit("hi"),end()); // a grammar expression definition
-grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
-grammar = both(either(lit("h"),lit("ha")),end());
+var grammar;// = both(lit("hi"),end()); // a grammar expression definition
+//grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
+//grammar = both(either(lit("h"),lit("ha")),end());
 //grammar = either(lit("hi"),lit("ho"));
+grammar = either(both(either(lit("ho"),either(lit("h"),lit("ha"))),lit("blah")),lit("ha"));
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
 
 grammar.emit(routine); // have the grammar emit its specialize parser code to this routine
 
-routine.r.push(val("case -1:print('parse succeeded');break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
+routine.r.push(val("case -1:/*print('parse succeeded');*/break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
 /*
 var input = utf32str("\uD80C\uDF14z\uD80C\uDF16");
 print(input.str);
@@ -589,6 +586,8 @@ var parser = eval(parserf); // compile the javascript function to machine code
 var input = utf32str("ha");
 
 parser(input);
+
+//for(var ee=100000;--ee>0;parser(input));
 
 
 
