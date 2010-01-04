@@ -321,6 +321,8 @@ var end = (function() {
     - each nondeterministic node creates its own State object, and when backtracking,
       the parent of a nondeterministic node descends the binary tree into the proper
       path branch by setting "t=t.l" (or "t=t.r") as the case may be.
+    - failing paths in nondeterministic nodes do not reset the offset (into the
+      input) themselves, but rather let the backtracking nodes do it.
  */
   
 function gboth(l, r) { // grammar "deterministic both" parser builder
@@ -377,6 +379,46 @@ gbothls.prototype.emit = function(c) {
       val("t=t.l"),
       gotol(this.l.bt)
     ]])
+  );
+};
+
+function gbothrs(l, r) { // grammar "both right nondeterministic" parser builder
+  gts.call(this, this.l = l, this.r = r); // call the parent constructor
+  this.b = true;
+  this.init = new gtr();
+  this.bt = new gtr();
+  r.init = new gtr(); // give left a "init" transition
+  r.notd = new gtr(); // give left a "not done" transition
+  r.done = new gtr(); // give left a "done" transition
+}
+derives(gbothrs, gts);
+gbothrs.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d // initial entry point
+  );
+  this.l.fail = this.r.fail;
+  this.l.emit(c);
+  c.r.push(
+    val("t.la=o") // mark how far left advanced
+  );
+  this.r.emit(c);
+  c.r.push(
+    casel(this.r.done), // right succeeded with finality
+    a, // ascend from right
+    val("t.r=null"), // nullify the reference to help the GC
+    gotol(this.done), // return "done"
+    
+    casel(this.r.notd), // right succeeded, but is not done.
+    val("t.i.r=t;t=t.i"), // stash right in myself; ascend
+    gotol(this.notd), // return "not done"
+    
+    casel(this.bt), // backtrack entry point
+    val("o=t.la;t=t.r"),
+    gotol(this.r.bt),
+    
+    casel(this.r.fail), // right failed
+    a, // ascend
+    gotol(this.fail) // goto our fail
   );
 };
 
@@ -557,7 +599,7 @@ var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
 //grammar = both(either(lit("h"),lit("ha")),end());
 //grammar = either(lit("hi"),lit("ho"));
-grammar = either(both(either(lit("ho"),either(lit("h"),lit("ha"))),lit("blah")),lit("ha"));
+grammar = both(both(lit("h"),either(lit("a"),lit("aa"))),lit("r"));
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -583,7 +625,7 @@ var parserf = routine.emit();
 
 var parser = eval(parserf); // compile the javascript function to machine code
 
-var input = utf32str("ha");
+var input = utf32str("haar");
 
 parser(input);
 
