@@ -701,6 +701,52 @@ function either(l,r) {
     : new geither(l,r); // neither nondeterministic
 }
 
+function gplus(l) { // grammar "deterministic" edition of plus
+  gts.call(this, this.l = l); // call the parent constructor
+  this.b = true;
+  this.init = new gtr(); // add a transition record for my initial entry point
+  this.bt = new gtr(); // add a transition record for my backtrack entry point
+}
+derives(gplus, gts);
+gplus.prototype.emit = function(c) {
+  var retry = new gtr(), check = new gtr(); // label for retry spot
+  c.r.push(
+    casel(this.init),d,
+    val("var z8=[]"), // create a container for the match offsets
+    casel(retry)
+  );
+  this.l.emit(c);
+  c.r.push( // left succeeded
+    cond(val("(t.s==o)"),[[ // child is a zero-length assertion
+      gotol(this.done)
+    ]]),
+    val("z8.push(o)"),
+    gotol(retry), // try another one
+    
+    casel(this.l.fail), // left hit its base case
+    cond(val("(z8.length==0)"),[[
+      a,
+      gotol(this.fail)
+    ]]),
+    casel(check),
+    cond(val("(z8.length==1)"),[[
+      gotol(this.done)
+    ]]),
+    val("t.z=z8"), // stash the saved offsets in self.
+    gotol(this.notd),
+    
+    casel(this.bt),
+    val("o=t.z.pop()"),
+    gotol(check)
+  );
+};
+
+function plus(l) {
+  return l.b
+    ? new gplusb(l) // nondeterministic version of plus
+    : new gplus(l); // deterministic version of plus
+}
+
 
 function utf32str_charAt(offset) {
   return String.fromCharCode(this[offset]);
@@ -743,7 +789,9 @@ var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = either(lit("hi"),lit("ho"));
 //grammar = both(both(lit("h"),either(lit("a"),lit("aa"))),lit("r"));
 //grammar = both(either(lit("h"),either(lit("a"),lit("aa"))),either(lit("f"),lit("aar")));
-grammar = either(either(lit("a"),either(lit("b"),lit("c"))),either(lit("f"),lit("haar")));
+//grammar = either(either(lit("a"),either(lit("b"),lit("c"))),either(lit("f"),lit("haar")));
+//grammar = plus(lit("a"));
+grammar = both(plus(lit("a")),lit("aa"));
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -769,7 +817,7 @@ var parserf = routine.emit();
 
 var parser = eval(parserf); // compile the javascript function to machine code
 
-var input = utf32str("haar");
+var input = utf32str("aaaa");
 
 parser(input);
 
