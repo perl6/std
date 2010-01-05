@@ -395,7 +395,11 @@ gbothls.prototype.emit = function(c) {
       ros,
       val("t=t.l"),
       gotol(this.l.bt)
-    ]])
+    ]]),
+    
+    casel(this.bt),
+    val("t=t.l"),
+    gotol(this.l.bt)
   );
 };
 
@@ -741,6 +745,65 @@ gplus.prototype.emit = function(c) {
   );
 };
 
+function gplusb(l) { // grammar "deterministic" edition of plus
+  gts.call(this, this.l = l); // call the parent constructor
+  this.b = true;
+  this.init = new gtr(); // add a transition record for my initial entry point
+  this.bt = new gtr(); // add a transition record for my backtrack entry point
+  l.init = new gtr(); // give left an "init" transition
+  l.notd = new gtr(); // give left a "not done" transition
+  l.done = new gtr(); // give left a "done" transition
+}
+derives(gplusb, gts);
+gplusb.prototype.emit = function(c) {
+  var retry = new gtr(), check = new gtr(); // label for retry spot
+  c.r.push(
+    casel(this.init),d,
+    val("t.z8=[],t.tr={}"), // create a container for the child objects
+    casel(retry)
+  );
+  this.l.emit(c);
+  c.r.push(
+    casel(this.l.done), // left succeeded
+    //cond(val("(t.s==o)"),[[ // child is a zero-length assertion
+    //  gotol(this.done)
+    //]]),
+    val("t.i.z8.push(t);t.nd=false;t=t.i"),
+    gotol(retry), // try another one
+    
+    casel(this.l.notd), // left succeeded
+    val("t.i.z8.push(t);t.nd=true;t=t.i"),
+    gotol(retry), // try another one
+    
+    casel(this.l.fail), // left hit its base case
+    cond(val("(t.z8.length==0)"),[[
+      a,
+      gotol(this.fail)
+    ]]),
+    casel(check),
+    cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
+      gotol(this.done)
+    ]]),
+    gotol(this.notd),
+    
+    casel(this.bt),
+    val("u=t.z8.pop()"),
+    cond(val("(u.nd)"),[[
+      val("o=(t=u).s"),
+      gotol(this.l.bt)
+    ]]),
+    cond(val("(t.z8.length==0)"),[[
+      a,
+      gotol(this.fail)
+    ]]),
+    val("o=u.s"),
+    cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
+      gotol(this.done)
+    ]]),
+    gotol(this.notd)
+  );
+};
+
 function plus(l) {
   return l.b
     ? new gplusb(l) // nondeterministic version of plus
@@ -781,7 +844,8 @@ function utf32str(str) {
 }
 
 
-var routine = func(["i"],[val("var gl=0,o=0,t={};last:for(;;){next:/*print(gl);*/switch(gl){case 0:")]); // empty parser routine
+//var routine = func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:print(gl+' at '+o+' '+(typeof t=='undefined'));switch(gl){case 0:")]); // empty parser routine
+var routine = func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:/*print(gl);*/switch(gl){case 0:")]); // empty parser routine
 
 var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
@@ -791,7 +855,8 @@ var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = both(either(lit("h"),either(lit("a"),lit("aa"))),either(lit("f"),lit("aar")));
 //grammar = either(either(lit("a"),either(lit("b"),lit("c"))),either(lit("f"),lit("haar")));
 //grammar = plus(lit("a"));
-grammar = both(plus(lit("a")),lit("aa"));
+//grammar = both(plus(lit("a")),lit("aa"));
+grammar = both(both(plus(either(lit("aa"),lit("a"))),lit('aaa')),end());
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -817,7 +882,7 @@ var parserf = routine.emit();
 
 var parser = eval(parserf); // compile the javascript function to machine code
 
-var input = utf32str("aaaa");
+var input = utf32str('aaaa');
 
 parser(input);
 
