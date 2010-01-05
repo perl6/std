@@ -45,6 +45,7 @@ function unescapeString(s) {
       case 'r':  return '\r';
       case 'n':  return '\n';
       case 't':  return '\t';
+      case 'f':  return '\f';
       case "'":  return '\'';
       case '"':  return '\"';
       default:   return s[1];
@@ -387,9 +388,9 @@ function gbothrs(l, r) { // grammar "both right nondeterministic" parser builder
   this.b = true;
   this.init = new gtr();
   this.bt = new gtr();
-  r.init = new gtr(); // give left a "init" transition
-  r.notd = new gtr(); // give left a "not done" transition
-  r.done = new gtr(); // give left a "done" transition
+  r.init = new gtr(); // give right a "init" transition
+  r.notd = new gtr(); // give right a "not done" transition
+  r.done = new gtr(); // give right a "done" transition
 }
 derives(gbothrs, gts);
 gbothrs.prototype.emit = function(c) {
@@ -413,6 +414,66 @@ gbothrs.prototype.emit = function(c) {
     gotol(this.notd), // return "not done"
     
     casel(this.bt), // backtrack entry point
+    val("o=t.la;t=t.r"),
+    gotol(this.r.bt),
+    
+    casel(this.r.fail), // right failed
+    a, // ascend
+    gotol(this.fail) // goto our fail
+  );
+};
+
+function gbothlrs(l, r) { // grammar "both left and right nondeterministic" parser builder
+  gts.call(this, this.l = l, this.r = r); // call the parent constructor
+  this.b = true;
+  this.init = new gtr();
+  this.bt = new gtr();
+  l.notd = new gtr(); // give left a "not done" transition
+  l.done = new gtr(); // give left a "done" transition
+  r.init = new gtr(); // give right a "init" transition
+  r.notd = new gtr(); // give right a "not done" transition
+  r.done = new gtr(); // give right a "done" transition
+}
+derives(gbothlrs, gts);
+gbothlrs.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d // initial entry point
+  );
+  this.l.fail = this.r.fail;
+  this.l.emit(c);
+  var rightinit = new gtr(); // a label for initial right when backtracking
+  c.r.push(
+    casel(this.l.done), // left succeeded with finality
+    a, // ascend; we don't need a reference to left; it's done
+    val("t.ld=true;t.la=o"),
+    gotol(rightinit),
+    
+    casel(this.l.notd),
+    val("t.i.l=t;t=t.i;t.ld=false;t.la=o"),
+    casel(rightinit)
+  );
+  this.r.emit(c);
+  c.r.push(
+    casel(this.r.done), // right succeeded with finality
+    a, // ascend from right
+    val("t.r=null"), // nullify the reference to help the GC
+    cond(val("(t.ld)"),[[
+      gotol(this.done) // return "done"
+    ]],[[
+      val("t.rd=true"), // mark right as done
+      gotol(this.notd) // return "not done"
+    ]]),
+    
+    casel(this.r.notd), // right succeeded, but is not done.
+    val("t.i.r=t;t=t.i"), // stash right in myself; ascend
+    val("t.rd=false"), // mark right as not done
+    gotol(this.notd), // return "not done"
+    
+    casel(this.bt), // backtrack entry point
+    cond(val("(t.rd)"),[[
+      val("o=t.s;t=t.l"),
+      gotol(this.l.bt)
+    ]]),
     val("o=t.la;t=t.r"),
     gotol(this.r.bt),
     
@@ -599,7 +660,8 @@ var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
 //grammar = both(either(lit("h"),lit("ha")),end());
 //grammar = either(lit("hi"),lit("ho"));
-grammar = both(both(lit("h"),either(lit("a"),lit("aa"))),lit("r"));
+//grammar = both(both(lit("h"),either(lit("a"),lit("aa"))),lit("r"));
+grammar = both(either(lit("h"),either(lit("a"),lit("aa"))),either(lit("f"),lit("r")));
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
