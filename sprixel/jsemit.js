@@ -306,6 +306,22 @@ var end = (function() {
   }
 })();
 
+function gbeg() { // grammar "beginning anchor" parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+}
+derives(gbeg, gts);
+gbeg.prototype.emit = function(c) {
+  c.r.push(val("o=0")); // just set current offset to 0. TODO: make parametric
+  // on the match start, for when we don't start at offset 0.
+};
+var beg = (function() {
+  var beger = new gbeg();
+  return function() {
+    return beger;
+  }
+})();
+
 /* Code block generation conventions/rules:
  *  - both non-deterministic (possibly-backtracking) nodes and
       deterministic nodes "fall through" to the end of their code emission
