@@ -3137,6 +3137,8 @@ grammar P6 is STD {
             | <infix=infix_circumfix_meta_operator> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix=infix_prefix_meta_operator>    { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix>                               { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            | {} <?dotty> <.panic: "Method call found where infix expected">
+            | {} <?postfix> <.panic: "Postfix found where infix expected">
             ]
             [ <?before '='> <?{ $infix = $<infix>; }> <infix_postfix_meta_operator($infix)>
                    { $<O> = $<infix_postfix_meta_operator>[0]<O>; $<sym> = $<infix_postfix_meta_operator>[0]<sym>; }
@@ -3527,10 +3529,10 @@ grammar P6 is STD {
 
     ## additive
     token infix:sym<+>
-        { <sym> <O(|%additive)> }
+        { <sym> <!before '+'> <O(|%additive)> }
 
     token infix:sym<->
-        { <sym> <O(|%additive)> }
+        { <sym> <!before '-'> <O(|%additive)> }
 
     token infix:sym<+|>
         { <sym> <O(|%additive)> }
