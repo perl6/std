@@ -610,6 +610,71 @@ geitherrs.prototype.emit = function(c) {
   );
 };
 
+function geitherlrs(l,r) { // grammar "left and right nondeterministic alternation" parser builder
+  gts.call(this, this.l = l, this.r = r); // call the parent constructor
+  this.b = true;
+  this.init = new gtr(); // add a transition record for my initial entry point
+  this.bt = new gtr(); // add a transition record for my backtrack entry point
+  l.notd = new gtr(); // give left a "not done" transition
+  l.done = new gtr(); // give left a "done" transition
+  r.init = new gtr(); // give right a "init" transition
+  r.notd = new gtr(); // give right a "not done" transition
+  r.done = new gtr(); // give right a "done" transition
+}
+derives(geitherlrs, gts);
+geitherlrs.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d // initial entry point
+  );
+  this.l.emit(c);
+  c.r.push(
+    casel(this.l.done), // left succeeded with finality
+    a, // ascend
+    val("t.ld=true;t.ri=false"), // mark that r has not been inited
+    gotol(this.notd), // return "not done"
+    
+    casel(this.l.notd), // left succeeded, but is not done.
+    a, // ascend
+    val("t.ld=false"), // mark that r has not been inited
+    gotol(this.notd), // return "not done"
+    
+    casel(this.l.fail),
+    val("t.ri=true"), // mark that r has been inited
+    ros
+  );
+  this.r.emit(c);
+  c.r.push(
+    casel(this.r.done), // right succeeded with finality
+    a, // ascend from right
+    val("t.r=null"), // nullify the reference to help the GC
+    gotol(this.done), // return "done"
+    
+    casel(this.r.notd), // right succeeded, but is not done.
+    val("t.i.r=t;t=t.i"), // stash right in myself; ascend
+    gotol(this.notd), // return "not done"
+    
+    casel(this.bt), // backtrack entry point
+    ros,
+    cond(
+      val("(!t.ld)"),[[ // if left isn't done
+        val("t=t.l"),
+        gotol(this.l.bt)
+      ], // else if
+      val("(!t.ri)"),
+      [
+        gotol(this.l.fail)
+      ],[ // else
+        val("t=t.r"),
+        gotol(this.r.bt)
+      ]
+    ]),
+    
+    casel(this.r.fail), // right failed
+    a, // ascend
+    gotol(this.fail) // goto our fail
+  );
+};
+
 function either(l,r) {
   return l.b || r.b
     ? !r.b
@@ -661,7 +726,8 @@ var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = both(either(lit("h"),lit("ha")),end());
 //grammar = either(lit("hi"),lit("ho"));
 //grammar = both(both(lit("h"),either(lit("a"),lit("aa"))),lit("r"));
-grammar = both(either(lit("h"),either(lit("a"),lit("aa"))),either(lit("f"),lit("r")));
+//grammar = both(either(lit("h"),either(lit("a"),lit("aa"))),either(lit("f"),lit("aar")));
+grammar = either(either(lit("a"),either(lit("b"),lit("c"))),either(lit("f"),lit("haar")));
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
