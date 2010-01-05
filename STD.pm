@@ -1045,7 +1045,7 @@ token comment:sym<#`(...)> {
 }
 
 token comment:sym<#(...)> {
-    '#' <?opener> <.worry: "Embedded comment without backtick is deprecated">
+    '#' <?opener> <.worry: "Embedded comment without backtick is deprecated"> <!>
     <.quibble($¢.cursor_fresh( %*LANG<Q> ))>
 }
 
