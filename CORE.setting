@@ -195,7 +195,6 @@ my proto die { }
 my proto exit { }
 my proto warn { }
 my proto caller { }
-my proto want { }
 my proto eval { }
 my proto evalfile { }
 my proto callsame { }

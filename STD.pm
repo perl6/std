@@ -3098,7 +3098,7 @@ grammar P6 is STD {
         { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
 
     token circumfix:sym<[ ]>
-        { :dba('array composer') '[' ~ ']' <semilist> <O(|%term)> }
+        { :dba('array composer') '[' ~ ']' <semilist> <O(|%term)> { @*MEMOS[$¢.pos]<acomp> = 1; } }
 
     #############
     # Operators #
@@ -5615,7 +5615,12 @@ method panic (Str $s) {
         my @t = try { $here.termish };
         $*IN_PANIC--;
         if @t {
-            $m ~~ s|Confused|Two terms in a row| if @t;
+            if @*MEMOS[$here.pos - 1]<acomp> {
+                $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
+            }
+            else {
+                $m ~~ s|Confused|Two terms in a row|;
+            }
         }
     }
 
