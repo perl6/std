@@ -759,7 +759,7 @@ gplusb.prototype.emit = function(c) {
   var retry = new gtr(), check = new gtr(); // label for retry spot
   c.r.push(
     casel(this.init),d,
-    val("t.z8=[],t.tr={}"), // create a container for the child objects
+    val("t.z8=[];t.ret={}"), // create containers for the child objects
     casel(retry)
   );
   this.l.emit(c);
@@ -769,10 +769,15 @@ gplusb.prototype.emit = function(c) {
     //  gotol(this.done)
     //]]),
     val("t.i.z8.push(t);t.nd=false;t=t.i"),
+    cond(val("(t.ret[o])"),[[
+      gotol(this.l.fail)
+    ]]),
+    val("t.ret[o]=true"),
     gotol(retry), // try another one
     
     casel(this.l.notd), // left succeeded
-    val("t.i.z8.push(t);t.nd=true;t=t.i"),
+    val("t.i.z8.push(t);t.nd=true"),
+    a,
     gotol(retry), // try another one
     
     casel(this.l.fail), // left hit its base case
@@ -784,6 +789,7 @@ gplusb.prototype.emit = function(c) {
     cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
       gotol(this.done)
     ]]),
+    val("t.ret[o]=true"),
     gotol(this.notd),
     
     casel(this.bt),
@@ -800,6 +806,10 @@ gplusb.prototype.emit = function(c) {
     cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
       gotol(this.done)
     ]]),
+    cond(val("(t.ret[o])"),[[
+      gotol(this.bt)
+    ]]),
+    val("t.ret[o]=true"),
     gotol(this.notd)
   );
 };
@@ -856,7 +866,8 @@ var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = either(either(lit("a"),either(lit("b"),lit("c"))),either(lit("f"),lit("haar")));
 //grammar = plus(lit("a"));
 //grammar = both(plus(lit("a")),lit("aa"));
-grammar = both(both(plus(either(lit("aa"),lit("a"))),lit('aaa')),end());
+//grammar = both(both(plus(either(lit("aa"),lit("a"))),lit('aaa')),end());
+grammar = both(both(plus(either(lit("aa"),lit("a"))),lit(Array(5000).join('a'))),end());
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -882,7 +893,7 @@ var parserf = routine.emit();
 
 var parser = eval(parserf); // compile the javascript function to machine code
 
-var input = utf32str('aaaa');
+var input = utf32str(Array(5001).join('a'));
 
 parser(input);
 
