@@ -107,6 +107,7 @@ function make_quarnary_ctor() { return function(l,m,n,r){ this.l=l;this.m=m;this
 function Expr_val(v) { this.v = v }
 Expr_val.prototype.emit = function() { return this.v };
 function val(v) { return new Expr_val(v) }
+function dval(v) { return new Expr_val(dbg ? v : '') }
 
 var Expr_func = make_binary_ctor();
 Expr_func.prototype.emit = function() {
@@ -716,7 +717,7 @@ gplus.prototype.emit = function(c) {
   var retry = new gtr(), check = new gtr(); // label for retry spot
   c.r.push(
     casel(this.init),d,
-    val("var z8=[]"), // create a container for the match offsets
+    val("t.z=[]"), // create a container for the match offsets
     casel(retry)
   );
   this.l.emit(c);
@@ -724,19 +725,19 @@ gplus.prototype.emit = function(c) {
     cond(val("(t.s==o)"),[[ // child is a zero-length assertion
       gotol(this.done)
     ]]),
-    val("z8.push(o)"),
+    val("t.z.push(o)"),
     gotol(retry), // try another one
     
     casel(this.l.fail), // left hit its base case
-    cond(val("(z8.length==0)"),[[
+    cond(val("(t.z.length==0)"),[[
       a,
       gotol(this.fail)
     ]]),
     casel(check),
-    cond(val("(z8.length==1)"),[[
+    cond(val("(t.z.length==1)"),[[
+      val("o=t.z.pop()"),
       gotol(this.done)
     ]]),
-    val("t.z=z8"), // stash the saved offsets in self.
     gotol(this.notd),
     
     casel(this.bt),
@@ -760,42 +761,65 @@ gplusb.prototype.emit = function(c) {
   c.r.push(
     casel(this.init),d,
     val("t.z8=[];t.ret={}"), // create containers for the child objects
-    casel(retry)
+    casel(retry),
+    dval("print('retry '+o)")
   );
   this.l.emit(c);
   c.r.push(
     casel(this.l.done), // left succeeded
+    dval("print('l.done '+o)"),
     //cond(val("(t.s==o)"),[[ // child is a zero-length assertion
     //  gotol(this.done)
     //]]),
-    val("t.i.z8.push(t);t.nd=false;t=t.i"),
-    cond(val("(t.ret[o])"),[[
-      gotol(this.l.fail)
+    cond(val("(t.i.ret[o])"),[[
+      dval("print('4already tried '+o)"),
+      val("t.i.z8.push(t);t.nd=false;t=t.i"),
+      gotol(this.bt)
     ]]),
-    val("t.ret[o]=true"),
+    val("t.i.z8.push(t);t.nd=false;t=t.i"),
     gotol(retry), // try another one
     
     casel(this.l.notd), // left succeeded
+    dval("print('l.notd '+o)"),
+    cond(val("(t.i.ret[o])"),[[
+      dval("print('already tried '+o)"),
+      val("t.i.z8.push(t);t.nd=true;t=t.i"),
+      gotol(this.bt)
+    ]]),
     val("t.i.z8.push(t);t.nd=true"),
     a,
     gotol(retry), // try another one
     
     casel(this.l.fail), // left hit its base case
+    dval("print('l.fail '+o)"),
     cond(val("(t.z8.length==0)"),[[
       a,
       gotol(this.fail)
     ]]),
     casel(check),
     cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
+      dval("print('done '+o)"),
       gotol(this.done)
     ]]),
+    //cond(val("(t.ret[o])"),[[
+    //  dval("print('2already tried '+o)"),
+    //  gotol(this.bt)
+    //]]),
     val("t.ret[o]=true"),
+    dval("print('notd '+o)"),
     gotol(this.notd),
     
     casel(this.bt),
+    dval("print('bt '+o)"),
     val("u=t.z8.pop()"),
     cond(val("(u.nd)"),[[
       val("o=(t=u).s"),
+      cond(val("(t.i.ret[o])"),[[
+        dval("print('3already tried '+o)"),
+        val("t=t.i"),
+        gotol(this.bt)
+      ]]),
+      dval("print('l.bt '+o)"),
       gotol(this.l.bt)
     ]]),
     cond(val("(t.z8.length==0)"),[[
@@ -804,12 +828,16 @@ gplusb.prototype.emit = function(c) {
     ]]),
     val("o=u.s"),
     cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
+      dval("print('done '+o)"),
       gotol(this.done)
     ]]),
     cond(val("(t.ret[o])"),[[
+      dval("print('3already tried '+o)"),
+      //val("t.z8.push(u)"),
       gotol(this.bt)
     ]]),
     val("t.ret[o]=true"),
+      dval("print('notd '+o)"),
     gotol(this.notd)
   );
 };
@@ -826,7 +854,8 @@ function utf32str_charAt(offset) {
 }
 
 function utf32str_substr(offset, length) {
-  //print('checking offset at '+offset);
+  if (dbg)
+    print('checking offset at '+offset);
   return offset <= 0
     ? offset + length >= this.l
       ? this.str.substring(0)
@@ -853,9 +882,10 @@ function utf32str(str) {
   return arr; // array of ints representing the string's unicode codepoints
 }
 
+var dbg = 0;
 
-//var routine = func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:print(gl+' at '+o+' '+(typeof t=='undefined'));switch(gl){case 0:")]); // empty parser routine
-var routine = func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:/*print(gl);*/switch(gl){case 0:")]); // empty parser routine
+var iter = 300;
+var routine = func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
 var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
@@ -867,7 +897,8 @@ var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = plus(lit("a"));
 //grammar = both(plus(lit("a")),lit("aa"));
 //grammar = both(both(plus(either(lit("aa"),lit("a"))),lit('aaa')),end());
-grammar = both(both(plus(either(lit("aa"),lit("a"))),lit(Array(5000).join('a'))),end());
+grammar = both(both(plus(either(lit("aa"),lit("a"))),lit(Array(iter).join('a'))),end());
+//grammar = both(both(plus(plus(lit("a"))),lit(Array(iter).join('a'))),end());
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -889,11 +920,13 @@ print("\uD80C\uDF16");
 
 var parserf = routine.emit();
 
-//print(parserf);
+if (dbg)
+  print(parserf);
 
 var parser = eval(parserf); // compile the javascript function to machine code
 
-var input = utf32str(Array(5001).join('a'));
+var input = utf32str(Array(iter+1).join('a'));
+//var input = utf32str('aaaa');
 
 parser(input);
 
