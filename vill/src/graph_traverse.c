@@ -61,6 +61,8 @@ graph_traverse( struct graph_traverse_struct * spider ) {
         /* node in the mapping's (key => value) pair list. */
         if ( top -> node -> content.mapping.head == NULL ) {
           /* the mapping is empty, ascend via the stack */
+          fprintf( stderr, "TODO 1\n" );
+          abort();
           spider -> spidey = NULL;
         }
         else {
@@ -82,6 +84,8 @@ graph_traverse( struct graph_traverse_struct * spider ) {
         /* the first sequence entry, unless the sequence is empty */
         if ( top -> node -> content.sequence.head == NULL ) {
           /* the sequence is empty, ascend via the stack */
+          fprintf( stderr, "TODO 2\n" );
+          abort();
           spider -> spidey = NULL;
         }
         else { /* top -> node -> content.sequence.head != NULL */
@@ -121,12 +125,7 @@ graph_traverse( struct graph_traverse_struct * spider ) {
             /* mapping containing more entries.  If ascending reaches */
             /* the root of the graph, the traversal is complete */
             struct node_stack_entry * removed_entry;
-            do {
-              removed_entry = top;
-              assert( spider -> tail -> prev );
-              free( removed_entry );
-              spider -> tail = spider -> tail -> prev;
-            } while (
+            while (
               /* This is the hairiest leg of the spider, */
               /* so be careful when touching the parentheses! */
               spider -> tail -> prev != NULL &&
@@ -138,22 +137,42 @@ graph_traverse( struct graph_traverse_struct * spider ) {
                 YAML_SEQUENCE &&
                 spider -> tail -> seq_entry -> next == NULL
               )
-            );
-            if ( spider -> tail != spider -> head ) {
+            ) {
+              removed_entry = top;
+              assert( spider -> tail -> prev );
+              spider -> tail = spider -> tail -> prev;
+              free( removed_entry );
+            }
+            if ( spider -> tail != NULL ) {
               /* the spider's tail points to a node that contains */
               /* another mapping entry or another sequence entry */
-#if 0
               if ( (spider -> tail -> node -> flags & YAML_KIND)
                   == YAML_MAPPING ) {
                 assert( spider -> tail -> map_entry -> next );
+                spider -> tail -> map_entry = spider -> tail -> map_entry -> next;
+                spider -> tail -> node = spider -> tail -> map_entry -> node;
+                spider -> spidey -> key = spider -> tail -> map_entry -> key;
               }
-#endif
+              else {
+                if( (spider -> tail -> node -> flags & YAML_KIND)
+                    == YAML_SEQUENCE ) {
+                  assert( spider -> tail -> seq_entry -> next );
+                  spider -> tail -> seq_entry = spider -> tail -> seq_entry -> next;
+                  spider -> tail -> node = spider -> tail -> seq_entry -> node;
+                }
+                else {
+                  assert( (spider -> tail -> node -> flags & YAML_KIND)
+                    == YAML_SCALAR );
+                  fprintf( stderr, "TODO 3\n" );
+                  abort();
+                }
+              }
               top = spider -> tail;
               spider -> spidey -> node       = top -> node;
               spider -> spidey -> parentnode = top -> prev -> node;
-              spider -> spidey = NULL; /* TODO: backtracking */
+//            spider -> spidey = NULL; /* TODO: backtracking */
             }
-            else { /* spider -> tail != spider -> head */
+            else { /* spider -> tail == NULL */
               /* the traversal has finished */
               spider -> spidey = NULL;
             }

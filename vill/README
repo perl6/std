@@ -273,12 +273,12 @@ for regular procedural code.
 The 'vill' project is still a conventional stack based implementation
 (therefore not CPS) for the following reasons.  For a novice LLVM user,
 there are no CPS based examples, only Static Single Assignment (SSA)
-ones instead (using 'Value *' in the code).  Observation of Rakudo
-(which is Parrot CPS based) raises concerns about speed and memory
-leaks.  CPS uses heap memory instead of stack, and heap management
-(garbage collection etc) is a big overhead.  The speed of Parrot and
-Rakudo are far short of Perl 5, which is not CPS based.  However Perl 5
-is not good at concurrency.
+ones instead (using 'Function *' and 'Value *' in the code).
+Observation of Rakudo (which is Parrot CPS based) raises concerns about
+speed and memory leaks.  CPS uses heap memory instead of stack, and heap
+management (garbage collection etc) is a big overhead.  The speed of
+Parrot and Rakudo are far short of Perl 5, which is not CPS based.  On
+the other hand Perl 5 is not good at concurrency.
 
 CPS is a calling convention.  The plan is to default to stack based, and
 add optional CPS in *Codegen() functions under the control of a 'vill'
@@ -340,19 +340,20 @@ that prints "vill compiled A\nvill compiled Z\n" when run.  During early
 testing the output file (test/hello) measured 8437 bytes on x86 or 9014
 bytes on amd64 (Linux).  It runs completely standalone.
 
-Currently everything is EXPERIMENTAL.  In src/ these work: compile.cpp
-make_puts.cpp run.cpp and save.cpp.  In test/ these work:
-yaml_token_roundtrip and test/yaml_parse_roundtrip.  There may be some
-breakage due to fiddling with yaml_compose().
+Currently everything is EXPERIMENTAL.
+There may be some breakage due to fiddling in src/yaml_compose.c .
+In src/ these work: compile.cpp make_puts.cpp run.cpp and save.cpp.
+In test/ these work: yaml_token_roundtrip and test/yaml_parse_roundtrip.
 
 Item 1. is blocking the rest of the roadmap, test/yaml_compose_roundtrip
-runs but fails to traverse the entire tree. The integrity of the
-composed AST looks good though.
+runs but fails to traverse the entire tree, because src/graph_traverse
+is incomplete.  The integrity of the composed AST looks good though, try
+./vill -Ds -e'say "syntax tree";'
 
 11. LICENSE
 
-Published by the authors named in the CREDITS files under the same
-terms as Perl 5.x (Artistic License 2.0).
+Published by the authors named in the CREDITS files under the same terms
+as Perl 5.x (Artistic License 2.0).
 
 APPENDIX A: Required software
 
@@ -421,6 +422,7 @@ such platforms build LLVM from source:
 
 APPENDIX B: References
 
+http://en.wikipedia.org/wiki/Static_single_assignment_form
 http://llvm.org/docs
 http://llvm.org/docs/tutorial
 http://gnuu.org/2009/09/18/writing-your-own-toy-compiler

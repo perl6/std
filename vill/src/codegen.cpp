@@ -34,10 +34,10 @@ villCompiler::codegen() {
   // start at the top of the Abstract Syntax Tree.
   //  Call the Perl 6 "action" handlers for the language
   // elements (comp_unit, statementlist etc) as they are encountered.
-  assert( AST != NULL );
-  assert( AST -> data != NULL );
+  assert( AST != NULL );         // TODO: remove after testing has
+  assert( AST -> data != NULL ); // TODO: verified that these are OK
   function_pointer Codegen = (function_pointer) AST -> data;
-  Value * result = Codegen( this, AST );
+  Value * result = Codegen( this, AST ); // Compile the entire comp_unit
   make_puts( BB, "vill compiled Z" );
 
   // Create the return instruction and add it to the basic block

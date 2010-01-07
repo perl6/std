@@ -39,6 +39,7 @@ yaml_compose_mapping( struct graph_node * parent_node,
     assert( parent_node -> content.mapping.tail == NULL );
     /* in an empty list the entry also becomes the head */
     parent_node -> content.mapping.head = new_mapping_entry;
+    /* the tail gets assigned immediately after the else block */
   }
   else {
     /* in a non empty list the existing tail must point to */
