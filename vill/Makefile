@@ -357,9 +357,9 @@ src/yaml_token.o: src/yaml_token.c src/yaml_token.h Makefile
 # Miscellaneous non object file targets
 
 clean:
-	@find . -name '*~'          -exec rm {} ';'  # editor backup files
-	@find . -name '*.o'         -exec rm {} ';'  # compiled object files
-	@find . -executable -type f -exec rm {} ';'  # er, executables?
+	@find . -name '*~'       -exec rm {} ';'  # editor backup files
+	@find . -name '*.o'      -exec rm {} ';'  # compiled object files
+	@find . -perm +x -type f -exec rm {} ';'  # executables
 
 # Cause the make to fail if the LLVM version is not 2.6
 # This (or rather the rm in the vill target) has the unfortunate side

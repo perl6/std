@@ -15,7 +15,8 @@ int local_debug_flag;      // control printing of tree walk
 
 // receive a tag string and return a pointer to the Codegen()
 // function of matching name.  If no name matches, return NULL.
-// TODO: design something better to return if no name matches.
+// TODO 1: design something better to return if no name matches.
+// TODO 2: do a more efficient lookup, eg binary search in a sorted list
 function_pointer
 local_Codegen( char * type_tag ) {
   // Codegen is a pointer to a function that receives a compiler object
