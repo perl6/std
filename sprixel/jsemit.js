@@ -323,6 +323,21 @@ var beg = (function() {
   }
 })();
 
+function gempty() { // grammar "empty" (epsilon) parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+}
+derives(gempty, gts);
+gempty.prototype.emit = function(c) {
+  // no-op; fall through to succeed with finality
+};
+var empty = (function() {
+  var emptyer = new gempty();
+  return function() {
+    return emptyer;
+  }
+})();
+
 /* Code block generation conventions/rules:
  *  - both non-deterministic (possibly-backtracking) nodes and
       deterministic nodes "fall through" to the end of their code emission
@@ -874,14 +889,17 @@ function plus(l) {
     : new gplus(l); // deterministic version of plus
 }
 
+function star(l) {
+  return either(plus(l),empty());
+}
 
 function utf32str_charAt(offset) {
   return String.fromCharCode(this[offset]);
 }
 
 function utf32str_substr(offset, length) {
-  if (dbg)
-    print('checking offset at '+offset);
+  //if (dbg)
+  //  print('checking offset at '+offset);
   return offset <= 0
     ? offset + length >= this.l
       ? this.str.substring(0)
@@ -915,19 +933,7 @@ var routine = dbg
   ? func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){print('op: '+gl);next:switch(gl){case 0:")])
   : func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
-var grammar;// = both(lit("hi"),end()); // a grammar expression definition
-//grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
-//grammar = both(either(lit("h"),lit("ha")),end());
-//grammar = either(lit("hi"),lit("ho"));
-//grammar = both(both(lit("h"),either(lit("a"),lit("aa"))),lit("r"));
-//grammar = both(either(lit("h"),either(lit("a"),lit("aa"))),either(lit("f"),lit("aar")));
-//grammar = either(either(lit("a"),either(lit("b"),lit("c"))),either(lit("f"),lit("haar")));
-//grammar = plus(lit("a"));
-//grammar = both(plus(lit("a")),lit("aa"));
-//grammar = both(both(plus(either(lit("aa"),lit("a"))),lit('aaa')),end());
-//grammar = both(both(plus(either(lit("aa"),lit("a"))),lit(Array(iter).join('a'))),end());
-grammar = both(plus(either(plus(lit("a")),plus(lit("a")))),lit(Array(iter).join('a')));
-//grammar = both(both(plus(plus(plus(plus(lit("a"))))),lit(Array(iter).join('a'))),end());
+var grammar = both(star(either(plus(lit("a")),plus(lit("a")))),lit(Array(iter).join('a')));
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -935,17 +941,6 @@ grammar.done = grammar.notd = {id:-1};
 grammar.emit(routine); // have the grammar emit its specialize parser code to this routine
 
 routine.r.push(val("case -1:/*print('parse succeeded');*/break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
-/*
-var input = utf32str("\uD80C\uDF14z\uD80C\uDF16");
-print(input.str);
-print(input.substr(0,1));
-print(input.substr(1,1));
-print(input.substr(2,1));
-print("\uD80C\uDF14z\uD80C\uDF16");
-print("\uD80C\uDF14");
-print("z");
-print("\uD80C\uDF16");
-*/
 
 var parserf = routine.emit();
 
