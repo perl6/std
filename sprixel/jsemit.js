@@ -95,6 +95,14 @@ var derives = (function() {
   };
 })();
 
+var derive = (function() {
+  function F() {} // derive an object whose prototype chain inherits from another
+  return function(obj, parent) {
+    F.prototype = parent;
+    return new F();
+  };
+})();
+
 
 var top = this;
 
@@ -242,6 +250,12 @@ gts.prototype.cur = function() { // whether it contains an unresolved named refe
     || (typeof this.r != 'undefined' && this.r.cur());
 }
 gts.prototype.u = false;
+gts.prototype.computeRefs = function(pats, name, refs) {
+  if (typeof this.l != 'undefined')
+    this.l.computeRefs(pats, name, refs);
+  if (typeof this.r != 'undefined')
+    this.r.computeRefs(pats, name, refs);
+}
 
 var gl = val("gl"); // the next target goto label variable expression
 var i = val("i"); // the input variable expression
@@ -336,6 +350,7 @@ var end = (function() {
 function gpref(name) { // grammar "named pattern reference" parser builder
   gts.call(this); // call the parent constructor
   this.u = true; // mark as unresolved
+  this.name = name;
 }
 derives(gpref, gts);
 gpref.prototype.emit = function(c) {
@@ -343,6 +358,12 @@ gpref.prototype.emit = function(c) {
     gotol(this.fail)
   ]]));
 };
+gpref.prototype.computeRefs = function(pats, name, refs) {
+  var hasIt = refs.hasOwnProperty(name);
+  refs[name] = true;
+  if (!hasIt && name != this.name) // prevent cyclical recursion
+    pats[name].computeRefs(pats, name, refs);
+}
 function pref(name) {
   return new gpref(name);
 }
@@ -964,6 +985,40 @@ function utf32str(str) {
   arr.charAt = utf32str_charAt;
   arr.substr = utf32str_substr;
   return arr; // array of ints representing the string's unicode codepoints
+}
+
+function Grammar(name, parent) {
+  this.pats = parent
+    ? derive(parent.pats)
+    : {}; // namespace for patterns
+  this.isRoot = !parent; // boolify its definedness
+  this.parent = parent;
+  this.name = name;
+}
+Grammar.prototype.addPattern = function(name, pattern) {
+  if (this.pats.hasOwnProperty(name))
+    throw 'Pattern '+name+' already defined in grammar '+this.name;
+  return this.pats[name] = pattern;
+}
+Grammar.prototype.compile = function(interpreterState) {
+  // recursively compute full set of named references for each 
+  //   pattern, preventing descent into a cyclical reference.
+  for (var name in this.pats) {
+    var pat = this.pats[name];
+    var refs = {};
+    var isRecursive = false;
+    pat.computeRefs(name, refs);
+    for (var refName in refs) {
+      if (refName == name)
+        isRecursive = true;
+      if (typeof this.pats[refName] == 'undefined')
+        throw 'Pattern '+name+' in grammar '+this.name+' contains unresolved reference to '+refName;
+    }
+    pat.namedRefs = refs;
+    pat.isRecursive = isRecursive;
+    // if a pattern is not recursive, it can be inlined (but cloned
+    //   so the labels/gotos are still unique) into its referer.
+  }
 }
 
 var dbg = 0;
