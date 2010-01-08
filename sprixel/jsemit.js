@@ -373,30 +373,24 @@ gbothls.prototype.emit = function(c) {
     casel(this.l.done), // left succeeded with finality
     a, // ascend; we don't need a reference to left; it's done
     val("t.ld=true"),
-    gotol(rightinit),
-    casel(this.l.notd),
-    val("t.i.l=t;t=t.i;t.ld=false"),
+    
     casel(rightinit)
   );
   this.r.emit(c);
   c.r.push(
     // right succeeded; we're either done or not.
-    cond(val("(t.ld)"),[[
-      gotol(this.done)
-    ],[
-      gotol(this.notd)
-    ]]),
+    val("gl=t.ld?"+this.done.id+":"+this.notd.id+";break"),
 
+    casel(this.l.notd),
+    val("t.i.l=t;t=t.i;t.ld=false"),
+    gotol(rightinit),
+    
     casel(this.r.fail),
     cond(val("(t.ld)"),[[
-      //ros,
       a,
       gotol(this.fail)
-    ],[
-      ros,
-      val("t=t.l"),
-      gotol(this.l.bt)
     ]]),
+    ros,
     
     casel(this.bt),
     val("t=t.l"),
@@ -409,7 +403,6 @@ function gbothrs(l, r) { // grammar "both right nondeterministic" parser builder
   this.b = true;
   this.init = new gtr();
   this.bt = new gtr();
-  r.init = new gtr(); // give right a "init" transition
   r.notd = new gtr(); // give right a "not done" transition
   r.done = new gtr(); // give right a "done" transition
 }
@@ -451,7 +444,6 @@ function gbothlrs(l, r) { // grammar "both left and right nondeterministic" pars
   this.bt = new gtr();
   l.notd = new gtr(); // give left a "not done" transition
   l.done = new gtr(); // give left a "done" transition
-  r.init = new gtr(); // give right a "init" transition
   r.notd = new gtr(); // give right a "not done" transition
   r.done = new gtr(); // give right a "done" transition
 }
@@ -525,7 +517,6 @@ geither.prototype.emit = function(c) {
   c.r.push(
     casel(this.init),d
   );
-  this.l.fail = this.bt; // make left fail directly to our backtrack label
   this.l.emit(c);
   c.r.push( // left succeeded
     gotol(this.notd), // return "not done"
@@ -534,10 +525,14 @@ geither.prototype.emit = function(c) {
     a,
     gotol(this.fail), // goto our fail
     
-    casel(this.bt), // left failed
-    ros // reset to start (TODO: I suspect extraneous)
+    casel(this.l.fail),
+    ros,
+    casel(this.bt)
   );
   this.r.emit(c);
+  //c.r.push(
+  //  gotol(this.done)
+  //);
 };
 
 function geitherls(l,r) { // grammar "left nondeterministic alternation" parser builder
@@ -590,7 +585,6 @@ function geitherrs(l,r) { // grammar "right nondeterministic alternation" parser
   r.done = new gtr(); // give right a "done" transition
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
-  r.init = new gtr(); // add a transition record for right initial
 }
 derives(geitherrs, gts);
 geitherrs.prototype.emit = function(c) {
@@ -638,7 +632,6 @@ function geitherlrs(l,r) { // grammar "left and right nondeterministic alternati
   this.bt = new gtr(); // add a transition record for my backtrack entry point
   l.notd = new gtr(); // give left a "not done" transition
   l.done = new gtr(); // give left a "done" transition
-  r.init = new gtr(); // give right a "init" transition
   r.notd = new gtr(); // give right a "not done" transition
   r.done = new gtr(); // give right a "done" transition
 }
@@ -655,12 +648,13 @@ geitherlrs.prototype.emit = function(c) {
     gotol(this.notd), // return "not done"
     
     casel(this.l.notd), // left succeeded, but is not done.
+    val("t.i.l=t"),
     a, // ascend
     val("t.ld=false"), // mark that r has not been inited
     gotol(this.notd), // return "not done"
     
     casel(this.l.fail),
-    val("t.ri=true"), // mark that r has been inited
+    val("t.ld=t.ri=true"), // mark that r has been inited
     ros
   );
   this.r.emit(c);
@@ -675,7 +669,6 @@ geitherlrs.prototype.emit = function(c) {
     gotol(this.notd), // return "not done"
     
     casel(this.bt), // backtrack entry point
-    ros,
     cond(
       val("(!t.ld)"),[[ // if left isn't done
         val("t=t.l"),
@@ -715,34 +708,65 @@ function gplus(l) { // grammar "deterministic" edition of plus
 derives(gplus, gts);
 gplus.prototype.emit = function(c) {
   var retry = new gtr(), check = new gtr(); // label for retry spot
+  var lname = "l"+this.init.id;
   c.r.push(
-    casel(this.init),d,
+    val("var "+lname),
+    casel(this.init),
+    cond(val("(("+lname+"||("+lname+"={}))[o])"),[[
+      //dval("print('gplus already failed at '+o)"),
+      gotol(this.fail)
+    ]]),
+    val(lname+"[o]=true"),
+    d,
+    //dval("print('gplus init '+o)"),
     val("t.z=[]"), // create a container for the match offsets
     casel(retry)
   );
   this.l.emit(c);
   c.r.push( // left succeeded
     cond(val("(t.s==o)"),[[ // child is a zero-length assertion
+      //dval("print('gplus done '+o)"),
+      //dval("print('marking gplus DONE at '+t.s)"),
+      val(lname+"[o]=true"),
       gotol(this.done)
     ]]),
     val("t.z.push(o)"),
+    //dval("print('gplus retry '+o)"),
     gotol(retry), // try another one
     
     casel(this.l.fail), // left hit its base case
+    //dval("print('gplus l.fail '+o)"),
     cond(val("(t.z.length==0)"),[[
+      val(lname+"[o]=true"),
+      //dval("print('marking gplus failed at '+t.s)"),
       a,
+      //dval("print('gplus fail '+o)"),
       gotol(this.fail)
     ]]),
     casel(check),
     cond(val("(t.z.length==1)"),[[
       val("o=t.z.pop()"),
+      //dval("print('marking gplus DONE at '+t.s)"),
+      val(lname+"[o]=true"),
+      //dval("print('gplus done '+o)"),
       gotol(this.done)
     ]]),
+    val(lname+"[o]=true"),
+    //dval("print('marking gplus done at '+t.s)"),
+    //dval("print('gplus notd '+o)"),
     gotol(this.notd),
     
     casel(this.bt),
+    //dval("print('gplus bt '+o)"),
     val("o=t.z.pop()"),
-    gotol(check)
+    cond(val("(t.z.length>0)"),[[
+      gotol(check)
+    ]]),
+    //dval("print('marking gplus failed at '+t.s)"),
+    //val(lname+"[t.s]=true"),
+    a,
+    //dval("print('gplus fail '+o)"),
+    gotol(this.fail)
   );
 };
 
@@ -757,48 +781,49 @@ function gplusb(l) { // grammar "deterministic" edition of plus
 }
 derives(gplusb, gts);
 gplusb.prototype.emit = function(c) {
-  var retry = new gtr(), check = new gtr(); // label for retry spot
+  var retry = new gtr(); // label for retry spot
   c.r.push(
     casel(this.init),d,
     val("t.z8=[];t.ret={}"), // create containers for the child objects
-    casel(retry),
-    dval("print('retry '+o)")
+    casel(retry)//,
+    //dval("print('gplusb retry '+o)")
   );
   this.l.emit(c);
   c.r.push(
     casel(this.l.done), // left succeeded
-    dval("print('l.done '+o)"),
+    //dval("print('gplusb l.done '+o)"),
+    val("t.i.z8.push(t);t.nd=false"),
     //cond(val("(t.s==o)"),[[ // child is a zero-length assertion
     //  gotol(this.done)
     //]]),
     cond(val("(t.i.ret[o])"),[[
-      dval("print('4already tried '+o)"),
-      val("t.i.z8.push(t);t.nd=false;t=t.i"),
+      //dval("print('gplusb 4already tried '+o)"),
+      a,
       gotol(this.bt)
     ]]),
-    val("t.i.z8.push(t);t.nd=false;t=t.i"),
+    a,
     gotol(retry), // try another one
     
     casel(this.l.notd), // left succeeded
-    dval("print('l.notd '+o)"),
+    //dval("print('gplusb l.notd '+o)"),
+    val("t.i.z8.push(t);t.nd=true"),
     cond(val("(t.i.ret[o])"),[[
-      dval("print('already tried '+o)"),
-      val("t.i.z8.push(t);t.nd=true;t=t.i"),
+      dval("print('gplusb already tried '+o)"),
+      a,
       gotol(this.bt)
     ]]),
-    val("t.i.z8.push(t);t.nd=true"),
     a,
     gotol(retry), // try another one
     
     casel(this.l.fail), // left hit its base case
-    dval("print('l.fail '+o)"),
+    //dval("print('gplusb l.fail '+o)"),
     cond(val("(t.z8.length==0)"),[[
       a,
       gotol(this.fail)
     ]]),
-    casel(check),
+    
     cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
-      dval("print('done '+o)"),
+      //dval("print('gplusb done '+o)"),
       gotol(this.done)
     ]]),
     //cond(val("(t.ret[o])"),[[
@@ -806,20 +831,21 @@ gplusb.prototype.emit = function(c) {
     //  gotol(this.bt)
     //]]),
     val("t.ret[o]=true"),
-    dval("print('notd '+o)"),
+    //dval("print('gplusb notd '+o)"),
     gotol(this.notd),
     
     casel(this.bt),
-    dval("print('bt '+o)"),
+    //dval("print('gplusb bt '+o)"),
     val("u=t.z8.pop()"),
+    //val("print('popped: '+(typeof u))"),
     cond(val("(u.nd)"),[[
-      val("o=(t=u).s"),
-      cond(val("(t.i.ret[o])"),[[
-        dval("print('3already tried '+o)"),
-        val("t=t.i"),
+      val("o=u.s"),
+      cond(val("(t.ret[o])"),[[
+        //dval("print('gplusb 3already tried '+o)"),
         gotol(this.bt)
       ]]),
-      dval("print('l.bt '+o)"),
+      val("t=u"),
+      //dval("print('gplusb l.bt '+o)"),
       gotol(this.l.bt)
     ]]),
     cond(val("(t.z8.length==0)"),[[
@@ -828,16 +854,16 @@ gplusb.prototype.emit = function(c) {
     ]]),
     val("o=u.s"),
     cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
-      dval("print('done '+o)"),
+      //dval("print('gplusb done '+o)"),
       gotol(this.done)
     ]]),
     cond(val("(t.ret[o])"),[[
-      dval("print('3already tried '+o)"),
+      //dval("print('gplusb 3already tried '+o)"),
       //val("t.z8.push(u)"),
       gotol(this.bt)
     ]]),
     val("t.ret[o]=true"),
-      dval("print('notd '+o)"),
+    //dval("print('gplusb notd '+o)"),
     gotol(this.notd)
   );
 };
@@ -883,9 +909,11 @@ function utf32str(str) {
 }
 
 var dbg = 0;
-
-var iter = 300;
-var routine = func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
+ 
+var iter = 400;
+var routine = dbg
+  ? func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){print('op: '+gl);next:switch(gl){case 0:")])
+  : func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
 var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = either(either(either(lit("hi"),lit("ha")),lit("hi")),lit("ho"));
@@ -897,8 +925,9 @@ var grammar;// = both(lit("hi"),end()); // a grammar expression definition
 //grammar = plus(lit("a"));
 //grammar = both(plus(lit("a")),lit("aa"));
 //grammar = both(both(plus(either(lit("aa"),lit("a"))),lit('aaa')),end());
-grammar = both(both(plus(either(lit("aa"),lit("a"))),lit(Array(iter).join('a'))),end());
-//grammar = both(both(plus(plus(lit("a"))),lit(Array(iter).join('a'))),end());
+//grammar = both(both(plus(either(lit("aa"),lit("a"))),lit(Array(iter).join('a'))),end());
+grammar = both(plus(either(plus(lit("a")),plus(lit("a")))),lit(Array(iter).join('a')));
+//grammar = both(both(plus(plus(plus(plus(lit("a"))))),lit(Array(iter).join('a'))),end());
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -924,6 +953,9 @@ if (dbg)
   print(parserf);
 
 var parser = eval(parserf); // compile the javascript function to machine code
+
+if (dbg)
+  print('compiled');
 
 var input = utf32str(Array(iter+1).join('a'));
 //var input = utf32str('aaaa');
