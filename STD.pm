@@ -948,7 +948,7 @@ token quotepair {
     ':'
     :dba('colon pair (restricted)')
     [
-    | '!' <identifier>
+    | '!' <identifier> [ '(' <.panic: "Argument not allowed on negated pair"> ]?
         { $key = $<identifier>.Str; $value = 0; }
     | <identifier>
         { $key = $<identifier>.Str; }
@@ -956,7 +956,7 @@ token quotepair {
         || <.unsp>? <?before '('> <circumfix> { $value = $<circumfix>; }
         || { $value = 1; }
         ]
-    | $<n>=(\d+) $<id>=(<[a..z]>+)
+    | $<n>=(\d+) $<id>=(<[a..z]>+) [ '(' <.panic: "2nd argument not allowed on pair"> ]?
         { $key = $<id>.Str; $value = $<n>.Str; }
     ]
     { $<k> = $key; $<v> = $value; }
@@ -2116,9 +2116,9 @@ grammar P6 is STD {
         ':'
         :dba('colon pair')
         [
-        | '!' <identifier>
+        | '!' <identifier> [ <[ \[ \( \< \{ ]> <.panic: "Argument not allowed on negated pair"> ]?
             { $key = $<identifier>.Str; $value = 0; }
-        | $<num> = [\d+] <identifier>
+        | $<num> = [\d+] <identifier> [ <[ \[ \( \< \{ ]> <.panic: "2nd argument not allowed on pair"> ]?
         | <identifier>
             { $key = $<identifier>.Str; }
             [
