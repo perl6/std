@@ -277,6 +277,9 @@ glit.prototype.emit = function(c) {
   ],[
     add_assign(o,val(this.v.l))
   ]]));
+  // TODO: below, but only on strings shorter than 100. Deconstruct
+  //   strings 100 chars or longer, esp if they are the result of a
+  //   "x" operation.
   // TODO: inline each char check instead of calling substr
 /*  c.r.push(cond(ne(val(0),bxor(val("i[o]"),val(this.v[0]))),[[
     assign(gl,val(this.fail.id)),
@@ -288,6 +291,24 @@ glit.prototype.emit = function(c) {
       b
     ]]));
   }*/
+};
+
+function range(lo,hi) { return new grange(lo,hi) }
+function grange(lo,hi) { // grammar range parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+  this.lo = utf32str(lo);
+  this.hi = utf32str(hi);
+}
+derives(grange, gts);
+grange.prototype.emit = function(c) {
+  c.r.push(
+    cond(lor(ge(o,val("i.l")),lor(gt(val(this.lo[0]),val("i[o]")),lt(val(this.hi[0]),val("i[o]")))),[[
+      gotol(this.fail)
+    ],[
+      val("o+=1")
+    ]])
+  );
 };
 
 function gend() { // grammar "end anchor" parser builder
@@ -930,10 +951,10 @@ var dbg = 0;
  
 var iter = 400;
 var routine = dbg
-  ? func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){print('op: '+gl);next:switch(gl){case 0:")])
+  ? func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case 0:")])
   : func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
-var grammar = both(star(either(plus(lit("a")),plus(lit("a")))),lit(Array(iter).join('a')));
+var grammar = both(plus(range("f","i")),end());
 
 grammar.fail = {id:1};
 grammar.done = grammar.notd = {id:-1};
@@ -952,8 +973,7 @@ var parser = eval(parserf); // compile the javascript function to machine code
 if (dbg)
   print('compiled');
 
-var input = utf32str(Array(iter+1).join('a'));
-//var input = utf32str('aaaa');
+var input = utf32str("ffghihfhghihfighihfgihihfg");
 
 parser(input);
 
