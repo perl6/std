@@ -237,6 +237,11 @@ var gtr = (function() {
 function gts() { // base grammar transition set
   this.fail = new gtr(); // each transition set has a fail label destination
 }
+gts.prototype.cur = function() { // whether it contains an unresolved named reference
+  return this.u || (typeof this.l != 'undefined' && this.l.cur())
+    || (typeof this.r != 'undefined' && this.r.cur());
+}
+gts.prototype.u = false;
 
 var gl = val("gl"); // the next target goto label variable expression
 var i = val("i"); // the input variable expression
@@ -327,6 +332,20 @@ var end = (function() {
     return ender;
   }
 })();
+
+function gpref(name) { // grammar "named pattern reference" parser builder
+  gts.call(this); // call the parent constructor
+  this.u = true; // mark as unresolved
+}
+derives(gpref, gts);
+gpref.prototype.emit = function(c) {
+  c.r.push(cond(ne(o,val("i.l")),[[
+    gotol(this.fail)
+  ]]));
+};
+function pref(name) {
+  return new gpref(name);
+}
 
 function gbeg() { // grammar "beginning anchor" parser builder
   gts.call(this); // call the parent constructor
@@ -954,12 +973,12 @@ var routine = dbg
   ? func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case 0:")])
   : func(["i"],[val("var gl=0,o=0,t={},c;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
-var grammar = both(plus(range("f","i")),end());
+var g = both(plus(range("f","i")),end());
 
-grammar.fail = {id:1};
-grammar.done = grammar.notd = {id:-1};
+g.fail = {id:1};
+g.done = g.notd = {id:-1};
 
-grammar.emit(routine); // have the grammar emit its specialize parser code to this routine
+g.emit(routine); // have the grammar emit its specialize parser code to this routine
 
 routine.r.push(val("case -1:/*print('parse succeeded');*/break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
 
