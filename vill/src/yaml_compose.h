@@ -78,6 +78,7 @@ struct graph_node * yaml_compose(FILE *);
 void                yaml_decompose(struct graph_node *);
 struct graph_node * ast_mapentry(struct graph_node *, const char *);
 struct graph_node * ast_seqentry(struct graph_node *, int);
+int                 ast_type_tag_equals(struct graph_node *, const char *);
 
 /* Bit masks for the graph_node -> flags field */
 #define YAML_MAPPING     0x1

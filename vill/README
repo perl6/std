@@ -135,9 +135,9 @@ In nested fashion each *Codegen() function called from a parent node in
 the AST generates IR of its own and calls *Codegen() functions for the
 AST nodes of its children.  Eventually the *Codegen() functions of the
 AST leaf nodes (for example Str) generate IR but have no children
-to recurse further.  Each *Codegen() function returns an LLVM Value *
-pointer to the block of code it has generated, which the calling
-*Codegen()  function links appropriately to the code that it is
+to recurse further.  Each *Codegen() function returns an LLVM Function *
+or Value * pointer to the block of code it has generated, which the
+calling *Codegen() function links appropriately to the code that it is
 generating for the parent node.
 
 The optimize() method does not work yet but is intended to call numerous
@@ -306,6 +306,27 @@ not to greedily consume all the fruit they can, on the contrary to put
 even more fruit onto the (source) tree to entice others to get involved.
 Perhaps one piece of LHF per person per week/month is a fair ration.
 
+Here are some guidelines for a typical contribution, adding a fictitious
+missing 'crazy' operator:
+
+1. You get a '!perl/hash:VAST::infix__S_crazy is not yet implemented in
+   vill' message when trying some new Perl 6 program that uses crazy.
+2. Copy the source file most similar in functionality (in your opinion)
+   to src/infix__S_crazy.cpp.
+3. Edit src/infix__S_crazy.cpp, changing the text to infix__S_crazy
+   wherever appropriate.
+4. The hard/easy part: make the functionality Do The Right Thing.  Save.
+5. Add infix__S_crazy to 'Codegen functions' in src/villCompiler.h.
+6. Add infix__S_crazy to local_Codegen in src/link_codegen.cpp.
+7. Edit vill/Makefile, adding src/infix__S_crazy.o in the right position
+   in the 'objects' list.  Also add an entry for src/infix__S_crazy.o to
+   the 'Object targets' list, copying and changing an existing entry if
+   you prefer.  Save.
+8. Run 'make' and test your code.  Thoroughly.  Edit, save, repeat.
+   Discuss in #perl6.  Commit into svn.pugscode.org if successful.
+
+The procedure for adding a new built in function is similar.
+
 9. ROADMAP (PARTIAL)
 
 1. Fix src/yaml_compose.c so that all reasonable Perl 6 inputs to
@@ -349,6 +370,11 @@ Item 1. is blocking the rest of the roadmap, test/yaml_compose_roundtrip
 runs but fails to traverse the entire tree, because src/graph_traverse
 is incomplete.  The integrity of the composed AST looks good though, try
 ./vill -Ds -e'say "syntax tree";'
+
+Despite this blockage, test runs of ./vill -DU -e'say "test codegen"'
+and similar show the entire AST being traversed.  The -DU option allows
+ad hoc checking of link_codegen() and codegen() operation, which is not
+complete but correct so far.
 
 11. LICENSE
 

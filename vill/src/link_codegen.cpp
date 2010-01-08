@@ -22,20 +22,29 @@ local_Codegen( char * type_tag ) {
   // and an AST node object as paramaters and returns a pointer to a
   // Value object.
   function_pointer Codegen;
-  if ( strcmp( type_tag,"!perl/hash:VAST::arglist" ) == 0 ) {
+  if ( strcmp( type_tag, "!perl/hash:VAST::arglist" ) == 0 ) {
     Codegen = &arglist;
   }
-  else if ( strcmp( type_tag,"!perl/hash:VAST::args" ) == 0 ) {
+  else if ( strcmp( type_tag, "!perl/hash:VAST::args" ) == 0 ) {
     Codegen = &args;
   }
   else if ( strcmp( type_tag, "!perl/hash:VAST::backslash__S_n" ) == 0 ) {
     Codegen = &backslash__S_n;
   }
-  else if ( strcmp( type_tag,"!perl/hash:VAST::comp_unit" ) == 0 ) {
+  else if ( strcmp( type_tag, "!perl/hash:VAST::comp_unit" ) == 0 ) {
     Codegen = &comp_unit;
   }
-  else if ( strcmp( type_tag,"!perl/hash:VAST::decint" ) == 0 ) {
+  else if ( strcmp( type_tag, "!perl/hash:VAST::decint" ) == 0 ) {
     Codegen = &decint;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::desigilname" ) == 0 ) {
+    Codegen = &desigilname;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::dottyop" ) == 0 ) {
+    Codegen = &dottyop;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::dotty__S_Dot" ) == 0 ) {
+    Codegen = &dotty__S_Dot;
   }
   else if ( strcmp( type_tag, "!perl/hash:VAST::eat_terminator" ) == 0 ) {
     Codegen = &eat_terminator;
@@ -46,14 +55,32 @@ local_Codegen( char * type_tag ) {
   else if ( strcmp( type_tag, "!perl/hash:VAST::identifier" ) == 0 ) {
     Codegen = &identifier;
   }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::infixish" ) == 0 ) {
+    Codegen = &infixish;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::infix__S_Comma" ) == 0 ) {
+    Codegen = &infix__S_Comma;
+  }
   else if ( strcmp( type_tag, "!perl/hash:VAST::infix__S_Plus" ) == 0 ) {
     Codegen = &infix__S_Plus;
   }
   else if ( strcmp( type_tag, "!perl/hash:VAST::integer" ) == 0 ) {
     Codegen = &integer;
   }
-  else if ( strcmp( type_tag, "!perl/hash:VAST::integer" ) == 0 ) {
-    Codegen = &integer;
+  else if ( strcmp( type_tag, "!perl/hash:VAST::longname" ) == 0 ) {
+    Codegen = &longname;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::methodop" ) == 0 ) {
+    Codegen = &methodop;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::modifier_expr" ) == 0 ) {
+    Codegen = &modifier_expr;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::modifier" ) == 0 ) {
+    Codegen = &modifier;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::name" ) == 0 ) {
+    Codegen = &name;
   }
   else if ( strcmp( type_tag, "!perl/hash:VAST::nibbler" ) == 0 ) {
     Codegen = &nibbler;
@@ -64,8 +91,23 @@ local_Codegen( char * type_tag ) {
   else if ( strcmp( type_tag, "!perl/hash:VAST::noun__S_value" ) == 0 ) {
     Codegen = &noun__S_value;
   }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::number__S_numish" ) == 0 ) {
+    Codegen = &number__S_numish;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::numish" ) == 0 ) {
+    Codegen = &numish;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::POST" ) == 0 ) {
+    Codegen = &POST;
+  }
   else if ( strcmp( type_tag, "!perl/hash:VAST::quote__S_Double_Double" ) == 0 ) {
     Codegen = &quote__S_Double_Double;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::semiarglist" ) == 0 ) {
+    Codegen = &semiarglist;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::sigil__S_At" ) == 0 ) {
+    Codegen = &sigil__S_At;
   }
   else if ( strcmp( type_tag, "!perl/hash:VAST::statement" ) == 0 ) {
     Codegen = &statement;
@@ -73,8 +115,26 @@ local_Codegen( char * type_tag ) {
   else if ( strcmp( type_tag, "!perl/hash:VAST::statementlist" ) == 0 ) {
     Codegen = &statementlist;
   }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::statement_mod_cond__S_if" ) == 0 ) {
+    Codegen = &statement_mod_cond__S_if;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::statement_mod_loop__S_for" ) == 0 ) {
+    Codegen = &statement_mod_loop__S_for;
+  }
   else if ( strcmp( type_tag, "!perl/hash:VAST::Str" ) == 0 ) {
     Codegen = &Str;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::SYM_dotty__S_Dot" ) == 0 ) {
+    Codegen = &SYM_dotty__S_Dot;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::SYM_infix__S_Comma" ) == 0 ) {
+    Codegen = &SYM_infix__S_Comma;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::termish" ) == 0 ) {
+    Codegen = &termish;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::term__S_dotty" ) == 0 ) {
+    Codegen = &term__S_dotty;
   }
   else if ( strcmp( type_tag, "!perl/hash:VAST::term__S_identifier" ) == 0 ) {
     Codegen = &term__S_identifier;
@@ -82,8 +142,20 @@ local_Codegen( char * type_tag ) {
   else if ( strcmp( type_tag, "!perl/hash:VAST::term__S_value" ) == 0 ) {
     Codegen = &term__S_value;
   }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::term__S_variable" ) == 0 ) {
+    Codegen = &term__S_variable;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::twigil__S_Star" ) == 0 ) {
+    Codegen = &twigil__S_Star;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::value__S_number" ) == 0 ) {
+    Codegen = &value__S_number;
+  }
   else if ( strcmp( type_tag, "!perl/hash:VAST::value__S_quote" ) == 0 ) {
     Codegen = &value__S_quote;
+  }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::variable" ) == 0 ) {
+    Codegen = &variable;
   }
   else if ( type_tag == NULL ) {
     fprintf( stderr, "\nnode has no type tag\n" );

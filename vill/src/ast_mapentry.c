@@ -8,7 +8,6 @@
 struct graph_node *
 ast_mapentry( struct graph_node * parent, const char * key ) {
   assert( (parent -> flags & YAML_KIND) == YAML_MAPPING );
-//assert( parent -> kind == MAPPING );
   struct mapping_list_entry * search_entry;
   search_entry = parent -> content.mapping.head;
   struct graph_node * child = NULL;
