@@ -392,9 +392,8 @@ function gempty() { // grammar "empty" (epsilon) parser builder
   this.b = false;
 }
 derives(gempty, gts);
-gempty.prototype.emit = function(c) {
+gempty.prototype.emit = function() {
   // no-op; fall through to succeed with finality
-  c.r.push(val("print('in empty')"))
 };
 function empty() { return new gempty() }
 
@@ -990,7 +989,7 @@ Grammar.prototype.compile = function(interpreterState) {
   //   we know which ones are recursive.
 }
 
-var dbg = 1;
+var dbg = 0;
 
 var iter = 400;
 var routine = dbg
