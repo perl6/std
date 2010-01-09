@@ -1057,43 +1057,50 @@ Grammar.prototype.compile = function(interpreterState) {
   }
   // second pass: actually resolve the named references, now that
   //   we know which ones are recursive.
-  this.parser = this.TOP.compile();
+  
+  var routine = dbg
+    ? func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case 0:")])
+    : func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
+
+  var g = this.TOP;
+
+  //g = g.regen();
+
+  g.fail = {id:1};
+  g.done = g.notd = {id:-1};
+
+  g.emit(routine); // have the grammar emit its specialize parser code to this routine
+
+  routine.r.push(val("case -1:/*print('parse succeeded');*/break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
+
+  var parserf = routine.emit();
+
+  if (dbg)
+    print(parserf);
+
+  this.parse = eval(parserf); // compile the javascript function to machine code
+
+  if (dbg)
+    print('compiled');
+}
+Grammar.prototype.parse = function(input) {
+  this.compile();
+  return this.parse(input);
 }
 
 var dbg = 0;
 
-var iter = 400;
-var routine = dbg
-  ? func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case 0:")])
-  : func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
-var g = both(lit('a'),both(either(lit('bcx'),both(star(dot()),lit('ef'))),both(star(dot()),both(lit('g'),end()))));
 
-g = g.regen();
+var g = new Grammar('wp6');
 
-g.fail = {id:1};
-g.done = g.notd = {id:-1};
+var pattern = both(lit('a'),both(either(lit('bcx'),both(star(dot()),lit('ef'))),both(star(dot()),both(lit('g'),end()))));
 
-g.emit(routine); // have the grammar emit its specialize parser code to this routine
-
-routine.r.push(val("case -1:/*print('parse succeeded');*/break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
-
-var parserf = routine.emit();
-
-if (dbg)
-  print(parserf);
-
-var parser = eval(parserf); // compile the javascript function to machine code
-
-if (dbg)
-  print('compiled');
+g.addPattern('stuff', pattern);
 
 var input = utf32str("abcdefg");
 
-parser(input);
-
-//for(var ee=100000;--ee>0;parser(input));
-
+g.parse(input);
 
 
 
