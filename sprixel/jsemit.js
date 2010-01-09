@@ -233,8 +233,10 @@ var gtr = (function() {
     return this;
   };
 })();
+gtr.prototype.toString = function() { return this.id.toString() };
 
 function gts() { // base grammar transition set
+  //print('building '+this);
   this.fail = new gtr(); // each transition set has a fail label destination
 }
 gts.prototype.cur = function() { // whether it contains an unresolved named reference
@@ -249,7 +251,7 @@ gts.prototype.computeRefs = function(pats, name, refs) {
     this.r.computeRefs(pats, name, refs);
 }
 gts.prototype.regen = function(grammar) {
-  return new this.root(
+  return this.root(
     this.l ? this.l.regen(grammar) : (this.v ? this.v.str : this.lo ? this.lo.str : null ),
     this.r ? this.r.regen(grammar) : this.hi ? this.hi.str : null);
 }
@@ -268,6 +270,8 @@ var dr = val("t=t.r");
 var ros = val("o=t.s"); // macro for "reset offset to my start"
 
 function gotol(lbl) { // macro for goto label with id of the transition object
+  //if (!lbl)
+  //  print(arguments.callee.caller);
   return val("gl="+lbl.id+";break");
 }
 
@@ -366,26 +370,44 @@ gdot.prototype.toString = function() {
 gdot.prototype.root = dot;
 
 function gpref(name) { // grammar "named pattern reference" parser builder
+  this.name = name;
+  this.b = true;
   gts.call(this); // call the parent constructor
   this.u = true; // mark as unresolved
-  this.name = name;
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
 }
 derives(gpref, gts);
 gpref.prototype.emit = function(c) {
-  c.r.push(cond(ne(o,val("i.l")),[[
-    gotol(this.fail)
-  ]]));
+  var pats = c.g.pats;
+  var pat = pats[this.name];
+  if (!pat.isRecursive) { // inline a replica of the callsite here, deeply.
+    var clone = pat.regen(c.g);
+    clone.fail = this.fail;
+    clone.notd = this.notd;
+    clone.done = this.done;
+    clone.init = this.init;
+    clone.bt = this.bt;
+    clone.emit(c);
+  } else {
+    throw 'recursive references not yet implemented';
+  }
 };
 gpref.prototype.computeRefs = function(pats, name, refs) {
   var hasIt = refs.hasOwnProperty(name);
   refs[name] = true;
   if (!hasIt && name != this.name) // prevent cyclical recursion
     pats[name].computeRefs(pats, name, refs);
-}
+};
 function pref(name) { return new gpref(name) }
 gpref.prototype.toString = function() {
-  return 'gpref('+this.name.str.toQuotedString()+')';
-}
+  return 'gpref('+this.name.toQuotedString()+')';
+};
+gpref.prototype.regen = function(grammar) {
+  return new gpref(this.name);
+};
 gpref.prototype.root = pref;
 
 function gbeg() { // grammar "beginning anchor" parser builder
@@ -400,7 +422,7 @@ gbeg.prototype.emit = function(c) {
 function beg() { return new gbeg() }
 gbeg.prototype.toString = function() {
   return 'beg()';
-}
+};
 gbeg.prototype.root = beg;
 
 function gempty() { // grammar "empty" (epsilon) parser builder
@@ -467,8 +489,8 @@ function gbothls(l, r) { // grammar "both left nondeterministic" parser builder
   this.b = true;
   this.init = new gtr();
   this.bt = new gtr();
-  l.notd = new gtr(); // give left a "not done" transition
-  l.done = new gtr(); // give left a "done" transition
+  this.notd = new gtr();
+  this.done = new gtr();
 }
 derives(gbothls, gts);
 gbothls.prototype.emit = function(c) {
@@ -519,8 +541,8 @@ function gbothrs(l, r) { // grammar "both right nondeterministic" parser builder
   this.b = true;
   this.init = new gtr();
   this.bt = new gtr();
-  r.notd = new gtr(); // give right a "not done" transition
-  r.done = new gtr(); // give right a "done" transition
+  this.notd = new gtr();
+  this.done = new gtr();
 }
 derives(gbothrs, gts);
 gbothrs.prototype.emit = function(c) {
@@ -559,10 +581,8 @@ function gbothlrs(l, r) { // grammar "both left and right nondeterministic" pars
   this.b = true;
   this.init = new gtr();
   this.bt = new gtr();
-  l.notd = new gtr(); // give left a "not done" transition
-  l.done = new gtr(); // give left a "done" transition
-  r.notd = new gtr(); // give right a "not done" transition
-  r.done = new gtr(); // give right a "done" transition
+  this.notd = new gtr();
+  this.done = new gtr();
 }
 derives(gbothlrs, gts);
 gbothlrs.prototype.emit = function(c) {
@@ -634,6 +654,8 @@ function geither(l,r) { // grammar "deterministic alternation" parser builder
   this.b = true;
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
+  this.notd = new gtr();
+  this.done = new gtr();
 }
 derives(geither, gts);
 geither.prototype.emit = function(c) {
@@ -665,14 +687,14 @@ geither.prototype.toString = function() {
 function geitherls(l,r) { // grammar "left nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
   this.b = true;
-  l.notd = new gtr(); // give left a "not done" transition
-  l.done = new gtr(); // give left a "done" transition
+  this.notd = new gtr();
+  this.done = new gtr();
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
-  r.init = new gtr(); // add a transition record for right initial
 }
 derives(geitherls, gts);
 geitherls.prototype.emit = function(c) {
+  var rinit = new gtr();
   c.r.push(
     casel(this.init),d // initial entry point
   );
@@ -690,7 +712,7 @@ geitherls.prototype.emit = function(c) {
     
     casel(this.bt), // backtrack entry point
     cond(val("(t.ld)"),[[
-      gotol(this.r.init)
+      gotol(rinit)
     ],[
       val("t=t.l"),
       gotol(this.l.bt)
@@ -702,7 +724,7 @@ geitherls.prototype.emit = function(c) {
     
     casel(this.l.fail), // left failed
     ros,
-    casel(this.r.init) // right initial entry point
+    casel(rinit) // right initial entry point
   );
   this.r.emit(c);
   c.r.push(
@@ -718,8 +740,8 @@ geitherls.prototype.toString = function() {
 function geitherrs(l,r) { // grammar "right nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
   this.b = true;
-  r.notd = new gtr(); // give right a "not done" transition
-  r.done = new gtr(); // give right a "done" transition
+  this.notd = new gtr();
+  this.done = new gtr();
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
 }
@@ -771,10 +793,8 @@ function geitherlrs(l,r) { // grammar "left and right nondeterministic alternati
   this.b = true;
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
-  l.notd = new gtr(); // give left a "not done" transition
-  l.done = new gtr(); // give left a "done" transition
-  r.notd = new gtr(); // give right a "not done" transition
-  r.done = new gtr(); // give right a "done" transition
+  this.notd = new gtr();
+  this.done = new gtr();
 }
 derives(geitherlrs, gts);
 geitherlrs.prototype.emit = function(c) {
@@ -841,6 +861,8 @@ function gplus(l) { // grammar "deterministic" edition of plus
   this.b = true;
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
+  this.notd = new gtr();
+  this.done = new gtr();
 }
 derives(gplus, gts);
 gplus.prototype.emit = function(c) {
@@ -899,9 +921,8 @@ function gplusb(l) { // grammar "deterministic" edition of plus
   this.b = true;
   this.init = new gtr(); // add a transition record for my initial entry point
   this.bt = new gtr(); // add a transition record for my backtrack entry point
-  l.init = new gtr(); // give left an "init" transition
-  l.notd = new gtr(); // give left a "not done" transition
-  l.done = new gtr(); // give left a "done" transition
+  this.notd = new gtr();
+  this.done = new gtr();
 }
 derives(gplusb, gts);
 gplusb.prototype.emit = function(c) {
@@ -1036,6 +1057,7 @@ Grammar.prototype.addPattern = function(name, pattern) {
     this.TOP = pattern;
   return pattern;
 }
+var resolutionActivated = false;
 Grammar.prototype.compile = function(interpreterState) {
   // recursively compute full set of named references for each 
   //   pattern, preventing descent into a cyclical reference.
@@ -1043,7 +1065,7 @@ Grammar.prototype.compile = function(interpreterState) {
     var pat = this.pats[name];
     var refs = {};
     var isRecursive = false;
-    pat.computeRefs(name, refs);
+    pat.computeRefs(this.pats, name, refs);
     for (var refName in refs) {
       if (refName == name)
         isRecursive = true;
@@ -1051,12 +1073,19 @@ Grammar.prototype.compile = function(interpreterState) {
         throw 'Pattern '+name+' in grammar '+this.name+' contains unresolved reference to '+refName;
     }
     pat.namedRefs = refs;
-    pat.isRecursive = isRecursive;
     // if a pattern is not recursive, it can be inlined (but cloned
     //   so the labels/gotos are still unique) into its referer.
+    pat.isRecursive = isRecursive;
+    /*// discover/mark whether the pattern has any references at all
+    resolutionActivated = false;
+    pat.cur();*/
   }
   // second pass: actually resolve the named references, now that
   //   we know which ones are recursive.
+  for (var name in this.pats) {
+    var pat = this.pats[name];
+    
+  }
   
   var routine = dbg
     ? func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case 0:")])
@@ -1068,7 +1097,9 @@ Grammar.prototype.compile = function(interpreterState) {
 
   g.fail = {id:1};
   g.done = g.notd = {id:-1};
-
+  
+  routine.g = this;
+  
   g.emit(routine); // have the grammar emit its specialize parser code to this routine
 
   routine.r.push(val("case -1:/*print('parse succeeded');*/break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
@@ -1094,11 +1125,13 @@ var dbg = 0;
 
 var g = new Grammar('wp6');
 
-var pattern = both(lit('a'),both(either(lit('bcx'),both(star(dot()),lit('ef'))),both(star(dot()),both(lit('g'),end()))));
+g.addPattern('stuff', star(dot()));
+g.addPattern('final anchor', end());
+g.TOP = g.addPattern('toplevel', both(pref('stuff'),pref('final anchor')));
 
-g.addPattern('stuff', pattern);
 
-var input = utf32str("abcdefg");
+
+var input = utf32str(Array(1<<6).join('\uffff'));
 
 g.parse(input);
 
