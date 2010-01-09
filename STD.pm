@@ -1216,7 +1216,7 @@ grammar P6 is STD {
         :my $*endargs = -1;
         :my %*LANG;
         :my $*PKGDECL ::= "";
-        :my $*IN_DECL;
+        :my $*IN_DECL = '';
         :my $*DECLARAND;
         :my $*NEWPKG;
         :my $*NEWPAD;
