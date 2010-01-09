@@ -10,13 +10,13 @@ void local_link_scalar(     struct graph_node * );
 void local_link_sequence(   struct graph_node * );
 // global variables shared by multiple functions in this file
 int need_space =  0;
-int indent     = -1; // only for diagnostic printing
-int local_debug_flag;      // control printing of tree walk
+int indent     = -1;   // only for diagnostic printing
+int local_debug_flag;  // controls trace printing of tree walk
 
 // receive a tag string and return a pointer to the Codegen()
 // function of matching name.  If no name matches, return NULL.
 // TODO 1: design something better to return if no name matches.
-// TODO 2: do a more efficient lookup, eg binary search in a sorted list
+// TODO 2: (LHF) do a faster lookup, eg binary search in a sorted list
 function_pointer
 local_Codegen( char * type_tag ) {
   // Codegen is a pointer to a function that receives a compiler object
@@ -199,7 +199,7 @@ local_link_mapping( struct graph_node * node ) {
       }
     }
     else {
-      // the node has no tag.
+      // the node has no tag.  Perhaps it could use some trace output.
       // TODO: provide some kind of default *Codegen() function pointer
       node -> data = (void *) &local_codegen_null;
     }
@@ -222,7 +222,7 @@ local_link_mapping( struct graph_node * node ) {
           local_link_sequence( map_entry -> node );
           break;
         case 0:
-  //    case NOT_YET_ASSIGNED:
+//      case NOT_YET_ASSIGNED:
           fprintf( stderr, "\nNOT YET ASSIGNED" );
           break;
         default:
@@ -265,19 +265,15 @@ local_link_sequence( struct graph_node * node ) {
       // TODO: provide some kind of default *Codegen() function pointer
       node -> data = (void *) &local_codegen_null;
     }
-    // The current node has been processed, now recurse through its children
-#if 0
-  if ( node -> type_tag != NULL ) {
-    local_debug_flag && fprintf( stderr, "\nTYPE_TAG:%s", node -> type_tag );
-    node -> data = (void *) local_Codegen( node -> type_tag );
-  }
-#endif
+    // The current node has been processed, now recurse on its children
     struct sequence_list_entry * sequence_entry;
     sequence_entry = node -> content.sequence.head;
     if ( sequence_entry == NULL ) {
+      // treat the trivial empty sequence specially
+      // TODO: find out why there is no local_debug_flag here, or add it
       fprintf( stderr, " []" );
     }
-    else {
+    else { // sequence_entry != NULL
       while ( sequence_entry != NULL ) {
         local_debug_flag && fprintf( stderr, "\n%*s-", (indent - 1) * 2, "" );
         switch ( sequence_entry -> node -> flags & YAML_KIND ) {
@@ -327,18 +323,24 @@ local_link_scalar( struct graph_node * node ) {
     first == ' ' || last == ' ' || first == '"' || last == '"' ||
     first == '!' || first == '#' || scalar_len == 0
   );
-  local_debug_flag && fprintf( stderr, "%s%s%s",     need_single_quotes?"'":"",
-    node -> content.scalar.text, need_single_quotes?"'":"" );
+  local_debug_flag && fprintf( stderr, "%s%s%s", need_single_quotes
+    ?"'":"", node -> content.scalar.text, need_single_quotes ?"'":"" );
   if ( node -> type_tag != NULL ) {
     fprintf( stderr, "\nTYPE_TAG:%s", node -> type_tag );
     abort();
   }
 }
 
+// Link the data pointer of each node to the Codegen() function whose
+// name matches the last part of the type_tag.
+//
 // Recursively walk the entire graph (AST) node by node the same way
-// that yaml_compose_roundtrip() does.  Link the data pointer of each
-// node to the Codegen() function whose name matches the last part of
-// the type_tag.
+// that yaml_compose_roundtrip() does.  Actually, not quite.  This one
+// walks recursively, which is fairly simple and fast.  A still ongoing
+// refactoring is changing yaml_compose_roundtrip() to not use recursion
+// but instead call graph_traverse() which uses an internal state stack,
+// thus implementing Continuation Passing Style.  Why so?  For greater
+// code re-use through graph_traverse(), when it eventually gets done.
 void
 villCompiler::link_codegen() {
   assert( AST != NULL );

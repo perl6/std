@@ -8,11 +8,12 @@ Contents
 4. Source code conventions
 5. Virtual machine
 6. Native executable cache
-7. Continuation passing style (CPS)
-8. Contributing
-9. Roadmap (partial)
-10. Status
-11. License
+7. Parser replacement
+8. Continuation passing style (CPS)
+9. Contributing
+10. Roadmap (partial)
+11. Status
+12. License
 A. Required software
 B. References
 
@@ -179,7 +180,9 @@ crossing the designer's mind.
 4. SOURCE CODE CONVENTIONS
 
 As 'vill' is a C and C++ LLVM based project, it follows the LLVM
-programming guidelines, see http://llvm.org/docs/CodingStandards.html
+programming guidelines, see http://llvm.org/docs/CodingStandards.html.
+In all the files that are changing a lot, the priority is clarity, not
+performance.
 
 The source code is divided into many small source files for several
 reasons.  Open Source projects should be simple in structure to engage
@@ -262,7 +265,43 @@ option will probably also purge the cache and force a recompile.
 Eventually a similar approach might compile modules into shared
 libraries, but that concept has not yet been proved.
 
-7. CONTINUATION PASSING STYLE (CPS)
+7. PARSER REPLACEMENT
+
+Creating an in-process parser for standard Perl 6 language (STD.pm) is a
+medium term plan for 'vill'.  Achieving it would mark the end of 'vill'
+as project name, because the 'viv' dependency would go, and the speed of
+compiling should improve.  It's very High Hanging Fruit and far away on
+the roadmap.
+
+The basis of a Perl 6 parser is a Perl 6 regex engine, so that needs to
+be written first, preferably in C.  The regex engine in nqp-rx has been
+suggested (by its author;) as a good starting point for porting, but
+nothing has been done yet to confirm the viability of such a port.  Even
+a limited regex engine would be useful to end user programs.
+
+Parsing Perl 6 is a more advanced stage, because the regex engine must
+be able to handle all of STD.pm, which is a large Perl 6 grammar that is
+still evolving.  Fortunately the engine still does not have to implement
+the entire Perl 6 regex language, only the subset that STD.pm uses.  It
+will require Longest Token Matching, which for example Rakudo currently
+lacks.
+
+The new parser must match the user's Perl 6 program (let's ignore Perl 5
+for now) to the STD.pm grammar, which also contains action methods
+written in a small subset of Perl 6.  The subset is small because gimme5
+must be able to translate it to Perl 5 when making viv.  The parser
+executes the action methods when parsing the user's Perl 6 code and
+creating the Abstract Syntax Tree.
+
+The plan is to program equivalents for the simplest and most frequently
+occurring Perl 6 statements in the action methods as parameterized
+general purpose C functions, and to recognize the rest of the Perl 6
+statements and implement them with individual custom substitutes, also
+in C.  The viability of this approach is uncertain.  There will probably
+be a parser generation stage that creates some of the C code dynamically
+from STD.pm, before compiling and linking that into the main compiler.
+
+8. CONTINUATION PASSING STYLE (CPS)
 
 At the end of http://llvm.org/docs/tutorial/LangImpl8.html in "Garbage
 Collected Stack Frames", the documentation confirms that LLVM supports
@@ -289,7 +328,7 @@ information in the AST.  It may also be possible to associate a calling
 convention with each called routine, so that the appropriate one is
 employed per call.  Presumably Pugs also did such things.
 
-8. CONTRIBUTING
+9. CONTRIBUTING
 
 Anyone with Pugs commit access is welcome to hack on 'vill', generally
 as long as the set of passing tests improves.  Join #perl6 on
@@ -327,7 +366,7 @@ missing 'crazy' operator:
 
 The procedure for adding a new built in function is similar.
 
-9. ROADMAP (PARTIAL)
+10. ROADMAP (PARTIAL)
 
 1. Fix src/yaml_compose.c so that all reasonable Perl 6 inputs to
    test/yaml_compose_roundtrip.c are handled properly.
@@ -354,7 +393,7 @@ The procedure for adding a new built in function is similar.
     the required subset of the spectest suite at that time.
 12. ...
 
-10. STATUS
+11. STATUS
 
 The LLVM code generator has been hard wired to produce an executable
 that prints "vill compiled A\nvill compiled Z\n" when run.  During early
@@ -366,17 +405,19 @@ There may be some breakage due to fiddling in src/yaml_compose.c .
 In src/ these work: compile.cpp make_puts.cpp run.cpp and save.cpp.
 In test/ these work: yaml_token_roundtrip and test/yaml_parse_roundtrip.
 
-Item 1. is blocking the rest of the roadmap, test/yaml_compose_roundtrip
-runs but fails to traverse the entire tree, because src/graph_traverse
-is incomplete.  The integrity of the composed AST looks good though, try
-./vill -Ds -e'say "syntax tree";'
+Item 1. is stalled, test/yaml_compose_roundtrip runs but fails to
+traverse the entire tree, because src/graph_traverse is incomplete.  The
+integrity of the composed AST looks good though, for example try:
 
-Despite this blockage, test runs of ./vill -DU -e'say "test codegen"'
+    ./vill -Ds -e'say "syntax tree";'
+
+Despite item 1. stalling, test runs of ./vill -DU -e'say "test codegen"'
 and similar show the entire AST being traversed.  The -DU option allows
 ad hoc checking of link_codegen() and codegen() operation, which is not
-complete but correct so far.
+complete but correct so far.  Therefore work is continuing on item 2. as
+well.
 
-11. LICENSE
+12. LICENSE
 
 Published by the authors named in the CREDITS files under the same terms
 as Perl 5.x (Artistic License 2.0).
@@ -395,13 +436,25 @@ On a Debian or Ubuntu system, install make with:
 
 Perl 5:
 
-Your computer may have a usable version of Perl 5 installed anyway. You
-can try this command to check:
+Your computer may have a usable version of Perl 5 installed anyway.  You
+need perl version 5.10.0 or higher.  You can try this command to check:
 
-    perl -v
+    /usr/local/bin/perl -v
 
-You need perl version 5.10.0 or higher. Use http://perl.com to get
-information about installing Perl 5.
+Note that 'viv', used by 'vill' needs the path exactly as written above.
+Your system might have Perl 5 installed in another directory.  You can
+find out with these commands:
+
+    which perl
+    ls -l /usr/local/bin/perl
+
+If your perl is not in /usr/local/bin but elsewhere, for example in
+/usr/bin, a command such as the following may help by creating a
+symbolic link:
+
+    sudo ln -s /usr/bin/perl /usr/local/bin
+
+Visit http://perl.com if you need information about installing Perl 5.
 
 c++:
 
@@ -421,10 +474,8 @@ Use Subversion to check out either the complete Pugs repository, or just
 the parts that contains viv and vill:
 
     svn checkout http://svn.pugscode.org/pugs pugs  # the entire repo
-    sudo cpan -i YAML::Syck  # or 'sudo apt-get libyaml-syck-perl'
-    sudo cpan -i YAML::XS
+    sudo cpan -i YAML::XS # or 'sudo apt-get libyaml-libyaml-perl'
     sudo cpan -i Moose
-    sudo ln -s /usr/bin/perl /usr/local/bin # if it says '/usr/local/bin/perl' not found
     cd pugs/src/perl6
     time make
 
