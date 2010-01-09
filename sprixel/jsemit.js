@@ -256,6 +256,11 @@ gts.prototype.computeRefs = function(pats, name, refs) {
   if (typeof this.r != 'undefined')
     this.r.computeRefs(pats, name, refs);
 }
+gts.prototype.regen = function(grammar) {
+  return new (this.root || this.constructor)(
+    this.l || this.v || this.lo,
+    this.r || this.hi);
+}
 
 var gl = val("gl"); // the next target goto label variable expression
 var i = val("i"); // the input variable expression
@@ -416,6 +421,16 @@ function empty() { return new gempty() }
     - failing paths in nondeterministic nodes do not reset the offset (into the
       input) themselves, but rather let the backtracking nodes do it.
  */
+
+function both(l,r) {
+  return l.b || r.b
+    ? !r.b
+      ? new gbothls(l,r) // only left nondeterministic
+      : !l.b
+        ? new gbothrs(l,r) // only right nondeterministic
+        : new gbothlrs(l,r) // both nondeterministic
+    : new gboth(l,r); // fully deterministic; neither      (yay, fully inlined)
+}
   
 function gboth(l, r) { // grammar "deterministic both" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -427,6 +442,7 @@ gboth.prototype.emit = function(c) {
   this.l.emit(c);
   this.r.emit(c);
 };
+gboth.prototype.root = both;
 
 function gbothls(l, r) { // grammar "both left nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -475,6 +491,7 @@ gbothls.prototype.emit = function(c) {
     gotol(this.l.bt)
   );
 };
+gbothls.prototype.root = both;
 
 function gbothrs(l, r) { // grammar "both right nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -511,6 +528,7 @@ gbothrs.prototype.emit = function(c) {
     gotol(this.fail) // goto our fail
   );
 };
+gbothrs.prototype.root = both;
 
 function gbothlrs(l, r) { // grammar "both left and right nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -572,15 +590,16 @@ gbothlrs.prototype.emit = function(c) {
     gotol(this.fail) // goto our fail
   );
 };
+gbothlrs.prototype.root = both;
 
-function both(l,r) {
+function either(l,r) {
   return l.b || r.b
     ? !r.b
-      ? new gbothls(l,r) // only left nondeterministic
+      ? new geitherls(l,r) // only left nondeterministic
       : !l.b
-        ? new gbothrs(l,r) // only right nondeterministic
-        : new gbothlrs(l,r) // both nondeterministic
-    : new gboth(l,r); // fully deterministic; neither      (yay, fully inlined)
+        ? new geitherrs(l,r) // only right nondeterministic
+        : new geitherlrs(l,r) // both nondeterministic
+    : new geither(l,r); // neither nondeterministic
 }
 
 function geither(l,r) { // grammar "deterministic alternation" parser builder
@@ -611,6 +630,7 @@ geither.prototype.emit = function(c) {
   //  gotol(this.done)
   //);
 };
+geither.prototype.root = either;
 
 function geitherls(l,r) { // grammar "left nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -660,6 +680,7 @@ geitherls.prototype.emit = function(c) {
     //gotol(this.done)
   );
 };
+geitherls.prototype.root = either;
 
 function geitherrs(l,r) { // grammar "right nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -707,6 +728,7 @@ geitherrs.prototype.emit = function(c) {
     gotol(this.fail) // goto our fail
   );
 };
+geitherrs.prototype.root = either;
 
 function geitherlrs(l,r) { // grammar "left and right nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -767,15 +789,12 @@ geitherlrs.prototype.emit = function(c) {
     gotol(this.fail) // goto our fail
   );
 };
+geitherlrs.prototype.root = either;
 
-function either(l,r) {
-  return l.b || r.b
-    ? !r.b
-      ? new geitherls(l,r) // only left nondeterministic
-      : !l.b
-        ? new geitherrs(l,r) // only right nondeterministic
-        : new geitherlrs(l,r) // both nondeterministic
-    : new geither(l,r); // neither nondeterministic
+function plus(l) {
+  return l.b
+    ? new gplusb(l) // nondeterministic version of plus
+    : new gplus(l); // deterministic version of plus
 }
 
 function gplus(l) { // grammar "deterministic" edition of plus
@@ -831,6 +850,7 @@ gplus.prototype.emit = function(c) {
     gotol(this.fail)
   );
 };
+gplus.prototype.root = plus
 
 function gplusb(l) { // grammar "deterministic" edition of plus
   gts.call(this, this.l = l); // call the parent constructor
@@ -909,12 +929,7 @@ gplusb.prototype.emit = function(c) {
     gotol(this.notd)
   );
 };
-
-function plus(l) {
-  return l.b
-    ? new gplusb(l) // nondeterministic version of plus
-    : new gplus(l); // deterministic version of plus
-}
+gplusb.prototype.root = plus
 
 function star(l) {
   return either(plus(l),empty());
