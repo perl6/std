@@ -2681,12 +2681,14 @@ END
 sub add_enum { my $self = shift;
     my $type = shift;
     my $expr = shift;
+    return unless @$type;
     return unless $expr;
+    my $typename = $type->[0]->Str;
     local $::IN_DECL = 'constant';
     # XXX complete kludge, really need to eval EXPR
     $expr =~ s/:(\w+)<\S+>/$1/g;  # handle :name<string>
     for ($expr =~ m/([a-zA-Z_]\w*)/g) {
-        $self->add_name($type . "::$_");
+        $self->add_name($typename . "::$_");
         $self->add_name($_);
     }
     $self;

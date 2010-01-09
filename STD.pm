@@ -1725,7 +1725,8 @@ grammar P6 is STD {
         | <typename>+
             {
                 my $t = $<typename>;
-                @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
+                @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported");
+                $*OFTYPE = $t[0];
             }
             <multi_declarator>
         | <multi_declarator>
@@ -2033,9 +2034,12 @@ grammar P6 is STD {
         <sym>:s <identifier> <pblock>
     }
 
-    token trait_mod:of      { <sym>:s <typename> }
+    token trait_mod:of {
+        ['of'|'returns']:s <typename>
+        [ <?{ $*OFTYPE }> <.panic("Extra 'of' type; already declared as type " ~ $*OFTYPE.Str)> ]?
+        { $*OFTYPE = $<typename>; }
+    }
     token trait_mod:as      { <sym>:s <typename> }
-    token trait_mod:returns { <sym>:s <typename> }
     token trait_mod:handles { <sym>:s <term> }
 
     #########
@@ -2063,6 +2067,7 @@ grammar P6 is STD {
 
     token termish {
         :my $*SCOPE = "";
+        :my $*OFTYPE;
         :my $*VAR;
         :dba('prefix or term')
         [
@@ -2510,7 +2515,7 @@ grammar P6 is STD {
         # parametric type?
         <.unsp>? [ <?before '['> <param=.postcircumfix> ]?
         <.unsp>? [ <?before '{'> <whence=.postcircumfix> ]?
-        <.ws> [ 'of' <.ws> <typename> ]?
+        [<.ws> 'of' <.ws> <typename> ]?
     }
 
     token numish {
@@ -2758,8 +2763,7 @@ grammar P6 is STD {
         :my $*DECLARAND;
         <sym> :s
         [
-            <longname> { $¢.add_name($<longname>.Str); }
-            [ of <.ws> <typename> ]?
+            [ <longname> { $¢.add_name($<longname>[0].Str); } ]?
             <trait>*
             [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
         ] || <.panic: "Malformed subset">
@@ -2769,8 +2773,9 @@ grammar P6 is STD {
         :my $*IN_DECL = 'enum';
         :my $*DECLARAND;
         <sym> <.ws>
-        <longname> <.ws> <trait>* <?before <[ < ( « ]> > <term> <.ws>
-            { $¢.add_name($<longname>.Str); $¢.add_enum($<longname>.Str, $<term>.Str); }
+        [ <longname> { $¢.add_name($<longname>[0].Str); } <.ws> ]?
+        <trait>* <?before <[ < ( « ]> > <term> <.ws>
+            {$¢.add_enum($<longname>, $<term>.Str); }
     }
 
     token type_declarator:constant {
