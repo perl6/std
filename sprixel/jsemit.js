@@ -246,7 +246,7 @@ function gts() { // base grammar transition set
   this.fail = new gtr(); // each transition set has a fail label destination
 }
 gts.prototype.cur = function() { // whether it contains an unresolved named reference
-  return this.u || (typeof this.l != 'undefined' && this.l.cur())
+  return this.u = this.u || (typeof this.l != 'undefined' && this.l.cur())
     || (typeof this.r != 'undefined' && this.r.cur());
 }
 gts.prototype.u = false;
@@ -258,8 +258,8 @@ gts.prototype.computeRefs = function(pats, name, refs) {
 }
 gts.prototype.regen = function(grammar) {
   return new (this.root || this.constructor)(
-    this.l || this.v || this.lo,
-    this.r || this.hi);
+    this.l ? this.l.regen(grammar) : (this.v ? this.v.str : this.lo ? this.lo.str : null ),
+    this.r ? this.r.regen(grammar) : this.hi ? this.hi.str : null);
 }
 
 var gl = val("gl"); // the next target goto label variable expression
@@ -316,6 +316,10 @@ glit.prototype.emit = function(c) {
     ]]));
   }*/
 };
+glit.prototype.toString = function() {
+  return 'lit('+this.v.str.toQuotedString()+')';
+}
+glit.prototype.root = lit;
 
 function range(lo,hi) { return new grange(lo,hi) }
 function grange(lo,hi) { // grammar range parser builder
@@ -334,6 +338,10 @@ grange.prototype.emit = function(c) {
     ]])
   );
 };
+grange.prototype.toString = function() {
+  return 'range('+this.lo.str.toQuotedString()+','+this.hi.str.toQuotedString()+')';
+}
+grange.prototype.root = range;
 
 function gend() { // grammar "end anchor" parser builder
   gts.call(this); // call the parent constructor
@@ -346,6 +354,10 @@ gend.prototype.emit = function(c) {
   ]]));
 };
 function end() { return new gend() }
+gend.prototype.toString = function() {
+  return 'end()';
+}
+gend.prototype.root = end;
 
 function gdot() { // grammar "any char (dot)" parser builder
   gts.call(this); // call the parent constructor
@@ -361,6 +373,10 @@ gdot.prototype.emit = function(c) {
   );
 };
 function dot() { return new gdot() }
+gdot.prototype.toString = function() {
+  return 'dot()';
+}
+gdot.prototype.root = dot;
 
 function gpref(name) { // grammar "named pattern reference" parser builder
   gts.call(this); // call the parent constructor
@@ -380,6 +396,10 @@ gpref.prototype.computeRefs = function(pats, name, refs) {
     pats[name].computeRefs(pats, name, refs);
 }
 function pref(name) { return new gpref(name) }
+gpref.prototype.toString = function() {
+  return 'gpref('+this.name.str.toQuotedString()+')';
+}
+gpref.prototype.root = pref;
 
 function gbeg() { // grammar "beginning anchor" parser builder
   gts.call(this); // call the parent constructor
@@ -391,6 +411,10 @@ gbeg.prototype.emit = function(c) {
   // on the match start, for when we don't start at offset 0.
 };
 function beg() { return new gbeg() }
+gbeg.prototype.toString = function() {
+  return 'beg()';
+}
+gbeg.prototype.root = beg;
 
 function gempty() { // grammar "empty" (epsilon) parser builder
   gts.call(this); // call the parent constructor
@@ -401,6 +425,10 @@ gempty.prototype.emit = function() {
   // no-op; fall through to succeed with finality
 };
 function empty() { return new gempty() }
+gempty.prototype.toString = function() {
+  return 'empty()';
+}
+gempty.prototype.root = empty;
 
 /* Code block generation conventions/rules:
  *  - both non-deterministic (possibly-backtracking) nodes and
@@ -443,6 +471,9 @@ gboth.prototype.emit = function(c) {
   this.r.emit(c);
 };
 gboth.prototype.root = both;
+gboth.prototype.toString = function() {
+  return 'both('+this.l+','+this.r+')';
+}
 
 function gbothls(l, r) { // grammar "both left nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -492,6 +523,9 @@ gbothls.prototype.emit = function(c) {
   );
 };
 gbothls.prototype.root = both;
+gbothls.prototype.toString = function() {
+  return 'both('+this.l+','+this.r+')';
+}
 
 function gbothrs(l, r) { // grammar "both right nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -529,6 +563,9 @@ gbothrs.prototype.emit = function(c) {
   );
 };
 gbothrs.prototype.root = both;
+gbothrs.prototype.toString = function() {
+  return 'both('+this.l+','+this.r+')';
+}
 
 function gbothlrs(l, r) { // grammar "both left and right nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -591,6 +628,9 @@ gbothlrs.prototype.emit = function(c) {
   );
 };
 gbothlrs.prototype.root = both;
+gbothlrs.prototype.toString = function() {
+  return 'both('+this.l+','+this.r+')';
+}
 
 function either(l,r) {
   return l.b || r.b
@@ -631,6 +671,9 @@ geither.prototype.emit = function(c) {
   //);
 };
 geither.prototype.root = either;
+geither.prototype.toString = function() {
+  return 'either('+this.l+','+this.r+')';
+}
 
 function geitherls(l,r) { // grammar "left nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -681,6 +724,9 @@ geitherls.prototype.emit = function(c) {
   );
 };
 geitherls.prototype.root = either;
+geitherls.prototype.toString = function() {
+  return 'either('+this.l+','+this.r+')';
+}
 
 function geitherrs(l,r) { // grammar "right nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -729,6 +775,9 @@ geitherrs.prototype.emit = function(c) {
   );
 };
 geitherrs.prototype.root = either;
+geitherrs.prototype.toString = function() {
+  return 'either('+this.l+','+this.r+')';
+}
 
 function geitherlrs(l,r) { // grammar "left and right nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -790,6 +839,9 @@ geitherlrs.prototype.emit = function(c) {
   );
 };
 geitherlrs.prototype.root = either;
+geitherlrs.prototype.toString = function() {
+  return 'either('+this.l+','+this.r+')';
+}
 
 function plus(l) {
   return l.b
@@ -850,7 +902,10 @@ gplus.prototype.emit = function(c) {
     gotol(this.fail)
   );
 };
-gplus.prototype.root = plus
+gplus.prototype.root = plus;
+gplus.prototype.toString = function() {
+  return 'plus('+this.l+')';
+}
 
 function gplusb(l) { // grammar "deterministic" edition of plus
   gts.call(this, this.l = l); // call the parent constructor
@@ -929,10 +984,20 @@ gplusb.prototype.emit = function(c) {
     gotol(this.notd)
   );
 };
-gplusb.prototype.root = plus
+gplusb.prototype.root = plus;
+gplusb.prototype.toString = function() {
+  return 'plus('+this.l+')';
+}
 
 function star(l) {
-  return either(plus(l),empty());
+  var r = either(plus(l),empty());
+  r.toString = function() {
+    return 'star('+l+')';
+  };
+  r.regen = function(grammar) {
+    return new star(this.l.l);
+  }
+  return r;
 }
 
 function utf32str_charAt(offset) {
@@ -979,7 +1044,10 @@ function Grammar(name, parent) {
 Grammar.prototype.addPattern = function(name, pattern) {
   if (this.pats.hasOwnProperty(name))
     throw 'Pattern '+name+' already defined in grammar '+this.name;
-  return this.pats[name] = pattern;
+  this.pats[name] = pattern;
+  if (typeof this.TOP == 'undefined')
+    this.TOP = pattern;
+  return pattern;
 }
 Grammar.prototype.compile = function(interpreterState) {
   // recursively compute full set of named references for each 
@@ -1002,6 +1070,7 @@ Grammar.prototype.compile = function(interpreterState) {
   }
   // second pass: actually resolve the named references, now that
   //   we know which ones are recursive.
+  this.parser = this.TOP.compile();
 }
 
 var dbg = 0;
@@ -1012,6 +1081,12 @@ var routine = dbg
   : func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
 
 var g = both(lit('a'),both(either(lit('bcx'),both(star(dot()),lit('ef'))),both(star(dot()),both(lit('g'),end()))));
+
+//print(g);
+
+g = g.regen();
+
+//print(g);
 
 g.fail = {id:1};
 g.done = g.notd = {id:-1};
