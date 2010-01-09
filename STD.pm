@@ -1722,7 +1722,7 @@ grammar P6 is STD {
         | <declarator>
         | <regex_declarator>
         | <package_declarator>
-        | <typename>+
+        | [<typename> ]+
             {
                 my $t = $<typename>;
                 @$t > 1 and $¢.panic("Multiple prefix constraints not yet supported");
@@ -1800,7 +1800,7 @@ grammar P6 is STD {
     }
 
     token package_declarator:does {
-        <sym> <.ws>
+        <sym>:s
         <typename>
     }
 
@@ -2747,7 +2747,7 @@ grammar P6 is STD {
         ] ** <param_sep>
         <.ws>
         { $*IN_DECL = ''; }
-        [ '-->' <.ws> <typename> ]?
+        [ '-->' <.ws> <typename> <.ws> ]?
         {{
             $*LEFTSIGIL = '@';
             if $padsig {
