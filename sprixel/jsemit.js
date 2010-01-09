@@ -167,16 +167,16 @@ function prefix(space, name, sym, noparens) {
   space[name] = new Function("l","return new Expr_"+name+"(l)");
   var f = space['Expr_'+name] = make_unary_ctor();
   f.prototype.emit = noparens
-    ? new Function('return"("+this.l.emit()+"'+sym+')"')
-    : new Function('return"('+sym+'("+this.l.emit()+"))"');
+    ? new Function('return'+(sym+'(').toQuotedString()+'+this.l.emit()+")"')
+    : new Function('return'+('('+sym+'(').toQuotedString()+'+this.l.emit()+"))"');
 }
 
 function postfix(space, name, sym, noparens) {
   space[name] = new Function("l","return new Expr_"+name+"(l)");
   var f = space['Expr_'+name] = make_unary_ctor();
   f.prototype.emit = noparens
-    ? new Function('return"'+sym+'("+this.l.emit()+")"')
-    : new Function('return"('+sym+'("+this.l.emit()+"))"');
+    ? new Function('return this.l.emit()+'+sym.toQuotedString())
+    : new Function('return"("+this.l.emit()+'+(sym+')').toQuotedString());
 }
 
 function ternary(space, name, lsym, rsym) {
@@ -186,9 +186,7 @@ function ternary(space, name, lsym, rsym) {
     new Function('return"("+this.l.emit()+"'+lsym+'"+this.m.emit()+"'+rsym+'"+this.r.emit()+")"');
 }
 
-// merely some codegen deferred macro-builders.  Eventually each of the emitter
-// methods will accept an object representing the current routine as the first
-// parameter.
+// merely some codegen deferred macro-builders.
 
 infix(top, "add", "+");
 infix(top, "sub", "-");
@@ -228,12 +226,6 @@ postfix(top, "postdec", "--", true);
 
 ternary(top, "tern", "?", ":");
 
-
-//var f = eval(func(["zz","yy"],[assign(val("yy"),add(sub(val("zz"),val(2)),val(8))),val("yy"),cond(lt(val(62),val("yy")),[[val("66")],[val("999")]]),val("99")]).emit());
-//print(f);
-//print(f(58,44));
-
-
 var gtr = (function() {
   var count = 2;
   return function() { // grammar transition record constructor.
@@ -257,7 +249,7 @@ gts.prototype.computeRefs = function(pats, name, refs) {
     this.r.computeRefs(pats, name, refs);
 }
 gts.prototype.regen = function(grammar) {
-  return new (this.root || this.constructor)(
+  return new this.root(
     this.l ? this.l.regen(grammar) : (this.v ? this.v.str : this.lo ? this.lo.str : null ),
     this.r ? this.r.regen(grammar) : this.hi ? this.hi.str : null);
 }
@@ -271,17 +263,12 @@ var d = val("t={i:t,s:o}"); // macro for "descend into new State object"
 var a = val("t=t.i"); // macro for "ascend to parent State object"
 var dls = val("t.i.l=t;t=t.i"); // macro for "store the last in my left"
 var dl = val("t=t.l"); // macro for "descend into my left"
-var drs = val("t.i.r=t");
+var drs = val("t.i.r=t;t=t.i");
 var dr = val("t=t.r");
 var ros = val("o=t.s"); // macro for "reset offset to my start"
-var bbt = val("gl=t.n;t=t.t;break"); // macro for "goto the next computed goto" (see goton())
 
 function gotol(lbl) { // macro for goto label with id of the transition object
   return val("gl="+lbl.id+";break");
-}
-
-function goton(lbl) { // goto next (set computed goto for next transition)
-  return val("t.n="+lbl.id);
 }
 
 function casel(lbl) { // macro for MARK label with id of the transition object
@@ -1082,11 +1069,7 @@ var routine = dbg
 
 var g = both(lit('a'),both(either(lit('bcx'),both(star(dot()),lit('ef'))),both(star(dot()),both(lit('g'),end()))));
 
-//print(g);
-
 g = g.regen();
-
-//print(g);
 
 g.fail = {id:1};
 g.done = g.notd = {id:-1};
