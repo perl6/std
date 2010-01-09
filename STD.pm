@@ -2781,10 +2781,7 @@ grammar P6 is STD {
     token type_declarator:constant {
         :my $*IN_DECL = 'constant';
         :my $*DECLARAND;
-        <sym>
-
-        <.ws>
-        <typename>*
+        <sym> <.ws>
 
         [
         | <identifier> { $¢.add_name($<identifier>.Str); }
