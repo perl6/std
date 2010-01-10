@@ -905,150 +905,15 @@ geitherlrs.prototype.toString = function() {
 }
 
 function plus(l) {
-  return l.b
-    ? new gplusb(l) // nondeterministic version of plus
-    : new gplus(l); // deterministic version of plus
-}
-
-function gplus(l) { // grammar "deterministic" edition of plus
-  gts.call(this, this.l = l); // call the parent constructor
-  this.b = true;
-  this.init = new gtr(); // add a transition record for my initial entry point
-  this.bt = new gtr(); // add a transition record for my backtrack entry point
-  this.notd = new gtr();
-  this.done = new gtr();
-}
-derives(gplus, gts);
-gplus.prototype.emit = function(c) {
-  var retry = new gtr(), check = new gtr(); // label for retry spot
-  var lname = "l"+this.init.id;
-  c.r.push(
-    val("var "+lname),
-    casel(this.init),
-    cond(val("(("+lname+"||("+lname+"={}))[o])"),[[
-      gotol(this.fail)
-    ]]),
-    val(lname+"[o]=true"),
-    d,
-    val("t.z=[]"), // create a container for the match offsets
-    casel(retry)
-  );
-  this.l.emit(c);
-  c.r.push( // left succeeded
-    cond(val("(t.s==o)"),[[ // child is a zero-length assertion
-      gotol(this.done)
-    ]]),
-    val("t.z.push(o)"),
-    gotol(retry), // try another one
-    
-    casel(this.l.fail), // left hit its base case
-    cond(val("(t.z.length==0)"),[[
-      val(lname+"[o]=true"),
-      a,
-      gotol(this.fail)
-    ]]),
-    casel(check),
-    cond(val("(t.z.length==1)"),[[
-      val("o=t.z.pop()"),
-      val(lname+"[o]=true"),
-      gotol(this.done)
-    ]]),
-    val(lname+"[o]=true"),
-    gotol(this.notd),
-    
-    casel(this.bt),
-    val("o=t.z.pop()"),
-    cond(val("(t.z.length>0)"),[[
-      gotol(check)
-    ]]),
-    a,
-    gotol(this.fail)
-  );
-};
-gplus.prototype.root = plus;
-gplus.prototype.toString = function() {
-  return 'plus('+this.l+')';
-}
-
-function gplusb(l) { // grammar "non-deterministic" edition of plus
-  gts.call(this, this.l = l); // call the parent constructor
-  this.b = true;
-  this.init = new gtr(); // add a transition record for my initial entry point
-  this.bt = new gtr(); // add a transition record for my backtrack entry point
-  this.notd = new gtr();
-  this.done = new gtr();
-}
-derives(gplusb, gts);
-gplusb.prototype.emit = function(c) {
-  var retry = new gtr(); // label for retry spot
-  c.r.push(
-    casel(this.init),d,
-    val("t.z8=[];t.ret={}"), // create containers for the child objects
-    casel(retry)
-  );
-  this.l.emit(c);
-  c.r.push(
-    casel(this.l.done), // left succeeded
-    val("t.i.z8.push(t);t.nd=false"),
-    //cond(val("(t.s==o)"),[[ // child is a zero-length assertion
-    //  gotol(this.done)
-    //]]), // TODO: write tests for whether this is necessary
-    cond(val("(t.i.ret[o])"),[[
-      a,
-      gotol(this.bt)
-    ]]),
-    a,
-    gotol(retry), // try another one
-    
-    casel(this.l.notd), // left succeeded
-    val("t.i.z8.push(t);t.nd=true"),
-    cond(val("(t.i.ret[o])"),[[
-      a,
-      gotol(this.bt)
-    ]]),
-    a,
-    gotol(retry), // try another one
-    
-    casel(this.l.fail), // left hit its base case
-    cond(val("(t.z8.length==0)"),[[
-      a,
-      gotol(this.fail)
-    ]]),
-    
-    cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
-      gotol(this.done)
-    ]]),
-    val("t.ret[o]=true"),
-    gotol(this.notd),
-    
-    casel(this.bt),
-    val("u=t.z8.pop()"),
-    cond(val("(u.nd)"),[[
-      val("o=u.s"),
-      cond(val("(t.ret[o])"),[[
-        gotol(this.bt)
-      ]]),
-      val("t=u"),
-      gotol(this.l.bt)
-    ]]),
-    cond(val("(t.z8.length==0)"),[[
-      a,
-      gotol(this.fail)
-    ]]),
-    val("o=u.s"),
-    cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
-      gotol(this.done)
-    ]]),
-    cond(val("(t.ret[o])"),[[
-      gotol(this.bt)
-    ]]),
-    val("t.ret[o]=true"),
-    gotol(this.notd)
-  );
-};
-gplusb.prototype.root = plus;
-gplusb.prototype.toString = function() {
-  return 'plus('+this.l+')';
+  var r = l.b
+    ? new grepeatb(l,1,null) // nondeterministic version of plus
+    : new grepeat(l,1,null); // deterministic version of plus
+  r.toString = function() {
+    return 'plus('+l+')';
+  };
+  r.regen = function(grammar) {
+    return plus(this.l.l);
+  }
 }
 
 function star(l) {
@@ -1057,14 +922,14 @@ function star(l) {
     return 'star('+l+')';
   };
   r.regen = function(grammar) {
-    return new star(this.l.l);
+    return star(this.l.l);
   }
   return r;
 }
 
 function repeat(l,min,max) {
   return min<=0
-    ? max<=0
+    ? (max!==null && max==0) // max===null means max is infinite (plus or star)
       ? empty()
       : either(repeat(l,1,max),empty())
     : l.b
@@ -1084,53 +949,45 @@ function grepeat(l,min,max) { // grammar "deterministic" edition of repeat
 }
 derives(grepeat, gts);
 grepeat.prototype.emit = function(c) {
-  var retry = new gtr(), check = new gtr(); // label for retry spot
-  var lname = "l"+this.init.id;
+  var retry = new gtr(); // label for retry spot
   c.r.push(
-    val("var "+lname),
-    casel(this.init),
-    cond(val("(("+lname+"||("+lname+"={}))[o])"),[[
-      gotol(this.fail)
-    ]]),
-    val(lname+"[o]=true"),
-    d,
-    val("t.z=[]"), // create a container for the match offsets
+    casel(this.init),d,
+    val("t.z=[]"),
     casel(retry)
   );
   this.l.emit(c);
-  c.r.push( // left succeeded
-    cond(val("(t.s==o)"),[[ // child is a zero-length assertion
+  c.r.push(
+    cond(val("(o==t.s)"),[[
       gotol(this.done)
     ]]),
-    val("t.z.push(o)"),
-    cond(val("(t.z.length<"+this.max+")"),[[
-      gotol(retry) // try another one
-    ],[
-      gotol(this.max > this.min ? this.notd : this.done)
-    ]]),
+    val("t.z.push(o)")
+  );
+  if (this.max===null) {
+    c.r.push(gotol(retry));
+  } else {
+    c.r.push(
+      cond(val("(t.z.length<"+this.max+")"),[[
+        gotol(retry) // try another one
+      ],val("(t.z.length>"+this.min+")"),[
+        gotol(this.notd)
+      ],[
+        gotol(this.done)
+      ]])
+    );
+  }
+  c.r.push(
+    casel(this.bt),
+    val("t.z.pop();o=t.z[t.z.length-1]"),
     
-    casel(this.l.fail), // left hit its base case
+    casel(this.l.fail),
     cond(val("(t.z.length<"+this.min+")"),[[
-      val(lname+"[o]=true"),
       a,
       gotol(this.fail)
-    ]]),
-    casel(check),
-    cond(val("(t.z.length==1)"),[[
-      val("o=t.z.pop()"),
-      val(lname+"[o]=true"),
+    ],val("(t.z.length=="+this.min+")"),[
       gotol(this.done)
-    ]]),
-    val(lname+"[o]=true"),
-    gotol(this.notd),
-    
-    casel(this.bt),
-    val("o=t.z.pop()"),
-    cond(val("(t.z.length>="+this.min+")"),[[
-      gotol(check)
-    ]]),
-    a,
-    gotol(this.fail)
+    ],[
+      gotol(this.notd)
+    ]])
   );
 };
 grepeat.prototype.toString = function() {
@@ -1139,9 +996,11 @@ grepeat.prototype.toString = function() {
       ? this.min.toString()
       : this.min.toString()+','+this.max.toString()
   )+')';
-}
+};
 
-function grepeatb(l) { // grammar "non-deterministic" edition of plus
+function grepeatb(l,min,max) { // grammar "non-deterministic" edition of plus
+  this.min = min;
+  this.max = max;
   gts.call(this, this.l = l); // call the parent constructor
   this.b = true;
   this.init = new gtr(); // add a transition record for my initial entry point
@@ -1149,72 +1008,93 @@ function grepeatb(l) { // grammar "non-deterministic" edition of plus
   this.notd = new gtr();
   this.done = new gtr();
 }
-derives(gplusb, gts);
-gplusb.prototype.emit = function(c) {
+derives(grepeatb, gts);
+grepeatb.prototype.emit = function(c) {
   var retry = new gtr(); // label for retry spot
   c.r.push(
     casel(this.init),d,
-    val("t.z8=[];t.ret={}"), // create containers for the child objects
-    casel(retry)
+    val("t.z=[];t.b=0;t.tr={};t.ret={}"), // create containers for the child objects
+    casel(retry),
+    val("t.tr[t.z.length+'.'+o]=1")
   );
   this.l.emit(c);
+  var check = new gtr();
   c.r.push(
     casel(this.l.done), // left succeeded
-    val("t.i.z8.push(t);t.nd=false"),
-    //cond(val("(t.s==o)"),[[ // child is a zero-length assertion
-    //  gotol(this.done)
-    //]]), // TODO: write tests for whether this is necessary
-    cond(val("(t.i.ret[o])"),[[
-      a,
-      gotol(this.bt)
-    ]]),
+    val("t.i.z.push(t);t.nd=false;t.e=o"),
     a,
-    gotol(retry), // try another one
-    
-    casel(this.l.notd), // left succeeded
-    val("t.i.z8.push(t);t.nd=true"),
-    cond(val("(t.i.ret[o])"),[[
-      a,
-      gotol(this.bt)
-    ]]),
-    a,
-    gotol(retry), // try another one
-    
-    casel(this.l.fail), // left hit its base case
-    cond(val("(t.z8.length==0)"),[[
-      a,
-      gotol(this.fail)
-    ]]),
-    
-    cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
-      gotol(this.done)
-    ]]),
-    val("t.ret[o]=true"),
-    gotol(this.notd),
-    
-    casel(this.bt),
-    val("u=t.z8.pop()"),
-    cond(val("(u.nd)"),[[
-      val("o=u.s"),
-      cond(val("(t.ret[o])"),[[
-        gotol(this.bt)
-      ]]),
-      val("t=u"),
-      gotol(this.l.bt)
-    ]]),
-    cond(val("(t.z8.length==0)"),[[
-      a,
-      gotol(this.fail)
-    ]]),
-    val("o=u.s"),
-    cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
-      gotol(this.done)
-    ]]),
     cond(val("(t.ret[o])"),[[
       gotol(this.bt)
     ]]),
-    val("t.ret[o]=true"),
-    gotol(this.notd)
+    cond((this.max===null
+        ? val("(!t.tr[t.z.length+'.'+o])")
+        : val("(t.z.length<"+this.max+"&&!t.tr[t.z.length+'.'+o])")),[[
+      gotol(retry) // try another one
+    ],val("((t.z.length>"+this.min+")||(t.z.length=="+this.min+"&&t.b>0))"),[
+      val("(t.ret[o]=1)"),
+      gotol(this.notd)
+    ],val("(t.z.length<"+this.min+")"),[
+      gotol(this.bt)
+    ],[ // we are at a base case for this repetition.
+      gotol(this.done)
+    ]]),
+    
+    casel(this.l.notd), // left succeeded
+    val("t.i.z.push(t);t.nd=true;t.e=o"),
+    a,
+    val("++t.b"), // increment the number of possible backtracks.
+    cond(val("(t.ret[o])"),[[
+      gotol(this.bt)
+    ]]),
+    cond((this.max===null
+        ? val("(!t.tr[t.z.length+'.'+o])")
+        : val("(t.z.length<"+this.max+"&&!t.tr[t.z.length+'.'+o])")),[[
+      gotol(retry) // try another one
+    ],val("(t.z.length<"+this.min+")"),[
+      gotol(this.bt)
+    ],[
+      val("(t.ret[o]=1)"),
+      gotol(this.notd)
+    ]]),
+    
+    casel(this.bt),
+    val("u=t.z.pop()"),
+    cond(val("(u.nd)"),[[
+      val("--t.b;o=u.s"),
+      //cond(val("(t.ret[o])"),[[
+      //  gotol(this.bt)
+      //]]),
+      val("t=u"),
+      gotol(this.l.bt)
+    ]]),
+    val("o=u.s"),
+    cond(val("(!t.ret[o])"),[[
+      cond(val("((t.z.length>"+this.min+")||(t.z.length=="+this.min+"&&t.b>0))"),[[
+        val("(t.ret[o]=1)"),
+        gotol(this.notd)
+      ]]),
+      gotol(this.done)
+    ]]),
+    
+    casel(this.l.fail),
+    cond(val("(t.z.length<"+this.min+")"),[[
+      val("o=(t.z[t.z.length-1]||{e:t.s}).e"),
+      cond(val("(!t.tr[t.z.length+'.'+o])"),[[
+        gotol(retry)
+      ]]),
+      cond(val("(t.b>0)"),[[
+        gotol(this.bt)
+      ],[
+        a,
+        gotol(this.fail)
+      ]])
+    ],val("(t.b>0||t.z.length>="+this.min+")"),[
+    // at least 1 of the children says it's not done, or we have > the minimum.
+      gotol(this.bt)
+    ],[ // we are at a base case for this repetition.
+      val("o=t.z[t.z.length-1].e"), // back up to the last end, if necessary.
+      gotol(this.done)
+    ]])
   );
 };
 grepeatb.prototype.toString = function() {
@@ -1350,23 +1230,13 @@ Grammar.prototype.parse = function(input) {
   return this.parse(input);
 }
 
-var dbg = 0;
+var dbg = 1;
 
 var g = new Grammar('wp6');
 
-g.addPattern('stuff', either(both(dot(),pref('stuff')),dot()));
-g.addPattern('final anchor', end());
-g.TOP = g.addPattern('toplevel', both(pref('stuff'),end()));
+g.addPattern('toplevel', both(repeat(repeat(dot(),1,2),3,3),end()));
 
-var input = utf32str(Array(1<<1).join('a'));
-
-g.parse(input);
-
-g = new Grammar('wp6');
-
-g.addPattern('toplevel', both(repeat(dot(),5,5),end()));
-
-var input = utf32str(Array(5).join('a'));
+var input = utf32str(Array(4).join('a'));
 
 g.parse(input);
 
