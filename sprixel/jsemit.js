@@ -86,6 +86,18 @@ Array.prototype.mapVals = function(fun) {
   return res;
 };
 
+function keys(o) {
+  var res = [], j=-1; for(var i in o) res[++j] = i; return res;
+}
+
+function values(o) {
+  if (o.__prototype__===Array.prototype) {
+    for(var res=[],j=-1,l=o.length;++j<l;res[j]=v(o[j]));
+    return res;
+  }
+  var res = [], j=-1;
+  for(var i in o) res[++j] = o[i]; return res;
+}
 
 var derives = (function() {
   function F() {} // cause a constructor's prototype chain to inherit from another's
@@ -408,10 +420,10 @@ gpref.prototype.emit = function(c) {
   }
 };
 gpref.prototype.computeRefs = function(pats, name, refs) {
-  var hasIt = refs.hasOwnProperty(name);
-  refs[name] = true;
+  var hasIt = refs.hasOwnProperty(this.name);
+  refs[this.name] = true;
   if (!hasIt && name != this.name) // prevent cyclical recursion
-    pats[name].computeRefs(pats, name, refs);
+    pats[this.name].computeRefs(pats, name, refs);
 };
 function pref(name) { return new gpref(name) }
 gpref.prototype.toString = function() {
@@ -433,9 +445,11 @@ function gcallt(l) { // grammar "call target" parser builder
 derives(gcallt, gts);
 gcallt.prototype.emit = function(c) {
   c.r.push(
-    casel(this.init),
-    gotol(this.l.init),
-    
+    casel(this.init)
+    //gotol(this.l.init)
+  );
+  this.l.emit(c);
+  c.r.push(
     casel(this.l.done),
     val("t=t.i;gl=t.dl;break"),
     
@@ -443,7 +457,7 @@ gcallt.prototype.emit = function(c) {
     val("t.i.r=t;t=t.i;gl=t.nl;break"),
     
     casel(this.l.fail),
-    val("gl=t.fl;break"),
+    val("gl=t.fl;t=t.i;break"),
     
     casel(this.bt),
     val("t=t.r"),
@@ -587,11 +601,11 @@ function gbothrs(l, r) { // grammar "both right nondeterministic" parser builder
 }
 derives(gbothrs, gts);
 gbothrs.prototype.emit = function(c) {
-  this.l.fail = this.fail;
-  this.l.emit(c);
+  this.l.fail = this.r.fail;
   c.r.push(
     casel(this.init),d // initial entry point
   );
+  this.l.emit(c);
   this.r.emit(c);
   c.r.push(
     casel(this.r.done), // right succeeded with finality
@@ -716,9 +730,9 @@ geither.prototype.emit = function(c) {
     casel(this.bt)
   );
   this.r.emit(c);
-  //c.r.push(
-  //  gotol(this.done)
-  //);
+  c.r.push(
+    gotol(this.done)
+  );
 };
 geither.prototype.root = either;
 geither.prototype.toString = function() {
@@ -769,8 +783,7 @@ geitherls.prototype.emit = function(c) {
   );
   this.r.emit(c);
   c.r.push(
-    a//,
-    //gotol(this.done)
+    gotol(this.done)
   );
 };
 geitherls.prototype.root = either;
@@ -1120,30 +1133,37 @@ Grammar.prototype.compile = function(interpreterState) {
       // wrap the pattern in a call target
       this.pats[name] = new gcallt(pat);
       this.pats[name].isRecursive = true;
+      if (pat===this.TOP)
+        this.TOP = this.pats[name]; // fixup the TOP one
     }
     /*// discover/mark whether the pattern has any references at all
     resolutionActivated = false;
     pat.cur();*/
   }
-  // second pass: actually resolve the named references, now that
-  //   we know which ones are recursive.
-  for (var name in this.pats) {
-    var pat = this.pats[name];
-    
-  }
   
   var routine = dbg
-    ? func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case 0:")])
-    : func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){next:switch(gl){case 0:")]); // empty parser routine
+    ? func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case -2:")])
+    : func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){next:switch(gl){case -2:")]); // empty parser routine
 
   var g = this.TOP;
 
   //g = g.regen();
 
-  g.fail = {id:1};
-  g.done = g.notd = {id:-1};
+  g.fail = new gtr(); g.fail.id = 1;
+  g.done = g.notd = new gtr(); g.done.id = -1;
   
   routine.g = this;
+  
+  // second pass: resolve & emit the named references, now that
+  //   we know which ones are recursive.
+  for (var name in this.pats) {
+    var pat = this.pats[name];
+    if (pat.isRecursive && pat!==this.TOP) {
+      pat.emit(routine);
+    }
+  }
+  
+  routine.r.push(val("case 0:"));
   
   g.emit(routine); // have the grammar emit its specialize parser code to this routine
 
@@ -1166,17 +1186,13 @@ Grammar.prototype.parse = function(input) {
 
 var dbg = 0;
 
-
-
 var g = new Grammar('wp6');
 
-g.addPattern('stuff', either(both(dot(),pref('stuff')),empty()));
+g.addPattern('stuff', either(both(dot(),pref('stuff')),dot()));
 g.addPattern('final anchor', end());
-g.TOP = g.addPattern('toplevel', both(pref('stuff'),pref('final anchor')));
+g.TOP = g.addPattern('toplevel', both(pref('stuff'),end()));
 
-
-
-var input = utf32str(Array(1<<6).join('\uffff'));
+var input = utf32str(Array(1<<10).join('\uffff'));
 
 g.parse(input);
 
