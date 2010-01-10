@@ -385,14 +385,26 @@ gpref.prototype.emit = function(c) {
   var pat = pats[this.name];
   if (!pat.isRecursive) { // inline a replica of the callsite here, deeply.
     var clone = pat.regen(c.g);
-    clone.fail = this.fail;
-    clone.notd = this.notd;
-    clone.done = this.done;
-    clone.init = this.init;
-    clone.bt = this.bt;
+    clone.fail = this.fail; // fixup the label references
+    if (clone.b) {
+      clone.notd = this.notd;
+      clone.done = this.done;
+      clone.init = this.init;
+      clone.bt = this.bt;
+    }
     clone.emit(c);
+    if (!clone.b) // some combinators aren't aligned perfectly
+      c.r.push(gotol(this.done));
   } else {
-    throw 'recursive references not yet implemented';
+    // emit a callsite such that the target site routes correctly (dynamically).
+    c.r.push(
+      casel(this.init),d,
+      val("t.dl="+this.done.id+";t.nl="+this.notd.id+";t.fl="+this.fail.id),
+      gotol(pat.init),
+      // the other half of this routine is constructed by gcallt (call target)
+      casel(this.bt),
+      gotol(pat.bt)
+    );
   }
 };
 gpref.prototype.computeRefs = function(pats, name, refs) {
@@ -409,6 +421,35 @@ gpref.prototype.regen = function(grammar) {
   return new gpref(this.name);
 };
 gpref.prototype.root = pref;
+
+function gcallt(l) { // grammar "call target" parser builder
+  gts.call(this); // call the parent constructor
+  this.l = l;
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gcallt, gts);
+gcallt.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),
+    gotol(this.l.init),
+    
+    casel(this.l.done),
+    val("t=t.i;gl=t.dl;break"),
+    
+    casel(this.l.notd),
+    val("t.i.r=t;t=t.i;gl=t.nl;break"),
+    
+    casel(this.l.fail),
+    val("gl=t.fl;break"),
+    
+    casel(this.bt),
+    val("t=t.r"),
+    gotol(this.l.bt)
+  );
+};
 
 function gbeg() { // grammar "beginning anchor" parser builder
   gts.call(this); // call the parent constructor
@@ -1075,7 +1116,11 @@ Grammar.prototype.compile = function(interpreterState) {
     pat.namedRefs = refs;
     // if a pattern is not recursive, it can be inlined (but cloned
     //   so the labels/gotos are still unique) into its referer.
-    pat.isRecursive = isRecursive;
+    if (pat.isRecursive = isRecursive) {
+      // wrap the pattern in a call target
+      this.pats[name] = new gcallt(pat);
+      this.pats[name].isRecursive = true;
+    }
     /*// discover/mark whether the pattern has any references at all
     resolutionActivated = false;
     pat.cur();*/
@@ -1125,7 +1170,7 @@ var dbg = 0;
 
 var g = new Grammar('wp6');
 
-g.addPattern('stuff', star(dot()));
+g.addPattern('stuff', either(both(dot(),pref('stuff')),empty()));
 g.addPattern('final anchor', end());
 g.TOP = g.addPattern('toplevel', both(pref('stuff'),pref('final anchor')));
 
