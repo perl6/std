@@ -1,5 +1,5 @@
 // codegen.cpp
-// convert from Abstract Syntax Tree to Intermediate Representation
+// convert a whole Abstract Syntax Tree to Intermediate Representation
 #include <assert.h>             // assert
 #include "villCompiler.h"       // villCompiler and core of LLVM
 #include "llvm/Instructions.h"  // BinaryOperator ConstantInt FunctionType ReturnInst
@@ -7,15 +7,16 @@
 void
 villCompiler::codegen() {
   // Create the main function: first create the type 'int ()'
-  FunctionType *FT =
-    FunctionType::get(Type::getInt32Ty(villContext), /*not vararg*/false);
+  FunctionType *FT = FunctionType::get(Type::getInt32Ty(villContext),
+    false); // the second param means not a vararg function
 
-  // By passing a module as the last parameter to the Function constructor,
-  // it automatically gets appended to the Module.
-  Function *F = Function::Create(FT, Function::ExternalLinkage, "main", villModule);
+  // By passing a module as the last parameter to the Function
+  // constructor, it automatically gets appended to the Module.
+  Function *F = Function::Create(FT, Function::ExternalLinkage, "main",
+    villModule);
 
-  // Add a basic block to the function... again, it automatically inserts
-  // because of the last argument.
+  // Add a basic block to the function... again, it automatically
+  // inserts because of the last argument.
   BasicBlock *BB = BasicBlock::Create(villContext, "EntryBlock", F);
 
   make_puts( BB, "vill compiled A" );
@@ -25,8 +26,8 @@ villCompiler::codegen() {
   Value *Three = ConstantInt::get(Type::getInt32Ty(villContext), 3);
 
   // Create the add instruction... does not insert...
-  Instruction *Add = BinaryOperator::Create(Instruction::Add, Two, Three,
-                                            "addresult");
+  Instruction *Add = BinaryOperator::Create(Instruction::Add, Two,
+    Three, "addresult");
 
   // explicitly insert it into the basic block...
   BB->getInstList().push_back(Add);
@@ -34,8 +35,8 @@ villCompiler::codegen() {
   // start at the top of the Abstract Syntax Tree.
   //  Call the Perl 6 "action" handlers for the language
   // elements (comp_unit, statementlist etc) as they are encountered.
-  assert( AST != NULL );         // TODO: remove after testing has
-  assert( AST -> data != NULL ); // TODO: verified that these are OK
+  assert( AST != NULL );
+  assert( AST -> data != NULL );
   function_pointer Codegen = (function_pointer) AST -> data;
   Value * result = Codegen( this, AST ); // Compile the entire comp_unit
   make_puts( BB, "vill compiled Z" );

@@ -414,7 +414,7 @@ integrity of the composed AST looks good though, for example try:
 
     ./vill -Ds -e'say "syntax tree";'
 
-Despite item 1. stalling, test runs of ./vill -DU -e'say "test codegen"'
+Despite item 1. stalling, test runs of ./vill -DU -e'print 12 + 34'
 and similar show the entire AST being traversed.  The -DU option allows
 ad hoc checking of link_codegen() and codegen() operation, which is not
 complete but correct so far.  Therefore work is continuing on item 2. as
