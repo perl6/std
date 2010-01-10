@@ -970,7 +970,7 @@ gplus.prototype.toString = function() {
   return 'plus('+this.l+')';
 }
 
-function gplusb(l) { // grammar "deterministic" edition of plus
+function gplusb(l) { // grammar "non-deterministic" edition of plus
   gts.call(this, this.l = l); // call the parent constructor
   this.b = true;
   this.init = new gtr(); // add a transition record for my initial entry point
@@ -1061,6 +1061,172 @@ function star(l) {
   }
   return r;
 }
+
+function repeat(l,min,max) {
+  return min<=0
+    ? max<=0
+      ? empty()
+      : either(repeat(l,1,max),empty())
+    : l.b
+      ? new grepeatb(l,min,max) // nondeterministic version of repeat
+      : new grepeat(l,min,max); // deterministic version of repeat
+}
+
+function grepeat(l,min,max) { // grammar "deterministic" edition of repeat
+  this.min = min;
+  this.max = max;
+  gts.call(this, this.l = l); // call the parent constructor
+  this.b = true;
+  this.init = new gtr(); // add a transition record for my initial entry point
+  this.bt = new gtr(); // add a transition record for my backtrack entry point
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(grepeat, gts);
+grepeat.prototype.emit = function(c) {
+  var retry = new gtr(), check = new gtr(); // label for retry spot
+  var lname = "l"+this.init.id;
+  c.r.push(
+    val("var "+lname),
+    casel(this.init),
+    cond(val("(("+lname+"||("+lname+"={}))[o])"),[[
+      gotol(this.fail)
+    ]]),
+    val(lname+"[o]=true"),
+    d,
+    val("t.z=[]"), // create a container for the match offsets
+    casel(retry)
+  );
+  this.l.emit(c);
+  c.r.push( // left succeeded
+    cond(val("(t.s==o)"),[[ // child is a zero-length assertion
+      gotol(this.done)
+    ]]),
+    val("t.z.push(o)"),
+    cond(val("(t.z.length<"+this.max+")"),[[
+      gotol(retry) // try another one
+    ],[
+      gotol(this.max > this.min ? this.notd : this.done)
+    ]]),
+    
+    casel(this.l.fail), // left hit its base case
+    cond(val("(t.z.length<"+this.min+")"),[[
+      val(lname+"[o]=true"),
+      a,
+      gotol(this.fail)
+    ]]),
+    casel(check),
+    cond(val("(t.z.length==1)"),[[
+      val("o=t.z.pop()"),
+      val(lname+"[o]=true"),
+      gotol(this.done)
+    ]]),
+    val(lname+"[o]=true"),
+    gotol(this.notd),
+    
+    casel(this.bt),
+    val("o=t.z.pop()"),
+    cond(val("(t.z.length>="+this.min+")"),[[
+      gotol(check)
+    ]]),
+    a,
+    gotol(this.fail)
+  );
+};
+grepeat.prototype.toString = function() {
+  return 'repeat('+this.l+','+(
+    this.min==this.max
+      ? this.min.toString()
+      : this.min.toString()+','+this.max.toString()
+  )+')';
+}
+
+function grepeatb(l) { // grammar "non-deterministic" edition of plus
+  gts.call(this, this.l = l); // call the parent constructor
+  this.b = true;
+  this.init = new gtr(); // add a transition record for my initial entry point
+  this.bt = new gtr(); // add a transition record for my backtrack entry point
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gplusb, gts);
+gplusb.prototype.emit = function(c) {
+  var retry = new gtr(); // label for retry spot
+  c.r.push(
+    casel(this.init),d,
+    val("t.z8=[];t.ret={}"), // create containers for the child objects
+    casel(retry)
+  );
+  this.l.emit(c);
+  c.r.push(
+    casel(this.l.done), // left succeeded
+    val("t.i.z8.push(t);t.nd=false"),
+    //cond(val("(t.s==o)"),[[ // child is a zero-length assertion
+    //  gotol(this.done)
+    //]]), // TODO: write tests for whether this is necessary
+    cond(val("(t.i.ret[o])"),[[
+      a,
+      gotol(this.bt)
+    ]]),
+    a,
+    gotol(retry), // try another one
+    
+    casel(this.l.notd), // left succeeded
+    val("t.i.z8.push(t);t.nd=true"),
+    cond(val("(t.i.ret[o])"),[[
+      a,
+      gotol(this.bt)
+    ]]),
+    a,
+    gotol(retry), // try another one
+    
+    casel(this.l.fail), // left hit its base case
+    cond(val("(t.z8.length==0)"),[[
+      a,
+      gotol(this.fail)
+    ]]),
+    
+    cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
+      gotol(this.done)
+    ]]),
+    val("t.ret[o]=true"),
+    gotol(this.notd),
+    
+    casel(this.bt),
+    val("u=t.z8.pop()"),
+    cond(val("(u.nd)"),[[
+      val("o=u.s"),
+      cond(val("(t.ret[o])"),[[
+        gotol(this.bt)
+      ]]),
+      val("t=u"),
+      gotol(this.l.bt)
+    ]]),
+    cond(val("(t.z8.length==0)"),[[
+      a,
+      gotol(this.fail)
+    ]]),
+    val("o=u.s"),
+    cond(val("(t.z8.length==1&&t.z8[0].nd==false)"),[[
+      gotol(this.done)
+    ]]),
+    cond(val("(t.ret[o])"),[[
+      gotol(this.bt)
+    ]]),
+    val("t.ret[o]=true"),
+    gotol(this.notd)
+  );
+};
+grepeatb.prototype.toString = function() {
+  return 'repeat('+this.l+','+(
+    this.min==this.max
+      ? this.min.toString()
+      : this.min.toString()+','+this.max.toString()
+  )+')';
+};
+grepeatb.prototype.regen = function(grammar) {
+  return repeat(this.l, this.min, this.max);
+};
 
 function utf32str_charAt(offset) {
   return String.fromCharCode(this[offset]);
@@ -1192,11 +1358,17 @@ g.addPattern('stuff', either(both(dot(),pref('stuff')),dot()));
 g.addPattern('final anchor', end());
 g.TOP = g.addPattern('toplevel', both(pref('stuff'),end()));
 
-var input = utf32str(Array(1<<10).join('\uffff'));
+var input = utf32str(Array(1<<1).join('a'));
 
 g.parse(input);
 
+g = new Grammar('wp6');
 
+g.addPattern('toplevel', both(repeat(dot(),5,5),end()));
+
+var input = utf32str(Array(5).join('a'));
+
+g.parse(input);
 
 
 
