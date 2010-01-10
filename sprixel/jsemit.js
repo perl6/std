@@ -906,14 +906,15 @@ geitherlrs.prototype.toString = function() {
 
 function plus(l) {
   var r = l.b
-    ? new grepeatb(l,1,null) // nondeterministic version of plus
-    : new grepeat(l,1,null); // deterministic version of plus
+    ? new grepeatb(l,1,-1) // nondeterministic version of plus
+    : new grepeat(l,1,-1); // deterministic version of plus
   r.toString = function() {
     return 'plus('+l+')';
   };
   r.regen = function(grammar) {
     return plus(this.l.l);
   }
+  return r;
 }
 
 function star(l) {
@@ -928,8 +929,9 @@ function star(l) {
 }
 
 function repeat(l,min,max) {
+  max = max || -1;
   return min<=0
-    ? (max!==null && max==0) // max===null means max is infinite (plus or star)
+    ? (max==0) // max==-1 means max is infinite (plus or star)
       ? empty()
       : either(repeat(l,1,max),empty())
     : l.b
@@ -952,40 +954,49 @@ grepeat.prototype.emit = function(c) {
   var retry = new gtr(); // label for retry spot
   c.r.push(
     casel(this.init),d,
+    dval('print("repeat init at "+o)'),
     val("t.z=[]"),
     casel(retry)
   );
   this.l.emit(c);
   c.r.push(
     cond(val("(o==t.s)"),[[
+        dval('print("repeat done at "+o)'),
       gotol(this.done)
     ]]),
     val("t.z.push(o)")
   );
-  if (this.max===null) {
+  if (this.max==-1) {
     c.r.push(gotol(retry));
   } else {
     c.r.push(
       cond(val("(t.z.length<"+this.max+")"),[[
+        dval('print("repeat retrying at "+o)'),
         gotol(retry) // try another one
       ],val("(t.z.length>"+this.min+")"),[
+        dval('print("repeat not done at "+o)'),
         gotol(this.notd)
       ],[
+        dval('print("repeat done at "+o)'),
         gotol(this.done)
       ]])
     );
   }
   c.r.push(
     casel(this.bt),
+    dval('print("repeat backtrack at "+o)'),
     val("t.z.pop();o=t.z[t.z.length-1]"),
     
     casel(this.l.fail),
     cond(val("(t.z.length<"+this.min+")"),[[
       a,
+      dval('print("repeat fail at "+o)'),
       gotol(this.fail)
     ],val("(t.z.length=="+this.min+")"),[
+        dval('print("repeat done at "+o)'),
       gotol(this.done)
     ],[
+        dval('print("repeat not done at "+o)'),
       gotol(this.notd)
     ]])
   );
@@ -1013,86 +1024,112 @@ grepeatb.prototype.emit = function(c) {
   var retry = new gtr(); // label for retry spot
   c.r.push(
     casel(this.init),d,
+    dval('print("repeatb init at "+o)'),
     val("t.z=[];t.b=0;t.tr={};t.ret={}"), // create containers for the child objects
     casel(retry),
     val("t.tr[t.z.length+'.'+o]=1")
   );
   this.l.emit(c);
-  var check = new gtr();
   c.r.push(
     casel(this.l.done), // left succeeded
+    dval('print("repeatb l.done at "+o)'),
     val("t.i.z.push(t);t.nd=false;t.e=o"),
     a,
     cond(val("(t.ret[o])"),[[
+      dval('print("repeatb going to bt at "+o)'),
       gotol(this.bt)
     ]]),
-    cond((this.max===null
+    dval("print([t.z.length+'.'+o,t.tr[t.z.length+'.'+o]])"),
+    cond((this.max==-1
         ? val("(!t.tr[t.z.length+'.'+o])")
         : val("(t.z.length<"+this.max+"&&!t.tr[t.z.length+'.'+o])")),[[
+      dval('print("repeatb retrying at "+o)'),
       gotol(retry) // try another one
     ],val("((t.z.length>"+this.min+")||(t.z.length=="+this.min+"&&t.b>0))"),[
       val("(t.ret[o]=1)"),
+      dval('print("repeatb notd at "+o)'),
       gotol(this.notd)
     ],val("(t.z.length<"+this.min+")"),[
+      dval('print("repeatb going to bt at "+o)'),
       gotol(this.bt)
     ],[ // we are at a base case for this repetition.
       gotol(this.done)
     ]]),
     
     casel(this.l.notd), // left succeeded
+    dval('print("repeatb l.notd at "+o)'),
     val("t.i.z.push(t);t.nd=true;t.e=o"),
     a,
     val("++t.b"), // increment the number of possible backtracks.
     cond(val("(t.ret[o])"),[[
+      dval('print("repeatb going to bt at "+o)'),
       gotol(this.bt)
     ]]),
-    cond((this.max===null
+    cond((this.max==-1
         ? val("(!t.tr[t.z.length+'.'+o])")
         : val("(t.z.length<"+this.max+"&&!t.tr[t.z.length+'.'+o])")),[[
+      dval('print("repeatb retrying at "+o)'),
       gotol(retry) // try another one
     ],val("(t.z.length<"+this.min+")"),[
+      dval('print("repeatb going to bt at "+o)'),
       gotol(this.bt)
     ],[
       val("(t.ret[o]=1)"),
+      dval('print("repeatb notd at "+o)'),
       gotol(this.notd)
     ]]),
     
     casel(this.bt),
+    dval('print("repeatb bt at "+o)'),
     val("u=t.z.pop()"),
     cond(val("(u.nd)"),[[
       val("--t.b;o=u.s"),
-      //cond(val("(t.ret[o])"),[[
-      //  gotol(this.bt)
-      //]]),
+      cond(val("(t.ret[o])"),[[
+        dval('print("repeatb going to bt at "+o)'),
+        gotol(this.bt)
+      ]]),
       val("t=u"),
+      dval('print("repeatb going to l.bt at "+o)'),
       gotol(this.l.bt)
     ]]),
     val("o=u.s"),
     cond(val("(!t.ret[o])"),[[
       cond(val("((t.z.length>"+this.min+")||(t.z.length=="+this.min+"&&t.b>0))"),[[
         val("(t.ret[o]=1)"),
+        dval('print("repeatb notd at "+o)'),
         gotol(this.notd)
+      ],val("(t.b>0)"),[
+        dval('print("repeatb going to bt at "+o)'),
+        gotol(this.bt)
+      ],[
+        dval('print("repeatb done at "+o)'),
+        gotol(this.done)
       ]]),
-      gotol(this.done)
     ]]),
     
     casel(this.l.fail),
+    dval('print("repeatb l.fail at "+o)'),
     cond(val("(t.z.length<"+this.min+")"),[[
       val("o=(t.z[t.z.length-1]||{e:t.s}).e"),
       cond(val("(!t.tr[t.z.length+'.'+o])"),[[
+        dval('print("repeatb retrying at "+o)'),
         gotol(retry)
       ]]),
       cond(val("(t.b>0)"),[[
+        dval('print("repeatb going44 to bt at "+o)'),
         gotol(this.bt)
       ],[
         a,
+        dval('print("repeatb fail at "+o)'),
         gotol(this.fail)
       ]])
-    ],val("(t.b>0||t.z.length>="+this.min+")"),[
+    ],val("(t.b>0||t.z.length>"+this.min+")"),[
     // at least 1 of the children says it's not done, or we have > the minimum.
+      dval('print("repeatb going55 to bt at "+o)'),
       gotol(this.bt)
     ],[ // we are at a base case for this repetition.
       val("o=t.z[t.z.length-1].e"), // back up to the last end, if necessary.
+      dval('print("repeatb done at "+o)'),
       gotol(this.done)
     ]])
   );
@@ -1230,13 +1267,13 @@ Grammar.prototype.parse = function(input) {
   return this.parse(input);
 }
 
-var dbg = 1;
+var dbg = 0;
 
 var g = new Grammar('wp6');
 
-g.addPattern('toplevel', both(repeat(repeat(dot(),1,2),3,3),end()));
+g.addPattern('toplevel', both(repeat(plus(dot()),1<<8),end()));
 
-var input = utf32str(Array(4).join('a'));
+var input = utf32str(Array((1<<8)+1).join('a'));
 
 g.parse(input);
 
