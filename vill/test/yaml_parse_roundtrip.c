@@ -194,7 +194,7 @@ local_test_commandline( char * commandline ) {
   int status = 0;
   FILE * infile, * outfile;
   printf( "yaml_parse_roundtrip -e %s%.*s", commandline,
-    49 - strlen(commandline),
+    49 - (int)strlen(commandline),
     "................................................." );
   char * viv_command;
   viv_command = malloc( 12 + strlen(commandline) );
@@ -223,7 +223,7 @@ local_test_one_file( char * programfile ) {
   int status;
   FILE * infile, * outfile;
   printf( "yaml_parse_roundtrip %s%.*s", programfile,
-    52 - strlen(programfile),
+    52 - (int)strlen(programfile),
     "...................................................." );
   char * viv_command;
   viv_command = malloc( 7 + strlen(programfile) );

@@ -8,7 +8,7 @@
 #include <unistd.h>            /* getcwd */
 #include "../src/yaml_token.h"  /* yaml_token */
 
-// show where to find the 'viv' Perl 6 parser
+/* show where to find the 'viv' Perl 6 parser */
 #define VIV_RELATIVE_PATH ".."
 
 #define USAGE "\nUsage: %s [options] [programfile]\n" \
@@ -124,7 +124,7 @@ local_test_commandline( char * commandline ) {
   int status = 0;
   FILE * infile, * outfile;
   printf( "yaml_token_roundtrip -e %s%.*s", commandline,
-    49 - strlen(commandline),
+    49 - (int)strlen(commandline),
     "................................................." );
   char * viv_command;
   viv_command = malloc( 12 + strlen(commandline) );
@@ -153,7 +153,7 @@ local_test_one_file( char * programfile ) {
   int status;
   FILE * infile, * outfile;
   printf( "yaml_token_roundtrip %s%.*s", programfile,
-    52 - strlen(programfile),
+    52 - (int)strlen(programfile),
     "...................................................." );
   char * viv_command;
   viv_command = malloc( 7 + strlen(programfile) );

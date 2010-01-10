@@ -17,9 +17,9 @@
 #include <string.h>  /* strlen */
 #include <unistd.h>  /* getcwd */
 #include "../src/graph_traverse.h"  /* graph_node */
-//#include "../src/yaml_compose_internal.h"  /* graph_node */
+/* #include "../src/yaml_compose_internal.h" */ /* graph_node */
 
-// show where to find the 'viv' Perl 6 parser
+/* show where to find the 'viv' Perl 6 parser */
 #define VIV_RELATIVE_PATH ".."
 
 void local_mapping(  FILE *, struct graph_node *, struct graph_node *);
@@ -173,7 +173,7 @@ local_test_commandline( char * commandline ) {
   int status = 0;
   FILE * infile, * outfile;
   printf( "yaml_compose_roundtrip -e %s%.*s", commandline,
-    47 - strlen(commandline),
+    47 - (int)strlen(commandline),
     "................................................." );
   char * viv_command;
   viv_command = (char *) malloc( 12 + strlen(commandline) );
@@ -201,7 +201,7 @@ local_test_one_file( char * programfile ) {
   int status;
   FILE * infile, * outfile;
   printf( "yaml_compose_roundtrip %s%.*s", programfile,
-    50 - strlen(programfile),
+    50 - (int)strlen(programfile),
     ".................................................." );
   char * viv_command;
   viv_command = (char *) malloc( 7 + strlen(programfile) );
