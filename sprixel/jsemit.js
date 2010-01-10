@@ -465,6 +465,57 @@ gcallt.prototype.emit = function(c) {
   );
 };
 
+function group(l,name) { return new ggroup(l,name) }
+function ggroup(l,name) { // grammar "group (named & anonymous)" parser builder
+  gts.call(this); // call the parent constructor
+  if (typeof name == 'undefined') {
+    this.anon = true;
+    throw 'anonymous captures not yet supported';
+  } else {
+    this.anon = false;
+    this.name = name;
+  }
+  this.l = l;
+  if (this.b = this.l.b) { // inherit backtrackability from the child
+    this.init = new gtr();
+    this.bt = new gtr();
+    this.notd = new gtr();
+    this.done = new gtr();
+  }
+}
+derives(ggroup, gts);
+ggroup.prototype.emit = function(c) {
+    c.r.push(
+      casel(this.init),
+      val("m={m:m,s:o,c:{},i:[]"+(
+        this.anon ? "" : ",n:"+this.name.toQuotedString()
+      )+"};m.m.c["+this.name.toQuotedString()+"]=m") // append to the end of the match linked list
+    );
+  if (this.b) { // need these iff we're backtrackable (non-deterministic)
+    this.l.emit(c);
+    c.r.push(
+      casel(this.l.done),
+      val("for(var q in m.c){if(!m.m.c.hasOwnProperty(q))m.m.c[q]=m.c[q]};m=m.m"),
+      gotol(this.done),
+      
+      casel(this.l.notd),
+      val("for(var q in m.c){if(!m.m.c.hasOwnProperty(q))m.m.c[q]=m.c[q]};m=m.m"),
+      gotol(this.notd),
+      
+      casel(this.l.fail),
+      val("m=m.m"),
+      gotol(this.fail),
+      
+      casel(this.bt),
+      val("m=m.c["+this.name.toQuotedString()+"]||{m:m,s:o,c:{},i:[]"+(
+        this.anon ? "" : ",n:"+this.name.toQuotedString()
+      )+"}"),
+      gotol(this.l.bt)
+    );
+  }
+};
+ggroup.prototype.root = group;
+
 function gbeg() { // grammar "beginning anchor" parser builder
   gts.call(this); // call the parent constructor
   this.b = false;
@@ -1039,7 +1090,7 @@ grepeatb.prototype.emit = function(c) {
       dval('print("repeatb going to bt at "+o)'),
       gotol(this.bt)
     ]]),
-    dval("print([t.z.length+'.'+o,t.tr[t.z.length+'.'+o]])"),
+    //dval("print([t.z.length+'.'+o,t.tr[t.z.length+'.'+o]])"),
     cond((this.max==-1
         ? val("(!t.tr[t.z.length+'.'+o])")
         : val("(t.z.length<"+this.max+"&&!t.tr[t.z.length+'.'+o])")),[[
@@ -1080,6 +1131,7 @@ grepeatb.prototype.emit = function(c) {
     ]]),
     
     casel(this.bt),
+    //dval("print(keys(t))"),
     dval('print("repeatb bt at "+o)'),
     val("u=t.z.pop()"),
     cond(val("(u.nd)"),[[
@@ -1125,6 +1177,11 @@ grepeatb.prototype.emit = function(c) {
       ]])
     ],val("(t.b>0||t.z.length>"+this.min+")"),[
     // at least 1 of the children says it's not done, or we have > the minimum.
+      val("o=(t.z[t.z.length-1]||{e:t.s}).e"),
+      cond(val("(!t.ret[o])"),[[
+        dval('print("repeatb notd at "+o)'),
+        gotol(this.notd)
+      ]]),
       dval('print("repeatb going55 to bt at "+o)'),
       gotol(this.bt)
     ],[ // we are at a base case for this repetition.
@@ -1185,8 +1242,10 @@ function Grammar(name, parent) {
   this.isRoot = !parent; // boolify its definedness
   this.parent = parent;
   this.name = name;
+  this.compiled = false;
 }
 Grammar.prototype.addPattern = function(name, pattern) {
+  pattern = group(pattern,name);
   if (this.pats.hasOwnProperty(name))
     throw 'Pattern '+name+' already defined in grammar '+this.name;
   this.pats[name] = pattern;
@@ -1225,15 +1284,17 @@ Grammar.prototype.compile = function(interpreterState) {
   }
   
   var routine = dbg
-    ? func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case -2:")])
-    : func(["i"],[val("var gl=0,o=0,t={},c;t.i=t;last:for(;;){next:switch(gl){case -2:")]); // empty parser routine
+    ? func(["i","g","gl","o","t"],[val("var m={t:t,c:{}};m.m=m;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case -4:")])
+    : func(["i","g","gl","o","t"],[val("var m={t:t,c:{}};m.m=m;t.i=t;last:for(;;){next:switch(gl){case -4:")]); // empty parser routine
 
   var g = this.TOP;
 
   //g = g.regen();
 
   g.fail = new gtr(); g.fail.id = 1;
-  g.done = g.notd = new gtr(); g.done.id = -1;
+  g.done = new gtr(); g.done.id = -1;
+  g.notd = new gtr(); g.notd.id = -2;
+  g.bt = new gtr(); g.bt.id = -3;
   
   routine.g = this;
   
@@ -1250,36 +1311,60 @@ Grammar.prototype.compile = function(interpreterState) {
   
   g.emit(routine); // have the grammar emit its specialize parser code to this routine
 
-  routine.r.push(val("case -1:/*print('parse succeeded');*/break last;case 1:default:print('parse failed');break last}}")); // finalize the routine
+  routine.r.push(val("case -1:if(dbg)print('parse succeeded');return new Match(t,m.m,g,i,o,true);case -2:if(dbg)print('parse succeeded, but is not completed');return new Match(t,m.m,g,i,o,false);case 1:default:print('parse failed');break last}}")); // finalize the routine
 
   var parserf = routine.emit();
 
   if (dbg)
     print(parserf);
 
-  this.parse = eval(parserf); // compile the javascript function to machine code
+  this.parser = eval(parserf); // compile the javascript function to machine code
 
   if (dbg)
     print('compiled');
+  
+  this.compiled = true;
 }
 Grammar.prototype.parse = function(input) {
-  this.compile();
-  return this.parse(input);
+  if (!this.compiled)
+    this.compile();
+  return this.parser(input,this,0,0,{});
 }
+Grammar.prototype.next = function(input,t,o) {
+  return this.parser(input,this,-3,o,t);
+}
+
+function Match(t,match,grammar,input,offset,completed) {
+  this.t = t;
+  //print(keys(t));
+  this.match = match;
+  this.grammar = grammar;
+  this.input = input;
+  this.offset = offset;
+  this.completed = completed;
+}
+Match.prototype.next = function() {
+  if (this.completed)
+    return this;
+  return this.grammar.next(this.input,this.t,this.offset);
+}
+
 
 var dbg = 0;
 
 var g = new Grammar('wp6');
 
-g.addPattern('toplevel', both(repeat(plus(dot()),1<<8),end()));
+var p = g.addPattern('toplevel', both(plus(dot()),both(group(plus(dot()),"tail"),end())));
 
-var input = utf32str(Array((1<<8)+1).join('a'));
+var input = utf32str(Array(4).join('a'));
 
-g.parse(input);
+var m = g.parse(input);
 
+print(m.match.c["tail"].s);
 
+m = m.next();
 
-
+print(m.match.c["tail"].s);
 
 
 
