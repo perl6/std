@@ -181,60 +181,63 @@ crossing the designer's mind.
 
 As 'vill' is a C and C++ LLVM based project, it follows the LLVM
 programming guidelines, see http://llvm.org/docs/CodingStandards.html.
-In all the files that are changing a lot, the priority is clarity, not
-performance.
+In files which change a lot, prefer clarity before performance.  Do not
+be too rigid - minor deviations from the guidelines might make a file
+more readable.  Remember perlstyle and the Intent of perlpod.
 
 The source code is divided into many small source files for several
-reasons.  Open Source projects should be simple in structure to engage
-many developers.  Finding the right file must be easy.  There is less
-complexity per source file (but more files of course).  People
-committing changes at the same time get fewer conflict and merge
-problems.  The make utility selectively recompiles small parts faster.
+reasons.  Open Source projects should be simple in structure to welcome
+new participants.  It must be easy to finding the right file.  There is
+less complexity per source file (but of course there are more files).
+People committing changes at the same time have fewer conflict and merge
+problems.  The make utility selectively recompiles small parts more
+quickly.
 
-The directory hierarchy is flat (all in src/ and test/) and the file
-name convention is simple: (indentifier name) ~~ (source file name).
-That means every externally linkable function or method should be in its
-own source file based on the same name.  The pugs/v6/mildew tree has a
-very similar approach.
+The directory hierarchy is flat (all in src/ and test/).  Do not add
+directories lightly; doc/ is waiting until this README becomes unwieldy.
 
-The names of identifiers not intended to be externally linkable begin
-with 'local_'.  That helps determine where every identifier is defined.
-So far the conventions have needed only two exceptions:
+The file name convention is: "indentifier name" ~~ "source file name".
+Thus every externally linkable function or method is defined in its own
+source file based on the same name.  The pugs/v6/mildew tree has a very
+similar approach.  Prefix 'local_' to names of identifiers not intended
+to be externally linkable, that helps find definitions quickly.
+There are only two minor exceptions so far:
 1) The C test source files contain a main() function as entry point in
 addition to the test function whose name matches the source file name.
 2) The destructor ~villCompiler() is in the same file as the constructor
 because the ~ character would be confusing on a file name.
 
-Within each source file, lists of names are sorted alphabetically as
-much as dependencies allow.  That applies to #include file names, cases
-in switch blocks and enumerations.  The #include directives are
-annotated with a (sorted) list of names that the enclosing file depends
-on from that header file.  It is useful to periodically comment
-out #include directives one by one to see (from compiler errors) that
-the header file is still needed, and what for.  If it is not needed, cut
-it out!
+Limit the length of source code lines to 72 characters (this README is
+an example).  Tolerate longer lines in the short term for expediency.
+Indent code with two spaces (never tabs) per level.  Vertically align as
+much similar code in successive lines as possible.  Use optional curly
+braces in flow control blocks, to more closely resemble Perl style.
+Declare return types in separate lines before function or method names.  
+
+Use long descriptive identifier names.  Declare identifiers separately
+before their first assignment, unless the value is a trivial constant.
+Keep lists of names sorted alphabetically as far as dependencies allow.
+That applies to #include file names, cases in switch blocks,
+enumerations etc.  Annotate #include directives with a (sorted) list of
+names that the enclosing file depends on from that header file.
+Periodically comment out #include directives one by one to see (from
+compiler errors) that the header file is still needed, and what for.  If
+it is not used, cut it out!
+
+Use simple explanatory constructs, for example, if ( p1 != NULL ) rather
+than if ( p1 ).  The compiler probably produces the same code anyway.
+Use assert() very liberally.  Put a space between the * and the name of
+a pointer to make it stand out.
+
+Comment verbosely, especially with the reasons for the code.  Use only C
+style comments in C language files, and C++ style comments in C++ source
+files.  When writing C style comments, begin and end them on the same
+line.  (Therefore never write multiline comments.)  To temporarily
+exclude lines of source code, use #if 0 and #endif instead.
 
 The location of <malloc.h> is inconsistent across different operating
 systems such as Linux and OS X, so <stdlib.h> should be used as a more
 portable substitute.  Thanks to masak++ and diakopter++ for diagnosing.
-
-As a layout convention the C++ source format declares the return type in
-a separate line before the function or method name.  Indentation of code
-is done with two spaces (never tabs) per level.  Additional spaces are
-used liberally to vertically align similar content in successive lines
-as much as possible.  Curly braces that are optional in flow control
-blocks should be used, to more closely resemble Perl style.  The layout
-conventions may be ignored occasionally if a different style appears
-subjectively to be more readable.
-
-The length of source code lines is limited to 72 characters (like this
-README).  Longer lines are tolerated in the short term for expediency.
-
-Verbose comments and long descriptive identifiers are preferred.  C
-source files should contain only C style comments and C++ files only C++
-comments.  Where C style comments are used, they always begin and end on
-the same line.  Multiline comments are never used.  Where several lines
-of source must be temporarily excluded, use #if 0 and #endif instead.
 
 5. VIRTUAL MACHINE
 
@@ -258,12 +261,12 @@ programs.
 There are plans to cache the compiled output files in /tmp/vill.  The
 idea comes from Walter Bright, of Zortech C++ and D compiler fame.  When
 a new 'vill' program is started, a 'make' style file and timestamp check
-will allow the time consuming compile process to be skipped if
-appropriate.  Command lines executed with the -e option will enjoy
-similar cacheing, tracked by a suitable checksum or digest.  The -c
-option will probably also purge the cache and force a recompile.
-Eventually a similar approach might compile modules into shared
-libraries, but that concept has not yet been proved.
+will allow the time consuming compile process to be skipped if possible.
+Command lines executed with the -e option will enjoy similar cacheing,
+tracked by a suitable checksum or digest.  The -c option will probably
+also purge the cache and force a recompile.  Eventually a similar
+approach might compile modules into shared libraries, but that concept
+would first need more planning.
 
 7. PARSER REPLACEMENT
 
@@ -350,19 +353,19 @@ missing 'crazy' operator:
 
 1. You get a '!perl/hash:VAST::infix__S_crazy is not yet implemented in
    vill' message when trying some new Perl 6 program that uses crazy.
-2. Copy the source file most similar in functionality (in your opinion)
-   to src/infix__S_crazy.cpp.
-3. Edit src/infix__S_crazy.cpp, changing the text to infix__S_crazy
-   wherever appropriate.
-4. The hard/easy part: make the functionality Do The Right Thing.  Save.
-5. Add infix__S_crazy to 'Codegen functions' in src/villCompiler.h.
-6. Add infix__S_crazy to local_Codegen in src/link_codegen.cpp.
-7. Edit vill/Makefile, adding src/infix__S_crazy.o in the right position
-   in the 'objects' list.  Also add an entry for src/infix__S_crazy.o to
-   the 'Object targets' list, copying and changing an existing entry if
-   you prefer.  Save.
-8. Run 'make' and test your code.  Thoroughly.  Edit, save, repeat.
-   Discuss in #perl6.  Commit into svn.pugscode.org if successful.
+2. Make the simplest example the triggers the same message.  View its
+   parse tree by using a command like: ./vill -Dp -e'your code example'
+3. Add infix__S_crazy to 'Codegen functions' in src/villCompiler.h.
+4. Add infix__S_crazy to local_Codegen() in src/link_codegen.cpp.
+5. Add src/infix__S_crazy.o to the 'objects' list in vill/Makefile.
+   Add it at the right place in the 'Object targets' list there as well.
+6. Copy the source file most similar in functionality (in your opinion)
+   to src/infix__S_crazy.cpp, and edit the comment and function name.
+   Or, create a new file from scratch.  Next the hard/easy part: make it
+   Do The Right Thing.  Study the parse tree from step 2 for more ideas.
+7. Run 'make' and test your code.  Thoroughly.  Use the various vill -D
+   options (see vill -H) for diagnostics.  Edit, save, repeat.
+8. Discuss in #perl6.  Commit into svn.pugscode.org if successful.
 
 The procedure for adding a new built in function is similar.
 

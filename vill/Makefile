@@ -8,22 +8,21 @@
 objects = src/arglist.o src/args.o src/ast_mapentry.o \
 	src/ast_seqentry.o src/ast_type_tag_equals.o src/backslash__S_n.o \
 	src/codegen.o src/comp_unit.o src/decint.o src/desigilname.o \
-	src/dottyop.o \
-	src/dotty__S_Dot.o src/eat_terminator.o src/escape__S_Back.o \
-	src/identifier.o src/infixish.o src/infix__S_Comma.o \
-	src/infix__S_Plus.o src/integer.o src/link_codegen.o \
-	src/load_ast.o src/longname.o src/main.o src/make_puts.o \
-	src/methodop.o src/modifier.o src/modifier_expr.o src/name.o src/nibbler.o \
-	src/noun__S_term.o src/noun__S_value.o src/number__S_numish.o \
-	src/numish.o src/optimize.o src/options.o src/POST.o \
-	src/quote__S_Double_Double.o src/run.o src/save.o \
-	src/semiarglist.o src/sigil__S_At.o src/statement.o src/statementlist.o \
-	src/statement_mod_cond__S_if.o src/statement_mod_loop__S_for.o \
-	src/Str.o \
-	src/SYM_dotty__S_Dot.o src/SYM_infix__S_Comma.o src/termish.o \
+	src/dottyop.o src/dotty__S_Dot.o src/eat_terminator.o \
+	src/escape__S_Back.o src/identifier.o src/infixish.o \
+	src/infix__S_Comma.o src/infix__S_Plus.o src/integer.o \
+	src/link_codegen.o src/load_ast.o src/longname.o src/main.o \
+	src/make_puts.o src/methodop.o src/modifier.o src/modifier_expr.o \
+	src/name.o src/nibbler.o src/noun__S_term.o src/noun__S_value.o \
+	src/number__S_numish.o src/numish.o src/optimize.o src/options.o \
+	src/POST.o src/quote__S_Double_Double.o src/run.o src/save.o \
+	src/semiarglist.o src/sigil__S_At.o src/statement.o \
+	src/statementlist.o src/statement_mod_cond__S_if.o \
+	src/statement_mod_loop__S_for.o src/Str.o src/SYM_dotty__S_Dot.o \
+	src/SYM_infix__S_Comma.o src/SYM_infix__S_Plus.o src/termish.o \
 	src/term__S_dotty.o src/term__S_identifier.o src/term__S_value.o \
-	src/term__S_variable.o src/twigil__S_Star.o src/unload_ast.o src/value__S_number.o \
-	src/value__S_quote.o src/variable.o \
+	src/term__S_variable.o src/twigil__S_Star.o src/unload_ast.o \
+	src/value__S_number.o src/value__S_quote.o src/variable.o \
 	src/verify.o src/villCompiler.o \
 	src/yaml_compose.o src/yaml_compose_alias.o \
 	src/yaml_compose_anchor.o src/yaml_compose_mapping.o \
@@ -260,6 +259,11 @@ src/SYM_infix__S_Comma.o: src/SYM_infix__S_Comma.cpp \
 	c++ -c src/SYM_infix__S_Comma.cpp `llvm-config --cxxflags` -O3 \
 		-o src/SYM_infix__S_Comma.o
 
+src/SYM_infix__S_Plus.o: src/SYM_infix__S_Plus.cpp \
+		src/villCompiler.h Makefile
+	c++ -c src/SYM_infix__S_Plus.cpp `llvm-config --cxxflags` -O3 \
+		-o src/SYM_infix__S_Plus.o
+
 src/termish.o: src/termish.cpp src/villCompiler.h Makefile
 	c++ -c src/termish.cpp `llvm-config --cxxflags` -O3 \
 		-o src/termish.o
@@ -404,6 +408,9 @@ parsetest: test/yaml_parse_roundtrip
 fruit:
 	@grep -nr 'TODO.*LHF' src/* test/*
 
+todo:
+	@grep -nr 'TODO'      src/* test/*
+
 wordcount:
 	@echo ' Lines  Words  Chars File'
 	@find . -name '*.[ch]*' | grep -v '\.svn' | grep -v '~$$' \
@@ -419,6 +426,7 @@ help:
 	@echo 'parsetest run yaml_parse_roundtrip on part of pugs/t/spec/*'
 	@echo 'tokentest run yaml_token_roundtrip on part of pugs/t/spec/*'
 	@echo 'clean     delete editor backups and generated files'
+	@echo 'todo      show all TODO lines'
 	@echo 'fruit     search for LHF (low hanging fruit) in TODO lines'
 	@echo 'wordcount line, word and byte counts of all source files'
 	@echo 'help      display this help'

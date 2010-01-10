@@ -1,8 +1,8 @@
-// integer.cpp
+// SYM_infix__S_Plus.cpp
 #include "villCompiler.h"
 
 Value *
-integer( struct villCompiler * vill, struct graph_node * node ) {
+SYM_infix__S_Plus( struct villCompiler * vill, struct graph_node * node ) {
   Value * result = NULL;
   vill -> debug_flags & DEBUG_USER && fprintf( stderr, "<integer>" );
   graph_node * decint = ast_mapentry( node, "decint" );

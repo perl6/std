@@ -87,6 +87,7 @@ Value * Str(                      struct villCompiler *, struct graph_node *);
 Value * SYM_dotty__S_Dot(         struct villCompiler *, struct graph_node *);
 Value * SYM_infix__S_Comma(       struct villCompiler *, struct graph_node *);
 Value * SYM_infix__S_Equal(       struct villCompiler *, struct graph_node *);
+Value * SYM_infix__S_Plus(        struct villCompiler *, struct graph_node *);
 Value * termish(                  struct villCompiler *, struct graph_node *);
 Value * term__S_identifier(       struct villCompiler *, struct graph_node *);
 Value * term__S_dotty(            struct villCompiler *, struct graph_node *);

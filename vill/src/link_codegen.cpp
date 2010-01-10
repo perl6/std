@@ -131,6 +131,9 @@ local_Codegen( char * type_tag ) {
   else if ( strcmp( type_tag, "!perl/hash:VAST::SYM_infix__S_Comma" ) == 0 ) {
     Codegen = &SYM_infix__S_Comma;
   }
+  else if ( strcmp( type_tag, "!perl/hash:VAST::SYM_infix__S_Plus" ) == 0 ) {
+    Codegen = &SYM_infix__S_Plus; // TODO: (LHF) Minus Star Slash etc
+  }
   else if ( strcmp( type_tag, "!perl/hash:VAST::termish" ) == 0 ) {
     Codegen = &termish;
   }
