@@ -415,14 +415,14 @@ gpref.prototype.emit = function(c) {
   var pats = c.g.pats;
   var pat = pats[this.name];
   if (!pat.isRecursive) { // inline a replica of the callsite here, deeply.
-    var clone = pat.l.regen(c.g);
+    var clone = pat.regen(c.g);
     clone.fail = this.fail; // fixup the label references
-    //if (clone.b) {
+    if (clone.b) {
       clone.notd = this.notd;
       clone.done = this.done;
       clone.init = this.init;
       clone.bt = this.bt;
-    //}
+    }
     clone.emit(c);
     if (!clone.b) // some combinators aren't aligned perfectly
       c.r.push(gotol(this.done));
@@ -497,12 +497,12 @@ function ggroup(l,name) { // grammar "group (named & anonymous)" parser builder
     this.name = name;
   }
   this.l = l;
-  //if (this.b = this.l.b) { // inherit backtrackability from the child
+  if (this.b = this.l.b) { // inherit backtrackability from the child
     this.init = new gtr();
     this.bt = new gtr();
     this.notd = new gtr();
     this.done = new gtr();
-  //}
+  }
 }
 derives(ggroup, gts);
 ggroup.prototype.emit = function(c) {
@@ -513,7 +513,7 @@ ggroup.prototype.emit = function(c) {
     )+"};m.m.c["+this.name.toQuotedString()+"]=m") // append to the end of the match linked list
   );
   this.l.emit(c);
-  //if (this.b) { // need these iff we're backtrackable (non-deterministic)
+  if (this.b) { // need these iff we're backtrackable (non-deterministic)
     c.r.push(
       casel(this.l.done),
       val("for(var q in m.c){if(!m.m.c.hasOwnProperty(q))m.m.c[q]=m.c[q]};m=m.m"),
@@ -533,11 +533,11 @@ ggroup.prototype.emit = function(c) {
       )+"}"),
       gotol(this.l.bt)
     );
-  //}
+  }
 };
 ggroup.prototype.root = group;
 ggroup.prototype.regen = function(grammar) {
-  return new ggroup(this.l,this.name);
+  return new ggroup(this.l.regen(grammar),this.name);
 };
 
 function gbeg() { // grammar "beginning anchor" parser builder
@@ -1089,7 +1089,7 @@ grepeat.prototype.toString = function() {
 };
 grepeat.prototype.root = repeat;
 grepeat.prototype.regen = function(grammar) {
-  return repeat(this.l,this.min,this.max);
+  return repeat(this.l.regen(grammar),this.min,this.max);
 };
 
 function grepeatb(l,min,max) { // grammar "non-deterministic" edition of plus
@@ -1241,7 +1241,7 @@ grepeatb.prototype.toString = function() {
   )+')';
 };
 grepeatb.prototype.regen = function(grammar) {
-  return repeat(this.l, this.min, this.max);
+  return repeat(this.l.regen(grammar), this.min, this.max);
 };
 
 function utf32str_charAt(offset) {
