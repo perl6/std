@@ -265,7 +265,7 @@ gts.prototype.computeRefs = function(pats, name, refs) {
 gts.prototype.regen = function(grammar) {
   return this.root(
     this.l ? this.l.regen(grammar) : (this.v ? this.v.str : this.lo ? this.lo.str : null ),
-    this.r ? this.r.regen(grammar) : this.hi ? this.hi.str : null);
+    this.r ? this.r.regen(grammar) : this.hi ? this.hi.str : null );
 }
 
 var gl = val("gl"); // the next target goto label variable expression
@@ -323,6 +323,25 @@ glit.prototype.toString = function() {
   return 'lit('+this.v.str.toQuotedString()+')';
 }
 glit.prototype.root = lit;
+
+function notchar(literal) { return new gnotchar(literal) }
+function gnotchar(literal) { // grammar literal parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+  this.v = utf32str(literal);
+}
+derives(gnotchar, gts);
+gnotchar.prototype.emit = function(c) {
+  c.r.push(cond(land(ne(o,val("i.l")),ne(val("i.substr(o,"+this.v.l+")"),val(this.v.str.toQuotedString()))),[[
+    add_assign(o,val(this.v.l))
+  ],[
+    gotol(this.fail)
+  ]]));
+};
+gnotchar.prototype.toString = function() {
+  return 'notchar('+this.v.str.toQuotedString()+')';
+}
+gnotchar.prototype.root = notchar;
 
 function range(lo,hi) { return new grange(lo,hi) }
 function grange(lo,hi) { // grammar range parser builder
@@ -396,14 +415,14 @@ gpref.prototype.emit = function(c) {
   var pats = c.g.pats;
   var pat = pats[this.name];
   if (!pat.isRecursive) { // inline a replica of the callsite here, deeply.
-    var clone = pat.regen(c.g);
+    var clone = pat.l.regen(c.g);
     clone.fail = this.fail; // fixup the label references
-    if (clone.b) {
+    //if (clone.b) {
       clone.notd = this.notd;
       clone.done = this.done;
       clone.init = this.init;
       clone.bt = this.bt;
-    }
+    //}
     clone.emit(c);
     if (!clone.b) // some combinators aren't aligned perfectly
       c.r.push(gotol(this.done));
@@ -468,6 +487,8 @@ gcallt.prototype.emit = function(c) {
 function group(l,name) { return new ggroup(l,name) }
 function ggroup(l,name) { // grammar "group (named & anonymous)" parser builder
   gts.call(this); // call the parent constructor
+  if (name === null)
+    throw arguments.callee.caller;
   if (typeof name == 'undefined') {
     this.anon = true;
     throw 'anonymous captures not yet supported';
@@ -476,23 +497,23 @@ function ggroup(l,name) { // grammar "group (named & anonymous)" parser builder
     this.name = name;
   }
   this.l = l;
-  if (this.b = this.l.b) { // inherit backtrackability from the child
+  //if (this.b = this.l.b) { // inherit backtrackability from the child
     this.init = new gtr();
     this.bt = new gtr();
     this.notd = new gtr();
     this.done = new gtr();
-  }
+  //}
 }
 derives(ggroup, gts);
 ggroup.prototype.emit = function(c) {
-    c.r.push(
-      casel(this.init),
-      val("m={m:m,s:o,c:{},i:[]"+(
-        this.anon ? "" : ",n:"+this.name.toQuotedString()
-      )+"};m.m.c["+this.name.toQuotedString()+"]=m") // append to the end of the match linked list
-    );
-  if (this.b) { // need these iff we're backtrackable (non-deterministic)
-    this.l.emit(c);
+  c.r.push(
+    casel(this.init),
+    val("m={m:m,s:o,c:{},i:[]"+(
+      this.anon ? "" : ",n:"+this.name.toQuotedString()
+    )+"};m.m.c["+this.name.toQuotedString()+"]=m") // append to the end of the match linked list
+  );
+  this.l.emit(c);
+  //if (this.b) { // need these iff we're backtrackable (non-deterministic)
     c.r.push(
       casel(this.l.done),
       val("for(var q in m.c){if(!m.m.c.hasOwnProperty(q))m.m.c[q]=m.c[q]};m=m.m"),
@@ -512,9 +533,12 @@ ggroup.prototype.emit = function(c) {
       )+"}"),
       gotol(this.l.bt)
     );
-  }
+  //}
 };
 ggroup.prototype.root = group;
+ggroup.prototype.regen = function(grammar) {
+  return new ggroup(this.l,this.name);
+};
 
 function gbeg() { // grammar "beginning anchor" parser builder
   gts.call(this); // call the parent constructor
@@ -628,6 +652,7 @@ gbothls.prototype.emit = function(c) {
     casel(this.r.fail),
     cond(val("(t.ld)"),[[
       a,
+      dval("print('bothls fail at '+o)"),
       gotol(this.fail)
     ]]),
     ros,
@@ -669,7 +694,7 @@ gbothrs.prototype.emit = function(c) {
     gotol(this.notd), // return "not done"
     
     casel(this.bt), // backtrack entry point
-    val("t=t.r"),
+    val("t=t.r;o=t.s"),
     gotol(this.r.bt),
     
     casel(this.r.fail), // right failed
@@ -695,7 +720,6 @@ gbothlrs.prototype.emit = function(c) {
   c.r.push(
     casel(this.init),d // initial entry point
   );
-  this.l.fail = this.r.fail;
   this.l.emit(c);
   var rightinit = new gtr(); // a label for initial right when backtracking
   c.r.push(
@@ -722,6 +746,10 @@ gbothlrs.prototype.emit = function(c) {
     casel(this.r.notd), // right succeeded, but is not done.
     val("t.i.r=t;t=t.i"), // stash right in myself; ascend
     gotol(this.notd), // return "not done"
+    
+    casel(this.l.fail),
+    a,
+    gotol(this.fail),
     
     casel(this.bt), // backtrack entry point
     cond(val("(!t.ld)"),[[
@@ -959,23 +987,23 @@ function plus(l) {
   var r = l.b
     ? new grepeatb(l,1,-1) // nondeterministic version of plus
     : new grepeat(l,1,-1); // deterministic version of plus
-  r.toString = function() {
+  /*r.toString = function() {
     return 'plus('+l+')';
   };
   r.regen = function(grammar) {
     return plus(this.l.l);
-  }
+  }*/
   return r;
 }
 
 function star(l) {
   var r = either(plus(l),empty());
-  r.toString = function() {
+  /*r.toString = function() {
     return 'star('+l+')';
   };
   r.regen = function(grammar) {
     return star(this.l.l);
-  }
+  }*/
   return r;
 }
 
@@ -1059,6 +1087,10 @@ grepeat.prototype.toString = function() {
       : this.min.toString()+','+this.max.toString()
   )+')';
 };
+grepeat.prototype.root = repeat;
+grepeat.prototype.regen = function(grammar) {
+  return repeat(this.l,this.min,this.max);
+};
 
 function grepeatb(l,min,max) { // grammar "non-deterministic" edition of plus
   this.min = min;
@@ -1084,6 +1116,11 @@ grepeatb.prototype.emit = function(c) {
   c.r.push(
     casel(this.l.done), // left succeeded
     dval('print("repeatb l.done at "+o)'),
+    cond(val("(o==t.i.s)"),[[
+      dval('print("repeatb done at "+o)'),
+      a,
+      gotol(this.done)
+    ]]),
     val("t.i.z.push(t);t.nd=false;t.e=o"),
     a,
     cond(val("(t.ret[o])"),[[
@@ -1108,6 +1145,11 @@ grepeatb.prototype.emit = function(c) {
     ]]),
     
     casel(this.l.notd), // left succeeded
+    cond(val("(o==t.i.s)"),[[
+      dval('print("repeatb done at "+o)'),
+      a,
+      gotol(this.done)
+    ]]),
     dval('print("repeatb l.notd at "+o)'),
     val("t.i.z.push(t);t.nd=true;t.e=o"),
     a,
@@ -1258,6 +1300,8 @@ Grammar.prototype.compile = function(interpreterState) {
   // recursively compute full set of named references for each 
   //   pattern, preventing descent into a cyclical reference.
   for (var name in this.pats) {
+    if (dbg)
+      print('recursing pattern '+name.toQuotedString());
     var pat = this.pats[name];
     var refs = {};
     var isRecursive = false;
@@ -1272,6 +1316,8 @@ Grammar.prototype.compile = function(interpreterState) {
     // if a pattern is not recursive, it can be inlined (but cloned
     //   so the labels/gotos are still unique) into its referer.
     if (pat.isRecursive = isRecursive) {
+      if (dbg)
+        print('recursive pattern: '+name.toQuotedString());
       // wrap the pattern in a call target
       this.pats[name] = new gcallt(pat);
       this.pats[name].isRecursive = true;
@@ -1303,9 +1349,14 @@ Grammar.prototype.compile = function(interpreterState) {
   for (var name in this.pats) {
     var pat = this.pats[name];
     if (pat.isRecursive && pat!==this.TOP) {
+      if (dbg)
+        print('compiling pattern '+name.toQuotedString());
       pat.emit(routine);
     }
   }
+  
+  if (dbg)
+    print('done compiling patterns');
   
   routine.r.push(val("case 0:"));
   
@@ -1319,7 +1370,7 @@ Grammar.prototype.compile = function(interpreterState) {
     print(parserf);
 
   this.parser = eval(parserf); // compile the javascript function to machine code
-
+  
   if (dbg)
     print('compiled');
   
@@ -1349,22 +1400,32 @@ Match.prototype.next = function() {
   return this.grammar.next(this.input,this.t,this.offset);
 }
 
+// steal some macros/combinators from jsmeta
+function opt(l) { return either(l,empty()) }
+function ws() { return pref('ws') }
+function poil(l) { return both(opt(ws()),l) }
+function foil(l) { return both(l,opt(ws())) }
+function pfoil(l) { return poil(foil(l)) }
+function oisep(l,sep) { return both(pfoil(l),star(both(pfoil(sep),pfoil(l.regen())))) }
+function oiplus(l) { return both(pfoil(l),star(pfoil(l.regen()))) }
+function ows() { return opt(ws()) }
 
 var dbg = 0;
 
 var g = new Grammar('wp6');
 
-var p = g.addPattern('toplevel', both(plus(dot()),both(group(plus(dot()),"tail"),end())));
+g.addPattern('toplevel', both(pref("grammar"),end()));
 
-var input = utf32str(Array(4).join('a'));
+g.addPattern('ws', either(lit(' '),lit(' ')));
+
+g.addPattern('grammar', plus(pfoil(pref('pattern'))));
+
+g.addPattern('pattern', both(lit('{'),poil(lit('}'))));
+
+var input = utf32str('{ } { }');
 
 var m = g.parse(input);
 
-print(m.match.c["tail"].s);
-
-m = m.next();
-
-print(m.match.c["tail"].s);
 
 
 
