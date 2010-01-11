@@ -1429,7 +1429,7 @@ Grammar.prototype.compile = function(interpreterState) {
     // if a pattern is not recursive, it can be inlined (but cloned
     //   so the labels/gotos are still unique) into its referer.
     if (pat.isRecursive = isRecursive) {
-      if (dbg)
+      //if (dbg)
         print('recursive pattern: '+name.toQuotedString());
       // wrap the pattern in a call target
       this.pats[name] = new gcallt(pat);
@@ -1614,7 +1614,38 @@ g.addToProto('metachar', '^^', psym());
 g.addToProto('metachar', '$', psym());
 g.addToProto('metachar', '$$', psym());
 
-var input = utf32str("^^accv+||blah");
+g.addToProto('metachar', 'assert', seq(lit('<'), pref('assertion'), lit('>')));
+
+g.addProto('assertion');
+
+g.addToProto('assertion', '?', seq(psym(), alt(poslook(lit('>')), pref('assertion'))));
+
+g.addToProto('assertion', '!', seq(psym(), alt(poslook(lit('>')), pref('assertion'))));
+
+g.addToProto('assertion', 'method', seq(lit('.'), pref('assertion')));
+
+g.addToProto('assertion', 'name', seq(plus(pref('backw')), opt(alt(
+  poslook(lit('>'>),
+  seq(lit('='), pref('assertion')),
+  seq(lit(':'), pref('arglist')),
+  seq(lit('('), pref('arglist'), lit(')')),
+  seq(pref('normspace'), pref('nibbler'))
+)))));
+
+g.addToProto('assertion', '[', seq(poslook(lits('[','+','-')), plus(pref('cclass_elem'))));
+
+g.addPattern('cclass_elem', seq(
+  opt(lits('+','-')),
+  opt(pref('normspace')),
+  seq(
+    lit('['),
+    star(seq(
+      star(pref('backs')),
+      alt(seq(lit('\\'),dot()), 
+      
+));
+
+var input = utf32str("^^accv+||blah**4..*");
 
 var sw = new Date();
 g.compile();
@@ -1628,7 +1659,17 @@ var sw = new Date();
 var m = g.parse(input);
 print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
 
+var sw = new Date();
+var m = g.parse(input);
+print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
 
+var sw = new Date();
+var m = g.parse(input);
+print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
+
+print('parser function is '+(g.parser.toString().length)+' chars long.');
+
+//print(g.parser.toString());
 
 
 
