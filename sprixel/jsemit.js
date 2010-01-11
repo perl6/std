@@ -254,19 +254,26 @@ function gts() { // base grammar transition set
 gts.prototype.cur = function() { // whether it contains an unresolved named reference
   return this.u = this.u || (typeof this.l != 'undefined' && this.l.cur())
     || (typeof this.r != 'undefined' && this.r.cur());
-}
+};
 gts.prototype.u = false;
 gts.prototype.computeRefs = function(pats, name, refs) {
   if (typeof this.l != 'undefined')
     this.l.computeRefs(pats, name, refs);
   if (typeof this.r != 'undefined')
     this.r.computeRefs(pats, name, refs);
-}
+};
 gts.prototype.regen = function(grammar) {
   return this.root(
     this.l ? this.l.regen(grammar) : (this.v ? this.v.str : this.lo ? this.lo.str : null ),
     this.r ? this.r.regen(grammar) : this.hi ? this.hi.str : null );
-}
+};
+gts.prototype.resolveSym = function(sym) {
+  if (typeof this.l != 'undefined')
+    this.l.resolveSym(sym, this, false);
+  if (typeof this.r != 'undefined')
+    this.r.resolveSym(sym, this, true);
+  return this;
+};
 
 var gl = val("gl"); // the next target goto label variable expression
 var i = val("i"); // the input variable expression
@@ -282,12 +289,14 @@ var dr = val("t=t.r");
 var ros = val("o=t.s"); // macro for "reset offset to my start"
 
 function gotol(lbl) { // macro for goto label with id of the transition object
-  //if (!lbl)
-  //  print(arguments.callee.caller);
+  if (!lbl)
+    print(arguments.callee.caller);
   return val("gl="+lbl.id+";break");
 }
 
 function casel(lbl) { // macro for MARK label with id of the transition object
+  if (!lbl)
+    print(arguments.callee.caller);
   return val("case "+lbl.id+":");
 }
 
@@ -440,6 +449,8 @@ gpref.prototype.emit = function(c) {
 };
 gpref.prototype.computeRefs = function(pats, name, refs) {
   var hasIt = refs.hasOwnProperty(this.name);
+  if (typeof pats[this.name] == 'undefined')
+    throw 'pattern '+this.name+' has not been declared';
   refs[this.name] = true;
   if (!hasIt && name != this.name) // prevent cyclical recursion
     pats[this.name].computeRefs(pats, name, refs);
@@ -507,7 +518,7 @@ function ggroup(l,name) { // grammar "group (named & anonymous)" parser builder
 derives(ggroup, gts);
 ggroup.prototype.emit = function(c) {
   c.r.push(
-    casel(this.init),
+    this.b?casel(this.init):val(''),
     val("m={m:m,s:o,c:{},i:[]"+(
       this.anon ? "" : ",n:"+this.name.toQuotedString()
     )+"};m.m.c["+this.name.toQuotedString()+"]=m") // append to the end of the match linked list
@@ -577,6 +588,43 @@ gposlook.prototype.regen = function(grammar) {
   return new gposlook(this.l.regen(grammar));
 };
 
+function neglook(l) { return new gneglook(l) }
+function gneglook(l) { // grammar "negative lookahead" parser builder
+  gts.call(this); // call the parent constructor
+  this.l = l;
+  this.b = true; // it's fully deterministic, even if its child isn't, but we
+  // can't mark it as such so it's never used recursively.
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gneglook, gts);
+gneglook.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d
+  );
+  if (!this.l.b)
+    this.l.done = this.l.notd = new gtr();
+  this.l.emit(c);
+  c.r.push(
+    casel(this.l.done),
+    casel(this.l.notd),
+    this.l.b?a:val(''),
+    a,
+    gotol(this.fail),
+    
+    casel(this.bt),
+    casel(this.l.fail),
+    ros,
+    gotol(this.done)
+  );
+};
+gneglook.prototype.root = neglook;
+gneglook.prototype.regen = function(grammar) {
+  return new gneglook(this.l.regen(grammar));
+};
+
 function gbeg() { // grammar "beginning anchor" parser builder
   gts.call(this); // call the parent constructor
   this.b = false;
@@ -603,8 +651,20 @@ gempty.prototype.emit = function() {
 function empty() { return new gempty() }
 gempty.prototype.toString = function() {
   return 'empty()';
-}
+};
 gempty.prototype.root = empty;
+
+function psym() { return new gpsym() }
+function gpsym() { // placeholder for proto sym
+  this.b = false; // because it's going to transform into a literal.
+}
+derives(gpsym, gts);
+gpsym.prototype.toString = function() {
+  return 'psym()';
+};
+gpsym.prototype.resolveSym = function(sym, parent, is_right) {
+  parent[is_right ? "r" : "l"] = lit(sym);
+}
 
 /* Code block generation conventions/rules:
  *  - both non-deterministic (possibly-backtracking) nodes and
@@ -1322,6 +1382,9 @@ function Grammar(name, parent) {
   this.parent = parent;
   this.name = name;
   this.compiled = false;
+  this.protos = parent
+    ? derive(parent.protos)
+    : {};
 }
 Grammar.prototype.addPattern = function(name, pattern) {
   pattern = group(pattern,name);
@@ -1331,9 +1394,22 @@ Grammar.prototype.addPattern = function(name, pattern) {
   if (typeof this.TOP == 'undefined')
     this.TOP = pattern;
   return pattern;
-}
-var resolutionActivated = false;
+};
 Grammar.prototype.compile = function(interpreterState) {
+  
+  // preprocess the protos
+  for (var name in this.protos) {
+    var proto = this.protos[name];
+    var alts = [];
+    for (var sym in proto) {
+      var holder = {};
+      var result = proto[sym].resolveSym(sym, holder, false);
+      alts.push(result || holder.l);
+    }
+    if (alts.length>0)
+      this.addPattern(name, alt.apply(null, alts));
+  }
+  
   // recursively compute full set of named references for each 
   //   pattern, preventing descent into a cyclical reference.
   for (var name in this.pats) {
@@ -1361,9 +1437,6 @@ Grammar.prototype.compile = function(interpreterState) {
       if (pat===this.TOP)
         this.TOP = this.pats[name]; // fixup the TOP one
     }
-    /*// discover/mark whether the pattern has any references at all
-    resolutionActivated = false;
-    pat.cur();*/
   }
   
   var routine = dbg
@@ -1421,6 +1494,17 @@ Grammar.prototype.parse = function(input) {
 Grammar.prototype.next = function(input,t,o) {
   return this.parser(input,this,-3,o,t);
 }
+Grammar.prototype.addProto = function(name) {
+  if (this.protos.hasOwnProperty(name))
+    throw 'protopattern '+name+' already declared';
+  this.protos[name] = (typeof this.protos[name] != 'undefined')
+    ? derive(this.protos[name]) // inherit from the parent if there is one
+    : {};
+}
+Grammar.prototype.addToProto = function(name,sym,pattern) {
+  var proto = this.protos[name];
+  proto[sym] = pattern;
+}
 
 function Match(t,match,grammar,input,offset,completed) {
   this.t = t;
@@ -1474,24 +1558,75 @@ function lits() {
 
 var dbg = 0;
 
-var g = new Grammar('wp6');
+var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
 
-g.addPattern('toplevel', both(pref("grammar"),end()));
+g.addPattern('toplevel', both(pref("P6Regex"),end()));
 
-g.addPattern('ws', plus(either(lits(' ','\n','\t','\f','\r'),both(lit('#'),star(notchar('\n'))))));
+g.addPattern('backs', lits(' ','\n','\t','\f','\r'));
+
+g.addPattern('backd', range('0','9'));
+
+g.addPattern('ws', plus(either(pref('backs'),both(lit('#'),star(notchar('\n'))))));
 
 g.addPattern('grammar', plus(pfoil(pref('pattern'))));
 
-g.addPattern('pattern', seq(lit('{'),poslook(lit(' ')),poil(lit('}'))));
+g.addPattern('pattern', seq(lit('{'),poil(lit('}'))));
 
-var input = utf32str("{ }\
-# comment here \
-   \
- # 'nother comment  \
-{ }");
+g.addProto('quantifier');
 
+g.addToProto('quantifier', '*', psym());
+g.addToProto('quantifier', '+', psym());
+g.addToProto('quantifier', '?', psym());
+g.addToProto('quantifier', '**', seq(
+  psym(),
+  star(pref('backs')),
+  pref('backmod'),
+  star(pref('backs')),
+  either(seq(group(plus(pref('backd')),'min'),
+    opt(seq(lit('..'),group(alt(plus(pref('backd')),lit('*')),'max')))
+  ),pref('quantified_atom'))));
+
+
+g.addPattern('P6Regex', seq(ows(),opt(lits('||','|','&&','&')),ows(),pref('termish'),
+  star(seq(ows(),lits('||','|'),ows(),pref('termish')))));
+
+g.addPattern('termish', plus(pref('quantified_atom')));
+
+g.addPattern('quantified_atom', seq(pref('atom'),
+  opt(seq(ows(),either(pref('quantifier'),seq(poslook(lit(':')),pref('backmod'),
+    neglook(pref('alpha'))))))));
+
+g.addPattern('alpha', alt(range('a','z'),range('A','Z')));
+
+g.addPattern('backw', alt(pref('alpha'),range('0','9'),lit('_')));
+
+g.addPattern('atom', alt(
+  seq(pref('backw'),opt(seq(plus(pref('backw')),poslook(pref('backw'))))),
+  pref('metachar')));
+
+g.addPattern('backmod', seq(opt(lit(':')),alt(lits('?','!'),neglook(lit(':')))));
+
+g.addProto('metachar');
+
+g.addToProto('metachar', '.', psym());
+g.addToProto('metachar', '^', psym());
+g.addToProto('metachar', '^^', psym());
+g.addToProto('metachar', '$', psym());
+g.addToProto('metachar', '$$', psym());
+
+var input = utf32str("^^accv+||blah");
+
+var sw = new Date();
+g.compile();
+print('Compile Time Elapsed: '+(new Date() - sw)+' ms');
+
+var sw = new Date();
 var m = g.parse(input);
+print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
 
+var sw = new Date();
+var m = g.parse(input);
+print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
 
 
 
