@@ -540,6 +540,43 @@ ggroup.prototype.regen = function(grammar) {
   return new ggroup(this.l.regen(grammar),this.name);
 };
 
+function poslook(l) { return new gposlook(l) }
+function gposlook(l) { // grammar "positive lookahead" parser builder
+  gts.call(this); // call the parent constructor
+  this.l = l;
+  this.b = true; // it's fully deterministic, even if its child isn't, but we
+  // can't mark it as such so it's never used recursively.
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gposlook, gts);
+gposlook.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),d
+  );
+  if (!this.l.b)
+    this.l.done = this.l.notd = new gtr();
+  this.l.emit(c);
+  c.r.push(
+    casel(this.l.done),
+    casel(this.l.notd),
+    this.l.b?a:val(''),
+    ros,
+    gotol(this.done),
+    
+    casel(this.bt),
+    casel(this.l.fail),
+    a,
+    gotol(this.fail)
+  );
+};
+gposlook.prototype.root = poslook;
+gposlook.prototype.regen = function(grammar) {
+  return new gposlook(this.l.regen(grammar));
+};
+
 function gbeg() { // grammar "beginning anchor" parser builder
   gts.call(this); // call the parent constructor
   this.b = false;
@@ -1409,6 +1446,31 @@ function pfoil(l) { return poil(foil(l)) }
 function oisep(l,sep) { return both(pfoil(l),star(both(pfoil(sep),pfoil(l.regen())))) }
 function oiplus(l) { return both(pfoil(l),star(pfoil(l.regen()))) }
 function ows() { return opt(ws()) }
+function popArgs() { arguments.length--; return arguments; }
+function seq() {
+  return arguments.length == 1
+    ? arguments[0]
+    : both(
+      arguments.length > 2
+        ? seq.apply(null, popArgs.apply(null,arguments))
+        : arguments[0]
+      , arguments[arguments.length - 1]);
+}
+function alt() {
+  return arguments.length == 1
+    ? arguments[0]
+    : either(
+      arguments.length > 2
+        ? alt.apply(null, popArgs.apply(null,arguments))
+        : arguments[0]
+      , arguments[arguments.length - 1]);
+}
+function lits() {
+  var args = Array(arguments.length);
+  for(var i=0;i<arguments.length;++i)
+    args[i] = lit(arguments[i]);
+  return alt.apply(null, args);
+}
 
 var dbg = 0;
 
@@ -1416,13 +1478,17 @@ var g = new Grammar('wp6');
 
 g.addPattern('toplevel', both(pref("grammar"),end()));
 
-g.addPattern('ws', either(lit(' '),lit(' ')));
+g.addPattern('ws', plus(either(lits(' ','\n','\t','\f','\r'),both(lit('#'),star(notchar('\n'))))));
 
 g.addPattern('grammar', plus(pfoil(pref('pattern'))));
 
-g.addPattern('pattern', both(lit('{'),poil(lit('}'))));
+g.addPattern('pattern', seq(lit('{'),poslook(lit(' ')),poil(lit('}'))));
 
-var input = utf32str('{ } { }');
+var input = utf32str("{ }\
+# comment here \
+   \
+ # 'nother comment  \
+{ }");
 
 var m = g.parse(input);
 
