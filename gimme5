@@ -978,7 +978,7 @@ sub regex {
     }
 
     my $od = first();
-    return bless { decl => [@decl], re => $od, min => $od->{min} }, "RE";
+    return bless { decl => [@decl], re => $od, min => $od->{min} }, "RE_ast";
 }
 
 sub first {
@@ -1562,7 +1562,7 @@ sub unbalanced {
     sub remember_alts { }
 }
 
-{ package RE; use base "REbase";
+{ package RE_ast; use base "REbase";
     sub walk {
         my $self = shift;
         if ($$self{decl}) {
