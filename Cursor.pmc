@@ -889,6 +889,8 @@ sub _NOTBEFORE { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    local $::HIGHEXPECT = {};   # don't count lookahead as expectation
+    local $::HIGHWATER = $::HIGHWATER;
     my @caps;
     @caps = @{$self->{'~CAPS'}} if $self->{'~CAPS'};  # must copy elems
     my @all = $block->($self);
@@ -912,6 +914,8 @@ sub before { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    local $::HIGHEXPECT = {};   # don't count lookahead as expectation
+    local $::HIGHWATER = $::HIGHWATER;
     my @caps;
     @caps = @{$self->{'~CAPS'}} if $self->{'~CAPS'};  # must copy elems
     my @all = $block->($self);
@@ -933,6 +937,7 @@ sub after { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    local $::HIGHEXPECT = {};   # don't count lookbehind as expectation
     my $end = $self->cursor($self->{_pos});
     my @caps;
     @caps = @{$self->{'~CAPS'}} if $self->{'~CAPS'};  # must copy elems

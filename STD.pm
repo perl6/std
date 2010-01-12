@@ -979,6 +979,7 @@ token circumfix:sym«< >»   { '<'
 token ws {
     :my @stub = return self if @*MEMOS[self.pos]<ws> :exists;
     :my $startpos = self.pos;
+    :my $*HIGHEXPECT = {};
 
     :dba('whitespace')
     [
@@ -5703,7 +5704,8 @@ method badinfix (Str $bad = $*sym) {
 # Since most keys are valid prefix operators or terms, this rule is difficult
 # to reach ('say »+«' works), but it's okay as a last-ditch default anyway.
 token term:sym<miscbad> {
-    {} <!{ $*QSIGIL }> <infixish> <.badinfix($<infixish>.Str)>
+    :my $bad;
+    {} <!{ $*QSIGIL }> <?before $bad = <.infixish>> <.badinfix($bad.Str)>
 }
 
 ## vim: expandtab sw=4 ft=perl6
