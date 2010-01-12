@@ -1556,11 +1556,15 @@ function lits() {
   return alt.apply(null, args);
 }
 
+function notchars() {
+  return seq(neglook(lits.apply(null, arguments)),dot());
+}
+
 var dbg = 0;
 
 var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
 
-g.addPattern('toplevel', both(pref("P6Regex"),end()));
+g.addPattern('TOP', seq(pref("nibbler"),end()));
 
 g.addPattern('backs', lits(' ','\n','\t','\f','\r'));
 
@@ -1568,9 +1572,15 @@ g.addPattern('backd', range('0','9'));
 
 g.addPattern('ws', plus(either(pref('backs'),both(lit('#'),star(notchar('\n'))))));
 
-g.addPattern('grammar', plus(pfoil(pref('pattern'))));
+g.addPattern('normspace', seq(poslook(alt(pref('backs'),lit('#'))), pref('ws')));
 
-g.addPattern('pattern', seq(lit('{'),poil(lit('}'))));
+g.addPattern('nibbler', seq(
+  opt(seq(pref('ws'),lits('||','|','&&','&'))),
+  pref('termish'),
+  star(seq(lits('||','|'),pref('termish')))
+));
+
+
 
 g.addProto('quantifier');
 
@@ -1608,13 +1618,24 @@ g.addPattern('backmod', seq(opt(lit(':')),alt(lits('?','!'),neglook(lit(':')))))
 
 g.addProto('metachar');
 
+g.addToProto('metachar', 'ws', pref('normspace'));
+g.addToProto('metachar', '[ ]', seq(lit('['), pref('nibbler'), lit(']')));
+g.addToProto('metachar', '( )', seq(lit('('), pref('nibbler'), lit(')')));
+//g.addToProto('metachar', '\'', seq(poslook(lit('\'')), pref('nibbler'), lit(')')));
 g.addToProto('metachar', '.', psym());
 g.addToProto('metachar', '^', psym());
 g.addToProto('metachar', '^^', psym());
 g.addToProto('metachar', '$', psym());
 g.addToProto('metachar', '$$', psym());
+g.addToProto('metachar', 'lwb', lits('<<','«'));
+g.addToProto('metachar', 'rwb', lits('>>','»'));
+g.addToProto('metachar', 'bs', seq(lit('\\'), pref('backslash')));
 
 g.addToProto('metachar', 'assert', seq(lit('<'), pref('assertion'), lit('>')));
+
+g.addProto('backslash');
+
+g.addToProto('backslash', 'w', lit('nn'));
 
 g.addProto('assertion');
 
@@ -1625,27 +1646,32 @@ g.addToProto('assertion', '!', seq(psym(), alt(poslook(lit('>')), pref('assertio
 g.addToProto('assertion', 'method', seq(lit('.'), pref('assertion')));
 
 g.addToProto('assertion', 'name', seq(plus(pref('backw')), opt(alt(
-  poslook(lit('>'>),
+  poslook(lit('>')),
   seq(lit('='), pref('assertion')),
-  seq(lit(':'), pref('arglist')),
-  seq(lit('('), pref('arglist'), lit(')')),
+  //seq(lit(':'), pref('arglist')),
+  //seq(lit('('), pref('arglist'), lit(')')),
   seq(pref('normspace'), pref('nibbler'))
-)))));
+))));
 
 g.addToProto('assertion', '[', seq(poslook(lits('[','+','-')), plus(pref('cclass_elem'))));
 
 g.addPattern('cclass_elem', seq(
   opt(lits('+','-')),
   opt(pref('normspace')),
-  seq(
+  alt(seq(
     lit('['),
     star(seq(
       star(pref('backs')),
-      alt(seq(lit('\\'),dot()), 
-      
+      alt(seq(lit('\\'),dot()), notchars(']','\\')),
+      opt(seq(star(pref('backs')), lit('..'), star(pref('backs')), dot()))
+    )),
+    star(pref('backs')),
+    lit(']')
+  ), plus(pref('backw'))),
+  pref('normspace')
 ));
 
-var input = utf32str("^^accv+||blah**4..*");
+var input = utf32str("^^accv+||blah <foo>");
 
 var sw = new Date();
 g.compile();
