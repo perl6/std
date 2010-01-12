@@ -330,8 +330,38 @@ glit.prototype.emit = function(c) {
 };
 glit.prototype.toString = function() {
   return 'lit('+this.v.str.toQuotedString()+')';
-}
+};
 glit.prototype.root = lit;
+
+function cc() { return new gcc(arguments) }
+function gcc(chars) { // grammar 'character class' parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+  this.chars = chars;
+  var con = '(cp=='+utf32str(chars[0])[0]
+  for (var i=1; i<chars.length; ++i) {
+    con += '||cp=='+utf32str(chars[i])[0];
+  }
+  this.con = val(con+')');
+}
+derives(gcc, gts);
+gcc.prototype.emit = function(c) {
+  c.r.push(
+    val('cp=i[o]'), // grab the unicode codepoint at the current offset
+    cond(this.con,[[
+      val('++o')
+    ],[
+      gotol(this.fail)
+    ]])
+  );
+};
+gcc.prototype.toString = function() {
+  return 'cc('+this.chars+')';
+};
+gcc.prototype.regen = function(grammar) {
+  return new gcc(this.chars);
+};
+gcc.prototype.root = cc;
 
 function notchar(literal) { return new gnotchar(literal) }
 function gnotchar(literal) { // grammar literal parser builder
@@ -341,7 +371,7 @@ function gnotchar(literal) { // grammar literal parser builder
 }
 derives(gnotchar, gts);
 gnotchar.prototype.emit = function(c) {
-  c.r.push(cond(land(ne(o,val("i.l")),ne(val("i.substr(o,"+this.v.l+")"),val(this.v.str.toQuotedString()))),[[
+  c.r.push(cond(land(ne(o,val("l")),ne(val("i.substr(o,"+this.v.l+")"),val(this.v.str.toQuotedString()))),[[
     add_assign(o,val(this.v.l))
   ],[
     gotol(this.fail)
@@ -349,7 +379,7 @@ gnotchar.prototype.emit = function(c) {
 };
 gnotchar.prototype.toString = function() {
   return 'notchar('+this.v.str.toQuotedString()+')';
-}
+};
 gnotchar.prototype.root = notchar;
 
 function range(lo,hi) { return new grange(lo,hi) }
@@ -362,16 +392,17 @@ function grange(lo,hi) { // grammar range parser builder
 derives(grange, gts);
 grange.prototype.emit = function(c) {
   c.r.push(
-    cond(lor(ge(o,val("i.l")),lor(gt(val(this.lo[0]),val("i[o]")),lt(val(this.hi[0]),val("i[o]")))),[[
+    val('cp=i[o]'),
+    cond(lor(ge(o,val("l")),lor(gt(val(this.lo[0]),val("cp")),lt(val(this.hi[0]),val("cp")))),[[
       gotol(this.fail)
     ],[
-      val("o+=1")
+      val("++o")
     ]])
   );
 };
 grange.prototype.toString = function() {
   return 'range('+this.lo.str.toQuotedString()+','+this.hi.str.toQuotedString()+')';
-}
+};
 grange.prototype.root = range;
 
 function gend() { // grammar "end anchor" parser builder
@@ -380,14 +411,14 @@ function gend() { // grammar "end anchor" parser builder
 }
 derives(gend, gts);
 gend.prototype.emit = function(c) {
-  c.r.push(cond(ne(o,val("i.l")),[[
+  c.r.push(cond(ne(o,val("l")),[[
     gotol(this.fail)
   ]]));
 };
 function end() { return new gend() }
 gend.prototype.toString = function() {
   return 'end()';
-}
+};
 gend.prototype.root = end;
 
 function gdot() { // grammar "any char (dot)" parser builder
@@ -397,7 +428,7 @@ function gdot() { // grammar "any char (dot)" parser builder
 derives(gdot, gts);
 gdot.prototype.emit = function(c) {
   c.r.push(
-    cond(ge(o,val("i.l")),[[
+    cond(ge(o,val("l")),[[
       gotol(this.fail)
     ]]),
     val("++o")
@@ -406,8 +437,28 @@ gdot.prototype.emit = function(c) {
 function dot() { return new gdot() }
 gdot.prototype.toString = function() {
   return 'dot()';
-}
+};
 gdot.prototype.root = dot;
+
+function gpanic(msg) { // grammar "panic" parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+  this.msg = msg;
+}
+derives(gpanic, gts);
+gpanic.prototype.emit = function(c) {
+  c.r.push(
+    val('throw '+this.msg.toQuotedString())
+  );
+};
+function panic() { return new gpanic() }
+gpanic.prototype.toString = function() {
+  return 'panic('+this.msg.toQuotedString+')';
+};
+gpanic.prototype.regen = function(grammar) {
+  return new gpanic(this.msg);
+};
+gpanic.prototype.root = panic;
 
 function gpref(name) { // grammar "named pattern reference" parser builder
   this.name = name;
@@ -424,7 +475,7 @@ gpref.prototype.emit = function(c) {
   var pats = c.g.pats;
   var pat = pats[this.name];
   if (!pat.isRecursive) { // inline a replica of the callsite here, deeply.
-    var clone = pat.regen(c.g);
+    var clone = pat.b ? pat.regen(c.g) : pat.l.regen(c.g);
     clone.fail = this.fail; // fixup the label references
     if (clone.b) {
       clone.notd = this.notd;
@@ -434,7 +485,8 @@ gpref.prototype.emit = function(c) {
     }
     clone.emit(c);
     if (!clone.b) // some combinators aren't aligned perfectly
-      c.r.push(gotol(this.done));
+      //c.r.push(gotol(this.done));
+      c.r.push(val('t={i:t}'));
   } else {
     // emit a callsite such that the target site routes correctly (dynamically).
     c.r.push(
@@ -1201,6 +1253,10 @@ function grepeatb(l,min,max) { // grammar "non-deterministic" edition of plus
 }
 derives(grepeatb, gts);
 grepeatb.prototype.emit = function(c) {
+  if (this.l.b instanceof gpref && !c.g.pats[this.l.name].isRecursive) {
+    repeat(c.g.pats[this.l.name].regen(c.g),this.min,this.max).emit(c);
+    return;
+  }
   var retry = new gtr(); // label for retry spot
   c.r.push(
     casel(this.init),d,
@@ -1440,8 +1496,8 @@ Grammar.prototype.compile = function(interpreterState) {
   }
   
   var routine = dbg
-    ? func(["i","g","gl","o","t"],[val("var m={t:t,c:{}};m.m=m;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case -4:")])
-    : func(["i","g","gl","o","t"],[val("var m={t:t,c:{}};m.m=m;t.i=t;last:for(;;){next:switch(gl){case -4:")]); // empty parser routine
+    ? func(["i","g","gl","o","t"],[val("var m={t:t,c:{}},l=i.l,cp;m.m=m;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case -4:")])
+    : func(["i","g","gl","o","t"],[val("var m={t:t,c:{}},l=i.l,cp;m.m=m;t.i=t;last:for(;;){next:switch(gl){case -4:")]); // empty parser routine
 
   var g = this.TOP;
 
@@ -1566,7 +1622,7 @@ var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
 
 g.addPattern('TOP', seq(pref("nibbler"),end()));
 
-g.addPattern('backs', lits(' ','\n','\t','\f','\r'));
+g.addPattern('backs', cc(' ','\t','\n'));
 
 g.addPattern('backd', range('0','9'));
 
@@ -1575,7 +1631,7 @@ g.addPattern('ws', plus(either(pref('backs'),both(lit('#'),star(notchar('\n'))))
 g.addPattern('normspace', seq(poslook(alt(pref('backs'),lit('#'))), pref('ws')));
 
 g.addPattern('nibbler', seq(
-  opt(seq(pref('ws'),lits('||','|','&&','&'))),
+  opt(seq(pref('backs'),lits('||','|','&&','&'))),
   pref('termish'),
   star(seq(lits('||','|'),pref('termish')))
 ));
@@ -1596,10 +1652,6 @@ g.addToProto('quantifier', '**', seq(
     opt(seq(lit('..'),group(alt(plus(pref('backd')),lit('*')),'max')))
   ),pref('quantified_atom'))));
 
-
-g.addPattern('P6Regex', seq(ows(),opt(lits('||','|','&&','&')),ows(),pref('termish'),
-  star(seq(ows(),lits('||','|'),ows(),pref('termish')))));
-
 g.addPattern('termish', plus(pref('quantified_atom')));
 
 g.addPattern('quantified_atom', seq(pref('atom'),
@@ -1608,13 +1660,13 @@ g.addPattern('quantified_atom', seq(pref('atom'),
 
 g.addPattern('alpha', alt(range('a','z'),range('A','Z')));
 
-g.addPattern('backw', alt(pref('alpha'),range('0','9'),lit('_')));
+g.addPattern('backw', alt(pref('alpha'),range('0','9'),cc('_')));
 
 g.addPattern('atom', alt(
   seq(pref('backw'),opt(seq(plus(pref('backw')),poslook(pref('backw'))))),
   pref('metachar')));
 
-g.addPattern('backmod', seq(opt(lit(':')),alt(lits('?','!'),neglook(lit(':')))));
+g.addPattern('backmod', seq(opt(cc(':')),alt(cc('?','!'),neglook(cc(':')))));
 
 g.addProto('metachar');
 
@@ -1653,25 +1705,34 @@ g.addToProto('assertion', 'name', seq(plus(pref('backw')), opt(alt(
   seq(pref('normspace'), pref('nibbler'))
 ))));
 
-g.addToProto('assertion', '[', seq(poslook(lits('[','+','-')), plus(pref('cclass_elem'))));
+g.addToProto('assertion', '[', seq(poslook(cc('[','+','-')), plus(pref('cclass_elem'))));
 
 g.addPattern('cclass_elem', seq(
-  opt(lits('+','-')),
+  opt(cc('+','-')),
   opt(pref('normspace')),
   alt(seq(
-    lit('['),
+    cc('['),
     star(seq(
       star(pref('backs')),
-      alt(seq(lit('\\'),dot()), notchars(']','\\')),
+      alt(seq(cc('\\'),dot()), notchars(']','\\')),
       opt(seq(star(pref('backs')), lit('..'), star(pref('backs')), dot()))
     )),
     star(pref('backs')),
-    lit(']')
+    cc(']')
   ), plus(pref('backw'))),
   pref('normspace')
 ));
 
-var input = utf32str("^^accv+||blah <foo>");
+var input = utf32str("^^accv+|| [ blah <foo>    <moo> ]");
+
+/*
+var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
+
+g.addPattern('TOP', seq(star(pref('backs')),end()));
+
+g.addPattern('backs', cc(' ','\n','a','b','c','d','e'));
+var input = utf32str(Array(1<<5).join('\n'));
+*/
 
 var sw = new Date();
 g.compile();
@@ -1694,6 +1755,7 @@ var m = g.parse(input);
 print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
 
 print('parser function is '+(g.parser.toString().length)+' chars long.');
+print('input text is '+(input.l)+' chars long.');
 
 //print(g.parser.toString());
 
