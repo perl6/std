@@ -179,6 +179,7 @@ sub parsefile {
     my $class = shift;
     my $file = shift;
     local $::FILE = { name => $file };
+    $file =~ s/::/\//g;
     open(FILE, '<:utf8', $file) or die "Can't open $file: $!\n";
     my $text;
     {
@@ -247,7 +248,7 @@ sub initparse {
 sub load_pad {
     my $self = shift;
     my $setting = shift;
-    my $file = "$setting.syml";
+    my $file = "syml/$setting.syml";
     if (-e $file) {
         bless($self->load_yaml_pad($setting),'Stash');
     }
@@ -262,7 +263,8 @@ sub load_perl_pad {
     state %PADS;
     return $PADS{$setting} if $PADS{$setting};
     my $file = "$setting.pad";
-    my $store = $::TMP_PREFIX . "$setting.pad.store";
+    my $store = $::TMP_PREFIX . "syml/$setting.pad.store";
+    mkdir 'syml' unless -d 'syml';
     if (-f $store and -M $file and -M $file > -M $store) {
         $PADS{$setting} = retrieve($store);
     }
@@ -286,8 +288,9 @@ sub load_yaml_pad {
     my $setting = shift;
     state %PADS;
     return $PADS{$setting} if $PADS{$setting};
-    my $file = "$setting.syml";
-    my $store = $::TMP_PREFIX . "$setting.syml.store";
+    my $file = "syml/$setting.syml";
+    my $store = $::TMP_PREFIX . "syml/$setting.syml.store";
+    mkdir 'syml' unless -d 'syml';
     if (-f $store and -M $file and -M $file > -M $store) {
         $PADS{$setting} = retrieve($store);
     }
@@ -311,6 +314,8 @@ sub you_were_here {
     my $all;
     $file =~ s/(\.setting)?$/.syml/;
     $file =~ s!.*/!!;
+    $file =~ s/::/\//g;
+    $file = 'syml/' . $file;
 
     # setting?
     if ($::YOU_WERE_HERE) {
@@ -330,6 +335,14 @@ sub you_were_here {
         }
     }
 
+    if ($file =~ /\//) {
+        my @parts = split('/',$file);
+        my $newfile = shift @parts;
+        while (@parts) {
+            mkdir $newfile unless -d $newfile;
+            $newfile .= '/' . shift @parts;
+        }
+    }
     open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
     print SETTING Dump($all);
     close SETTING;
@@ -2228,6 +2241,7 @@ sub do_use { my $self = shift;
 sub do_need { my $self = shift;
     my $m = shift;
     my $module = $m->Str;
+    my $modfile = $module;
     my $topsym;
     my $lib = '.';
     my $std = -x 'std' ? './std' : 'std';
@@ -2239,18 +2253,21 @@ sub do_need { my $self = shift;
             @::PERL6LIB = qw( ./lib ../lib t/spec/packages ../t/spec/packages . .. );
         }
     }
+    $modfile =~ s/::/\//g;
     for my $d (@::PERL6LIB) {
-        if (-f "$d/$module.pm") {
+        if (-f "$d/$modfile.pm") {
             $lib = $d;
             last;
         }
     }
-    if (-f "$module.pm.syml" and -M "$lib/$module.pm" > -M "$module.pm.syml") {
-        $topsym = LoadFile("$module.pm.syml");
+    mkdir 'syml' unless -d 'syml';
+    if (-f "syml/$modfile.pm.syml" and -M "$lib/$modfile.pm" > -M "syml/$modfile.pm.syml") {
+        $topsym = LoadFile("syml/$modfile.pm.syml");
     }
-    elsif (-f "$lib/$module.pm") {
+    elsif (-f "$lib/$modfile.pm") {
+        say "$std $lib/$module.pm";
         system "$std $lib/$module.pm" and die "Can't compile $lib/$module.pm";
-        $topsym = LoadFile("$module.pm.syml");
+        $topsym = LoadFile("syml/$modfile.pm.syml");
     }
     else {
         $self->worry("Can't locate module $module");

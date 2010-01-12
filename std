@@ -9,7 +9,6 @@ my $failures = 0;
 
 for my $file (@ARGV) {
     warn $file,"\n" if @ARGV > 1;
-    next unless -f $file;
     my $setting = "CORE";
     $setting = "NULL" if $file eq 'CORE.setting';
     eval {

@@ -14,7 +14,7 @@ snap: $(FIXINS) check lex/STD/termish
 	mkdir snap.new
 	@#svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
 	svn info |perl -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
-	cp $(FIXINS)  tryfile STD.pmc STD_P5.pmc *.syml CORE.*.store snap.new
+	cp -r $(FIXINS) tryfile STD.pmc STD_P5.pmc syml snap.new
 	-cp -r lib snap.new
 	-cp -r setting snap.new
 	-cp -r sprixel snap.new
@@ -30,11 +30,10 @@ STD_P5.pmc: STD_P5.pm gimme5
 STD.pmc: STD.pm gimme5
 	perl gimme5 $< >STD.pm5
 	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD.pm5 >$@
-	rm -rf lex *.pad.store
+	rm -rf lex syml/*.pad.store
 
-CORE.syml: CORE.setting
-	@touch CORE.syml.store
-	-rm CORE.syml.store
+syml/CORE.syml: CORE.setting
+	-rm -f syml/CORE.syml.store
 	-./std CORE.setting
 
 check: STD.pmc STD_P5.pmc
@@ -42,7 +41,7 @@ check: STD.pmc STD_P5.pmc
 	/usr/local/bin/perl -c STD_P5.pmc
 
 # pre-generate common sublexers
-lex/STD/termish: STD.pmc STD_P5.pmc CORE.syml
+lex/STD/termish: STD.pmc STD_P5.pmc syml/CORE.syml
 	@echo 'Generating STD lexers...'
 	./tryfile STD.pm
 
@@ -50,7 +49,7 @@ cat:
 	cat try5.out
 
 clean:
-	rm -rf lex try5.* *.pad.store *.syml.store *.syml STD.pmc STD_P5.pmc STD.pm5 STD_P5.pm5
+	rm -rf lex try5.* *.pad.store syml STD.pmc STD_P5.pmc STD.pm5 STD_P5.pm5
 
 # purge is an alias for distclean
 distclean purge: clean
@@ -75,7 +74,7 @@ help:
 	@echo 'snap            copies runnable files and svn revision to snap/'
 	@echo 'STD_P5.pmc      (internal)'
 	@echo 'STD.pmc         (internal)'
-	@echo 'CORE.syml       (internal)'
+	@echo 'syml/CORE.syml  (internal)'
 	@echo 'check           validates STD.pm STD.pmc and STD_P5.pmc in Perl 5'
 	@echo 'lex/STD/termish (internal)'
 	@echo 'cat             shows the output written by the last tryfile'
