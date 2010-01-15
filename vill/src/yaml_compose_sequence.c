@@ -4,7 +4,7 @@
 #include "yaml_parse.h"             /* SEQUENCE NOT_YET_ASSIGNED */
 #include "yaml_compose_internal.h"  /* graph_node */
 
-/* yaml_compose_sequence must: */
+/* Called from yaml_compose, yaml_compose_sequence must: */
 /* 1. ensure the parent node is of sequence kind */
 /* 2. add a new entry to the parent node's list of sequence entries */
 /* 3. create an empty graph node as sequence list value */

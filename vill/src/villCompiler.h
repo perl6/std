@@ -91,12 +91,13 @@ Value * SYM_infix__S_Plus(        struct villCompiler *, struct graph_node *);
 Value * termish(                  struct villCompiler *, struct graph_node *);
 Value * term__S_identifier(       struct villCompiler *, struct graph_node *);
 Value * term__S_dotty(            struct villCompiler *, struct graph_node *);
+Value * term__S_scope_declarator( struct villCompiler *, struct graph_node *);
 Value * term__S_value(            struct villCompiler *, struct graph_node *);
 Value * term__S_variable(         struct villCompiler *, struct graph_node *);
 Value * twigil__S_Star(           struct villCompiler *, struct graph_node *);
 Value * value__S_number(          struct villCompiler *, struct graph_node *);
-Value * variable(                 struct villCompiler *, struct graph_node *);
 Value * value__S_quote(           struct villCompiler *, struct graph_node *);
+Value * variable(                 struct villCompiler *, struct graph_node *);
 Value * variable_declarator(      struct villCompiler *, struct graph_node *);
 
 // Debug flags similar to -D in P5's perldoc perlrun. Set in options.cpp

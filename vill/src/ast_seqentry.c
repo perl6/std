@@ -13,7 +13,6 @@ ast_seqentry( struct graph_node * parent, int index ) {
   static struct sequence_list_entry * previous_entry  = NULL;
   static struct graph_node          * previous_parent = NULL;
   assert( (parent -> flags & YAML_KIND) == YAML_SEQUENCE );
-//assert( parent -> kind == SEQUENCE );
   struct sequence_list_entry * entry= parent -> content.sequence.head;
   assert( entry != NULL );
   struct graph_node * child = NULL;  /* default result for bad index */

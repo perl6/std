@@ -334,38 +334,40 @@ employed per call.  Presumably Pugs also did such things.
 9. CONTRIBUTING
 
 Anyone with Pugs commit access is welcome to hack on 'vill', generally
-as long as the set of passing tests improves.  Join #perl6 on
-irc.freenode.net to meet other contributors.  Not Yet Implemented (NYI)
-bits of Perl 6 code successfully make it through viv into the AST, only
-to fail because of missing or incomplete *Codegen() functions.  An error
-message such as "!perl/hash:VAST::SYM_infix__S_Tilde is not yet
-implemented" is rather common and points to an obvious hole.  Make a new
-file in src/ and entries in Makefile and src/link_codegen.cpp to fix it.
+as long as the changes improve it.  Join #perl6 on irc.freenode.net to
+meet other contributors.  Not Yet Implemented (NYI) bits of Perl 6 code
+successfully make it through viv into the AST, only to fail because of
+missing or incomplete *Codegen() functions.
 
-Beginner hackers can grep for TODO comments, particularly those also
-labelled (LHF) (low hanging fruit).  Experienced hackers are requested
-not to greedily consume all the fruit they can, on the contrary to put
-even more fruit onto the (source) tree to entice others to get involved.
-Perhaps one piece of LHF per person per week/month is a fair ration.
+New hackers can grep for TODO comments, particularly those also marked
+(LHF) (low hanging fruit), or run 'make todo' or 'make fruit' instead.
+Experienced hackers are requested not to greedily consume all the fruit
+they can, on the contrary please put even more fruit onto the (source)
+tree to tempt others to get involved.  Perhaps one piece of LHF per
+person per week/month is a fair ration.
 
-Here are some guidelines for a typical contribution, adding a fictitious
-missing 'crazy' operator:
+Here are some guidelines for a typical contribution.  Recall the Source
+Code Conventions above.  Let's add a fictitious missing 'zap' operator
+(please don't actually implement zap;) :
 
-1. You get a '!perl/hash:VAST::infix__S_crazy is not yet implemented in
-   vill' message when trying some new Perl 6 program that uses crazy.
+1. A '!perl/hash:VAST::infix__S_zap is not yet implemented in vill'
+   message appears when you run a Perl 6 program that uses zap.
 2. Make the simplest example the triggers the same message.  View its
-   parse tree by using a command like: ./vill -Dp -e'your code example'
-3. Add infix__S_crazy to 'Codegen functions' in src/villCompiler.h.
-4. Add infix__S_crazy to local_Codegen() in src/link_codegen.cpp.
-5. Add src/infix__S_crazy.o to the 'objects' list in vill/Makefile.
+   parse tree by using a command like: ./vill -Dp -e' "foo" zap "bar" '
+3. Add infix__S_zap to 'Codegen functions' in src/villCompiler.h.
+4. Add infix__S_zap to local_Codegen() in src/link_codegen.cpp.
+5. Add src/infix__S_zap.o to the 'objects' list in vill/Makefile.
    Add it at the right place in the 'Object targets' list there as well.
 6. Copy the source file most similar in functionality (in your opinion)
-   to src/infix__S_crazy.cpp, and edit the comment and function name.
-   Or, create a new file from scratch.  Next the hard/easy part: make it
-   Do The Right Thing.  Study the parse tree from step 2 for more ideas.
-7. Run 'make' and test your code.  Thoroughly.  Use the various vill -D
-   options (see vill -H) for diagnostics.  Edit, save, repeat.
-8. Discuss in #perl6.  Commit into svn.pugscode.org if successful.
+   to src/infix__S_zap.cpp, and edit the comment, function name and
+   debug trace text.  Or, create a new file from scratch.  Next the
+   hard/easy part: make it Do The Right Thing.  Study the parse tree
+   from step 2 for ideas.
+7. Run 'make', 'make test', and test your code.  Use various vill -D
+   options (eg -DU, see vill -H) for diagnostics.  Edit, save, repeat.
+8. Discuss in #perl6.  Commit into svn.pugscode.org if successful.  If
+   your work reveals similar code that others could write, add a comment
+   by your entry in link_codegen.cpp like: // TODO: (LHF) zop zup etc
 
 The procedure for adding a new built in function is similar.
 
@@ -412,7 +414,7 @@ Item 1. is stalled, test/yaml_compose_roundtrip runs but fails to
 traverse the entire tree, because src/graph_traverse is incomplete.  The
 integrity of the composed AST looks good though, for example try:
 
-    ./vill -Ds -e'say "syntax tree";'
+    ./vill -Ds -e 'my $foo="bar"; print $foo;'
 
 Despite item 1. stalling, test runs of ./vill -DU -e'print 12 + 34'
 and similar show the entire AST being traversed.  The -DU option allows
