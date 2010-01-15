@@ -300,7 +300,7 @@ function casel(lbl) { // macro for MARK label with id of the transition object
   return val("case "+lbl.id+":");
 }
 
-function lit(literal) { return new glit(literal) }
+function lit(literal) { return new (literal.length > 1 ? glit : gcc)(literal) }
 function glit(literal) { // grammar literal parser builder
   gts.call(this); // call the parent constructor
   this.b = false;
@@ -601,6 +601,47 @@ ggroup.prototype.emit = function(c) {
 ggroup.prototype.root = group;
 ggroup.prototype.regen = function(grammar) {
   return new ggroup(this.l.regen(grammar),this.name);
+};
+
+function action(l,code) { return new gaction(l,code) }
+function gaction(l,code) { // grammar "group (named & anonymous)" parser builder
+  gts.call(this); // call the parent constructor
+  this.code = code;
+  this.l = l;
+  this.b = this.l.b;
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gaction, gts);
+gaction.prototype.emit = function(c) {
+  this.l.fail = this.fail;
+  if (this.l.b)
+    this.l.bt = this.bt;
+  this.l.emit(c);
+  if (this.l.b) {
+    c.r.push(
+      casel(this.l.done),
+      val(this.code),
+      gotol(this.done),
+      
+      casel(this.l.notd),
+      val(this.code),
+      gotol(this.notd)
+    );
+  } else {
+    c.r.push(
+      val(this.code)
+    );
+  }
+};
+gaction.prototype.root = action;
+gaction.prototype.regen = function(grammar) {
+  return new gaction(this.l.regen(grammar),this.code);
+};
+gaction.prototype.toString = function(grammar) {
+  return 'action('+l+')'; // TODO: allow the action user to give the action a label.
 };
 
 function poslook(l) { return new gposlook(l) }
@@ -1485,7 +1526,7 @@ Grammar.prototype.compile = function(interpreterState) {
     // if a pattern is not recursive, it can be inlined (but cloned
     //   so the labels/gotos are still unique) into its referer.
     if (pat.isRecursive = isRecursive) {
-      //if (dbg)
+      if (dbg)
         print('recursive pattern: '+name.toQuotedString());
       // wrap the pattern in a call target
       this.pats[name] = new gcallt(pat);
@@ -1495,9 +1536,26 @@ Grammar.prototype.compile = function(interpreterState) {
     }
   }
   
+  // now that all the named patterns have been resolved, make another pass to discover/mark
+  //   what we can learn about the possible lengths of the patterns (whether it's zero-length,
+  //   whether it can possibly be zero-length, & what length it would be if it's not zero-length).
+  //   We'll then be able to use this knowledge to detect whether a pattern recursion is left-
+  //   recursive or right-recursive (or both, pathologically self-referential - no termination
+  //   pattern).  
+  // Eventually we'll be able to use those data to definitively compute whether a pattern can be
+  //   Boyer-Moore'd, and if there are no named groups (named captures) contained, the entire 
+  //   match procedure can be swapped out for a mere JS literal RegExp object (or Perl if we're
+  //   targeting Perl 5 by then).  
+  for (var name in this.pats) {
+    
+  }
+  
+  var preamble = "var m={t:t,c:{}},l=i.l,cp;m.m=m;t.i=t;last:for(;;){";
+  var postamble = "case -1:if(dbg)print('parse succeeded');return new Match(t,m.m,g,i,o,true);case -2:if(dbg)print('parse succeeded, but is not completed');return new Match(t,m.m,g,i,o,false);case 1:default:print('parse failed');break last}}";
+  
   var routine = dbg
-    ? func(["i","g","gl","o","t"],[val("var m={t:t,c:{}},l=i.l,cp;m.m=m;t.i=t;last:for(;;){print('op: '+gl+' '+o);next:switch(gl){case -4:")])
-    : func(["i","g","gl","o","t"],[val("var m={t:t,c:{}},l=i.l,cp;m.m=m;t.i=t;last:for(;;){next:switch(gl){case -4:")]); // empty parser routine
+    ? func(["i","g","gl","o","t"],[val(preamble+"print('op: '+gl+' '+o);next:switch(gl){case -4:")])
+    : func(["i","g","gl","o","t"],[val(preamble+"next:switch(gl){case -4:")]); // empty parser routine
 
   var g = this.TOP;
 
@@ -1528,7 +1586,7 @@ Grammar.prototype.compile = function(interpreterState) {
   
   g.emit(routine); // have the grammar emit its specialize parser code to this routine
 
-  routine.r.push(val("case -1:if(dbg)print('parse succeeded');return new Match(t,m.m,g,i,o,true);case -2:if(dbg)print('parse succeeded, but is not completed');return new Match(t,m.m,g,i,o,false);case 1:default:print('parse failed');break last}}")); // finalize the routine
+  routine.r.push(val(postamble)); // finalize the routine
 
   var parserf = routine.emit();
 
@@ -1620,19 +1678,21 @@ var dbg = 0;
 
 var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
 
-g.addPattern('TOP', seq(pref("nibbler"),end()));
+var input = utf32str("# just|^^|[a..z]?");
+
+g.addPattern('TOP', seq(pref("termishes"),end()));
 
 g.addPattern('backs', cc(' ','\t','\n'));
 
 g.addPattern('backd', range('0','9'));
 
-g.addPattern('ws', plus(either(pref('backs'),both(lit('#'),star(notchar('\n'))))));
+g.addPattern('ws', plus(either(plus(pref('backs')),both(lit('#'),star(notchar('\n'))))));
 
-g.addPattern('normspace', seq(poslook(alt(pref('backs'),lit('#'))), pref('ws')));
-
-g.addPattern('nibbler', seq(
-  opt(seq(pref('backs'),lits('||','|','&&','&'))),
-  pref('termish'),
+g.addPattern('termishes', seq(
+  ows(),
+  opt(seq(lits('||','|','&&','&'))),
+  //pref('termish'),
+  action(pref('termish'), 'print(m.c.termish.n)'),
   star(seq(lits('||','|'),pref('termish')))
 ));
 
@@ -1645,17 +1705,17 @@ g.addToProto('quantifier', '+', psym());
 g.addToProto('quantifier', '?', psym());
 g.addToProto('quantifier', '**', seq(
   psym(),
-  star(pref('backs')),
+  ows(),
   pref('backmod'),
-  star(pref('backs')),
+  ows(),
   either(seq(group(plus(pref('backd')),'min'),
     opt(seq(lit('..'),group(alt(plus(pref('backd')),lit('*')),'max')))
   ),pref('quantified_atom'))));
 
 g.addPattern('termish', plus(pref('quantified_atom')));
 
-g.addPattern('quantified_atom', seq(pref('atom'),
-  opt(seq(ows(),either(pref('quantifier'),seq(poslook(lit(':')),pref('backmod'),
+g.addPattern('quantified_atom', seq(pref('atom'),ows(),
+  opt(seq(either(pref('quantifier'),seq(poslook(lit(':')),pref('backmod'),
     neglook(pref('alpha'))))))));
 
 g.addPattern('alpha', alt(range('a','z'),range('A','Z')));
@@ -1670,10 +1730,10 @@ g.addPattern('backmod', seq(opt(cc(':')),alt(cc('?','!'),neglook(cc(':')))));
 
 g.addProto('metachar');
 
-g.addToProto('metachar', 'ws', pref('normspace'));
-g.addToProto('metachar', '[ ]', seq(lit('['), pref('nibbler'), lit(']')));
-g.addToProto('metachar', '( )', seq(lit('('), pref('nibbler'), lit(')')));
-//g.addToProto('metachar', '\'', seq(poslook(lit('\'')), pref('nibbler'), lit(')')));
+//g.addToProto('metachar', 'ws', pref('normspace'));
+g.addToProto('metachar', '[ ]', seq(cc('['), pref('termishes'), lit(']')));
+g.addToProto('metachar', '( )', seq(cc('('), pref('termishes'), lit(')')));
+//g.addToProto('metachar', '\'', seq(poslook(lit('\'')), pref('termishes'), lit(')')));
 g.addToProto('metachar', '.', psym());
 g.addToProto('metachar', '^', psym());
 g.addToProto('metachar', '^^', psym());
@@ -1681,9 +1741,9 @@ g.addToProto('metachar', '$', psym());
 g.addToProto('metachar', '$$', psym());
 g.addToProto('metachar', 'lwb', lits('<<','«'));
 g.addToProto('metachar', 'rwb', lits('>>','»'));
-g.addToProto('metachar', 'bs', seq(lit('\\'), pref('backslash')));
+g.addToProto('metachar', 'bs', seq(cc('\\'), pref('backslash')));
 
-g.addToProto('metachar', 'assert', seq(lit('<'), pref('assertion'), lit('>')));
+g.addToProto('metachar', 'assert', seq(cc('<'), pref('assertion'), cc('>')));
 
 g.addProto('backslash');
 
@@ -1691,48 +1751,39 @@ g.addToProto('backslash', 'w', lit('nn'));
 
 g.addProto('assertion');
 
-g.addToProto('assertion', '?', seq(psym(), alt(poslook(lit('>')), pref('assertion'))));
+g.addToProto('assertion', '?', seq(psym(), alt(poslook(cc('>')), pref('assertion'))));
 
-g.addToProto('assertion', '!', seq(psym(), alt(poslook(lit('>')), pref('assertion'))));
+g.addToProto('assertion', '!', seq(psym(), alt(poslook(cc('>')), pref('assertion'))));
 
-g.addToProto('assertion', 'method', seq(lit('.'), pref('assertion')));
+g.addToProto('assertion', 'method', seq(cc('.'), pref('assertion')));
 
 g.addToProto('assertion', 'name', seq(plus(pref('backw')), opt(alt(
-  poslook(lit('>')),
-  seq(lit('='), pref('assertion')),
+  poslook(cc('>')),
+  seq(cc('='), pref('assertion'))//,
   //seq(lit(':'), pref('arglist')),
   //seq(lit('('), pref('arglist'), lit(')')),
-  seq(pref('normspace'), pref('nibbler'))
+  //seq(ows(), pref('termishes'))
 ))));
 
 g.addToProto('assertion', '[', seq(poslook(cc('[','+','-')), plus(pref('cclass_elem'))));
 
 g.addPattern('cclass_elem', seq(
   opt(cc('+','-')),
-  opt(pref('normspace')),
+  ows(),
   alt(seq(
     cc('['),
     star(seq(
-      star(pref('backs')),
+      ows(),
       alt(seq(cc('\\'),dot()), notchars(']','\\')),
-      opt(seq(star(pref('backs')), lit('..'), star(pref('backs')), dot()))
+      opt(seq(ows()), lit('..'), ows(), dot())
     )),
-    star(pref('backs')),
+    ows(),
     cc(']')
   ), plus(pref('backw'))),
-  pref('normspace')
+  ows()
 ));
 
-var input = utf32str("^^accv+|| [ blah <foo>    <moo> ]");
-
-/*
-var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
-
-g.addPattern('TOP', seq(star(pref('backs')),end()));
-
-g.addPattern('backs', cc(' ','\n','a','b','c','d','e'));
-var input = utf32str(Array(1<<5).join('\n'));
-*/
+dbg=0;
 
 var sw = new Date();
 g.compile();
@@ -1746,25 +1797,31 @@ var sw = new Date();
 var m = g.parse(input);
 print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
 
-var sw = new Date();
-var m = g.parse(input);
-print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
-
-var sw = new Date();
-var m = g.parse(input);
-print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
-
 print('parser function is '+(g.parser.toString().length)+' chars long.');
 print('input text is '+(input.l)+' chars long.');
 
+//print(keys(m.match.m.c));
+
+
 //print(g.parser.toString());
 
-
-
-
-
-
-
-
-
-
+/*
+for (var te=1; te<10000000000000; te*=2) {
+  var sw = new Date();
+  //var code = 'switch(a){';
+  var code = '';
+  var a = func(['a'], []);
+  for (var tf=0; tf<te; ++tf)
+    //code+='case '+tf+':return '+tf+';';
+    //code+='if (a=='+tf+')return '+tf+';';
+    code+=';';
+  //a.r.push(val(code+'}'));
+  a.r.push(val('return a;'));
+  var c = eval(a.emit());
+  print(te+' compiled: '+(new Date() - sw)+' ms');
+  c(te);
+  print(te+'    executed: '+(new Date() - sw)+' ms');
+  c(te);
+  print(te+'       executed: '+(new Date() - sw)+' ms');
+}
+*/
