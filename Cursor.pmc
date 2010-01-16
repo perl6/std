@@ -497,11 +497,17 @@ sub cursor_fate { my $self = shift;
         # Subsequent calls return next-most specific, then next-most longest.
         return sub {
                     while (@candidates) {
-                        my $long = pop @candidates or next;
-                        while (@$long) {
-                            my $specific = pop @$long or next;
-                            return @$fates[@$specific];
+                        my $long = $candidates[-1];
+                        if (defined $long) {
+                            while (@$long) {
+                                my $specific = pop @$long // next;
+                                if ($DEBUG & DEBUG::autolexer) {
+                                    say ::LOG "relex sez ", join ' ', @$specific;
+                                }
+                                return @$fates[@$specific];
+                            }
                         }
+                        pop @candidates;
                     }
                     ();
                 };
