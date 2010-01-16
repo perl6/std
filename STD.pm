@@ -5258,7 +5258,7 @@ method add_our_name ($n) {
         if $name ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
             $curstash.{"&$name"} //= $declaring;
             $sid ~= "::$name";
-            $*NEWPAD = $curstash.{$name ~ '::'} //= Stash.new(
+            $*NEWPKG = $curstash.{$name ~ '::'} //= Stash.new(
                 'PARENT::' => $curstash.idref,
                 '!file' => $*FILE, '!line' => self.line,
                 '!id' => [$sid] );
