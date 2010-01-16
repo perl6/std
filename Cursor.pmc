@@ -488,17 +488,24 @@ sub cursor_fate { my $self = shift;
             $ch = $::ORIG[++$p];
             $state = $next;
         }
-        my @fnums = map { $_ ? map({ $_ ? @$_ : () } reverse @$_) : () } reverse @candidates;
-        if ($DEBUG & DEBUG::autolexer) {
-            print ::LOG $p," FNUMS @fnums\n" if $DEBUG & DEBUG::autolexer;
-            my $f = $lexer->{FATES};
-            for my $fnum (@fnums) {
-                print ::LOG "$fnum ",::fatestr($f->[$fnum]),"\n";
-            }
-        }
 
-        my @FATES = @{$lexer->{FATES}}[@fnums];
-        return sub { splice(@FATES,0) };
+        my $fates = $lexer->{FATES};
+
+        # Return longest, most-specific candidate or list of tied candidates.
+        # (If the latter, candidate list itself follows original rule order).
+        # This is essentially a lazy list of LTM candidates, batched by ties.
+        # Subsequent calls return next-most specific, then next-most longest.
+        return sub {
+                    while (@candidates) {
+                        my $long = pop @candidates or next;
+                        while (@$long) {
+                            my $specific = pop @$long or next;
+                            return @$fates[@$specific];
+                        }
+                    }
+                    ();
+                };
+
     }
     print ::LOG "FAILED trie at $P\n" if $DEBUG & DEBUG::autolexer;
     die "TRIE failed";
@@ -2265,7 +2272,7 @@ sub do_need { my $self = shift;
         $topsym = LoadFile("syml/$modfile.pm.syml");
     }
     elsif (-f "$lib/$modfile.pm") {
-        say "$std $lib/$module.pm";
+        # say "$std $lib/$module.pm";
         system "$std $lib/$module.pm" and die "Can't compile $lib/$module.pm";
         $topsym = LoadFile("syml/$modfile.pm.syml");
     }
