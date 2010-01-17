@@ -405,6 +405,31 @@ grange.prototype.toString = function() {
 };
 grange.prototype.root = range;
 
+function doublec() { return new gdoublec() }
+function gdoublec() { // grammar 'double colon (fail to last alternation)' builder
+  gts.call(this); // call the parent constructor
+  this.b = true;
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gdoublec, gts);
+gdoublec.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),
+    d,
+    gotol(this.notd),
+    
+    casel(this.bt),
+    val("t=cg;gl=cl;break")
+  );
+};
+gdoublec.prototype.toString = function() {
+  return 'doublec()';
+};
+gdoublec.prototype.root = doublec;
+
 function gend() { // grammar "end anchor" parser builder
   gts.call(this); // call the parent constructor
   this.b = false;
@@ -483,7 +508,11 @@ gpref.prototype.emit = function(c) {
       clone.init = this.init;
       clone.bt = this.bt;
     }
+    // still backtrack even if we're in a cancellable alternation.
+    var prior_calt_count = calt_count;
+    calt_count = 0;
     clone.emit(c);
+    calt_count = prior_calt_count;
     if (!clone.b) // some combinators aren't aligned perfectly
       //c.r.push(gotol(this.done));
       c.r.push(val('t={i:t}'));
@@ -550,8 +579,6 @@ gcallt.prototype.emit = function(c) {
 function group(l,name) { return new ggroup(l,name) }
 function ggroup(l,name) { // grammar "group (named & anonymous)" parser builder
   gts.call(this); // call the parent constructor
-  if (name === null)
-    throw arguments.callee.caller;
   if (typeof name == 'undefined') {
     this.anon = true;
     throw 'anonymous captures not yet supported';
@@ -601,6 +628,53 @@ ggroup.prototype.emit = function(c) {
 ggroup.prototype.root = group;
 ggroup.prototype.regen = function(grammar) {
   return new ggroup(this.l.regen(grammar),this.name);
+};
+
+var calt_count = 0;
+function calt(l) { return new gcalt(l) }
+function gcalt(l) { // grammar "cancelable alternation" parser builder
+  gts.call(this); // call the parent constructor
+  this.l = l;
+  if (!(this.b = l.b))
+    throw "nonsensical usage: cancellable alternation of a deterministic pattern?";
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gcalt, gts);
+gcalt.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),
+    d,
+    val("t.cg=cg;t.cl=cl;cg=t;cl="+this.fail.id) // save the last cg; make myself cg
+  );
+  ++calt_count;
+  this.l.emit(c);
+  --calt_count;
+  c.r.push(
+    casel(this.l.done),
+    a,
+    val("cg=t.cg;cl=t.cl"),
+    gotol(this.done),
+    
+    casel(this.l.notd),
+    val("t.i.l=t;t=t.i;cg=t.cg;cl=t.cl"),
+    gotol(this.notd),
+    
+    casel(this.l.fail),
+    val("cg=t.cg;cl=t.cl"),
+    a,
+    gotol(this.fail),
+    
+    casel(this.bt),
+    val("cg=t;t=t.l;cl="+this.fail.id),
+    gotol(this.l.bt)
+  );
+};
+gcalt.prototype.root = group;
+gcalt.prototype.regen = function(grammar) {
+  return new gcalt(this.l.regen(grammar));
 };
 
 function action(l,code) { return new gaction(l,code) }
@@ -1550,16 +1624,14 @@ Grammar.prototype.compile = function(interpreterState) {
     
   }
   
-  var preamble = "var m={t:t,c:{}},l=i.l,cp;m.m=m;t.i=t;last:for(;;){";
+  var preamble = "var m={t:t,c:{}},l=i.l,cp,cg,cl;m.m=m;t.i=t;last:for(;;){";
   var postamble = "case -1:if(dbg)print('parse succeeded');return new Match(t,m.m,g,i,o,true);case -2:if(dbg)print('parse succeeded, but is not completed');return new Match(t,m.m,g,i,o,false);case 1:default:print('parse failed');break last}}";
   
   var routine = dbg
     ? func(["i","g","gl","o","t"],[val(preamble+"print('op: '+gl+' '+o);next:switch(gl){case -4:")])
     : func(["i","g","gl","o","t"],[val(preamble+"next:switch(gl){case -4:")]); // empty parser routine
 
-  var g = this.TOP;
-
-  //g = g.regen();
+  var g = this.TOP.regen();
 
   g.fail = new gtr(); g.fail.id = 1;
   g.done = new gtr(); g.done.id = -1;
@@ -1575,6 +1647,9 @@ Grammar.prototype.compile = function(interpreterState) {
     if (pat.isRecursive && pat!==this.TOP) {
       if (dbg)
         print('compiling pattern '+name.toQuotedString());
+      // reset the cancellable alternations counter.
+      // TODO: comment following line if it's not needed.
+      calt_count = 0;
       pat.emit(routine);
     }
   }
@@ -1675,7 +1750,7 @@ function notchars() {
 }
 
 var dbg = 0;
-
+/*
 var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
 
 var input = utf32str("# just|^^|[a..z]?");
@@ -1782,9 +1857,19 @@ g.addPattern('cclass_elem', seq(
   ), plus(pref('backw'))),
   ows()
 ));
-
+*/
 dbg=0;
 
+var g = new Grammar('doublectest');
+g.addPattern('TOP', calt(alt(seq(lit('if'),doublec(),lit('not')),lit('ify'))));
+g.compile(); g.parse(utf32str('verify'));
+
+var g = new Grammar('doublectest');
+g.addPattern('TOP', alt(calt(alt(seq(lit('if'),doublec(),lit('not')),lit('ify'))),lit('ify')));
+g.compile(); g.parse(utf32str('ify'));
+
+
+/*
 var sw = new Date();
 g.compile();
 print('Compile Time Elapsed: '+(new Date() - sw)+' ms');
@@ -1799,7 +1884,7 @@ print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
 
 print('parser function is '+(g.parser.toString().length)+' chars long.');
 print('input text is '+(input.l)+' chars long.');
-
+*/
 //print(keys(m.match.m.c));
 
 
