@@ -430,6 +430,51 @@ gdoublec.prototype.toString = function() {
 };
 gdoublec.prototype.root = doublec;
 
+function singlec(l) { return new gsinglec(l) }
+function gsinglec(l) { // grammar 'single colon (fail if backtracked over)' builder
+  // note: a Perl 6 parser generator must wrap the prior atom in this, just like
+  // the repetition operators.
+  gts.call(this); // call the parent constructor
+  this.b = true;
+  this.l = l;
+  if (!l.b) { // fake the labels
+    this.l.done = new gtr();
+    this.l.notd = new gtr();
+  }
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gsinglec, gts);
+gsinglec.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),
+    d
+  );
+  this.l.emit(c);
+  c.r.push(
+    casel(this.l.done),
+    a,
+    gotol(this.done),
+    
+    casel(this.l.notd),
+    // val("t.i.l=t"), // don't need to save it since we're never backtracking.
+    a,
+    gotol(this.notd),
+    
+    casel(this.l.fail),
+    // backtrack does the same thing as fail
+    casel(this.bt),
+    a,
+    gotol(this.fail)
+  );
+};
+gsinglec.prototype.toString = function() {
+  return 'singlec('+this.l+')';
+};
+gsinglec.prototype.root = singlec;
+
 function gend() { // grammar "end anchor" parser builder
   gts.call(this); // call the parent constructor
   this.b = false;
@@ -1862,12 +1907,15 @@ dbg=0;
 
 var g = new Grammar('doublectest');
 g.addPattern('TOP', calt(alt(seq(lit('if'),doublec(),lit('not')),lit('ify'))));
-g.compile(); g.parse(utf32str('verify'));
+g.compile(); g.parse(utf32str('ify'));
 
 var g = new Grammar('doublectest');
 g.addPattern('TOP', alt(calt(alt(seq(lit('if'),doublec(),lit('not')),lit('ify'))),lit('ify')));
 g.compile(); g.parse(utf32str('ify'));
 
+var g = new Grammar('singlectest');
+g.addPattern('TOP', seq(singlec(star(cc('a'))),cc('a')));
+g.compile(); g.parse(utf32str('aa'));
 
 /*
 var sw = new Date();
