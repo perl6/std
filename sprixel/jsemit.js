@@ -355,6 +355,20 @@ gprior.prototype.toString = function() {
 };
 gprior.prototype.root = prior;
 
+function fail() { return new gfail() }
+function gfail() { // grammar '<!> (never match anything)' parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+}
+derives(gfail, gts);
+gfail.prototype.emit = function(c) {
+  gotol(this.fail)
+};
+gfail.prototype.toString = function() {
+  return 'fail()';
+};
+gfail.prototype.root = fail;
+
 function cc() { return new gcc(arguments) }
 function gcc(chars) { // grammar 'character class' parser builder
   gts.call(this); // call the parent constructor
