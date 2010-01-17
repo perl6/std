@@ -333,6 +333,28 @@ glit.prototype.toString = function() {
 };
 glit.prototype.root = lit;
 
+function prior() { return new gprior() }
+function gprior() { // grammar '<.prior> (literal constant string of last successful match)' parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+}
+derives(gprior, gts);
+var sprixel$$last_match;
+function sprixel$$get_last_match_str() {
+  return (typeof sprixel$$last_match == 'undefined' ? 'sprixel$$last_match' : sprixel$$last_match).toString();
+}
+gprior.prototype.emit = function(c) {
+  c.r.push(cond(ne(val('(cp=sprixel$$get_last_match_str())'),val("i.substr(o,cp.length)")),[[
+    gotol(this.fail)
+  ],[
+    add_assign(o,val('cp.length'))
+  ]]));
+};
+gprior.prototype.toString = function() {
+  return 'prior()';
+};
+gprior.prototype.root = prior;
+
 function cc() { return new gcc(arguments) }
 function gcc(chars) { // grammar 'character class' parser builder
   gts.call(this); // call the parent constructor
@@ -1753,7 +1775,10 @@ Grammar.prototype.compile = function(interpreterState) {
 Grammar.prototype.parse = function(input) {
   if (!this.compiled)
     this.compile();
-  return this.parser(input,this,0,0,{});
+  var res = this.parser(input,this,0,0,{});
+  if (typeof res != 'undefined')
+    return sprixel$$last_match = res;
+  // TODO: return Failure
 }
 Grammar.prototype.next = function(input,t,o) {
   return this.parser(input,this,-3,o,t);
@@ -1783,6 +1808,9 @@ Match.prototype.next = function() {
   if (this.completed)
     return this;
   return this.grammar.next(this.input,this.t,this.offset);
+}
+Match.prototype.toString = function() {
+  return this.input.substr(0,this.offset);
 }
 
 // steal some macros/combinators from jsmeta
@@ -1944,12 +1972,19 @@ g.compile(); g.parse(utf32str('ify'));
 var g = new Grammar('singlectest');
 g.addPattern('TOP', seq(singlec(star(cc('a'))),cc('a')));
 g.compile(); g.parse(utf32str('aa'));
-*/
-dbg=1;
 
 var g = new Grammar('committest');
 g.addPattern('TOP', seq(star(cc('a')),commit(),cc('a')));
 g.compile(); g.parse(utf32str('aa'));
+*/
+
+var g = new Grammar('priortest');
+g.addPattern('TOP', star(cc('a')));
+g.compile(); g.parse(utf32str('aa'));
+var g = new Grammar('priortest');
+g.addPattern('TOP', repeat(prior(),2,2));
+g.compile(); g.parse(utf32str('aaaa'));
+
 
 /*
 var sw = new Date();
