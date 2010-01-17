@@ -356,7 +356,10 @@ gcc.prototype.emit = function(c) {
   );
 };
 gcc.prototype.toString = function() {
-  return 'cc('+this.chars+')';
+  var chars = this.chars[0].toProgramString();
+  for (var i=1;i<this.chars.length;++i)
+    chars += "','"+this.chars[i].toProgramString();
+  return "cc('"+chars+"')";
 };
 gcc.prototype.regen = function(grammar) {
   return new gcc(this.chars);
@@ -474,6 +477,33 @@ gsinglec.prototype.toString = function() {
   return 'singlec('+this.l+')';
 };
 gsinglec.prototype.root = singlec;
+
+function commit() { return new gcommit() }
+function gcommit() { // grammar 'commit (fail entire match)' builder
+  gts.call(this); // call the parent constructor
+  this.b = true;
+  this.init = new gtr();
+  this.bt = new gtr();
+  this.notd = new gtr();
+  this.done = new gtr();
+}
+derives(gcommit, gts);
+gcommit.prototype.emit = function(c) {
+  c.r.push(
+    casel(this.init),
+    d,
+    dval('print("in commit")'),
+    gotol(this.notd),
+    
+    casel(this.bt),
+    dval('print("backtracking commit")'),
+    val("gl=1;break") // do not pass Go.  do not collect 200 Perl 6 implementations.
+  );
+};
+gcommit.prototype.toString = function() {
+  return 'commit()';
+};
+gcommit.prototype.root = commit;
 
 function gend() { // grammar "end anchor" parser builder
   gts.call(this); // call the parent constructor
@@ -1689,9 +1719,9 @@ Grammar.prototype.compile = function(interpreterState) {
   //   we know which ones are recursive.
   for (var name in this.pats) {
     var pat = this.pats[name];
+    if (dbg)
+      print('compiling pattern '+name.toQuotedString()+' '+pat.l);
     if (pat.isRecursive && pat!==this.TOP) {
-      if (dbg)
-        print('compiling pattern '+name.toQuotedString());
       // reset the cancellable alternations counter.
       // TODO: comment following line if it's not needed.
       calt_count = 0;
@@ -1768,20 +1798,20 @@ function popArgs() { arguments.length--; return arguments; }
 function seq() {
   return arguments.length == 1
     ? arguments[0]
-    : both(
+    : both(arguments[0], 
       arguments.length > 2
-        ? seq.apply(null, popArgs.apply(null,arguments))
-        : arguments[0]
-      , arguments[arguments.length - 1]);
+        ? seq.apply(null, Array.prototype.slice.call(arguments, 1))
+        : arguments[1]
+      );
 }
 function alt() {
   return arguments.length == 1
     ? arguments[0]
-    : either(
+    : either(arguments[0], 
       arguments.length > 2
-        ? alt.apply(null, popArgs.apply(null,arguments))
-        : arguments[0]
-      , arguments[arguments.length - 1]);
+        ? alt.apply(null, Array.prototype.slice.call(arguments, 1))
+        : arguments[1]
+      );
 }
 function lits() {
   var args = Array(arguments.length);
@@ -1902,8 +1932,6 @@ g.addPattern('cclass_elem', seq(
   ), plus(pref('backw'))),
   ows()
 ));
-*/
-dbg=0;
 
 var g = new Grammar('doublectest');
 g.addPattern('TOP', calt(alt(seq(lit('if'),doublec(),lit('not')),lit('ify'))));
@@ -1915,6 +1943,12 @@ g.compile(); g.parse(utf32str('ify'));
 
 var g = new Grammar('singlectest');
 g.addPattern('TOP', seq(singlec(star(cc('a'))),cc('a')));
+g.compile(); g.parse(utf32str('aa'));
+*/
+dbg=1;
+
+var g = new Grammar('committest');
+g.addPattern('TOP', seq(star(cc('a')),commit(),cc('a')));
 g.compile(); g.parse(utf32str('aa'));
 
 /*
