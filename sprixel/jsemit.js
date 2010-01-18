@@ -778,11 +778,13 @@ ggroup.prototype.emit = function(c) {
   if (this.b) { // need these iff we're backtrackable (non-deterministic)
     c.r.push(
       casel(this.l.done),
-      val("for(var q in m.c){if(!m.m.c.hasOwnProperty(q))m.m.c[q]=m.c[q]};m=m.m"),
+      //val("for(var q in m.c){if(!m.m.c.hasOwnProperty(q))m.m.c[q]=m.c[q]};m=m.m"),
+      val("m=m.m"),
       gotol(this.done),
       
       casel(this.l.notd),
-      val("for(var q in m.c){if(!m.m.c.hasOwnProperty(q))m.m.c[q]=m.c[q]};m=m.m"),
+      //val("for(var q in m.c){if(!m.m.c.hasOwnProperty(q))m.m.c[q]=m.c[q]};m=m.m"),
+      val("m=m.m"),
       gotol(this.notd),
       
       casel(this.l.fail),
@@ -2000,24 +2002,20 @@ g.addPattern('block', seq(
 g.addPattern('blockoid', seq(
   cc('{'),
   pref('statement_list'),
+  ows(),
   cc('}')
 ));
 
 g.addPattern('statement_list', seq(
-  ows(),
-  pref('statement'),
+  star(xor(pref('stmt_sep'),ws())),
+  xopt(pref('statement')),
   star(seq(
     alt(
-      seq(lb('}\n'),star(pref('stmt_sep'))),
-      plus(pref('stmt_sep'))
+      seq(lb('}\n'),star(xor(pref('stmt_sep'),ws()))),
+      plus(xor(pref('stmt_sep'),ws()))
     ),
-    pref('statement')
-  )),
-  alt(
-    seq(lb('}\n'),star(pref('stmt_sep'))),
-    plus(pref('stmt_sep')),
-    ows()
-  )
+    opt(pref('statement'))
+  ))
 ));
 
 g.addPattern('stmt_sep', seq(ows(), cc(';')));
@@ -2081,8 +2079,8 @@ g.addToProto('statement_control', 'if', seq(
   psym(),
   ws(),
   pref('xblock'),
-  star(seq(lit('elsif'),ws(),pref('xblock'))),
-  xopt(seq(lit('else'),ws(),pref('pblock')))
+  star(seq(ows(),lit('elsif'),ws(),pref('xblock'))),
+  xopt(seq(ows(),lit('else'),ows(),pref('pblock')))
 ));
 
 g.addToProto('statement_control', 'unless', seq(
@@ -2301,7 +2299,7 @@ g.addPattern('termish', lits('^^', '[a..z]?'));
 
 */
 dbg = 0;
-var input = utf32str("hi");
+var input = utf32str(" ; ; ;;;;;    ; if hi { ; ; ;;;;;  \n  ; hi  ; ; ;;;;;    ; if hi { ; ; ;;;;;  \n  ; hi  ; ; ;;;;;    ; ;}elsif hi {} else{  ; ; ;;;;;    ; ;}  ;;}elsif hi {} else{  ; ; ;;;;;    ; ;}  ; ; ;;;;;    ; ;");
 
 var sw = new Date();
 g.compile();
