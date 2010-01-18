@@ -2003,18 +2003,20 @@ g.addPattern('blockoid', seq(
   cc('{'),
   pref('statement_list'),
   ows(),
-  cc('}')
+  cc('}'),
+  commit()
 ));
 
 g.addPattern('statement_list', seq(
-  star(xor(pref('stmt_sep'),ws())),
+  star(xor(seq(pref('stmt_sep'),commit()),ws())),
   xopt(pref('statement')),
   star(seq(
     alt(
       seq(lb('}\n'),star(xor(pref('stmt_sep'),ws()))),
       plus(xor(pref('stmt_sep'),ws()))
     ),
-    opt(pref('statement'))
+    opt(pref('statement')),
+    commit()
   ))
 ));
 
@@ -2299,7 +2301,7 @@ g.addPattern('termish', lits('^^', '[a..z]?'));
 
 */
 dbg = 0;
-var input = utf32str(" ; ; ;;;;;    ; if hi { ; ; ;;;;;  \n  ; hi  ; ; ;;;;;    ; if hi { ; ; ;;;;;  \n  ; hi  ; ; ;;;;;    ; ;}elsif hi {} else{  ; ; ;;;;;    ; ;}  ;;}elsif hi {} else{  ; ; ;;;;;    ; ;}  ; ; ;;;;;    ; ;");
+var input = utf32str(" ; ; ;;;;;    ; if hi {\n  ; hi  ; ; ;;;;;    ; if hi { ; ; ;;;;;  \n  ; hi  ; ; ;;;;;    ; ;}elsif hi {} else{  ; ; ;;;;;    ; ;}  ;;}elsif hi {} else{  ; ; ;;;;;    ; ;}\nif hi {hi}");
 
 var sw = new Date();
 g.compile();
