@@ -333,6 +333,23 @@ glit.prototype.toString = function() {
 };
 glit.prototype.root = lit;
 
+function lb(literal) { return new glb(literal) }
+function glb(literal) { // grammar literal lookbehind parser builder
+  gts.call(this); // call the parent constructor
+  this.b = false;
+  this.v = utf32str(literal);
+}
+derives(glb, gts);
+glb.prototype.emit = function(c) {
+  c.r.push(cond(ne(val("i.substr(o-"+this.v.l+","+this.v.l+")"),val(this.v.str.toQuotedString())),[[
+    gotol(this.fail)
+  ]]));
+};
+glb.prototype.toString = function() {
+  return 'lb('+this.v.str.toQuotedString()+')';
+};
+glb.prototype.root = lb;
+
 function prior() { return new gprior() }
 function gprior() { // grammar '<.prior> (literal constant string of last successful match)' parser builder
   gts.call(this); // call the parent constructor
@@ -690,7 +707,7 @@ gpref.prototype.computeRefs = function(pats, name, refs) {
 };
 function pref(name) { return new gpref(name) }
 gpref.prototype.toString = function() {
-  return 'gpref('+this.name.toQuotedString()+')';
+  return 'pref('+this.name.toQuotedString()+')';
 };
 gpref.prototype.regen = function(grammar) {
   return new gpref(this.name);
@@ -727,6 +744,9 @@ gcallt.prototype.emit = function(c) {
     gotol(this.l.bt)
   );
 };
+gcallt.prototype.toString = function() {
+  return this.l.toString();
+}
 
 function group(l,name) { return new ggroup(l,name) }
 function ggroup(l,name) { // grammar "group (named & anonymous)" parser builder
@@ -780,6 +800,9 @@ ggroup.prototype.emit = function(c) {
 ggroup.prototype.root = group;
 ggroup.prototype.regen = function(grammar) {
   return new ggroup(this.l.regen(grammar),this.name);
+};
+ggroup.prototype.toString = function() {
+  return 'group('+this.l+','+this.name.toQuotedString()+')';
 };
 
 var calt_count = 0;
@@ -849,10 +872,12 @@ gaction.prototype.emit = function(c) {
   if (this.l.b) {
     c.r.push(
       casel(this.l.done),
+      dval('print("doing done action")'),
       val(this.code),
       gotol(this.done),
       
       casel(this.l.notd),
+      dval('print("doing notd action")'),
       val(this.code),
       gotol(this.notd)
     );
@@ -867,7 +892,7 @@ gaction.prototype.regen = function(grammar) {
   return new gaction(this.l.regen(grammar),this.code);
 };
 gaction.prototype.toString = function(grammar) {
-  return 'action('+l+')'; // TODO: allow the action user to give the action a label.
+  return 'action('+this.l+')'; // TODO: allow the action user to give the action a label.
 };
 
 function poslook(l) { return new gposlook(l) }
@@ -905,6 +930,9 @@ gposlook.prototype.emit = function(c) {
 gposlook.prototype.root = poslook;
 gposlook.prototype.regen = function(grammar) {
   return new gposlook(this.l.regen(grammar));
+};
+gposlook.prototype.toString = function(grammar) {
+  return 'poslook('+this.l+')';
 };
 
 function neglook(l) { return new gneglook(l) }
@@ -983,7 +1011,7 @@ gpsym.prototype.toString = function() {
 };
 gpsym.prototype.resolveSym = function(sym, parent, is_right) {
   parent[is_right ? "r" : "l"] = lit(sym);
-}
+};
 
 /* Code block generation conventions/rules:
  *  - both non-deterministic (possibly-backtracking) nodes and
@@ -1028,7 +1056,7 @@ gboth.prototype.emit = function(c) {
 gboth.prototype.root = both;
 gboth.prototype.toString = function() {
   return 'both('+this.l+','+this.r+')';
-}
+};
 
 function gbothls(l, r) { // grammar "both left nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -1081,7 +1109,7 @@ gbothls.prototype.emit = function(c) {
 gbothls.prototype.root = both;
 gbothls.prototype.toString = function() {
   return 'both('+this.l+','+this.r+')';
-}
+};
 
 function gbothrs(l, r) { // grammar "both right nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -1121,7 +1149,7 @@ gbothrs.prototype.emit = function(c) {
 gbothrs.prototype.root = both;
 gbothrs.prototype.toString = function() {
   return 'both('+this.l+','+this.r+')';
-}
+};
 
 function gbothlrs(l, r) { // grammar "both left and right nondeterministic" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -1168,6 +1196,7 @@ gbothlrs.prototype.emit = function(c) {
     gotol(this.fail),
     
     casel(this.bt), // backtrack entry point
+    dval('print('+this.toString().toQuotedString()+'+"backtracked at "+t.s)'),
     cond(val("(!t.ld)"),[[
       val("o=t.s;t=t.l"),
       gotol(this.l.bt)
@@ -1176,6 +1205,7 @@ gbothlrs.prototype.emit = function(c) {
     gotol(this.r.bt),
     
     casel(this.r.fail), // right failed
+    dval('print('+this.r.toString().toQuotedString()+'+"failed at "+t.s)'),
     cond(val("(!t.ld)"),[[
       val("o=t.s;t=t.l"),
       gotol(this.l.bt)
@@ -1187,7 +1217,7 @@ gbothlrs.prototype.emit = function(c) {
 gbothlrs.prototype.root = both;
 gbothlrs.prototype.toString = function() {
   return 'both('+this.l+','+this.r+')';
-}
+};
 
 function either(l,r) {
   return l.b || r.b
@@ -1234,7 +1264,7 @@ geither.prototype.emit = function(c) {
 geither.prototype.root = either;
 geither.prototype.toString = function() {
   return 'either('+this.l+','+this.r+')';
-}
+};
 
 function geitherls(l,r) { // grammar "left nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -1246,7 +1276,6 @@ function geitherls(l,r) { // grammar "left nondeterministic alternation" parser 
 }
 derives(geitherls, gts);
 geitherls.prototype.emit = function(c) {
-  var rinit = new gtr();
   c.r.push(
     casel(this.init),d // initial entry point
   );
@@ -1264,7 +1293,7 @@ geitherls.prototype.emit = function(c) {
     
     casel(this.bt), // backtrack entry point
     cond(val("(t.ld)"),[[
-      gotol(rinit)
+      gotol(this.l.fail)
     ],[
       val("t=t.l"),
       gotol(this.l.bt)
@@ -1275,8 +1304,7 @@ geitherls.prototype.emit = function(c) {
     gotol(this.fail), // goto our fail
     
     casel(this.l.fail), // left failed
-    ros,
-    casel(rinit) // right initial entry point
+    ros
   );
   this.r.emit(c);
   c.r.push(
@@ -1286,7 +1314,7 @@ geitherls.prototype.emit = function(c) {
 geitherls.prototype.root = either;
 geitherls.prototype.toString = function() {
   return 'either('+this.l+','+this.r+')';
-}
+};
 
 function geitherrs(l,r) { // grammar "right nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -1337,7 +1365,7 @@ geitherrs.prototype.emit = function(c) {
 geitherrs.prototype.root = either;
 geitherrs.prototype.toString = function() {
   return 'either('+this.l+','+this.r+')';
-}
+};
 
 function geitherlrs(l,r) { // grammar "left and right nondeterministic alternation" parser builder
   gts.call(this, this.l = l, this.r = r); // call the parent constructor
@@ -1399,7 +1427,7 @@ geitherlrs.prototype.emit = function(c) {
 geitherlrs.prototype.root = either;
 geitherlrs.prototype.toString = function() {
   return 'either('+this.l+','+this.r+')';
-}
+};
 
 function plus(l) {
   var r = l.b
@@ -1668,7 +1696,7 @@ grepeatb.prototype.regen = function(grammar) {
 
 function utf32str_charAt(offset) {
   return String.fromCharCode(this[offset]);
-}
+};
 
 function utf32str_substr(offset, length) {
   //if (dbg)
@@ -1828,7 +1856,7 @@ Grammar.prototype.compile = function(interpreterState) {
     print('compiled');
   
   this.compiled = true;
-}
+};
 Grammar.prototype.parse = function(input) {
   if (!this.compiled)
     this.compile();
@@ -1836,21 +1864,21 @@ Grammar.prototype.parse = function(input) {
   if (typeof res != 'undefined')
     return sprixel$$last_match = res;
   // TODO: return Failure
-}
+};
 Grammar.prototype.next = function(input,t,o) {
   return this.parser(input,this,-3,o,t);
-}
+};
 Grammar.prototype.addProto = function(name) {
   if (this.protos.hasOwnProperty(name))
     throw 'protopattern '+name+' already declared';
   this.protos[name] = (typeof this.protos[name] != 'undefined')
     ? derive(this.protos[name]) // inherit from the parent if there is one
     : {};
-}
+};
 Grammar.prototype.addToProto = function(name,sym,pattern) {
   var proto = this.protos[name];
   proto[sym] = pattern;
-}
+};
 
 function Match(t,match,grammar,input,offset,completed) {
   this.t = t;
@@ -1865,20 +1893,21 @@ Match.prototype.next = function() {
   if (this.completed)
     return this;
   return this.grammar.next(this.input,this.t,this.offset);
-}
+};
 Match.prototype.toString = function() {
   return this.input.substr(0,this.offset);
-}
+};
 
 // steal some macros/combinators from jsmeta
 function opt(l) { return either(l,empty()) }
+function xopt(l) { return xor(l,empty()) }
 function ws() { return pref('ws') }
 function poil(l) { return both(opt(ws()),l) }
 function foil(l) { return both(l,opt(ws())) }
 function pfoil(l) { return poil(foil(l)) }
 function oisep(l,sep) { return both(pfoil(l),star(both(pfoil(sep),pfoil(l.regen())))) }
 function oiplus(l) { return both(pfoil(l),star(pfoil(l.regen()))) }
-function ows() { return opt(ws()) }
+function ows() { return xor(ws(),empty()) }
 function popArgs() { arguments.length--; return arguments; }
 function seq() {
   return arguments.length == 1
@@ -1945,32 +1974,156 @@ Grammar.defaultPatterns = {
 
 
 var dbg = 0;
-/*
+
 var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
 
-var input = utf32str("# just|^^|[a..z]?");
+//var input = utf32str("|^^|<[a..z]>?");
 
-g.addPattern('TOP', seq(pref("termishes"),end()));
+g.addPattern('TOP', seq(ows(), pref('statement'), star(seq(
+  alt(
+    seq(lb('}\n'),star(pref('stmt_sep'))),
+    plus(pref('stmt_sep'))
+  ),pref('statement'))), alt(
+    seq(lb('}\n'),star(pref('stmt_sep'))),
+    plus(pref('stmt_sep')),
+    ows()
+  ), end()));
 
-g.addPattern('backs', cc(' ','\t','\n'));
+g.addPattern('stmt_sep', seq(ows(), cc(';')));
 
-g.addPattern('backd', range('0','9'));
+g.addPattern('\\s', cc(' ','\t','\n'));
 
-g.addPattern('ws', plus(either(plus(pref('backs')),both(lit('#'),star(notchar('\n'))))));
+g.addPattern('\\d', range('0','9'));
+
+g.addPattern('ws', plus(xor(plus(pref('\\s')),both(lit('#'),star(notchar('\n'))))));
+
+g.addPattern('apostrophe', cc("'",'-'));
+
+g.addPattern('identifier', seq(
+  pref('ident'),
+  star(seq(
+    xopt(cc("'")),
+    pref('ident')
+  ))
+));
+
+g.addPattern('label', seq(
+  pref('identifier'),
+  cc(':')
+));
+
+g.addPattern('statement', seq(
+  neglook(cc(']',')','}')), // don't need to look for end; that occurs far too infrequently
+  ows(),
+  alt(
+    seq(pref('label'),pref('statement')),
+    pref('statement_control'),
+    seq(
+      expr(),
+      ows(),
+      oneof(
+        seq(pref('statement_mod_cond'),opt(pref('statement_mod_loop'))),
+        pref('statement_mod_loop'),
+        empty()
+      )
+    )
+  )
+));
+
+function expr() { return lit('hi') }
+
+g.addProto('statement_control');
+
+g.addToProto('statement_control', 'if', seq(
+  psym(),
+  ws(),
+  pref('xblock'),
+  star(seq(lit('elsif'),ws(),pref('xblock'))),
+  xopt(seq(lit('else'),ws(),pref('pblock')))
+));
+
+g.addToProto('statement_control', 'unless', seq(
+  psym(),
+  ws(),
+  pref('xblock')
+));
+
+g.addToProto('statement_control', 'while', seq(
+  lits('while','until'),
+  ws(),
+  pref('xblock')
+));
+
+g.addToProto('statement_control', 'repeat', seq(
+  psym(),
+  ws(),
+  alt(
+    seq(lits('while','until'),ws(),pref('xblock')),
+    seq(pref('pblock'),ws(),lits('while','until'),ws(),expr())
+  )
+));
+
+g.addToProto('statement_control', 'loop', seq(
+  psym(),
+  ws(),
+  xopt(seq(
+    cc('('),
+    xopt(expr()),
+    ows(),
+    cc(';'),
+    xopt(expr()),
+    ows(),
+    cc(';'),
+    xopt(expr()),
+    ows(),
+    cc(')')
+  )),
+  ws(),
+  pref('block')
+));
+
+g.addToProto('statement_control', 'for', seq(
+  psym(),
+  ws(),
+  pref('xblock')
+));
+
+g.addToProto('statement_control', 'given', seq(
+  psym(),
+  ws(),
+  pref('xblock')
+));
+
+g.addToProto('statement_control', 'when', seq(
+  psym(),
+  ws(),
+  pref('xblock')
+));
+
+g.addToProto('statement_control', 'CATCH', seq(
+  psym(),
+  ws(),
+  pref('block')
+));
+
+g.addToProto('statement_control', 'CONTROL', seq(
+  psym(),
+  ws(),
+  pref('block')
+));
 
 g.addPattern('termishes', seq(
   ows(),
-  opt(seq(lits('||','|','&&','&'))),
-  //pref('termish'),
-  action(pref('termish'), 'print(m.c.termish.n)'),
-  star(seq(lits('||','|'),pref('termish')))
+  opt(lits('||','|','&&','&')),
+  action(empty(), 'm.c.termishes=[]'),
+  action(pref('termish'), 'm.c.termishes.push(m.c.termish)'),
+  action(empty(), 'print("zz: "+m.c.termishes.length+" "+o)'),
+  star(seq(lits('||','|'),action(pref('termish'), 'm.c.termishes.push(m.c.termish)'))),
+  action(empty(), 'print("yy: "+m.c.termishes.length+" "+o)')
 ));
-
-
 
 g.addProto('quantifier');
 
-g.addToProto('quantifier', '*', psym());
 g.addToProto('quantifier', '+', psym());
 g.addToProto('quantifier', '?', psym());
 g.addToProto('quantifier', '**', seq(
@@ -1981,6 +2134,7 @@ g.addToProto('quantifier', '**', seq(
   either(seq(group(plus(pref('backd')),'min'),
     opt(seq(lit('..'),group(alt(plus(pref('backd')),lit('*')),'max')))
   ),pref('quantified_atom'))));
+g.addToProto('quantifier', '*', psym());
 
 g.addPattern('termish', plus(pref('quantified_atom')));
 
@@ -2003,12 +2157,12 @@ g.addProto('metachar');
 //g.addToProto('metachar', 'ws', pref('normspace'));
 g.addToProto('metachar', '[ ]', seq(cc('['), pref('termishes'), lit(']')));
 g.addToProto('metachar', '( )', seq(cc('('), pref('termishes'), lit(')')));
-//g.addToProto('metachar', '\'', seq(poslook(lit('\'')), pref('termishes'), lit(')')));
+g.addToProto('metachar', '\'', seq(poslook(lit('\'')), pref('termishes'), lit(')')));
 g.addToProto('metachar', '.', psym());
-g.addToProto('metachar', '^', psym());
 g.addToProto('metachar', '^^', psym());
-g.addToProto('metachar', '$', psym());
+g.addToProto('metachar', '^', psym());
 g.addToProto('metachar', '$$', psym());
+g.addToProto('metachar', '$', psym());
 g.addToProto('metachar', 'lwb', lits('<<','«'));
 g.addToProto('metachar', 'rwb', lits('>>','»'));
 g.addToProto('metachar', 'bs', seq(cc('\\'), pref('backslash')));
@@ -2041,6 +2195,7 @@ g.addPattern('cclass_elem', seq(
   opt(cc('+','-')),
   ows(),
   alt(seq(
+    //action(empty(), 'print("in cclass_elem")'),
     cc('['),
     star(seq(
       ows(),
@@ -2052,7 +2207,7 @@ g.addPattern('cclass_elem', seq(
   ), plus(pref('back$w'))),
   ows()
 ));
-
+/*
 var g = new Grammar('doublectest');
 g.addPattern('TOP', calt(alt(seq(lit('if'),doublec(),lit('not')),lit('ify'))));
 g.compile(); g.parse(utf32str('ify'));
@@ -2076,14 +2231,33 @@ var g = new Grammar('priortest');
 g.addPattern('TOP', repeat(prior(),2,2));
 g.compile(); g.parse(utf32str('aaaa'));
 
-*/
+
 
 dbg = 0;
 var g = new Grammar('priortest');
 g.addPattern('TOP', both(star(pref('alpha')),end()));
 g.compile(); g.parse(utf32str('aaD'));
 
-/*
+
+var g = new Grammar('wp6'); // wannabe Perl 6.  heh.
+
+var input = utf32str("|^^|[a..z]?");
+
+g.addPattern('TOP', seq(pref("termishes"),end()));
+
+g.addPattern('termishes', seq(
+  opt(lits('||','|','&&','&')),
+  action(empty(), 'm.c.termishes=[]'),
+  action(pref('termish'), 'm.c.termishes.push(m.c.termish)'),
+  action(empty(), 'print("zz: "+m.c.termishes.length+" "+o)'),
+  star(seq(lits('||','|'),pref('termish'))),
+  action(empty(), 'print("yy: "+m.c.termishes.length+" "+o)')
+));
+
+g.addPattern('termish', lits('^^', '[a..z]?'));
+
+*/
+
 var sw = new Date();
 g.compile();
 print('Compile Time Elapsed: '+(new Date() - sw)+' ms');
@@ -2091,14 +2265,14 @@ print('Compile Time Elapsed: '+(new Date() - sw)+' ms');
 var sw = new Date();
 var m = g.parse(input);
 print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
-
+/*
 var sw = new Date();
 var m = g.parse(input);
 print('Parse Time Elapsed: '+(new Date() - sw)+' ms');
-
+*/
 print('parser function is '+(g.parser.toString().length)+' chars long.');
 print('input text is '+(input.l)+' chars long.');
-*/
+
 //print(keys(m.match.m.c));
 
 
