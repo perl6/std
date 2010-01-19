@@ -36,6 +36,7 @@ my class Hash { }
 my class KeyHash { }
 my class KeySet { }
 my class KeyBag { }
+my class KeyWeight { }
 my class Pair { }
 my class PairMap { }
 my class Enum { }
@@ -113,6 +114,7 @@ my class int64 { }
 
 my role Rational { }
 my class Rat { }
+my class FatRat { }
 my class rat { }
 my class rat8 { }
 my class rat16 { }

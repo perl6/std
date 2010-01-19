@@ -3920,7 +3920,7 @@ grammar P6 is STD {
         }
         [
         ||  <?{
-                $¢.is_name($<longname>.Str) or substr($<longname>.Str,0,2) eq '::'
+                $¢.is_name($name) or substr($name,0,2) eq '::'
             }>
             # parametric type?
             <.unsp>? [ <?before '['> <postcircumfix> ]?
