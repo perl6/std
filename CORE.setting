@@ -43,14 +43,16 @@ my class Enum { }
 my class EnumMap { }
 my class List { }
 my class Seq { }
+my class SeqIter { }
 my class Range { }
-my class RangeIterator { }
+my class RangeIter { }
 my class Set { }
 my class Bag { }
 my class Mapping { }
 my class Sink { }
 my class Undef { }
 my class Failure { }
+my class EMPTY is Failure { }
 my class Exception { }
 my class Code { }
 my class Block { }
