@@ -2898,6 +2898,7 @@ grammar P6 is STD {
                 @t > 1 and $¢.panic("Multiple prefix constraints not yet supported")
             }}
             [
+            | '**' <param_var>   { $quant = '**'; $kind = '*'; }
             | '*' <param_var>   { $quant = '*'; $kind = '*'; }
             | '|' <param_var>   { $quant = '|'; $kind = '*'; }
             | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
@@ -2913,6 +2914,7 @@ grammar P6 is STD {
             | <?> { $quant = ''; $kind = '!' }
             ]
 
+        | '**' <param_var>   { $quant = '**'; $kind = '*'; }
         | '*' <param_var>   { $quant = '*'; $kind = '*'; }
         | '|' <param_var>   { $quant = '|'; $kind = '*'; }
         | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
@@ -2939,6 +2941,7 @@ grammar P6 is STD {
                 given $quant {
                   when '!' { $¢.panic("Can't put a default on a required parameter") }
                   when '*' { $¢.panic("Can't put a default on a slurpy parameter") }
+                  when '**' { $¢.panic("Can't put a default on a slice parameter") }
                   when '|' { $¢.panic("Can't put a default on an slurpy capture parameter") }
                   when '\\' { $¢.panic("Can't put a default on a capture parameter") }
                 }
