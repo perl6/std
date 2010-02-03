@@ -274,7 +274,6 @@ token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
 # you otherwise don't care what the longest token is.
 
 token sigil:sym<$>  { <sym> }
-token sigil:sym<@@> { <sym> }
 token sigil:sym<@>  { <sym> }
 token sigil:sym<%>  { <sym> }
 token sigil:sym<&>  { <sym> }
