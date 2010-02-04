@@ -12,6 +12,8 @@ my role Package does Stash { }
 my role Module does Stash { }
 my role Class does Module { }
 my role Grammar does Class { }
+my role List { }
+my role Iterable { }
 
 # XXX does this mean anything?
 my role Matcher { }
@@ -26,26 +28,26 @@ my class WhateverCode { }
 my class HyperWhatever { }
 my class Capture { }
 my class Parcel { }
+my class Iterator does List { }
 my class Match { }
 my class Signature { }
 my class Parameter { }
 my class Proxy { }
 my class Scalar { }
-my class Array { }
-my class Hash { }
-my class KeyHash { }
-my class KeySet { }
-my class KeyBag { }
-my class KeyWeight { }
+my class Array does Iterable { }
+my class Hash does Iterable { }
+my class KeyHash does Iterable { }
+my class KeySet does Iterable { }
+my class KeyBag does Iterable { }
+my class KeyWeight does Iterable { }
 my class Pair { }
 my class PairMap { }
 my class Enum { }
 my class EnumMap { }
-my class List { }
 my class Seq { }
-my class SeqIter { }
+my class SeqIter does List { }
 my class Range { }
-my class RangeIter { }
+my class RangeIter does List { }
 my class Set { }
 my class Bag { }
 my class Mapping { }
