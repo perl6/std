@@ -3425,7 +3425,7 @@ grammar P6 is STD {
         { '.' <[\]\)\},:\s\$"']> <.obs('. to concatenate strings', '~')> }
 
     token postfix:sym['->'] ()
-        { '->' <.obs('-> to call a method', '.')> }
+        { '->' <.obs('-> as postfix', 'either . to call a method, or whitespace to delimit a pointy block')> }
 
     ## autoincrement
     token postfix:sym<++>
