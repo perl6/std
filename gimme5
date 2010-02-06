@@ -278,9 +278,9 @@ my $out = "";
 
 sub MAIN {
 
-    if (s/^\s*grammar (\w+(?:::\w+)*)(?::\w+<.*?>)*(?:\s*is\s+(\w+))?;\n//) {
-	$TOP = $PKG = $1;
-	my $extends = $2 // 'Cursor';
+    if (s/^((?:#.*\n)*?\s*)grammar (\w+(?:::\w+)*)(?::\w+<.*?>)*(?:\s*is\s+(\w+))?;\n/$1/) {
+	$TOP = $PKG = $2;
+	my $extends = $3 // 'Cursor';
 	$out .= "package $PKG;\n";
 	$out .= <<"END";
 use Moose ':all' => { -prefix => "moose_" };
