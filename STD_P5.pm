@@ -1,3 +1,10 @@
+# STD_P5.pm
+#
+# Copyright 2009-2010, Larry Wall
+#
+# You may copy this software under the terms of the Artistic License,
+#     version 2.0 or later.
+
 grammar STD::P5 is STD;
 
 use DEBUG;

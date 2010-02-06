@@ -1,3 +1,10 @@
+# STD.pm
+#
+# Copyright 2007-2010, Larry Wall
+#
+# You may copy this software under the terms of the Artistic License,
+#     version 2.0 or later.
+
 grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 
 use DEBUG;

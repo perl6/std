@@ -1,4 +1,12 @@
 package LazyMap;
+
+# LazyMap.pm
+#
+# Copyright 2007-2010, Larry Wall
+#
+# You may copy this software under the terms of the Artistic License,
+#     version 2.0 or later.
+
 use strict;
 use warnings;
 no warnings 'recursion';
