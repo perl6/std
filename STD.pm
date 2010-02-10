@@ -3838,9 +3838,6 @@ grammar P6 is STD {
             { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec; }
         <O(|%comma)> }
 
-    token infix:sym« p5=> »
-        { <sym> <O(|%comma)> }
-
     token infix:sym<Z>
         { <sym> <O(|%list_infix)> }
 
