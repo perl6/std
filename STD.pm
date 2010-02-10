@@ -3489,7 +3489,7 @@ grammar P6 is STD {
         { <sym> <O(|%symbolic_unary)> }
 
     token prefix:sym<||>
-        { <sym> <.badinfix> <O(|%symbolic_unary)> }
+        { <sym> <O(|%symbolic_unary)> }
 
     token prefix:sym<|>
         { <sym> <O(|%symbolic_unary)> }
