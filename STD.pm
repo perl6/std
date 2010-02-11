@@ -2874,7 +2874,7 @@ grammar P6 is STD {
                 $vname ~= $n;
                 given $twigil {
                     when '' {
-                        self.add_my_variable($vname) if $n ne '';
+                        self.add_my_name($vname) if $n ne '';
                     }
                     when '.' {
                     }
@@ -5435,30 +5435,11 @@ method add_variable ($name) {
     my $scope = $*SCOPE || 'our';
     return self if $scope eq 'anon';
     if $scope eq 'our' {
-        self.add_our_variable($name);
+        self.add_our_name($name);
     }
     else {
-        self.add_my_variable($name);
-    }
-    self;
-}
-
-method add_my_variable ($n) {
-    my $name = $n;
-    say "add_my_variable $name" if $*DEBUG +& DEBUG::symtab;
-    if substr($name, 0, 1) eq '&' {
         self.add_my_name($name);
-        if $name ~~ s/\:\(.*// {
-            self.add_my_name($name);
-        }
-        return self;
     }
-    self.add_my_name($name);
-    self;
-}
-
-method add_our_variable ($name) {
-    self.add_our_name($name);
     self;
 }
 
@@ -5473,7 +5454,7 @@ method add_placeholder($name) {
     if not $*CURPAD.<!NEEDSIG> {
         self.panic("Placeholder variable $name cannot be used in this kind of block");
     }
-    self.add_my_variable($name);
+    self.add_my_name($name);
     $name ~~ s/\^//;
     $name = ':' ~ $name if $name ~~ s/\://;
     $*CURPAD.{'%?PLACEHOLDERS'}{$name}++;
