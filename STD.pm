@@ -5121,11 +5121,11 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't hand optiona
         say "Adding new package $pkg in ", $curstash.id if $*DEBUG +& DEBUG::symtab;
         $curstash = $newstash;
     }
-    $name = my $vname = shift @components;
+    $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
-    if $name ~~ /\:/ {
-        $name ~~ s/\:.*//;
+    if $shortname ~~ /\:/ {
+        $shortname ~~ s/\:.*//;
     }
 
     # This may just be a lexical alias to "our" and such,
@@ -5177,12 +5177,12 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't hand optiona
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
-        $curstash.{$vname} = $declaring unless $vname eq $name;
+        $curstash.{$shortname} = $declaring unless $shortname eq $name;
         $*DECLARAND<inpad> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
         $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
-        if !$*DECLARAND<const> and $name ~~ /^\w+$/ {
-            $curstash.{"&$name"} //= $curstash.{$name};
+        if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
+            $curstash.{"&$shortname"} //= $curstash.{$shortname};
             $sid ~= "::$name";
             $*NEWPAD = $curstash.{$name ~ '::'} //= ($p // Stash.new(
                 'PARENT::' => $curstash.idref,
@@ -5220,10 +5220,10 @@ method add_our_name ($n) {
         $curstash = $newstash;
         say "Adding new package $pkg in $curstash " if $*DEBUG +& DEBUG::symtab;
     }
-    $name = my $vname = shift @components;
+    $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
-    if $name ~~ /\:/ {
-        $name ~~ s/\:.*//;
+    if $shortname ~~ /\:/ {
+        $shortname ~~ s/\:.*//;
     }
 
     my $declaring = $*DECLARAND // NAME.new(
@@ -5267,10 +5267,10 @@ method add_our_name ($n) {
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
-        $curstash.{$vname} = $declaring unless $vname eq $name;
+        $curstash.{$shortname} //= $declaring unless $shortname eq $name;
         $*DECLARAND<inpkg> = $curstash.idref;
-        if $name ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
-            $curstash.{"&$name"} //= $declaring;
+        if $shortname ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
+            $curstash.{"&$shortname"} //= $declaring;
             $sid ~= "::$name";
             $*NEWPKG = $curstash.{$name ~ '::'} //= Stash.new(
                 'PARENT::' => $curstash.idref,
