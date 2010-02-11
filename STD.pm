@@ -5104,7 +5104,7 @@ method add_name ($name) {
     self;
 }
 
-method add_my_name ($n, $d, $p) {
+method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't hand optionals right
     my $name = $n;
     say "add_my_name $name in ", $*CURPAD.id if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
@@ -5121,9 +5121,12 @@ method add_my_name ($n, $d, $p) {
         say "Adding new package $pkg in ", $curstash.id if $*DEBUG +& DEBUG::symtab;
         $curstash = $newstash;
     }
-    $name = shift @components;
+    $name = my $vname = shift @components;
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
+    if $name ~~ /\:/ {
+        $name ~~ s/\:.*//;
+    }
 
     # This may just be a lexical alias to "our" and such,
     # so reuse $*DECLARAND pointer if it's there.
@@ -5174,6 +5177,7 @@ method add_my_name ($n, $d, $p) {
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
+        $curstash.{$vname} = $declaring unless $vname eq $name;
         $*DECLARAND<inpad> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
         $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
@@ -5216,8 +5220,11 @@ method add_our_name ($n) {
         $curstash = $newstash;
         say "Adding new package $pkg in $curstash " if $*DEBUG +& DEBUG::symtab;
     }
-    $name = shift @components;
+    $name = my $vname = shift @components;
     return self unless defined $name and $name ne '';
+    if $name ~~ /\:/ {
+        $name ~~ s/\:.*//;
+    }
 
     my $declaring = $*DECLARAND // NAME.new(
         xpad => $curstash.idref,
@@ -5260,6 +5267,7 @@ method add_our_name ($n) {
     }
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
+        $curstash.{$vname} = $declaring unless $vname eq $name;
         $*DECLARAND<inpkg> = $curstash.idref;
         if $name ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
             $curstash.{"&$name"} //= $declaring;
