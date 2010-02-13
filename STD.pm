@@ -1741,7 +1741,7 @@ grammar P6 is STD {
         || <?before <[A..Z]>><longname>{{
                 my $t = $<longname>.Str;
                 if not $¢.is_known($t) {
-                    $¢.panic("In \"$*SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
+                    $¢.panic("In $*SCOPE declaration, typename '$t' must be predeclared (or marked as declarative with :: prefix)");
                 }
             }}
             <!> # drop through
@@ -2219,7 +2219,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$)> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym> <?{ $*GOAL ne ')' }> <?before \s | ',' | <terminator> >
         <.obs('$) variable', '$*EGID')>
     }
 
@@ -2465,7 +2465,7 @@ grammar P6 is STD {
                     return ();
                 }
                 else {
-                    $¢.panic("Anonymous variable requires declarator");
+                    $¢.panic("Non-declarative sigil is missing its name");
                 }
               }}
             ]
@@ -2933,7 +2933,7 @@ grammar P6 is STD {
             | '!'           { $quant = '!'; $kind //= '!' }
             | <?>
             ]
-        | {} <longname> <.panic("Invalid typename " ~ $<longname>.Str)>
+        | {} <longname> <.panic("In parameter declaration, typename '" ~ $<longname>.Str ~ "' must be predeclared (or marked as declarative with :: prefix)")>
         ]
 
         <trait>*
@@ -5168,7 +5168,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't hand optiona
                 self.panic("Illegal redeclaration of symbol '$name'$loc");
             }
             elsif $name ~~ s/^\&// {
-                self.panic("Illegal redeclaration of routine '$name'$loc");
+                self.panic("Illegal redeclaration of routine '$name'$loc") unless $name eq '';
             }
             else {  # XXX eventually check for conformant arrays here
                 self.worry("Useless redeclaration of variable $name$loc");
@@ -5258,7 +5258,7 @@ method add_our_name ($n) {
                 self.panic("Illegal redeclaration of symbol '$sid'$loc");
             }
             elsif $name ~~ /^\&/ {
-                self.panic("Illegal redeclaration of routine '$sid'$loc");
+                self.panic("Illegal redeclaration of routine '$sid'$loc") unless $name eq '';
             }
             else {  # XXX eventually check for conformant arrays here
                 # (redeclaration of identical package vars is not useless)
