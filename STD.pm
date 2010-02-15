@@ -3530,7 +3530,7 @@ grammar P6 is STD {
         { <sym> <O(|%multiplicative)> }
 
     token infix:sym<?&>
-        { <sym> <O(|%multiplicative)> }
+        { <sym> <O(|%multiplicative, iffy => 1)> }
 
     token infix:sym« ~< »
         { <sym> <!before '<'> <O(|%multiplicative)> }
@@ -3559,7 +3559,7 @@ grammar P6 is STD {
         { <sym> <O(|%additive)> }
 
     token infix:sym<?|>
-        { <sym> <O(|%additive)> }
+        { <sym> <O(|%additive, iffy => 1)> }
 
     token infix:sym<?^>
         { <sym> <O(|%additive)> }
@@ -3579,15 +3579,15 @@ grammar P6 is STD {
 
     ## junctive and (all)
     token infix:sym<&>
-        { <sym> <O(|%junctive_and)> }
+        { <sym> <O(|%junctive_and, iffy => 1)> }
 
 
     ## junctive or (any)
     token infix:sym<|>
-        { <sym> <O(|%junctive_or)> }
+        { <sym> <O(|%junctive_or, iffy => 1)> }
 
     token infix:sym<^>
-        { <sym> <O(|%junctive_or)> }
+        { <sym> <O(|%junctive_or, iffy => 1)> }
 
 
     ## named unary examples
@@ -3699,15 +3699,15 @@ grammar P6 is STD {
 
     ## tight and
     token infix:sym<&&>
-        { <sym> <O(|%tight_and)> }
+        { <sym> <O(|%tight_and, iffy => 1)> }
 
 
     ## tight or
     token infix:sym<||>
-        { <sym> <O(|%tight_or)> }
+        { <sym> <O(|%tight_or, iffy => 1)> }
 
     token infix:sym<^^>
-        { <sym> <O(|%tight_or)> }
+        { <sym> <O(|%tight_or, iffy => 1)> }
 
     token infix:sym<//>
         { <sym> <O(|%tight_or)> }
@@ -3861,6 +3861,7 @@ grammar P6 is STD {
         :defined, :eval, :exp, :glob, :lc, :lcfirst, :log, :lstat, :mkdir,
         :ord, :readlink, :readpipe, :require, :reverse, :rmdir, :sin,
         :split, :sqrt, :stat, :uc, :ucfirst, :unlink,
+        :WHAT, :WHICH, :WHERE, :HOW, :WHENCE, :VAR,
     );
 
     # force identifier(), identifier.(), etc. to be a function call always
@@ -3885,7 +3886,7 @@ grammar P6 is STD {
                 $ok = 1 if $al and $al.from != $al.to;
                 $ok = 1 if $<args><semiarglist>;
                 if not $ok {
-                    $<identifier>.worryobs("bare '$name'", ".$name if you want to $name \$_, or use an explicit argument");
+                    $<identifier>.worryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
                 }
             }
         }}
@@ -3952,20 +3953,20 @@ grammar P6 is STD {
 
     ## loose and
     token infix:sym<and>
-        { <sym> <O(|%loose_and)> }
+        { <sym> <O(|%loose_and, iffy => 1)> }
 
     token infix:sym<andthen>
         { <sym> <O(|%loose_and)> }
 
     ## loose or
     token infix:sym<or>
-        { <sym> <O(|%loose_or)> }
+        { <sym> <O(|%loose_or, iffy => 1)> }
 
     token infix:sym<orelse>
         { <sym> <O(|%loose_or)> }
 
     token infix:sym<xor>
-        { <sym> <O(|%loose_or)> }
+        { <sym> <O(|%loose_or, iffy => 1)> }
 
     ## sequencer
     token infix:sym« <== »
