@@ -171,7 +171,7 @@ token category:sigil { <sym> }
 proto token sigil { <...> }
 
 token category:twigil { <sym> }
-proto token twigil { <...> }
+proto token twigil (:$*endsym = 'begid') { <...> }
 
 token category:special_variable { <sym> }
 proto token special_variable { <...> }
@@ -273,6 +273,7 @@ token category:terminator { <sym> }
 proto token terminator { <...> }
 
 token unspacey { <.unsp>? }
+token begid { <?before \w> }
 token endid { <?before <-[ \- \' \w ]> > }
 token spacey { <?before <[ \s \# ]> > }
 token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
@@ -287,10 +288,9 @@ token sigil:sym<&>  { <sym> }
 
 token twigil:sym<.> { <sym> }
 token twigil:sym<!> { <sym> }
-token twigil:sym<^> { <sym> <?before \w> }
-token twigil:sym<:> { <sym> <?before \w> }
+token twigil:sym<^> { <sym> }
+token twigil:sym<:> { <sym> }
 token twigil:sym<*> { <sym> }
-token twigil:sym<+> { <sym> <!!worry: "The + twigil is deprecated, use the * twigil instead"> }
 token twigil:sym<?> { <sym> }
 token twigil:sym<=> { <sym> }
 token twigil:sym<~> { <sym> }
