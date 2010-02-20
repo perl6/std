@@ -491,6 +491,9 @@ version (2.7beta) changes too rapidly.
 
     sudo apt-get install llvm     # Ubuntu 9.10
 
+Note: LLVM 2.7 will be released in march 2010, so this dependency is
+about to change in a non-backwards-compatible way.  It's for the best :)
+
 Version 2.5 included with many other operating systems is too old.  On
 such platforms build LLVM from source:
 
@@ -509,3 +512,4 @@ http://llvm.org/docs
 http://llvm.org/docs/tutorial
 http://gnuu.org/2009/09/18/writing-your-own-toy-compiler
 http://compiler-rt.llvm.org
+http://www.daemonology.net/blog/2008-06-05-faster-utf8-strlen.html

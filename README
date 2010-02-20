@@ -1,28 +1,37 @@
-== Perl 6 Parser Stuff in the Pugs Repo
+=head1 Perl 6 Parser Stuff in the Pugs Repo
 
-This is a start of some notes about what's going on in this magical directory
-of pugs/Perl6. Larry mostly hacks in here, I think.
+This is a start of some notes about what's going on in this magical
+directory of pugs/src/perl6.  It is the home of STD.pm, the canonical
+Perl 6 grammar, which is written in Perl 6, setting us all a typical
+chicken-or-egg bootstrapping challenge.  So Larry has devised a cunning
+Perl 6 to Perl 5 translator for just this job, called "gimme5".  Running
+C<make> tells gimme5 to convert STD.pm into a Perl 5 script called
+"viv".
 
-== Prerequisites
+Using "viv" with the -e option will output an Abstract Syntax Tree for
+your input program.  The AST is in YAML format.
 
-You'll need the following Perl stuff to run stuff:
+=head1 Prerequisites
 
-* Perl 5.10.0 in /usr/local/bin/
-* YAML::Syck
-* Moose
+You'll need the following Perl bits to run stuff:
 
-== Running Stuff
+* Perl 5.10.0 in /usr/local/bin/ 
+  (using current perl with eg `sudo ln -s /usr/bin/perl /usr/local/bin`)
+
+* YAML::XS       (eg sudo apt-get install libyaml-libyaml-perl)
+
+* Moose          (eg sudo apt-get install libmoose-perl)
+
+=head1 Running Stuff
 
 You can get started by using the following Makefile commands:
 
-> make
-> make all
-> make check
-> make try
-> make try cat
-> make clean
-> make distclean
+ make
+ make all
+ make check
+ make try
+ make try cat
+ make clean
+ make distclean
+ make help
 
-== The End
-
-for now...
