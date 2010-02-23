@@ -326,8 +326,7 @@ sub you_were_here {
     $file =~ s/(\.setting)?$/.syml/;
     $file =~ s!.*/!!;
     $file =~ s/::/\//g;
-    my $syml = $::TMP_PREFIX . 'syml';
-    $file = "$syml/$file";
+    $file = "syml/" . $file;
 
     # setting?
     if ($::YOU_WERE_HERE) {
