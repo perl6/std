@@ -3391,7 +3391,7 @@ grammar P6 is STD {
         | <EXPR(item %list_prefix)> {{
                 my $delims = $<EXPR><delims>;
                 for @$delims {
-                    if ($_.<sym> // '') eq ':' {
+                    if $_.<wascolon> // '' {
                         if $inv_ok {
                             $*INVOCANT_IS = $<EXPR><list>[0];
                         }
@@ -3833,10 +3833,15 @@ grammar P6 is STD {
     token infix:sym<,>
         { <sym> <O(|%comma, fiddly => 0)> }
 
-    token infix:sym<:>
-        { <sym> <?before \s | <terminator> >
-            { $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec; }
-        <O(|%comma)> }
+    token infix:sym<:> {
+        ':' <?before \s | <terminator> >
+        {
+            $¢.panic("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec;
+            $<sym> = ',';
+            $<wascolon> = True;
+        }
+        <O(|%comma)>
+    }
 
     token infix:sym<Z>
         { <sym> <O(|%list_infix)> }
@@ -4502,16 +4507,20 @@ method EXPR ($preclvl) {
 
             # Equal precedence, so use associativity to decide.
             if @opstack[*-1]<O><prec> eq $inprec {
+                my $assoc = 1;
                 given $inO<assoc> {
-                    when 'non'   { $here.panic('"' ~ $infix.Str ~ '" is not associative') }
+                    when 'non'   { $assoc = 0; }
                     when 'left'  { &reduce() }   # reduce immediately
                     when 'right' { }            # just shift
                     when 'chain' { }            # just shift
                     when 'unary' { }            # just shift
-                    when 'list'  {              # if op differs reduce else shift
-                       # &reduce() if $infix<sym> !eqv @opstack[*-1]<sym>;
+                    when 'list'  {
+                        $assoc = 0 unless $infix<sym> eqv @opstack[*-1]<sym>;
                     }
                     default { $here.panic('Unknown associativity "' ~ $_ ~ '" for "' ~ $infix<sym> ~ '"') }
+                }
+                if not $assoc {
+                   $here.panic('"' ~ @opstack[*-1]<sym> ~ '" and "' ~ $infix.Str ~ '" are non-associative and require parens');
                 }
             }
 

@@ -12,6 +12,7 @@ constant Nil = ();
 my enum Bool <False True>;
 
 my enum Order < Increase Same Decrease >;
+my enum TrigBase <Radians Degrees Gradians Circles>;
 
 my role Stash { }
 my role Role does Stash { }
