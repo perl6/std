@@ -5484,11 +5484,19 @@ method check_variable ($variable) {
             $ok ||= $first lt 'A';
             $ok ||= self.is_known($name);
             if not $ok {
+                my $id = $name;
+                $id ~~ s/^\W\W?//;
                 if $name eq '@_' or $name eq '%_' {
                     $variable.add_placeholder($name);
                 }
+                elsif self.is_known('@' ~ $id) {
+                    $variable.panic("Variable $name is not predeclared (did you mean \@$id?)");
+                }
+                elsif self.is_known('%' ~ $id) {
+                    $variable.panic("Variable $name is not predeclared (did you mean \%$id?)");
+                }
                 else {
-                    $variable.worry("Variable $name is not predeclared");
+                    $variable.panic("Variable $name is not predeclared");
                 }
             }
         }
