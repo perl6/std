@@ -3431,8 +3431,13 @@ grammar P6 is STD {
     token infix:sym<.> ()
         { '.' <[\]\)\},:\s\$"']> <.obs('. to concatenate strings', '~')> }
 
-    token postfix:sym['->'] ()
-        { '->' <.obs('-> as postfix', 'either . to call a method, or whitespace to delimit a pointy block')> }
+    token postfix:sym['->'] () {
+        '->'
+        [
+        | <brack=[ \[ \{ \( ]> <.obs("'->" ~ $<brack>.Str ~ "' as postfix dereferencer", "'." ~ $<brack>.Str ~ "' or just '" ~ $<brack>.Str ~ "' to deref, or whitespace to delimit a pointy block")>
+        | <.obs('-> as postfix', 'either . to call a method, or whitespace to delimit a pointy block')>
+        ]
+    }
 
     ## autoincrement
     token postfix:sym<++>
