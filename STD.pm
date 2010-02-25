@@ -1879,6 +1879,7 @@ grammar P6 is STD {
     token declarator {
         [
         | <variable_declarator>
+            [ <?before <.ws>','<.ws> { @*MEMOS[$¢.pos]<declend> = $*SCOPE; }> ]?
         | '(' ~ ')' <signature> <trait>*
         | <routine_declarator>
         | <regex_declarator>
@@ -5493,6 +5494,9 @@ method check_variable ($variable) {
                 $id ~~ s/^\W\W?//;
                 if $name eq '@_' or $name eq '%_' {
                     $variable.add_placeholder($name);
+                }
+                elsif my $scope = @*MEMOS[$variable.from]<declend> {
+                    $variable.panic("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
                 }
                 elsif self.is_known('@' ~ $id) {
                     $variable.panic("Variable $name is not predeclared (did you mean \@$id?)");
