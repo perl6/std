@@ -1705,19 +1705,32 @@ grammar P6 is STD {
     token variable_declarator {
         :my $*IN_DECL = 'variable';
         :my $*DECLARAND;
+        :my $var;
         <variable>
-        { $¢.add_variable($<variable>.Str); $*IN_DECL = ''; }
+        {
+            $var = $<variable>.Str;
+            $¢.add_variable($var);
+            $*IN_DECL = '';
+        }
         [   # Is it a shaped array or hash declaration?
           #  <?{ $<sigil> eq '@' | '%' }>
             <.unsp>?
             $<shape> = [
             | '(' ~ ')' <signature>
-                [
-                || <?{ $*LEFTSIGIL eq '&'}> <.panic: "The () shape syntax in routine declarations is reserved (maybe you want :() to add a signature to the name?)">
-                || <?{ $*LEFTSIGIL eq '@'}> <.panic: "The () shape syntax in array declarations is reserved">
-                || <?{ $*LEFTSIGIL eq '%'}> <.panic: "The () shape syntax in hash declarations is reserved">
-                || <.panic: "The () shape syntax in variable declarations is currently reserved">
-                ]
+                {{
+                    given substr($var,0,1) {
+                        when '&' {
+                            $¢.panic("The () shape syntax in routine declarations is reserved (maybe use :() to declare a longname?)");
+                        }
+                        when '@' {
+                            $¢.panic("The () shape syntax in array declarations is reserved");
+                        }
+                        when '%' {
+                            $¢.panic("The () shape syntax in hash declarations is reserved");
+                        }
+                        $¢.panic("The () shape syntax in variable declarations is reserved");
+                    }
+                }}
             | :dba('shape definition') '[' ~ ']' <semilist>
             | :dba('shape definition') '{' ~ '}' <semilist>
             | <?before '<'> <postcircumfix>
