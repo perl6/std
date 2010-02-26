@@ -1712,6 +1712,12 @@ grammar P6 is STD {
             <.unsp>?
             $<shape> = [
             | '(' ~ ')' <signature>
+                [
+                || <?{ $*LEFTSIGIL eq '&'}> <.panic: "The () shape syntax in routine declarations is reserved (maybe you want :() to add a signature to the name?)">
+                || <?{ $*LEFTSIGIL eq '@'}> <.panic: "The () shape syntax in array declarations is reserved">
+                || <?{ $*LEFTSIGIL eq '%'}> <.panic: "The () shape syntax in hash declarations is reserved">
+                || <.panic: "The () shape syntax in variable declarations is currently reserved">
+                ]
             | :dba('shape definition') '[' ~ ']' <semilist>
             | :dba('shape definition') '{' ~ '}' <semilist>
             | <?before '<'> <postcircumfix>
