@@ -3411,7 +3411,7 @@ grammar P6 is STD {
         | <EXPR(item %list_prefix)> {{
                 my $delims = $<EXPR><delims>;
                 for @$delims {
-                    if $_.<wascolon> // '' {
+                    if $_.<infix><wascolon> // '' {
                         if $inv_ok {
                             $*INVOCANT_IS = $<EXPR><list>[0];
                         }
