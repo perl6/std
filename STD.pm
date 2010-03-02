@@ -3762,6 +3762,10 @@ grammar P6 is STD {
         <O(|%conditional, _reducecheck => 'raise_middle')>
     }
 
+    token infix:sym<!!> {
+        <sym> <.panic: "Ternary !! seems to be missing its ??">
+    }
+
     method raise_middle {
         self.<middle> = self.<infix><EXPR>;
         self;
@@ -4048,7 +4052,7 @@ grammar P6 is STD {
         :dba('infix stopper')
         [
         | <?before <stopper> >
-        | <?before '!!' > [ <?{ $*GOAL eq '!!' }> || <.panic: "Ternary !! seems to be missing its ??"> ]
+        | <?before '!!'> <?{ $*GOAL eq '!!' }>
         | <?before '{' | <lambda> > <?{ ($*GOAL eq '{' or $*GOAL eq 'endargs') and @*MEMOS[$¢.pos]<ws> }>
         | <?{ $*GOAL eq 'endargs' and @*MEMOS[$¢.pos]<endargs> }>
         ]
