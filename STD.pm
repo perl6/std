@@ -2099,7 +2099,7 @@ grammar P6 is STD {
         :dba('prefix or term')
         [
         | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
-            [ <?{ $<term> }> || <term> ]
+            [ <?{ $<term> }> || <term> || <.panic("Prefix requires an argument")> ]
         | <term>
         ]
 
