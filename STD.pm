@@ -191,8 +191,8 @@ proto token value { <...> }
 token category:term { <sym> }
 proto token term { <...> }
 
-token category:number { <sym> }
-proto token number { <...> }
+token category:strtonum { <sym> }
+proto token strtonum { <...> }
 
 token category:quote { <sym> }
 proto token quote () { <...> }
@@ -2545,22 +2545,23 @@ grammar P6 is STD {
         [<.ws> 'of' <.ws> <typename> ]?
     }
 
-    token numish {
+    # Note, does not include <1/2> forms, which are parsed as quotewords
+
+    token number {
         [
         | 'NaN' »
-        | <[+\-]>?
-            [
-            | <integer>
-            | <dec_number>
-            | <rad_number>
-            | 'Inf' »
-            ]
+        | <integer>
+        | <dec_number>
+        | <rad_number>
+        | 'Inf' »
         ]
     }
 
-    token number:rational { <nu=.integer>'/'<de=.integer> }
-    token number:complex { <re=.numish><?before <[+\-]>\d><im=.numish>'\\'?'i' | <im=.numish>'\\'?'i' }
-    token number:numish { <numish> }
+    # <strtonum> is (we hope) used only by Str --> Num conversions
+    #  (such as those done dwimmily by quotewords)
+    token strtonum:rational { <[+\-]>?<nu=.integer>'/'<de=.integer> }
+    token strtonum:complex { [<[+\-]>?<re=.number>]? <[+\-]><im=.number>'\\'?'i' }
+    token strtonum:number { <[+\-]>?<number> }
 
     ##########
     # Quotes #
