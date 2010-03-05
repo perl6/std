@@ -2476,7 +2476,7 @@ grammar P6 is STD {
         || [
             | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str }
             | <special_variable>
-            | <sigil> $<index>=[\d+]
+            | <sigil> <index=.decint>
             # Note: $() can also parse as contextualizer in an expression; should have same effect
             | <sigil> <?before '<' | '('> <postcircumfix>
             | <sigil> <?{ $*IN_DECL }>
@@ -5144,7 +5144,7 @@ method add_name ($name) {
     self;
 }
 
-method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't hand optionals right
+method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optionals right
     my $name = $n;
     say "add_my_name $name in ", $*CURPAD.id if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
