@@ -1264,6 +1264,7 @@ grammar P6 is STD {
             $*UNIT = $*CURPAD;
             $ALL.<UNIT> = $*UNIT;
             self.finishpad;
+            # $¢ = self.cursor_fresh($*CURPAD<$?LANGNAME>);
         }}
         <statementlist>
         [ <?unitstopper> || <.panic: "Confused"> ]
@@ -1348,11 +1349,13 @@ grammar P6 is STD {
 
         <.finishpad>
         [
-        | :dba('block') '{' ~ '}' <statementlist>
+        | :dba('block') '{' ~ '}' <statementlist> <.curlycheck>
         | <?terminator> <.panic: 'Missing block'>
         | <?> <.panic: "Malformed block">
         ]
+    }
 
+    token curlycheck {
         [
         | <?before \h* $$>  # (usual case without comments)
             { @*MEMOS[$¢.pos]<endstmt> = 2; }
@@ -1382,14 +1385,7 @@ grammar P6 is STD {
         <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
         [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
 
-        [
-        | <?before \h* $$>  # (usual case without comments)
-            { @*MEMOS[$¢.pos]<endstmt> = 2; }
-        | \h* <?before <[\\,:]>>
-        | <.unv>? $$
-            { @*MEMOS[$¢.pos]<endstmt> = 2; }
-        | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
-        ]
+        <.curlycheck>
     }
 
     # statement semantics
@@ -1732,7 +1728,7 @@ grammar P6 is STD {
                     }
                 }}
             | :dba('shape definition') '[' ~ ']' <semilist>
-            | :dba('shape definition') '{' ~ '}' <semilist>
+            | :dba('shape definition') '{' ~ '}' <semilist> <.curlycheck>
             | <?before '<'> <postcircumfix>
             ]*
         ]?
@@ -1983,7 +1979,7 @@ grammar P6 is STD {
                 [
                 | '(' ~ ')' <signature>
                 | '[' ~ ']' <signature>
-                | '{' ~ '}' <signature>
+                | '{' ~ '}' <signature> # don't need curlycheck here
                 | <?before '<'> <postcircumfix>
                 ]
                 <trait>*
@@ -2377,7 +2373,7 @@ grammar P6 is STD {
             else {
                 $¢.obs($bad, $sigil ~ $text);
             }
-        }}
+        }} # always fails, don't need curlycheck here
     }
 
     token special_variable:sym<$[> {
@@ -3351,7 +3347,7 @@ grammar P6 is STD {
         { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
 
     token postcircumfix:sym<{ }>
-        { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> }
+        { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> <.curlycheck> }
 
     token postcircumfix:sym«< >» {
         :my $pos;
