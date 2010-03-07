@@ -5665,11 +5665,11 @@ method panic (Str $s) {
             my $endpos = $here.pos;
             my $startpos = @*MEMOS[$here.pos]<ws> // $endpos;
 
-            if @*MEMOS[$here.pos - 1]<acomp> {
-                $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
-            }
-            elsif $endpos != $startpos and substr($*ORIG, $startpos, $endpos - $startpos) ~~ /\n/ {
+            if substr($*ORIG, $startpos, $endpos - $startpos) ~~ /\n/ {
                 $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
+            }
+            elsif @*MEMOS[$here.pos - 1]<acomp> {
+                $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
             }
             else {
                 $m ~~ s|Confused|Two terms in a row|;
