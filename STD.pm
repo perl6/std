@@ -1852,11 +1852,11 @@ grammar P6 is STD {
                         my $shortname = $longname.<name>.Str;
                         if $*SCOPE eq 'our' {
                             $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                            say "added our " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
+                            self.deb("added our " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
                         }
                         else {
                             $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-                            say "added my " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
+                            self.deb("added my " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
                         }
                     }
                     $*begin_compunit = 0;
@@ -3070,7 +3070,7 @@ grammar P6 is STD {
         [ <?before [ '(' || \h*<sigil><twigil>?\w ] >
             <.obs('undef as a verb', 'undefine function or assignment of Nil')>
         ]?
-        <.obs('undef as a value', "something more specific:\n\tMu (the \"most undefined\" type object),\n\tan undefined type object such as Int,\n\tNil as an empty list,\n\t*.notdef as a matcher or method,\n\tAny:U as a type constraint\n\tor fail() as a failure return\n\t   ")>
+        <.obs('undef as a value', "something more specific:\n\tMu (the \"most undefined\" type object),\n\tan undefined type object such as Int,\n\tNil as an empty list,\n\t:!defined as a matcher,\n\tAny:U as a type constraint\n\tor fail() as a failure return\n\t   ")>
     }
 
     token term:sym<proceed>
@@ -5013,7 +5013,7 @@ method getdecl {
 
 method is_name ($n, $curpad = $*CURPAD) {
     my $name = $n;
-    say "is_name $name" if $*DEBUG +& DEBUG::symtab;
+    self.deb("is_name $name") if $*DEBUG +& DEBUG::symtab;
 
     my $curpkg = $*CURPKG;
     return True if $name ~~ /\:\:\(/;
@@ -5023,28 +5023,28 @@ method is_name ($n, $curpad = $*CURPAD) {
         return True if @components[0] eq 'CALLER::';
         return True if @components[0] eq 'CONTEXT::';
         if $curpkg = self.find_top_pkg(@components[0]) {
-            say "Found lexical package ", @components[0] if $*DEBUG +& DEBUG::symtab;
+            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            say "Looking for GLOBAL::<$name>" if $*DEBUG +& DEBUG::symtab;
+            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
             $curpkg = $*GLOBAL;
         }
         while @components > 1 {
             my $pkg = shift @components;
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
-            say "Found $pkg okay" if $*DEBUG +& DEBUG::symtab;
+            self.deb("Found $pkg okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
     $name = shift(@components)//'';
-    say "Looking for $name" if $*DEBUG +& DEBUG::symtab;
+    self.deb("Looking for $name") if $*DEBUG +& DEBUG::symtab;
     return True if $name eq '';
     my $pad = $curpad;
     while $pad {
-        say "Looking in ", $pad.id if $*DEBUG +& DEBUG::symtab;
+        self.deb("Looking in ", $pad.id) if $*DEBUG +& DEBUG::symtab;
         if $pad.{$name} {
-            say "Found $name in ", $pad.id if $*DEBUG +& DEBUG::symtab;
+            self.deb("Found $name in ", $pad.id) if $*DEBUG +& DEBUG::symtab;
             return True;
         }
         my $oid = $pad.<OUTER::>[0] || last;
@@ -5052,13 +5052,13 @@ method is_name ($n, $curpad = $*CURPAD) {
     }
     return True if $curpkg.{$name};
     return True if $*GLOBAL.{$name};
-    say "$name not found" if $*DEBUG +& DEBUG::symtab;
+    self.deb("$name not found") if $*DEBUG +& DEBUG::symtab;
     return False;
 }
 
 method find_stash ($n, $curpad = $*CURPAD) {
     my $name = $n;
-    say "find_stash $name" if $*DEBUG +& DEBUG::symtab;
+    self.deb("find_stash $name") if $*DEBUG +& DEBUG::symtab;
 
     return () if $name ~~ /\:\:\(/;
     my @components = self.canonicalize_name($name);
@@ -5067,18 +5067,18 @@ method find_stash ($n, $curpad = $*CURPAD) {
         return () if @components[0] eq 'CALLER::';
         return () if @components[0] eq 'CONTEXT::';
         if $curpad = self.find_top_pkg(@components[0]) {
-            say "Found lexical package ", @components[0] if $*DEBUG +& DEBUG::symtab;
+            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            say "Looking for GLOBAL::<$name>" if $*DEBUG +& DEBUG::symtab;
+            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
             $curpad = $*GLOBAL;
         }
         while @components > 1 {
             my $pad = shift @components;
             $curpad = $curpad.{$pad};
             return () unless $curpad;
-            say "Found $pad okay" if $*DEBUG +& DEBUG::symtab;
+            self.deb("Found $pad okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
     $name = shift(@components)//'';
@@ -5096,7 +5096,7 @@ method find_stash ($n, $curpad = $*CURPAD) {
 }
 
 method find_top_pkg ($name) {
-    say "find_top_pkg $name" if $*DEBUG +& DEBUG::symtab;
+    self.deb("find_top_pkg $name") if $*DEBUG +& DEBUG::symtab;
     if $name eq 'OUR::' {
         return $*CURPKG;
     }
@@ -5125,7 +5125,7 @@ method find_top_pkg ($name) {
 method add_name ($name) {
     my $scope = $*SCOPE || 'my';
     return self if $scope eq 'anon';
-    say "Adding $scope $name" if $*DEBUG +& DEBUG::symtab;
+    self.deb("Adding $scope $name") if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
         self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
     }
@@ -5142,7 +5142,7 @@ method add_name ($name) {
 
 method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optionals right
     my $name = $n;
-    say "add_my_name $name in ", $*CURPAD.id if $*DEBUG +& DEBUG::symtab;
+    self.deb("add_my_name $name in ", $*CURPAD.id) if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPAD;
     my @components = self.canonicalize_name($name);
@@ -5154,7 +5154,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
             'PARENT::' => $curstash.idref,
             '!stub' => 1,
             '!id' => [$sid] );
-        say "Adding new package $pkg in ", $curstash.id if $*DEBUG +& DEBUG::symtab;
+        self.deb("Adding new package $pkg in ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
         $curstash = $newstash;
     }
     $name = my $shortname = shift @components;
@@ -5174,7 +5174,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
     );
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
-        say "$name exists, curstash = ", $curstash.id if $*DEBUG +& DEBUG::symtab;
+        self.deb("$name exists, curstash = ", $curstash.id) if $*DEBUG +& DEBUG::symtab;
         my $omult = $old<mult> // '';
         if $declaring === $old {}  # already did this, probably enum
         elsif $*SCOPE eq 'use' {}
@@ -5233,10 +5233,10 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
 
 method add_our_name ($n) {
     my $name = $n;
-    say "add_our_name $name in " ~ $*CURPKG.id if $*DEBUG +& DEBUG::symtab;
+    self.deb("add_our_name $name in " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
     my $curstash = $*CURPKG;
-    say "curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL if $*DEBUG +& DEBUG::symtab;
+    self.deb("curstash $curstash global $*GLOBAL ", join ' ', %$*GLOBAL) if $*DEBUG +& DEBUG::symtab;
     $name ~~ s/\:ver\<.*?\>//;
     $name ~~ s/\:auth\<.*?\>//;
     my @components = self.canonicalize_name($name);
@@ -5256,7 +5256,7 @@ method add_our_name ($n) {
             '!stub' => 1,
             '!id' => [$sid] );
         $curstash = $newstash;
-        say "Adding new package $pkg in $curstash " if $*DEBUG +& DEBUG::symtab;
+        self.deb("Adding new package $pkg in $curstash ") if $*DEBUG +& DEBUG::symtab;
     }
     $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
@@ -5323,14 +5323,14 @@ method add_our_name ($n) {
 method add_mystery ($name,$pos,$ctx) {
     return self if $*IN_PANIC;
     if not self.is_known($name) {
-        say "add_mystery $name $*CURPAD" if $*DEBUG +& DEBUG::symtab;
+        self.deb("add_mystery $name $*CURPAD") if $*DEBUG +& DEBUG::symtab;
         %*MYSTERY{$name}.<pad> = $*CURPAD;
         %*MYSTERY{$name}.<ctx> = $ctx;
         %*MYSTERY{$name}.<line> ~= ',' if %*MYSTERY{$name}.<line>;
         %*MYSTERY{$name}.<line> ~= self.lineof($pos);
     }
     else {
-        say "$name is known" if $*DEBUG +& DEBUG::symtab;
+        self.deb("$name is known") if $*DEBUG +& DEBUG::symtab;
     }
     self;
 }
@@ -5400,7 +5400,7 @@ method load_setting ($setting) {
 
 method is_known ($n, $curpad = $*CURPAD) {
     my $name = $n;
-    say "is_known $name" if $*DEBUG +& DEBUG::symtab;
+    self.deb("is_known $name") if $*DEBUG +& DEBUG::symtab;
     return True if $*QUASIMODO;
     return True if $*CURPKG.{$name};
     my $curpkg = $*CURPKG;
@@ -5410,40 +5410,40 @@ method is_known ($n, $curpad = $*CURPAD) {
         return True if @components[0] eq 'CALLER::';
         return True if @components[0] eq 'CONTEXT::';
         if $curpkg = self.find_top_pkg(@components[0]) {
-            say "Found lexical package ", @components[0] if $*DEBUG +& DEBUG::symtab;
+            self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
-            say "Looking for GLOBAL::<$name>" if $*DEBUG +& DEBUG::symtab;
+            self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
             $curpkg = $*GLOBAL;
         }
         while @components > 1 {
             my $pkg = shift @components;
-            say "Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg) if $*DEBUG +& DEBUG::symtab;
+            self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $*DEBUG +& DEBUG::symtab;
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
-            say "Found $pkg okay, now in $curpkg " if $*DEBUG +& DEBUG::symtab;
+            self.deb("Found $pkg okay, now in $curpkg ") if $*DEBUG +& DEBUG::symtab;
         }
     }
 
     $name = shift(@components)//'';
-    say "Final component is $name" if $*DEBUG +& DEBUG::symtab;
+    self.deb("Final component is $name") if $*DEBUG +& DEBUG::symtab;
     return True if $name eq '';
     if $curpkg.{$name} {
-        say "Found" if $*DEBUG +& DEBUG::symtab;
+        self.deb("Found") if $*DEBUG +& DEBUG::symtab;
         return True;
     }
     my $varbind = { truename => '???' };
     return True if self.pad_can_find_name($curpad,$name,$varbind);
-    say "Not Found" if $*DEBUG +& DEBUG::symtab;
+    self.deb("Not Found") if $*DEBUG +& DEBUG::symtab;
 
     return False;
 }
 
 method pad_can_find_name ($pad, $name, $varbind) {
-    say "Looking in ", $pad.id if $*DEBUG +& DEBUG::symtab;
+    self.deb("Looking in ", $pad.id) if $*DEBUG +& DEBUG::symtab;
     if $pad.{$name} {
-        say "Found $name in ", $pad.id if $*DEBUG +& DEBUG::symtab;
+        self.deb("Found $name in ", $pad.id) if $*DEBUG +& DEBUG::symtab;
         return True;
     }
 
@@ -5513,7 +5513,7 @@ method add_placeholder($name) {
 
 method check_variable ($variable) {
     my $name = $variable.Str;
-    say "check_variable $name" if $*DEBUG +& DEBUG::symtab;
+    self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W*)(.?)/;
     given $twigil {
         when '' {
