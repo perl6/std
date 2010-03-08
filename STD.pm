@@ -5191,14 +5191,16 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
             if $ofile {
                 if $ofile !=== $*FILE {
                     my $oname = $ofile<name>;
-                    $loc = " (from $oname line $oline)";
+                    $loc = " (see $oname line $oline)";
                 }
                 else {
-                    $loc = " (from line $oline)";
+                    $loc = " (see line $oline)";
                 }
             }
             if $old.opad {
-                self.panic("Lexical symbol '$name'$loc is already bound to an outer scope implicitly\n  and must therefore be rewritten explicitly as '" ~ $old.name ~ "' before you can\n  unambiguously declare a new '$name' in the same scope");
+                my $rebind = $old<rebind>;
+                my $truename = $old<varbind><truename>;
+                self.panic("Lexical symbol '$name' is already bound to an outer symbol$loc;\n  the implicit outer binding at line $rebind must be rewritten as $truename\n  before you can unambiguously declare a new '$name' in this scope");
             }
             elsif $name ~~ /^\w/ {
                 self.panic("Illegal redeclaration of symbol '$name'$loc");
@@ -5431,35 +5433,47 @@ method is_known ($n, $curpad = $*CURPAD) {
         say "Found" if $*DEBUG +& DEBUG::symtab;
         return True;
     }
-
-    my $pad = $curpad;
-    my $outer = 0;
-    while $pad {
-        say "Looking in ", $pad.id if $*DEBUG +& DEBUG::symtab;
-        if $pad.{$name} {
-            say "Found $name in ", $pad.id if $*DEBUG +& DEBUG::symtab;
-            if $outer { # fake up an alias to outer symbol to catch reclaration
-                my $n = $pad.{$name};
-                $curpad.{$name} = NAME.new(
-                    xpad => $pad.idref,
-                    opad => $pad.idref,
-                    name => ("OUTER::" x $outer) ~ "<$name>",
-                    file => $*FILE, line => self.line,
-                    mult => 'only',
-                );
-            }
-            return True;
-        }
-        my $oid = $pad.<OUTER::>[0] || last;
-        say $oid // "No OUTER" if $*DEBUG +& DEBUG::symtab;
-        $pad = $ALL.{$oid};
-        $outer++;
-    }
+    my $varbind = { truename => '???' };
+    return True if self.pad_can_find_name($curpad,$name,$varbind);
     say "Not Found" if $*DEBUG +& DEBUG::symtab;
 
     return False;
 }
 
+method pad_can_find_name ($pad, $name, $varbind) {
+    say "Looking in ", $pad.id if $*DEBUG +& DEBUG::symtab;
+    if $pad.{$name} {
+        say "Found $name in ", $pad.id if $*DEBUG +& DEBUG::symtab;
+        return True;
+    }
+
+    my $outpadid = $pad.<OUTER::>[0];
+    return False unless $outpadid;
+    my $outpad = $ALL.{$outpadid};
+
+    if self.pad_can_find_name($outpad,$name,$varbind) {
+        # fake up an alias to outer symbol to catch reclaration
+        my $outname = $outpad.{$name}<name>;
+        my $outfile = $outpad.{$name}<file>;
+        my $outline = $outpad.{$name}<line>;
+        $outname = '<' ~ $outname ~ '>' unless $outname ~~ /\:\:\</;
+        $outname = "OUTER::" ~ $outname;
+        $pad.{$name} = NAME.new(
+            xpad => $pad.idref,
+            opad => $pad.idref,
+            name => $outname,
+            file => $outfile, line => $outline,
+            rebind => self.line,
+            varbind => $varbind,
+            mult => 'only',
+        );
+        # the innermost pad sets this last to get correct # of OUTER::s
+        $varbind.<truename> = $outname;
+        return True;
+    }
+
+    return False;
+}
 
 method add_routine ($name) {
     my $vname = '&' ~ $name;
