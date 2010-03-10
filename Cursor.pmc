@@ -23,8 +23,8 @@ use feature 'say', 'state';
 require 'mangle.pl';
 
 our $CTX = '';
-our $DEBUG = 0 + ($ENV{STD5DEBUG} // 0);
-$::DEBUG //= 0;
+our $DEBUG //= 0 + ($ENV{STD5DEBUG} // 0);
+$::DEBUG //= $DEBUG;
 our %LEXERS;       # per language, the cache of lexers, keyed by rule name
 our %FATECACHE; # fates we've already turned into linked lists
 my %lexer_cache = ();
@@ -534,6 +534,7 @@ sub cursor_all { my $self = shift;
 
     $self->deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
+    $r{_from} = $fpos;
     $r{_pos} = $tpos;
 
     bless \%r, ref $self;
@@ -2387,7 +2388,10 @@ sub canonicalize_name { my $self = shift;
     }
     my @components = split(/(?<=::)/, $name, -1);
     shift(@components) while @components and $components[0] eq '';
-    push(@components, $vname) if defined $vname;
+    if (defined $vname) {
+        $components[-1] .= '::' unless $components[-1] =~ /::$/;
+        push(@components, $vname) if defined $vname;
+    }
     @components;
 }
 

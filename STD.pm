@@ -10,6 +10,7 @@ grammar STD:ver<6.0.0.alpha>:auth<http://perl.org>;
 use DEBUG;
 use NAME;
 use Stash;
+use Cursor;
 
 our $ALL;
 
@@ -1027,7 +1028,7 @@ token unsp {
 token vws {
     :dba('vertical whitespace')
     \v
-    [ '#DEBUG -1' { say "DEBUG"; $STD::DEBUG = $*DEBUG = -1; } ]?
+    [ '#DEBUG -1' { say "DEBUG"; $*DEBUG = -1; } ]?
 }
 
 # We provide two mechanisms here:
@@ -1832,6 +1833,7 @@ grammar P6 is STD {
         :my $*DECLARAND;
         :my $*NEWPKG;
         :my $*NEWPAD;
+        :temp $*CURPKG;
         { $*SCOPE ||= 'our'; }
         [
             [
@@ -1845,7 +1847,6 @@ grammar P6 is STD {
             [
             || <?before '{'>
                 [
-                :temp $*CURPKG;
                 {{
                     # figure out the actual full package name (nested in outer package)
                     if $longname and $*NEWPKG {
@@ -1884,6 +1885,7 @@ grammar P6 is STD {
                             };
                         }
                     }}
+                    <statementlist>     # whole rest of file, presumably
                 || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
                 ]
             || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
@@ -3960,12 +3962,16 @@ grammar P6 is STD {
         ||  <?{
                 $¢.is_name($name) or substr($name,0,2) eq '::'
             }>
+
             # parametric type?
-            <.unsp>? [ <?before '['> <postcircumfix> ]?
             :dba('type parameter')
+            <.unsp>? [ <?before '['> <postcircumfix> ]?
+
+            :dba('namespace variable lookup')
             [
-                '::'
+                <?after '::'>
                 <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix>
+                { $*VAR = $¢.cursor_all(self.pos, $¢.pos) }
             ]?
 
         # unrecognized names are assumed to be post-declared listops.
@@ -5034,6 +5040,12 @@ method is_name ($n, $curpad = $*CURPAD) {
             my $pkg = shift @components;
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
+            try {
+                my $outpadid = $curpkg.[0];
+                return False unless $outpadid;
+                $curpkg = $ALL.{$outpadid};
+                return False unless $curpkg;
+            };
             self.deb("Found $pkg okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
@@ -5078,6 +5090,12 @@ method find_stash ($n, $curpad = $*CURPAD) {
             my $pad = shift @components;
             $curpad = $curpad.{$pad};
             return () unless $curpad;
+            try {
+                my $outpadid = $curpad.[0];
+                return False unless $outpadid;
+                $curpad = $ALL.{$outpadid};
+                return () unless $curpad;
+            };
             self.deb("Found $pad okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
@@ -5097,11 +5115,15 @@ method find_stash ($n, $curpad = $*CURPAD) {
 
 method find_top_pkg ($name) {
     self.deb("find_top_pkg $name") if $*DEBUG +& DEBUG::symtab;
+    $name ~= '::' unless $name ~~ /\:\:$/;
     if $name eq 'OUR::' {
         return $*CURPKG;
     }
     elsif $name eq 'MY::' {
         return $*CURPAD;
+    }
+    elsif $name eq 'OUTER::' {
+        return $ALL.{$*CURPAD.<OUTER::>[0]};
     }
     elsif $name eq 'CORE::' {
         return $*CORE;
@@ -5403,6 +5425,7 @@ method is_known ($n, $curpad = $*CURPAD) {
     self.deb("is_known $name") if $*DEBUG +& DEBUG::symtab;
     return True if $*QUASIMODO;
     return True if $*CURPKG.{$name};
+    return False if $name ~~ /\:\:\(/;
     my $curpkg = $*CURPKG;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
@@ -5422,6 +5445,12 @@ method is_known ($n, $curpad = $*CURPAD) {
             self.deb("Looking for $pkg in $curpkg ", join ' ', keys(%$curpkg)) if $*DEBUG +& DEBUG::symtab;
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
+            try {
+                my $outpadid = $curpkg.[0];
+                return False unless $outpadid;
+                $curpkg = $ALL.{$outpadid};
+                return False unless $curpkg;
+            };
             self.deb("Found $pkg okay, now in $curpkg ") if $*DEBUG +& DEBUG::symtab;
         }
     }
@@ -5433,8 +5462,11 @@ method is_known ($n, $curpad = $*CURPAD) {
         self.deb("Found") if $*DEBUG +& DEBUG::symtab;
         return True;
     }
+    # leading components take us non-lexical?  assume we can't know
+    return False if $curpkg !=== $*CURPKG and $curpkg<!id>[0] ~~ /^GLOBAL($|\:\:)/;
+
     my $varbind = { truename => '???' };
-    return True if self.pad_can_find_name($curpad,$name,$varbind);
+    return True if $n !~~ /\:\:/ and self.pad_can_find_name($curpad,$name,$varbind);
     self.deb("Not Found") if $*DEBUG +& DEBUG::symtab;
 
     return False;
@@ -5514,15 +5546,15 @@ method add_placeholder($name) {
 method check_variable ($variable) {
     my $name = $variable.Str;
     self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
-    my ($sigil, $twigil, $first) = $name ~~ /(\W)(\W*)(.?)/;
+    my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
     given $twigil {
         when '' {
             my $ok = 0;
-            $ok = 1 if $name ~~ /::/;
             $ok ||= $*IN_DECL;
             $ok ||= $sigil eq '&';
             $ok ||= $first lt 'A';
             $ok ||= self.is_known($name);
+            $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
             if not $ok {
                 my $id = $name;
                 $id ~~ s/^\W\W?//;
@@ -5532,11 +5564,13 @@ method check_variable ($variable) {
                 elsif my $scope = @*MEMOS[$variable.from]<declend> {
                     $variable.panic("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
                 }
-                elsif self.is_known('@' ~ $id) {
-                    $variable.panic("Variable $name is not predeclared (did you mean \@$id?)");
-                }
-                elsif self.is_known('%' ~ $id) {
-                    $variable.panic("Variable $name is not predeclared (did you mean \%$id?)");
+                elsif $id !~~ /\:\:/ {
+                    if self.is_known('@' ~ $id) {
+                        $variable.panic("Variable $name is not predeclared (did you mean \@$id?)");
+                    }
+                    elsif self.is_known('%' ~ $id) {
+                        $variable.panic("Variable $name is not predeclared (did you mean \%$id?)");
+                    }
                 }
                 else {
                     $variable.panic("Variable $name is not predeclared");

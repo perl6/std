@@ -235,8 +235,8 @@ my proto chop { }
 my proto p5chomp { }
 my proto chomp { }
 my proto trim { }
-my proto trim_start { }
-my proto trim_end { }
+my proto trim-leading { }
+my proto trim-trailing { }
 my proto index { }
 my proto rindex { }
 my proto substr { }
