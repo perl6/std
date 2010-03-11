@@ -2692,8 +2692,16 @@ grammar P6 is STD {
         <!old_rx_mods>
     }
     token quote:tr {
-        <sym> » <!before '('> <pat=.tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
+        <sym> » <!before '('> <pat=.tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:tr))>
         <!old_tr_mods>
+    }
+
+    token quote:y {
+        <sym> »
+        # could be defined as a function or constant
+        <!{ self.is_known('&y') or self.is_known('y') }>
+        <!before '('> <?before \h*\W>
+        <.obs('y///','tr///')>
     }
 
     token old_rx_mods {
@@ -4190,6 +4198,7 @@ grammar Q is STD {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)!) { self.panic("Too late for :qq") }
+        multi method tweak (:trans(:$tr)!) { self.panic("Too late for :tr") }
         # end tweaks (DO NOT ERASE)
 
     } # end role
@@ -4202,6 +4211,29 @@ grammar Q is STD {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)!) { self.panic("Too late for :qq") }
+        multi method tweak (:trans(:$tr)!) { self.panic("Too late for :tr") }
+        # end tweaks (DO NOT ERASE)
+
+    } # end role
+
+    role tr {
+        token stopper { \' }
+
+        token escape:sym<\\> { <sym> <item=.backslash> }
+        token escape:sym<-> { <sym> <.obs('- as character range','..')> }
+        token escape:sym<..> { <sym> }
+
+        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
+        token backslash:sym<\\> { <text=.sym> }
+        token backslash:stopper { <text=.stopper> }
+
+        # keep random backslashes like q does
+        token backslash:misc { {} (.) { $<text> = "\\" ~ $0.Str; } }
+
+        # begin tweaks (DO NOT ERASE)
+        multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
+        multi method tweak (:double(:$qq)!) { self.panic("Too late for :qq") }
+        multi method tweak (:trans(:$tr)!) { self.panic("Too late for :tr") }
         # end tweaks (DO NOT ERASE)
 
     } # end role
@@ -4223,6 +4255,7 @@ grammar Q is STD {
     multi method tweak (:single(:$q)!) { self.truly($q,':q'); self.mixin( ::q ); }
 
     multi method tweak (:double(:$qq)!) { self.truly($qq, ':qq'); self.mixin( ::qq ); }
+    multi method tweak (:trans(:$tr)!) { self.truly($tr, ':tr'); self.mixin( ::tr ); }
 
     multi method tweak (:backslash(:$b)!)   { self.mixin($b ?? ::b1 !! ::b0) }
     multi method tweak (:scalar(:$s)!)      { self.mixin($s ?? ::s1 !! ::s0) }
