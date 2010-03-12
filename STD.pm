@@ -1240,6 +1240,7 @@ grammar P6 is STD {
         :my $*CURPAD;
         :my $*MULTINESS = '';
         :my $*SIGNUM = 0;
+        :my $*MONKEY_TYPING = False;
 
         :my $*CURPKG;
         {{
@@ -1392,6 +1393,7 @@ grammar P6 is STD {
     # statement semantics
     rule statementlist {
         :my $*INVOCANT_OK = 0;
+        :temp $*MONKEY_TYPING;
         :dba('statement list')
 
         [
@@ -1531,6 +1533,9 @@ grammar P6 is STD {
         | <module_name>
             {{
                 $longname = $<module_name><longname>;
+                if $longname.Str eq 'MONKEY_TYPING' {
+                    $*MONKEY_TYPING = True;
+                }
             }}
             [
             || <.spacey> <arglist>
@@ -1764,14 +1769,20 @@ grammar P6 is STD {
         || <.panic: "Malformed $*SCOPE">
     }
 
+    method monkey($scope) {
+        if not $*MONKEY_TYPING {
+            self.panic("Can't $scope without 'use MONKEY_TYPING;'");
+        }
+        self.scoped($scope);
+    }
 
     token scope_declarator:my        { <sym> <scoped('my')> }
     token scope_declarator:our       { <sym> <scoped('our')> }
     token scope_declarator:anon      { <sym> <scoped('anon')> }
     token scope_declarator:state     { <sym> <scoped('state')> }
     token scope_declarator:has       { <sym> <scoped('has')> }
-    token scope_declarator:augment   { <sym> <scoped('augment')> }
-    token scope_declarator:supersede { <sym> <scoped('supersede')> }
+    token scope_declarator:augment   { <sym> <scoped=.monkey('augment')> }
+    token scope_declarator:supersede { <sym> <scoped=.monkey('supersede')> }
 
 
     token package_declarator:class {
