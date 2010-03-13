@@ -1769,20 +1769,13 @@ grammar P6 is STD {
         || <.panic: "Malformed $*SCOPE">
     }
 
-    method monkey($scope) {
-        if not $*MONKEY_TYPING {
-            self.panic("Can't $scope without 'use MONKEY_TYPING;'");
-        }
-        self.scoped($scope);
-    }
-
     token scope_declarator:my        { <sym> <scoped('my')> }
     token scope_declarator:our       { <sym> <scoped('our')> }
     token scope_declarator:anon      { <sym> <scoped('anon')> }
     token scope_declarator:state     { <sym> <scoped('state')> }
     token scope_declarator:has       { <sym> <scoped('has')> }
-    token scope_declarator:augment   { <sym> <scoped=.monkey('augment')> }
-    token scope_declarator:supersede { <sym> <scoped=.monkey('supersede')> }
+    token scope_declarator:augment   { <sym> <scoped('augment')> }
+    token scope_declarator:supersede { <sym> <scoped('supersede')> }
 
 
     token package_declarator:class {
@@ -5190,10 +5183,14 @@ method find_top_pkg ($name) {
 
 method add_name ($name) {
     my $scope = $*SCOPE || 'my';
-    return self if $scope eq 'anon';
+    my $pkgdecl = $*PKGDECL || 'package';
+    return self if $scope eq 'anon' or $pkgdecl eq 'slang';
     self.deb("Adding $scope $name") if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
-        self.is_name($name) or self.worry("Can't $scope something that doesn't exist");
+        self.is_name($name) or
+            self.worry("Can't $scope $pkgdecl $name because it doesn't exist");
+        $*MONKEY_TYPING or
+            self.panic("Can't $scope $pkgdecl $name without MONKEY_TYPING");
     }
     else {
         if $scope eq 'our' {
