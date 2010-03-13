@@ -5183,7 +5183,7 @@ method find_top_pkg ($name) {
 
 method add_name ($name) {
     my $scope = $*SCOPE || 'my';
-    my $pkgdecl = $*PKGDECL || 'package';
+    my $pkgdecl = $*PKGDECL || 'symbol';
     return self if $scope eq 'anon' or $pkgdecl eq 'slang';
     self.deb("Adding $scope $name") if $*DEBUG +& DEBUG::symtab;
     if $scope eq 'augment' or $scope eq 'supersede' {
