@@ -2199,7 +2199,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$@> {
-        <sym> ::
+        <sym> <?before \W> ::
         <.obs('$@ variable as eval error', '$!')>
     }
 
@@ -2215,7 +2215,7 @@ grammar P6 is STD {
         <.obs('$$ variable', '$*PID')>
     }
     token special_variable:sym<$%> {
-        <sym> ::
+        <sym> <!before \w> <!sigil> ::
         <.obs('$% variable', 'Form module')>
     }
 
@@ -2453,6 +2453,7 @@ grammar P6 is STD {
     token desigilname {
         [
         | <?before '$' > <variable> { $*VAR = $<variable> }
+        | <?before <[\@\%\&]> <sigil>* \w > <.panic: "Invalid hard reference syntax">
         | <longname>
         ]
     }
