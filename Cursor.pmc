@@ -2389,7 +2389,7 @@ sub canonicalize_name { my $self = shift;
     my @components = split(/(?<=::)/, $name, -1);
     shift(@components) while @components and $components[0] eq '';
     if (defined $vname) {
-        $components[-1] .= '::' unless $components[-1] =~ /::$/;
+        $components[-1] .= '::' if @components and $components[-1] !~ /::$/;
         push(@components, $vname) if defined $vname;
     }
     @components;
