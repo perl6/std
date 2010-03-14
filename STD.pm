@@ -3130,7 +3130,13 @@ grammar P6 is STD {
                 }
             }
             return () if $*IN_REDUCE;
-            if @*MEMOS[$¢.pos-1]<baremeth> {
+            my $endpos = $¢.pos;
+            my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
+
+            if self.lineof($startpos) != self.lineof($endpos) {
+                $¢.panic("Unexpected block in infix position (previous line missing its semicolon?)");
+            }
+            elsif @*MEMOS[$¢.pos-1]<baremeth> {
                 $¢.panic("Unexpected block in infix position (method call needs colon or parens to take arguments)");
             }
             else {
@@ -3147,7 +3153,7 @@ grammar P6 is STD {
         { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
 
     token circumfix:sym<[ ]>
-        { :dba('array composer') '[' ~ ']' <semilist> <O(|%term)> { @*MEMOS[$¢.pos]<acomp> = 1; } }
+        { :dba('array composer') '[' ~ ']' <semilist> <O(|%term)> { @*MEMOS[$¢.pos]<arraycomp> = 1; } }
 
     #############
     # Operators #
@@ -5759,15 +5765,15 @@ method panic (Str $s) {
         $*IN_PANIC--;
         if @t {
             my $endpos = $here.pos;
-            my $startpos = @*MEMOS[$here.pos]<ws> // $endpos;
+            my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
 
-            if substr($*ORIG, $startpos, $endpos - $startpos) ~~ /\n/ {
+            if self.lineof($startpos) != self.lineof($endpos) {
                 $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
             }
             elsif @*MEMOS[$here.pos - 1]<baremeth> {
                 $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
             }
-            elsif @*MEMOS[$here.pos - 1]<acomp> {
+            elsif @*MEMOS[$here.pos - 1]<arraycomp> {
                 $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
             }
             else {
