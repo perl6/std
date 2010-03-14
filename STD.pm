@@ -3130,7 +3130,12 @@ grammar P6 is STD {
                 }
             }
             return () if $*IN_REDUCE;
-            $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
+            if @*MEMOS[$¢.pos-1]<baremeth> {
+                $¢.panic("Unexpected block in infix position (method call needs colon or parens to take arguments)");
+            }
+            else {
+                $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
+            }
         }}
         <O(|%term)>
     }
@@ -3403,6 +3408,7 @@ grammar P6 is STD {
         [
         | ':' <?before \s> <!{ $*QSIGIL }> <arglist>
         | <?[\\(]> <args>
+        | { @*MEMOS[$¢.pos]<baremeth> = 1 }
         ]?
     }
 
@@ -5757,6 +5763,9 @@ method panic (Str $s) {
 
             if substr($*ORIG, $startpos, $endpos - $startpos) ~~ /\n/ {
                 $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
+            }
+            elsif @*MEMOS[$here.pos - 1]<baremeth> {
+                $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
             }
             elsif @*MEMOS[$here.pos - 1]<acomp> {
                 $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
