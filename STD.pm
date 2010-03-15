@@ -3279,12 +3279,12 @@ grammar P6 is STD {
         )
         { $op = $<s><op>; }
 
-        <.can_meta($op, "reduce")>
+        <.can_meta($op, "reduce with")>
 
         [
         || <!{ $op<O><diffy> }>
         || <?{ $op<O><assoc> eq 'chain' }>
-        || <.panic("Can't reduce " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
+        || <.panic("Can't reduce with " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
         ]
 
         <O($op.Opairs, |%list_prefix, assoc => 'unary', uassoc => 'left')>
@@ -3318,21 +3318,29 @@ grammar P6 is STD {
 
     token infix_prefix_meta_operator:sym<R> {
         <sym> {} <infixish(1)>
-        <.can_meta($<infixish>, "reverse")>
+        <.can_meta($<infixish>, "reverse the args of")>
         <?{ $<O> = $<infixish><O>; }>
     }
 
     token infix_prefix_meta_operator:sym<S> {
         <sym> {} <infixish(1)>
-        <.can_meta($<infixish>, "sequence")>
+        <.can_meta($<infixish>, "sequence the args of")>
         <?{ $<O> = $<infixish><O>; }>
     }
 
     token infix_prefix_meta_operator:sym<X> {
-        <sym> {}
+        <sym> <?before \S> {}
         [ <infixish(1)>
-            [X <.panic: "Old form of XopX found">]?
-            <.can_meta($<infixish>[0], "cross")>
+            <.can_meta($<infixish>[0], "cross with")>
+            <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
+        ]?
+        <O(|%list_infix, self.Opairs)>
+    }
+
+    token infix_prefix_meta_operator:sym<Z> {
+        <sym> <?before \S> {}
+        [ <infixish(1)>
+            <.can_meta($<infixish>[0], "zip with")>
             <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
         ]?
         <O(|%list_infix, self.Opairs)>
@@ -3344,7 +3352,7 @@ grammar P6 is STD {
         | '»'
         ]
         {} <infixish(1)> [ '«' | '»' || <.panic: "Missing « or »"> ]
-        <.can_meta($<infixish>, "hyper")>
+        <.can_meta($<infixish>, "hyper with")>
         <?{ $<O> := $<infixish><O>; }>
     }
 
@@ -3354,7 +3362,7 @@ grammar P6 is STD {
         | '>>'
         ]
         {} <infixish(1)> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
-        <.can_meta($<infixish>, "hyper")>
+        <.can_meta($<infixish>, "hyper with")>
         <?{ $<O> := $<infixish><O>; }>
     }
 
@@ -3363,7 +3371,7 @@ grammar P6 is STD {
         <.can_meta($op, "make assignment out of")>
         [ <!{ $op<O><diffy> }> || <.panic("Can't make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
         { $<sym> = $op<sym> ~ '='; }
-        <O(|%item_assignment, $op.Opairs, dba => 'assignment', iffy => 0)>
+        <O(|%item_assignment, $op.Opairs, dba => 'item assignment', iffy => 0)>
     }
 
     token postcircumfix:sym<( )>
@@ -3895,6 +3903,9 @@ grammar P6 is STD {
         }
         <O(|%comma)>
     }
+
+    token infix:sym<X>
+        { <sym> <O(|%list_infix)> }
 
     token infix:sym<Z>
         { <sym> <O(|%list_infix)> }
