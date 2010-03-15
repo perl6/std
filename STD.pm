@@ -5626,9 +5626,7 @@ method check_variable ($variable) {
                         $variable.panic("Variable $name is not predeclared (did you mean \%$id?)");
                     }
                 }
-                else {
-                    $variable.panic("Variable $name is not predeclared");
-                }
+                $variable.panic("Variable $name is not predeclared");
             }
         }
         when '^' {
