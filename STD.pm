@@ -5615,18 +5615,20 @@ method check_variable ($variable) {
                 if $name eq '@_' or $name eq '%_' {
                     $variable.add_placeholder($name);
                 }
-                elsif my $scope = @*MEMOS[$variable.from]<declend> {
-                    $variable.panic("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
-                }
-                elsif $id !~~ /\:\:/ {
-                    if self.is_known('@' ~ $id) {
-                        $variable.panic("Variable $name is not predeclared (did you mean \@$id?)");
+                else {  # guaranteed fail now
+                    if my $scope = @*MEMOS[$variable.from]<declend> {
+                        $variable.panic("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
                     }
-                    elsif self.is_known('%' ~ $id) {
-                        $variable.panic("Variable $name is not predeclared (did you mean \%$id?)");
+                    elsif $id !~~ /\:\:/ {
+                        if self.is_known('@' ~ $id) {
+                            $variable.panic("Variable $name is not predeclared (did you mean \@$id?)");
+                        }
+                        elsif self.is_known('%' ~ $id) {
+                            $variable.panic("Variable $name is not predeclared (did you mean \%$id?)");
+                        }
                     }
+                    $variable.panic("Variable $name is not predeclared");
                 }
-                $variable.panic("Variable $name is not predeclared");
             }
         }
         when '^' {
