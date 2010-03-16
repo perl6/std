@@ -101,10 +101,10 @@ sub MAIN {
 	print $x;
     }
     elsif ($output eq 'p6') {
-	print $r->ret($r->emit_p6);
+	say substr($r->ret(0,$r->emit_p6(0)),0,-3);
     }
     elsif ($output eq 'p5') {
-	print fixpod($r->ret($r->emit_p5(0)));
+	print fixpod($r->ret(0,$r->emit_p5(0)));
     }
     else {
 	die "Unknown output mode";
@@ -519,6 +519,12 @@ sub indent {
 	return;
     }
 
+    sub termish {
+	my $self = shift;
+	my $match = shift;
+	$match->{'_ast'} = $match->{term}{'_ast'};
+    }
+
     sub gen_class {
 	my $class = shift;
 	my $base = shift() // 'VAST::Base';
@@ -539,11 +545,12 @@ sub indent {
 { package VAST::Base;
 
     sub ret { my $self = shift;
+	my $lvl = shift;
 	my $val = join '', @_;
 	my @c = map { ref $_ } @context;
 	my $c = "@c " . ref($self);
 	$c =~ s/VAST:://g;
-	print STDERR "$c returns $val\n" if $OPT_log;
+	print STDERR ' ' x ($lvl-1), "$c returns $val\n" if $OPT_log;
 	wantarray ? @_ : $val;
     }
 
@@ -555,7 +562,9 @@ sub indent {
     }
 
     sub emit_p6 { my $self = shift;
+	my $lvl = shift;
 	my $text = '';
+	say ' ' x $lvl, "VAST::Base::emit_p6 on behalf of ",ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
 	if (exists $self->{'.'}) {
 	    my $last = $self->{BEG};
 	    my $all = $self->{'.'};
@@ -576,7 +585,9 @@ sub indent {
 		if (ref($kid) =~ /STD/) {
 		    print STDERR ::Dump($self);
 		}
-		$text .= $kid->emit_p6();
+		my $new = $kid->emit_p6($lvl+1);
+		substr($new,0,$last-$kb,'') if $kb < $last;
+		$text .= $new;
 		$last = $kid->{END};
 
 	    }
@@ -584,11 +595,11 @@ sub indent {
 	    if ($se > $last) {
 		    $text .= substr($::ORIG, $last, $se - $last);
 	    }
-	    return $self->ret($text);
+	    return $self->ret($lvl,$text);
 	}
 	else {
 	    my $text = $self->{TEXT};
-	    return $self->ret($text);
+	    return $self->ret($lvl,$text);
 	}
     }
 
@@ -630,7 +641,7 @@ sub indent {
 	    push @text, $self->{TEXT};
 	}
 	splice(@context,$lvl);
-	$self->ret(@text);
+	$self->ret($lvl,@text);
     }
 
     sub gap { my $self = shift;
@@ -659,11 +670,11 @@ sub indent {
 	if ($t[0] eq '*') {	# *-1
 	    $t[0] = '';
 	}
-	$self->ret(@t);
+	$self->ret($lvl,@t);
     }
 }
 
-{ package VAST::ADVERB; our @ISA = 'VAST::Base';
+{ package VAST::Adverb; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my @t = $self->SUPER::emit_p5($lvl+1);
 	my $adv = pop @t;
@@ -672,7 +683,7 @@ sub indent {
 	    unshift(@t, $adv . ' ');
 	    $t[-1] =~ s/\s+$//;
 	}
-	$self->ret(@t);
+	$self->ret($lvl,@t);
     }
 }
 
@@ -800,6 +811,10 @@ sub indent {
 }
 
 
+{ package VAST::Chaining; our @ISA = 'VAST::Base';
+}
+
+
 { package VAST::circumfix; our @ISA = 'VAST::Base';
 }
 
@@ -836,12 +851,13 @@ sub indent {
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
     sub emit_p5 { my $self = shift; my $lvl = shift;
 	$context[$lvl] = $self;
-	my $r = $self->ret($self->{statementlist}->emit_p5($lvl+1));
+	my $r = $self->ret($lvl,$self->{statementlist}->emit_p5($lvl+1));
 	splice(@context,$lvl);
 	$r .= "\n";
     }
     sub emit_p6 { my $self = shift;
-	$self->ret($self->{statementlist}->emit_p6);
+	my $lvl = shift;
+	$self->ret($lvl,substr($::ORIG, 0, $self->{statementlist}{BEG}) . $self->{statementlist}->emit_p6($lvl+1));
     }
 
 }
@@ -857,7 +873,7 @@ sub indent {
 	    s/\?\?/?/;
 	    s/!!/:/;
         }
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -954,60 +970,20 @@ sub indent {
 { package VAST::infix; our @ISA = 'VAST::Base';
 }
 
-{ package VAST::SYM_infix__S_and; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_BangEqual; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_ColonEqual; our @ISA = 'VAST::Base';
+{ package VAST::SYM_infix__S_ColonEqual; our @ISA = 'VAST::Item_assignment';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '=';	# XXX oversimplified
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
-{ package VAST::SYM_infix__S_ColonColonEqual; our @ISA = 'VAST::Base';
+{ package VAST::SYM_infix__S_ColonColonEqual; our @ISA = 'VAST::Item_assignment';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '=';	# XXX oversimplified
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
-}
-
-
-{ package VAST::SYM_infix__S_Comma; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_DotDot; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_eq; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_Equal; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_EqualEqual; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_EqualGt; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_gt; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_Gt; our @ISA = 'VAST::Base';
 }
 
 
@@ -1015,114 +991,46 @@ sub indent {
 }
 
 
-{ package VAST::SYM_infix__S_le; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_lt; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_Lt; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_LtEqual; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_Minus; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_ne; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_or; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_orelse; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_Plus; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_PlusAmp; our @ISA = 'VAST::Base';
+{ package VAST::SYM_infix__S_PlusAmp; our @ISA = 'VAST::Multiplicative';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '&';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
-{ package VAST::SYM_infix__S_PlusVert; our @ISA = 'VAST::Base';
+{ package VAST::SYM_infix__S_PlusVert; our @ISA = 'VAST::Additive';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '|';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
 
-{ package VAST::SYM_infix_postfix_meta_operator; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix_postfix_meta_operator__S_Equal; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_QuestionQuestion_BangBang; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_SlashSlash; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_Star; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::infixstopper; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_Tilde; our @ISA = 'VAST::Base';
+{ package VAST::SYM_infix__S_Tilde; our @ISA = 'VAST::Concatenation';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '.';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
 
-{ package VAST::SYM_infix__S_TildeTilde; our @ISA = 'VAST::Base';
+{ package VAST::SYM_infix__S_TildeTilde; our @ISA = 'VAST::Chaining';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '=~';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
-{ package VAST::SYM_infix__S_TildeVert; our @ISA = 'VAST::Base';
+{ package VAST::SYM_infix__S_TildeVert; our @ISA = 'VAST::Additive';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '|';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
-}
-
-
-{ package VAST::SYM_infix__S_VertVert; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_infix__S_x; our @ISA = 'VAST::Base';
 }
 
 
@@ -1146,7 +1054,7 @@ sub indent {
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = 'sub';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1290,7 +1198,7 @@ sub indent {
 	my $t = join('', @t);
 	$t =~ s/^(.*\S)\s*:(delete|exists)/$2 $1/;
 #	print STDERR ::Dump(\@t);
-	$self->ret($t);
+	$self->ret($lvl,$t);
     }
 }
 
@@ -1308,7 +1216,7 @@ sub indent {
 	    }
 	    unshift(@e,$t);
 	}
-        $self->ret(@b,@e);
+        $self->ret($lvl,@b,@e);
     }
 }
 
@@ -1381,7 +1289,7 @@ sub indent {
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	pop(@t);shift(@t);
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1416,7 +1324,7 @@ sub indent {
 	# print STDERR "HERE " . ref($self) . "\n";
 	my $t = $self->SUPER::emit_p5($lvl+1);
 	# print STDERR "$t in " . ref($context[$lvl-1]);
-	$self->ret($t);
+	$self->ret($lvl,$t);
     }
 }
 
@@ -1449,7 +1357,7 @@ sub indent {
 	my $txt = $self->Str;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$txt =~ s/^/## /mg;
-        $self->ret($txt,@t);
+        $self->ret($lvl,$txt,@t);
     }
 }
 
@@ -1506,7 +1414,7 @@ sub indent {
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/\S.*//s;
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1515,7 +1423,7 @@ sub indent {
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/\S.*//s;
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1524,7 +1432,7 @@ sub indent {
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/\S.*//s;
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1532,7 +1440,7 @@ sub indent {
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/\S.*//s;
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1617,7 +1525,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	my $t = '    my ' . join('',@t) . " = shift;\n";
-        $self->ret($t);
+        $self->ret($lvl,$t);
     }
 }
 
@@ -1646,49 +1554,17 @@ END
 }
 
 
-{ package VAST::SYM_postcircumfix__S_Bra_Ket; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_postcircumfix__S_Cur_Ly; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_postcircumfix__S_Fre_Nch; our @ISA = 'VAST::Base';
-}
-
-
 { package VAST::SYM_postcircumfix__S_Lt_Gt; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = "{'";
 	$t[-1] = "'}";
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
 
-{ package VAST::SYM_postcircumfix__S_Paren_Thesis; our @ISA = 'VAST::Base';
-}
-
-
 { package VAST::postfix; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_postfix__S_MinusMinus; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_postfix__S_PlusPlus; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::postfix_prefix_meta_operator; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::postfix_prefix_meta_operator__S_Nch; our @ISA = 'VAST::Base';
 }
 
 
@@ -1704,32 +1580,20 @@ END
 }
 
 
-{ package VAST::SYM_prefix__S_Bang; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_prefix__S_Minus; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_prefix__S_not; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::SYM_prefix__S_Plus; our @ISA = 'VAST::Base';
+{ package VAST::SYM_prefix__S_Plus; our @ISA = 'VAST::Symbolic_unary';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '0+';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
 
-{ package VAST::SYM_prefix__S_temp; our @ISA = 'VAST::Base';
+{ package VAST::SYM_prefix__S_temp; our @ISA = 'VAST::Named_unary';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = 'local';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1772,7 +1636,7 @@ END
 	my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/</qw</;
 #	print STDERR ::Dump(\@t);
-	$self->ret(@t);
+	$self->ret($lvl,@t);
     }
 }
 
@@ -1846,7 +1710,7 @@ END
 	$comment =~ s/\s*\{.*//s;
         my $t = join '', $self->SUPER::emit_p5($lvl+1);
 	$t =~ s/method/sub/;
-        $self->ret("## $comment\n$t");
+        $self->ret($lvl,"## $comment\n$t");
     }
 }
 
@@ -1889,7 +1753,7 @@ END
 	my $t = join('', @t);
 	$t =~ s/my(\s+)&(\w+)/my$1\$$2/;
 	$t =~ s/my(\s+)([\$@%])::(\w+)/local$1${2}::$3/;
-        $self->ret($t);
+        $self->ret($lvl,$t);
     }
 }
 
@@ -1950,7 +1814,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '$C';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1959,7 +1823,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '$M';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1967,7 +1831,7 @@ END
 { package VAST::statement; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -1998,7 +1862,7 @@ END
 	my $t = join('', @t);
 	$t =~ s/^loop(\s+\()/for$1/;
 	$t =~ s/^loop/for (;;)/;
-        $self->ret($t);
+        $self->ret($lvl,$t);
     }
 }
 
@@ -2059,7 +1923,7 @@ END
 }
 
 
-{ package VAST::Structural; our @ISA = 'VAST::Base';
+{ package VAST::Structural_infix; our @ISA = 'VAST::Base';
 }
 
 
@@ -2082,15 +1946,16 @@ END
 	    $t[0] = '\\';
 	    $t[1] =~ s/^\s+//;
 	}
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
 
 { package VAST::terminator; our @ISA = 'VAST::Base';
     sub emit_p6 {  my $self = shift;
-        my @t = $self->SUPER::emit_p6();
-        $self->ret('');
+	my $lvl = shift;
+        my @t = $self->SUPER::emit_p6($lvl+1);
+        $self->ret($lvl,'');
     }
 }
 
@@ -2131,7 +1996,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '$self';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -2175,7 +2040,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = 'self->';	# XXX
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -2184,7 +2049,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '::';
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -2199,7 +2064,7 @@ END
 	if (ref $context[-1] ne 'VAST::scoped') {
 	    @t = $self->SUPER::emit_p5($lvl+1);
 	}
-        $self->ret(@t);
+        $self->ret($lvl,@t);
     }
 }
 
@@ -2254,7 +2119,7 @@ END
 	my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '(' . $t[0] . ')';
 	$t[0] =~ s/(\s+)\)$/)$1/;
-	$self->ret(@t);
+	$self->ret($lvl,@t);
     }
 }
 
