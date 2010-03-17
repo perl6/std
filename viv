@@ -564,7 +564,7 @@ sub indent {
     sub emit_p6 { my $self = shift;
 	my $lvl = shift;
 	my $text = '';
-	say ' ' x $lvl, "VAST::Base::emit_p6 on behalf of ",ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
+	say ' ' x $lvl, ref $self, " in Base from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
 	if (exists $self->{'.'}) {
 	    my $last = $self->{BEG};
 	    my $all = $self->{'.'};
@@ -605,6 +605,7 @@ sub indent {
 
     sub emit_p5 { my $self = shift; my $lvl = shift;
 	my @text;
+	say ' ' x $lvl, ref $self, " in Base from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
 	$context[$lvl] = $self;
 	# print STDERR "HERE " . ref($self) . "\n";
 	if (exists $self->{'.'}) {
@@ -1210,7 +1211,7 @@ sub indent {
 	while (@b) {
 	    my $t = pop(@b);
 	    if ($t =~ s/^\{//) {
-		$t = "{\n    my \$self = shift;\n" . pop(@b) . $t;
+		$t = " {\n    my \$self = shift;\n" . pop(@b) . $t;
 		unshift(@e,$t);
 		last;
 	    }
@@ -1317,73 +1318,6 @@ sub indent {
 { package VAST::normspace; our @ISA = 'VAST::Base';
 }
 
-
-
-{ package VAST::noun; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-	# print STDERR "HERE " . ref($self) . "\n";
-	my $t = $self->SUPER::emit_p5($lvl+1);
-	# print STDERR "$t in " . ref($context[$lvl-1]);
-	$self->ret($lvl,$t);
-    }
-}
-
-{ package VAST::noun__S_capterm; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_circumfix; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_colonpair; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_fatarrow; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_multi_declarator; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_package_declarator; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_regex_declarator; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-	my $txt = $self->Str;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-	$txt =~ s/^/## /mg;
-        $self->ret($lvl,$txt,@t);
-    }
-}
-
-
-{ package VAST::noun__S_routine_declarator; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_scope_declarator; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_statement_prefix; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_term; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_value; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::noun__S_variable; our @ISA = 'VAST::Base';
-}
 
 
 { package VAST::nulltermish; our @ISA = 'VAST::Base';
@@ -1512,9 +1446,12 @@ END
 	$out .= <<'END';
 }
 
-use YAML::XS; # apparently better than YAML::XS, but nobody knows why
+use YAML::XS;
+
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "\n" } if $::DEBUG;
 
 END
+	    $out .= $self->{statementlist}->emit_p5($lvl+1);
 	}
 	$out;
     }
@@ -1677,18 +1614,54 @@ END
 
 
 { package VAST::regex_declarator__S_regex; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my $comment = substr($::ORIG, $self->{BEG},100);
+	$comment =~ s/\s*\{.*//s;
+        my $t = join '', $self->SUPER::emit_p5($lvl+1);
+	$t =~ s/regex/sub/;
+        $self->ret($lvl,"## $comment\n$t");
+    }
 }
 
 
 { package VAST::regex_declarator__S_rule; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my $comment = substr($::ORIG, $self->{BEG},100);
+	$comment =~ s/\s*\{.*//s;
+        my $t = join '', $self->SUPER::emit_p5($lvl+1);
+	$t =~ s/rule/sub/;
+        $self->ret($lvl,"## $comment\n$t");
+    }
 }
 
 
 { package VAST::regex_declarator__S_token; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my $comment = substr($::ORIG, $self->{BEG},100);
+	$comment =~ s/\s*\{.*//s;
+        my $t = join '', $self->SUPER::emit_p5($lvl+1);
+	$t =~ s/token/sub/;
+        $self->ret($lvl,"## $comment\n$t");
+    }
 }
 
-
 { package VAST::regex_def; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+        my @b = $self->SUPER::emit_p5($lvl+1);
+	my @e = '';
+	while (@b) {
+	    my $t = pop(@b);
+	    if ($t =~ s/^\{//) {
+		$t = " {\n    my \$self = shift;\n" . pop(@b) . $t;
+		unshift(@e,$t);
+		last;
+	    }
+	    unshift(@e,$t);
+	}
+	my $block = join('', @b, @e);
+	$block =~ s/(.*[^ ]) +\}\n/$1\n}\n/s;
+        $self->ret($lvl,$block);
+    }
 }
 
 
@@ -1736,10 +1709,6 @@ END
 
 
 { package VAST::scope_declarator; our @ISA = 'VAST::Base';
-}
-
-
-{ package VAST::scope_declarator__S_constant; our @ISA = 'VAST::Base';
 }
 
 
@@ -1939,6 +1908,58 @@ END
 }
 
 
+{ package VAST::term; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	# print STDERR "HERE " . ref($self) . "\n";
+	my $t = $self->SUPER::emit_p5($lvl+1);
+	# print STDERR "$t in " . ref($context[$lvl-1]);
+	$self->ret($lvl,$t);
+    }
+}
+
+{ package VAST::term__S_capterm; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_circumfix; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_colonpair; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my $t = $self->SUPER::emit_p5($lvl+1);
+	my $val;
+	if ($t =~ s/^:!//) {
+	    $val = 0
+	}
+	elsif ($t =~ s/^:(\d+)//) {
+	    $val = $1;
+	}
+	else {
+	    $t =~ s/^://;
+	    $val = 1;
+	}
+	if ($t =~ s/^(\w+)$/'$1'/) {
+	    $t .= " => $val";
+	}
+	else {
+	    my ($name,$rest) = $t =~ /^(\w+)(.*)$/s;
+	    $rest =~ s/^<([^\s']*)>/'$1'/ or
+	    $rest =~ s/^(<\S*>)/q$1/ or
+	    $rest =~ s/^(<\s*\S+\s*>)/qw$1/ or
+	    $rest =~ s/^(<.*>)/[qw$1]/;	# p5's => isn't scalar context
+	    $t = "'$name' => $rest";
+	}
+	$self->ret($lvl,$t);
+    }
+
+}
+
+
+{ package VAST::term__S_fatarrow; our @ISA = 'VAST::Base';
+}
+
+
 { package VAST::term__S_identifier; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
@@ -1948,6 +1969,48 @@ END
 	}
         $self->ret($lvl,@t);
     }
+}
+
+
+{ package VAST::term__S_multi_declarator; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_package_declarator; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_regex_declarator; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my $txt = $self->Str;
+        my @t = $self->SUPER::emit_p5($lvl+1);
+	$txt =~ s/^/## /mg;
+        $self->ret($lvl,$txt,@t);
+    }
+}
+
+
+{ package VAST::term__S_routine_declarator; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_scope_declarator; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_statement_prefix; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_term; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_value; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::term__S_variable; our @ISA = 'VAST::Base';
 }
 
 
@@ -2056,6 +2119,16 @@ END
 
 { package VAST::type_constraint; our @ISA = 'VAST::Base';
 }
+
+{ package VAST::type_declarator__S_constant; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+        my @t = $self->SUPER::emit_p5($lvl+1);
+	my $t = join('', @t);
+	$t =~ s/constant/our/;
+        $self->ret($lvl,$t);
+    }
+}
+
 
 
 { package VAST::typename; our @ISA = 'VAST::Base';

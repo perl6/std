@@ -4639,28 +4639,26 @@ grammar Regex is STD {
 
     # begin tweaks (DO NOT ERASE)
     multi method tweak (:Perl5(:$P5)!) { self.require_P5; self.cursor_fresh( %*LANG<Q> ).mixin( ::q ).mixin( ::p5 ) }
-    multi method tweak (:overlap(:$ov)!) { self }
-    multi method tweak (:exhaustive(:$ex)!) { self }
-    multi method tweak (:continue(:$c)!) { self }
-    multi method tweak (:pos(:$p)!) { self }
-    multi method tweak (:sigspace(:$s)!) { self }
-    multi method tweak (:ratchet(:$r)!) { self }
-    multi method tweak (:global(:$g)!) { self }
-    multi method tweak (:ignorecase(:$i)!) { self }
-    multi method tweak (:ignoreaccent(:$a)!) { self }
-    multi method tweak (:samecase(:$ii)!) { self }
-    multi method tweak (:sameaccent(:$aa)!) { self }
-    multi method tweak (:$nth!) { self }
-    multi method tweak (:st(:$nd)!) { self }
-    multi method tweak (:rd(:$th)!) { self }
-    multi method tweak (:$x!) { self }
-    multi method tweak (:$bytes!) { self }
-    multi method tweak (:$codes!) { self }
-    multi method tweak (:$graphs!) { self }
-    multi method tweak (:$chars!) { self }
-    multi method tweak (:$rw!) { self }
-    multi method tweak (:$keepall!) { self }
-    multi method tweak (:$panic!) { self }
+    multi method tweak (:overlap(:$ov)!) { %*RX<ov> = $ov; self; }
+    multi method tweak (:exhaustive(:$ex)!) { %*RX<ex> = $ex; self; }
+    multi method tweak (:continue(:$c)!) { %*RX<c> = $c; self; }
+    multi method tweak (:pos(:$p)!) { %*RX<p> = $p; self; }
+    multi method tweak (:sigspace(:$s)!) { %*RX<s> = $s; self; }
+    multi method tweak (:ratchet(:$r)!) { %*RX<r> = $r; self; }
+    multi method tweak (:global(:$g)!) { %*RX<g> = $g; self; }
+    multi method tweak (:ignorecase(:$i)!) { %*RX<i> = $i; self; }
+    multi method tweak (:ignoreaccent(:$a)!) { %*RX<a> = $a; self; }
+    multi method tweak (:samecase(:$ii)!) { %*RX<ii> = $ii; self; }
+    multi method tweak (:sameaccent(:$aa)!) { %*RX<aa> = $aa; self; }
+    multi method tweak (:$nth!) { %*RX<nth> = $nth; self; }
+    multi method tweak (:st(:$nd)!) { %*RX<nth> = $nd; self; }
+    multi method tweak (:rd(:$th)!) { %*RX<nth> = $th; self; }
+    multi method tweak (:$x!) { %*RX<x> = $x; self; }
+    multi method tweak (:$bytes!) { %*RX<bytes> = $bytes; self; }
+    multi method tweak (:$codes!) { %*RX<codes> = $codes; self; }
+    multi method tweak (:$graphs!) { %*RX<graphs> = $graphs; self; }
+    multi method tweak (:$chars!) { %*RX<chars> = $chars; self; }
+    multi method tweak (:$rw!) { %*RX<rw> = $rw; self; }
     # end tweaks (DO NOT ERASE)
 
     token category:metachar { <sym> }
@@ -4681,7 +4679,7 @@ grammar Regex is STD {
     proto token regex_infix { <...> }
 
     token ws {
-        <?{ $*sigspace }>
+        <?{ $*RX<s> }>
         || [ <?before \s | '#'> <.nextsame> ]?   # still get all the pod goodness, hopefully
     }
 
@@ -4692,10 +4690,7 @@ grammar Regex is STD {
     token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex (for literal please quote with single quotes)"> }  # no unspace in regexen
 
     rule nibbler {
-        :temp $*sigspace;
-        :temp $*ratchet;
-        :temp $*ignorecase;
-        :temp $*ignoreaccent;
+        :temp %*RX;
         [ \s* < || | && & > ]?
         <EXPR>
         [ <?before <stopper> || $*GOAL > || <.panic: "Unrecognized regex metacharacter (must be quoted to match literally)"> ]
@@ -4951,25 +4946,25 @@ grammar Regex is STD {
 
     # XXX needs some generalization
 
-    token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { $*ignorecase = 1 } }
-    token mod_internal:sym<:!i>   { $<sym>=[':!i'|':!ignorecase'] » { $*ignorecase = 0 } }
-    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { $*ignorecase = eval $<mod_arg>.Str } }
-    token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { $*ignorecase = $0 } }
+    token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { %*RX<i> = 1 } }
+    token mod_internal:sym<:!i>   { $<sym>=[':!i'|':!ignorecase'] » { %*RX<i> = 0 } }
+    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { %*RX<i> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { %*RX<i> = $0 } }
 
-    token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { $*ignoreaccent = 1 } }
-    token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { $*ignoreaccent = 0 } }
-    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { $*ignoreaccent = eval $<mod_arg>.Str } }
-    token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { $*ignoreaccent = $0 } }
+    token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { %*RX<a> = 1 } }
+    token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { %*RX<a> = 0 } }
+    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { %*RX<a> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { %*RX<a> = $0 } }
 
-    token mod_internal:sym<:s>    { ':s' 'igspace'? » { $*sigspace = 1 } }
-    token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { $*sigspace = 0 } }
-    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { $*sigspace = eval $<mod_arg>.Str } }
-    token mod_internal:sym<:0s>   { ':' (\d+) 's' 'igspace'? » { $*sigspace = $0 } }
+    token mod_internal:sym<:s>    { ':s' 'igspace'? » { %*RX<s> = 1 } }
+    token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { %*RX<s> = 0 } }
+    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { %*RX<s> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:0s>   { ':' (\d+) 's' 'igspace'? » { %*RX<s> = $0 } }
 
-    token mod_internal:sym<:r>    { ':r' 'atchet'? » { $*ratchet = 1 } }
-    token mod_internal:sym<:!r>   { ':!r' 'atchet'? » { $*ratchet = 0 } }
-    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { $*ratchet = eval $<mod_arg>.Str } }
-    token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { $*ratchet = $0 } }
+    token mod_internal:sym<:r>    { ':r' 'atchet'? » { %*RX<r> = 1 } }
+    token mod_internal:sym<:!r>   { ':!r' 'atchet'? » { %*RX<r> = 0 } }
+    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { %*RX<r> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { %*RX<r> = $0 } }
  
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] <.require_P5> [ :lang( $¢.cursor_fresh( %*LANG<P5Regex> ).unbalanced($*GOAL) ) <nibbler> ] }
 
@@ -5590,6 +5585,14 @@ method add_variable ($name) {
     self;
 }
 
+method add_constant($name,$value) {
+    self.deb("add_constant $name = $value in", $*CURPAD.id) if $*DEBUG +& DEBUG::symtab;
+    my $*DECLARAND;
+    self.add_my_name($name);
+    $*DECLARAND<value> = $value;
+    self;
+}
+
 method add_placeholder($name) {
     my $*IN_DECL = 'variable';
     if $*SIGNUM {
@@ -5668,7 +5671,7 @@ method check_variable ($variable) {
     self;
 }
 
-method lookup_compiler_var($name) {
+method lookup_compiler_var($name, $default = Nil) {
 
     # see if they did "constant $?FOO = something" earlier
     my $lex = $*CURPAD.{$name};
@@ -5712,6 +5715,10 @@ method lookup_compiler_var($name) {
         when '%?CONFIG'    { return 'unimpl'; }
         when '%?DEEPMAGIC' { return 'unimpl'; }
 
+        my $dynvar = self.lookup_dynvar($name);
+        return $dynvar if defined $dynvar;
+
+        return $default if defined $default;
         # (derived grammars should default to nextsame, terminating here)
         default { self.worry("Unrecognized variable: $name"); return 0; }
     }

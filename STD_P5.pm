@@ -2755,7 +2755,7 @@ grammar Regex is STD {
     }
 
     token ws {
-        <?{ $*sigspace }>
+        <?{ $*RX<s> }>
         || [ <?before \s | '#'> <.nextsame> ]?   # still get all the pod goodness, hopefully
     }
 

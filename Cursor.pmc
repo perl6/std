@@ -2395,4 +2395,19 @@ sub canonicalize_name { my $self = shift;
     @components;
 }
 
+sub lookup_dynvar { my $self = shift;
+    my $name = shift;
+    no strict 'refs';
+    if ($name =~ s/^\$\?/::/) {
+        return $$name if defined $$name;
+    }
+    elsif ($name =~ s/^\@\?/::/) {
+        return \@$name if defined *$name{ARRAY};
+    }
+    elsif ($name =~ s/^\%\?/::/) {
+        return \%$name if defined *$name{HASH};
+    }
+    return
+}
+
 ## vim: expandtab sw=4
