@@ -4507,7 +4507,7 @@ method EXPR ($preclvl) {
         my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
-            $here.panic("Missing term") if @opstack > 1;
+            $here.panic("Bogus term") if @opstack > 1;
             return ();
             # $here.panic("Failed to parse a required term");
         }
@@ -5875,8 +5875,16 @@ method badinfix (Str $bad = $*sym) {
 # Since most keys are valid prefix operators or terms, this rule is difficult
 # to reach ('say »+«' works), but it's okay as a last-ditch default anyway.
 token term:sym<miscbad> {
-    :my $bad;
-    {} <!{ $*QSIGIL }> <?before $bad = <.infixish>> <.badinfix($bad.Str)>
+    {} <!{ $*QSIGIL }>
+    {{
+        my ($bad) = try {
+            $¢.infixish;
+        };
+        $*HIGHWATER = 0;
+        $*HIGHMESS = '';
+        self.badinfix($bad.Str) if $bad;
+    }}
+    <!>
 }
 
 ## vim: expandtab sw=4 ft=perl6
