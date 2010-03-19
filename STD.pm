@@ -1472,6 +1472,7 @@ grammar P6 is STD {
             \h*
             <!before ';' | ')' | ']' | '}' >
             <!infixstopper>
+            { $*HIGHWATER = $¢.pos = @*MEMOS[$¢.pos]<ws>//$¢.pos; }
             <.panic: "Missing punctuation (semicolon or comma?) after block">
         ]?
     }
@@ -5880,7 +5881,7 @@ token term:sym<miscbad> {
         my ($bad) = try {
             $¢.infixish;
         };
-        $*HIGHWATER = 0;
+        $*HIGHWATER = -1;
         $*HIGHMESS = '';
         self.badinfix($bad.Str) if $bad;
     }}
