@@ -1472,7 +1472,7 @@ grammar P6 is STD {
             \h*
             <!before ';' | ')' | ']' | '}' >
             <!infixstopper>
-            <.panic: "Missing semicolon or comma after block">
+            <.panic: "Missing punctuation (semicolon or comma?) after block">
         ]?
     }
 
