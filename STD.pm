@@ -4688,7 +4688,7 @@ grammar Regex is STD {
         <?before \s | '#'> [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <.ws> ]
     }
 
-    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex (for literal please quote with single quotes)"> }  # no unspace in regexen
+    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex (for literal # please quote with single quotes, '#')"> }  # no unspace in regexen
 
     rule nibbler {
         :temp %*RX;
