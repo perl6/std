@@ -1185,17 +1185,24 @@ token dec_number {
     <!!before [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)">]? >
 }
 
+token alnumint {
+    [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
+}
+
 token rad_number {
     ':' $<radix> = [\d+] <.unsp>?      # XXX optional dot here?
     {}           # don't recurse in lexer
     :dba('number in radix notation')
     [
     || '<'
-            $<intpart> = [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
-            $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]?
+            [
+            | $<coeff> = [                '.' <frac=.alnumint> ]
+            | $<coeff> = [<int=.alnumint> '.' <frac=.alnumint> ]
+            | $<coeff> = [<int=.alnumint>                    ]
+            ]
             [ '*' <base=.radint> '**' <exp=.radint> ]?
        '>'
-#      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
+#      { make radcalc($<radix>, $<coeff>, $<base>, $<exp>) }
     || <?before '['> <circumfix>
     || <?before '('> <circumfix>
     || <.panic: "Malformed radix number">
@@ -4688,7 +4695,7 @@ grammar Regex is STD {
         <?before \s | '#'> [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <.ws> ]
     }
 
-    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex (for literal # please quote with single quotes, '#')"> }  # no unspace in regexen
+    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr($::ORIG,$¢.pos,1) ~ "') or use a backslashed form like \\x" ~ sprintf("%02x", ord(substr($::ORIG,$¢.pos,1)))> }  # no unspace in regexen
 
     rule nibbler {
         :temp %*RX;
