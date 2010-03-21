@@ -1200,7 +1200,11 @@ token rad_number {
             | $<coeff> = [<int=.alnumint> '.' <frac=.alnumint> ]
             | $<coeff> = [<int=.alnumint>                    ]
             ]
-            [ '*' <base=.radint> '**' <exp=.radint> ]?
+            [
+                '*'
+                <base=.radint>
+                [ '**' || <.panic: "Base is missing ** exponent part"> ]
+                <exp=.radint> ]?
        '>'
 #      { make radcalc($<radix>, $<coeff>, $<base>, $<exp>) }
     || <?before '['> <circumfix>
