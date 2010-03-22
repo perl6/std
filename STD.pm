@@ -1048,7 +1048,7 @@ token unv {
 }
 
 token comment:sym<#`(...)> {
-    '#`' [ <?opener> || <.panic: "Opening bracket is required for #` comment"> ]
+    '#`' :: [ <?opener> || <.panic: "Opening bracket is required for #` comment"> ]
     <.quibble($¢.cursor_fresh( %*LANG<Q> ))>
 }
 
@@ -1058,16 +1058,16 @@ token comment:sym<#(...)> {
 }
 
 token comment:sym<#=(...)> {
-    '#=' <?opener>
+    '#=' <?opener> ::
     <quibble($¢.cursor_fresh( %*LANG<Q> ))>
 }
 
 token comment:sym<#=> {
-   '#=' {} $<attachment> = [\N*]
+   '#=' :: $<attachment> = [\N*]
 }
 
 token comment:sym<#> {
-   '#' {} \N*
+   '#' {} <!before '`'> \N*     # XXX shouldn't need this if :: worked right above
 }
 
 token ident {
@@ -1372,8 +1372,8 @@ grammar P6 is STD {
         [
         | <?before \h* $$>  # (usual case without comments)
             { @*MEMOS[$¢.pos]<endstmt> = 2; }
-        | \h* <?before <[\\,:]>>
-        | <.unv>? $$
+        | <?before \h* <[\\,:]>>
+        | <.unv> $$
             { @*MEMOS[$¢.pos]<endstmt> = 2; }
         | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
         ]
