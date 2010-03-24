@@ -254,7 +254,7 @@ my $all = $_;
 sub indent {
     my $x = shift || '';
     my $i = shift || 1;
-    my $s = '    ' x $i;
+    my $s = '  ' x $i;
     $x =~ s/^/$s/mg;
     $x;
 }
@@ -347,21 +347,31 @@ sub $name {
 
     local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
 
-    my \$C = \$self;
+    my \$C = \$self->cursor_xact('RULE $name');
     my \$S = \$C->{'_pos'};
 
-    my \@result = eval {
+    my \@result = do {
 	my \$trystate;
 	my (\$tag, \$try);
         my \@try;
         my \$relex;
+        my \$x;
         if (my \$fate = \$C->{'_fate'}) {
             if (\$fate->[1] eq '$name') {
                 \$C->deb("Fate passed to $name: ", ::fatestr(\$fate)) if \$::DEBUG & DEBUG::fates;
                 (\$C->{'_fate'}, \$tag, \$try) = \@\$fate;
                 \@try = (\$try);
+                \$x = 'ALT $name';
+            }
+            else {
+                \$x = 'ALTLTM $name';
             }
         }
+        else {
+            \$x = 'ALTLTM $name';
+        }
+        my \$C = \$C->cursor_xact(\$x);
+        my \$xact = \$C->xact;
 
 	my \@gather = ();
         for (;;) {
@@ -378,14 +388,14 @@ sub $name {
     
 	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 	    push \@gather, \$C->\$try(\@_);
+            if (\$xact->[-2]) {  # committed?
+                #splice(\@gather,1) if \@gather;
+                last;
+            }
             last if \@gather;
 	}
 	\$self->_MATCHIFYr(\$S, "$name", \@gather);
     };
-    if (\$@) {
-	return () if \$@ =~ /^ABORTRULE/;
-	die \$@;
-    }
     \@result;
 }
 
@@ -616,12 +626,13 @@ END
             if ($NEEDORIGARGS) {
                 $body .= "    my \@origargs = \@_;\n";
             }
-            $body .= <<'END';
-    local $::CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
+            $body .= <<"END";
+    local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
 <<DECL>>
 
-    my $C = $self;
-    my $S = $C->{'_pos'};
+    my \$C = \$self->cursor_xact("RULE $NAME");
+    my \$xact = \$C->xact;
+    my \$S = \$C->{'_pos'};
 END
 
 	    for my $binding ( keys %BINDINGS ) {
@@ -1290,6 +1301,12 @@ sub atom {
         return bless { text => $boundary, min => 0, %adverbs }, "RE_meta";
     }
 
+    if (s/^(::>)//) {
+        my $then = $1;
+        ws();
+        return bless { text => $then, min => 0, %adverbs }, "RE_meta";
+    }
+
     if (s/^(<(\.\.\.|!!!|\?\?\?)>)//) {
         my $notyet = $1;
         ws();
@@ -1555,7 +1572,7 @@ sub unbalanced {
 	my $ratchet = $MAYBACKTRACK ? '' : 'r';
 	$re = "\$C->_SUBSUME$ratchet([" .
 	    join(',', map {"'$_'"} @BINDINGS) .
-	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re) . "\n})";
+	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re, 2) . "\n})";
 	@BINDINGS = ();
 	$re;
     }
@@ -1696,11 +1713,12 @@ sub unbalanced {
         my $self = shift;
 	my $re;
 	{
+            local $MAYBACKTRACK = $MAYBACKTRACK;
 	    local @BINDINGS;
 	    $re = ::indent($$self{re}->walk(@_));
 	}
 	my $ratchet = $MAYBACKTRACK ? '' : 'r';
-        $re = "\$C->_BRACKET$ratchet( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+        $re = "\$C->_BRACKET$ratchet(sub {\n  my \$C=shift;\n" . $re . "\n})";
 	$self->bind($re);
     }
 
@@ -1814,6 +1832,7 @@ sub unbalanced {
 #		$code = "\$C->_PATTERN(qr/\\G.*?/)";
 #	    }
             $code = "\$C->_SCANf$REV()";
+            $MAYBACKTRACK = 1;
         }
         elsif ($text eq '^') {
 	    $code = "\$C->_PATTERN(qr/\\G\\A/)";
@@ -1837,14 +1856,15 @@ sub unbalanced {
         }
         elsif ($text eq '::') {
             $PURE = 0;
-	    my $extra = $self->{extra} || '';
-            $code = "\$C->_COMMITBRANCH$REV($extra)";
-            $MAYBACKTRACK = 1;
+            $code = "\$C->_COMMITLTM$REV()";
+        }
+        elsif ($text eq '::>') {
+            $PURE = 0;
+            $code = "\$C->_COMMITBRANCH$REV()";
         }
         elsif ($text eq ':::') {
             $PURE = 0;
             $code = "\$C->_COMMITRULE$REV()";
-            $MAYBACKTRACK = 1;
         }
         elsif ($text eq '\\d') {
 	    if ($REV) {
@@ -1967,20 +1987,20 @@ sub unbalanced {
 	    $name = ::un6($name);
             $re = <<"END";
 do {
-    if (not $name) {
-        \$C;
-    }
-    elsif (ref $name eq 'Regexp') {
-        if (\$::ORIG =~ m/$name/gc) {
-            \$C->cursor(\$+[0]);
-        }
-        else {
-            ();
-        }
+  if (not $name) {
+    \$C;
+  }
+  elsif (ref $name eq 'Regexp') {
+    if (\$::ORIG =~ m/$name/gc) {
+      \$C->cursor(\$+[0]);
     }
     else {
-        \$C->$name$rest;
+      ();
     }
+  }
+  else {
+    \$C->$name$rest;
+  }
 }
 END
         }
@@ -2113,10 +2133,10 @@ END
         }
         else {
             ::panic("Can't reverse serial disjunction") if $REV;
-            for (@result) { s/^/eval { push \@gather, / }
-            my $result = "do { my \@gather;\n" .
-                            ::indent(join("} // do {die \$@ if \$@ and \$@ !~ /ABORT/;1} \nor\n", @result),2) .
-                          "} or do { die \$@ if \$@ };\n  \@gather;\n}";
+            for (@result) { $_ = ::indent($_); s/^ */do {\n  push \@gather, /; }
+            my $result = "do {\n  my \$C = \$C->cursor_xact('ALT ||');\n  my \@gather;\n" .
+                            ::indent(join("\n}\nor \$xact->[-2] or\n", @result)) .
+                          "};\n  \@gather;\n}";
             $result;
         }
     }
@@ -2293,7 +2313,7 @@ END
     sub wrapone {
         my ($outer, $inner) = @_;
         if ($MAYBACKTRACK) {
-            "Cursor::lazymap(sub { my \$C=\$_[0];\n" .
+            "Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
                 ::indent($inner) .
             "\n}, $outer)";
         }
@@ -2306,12 +2326,12 @@ END
 		my $in = ::indent($inner,2);
 		substr(<<"END",0,-1);
 do {
-    if (my (\$C) = ($outer)) {
+  if (my (\$C) = ($outer)) {
 $in;
-    }
-    else {
-        ();
-    }
+  }
+  else {
+    ();
+  }
 }
 END
 
@@ -2489,18 +2509,25 @@ END
             }
             my $result = <<"END";
 do {
-  my \@result = eval {
+  my \@result = do {
     my \$trystate;
     my (\$tag, \$try);
     my \@try;
     my \$relex;
 
     my \$fate;
+    my \$x;
     if (\$fate = \$C->{'_fate'} and \$fate->[1] eq '$altname') {
         \$C->deb("Fate passed to $altname: ", ::fatestr(\$fate)) if \$::DEBUG & DEBUG::fates;
         (\$C->{'_fate'}, \$tag, \$try) = \@\$fate;
         \@try = (\$try);
+        \$x = 'ALT $altname';    # some outer ltm is controlling us
     }
+    else {
+        \$x = 'ALTLTM $altname'; # we are top level ltm
+    }
+    my \$C = \$C->cursor_xact(\$x);
+    my \$xact = \$C->xact;
 
     my \@gather = ();
     for (;;) {
@@ -2522,22 +2549,15 @@ END
 
             $result .= <<'END';
         )[$try])->($C);
+        if ($xact->[-2]) {  # committed?
+            #splice(@gather,1) if @gather;
+            last;
+        }
         last if @gather;
     }
     @gather;
   };
-  if (@result) {
-    @result;
-  }
-  elsif ($@) {
-    my ($first) = $@ =~ /(^.*)/;
-    $self->deb("CAUGHT $first") if $::DEBUG & DEBUG::trace_call;
-    die $@ if $@ !~ /^ABORTBRANCH/;
-    ();
-  }
-  else {
-    ();
-  }
+  @result;
 }
 END
             $result;

@@ -1067,7 +1067,7 @@ token comment:sym<#=> {
 }
 
 token comment:sym<#> {
-   '#' {} <!before '`'> \N*     # XXX shouldn't need this if :: worked right above
+   '#' {} \N*
 }
 
 token ident {
@@ -1362,7 +1362,7 @@ grammar P6 is STD {
 
         <.finishpad>
         [
-        | :dba('block') '{' ~ '}' <statementlist> <.curlycheck>
+        | :dba('block') '{' ~ '}' <statementlist> :: <.curlycheck>
         | <?terminator> <.panic: 'Missing block'>
         | <?> <.panic: "Malformed block">
         ]
@@ -1370,12 +1370,12 @@ grammar P6 is STD {
 
     token curlycheck {
         [
-        | <?before \h* $$>  # (usual case without comments)
+        || <?before \h* $$>  # (usual case without comments)
             { @*MEMOS[$¢.pos]<endstmt> = 2; }
-        | <?before \h* <[\\,:]>>
-        | <.unv> $$
+        || <?before \h* <[\\,:]>>
+        || <.unv> $$
             { @*MEMOS[$¢.pos]<endstmt> = 2; }
-        | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
+        || <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
         ]
     }
 

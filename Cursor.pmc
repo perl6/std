@@ -94,6 +94,7 @@ sub pos { $_[0]->{_pos} }
 sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
 sub Str { no warnings; exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from})//'' : '' }
 sub peek { $_[0]->{_peek} }
+sub xact { $_[0]->{_xact} // die "internal error: cursor has no xact!!!" }
 sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
 
@@ -173,6 +174,7 @@ sub new {
     }
     my $self = bless \%args, ref $class || $class;
     $self->BUILD;
+    $self->{_xact} = ['MATCH',0,0];
     $self;
 }
 
@@ -230,11 +232,12 @@ sub initparse {
     my $setting = $args{setting} // 'CORE';
     my $actions = $args{actions} // '';
 
-
     local $::TMP_PREFIX = $tmp_prefix;
     local $::SETTINGNAME = $setting;
     local $::ACTIONS = $actions;
     local @::MEMOS = @::MEMOS;
+
+    local @::ACTIVE = ();
 
     # various bits of info useful for error messages
     local $::HIGHWATER = 0;
@@ -384,6 +387,28 @@ sub delete {
 # Cursor transformations
 #############################################################
 
+sub cursor_xact { my $self = shift;
+    my $name = shift;
+    my $xact = $self->{_xact} // 0;
+    if (not $xact and $name ne 'MATCH') {
+        print Dump($self);
+        exit;
+    }
+    if ($DEBUG & DEBUG::cursors) {
+        my $pedigree = '';
+        for (my $x = $xact; $x; $x = $x->[-1]) {
+            my $n = $x->[0];
+            $n =~ s/^RULE // or
+            $n =~ s/^ALT//;
+            $pedigree .= ($x->[-2] ? " - " : " + ") . $n;
+        }
+        $self->deb("cursor_xact $name$pedigree");
+    }
+    my %r = %$self;
+    $r{_xact} = [$name,@_,0,$xact];
+    bless \%r, ref $self;
+}
+
 sub cursor_peek { my $self = shift;
     $self->deb("cursor_peek") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
@@ -398,6 +423,7 @@ sub cursor_fresh { my $self = shift;
    # $r{_from} =
     $r{_pos} = $self->{_pos};
     $r{_fate} = $self->{_fate};
+    $r{_xact} = $self->{_xact};
     $r{_herelang} = $self->{_herelang} if $self->{_herelang};
     bless \%r, ref $lang || $lang;
 }
@@ -413,6 +439,7 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     my $bindings = shift;
     my $submatch = shift;               # this is the submatch's cursor
     delete $self->{_fate};
+    my $xact = $self->{_xact};
 
     $self->deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
     my @caps;
@@ -434,6 +461,7 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     }
     $submatch->{_from} = $r{_from} = $r{_pos};
     $r{_pos} = $submatch->{_pos};
+    $r{_xact} = $xact;
     bless \%r, ref $self;               # return new match cursor for parent
 }
 
@@ -673,7 +701,8 @@ sub _MATCHIFY { my $self = shift;
     my $S = shift;
     my $name = shift;
     return () unless @_;
-    my @result = lazymap( sub { my $x = shift; $x->_REDUCE($S, $name)->retm() }, @_);
+    my $xact = $self->{_xact};
+    my @result = lazymap( sub { my $x = shift; $x->{_xact} = $xact; $x->_REDUCE($S, $name)->retm() }, @_);
     if (wantarray) {
         @result;
     }
@@ -688,16 +717,21 @@ sub _MATCHIFYr { my $self = shift;
     return () unless @_;
     my $var = shift;
 #    $var->{_from} = $self->{_from};
+    my $xact = $self->{_xact};
+    $var->{_xact} = $xact;
     $var->_REDUCE($S, $name)->retm();
 }
 
 sub _SCANf { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $pos = $self->{_pos};
     my $eos = @::ORIG;
 
-    lazymap( sub { $self->cursor($_[0])->retm() }, LazyRange->new($pos,$eos) );
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("SCANf $pos");
+    my $xact = $C->xact;
+
+    lazymap( sub { $self->cursor($_[0])->retm() }, LazyRange->new($xact, $pos,$eos) );
 }
 
 sub _SCANg { my $self = shift;
@@ -705,8 +739,10 @@ sub _SCANg { my $self = shift;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $pos = $self->{_pos};
     my $eos = @::ORIG;
+    my $C = $self->cursor_xact("SCANg $pos");
+    my $xact = $C->xact;
 
-    lazymap( sub { $self->cursor($_[0])->retm() }, LazyRangeRev->new($eos,$pos) );
+    lazymap( sub { $C->cursor($_[0])->retm() }, LazyRangeRev->new($xact, $eos,$pos) );
 }
 
 sub _STARf { my $self = shift;
@@ -715,9 +751,13 @@ sub _STARf { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("SCANf $pos");
+    my $xact = $C->xact;
+
     lazymap(sub { $_[0]->retm() }, 
-        $self->cursor($self->{_pos}),
-        LazyMap->new(sub { $self->_PLUSf($_[0]) }, $block));
+        $C->cursor($pos),
+        LazyMap->new(sub { $C->_PLUSf($_[0]) }, $block));
 }
 
 sub _STARg { my $self = shift;
@@ -726,10 +766,14 @@ sub _STARg { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("STARg $pos");
+#    my $xact = $C->xact;
+
     lazymap(sub { $_[0]->retm() }, reverse
         eager(
-            $self->cursor($self->{_pos}),
-            $self->_PLUSf($block))
+            $C->cursor($self->{_pos}),
+            $C->_PLUSf($block))
         );
 }
 
@@ -738,22 +782,26 @@ sub _STARr { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $pos = $self;
-    my $prev_pos = $pos->{_pos} // 0;
+    my $pos = $self->{_pos};
+    my $prev = $self->cursor_xact("STARr $pos");
+#    my $xact = $prev->xact;
+
+    my $prev_pos = $prev->{_pos} // 0;
     my @all;
     my $eos = @::ORIG;
+
     for (;;) {
-      last if $pos->{_pos} == $eos;
-        my @matches = $block->($pos);  # XXX shouldn't read whole list
+      last if $prev->{_pos} == $eos;
+        my @matches = $block->($prev);  # XXX shouldn't read whole list
 #            say @matches.perl;
       last unless @matches;
         my $first = $matches[0];  # no backtracking into block on ratchet
         last if $first->{_pos} == $prev_pos;
         $prev_pos = $first->{_pos};
         push @all, $first;
-        $pos = $first;
+        $prev = $first;
     }
-    $pos->retm();
+    $self->cursor($prev_pos)->retm();
 }
 
 sub _PLUSf { my $self = shift;
@@ -761,10 +809,14 @@ sub _PLUSf { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $x = $self;
+
+    my $pos = $self->{_pos};
+    my $x = $self->cursor_xact("PLUSf $pos");
+    my $xact = $x->xact;
 
     # don't go beyond end of string
     return () if $self->{_pos} == @::ORIG;
+
     lazymap(
         sub {
             my $x = $_[0];
@@ -783,7 +835,11 @@ sub _PLUSg { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
-    reverse eager($self->_PLUSf($block, @_));
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("PLUSg $pos");
+#    my $xact = $C->xact;
+
+    reverse eager($C->_PLUSf($block, @_));
 }
 
 sub _PLUSr { my $self = shift;
@@ -791,9 +847,13 @@ sub _PLUSr { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $to = $self;
     my @all;
     my $eos = @::ORIG;
+
+    my $pos = $self->{_pos};
+    my $to = $self->cursor_xact("PLUSr $pos");
+#    my $xact = $to->xact;
+
     for (;;) {
       last if $to->{_pos} == $eos;
         my @matches = $block->($to);  # XXX shouldn't read whole list
@@ -804,7 +864,7 @@ sub _PLUSr { my $self = shift;
         $to = $first;
     }
     return () unless @all;
-    $to->retm();
+    $self->cursor($to->{_pos})->retm();
 }
 
 sub _REPSEPf { my $self = shift;
@@ -813,15 +873,19 @@ sub _REPSEPf { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $x = $self;
 
     my @result;
     # don't go beyond end of string
     return () if $self->{_pos} == @::ORIG;
+
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("REPSEPf $pos");
+#    my $xact = $C->xact;
+
     do {
-        for my $x ($block->($self)) {
+        for my $x ($block->($C)) {
             for my $s ($sep->($x)) {
-                push @result, lazymap(sub { $self->cursor($_[0]->{_pos}) }, $x, $s->_REPSEPf($sep,$block));
+                push @result, lazymap(sub { $C->cursor($_[0]->{_pos}) }, $x, $s->_REPSEPf($sep,$block));
             }
         }
     };
@@ -835,7 +899,11 @@ sub _REPSEPg { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
-    reverse eager($self->_REPSEPf($sep, $block, @_));
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("REPSEPg $pos");
+    # my $xact = $C->xact;
+
+    reverse eager($C->_REPSEPf($sep, $block, @_));
 }
 
 sub _REPSEPr { my $self = shift;
@@ -844,9 +912,13 @@ sub _REPSEPr { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my $to = $self;
     my @all;
     my $eos = @::ORIG;
+
+    my $pos = $self->{_pos};
+    my $to = $self->cursor_xact("REPSEPr $pos");
+#    my $xact = $C->xact;
+
     for (;;) {
       last if $to->{_pos} == $eos;
         my @matches = $block->($to);  # XXX shouldn't read whole list
@@ -860,7 +932,7 @@ sub _REPSEPr { my $self = shift;
         $to = $sep;
     }
     return () unless @all;
-    $all[-1]->retm;
+    $self->cursor($all[-1]->{_pos})->retm;
 }
 
 sub _OPTr { my $self = shift;
@@ -869,8 +941,13 @@ sub _OPTr { my $self = shift;
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
 
-    my $x = ($block->($self))[0];
-    my $r = $x // $self->cursor_tweak($self->{_pos});
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("OPTr $pos");
+    my $xact = $C->xact;
+
+    my $x = ($block->($C))[0];
+    my $r = $x // $C->cursor_tweak($pos);
+    $r->{_xact} = $self->{_xact};
     $r->retm();
 }
 
@@ -879,10 +956,16 @@ sub _OPTg { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    my @x = $block->($self);
+
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("OPTg $pos");
+#    my $xact = $C->xact;
+
+    my @x = $block->($C);
+
     lazymap(sub { $_[0]->retm() },
-        $block->($self),
-        $self->cursor($self->{_pos}));
+        $block->($C),
+        $self->cursor($pos));
 }
 
 sub _OPTf { my $self = shift;
@@ -890,8 +973,13 @@ sub _OPTf { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+
+    my $pos = $self->{_pos};
+    my $C = $self->cursor_xact("OPTf $pos");
+#    my $xact = $C->xact;
+
     lazymap(sub { $_[0]->retm() },
-        $self->cursor($self->{_pos}),
+        $C->cursor($C->{_pos}),
         $block->($self));
 }
 
@@ -1005,8 +1093,10 @@ sub ws {
     local $CTX = $self->callm() if $DEBUG & DEBUG::trace_call;
     my @stub = return $self if exists $::MEMOS[$self->{_pos}]{ws};
 
-    my $C = $self;
-    my $S = $C->pos;
+    my $S = $self->{_pos};
+    my $C = $self->cursor_xact("RULE ws $S");
+#    my $xact = $C->xact;
+
     $::MEMOS[$S]{ws} = undef;   # exists means we know, undef means no ws  before here
 
     $self->_MATCHIFY($S, 'ws',
@@ -1602,25 +1692,59 @@ sub _REDUCE { my $self = shift;
 }
 
 sub _COMMITBRANCH { my $self = shift;
-    $self->{LAST} = shift() if @_;
+    my $xact = $self->xact;
+#    $self->{LAST} = shift() if @_;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    $self->deb("Commit branch to $P") if $DEBUG & DEBUG::matchers;
-    $self, LazyMap->new(sub { $self->deb("ABORTBRANCH") if $DEBUG & DEBUG::trace_call; die "ABORTBRANCH" }, $self);
+    while ($xact) {
+        $xact->[-2] = 1;
+        $self->deb("Commit $$xact[0] to $P") if $DEBUG & DEBUG::matchers;
+        return $self->cursor_xact("CB") if $xact->[0] =~ /^ALT/;
+        $xact = $xact->[-1];
+    }
+    die "Not in an alternation, so can't commit to a branch";
+}
+
+sub _COMMITLTM { my $self = shift;
+    my $xact = $self->xact;
+#    $self->{LAST} = shift() if @_;
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    while ($xact) {
+        $xact->[-2] = 1;
+        $self->deb("Commit $$xact[0] to $P") if $DEBUG & DEBUG::matchers;
+        return $self->cursor_xact("CL") if $xact->[0] =~ /^ALTLTM/;
+        $xact = $xact->[-1];
+    }
+    die "Not in a longest token matcher, so can't commit to a longest token";
 }
 
 sub _COMMITRULE { my $self = shift;
+    my $xact = $self->xact;
+#    $self->{LAST} = shift() if @_;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    $self->deb("Commit rule to $P") if $DEBUG & DEBUG::matchers;
-    $self, LazyMap->new(sub { $self->deb("ABORTRULE") if $DEBUG & DEBUG::trace_call; die "ABORTRULE" }, $self);
+    while ($xact) {
+        $xact->[-2] = 1;
+        $self->deb("Commit $$xact[0] to $P") if $DEBUG & DEBUG::matchers;
+        return $self->cursor_xact("CR") if $xact->[0] =~ /^RULE/;
+        $xact = $xact->[-1];
+    }
+    die "Not in a rule, so can't commit to rule";
 }
 
 sub commit { my $self = shift;
+    my $xact = $self->xact;
+#    $self->{LAST} = shift() if @_;
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
-    $self->deb("Commit match to $P") if $DEBUG & DEBUG::matchers;
-    $self, LazyMap->new(sub { $self->deb("ABORTMATCH") if $DEBUG & DEBUG::trace_call; die "ABORTMATCH" }, 1);
+    while ($xact) {
+        $xact->[-2] = 1;
+        $self->deb("Commit $$xact[0] to $P") if $DEBUG & DEBUG::matchers;
+        return $self->cursor_xact("CM") if $xact->[0] =~ /^MATCH/;
+        $xact = $xact->[-1];
+    }
+    die "Not in a match, so can't commit to match";
 }
 
 sub fail { my $self = shift;
@@ -2194,8 +2318,13 @@ sub $mangle {
     my %args = \@_;
     my \$sym = \$args{sym} // q$sym;
 
-    my \$C = \$self;
+    my \$xact = ['RULE $mangle', 0, \$::XACT];
+    local \$::XACT = \$xact;
+
     my \$S = \$self->{_pos};
+    my \$C = \$self->cursor_xact("RULE $mangle \$S");
+#    my \$xact = \$C->xact;
+
     \$C->{'sym'} = \$sym;
 
     \$self->_MATCHIFY(\$S, '$mangle',

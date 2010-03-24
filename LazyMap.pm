@@ -1,4 +1,5 @@
 package LazyMap;
+use 5.010;
 
 # LazyMap.pm
 #
@@ -58,35 +59,48 @@ sub iter {
     my $self = shift;
     my $lazies = $self->{L};
     my $called = $self->{C};
-    while (not @$called) {
-	return () unless @$lazies;
-	my $lazy = $$lazies[0];
-	if (ref($lazy) =~ /^Lazy/) {
-	    my $todo = $lazy->iter;
-	    if (defined $todo) {
-		@$called = $self->{B}->($todo);
+    while (@$called or @$lazies) {
+	# pull from lazy list only when forced to
+	while (not @$called) {
+	    return () unless @$lazies;
+	    my $lazy = $$lazies[0];
+	    # recursive lazies?  delegate to lower ->iter
+	    if (ref($lazy) =~ /^Lazy/) {
+		my $todo = $lazy->iter;
+		if (defined $todo) {
+		    @$called = $self->{B}->($todo);
+		}
+		else {
+		    shift @$lazies;
+		}
 	    }
-	    else {
+	    elsif (defined $lazy) { # just call our own block
+		@$called = $self->{B}->(shift @$lazies);
+	    }
+	    else { # undef snuck into the list somehow
 		shift @$lazies;
 	    }
 	}
-	elsif (defined $lazy) {
-	    @$called = $self->{B}->(shift @$lazies);
+
+	# evaluating the blocks may have returned something lazy, so delegate again
+	while (@$called and ref($$called[0]) =~ /^Lazy/) {
+	    my $really = $$called[0]->iter;
+	    if ($really) {
+		unshift @$called, $really;
+	    }
+	    else {
+		shift @$called;
+	    }
 	}
-	else {
-	    shift @$lazies;
+
+	# finally have at least one real cursor, grep for first with live transaction
+	while (@$called and ref($$called[0]) !~ /^Lazy/) {
+	    my $candidate = shift @$called;
+	    # make sure its transaction doesn't have a prior commitment
+	    my $xact = $candidate->{_xact};
+	    return $candidate unless $xact->[-2];
 	}
     }
-    while (ref($$called[0]) =~ /^Lazy/) {
-	my $really = $$called[0]->iter;
-	if ($really) {
-	    return $really;
-	}
-	else {
-	    shift @$called;
-	}
-    }
-    return shift @$called if @$called;
     return ();
 }
 
@@ -121,27 +135,35 @@ sub eager {
 { package LazyConst;
     sub new {
 	my $self = shift;
-	bless { 'K' => shift }, 'LazyConst';
+	my $xact = shift;
+	bless { 'K' => shift, 'X' => $xact }, 'LazyConst';
     }
     sub true {
 	1;
     }
-    sub iter { $_[0]->{K} }
+    sub iter {
+	return () if $_[0]->{X}->[-2];
+	$_[0]->{K};
+    }
 }
 
 { package LazyRange;
     sub new {
 	my $class = shift;
+	my $xact = shift;
 	my $start = shift;
 	my $end = shift;
-	bless { 'N' => $start, 'E' => $end }, $class;
+	bless { 'N' => $start, 'E' => $end, 'X' => $xact }, $class;
     }
     sub true {
 	1;
     }
     sub iter {
 	my $self = shift;
-	if ((my $n = $self->{N}++) <= $self->{E}) {
+	if ($self->{X}->[-2]) {
+	    ()
+	}
+	elsif ((my $n = $self->{N}++) <= $self->{E}) {
 	    $n;
 	}
 	else {
@@ -153,16 +175,20 @@ sub eager {
 { package LazyRangeRev;
     sub new {
 	my $class = shift;
+	my $xact = shift;
 	my $start = shift;
 	my $end = shift;
-	bless { 'N' => $start, 'E' => $end }, $class;
+	bless { 'N' => $start, 'E' => $end, 'X' => $xact }, $class;
     }
     sub true {
 	1;
     }
     sub iter {
 	my $self = shift;
-	if ((my $n = $self->{N}--) >= $self->{E}) {
+	if ($self->{X}->[-2]) {
+	    ()
+	}
+	elsif ((my $n = $self->{N}--) >= $self->{E}) {
 	    $n;
 	}
 	else {
