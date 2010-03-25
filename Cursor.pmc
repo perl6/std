@@ -423,6 +423,7 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     my $bindings = shift;
     my $submatch = shift;               # this is the submatch's cursor
     delete $self->{_fate};
+    delete $submatch->{_xact};
 
     $self->deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
     my @caps;
