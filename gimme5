@@ -388,10 +388,7 @@ sub $name {
     
 	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 	    push \@gather, \$C->\$try(\@_);
-            if (\$xact->[-2]) {  # committed?
-                #splice(\@gather,1) if \@gather;
-                last;
-            }
+            last if \$xact->[-2];  # committed?
             last if \@gather;
 	}
 	\$self->_MATCHIFYr(\$S, "$name", \@gather);
@@ -2134,7 +2131,7 @@ END
         else {
             ::panic("Can't reverse serial disjunction") if $REV;
             for (@result) { $_ = ::indent($_); s/^ */do {\n  push \@gather, /; }
-            my $result = "do {\n  my \$C = \$C->cursor_xact('ALT ||');\n  my \@gather;\n" .
+            my $result = "do {\n  my \$C = \$C->cursor_xact('ALT ||');\n  my \$xact = \$C->xact;\n  my \@gather;\n" .
                             ::indent(join("\n}\nor \$xact->[-2] or\n", @result)) .
                           "};\n  \@gather;\n}";
             $result;
@@ -2549,10 +2546,7 @@ END
 
             $result .= <<'END';
         )[$try])->($C);
-        if ($xact->[-2]) {  # committed?
-            #splice(@gather,1) if @gather;
-            last;
-        }
+        last if $xact->[-2];  # committed?
         last if @gather;
     }
     @gather;

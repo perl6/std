@@ -36,13 +36,13 @@ use overload 'bool' => 'true';
 sub new {
     my $class = shift;
     my $block = shift;
-    return bless { 'B' => $block, 'C' => [], 'L' => [@_] }, $class;
+    return bless { 'B' => $block, 'C' => [], 'L' => [@_], 'N' => 0 }, $class;
 }
 
 sub lazymap (&@) {
     my $block = shift;
     return () unless @_;
-    my $lazy = bless { 'B' => $block, 'C' => [], 'L' => [@_] }, 'LazyMap';
+    my $lazy = bless { 'B' => $block, 'C' => [], 'L' => [@_], 'N' => 0 }, 'LazyMap';
     if (wantarray) {
 	if (my @retval = iter($lazy)) {
 	    push @retval, $lazy if @{$lazy->{C}} || @{$lazy->{L}};
@@ -98,7 +98,8 @@ sub iter {
 	    my $candidate = shift @$called;
 	    # make sure its transaction doesn't have a prior commitment
 	    my $xact = $candidate->{_xact};
-	    return $candidate unless $xact->[-2];
+	    my $n = $self->{N}++;
+	    return $candidate unless $xact->[-2] and $n;
 	}
     }
     return ();

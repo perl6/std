@@ -1089,8 +1089,8 @@ token pod_comment {
     [
     | 'begin' \h+ <identifier> ::
         [
-        ||  .*? "\n" \h* '=' <.unsp>? 'end' \h+ $<identifier> » \N*
-        ||  <?{ $<identifier>.Str eq 'END'}> .*
+        || .*? "\n" [ :r \h* '=' <.unsp>? 'end' \h+ $<identifier> » \N* ]
+        || <?{ $<identifier>.Str eq 'END'}> .*
         || { my $id = $<identifier>.Str; self.panic("=begin $id without matching =end $id"); }
         ]
     | 'begin' » :: \h* [ $$ || '#' || <.panic: "Unrecognized token after =begin"> ]
