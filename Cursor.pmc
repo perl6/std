@@ -93,7 +93,6 @@ sub to { $_[0]->{_pos} }
 sub pos { $_[0]->{_pos} }
 sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
 sub Str { no warnings; exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from})//'' : '' }
-sub peek { $_[0]->{_peek} }
 sub xact { $_[0]->{_xact} // die "internal error: cursor has no xact!!!" }
 sub orig { \$::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
@@ -399,7 +398,7 @@ sub cursor_xact { my $self = shift;
         for (my $x = $xact; $x; $x = $x->[-1]) {
             my $n = $x->[0];
             $n =~ s/^RULE // or
-            $n =~ s/^ALT//;
+            $n =~ s/^ALT *//;
             $pedigree .= ($x->[-2] ? " - " : " + ") . $n;
         }
         $self->deb("cursor_xact $name$pedigree");
@@ -409,21 +408,11 @@ sub cursor_xact { my $self = shift;
     bless \%r, ref $self;
 }
 
-sub cursor_peek { my $self = shift;
-    $self->deb("cursor_peek") if $DEBUG & DEBUG::cursors;
-    my %r = %$self;
-    $r{_peek} = 1;
-    bless \%r, ref $self;
-}
-
 sub cursor_fresh { my $self = shift;
     my %r;
     my $lang = @_ && $_[0] ? shift() : ref $self;
     $self->deb("cursor_fresh lang $lang") if $DEBUG & DEBUG::cursors;
-   # $r{_from} =
-    $r{_pos} = $self->{_pos};
-    $r{_fate} = $self->{_fate};
-    $r{_xact} = $self->{_xact};
+    @r{'_pos','_fate','_xact'} = @$self{'_pos','_fate','_xact'};
     $r{_herelang} = $self->{_herelang} if $self->{_herelang};
     bless \%r, ref $lang || $lang;
 }
@@ -439,7 +428,6 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     my $bindings = shift;
     my $submatch = shift;               # this is the submatch's cursor
     delete $self->{_fate};
-    my $xact = $self->{_xact};
 
     $self->deb("cursor_bind @$bindings") if $DEBUG & DEBUG::cursors;
     my @caps;
@@ -461,7 +449,7 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     }
     $submatch->{_from} = $r{_from} = $r{_pos};
     $r{_pos} = $submatch->{_pos};
-    $r{_xact} = $xact;
+    $r{_xact} = $self->{_xact};
     bless \%r, ref $self;               # return new match cursor for parent
 }
 
@@ -562,8 +550,7 @@ sub cursor_all { my $self = shift;
 
     $self->deb("cursor_all from $fpos to $tpos") if $DEBUG & DEBUG::cursors;
     my %r = %$self;
-    $r{_from} = $fpos;
-    $r{_pos} = $tpos;
+    @r{'_from','_pos'} = ($fpos,$tpos);
 
     bless \%r, ref $self;
 }
@@ -585,6 +572,22 @@ sub cursor_tweak { my $self = shift;
         $self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
     }
     $self->{_pos} = $tpos;
+    return () if $tpos > @::ORIG;
+
+    $self;
+}
+
+sub cursor_incr { my $self = shift;
+    my $tpos = $self->{_pos} + 1;
+
+    if ($DEBUG & DEBUG::cursors) {
+        my $peek = substr($::ORIG,$tpos,20);
+        $peek =~ s/\n/\\n/g;
+        $peek =~ s/\t/\\t/g;
+        $self->deb("cursor to $tpos --------->$GREEN$peek$CLEAR");
+    }
+    $self->{_pos} = $tpos;
+    return () if $tpos > @::ORIG;
 
     $self;
 }
@@ -632,7 +635,6 @@ sub cursor_rev { my $self = shift;
     }
     my %r = %$self;
     $r{_pos} = $fpos;
-#    $r{_from} = $self->{_from};
 
     bless \%r, ref $self;
 }
@@ -689,8 +691,9 @@ sub callm { my $self = shift;
     }
 }
 
-sub retm { my $self = shift;
-    return $self unless $DEBUG & DEBUG::trace_call;
+sub retm {
+    return $_[0] unless $DEBUG & DEBUG::trace_call;
+    my $self = shift;
     warn "Returning non-Cursor: $self\n" unless exists $self->{_pos};
     my ($package, $file, $line, $subname, $hasargs) = caller(1);
     $self->deb($subname, " returning @{[$self->{_pos}]}");
@@ -1904,7 +1907,7 @@ sub _AUTOLEXgen { my $self = shift;
         $::AUTOLEXED{$key} = $fakepos;
         my $ast = $retree->{$key};
         if ($ast and ref $ast ne 'HASH') {
-            @pat = $ast->longest($self->cursor_peek());
+            @pat = $ast->longest($self);
         }
         else {  # a protomethod, look up all methods it can call
             my $proto = $key;
@@ -1912,13 +1915,12 @@ sub _AUTOLEXgen { my $self = shift;
                 my $protopat = $proto . '__S_';
                 my $protolen = length($protopat);
                 my $altnum = 0;
-                my $peek = $self->cursor_peek();
                 for my $class ($self->meta->linearized_isa) {
                     for my $method (sort $class->meta->get_method_list) {
                         if (substr($method,0,$protolen) eq $protopat) {
                             next if substr($method,-6,6) eq '__PEEK';
                             my $callname = $class . '::' . $method . '__PEEK';
-                            my $peeklex = $peek->$callname();
+                            my $peeklex = $self->$callname();
                             if ($peeklex and $peeklex->{PATS}) {
                                 my @alts = @{$peeklex->{PATS}};
                                 for my $alt (@alts) {

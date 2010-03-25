@@ -912,7 +912,6 @@ role herestop {
 
 method heredoc () {
     my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
-    return if self.peek;
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $*DELIM = $herestub.delim;
@@ -4355,9 +4354,6 @@ grammar Quasi is STD::P6 {
 
 method EXPR ($preclvl) {
     my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
-    if self.peek {
-        return self._AUTOLEXpeek('EXPR');
-    }
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $*LEFTSIGIL = '';
     my $*PRECLIM = $preclim;

@@ -351,7 +351,6 @@ sub $name {
     my \$S = \$C->{'_pos'};
 
     my \@result = do {
-	my \$trystate;
 	my (\$tag, \$try);
         my \@try;
         my \$relex;
@@ -371,25 +370,25 @@ sub $name {
             \$x = 'ALTLTM $name';
         }
         my \$C = \$C->cursor_xact(\$x);
-        my \$xact = \$C->xact;
+        my \$xact = \$C->{_xact};
 
 	my \@gather = ();
         for (;;) {
             if (not \@try) {
                 \$relex //= \$C->cursor_fate('$PKG', '$name:*', \$retree);
-                \@try = \$relex->(\$C, \$trystate);
+                \@try = \$relex->(\$C);
+                last unless \@try;
             }
-            last unless \@try;
 	    \$try = shift(\@try) // next;
     
-            if (ref \$try eq 'ARRAY') {
+            if (ref \$try) {
                 (\$C->{'_fate'}, \$tag, \$try) = \@\$try;	# next candidate fate
             }
     
 	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
 	    push \@gather, \$C->\$try(\@_);
-            last if \$xact->[-2];  # committed?
             last if \@gather;
+            last if \$xact->[-2];  # committed?
 	}
 	\$self->_MATCHIFYr(\$S, "$name", \@gather);
     };
@@ -1569,7 +1568,7 @@ sub unbalanced {
 	my $ratchet = $MAYBACKTRACK ? '' : 'r';
 	$re = "\$C->_SUBSUME$ratchet([" .
 	    join(',', map {"'$_'"} @BINDINGS) .
-	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re, 2) . "\n})";
+	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re, 2) . "\n  })";
 	@BINDINGS = ();
 	$re;
     }
@@ -1769,7 +1768,7 @@ sub unbalanced {
 	    $self->bind('$C->_PATTERN(qr/\\G(?i:' . $text . ')/")');
 	}
 	else {
-	    $self->bind('$C->_PATTERN(qr/\\G' . $text . '/)');
+	    $self->bind('$C->_EXACT("' . $text . '")');
 	}
     }
 }
@@ -1808,7 +1807,7 @@ sub unbalanced {
 		$code = "\$C->_PATTERN(qr/\\G(?<=(?s:.))/)";
 	    }
 	    else {
-		$code = "\$C->_PATTERN(qr/\\G(?s:.)/)";
+		$code = "\$C->cursor_incr()";
 	    }
 #            $code = "\$C->_ANY$REV()";
         }
@@ -2507,7 +2506,6 @@ END
             my $result = <<"END";
 do {
   my \@result = do {
-    my \$trystate;
     my (\$tag, \$try);
     my \@try;
     my \$relex;
@@ -2524,18 +2522,18 @@ do {
         \$x = 'ALTLTM $altname'; # we are top level ltm
     }
     my \$C = \$C->cursor_xact(\$x);
-    my \$xact = \$C->xact;
+    my \$xact = \$C->{_xact};
 
     my \@gather = ();
     for (;;) {
         if (not \@try) {
             \$relex //= \$C->cursor_fate('$PKG', '$altname', \$retree);
-            \@try = \$relex->(\$C, \$trystate);
+            \@try = \$relex->(\$C);
+            last unless \@try;
         }
-        last unless \@try;
         \$try = shift(\@try) // next;
 
-        if (ref \$try eq 'ARRAY') {
+        if (ref \$try) {
             (\$C->{'_fate'}, \$tag, \$try) = \@\$try;	# next candidate fate
         }
 
@@ -2546,8 +2544,8 @@ END
 
             $result .= <<'END';
         )[$try])->($C);
-        last if $xact->[-2];  # committed?
         last if @gather;
+        last if $xact->[-2];  # committed?
     }
     @gather;
   };

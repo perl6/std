@@ -236,7 +236,7 @@ sub here {
             {
                 local $::PREFIX = "";
                 $name .= '__PEEK';
-                $lexer = eval { $C->cursor_peek->$name() };
+                $lexer = eval { $C->$name() };
             }
             return $IMP unless $lexer and exists $lexer->{PATS};
             my @pat = @{$lexer->{PATS}};
@@ -276,7 +276,7 @@ sub here {
             }
             else {
                 $name .= '__PEEK';
-                my $lexer = $C->cursor_peek->$name($re);
+                my $lexer = $C->$name($re);
                 my @pat = @{$lexer->{PATS}};
                 return unless @pat;
                 return @pat;
