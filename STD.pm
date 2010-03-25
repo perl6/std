@@ -3129,14 +3129,13 @@ grammar P6 is STD {
                 next unless $m;
                 if $line - ($m.<line>//-123) < 5 {
                     if $m.<ctx> eq '(' {
-                        $¢.panic($_ ~ '() interpreted as function call at line ' ~ $m.<line> ~
-                        "; please use whitespace " ~
-                        ($_ eq 'loop' ?? 'around' !! 'instead of') ~
-                        " parens\nUnexpected block in infix position (two terms in a row)");
+                        $¢.panic("Word '$_' interpreted as '$_" ~ "()' function call; please use whitespace " ~
+                        ($_ eq 'loop' ?? 'around the parens' !! 'instead of parens') ~ $m<token>.locmess ~
+                        "\nUnexpected block in infix position (two terms in a row)");
                     }
                     else {
-                        $¢.panic("'$_' interpreted as listop at line " ~ $m.<line> ~
-                        "; please use 'do' to introduce statement_control:<$_>.\nUnexpected block in infix position (two terms in a row)");
+                        $¢.panic("Word '$_' interpreted as a listop; please use 'do $_' to introduce the statement control word" ~ $m<token>.cursor($m<token>.from).locmess ~
+                        "\nUnexpected block in infix position (two terms in a row)");
                     }
                 }
             }
@@ -3952,7 +3951,7 @@ grammar P6 is STD {
         <identifier> <?before [<unsp>|'(']? > <![:]>
         { $name = $<identifier>.Str; $pos = $¢.pos; }
         <args( $¢.is_name($name) )>
-        { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
+        { self.add_mystery($<identifier>,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
         {{
             if $*BORG and $*BORG.<block> {
                 if not $*BORG.<name> {
@@ -4022,7 +4021,7 @@ grammar P6 is STD {
             ]?
 
         # unrecognized names are assumed to be post-declared listops.
-        || <args> { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
+        || <args> { self.add_mystery($<longname>,$pos,'termish') unless $<args><invocant>; }
             {{
                 if $*BORG and $*BORG.<block> {
                     if not $*BORG.<name> {
@@ -5410,11 +5409,13 @@ method add_our_name ($n) {
     self;
 }
 
-method add_mystery ($name,$pos,$ctx) {
+method add_mystery ($token,$pos,$ctx) {
+    my $name = $token.Str;
     return self if $*IN_PANIC;
     if not self.is_known($name) {
         self.deb("add_mystery $name $*CURPAD") if $*DEBUG +& DEBUG::symtab;
         %*MYSTERY{$name}.<pad> = $*CURPAD;
+        %*MYSTERY{$name}.<token> = $token;
         %*MYSTERY{$name}.<ctx> = $ctx;
         %*MYSTERY{$name}.<line> ~= ',' if %*MYSTERY{$name}.<line>;
         %*MYSTERY{$name}.<line> ~= self.lineof($pos);
