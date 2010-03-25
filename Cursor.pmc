@@ -388,14 +388,9 @@ sub delete {
 
 sub cursor_xact { my $self = shift;
     my $name = shift;
-    my $xact = $self->{_xact} // 0;
-    if (not $xact and $name ne 'MATCH') {
-        print Dump($self);
-        exit;
-    }
     if ($DEBUG & DEBUG::cursors) {
         my $pedigree = '';
-        for (my $x = $xact; $x; $x = $x->[-1]) {
+        for (my $x = $self->{_xact}; $x; $x = $x->[-1]) {
             my $n = $x->[0];
             $n =~ s/^RULE // or
             $n =~ s/^ALT *//;
@@ -403,9 +398,9 @@ sub cursor_xact { my $self = shift;
         }
         $self->deb("cursor_xact $name$pedigree");
     }
-    my %r = %$self;
-    $r{_xact} = [$name,@_,0,$xact];
-    bless \%r, ref $self;
+    # doing this in place is slightly dangerous, but seems to work
+    $self->{_xact} = [$name,0,$self->{_xact}];
+    $self;
 }
 
 sub cursor_fresh { my $self = shift;
