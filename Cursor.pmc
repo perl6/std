@@ -249,6 +249,7 @@ sub initparse {
     $::ORIG = $text . "\n;";           # original string
 
     my $result = $self->new($text)->$rule();
+    delete $result->{_xact};
 
     # XXX here attach stuff that will enable :cont
 

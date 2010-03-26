@@ -4382,6 +4382,9 @@ method EXPR ($preclvl) {
                     push @chain, pop(@opstack);
                 }
                 push @chain, pop(@termstack);
+                for @chain {
+                    $_.<_xact> :delete;
+                }
                 my $endpos = @chain[0]<_pos>;
                 @chain = reverse @chain if @chain > 1;
                 my $startpos = @chain[0]<_from>;
@@ -4423,6 +4426,12 @@ method EXPR ($preclvl) {
                 else {
                     self.worry("Missing final term in '" ~ $sym ~ "' list");
                 }
+                for @list {
+                    $_.<_xact> :delete;
+                }
+                for @delims {
+                    $_.<_xact> :delete;
+                }
                 my $endpos = @list[0]<_pos>;
                 @list = reverse @list if @list > 1;
                 my $startpos = @list[0]<_from>;
@@ -4457,6 +4466,7 @@ method EXPR ($preclvl) {
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
                 my $nop = $op.cursor_fresh();
                 my $arg = pop @termstack;
+                $arg<_xact> :delete;
                 $op<arg> = $arg;
                 my $a = $op<~CAPS>;
                 $op<_arity> = 'UNARY';
@@ -4483,6 +4493,8 @@ method EXPR ($preclvl) {
 
                 my $right = pop @termstack;
                 my $left = pop @termstack;
+                $right<_xact> :delete;
+                $left<_xact> :delete;
                 $op<right> = $right;
                 $op<left> = $left;
                 $op<_from> = $left<_from>;
