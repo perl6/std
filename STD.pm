@@ -312,7 +312,7 @@ regex stdstopper {
 }
 
 token longname {
-    <name> <colonpair>*
+    <name> [ <!before ':{'> <colonpair> ]*
 }
 
 token name {
@@ -3430,7 +3430,7 @@ grammar P6 is STD {
 
         :dba('method arguments')
         [
-        | ':' <?before \s> <!{ $*QSIGIL }> <arglist>
+        | ':' <?before \s | '{'> <!{ $*QSIGIL }> <arglist>
         | <?[\\(]> <args>
         | { @*MEMOS[$¢.pos]<baremeth> = 1 }
         ]?
@@ -4975,11 +4975,11 @@ grammar Regex is STD {
  
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] <.require_P5> [ :lang( $¢.cursor_fresh( %*LANG<P5Regex> ).unbalanced($*GOAL) ) <nibbler> ] }
 
-    token mod_internal:adv {
-        <?before ':' <.identifier> > [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
+    token mod_internal:p6adv {
+        <?before ':' ['dba'|'lang'] » > [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
     }
 
-    token mod_internal:oops { ':'\w+ <.panic: "Unrecognized regex modifier"> }
+    token mod_internal:oops { (':'\w+) <.panic: "Unrecognized regex modifier " ~ $0.Str > }
 
     token quantifier:sym<*>  { <sym> <quantmod> }
     token quantifier:sym<+>  { <sym> <quantmod> }
