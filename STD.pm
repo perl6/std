@@ -975,7 +975,7 @@ token circumfix:sym<« »>   { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(
 token circumfix:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
 token circumfix:sym«< >»   { '<'
                               [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
-                              [ <?before '>' > <.obs('<>', 'lines() or ()')> ]?
+                              [ <?before '>' > <.obs('<>', "lines() to read input,\n  or ('') to represent the null string,\n  or () to represent Nil")> ]?
                               <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
 
 ##################
@@ -2154,6 +2154,13 @@ grammar P6 is STD {
         <key=.identifier> \h* '=>' <.ws> <val=.EXPR(item %item_assignment)>
     }
 
+    token coloncircumfix ($front) {
+        [
+        | '<>' <.worry("Pair with <> really means a Nil value, not null string; use :$front" ~ "('') to represent the null string,\n  or :$front" ~ "() to represent Nil more accurately")>
+        | <circumfix>
+        ]
+    }
+
     token colonpair {
         :my $key;
         :my $value;
@@ -2167,12 +2174,12 @@ grammar P6 is STD {
         | <identifier>
             { $key = $<identifier>.Str; }
             [
-            || <.unsp>? :dba('pair value') <circumfix> { $value = $<circumfix>; }
+            || <.unsp>? :dba('pair value') <coloncircumfix($key)> { $value = $<coloncircumfix>; }
             || { $value = 1; }
             ]
         | :dba('signature') '(' ~ ')' <fakesignature>
-        | <circumfix>
-            { $key = ""; $value = $<circumfix>; }
+        | <coloncircumfix('')>
+            { $key = ""; $value = $<coloncircumfix>; }
         | $<var> = (<sigil> {} <twigil>? <desigilname>)
             { $key = $<var><desigilname>.Str; $value = $<var>; }
         ]

@@ -374,10 +374,9 @@ sub $name {
 
 	my \@gather = ();
         for (;;) {
-            if (not \@try) {
+            unless (\@try) {
                 \$relex //= \$C->cursor_fate('$PKG', '$name:*', \$retree);
-                \@try = \$relex->(\$C);
-                last unless \@try;
+                \@try = \$relex->(\$C) or last;
             }
 	    \$try = shift(\@try) // next;
     
@@ -2526,10 +2525,9 @@ do {
 
     my \@gather = ();
     for (;;) {
-        if (not \@try) {
+        unless (\@try) {
             \$relex //= \$C->cursor_fate('$PKG', '$altname', \$retree);
-            \@try = \$relex->(\$C);
-            last unless \@try;
+            \@try = \$relex->(\$C) or last;
         }
         \$try = shift(\@try) // next;
 
