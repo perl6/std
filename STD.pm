@@ -2168,7 +2168,7 @@ grammar P6 is STD {
         ':'
         :dba('colon pair')
         [
-        | '!' :: [ <identifier> || <.panic: "Malformed False pair">]
+        | '!' :: [ <identifier> || <.panic: "Malformed False pair; expected identifier">]
             [ <?[ \[ \( \< \{ ]> <.panic: "Extra argument not allowed; pair already has False argument"> ]?
             { $key = $<identifier>.Str; $value = 0; }
         | $<num> = [\d+] <identifier> [ <?[ \[ \( \< \{ ]> <.panic("Extra argument not allowed; pair already has argument of " ~ $<num>.Str)> ]?
