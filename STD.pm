@@ -1052,8 +1052,12 @@ token comment:sym<#`(...)> {
 }
 
 token comment:sym<#(...)> {
-    '#' <?opener> <.worry: "Embedded comment without backtick is deprecated"> <!>
-    <.quibble($¢.cursor_fresh( %*LANG<Q> ))>
+    '#' <?opener>
+    <.suppose
+        <quibble($¢.cursor_fresh( %*LANG<Q> ))>
+        <!before <[,;:]>* \h* [ '#' | $$ ] >   # extra stuff on line after closer?
+    >
+    <.worry: "Embedded comment seems to be missing backtick"> <!>
 }
 
 token comment:sym<#=(...)> {
@@ -1251,6 +1255,8 @@ grammar P6 is STD {
         :my $*MULTINESS = '';
         :my $*SIGNUM = 0;
         :my $*MONKEY_TYPING = False;
+        :my %*WORRIES;
+        :my @*WORRIES;
 
         :my $*CURPKG;
         {{
@@ -5808,7 +5814,7 @@ method panic (Str $s) {
     if $m ~~ /infix|nofun/ and not $m ~~ /regex/ {
         die "Recursive panic" if $*IN_PANIC;
         $*IN_PANIC++;
-        my @t = try { $here.termish };
+        my @t = $here.suppose( sub { $here.termish } );
         $*IN_PANIC--;
         if @t {
             my $endpos = $here.pos;
@@ -5839,7 +5845,8 @@ method panic (Str $s) {
 }
 
 method worry (Str $s) {
-    push @*WORRIES, $s ~ self.locmess;
+    my $m = $s ~ self.locmess;
+    push @*WORRIES, $m unless %*WORRIES{$m}++;
     self;
 }
 
@@ -5906,9 +5913,9 @@ method badinfix (Str $bad = $*sym) {
 token term:sym<miscbad> {
     {} <!{ $*QSIGIL }>
     {{
-        my ($bad) = try {
+        my ($bad) = $¢.suppose( sub {
             $¢.infixish;
-        };
+        });
         $*HIGHWATER = -1;
         $*HIGHMESS = '';
         self.badinfix($bad.Str) if $bad;

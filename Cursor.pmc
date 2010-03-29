@@ -1058,6 +1058,23 @@ sub before { my $self = shift;
     return ();
 }
 
+sub suppose { my $self = shift;
+    my $block = shift;
+    no warnings 'recursion';
+
+    local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
+    local @::WORRIES;
+    local %::WORRIES;
+    local $::HIGHWATER = -1;
+    local $::HIGHMESS;
+    local $::HIGHEXPECT = {};
+    my @all;
+    eval {
+        @all = $block->($self);
+    };
+    lazymap( sub { $_[0]->retm() }, @all );
+}
+
 sub after { my $self = shift;
     my $block = shift;
     no warnings 'recursion';
