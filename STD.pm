@@ -2812,7 +2812,10 @@ grammar P6 is STD {
         ] ** <param_sep>
         <.ws>
         { $*IN_DECL = ''; }
-        [ '-->' <.ws> <typename> <.ws> ]?
+        [ '-->' <.ws> <typename> <.ws>
+            [ <?{ $*OFTYPE }> <.panic("Extra 'of' type; already declared as type " ~ $*OFTYPE.Str)> ]?
+            { $*OFTYPE = $<typename>[0]; }
+        ]?
         {{
             $*LEFTSIGIL = '@';
             if $padsig {
