@@ -3,6 +3,8 @@
 use STD;
 use utf8;
 
+use Actions;
+
 my $failures = 0;
 
 @ARGV = 'CORE.setting' unless @ARGV;
@@ -11,8 +13,9 @@ for my $file (@ARGV) {
     warn $file,"\n" if @ARGV > 1;
     my $setting = "CORE";
     $setting = "NULL" if $file eq 'CORE.setting';
+    my $r;
     eval {
-	warn "Undefined\n" unless defined STD->parsefile($file, setting => $setting);
+        $r = STD->parsefile($file, setting => $setting, actions => 'Actions')->{'_ast'};
     };
     if ($@) {
 	warn $@;
@@ -31,3 +34,10 @@ if ($failures) {
     }
     exit $failures;
 }
+elsif ($vsz) {
+    warn "ok $time $vsz\n";
+}
+else {
+    warn "ok\n";
+}
+
