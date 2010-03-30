@@ -113,27 +113,27 @@ method TOP ($STOP = '') {
 # Users should specify precedence only in relation to existing levels.
 
 constant %term            = (:dba('term')            , :prec<z=>);
-constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly);
-constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>);
-constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>);
-constant %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>);
-constant %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>);
-constant %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>);
-constant %replication     = (:dba('replication')     , :prec<s=>, :assoc<left>);
-constant %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>);
-constant %junctive_and    = (:dba('junctive and')    , :prec<q=>, :assoc<list>);
-constant %junctive_or     = (:dba('junctive or')     , :prec<p=>, :assoc<list>);
-constant %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>);
+constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
+constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>, :!pure);
+constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>, :pure);
+constant %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>, :pure);
+constant %multiplicative  = (:dba('multiplicative')  , :prec<u=>, :assoc<left>, :pure);
+constant %additive        = (:dba('additive')        , :prec<t=>, :assoc<left>, :pure);
+constant %replication     = (:dba('replication')     , :prec<s=>, :assoc<left>, :pure);
+constant %concatenation   = (:dba('concatenation')   , :prec<r=>, :assoc<list>, :pure);
+constant %junctive_and    = (:dba('junctive and')    , :prec<q=>, :assoc<list>, :pure);
+constant %junctive_or     = (:dba('junctive or')     , :prec<p=>, :assoc<list>, :pure);
+constant %named_unary     = (:dba('named unary')     , :prec<o=>, :assoc<unary>, :uassoc<left>, :pure);
 constant %structural      = (:dba('structural infix'), :prec<n=>, :assoc<non>, :diffy);
-constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :diffy, :iffy);
+constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :diffy, :iffy, :pure);
 constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>);
 constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>);
 constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :fiddly);
-constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>);
-constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>, :fiddly);
-constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>);
-constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>, :fiddly);
-constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>);
+constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
+constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>, :fiddly, :!pure);
+constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>, :pure);
+constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>, :fiddly, :pure);
+constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>, :pure);
 constant %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
 constant %loose_and       = (:dba('loose and')       , :prec<d=>, :assoc<list>);
 constant %loose_or        = (:dba('loose or')        , :prec<c=>, :assoc<list>);
@@ -1416,6 +1416,7 @@ grammar P6 is STD {
         | $
         | <?before <[\)\]\}]>>
         | [<statement><eat_terminator> ]*
+                { self.mark_sinks($<statement>) }
         ]
     }
 
@@ -1495,7 +1496,7 @@ grammar P6 is STD {
 
     token eat_terminator {
         [
-        || ';' [ <?before $> { $*ORIG ~~ s/\;$/ /; } ]?
+        || ';'
         || <?{ @*MEMOS[$¢.pos]<endstmt> }> <.ws>
         || <?terminator>
         || $

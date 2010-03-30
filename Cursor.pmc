@@ -164,6 +164,7 @@ sub dump {
 
 sub new {
     my $class = shift;
+#    $::ORIG = shift;
     { no warnings; @::ORIG = unpack("U*", $::ORIG); }
     $::MEMOS[@::ORIG] = undef;  # memos kept by position
     my %args = ('_pos' => 0, '_from' => 0);
@@ -246,9 +247,10 @@ sub initparse {
     local $::LAST_NIBBLE = { firstline => 0, lastline => 0 };
     local $::LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
     local $::GOAL = "(eof)";
-    $::ORIG = $text . "\n;";           # original string
+    $text .= "\n" unless substr($text,-1,1) eq "\n";
+    $::ORIG = $text;           # original string
 
-    my $result = $self->new($text)->$rule();
+    my $result = $self->new()->$rule();
     delete $result->{_xact};
 
     # XXX here attach stuff that will enable :cont
@@ -2553,6 +2555,27 @@ sub lookup_dynvar { my $self = shift;
         return \%$name if defined *$name{HASH};
     }
     return
+}
+
+sub mark_sinks { my $self = shift;
+    my $statements = shift;
+    return $self unless @$statements;
+    my @s = @$statements;
+    my $final = pop(@s);
+    for my $s (@s) {
+        if ($s->is_pure) {
+            $self->worry("Useless use of " . $s->Str . " in sink context");
+        }
+        $s->{_pure} = 1;   # nothing is pure :)
+        $s->{_sink} = 1;
+    }
+    $self;
+}
+
+sub is_pure { my $self = shift;
+    return 1 if $self->{_pure};
+    # visit kids here?
+    return 0;
 }
 
 ## vim: expandtab sw=4
