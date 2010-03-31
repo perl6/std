@@ -2417,7 +2417,7 @@ sub do_need { my $self = shift;
     my $topsym;
     my $lib = '.';
     my $std = -x 'std' ? './std' : 'std';
-    if (not @::PERL6lib) {
+    if (not @::PERL6LIB) {
         if ($ENV{PERL6LIB}) {
             @::PERL6LIB = split ':', $ENV{PERL6LIB}
         }
