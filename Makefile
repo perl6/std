@@ -1,7 +1,7 @@
 # Makefile for STD.pm viv etcetera in pugs/src/perl6
 .PHONY: check try cat clean distclean purge test
 
-FIXINS=Cursor.pmc RE_ast.pmc LazyMap.pm lib/DEBUG.pm DEBUG.pmc lib/Test.pm \
+FIXINS=Cursor.pmc RE_ast.pmc LazyMap.pm Actions.pm lib/DEBUG.pm DEBUG.pmc lib/Test.pm \
 	CORE.setting NULL.pad std mangle.pl CORE.pad lib/NAME.pm NAME.pmc \
 	lib/Stash.pm Stash.pmc sprixel.pl ToJS.pm viv sprixelCORE.setting
 

@@ -89,6 +89,7 @@ my class StrLen { }
 my class Version { }
 
 my role Numeric { }
+my role Real { }
 my class Num { 
     # for now, limit denominator to one quintillion to fit in Rat64.
     constant pi is export = 3.14159_26535_89793_238;   # 46_26433_83279_50288;
