@@ -1641,6 +1641,10 @@ grammar P6 is STD {
         <xblock>
     }
 
+    token statement_control:foreach {
+        <sym> <.obs("'foreach'", "'for'")>
+    }
+
     token statement_control:given {
         <sym> :s
         <xblock>
