@@ -1712,7 +1712,6 @@ grammar P6 is STD {
         [ <?before '['> :dba('generic role') '[' ~ ']' <arglist> ]?
     }
 
-
     token vnum {
         \d+ | '*'
     }
@@ -2619,10 +2618,12 @@ grammar P6 is STD {
 
     token tribble ($l, $lang2 = $l) {
         :my ($lang, $start, $stop);
+        :my $*TRSTATE = '';
         <babble($l)>
         { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
         $start <left=.nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
+        { $*TRSTATE = ''; }
         [ <?{ $start ne $stop }>
             <.ws> <quibble($lang2)>
         || 
@@ -4133,7 +4134,7 @@ grammar P6 is STD {
 grammar Q is STD {
 
     role b1 {
-        token escape:sym<\\> { <sym> <item=.backslash> }
+        token escape:sym<\\> { <sym> {} <item=.backslash> }
         token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
         token backslash:sym<\\> { <text=.sym> }
         token backslash:stopper { <text=.stopper> }
@@ -4278,16 +4279,50 @@ grammar Q is STD {
     role tr {
         token stopper { \' }
 
-        token escape:sym<\\> { <sym> <item=.backslash> }
-        token escape:sym<-> { <sym> <.obs('- as character range','..')> }
-        token escape:sym<..> { <sym> }
+        method trstate ($s) {
+            if $*TRSTATE eq '..' {
+                $*TRSTATE = '';
+            }
+            else {
+                $*TRSTATE = $s;
+            }
+            self;
+        }
 
-        token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
+        # (must not allow anything to match . in nibbler or we'll lose track of state)
+        token escape:ws { <?before \s> <.ws> }
+        token escape:ch { $<ch> = [\S] <.trstate($<ch>.Str)> }
+        token escape:sym<#> { '#' <.panic: "Please backslash # for literal char or put whitespace in front for comment"> }
+
+        token escape:sym<\\> { <sym> <item=.backslash>  <.trstate('\\' ~ $<item>.Str)> }
+
+        token escape:sym<..> { <sym>
+            [
+            || <?{ $*TRSTATE eq '' or $*TRSTATE eq '..' }> <.panic: "Range missing start character on the left">
+            || <?before \s* <!stopper> <!before '..'> \S >
+            || <.panic: "Range missing stop character on the right">
+            ]
+            { $*TRSTATE = '..'; }
+        }
+
+        token escape:sym<-> { '-' <?{ $*TRSTATE ne '' }> \s* <!stopper> \S <.obs('- as character range','..')> }
+
         token backslash:sym<\\> { <text=.sym> }
         token backslash:stopper { <text=.stopper> }
+        token backslash:a { <sym> }
+        token backslash:b { <sym> }
+        token backslash:c { <sym> <charspec> }
+        token backslash:e { <sym> }
+        token backslash:f { <sym> }
+        token backslash:n { <sym> }
+        token backslash:o { :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
+        token backslash:r { <sym> }
+        token backslash:t { <sym> }
+        token backslash:x { :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
+        token backslash:sym<0> { <sym> }
 
         # keep random backslashes like q does
-        token backslash:misc { {} (.) { $<text> = "\\" ~ $0.Str; } }
+        token backslash:misc { . }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
