@@ -1712,7 +1712,6 @@ grammar P6 is STD {
         [ <?before '['> :dba('generic role') '[' ~ ']' <arglist> ]?
     }
 
-    token module_name:deprecated { 'v6-alpha' }
 
     token vnum {
         \d+ | '*'
