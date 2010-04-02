@@ -1439,8 +1439,8 @@ grammar P6 is STD {
           <.panic("Illegal redeclaration of '$label'")>
         ]?
 
-        # add label as a pseudo type
-        {{ my $*IN_DECL = 'label'; $¢.add_my_name($label); }}
+        # add label as a pseudo constant
+        {{ $¢.add_constant($label,self.label_id); }}
 
     }
 
@@ -5667,6 +5667,7 @@ method add_variable ($name) {
 }
 
 method add_constant($name,$value) {
+    my $*IN_DECL = 'constant';
     self.deb("add_constant $name = $value in", $*CURPAD.id) if $*DEBUG +& DEBUG::symtab;
     my $*DECLARAND;
     self.add_my_name($name);
@@ -5899,10 +5900,13 @@ method worry (Str $s) {
 method locmess () {
     my $pos = self.pos;
     my $line = self.lineof($pos);
-    if $pos >= @*MEMOS - 2 {
-        $pos = @*MEMOS - 3;
-        $line = ($line - 1) ~ " (EOF)";
+
+    # past final newline?
+    if $pos >= @*MEMOS - 1 {
+        $pos = $pos - 1;
+        $line = $line ~ " (EOF)";
     }
+
     my $pre = substr($*ORIG, 0, $pos);
     $pre = substr($pre, -40, 40);
     1 while $pre ~~ s!.*\n!!;

@@ -27,17 +27,17 @@ $time =~ s/^00://;
 $vsz =~ s/\d\d\d$/m/;
 if ($failures) {
     if ($vsz) {
-	warn "std FAILED $time $vsz\n";
+	warn "std FAILED $time $vsz @ARGV\n";
     }
     else {
-	warn "std FAILED\n";
+	warn "std FAILED @ARGV\n";
     }
     exit $failures;
 }
 elsif ($vsz) {
-    warn "ok $time $vsz\n";
+    warn "ok $time $vsz @ARGV\n";
 }
 else {
-    warn "ok\n";
+    warn "ok @ARGV\n";
 }
 

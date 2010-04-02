@@ -103,6 +103,10 @@ sub chunks { die "unimpl" }
 sub ast { exists $_[0]->{'_ast'} ? $_[0]->{'_ast'} : $_[0]->Str }
 sub make { $_[0]->{'_ast'} = $_[1]; $_[0] }
 
+sub label_id {
+    bless { 'file' => $::FILE->{name}, 'pos' => $_[0]->{_pos} }, 'LABEL';
+}
+
 sub list { my $self = shift;
     my @result;
     # can't just do this in numerical order because some might be missing
