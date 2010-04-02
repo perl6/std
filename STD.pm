@@ -3827,7 +3827,11 @@ grammar P6 is STD {
     }
 
     token infix:sym<!!> {
-        <sym> <.panic: "Ternary !! seems to be missing its ??">
+        <sym> ::
+        [
+        || <.suppose <infixish>> <.panic: "An infix may not start with !!">
+        || <.panic: "Ternary !! seems to be missing its ??">
+        ]
     }
 
     method raise_middle {
