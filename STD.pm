@@ -2203,8 +2203,12 @@ grammar P6 is STD {
     token special_variable:sym<$!> { <sym> <!before \w> }
 
     token special_variable:sym<$!{ }> {
-        ( '$!{' :: (.*?) '}' )
-        <.obs($0.Str ~ " variable", 'smart match against $!')>
+        '$!' '{' ~ '}' [<identifier> | <statementlist>]
+        {{
+            my $all = substr($*ORIG, self.pos, $¢.pos - self.pos);
+            my ($inside) = $all ~~ m!^...\s*(.*?)\s*.$!;
+            $¢.obs("Perl 5's $all construct", "a smartmatch like \$! ~~ $inside" );
+        }}
     }
 
     token special_variable:sym<$/> {
