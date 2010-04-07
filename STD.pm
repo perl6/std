@@ -1028,6 +1028,14 @@ token vws {
     :dba('vertical whitespace')
     \v
     [ '#DEBUG -1' { say "DEBUG"; $*DEBUG = -1; } ]?
+    [
+        ^^ [
+            | '<<<<<<<'
+            | '======='
+            | '>>>>>>>'
+        ]
+        <.panic: 'version control conflict marker'>
+    ]?
 }
 
 # We provide two mechanisms here:
