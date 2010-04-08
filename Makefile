@@ -1,9 +1,9 @@
-# Makefile for STD.pm viv etcetera in pugs/src/perl6
+# Makefile for STD.pm6 viv etcetera in pugs/src/perl6
 .PHONY: check try cat clean distclean purge test
 
-FIXINS=Cursor.pmc RE_ast.pmc LazyMap.pm Actions.pm lib/DEBUG.pm DEBUG.pmc lib/Test.pm \
-	CORE.setting NULL.pad std mangle.pl CORE.pad lib/NAME.pm NAME.pmc \
-	lib/Stash.pm Stash.pmc sprixel.pl ToJS.pm viv sprixelCORE.setting
+FIXINS=Cursor.pmc RE_ast.pmc LazyMap.pm Actions.pm lib/DEBUG.pm6 DEBUG.pmc lib/Test.pm6 \
+	CORE.setting NULL.pad std mangle.pl CORE.pad lib/NAME.pm6 NAME.pmc \
+	lib/Stash.pm6 Stash.pmc sprixel.pl ToJS.pm viv sprixelCORE.setting
 
 all: $(FIXINS) check lex/STD/termish
 
@@ -23,12 +23,16 @@ snap: $(FIXINS) check lex/STD/termish
 	-mv snap snap.old
 	mv snap.new snap
 
-STD_P5.pmc: STD_P5.pm gimme5
+STD_P5.pm5: STD_P5.pm6 gimme5
 	perl gimme5 $< >STD_P5.pm5
+
+STD_P5.pmc: STD_P5.pm5
 	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD_P5.pm5 >$@
 
-STD.pmc: STD.pm gimme5
+STD.pm5: STD.pm6 gimme5
 	perl gimme5 $< >STD.pm5
+
+STD.pmc: STD.pm5
 	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD.pm5 >$@
 	rm -rf lex syml/*.pad.store
 
@@ -43,7 +47,7 @@ check: STD.pmc STD_P5.pmc
 # pre-generate common sublexers
 lex/STD/termish: STD.pmc STD_P5.pmc syml/CORE.syml
 	@echo 'Generating STD lexers...'
-	./tryfile STD.pm
+	./tryfile STD.pm6
 
 cat:
 	cat try5.out
@@ -75,7 +79,7 @@ help:
 	@echo 'STD_P5.pmc      (internal)'
 	@echo 'STD.pmc         (internal)'
 	@echo 'syml/CORE.syml  (internal)'
-	@echo 'check           validates STD.pm STD.pmc and STD_P5.pmc in Perl 5'
+	@echo 'check           validates STD.pmc and STD_P5.pmc in Perl 5'
 	@echo 'lex/STD/termish (internal)'
 	@echo 'cat             shows the output written by the last tryfile'
 	@echo 'clean           removes many generated files'

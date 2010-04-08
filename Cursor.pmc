@@ -204,12 +204,12 @@ sub parsefile {
 
     my $result;
     if ($STORABLE) {
-        my $store = "lex/STD.pm.store";
+        my $store = "lex/STD.pm6.store";
         if (-f $store and -M $file > -M $store) {
             *::LEXERS = retrieve($store);
         }
         $result = $class->initparse($text,@_);
-        if (defined $result and $file eq 'STD.pm') {
+        if (defined $result and $file eq 'STD.pm6') {
             store(\%::LEXERS, $store);
         }
     }
@@ -220,7 +220,7 @@ sub parsefile {
     if ($::YOU_WERE_HERE) {
         $result->you_were_here;
     }
-    elsif ($file =~ /\.pm$/) {
+    elsif ($file =~ /\.pm6?$/) {
         $result->you_were_here;
     }
     $result;
@@ -2430,24 +2430,34 @@ sub do_need { my $self = shift;
         }
     }
     $modfile =~ s/::/\//g;
+    my $ext;
     for my $d (@::PERL6LIB) {
-        if (-f "$d/$modfile.pm") {
+        if (-f "$d/$modfile.pm6") {
+            $ext = '.pm6';
+            $lib = $d;
+            last;
+        }
+        elsif (-f "$d/$modfile.pm") {
+            $ext = '.pm';
             $lib = $d;
             last;
         }
     }
     my $syml = $::TMP_PREFIX . 'syml';
     mkdir $syml unless -d $syml;
-    if (-f "$syml/$modfile.pm.syml" and -M "$lib/$modfile.pm" > -M "$syml/$modfile.pm.syml") {
-        $topsym = LoadFile("$syml/$modfile.pm.syml");
+    if (not $ext) {
+        $self->worry("Can't locate module $module");
     }
-    elsif (-f "$lib/$modfile.pm") {
-        # say "$std $lib/$module.pm";
-        system "$std $lib/$module.pm" and die "Can't compile $lib/$module.pm";
-        $topsym = LoadFile("$syml/$modfile.pm.syml");
+    elsif (-f "$syml/$modfile$ext.syml" and -M "$lib/$modfile$ext" > -M "$syml/$modfile$ext.syml") {
+        $topsym = LoadFile("$syml/$modfile$ext.syml");
+    }
+    elsif (-f "$lib/$modfile$ext") {
+        # say "$std $lib/$module$ext";
+        system "$std $lib/$module$ext" and die "Can't compile $lib/$module$ext";
+        $topsym = LoadFile("$syml/$modfile$ext.syml");
     }
     else {
-        $self->worry("Can't locate module $module");
+        $self->worry("Module $module disappeared during load");
     }
     $self->add_my_name($module);
     $::DECLARAND->{really} = $topsym;
