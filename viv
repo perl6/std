@@ -102,7 +102,7 @@ sub MAIN {
 	print $x;
     }
     elsif ($output eq 'p6') {
-	say substr($r->ret(0,$r->emit_p6(0)),0,-3);
+	say $r->ret(0,$r->emit_p6(0));
     }
     elsif ($output eq 'p5') {
 	print fixpod($r->ret(0,$r->emit_p5(0)));
