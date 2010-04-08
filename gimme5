@@ -209,6 +209,7 @@ sub un6 {
         $f =~ s/^\bMu\b//                	and $t .= qq/undef/, next;
         $f =~ s/^\bNil\b//                	and $t .= qq/()/, next;
         $f =~ s/^\bchars\(//             	and $t .= qq/length(/, next;
+        $f =~ s/^\bnote\b//             	and $t .= qq/print STDERR /, next;
         $f =~ s/^\$\?PACKAGE//             	and $t .= qq/__PACKAGE__/, next;
 
         # the following must do partial rescan of final expression
@@ -305,7 +306,7 @@ END
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "\n" } if $::DEBUG;
+$SIG{__WARN__} = sub { print STDERR @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "\n" } if $::DEBUG;
 
 END
     }

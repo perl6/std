@@ -209,6 +209,7 @@ my proto goto { }
 my proto die { }
 my proto exit { }
 my proto warn { }
+my proto note { }
 my proto caller { }
 my proto eval { }
 my proto evalfile { }
