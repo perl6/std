@@ -2438,6 +2438,13 @@ sub do_need { my $self = shift;
             last;
         }
         elsif (-f "$d/$modfile.pm") {
+            {
+                local $/;
+                open PM, "$d/$modfile.pm" or next;
+                my $pm = <PM>;
+                close PM;
+                next if $pm =~ /^\s*package\s+\w+\s*;/m; # ignore p5 code
+            }
             $ext = '.pm';
             $lib = $d;
             last;
