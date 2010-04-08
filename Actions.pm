@@ -278,9 +278,11 @@ sub PREFIX {
 	$base = '';
     }
     else {
-	$class = $match->{_ast}{prefix}{_op} //
-	$class = $match->{_ast}{prefix_postfix_meta_operator}{_op} //
-	$class = $match->{_ast}{prefix_circumfix_meta_operator}{_op} // warn ::Dump($match);
+	$class =
+	    $match->{_ast}{prefix}{_op} //
+	    $match->{_ast}{prefix_postfix_meta_operator}{_op} //
+	    $match->{_ast}{prefix_circumfix_meta_operator}{_op} //
+	    warn ::Dump($match);
     }
 
     gen_class($class,$base);
