@@ -1027,15 +1027,14 @@ token unsp {
 
 token vws {
     :dba('vertical whitespace')
-    \v
     [
         [
-        | '#DEBUG -1' { say "DEBUG"; $*DEBUG = -1; }
-        | '<<<<<<<' <?before [.*? \v '=======']: .*? \v '>>>>>>>' > <.sorry: 'Found a version control conflict marker'>
-        | '=======' <.sorry: 'Ignoring second part of conflict'> .*? \v '>>>>>>>'   # ignore second half
+        | \v
+        | '#DEBUG -1' { say "DEBUG"; $*DEBUG = -1; } \N* \v
+        | '<<<<<<<' :: <?before [.*? \v '=======']: .*? \v '>>>>>>>' > <.sorry: 'Found a version control conflict marker'> \N* \v
+        | '=======' :: .*? \v '>>>>>>>' \N* \v   # ignore second half
         ]
-        \N* \v  # XXX should be \V* \v or \N* \n
-    ]*
+    ]+
 }
 
 # We provide two mechanisms here:
