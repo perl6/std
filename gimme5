@@ -1197,7 +1197,7 @@ sub atom {
 
 	my $dba = $adverbs{dba} // $NAME;
 	$dba =~ s/'/\\\'/g;
-	my $failgoal = bless { name => 'FAILGOAL', rest => "($goaltext, '$dba')", min => 0, nobind => 1 }, "RE_method";
+	my $failgoal = bless { name => 'FAILGOAL', rest => "($goaltext, '$dba',\$goalpos)", min => 0, nobind => 1 }, "RE_method";
 	my $check = bless { zyg => [$goal, $failgoal], min => 1, %adverbs}, "RE_first";
 	my $checkbrack = bless({ decl => [], re => $check, min => 1 }, "RE_bracket");
 
@@ -1206,7 +1206,7 @@ sub atom {
 	my $nest = quantified_atom();
 
 	@STUFFED = ($nest, $checkbrack);
-        return bless { text => ':', min => 0, extra => "local \$::GOAL = $goaltext", %adverbs }, "RE_meta";
+        return bless { text => ':', min => 0, extra => "local \$::GOAL = $goaltext, my \$goalpos = \$C", %adverbs }, "RE_meta";
     }
     if (s/^ (\w+) (?! \s* [*+?]) //x) {
         my $word = $1;

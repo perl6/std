@@ -969,15 +969,18 @@ token quotepair {
     { $<k> = $key; $<v> = $value; }
 }
 
-token quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> "'" }
-token quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> '"' }
+token quote:sym<' '>   { :dba('single quotes') "'" ~ "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> }
+token quote:sym<" ">   { :dba('double quotes') '"' ~ '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> }
 
-token circumfix:sym<« »>   { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
-token circumfix:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
-token circumfix:sym«< >»   { '<'
-                              [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
-                              [ <?before '>' > <.obs('<>', "lines() to read input,\n  or ('') to represent the null string,\n  or () to represent Nil")> ]?
-                              <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
+token circumfix:sym<« »>   { :dba('shell-quote words') '«' ~ '»' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> }
+token circumfix:sym«<< >>» { :dba('shell-quote words') '<<' ~ '>>' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> }
+token circumfix:sym«< >»   { :dba('quote words') '<' ~ '>'
+    [
+        [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
+        [ <?before '>' > <.obs('<>', "lines() to read input,\n  or ('') to represent the null string,\n  or () to represent Nil")> ]?
+        <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))>
+    ]
+}
 
 ##################
 # Lexer routines #
@@ -1030,9 +1033,9 @@ token vws {
     [
         [
         | \v
-        | '#DEBUG -1' { say "DEBUG"; $*DEBUG = -1; } \N* \v
-        | '<<<<<<<' :: <?before [.*? \v '=======']: .*? \v '>>>>>>>' > <.sorry: 'Found a version control conflict marker'> \N* \v
-        | '=======' :: .*? \v '>>>>>>>' \N* \v   # ignore second half
+        | '#DEBUG -1' { say "DEBUG"; $*DEBUG = -1; } \V* \v
+        | '<<<<<<<' :: <?before [.*? \v '=======']: .*? \v '>>>>>>>' > <.sorry: 'Found a version control conflict marker'> \V* \v
+        | '=======' :: .*? \v '>>>>>>>' \V* \v   # ignore second half
         ]
     ]+
 }
@@ -1264,6 +1267,7 @@ grammar P6 is STD {
         :my %*WORRIES;
         :my @*WORRIES;
         :my $*FATALS = 0;
+        :my $*IN_SUPPOSE = False;
 
         :my $*CURPKG;
         {{
@@ -3622,10 +3626,10 @@ grammar P6 is STD {
         { <sym> <!before '<'> <O(|%multiplicative)> }
 
     token infix:sym« << »
-        { <sym> \s <.obs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
+        { <sym> \s <.sorryobs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
 
     token infix:sym« >> »
-        { <sym> \s <.obs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
+        { <sym> \s <.sorryobs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
 
     token infix:sym« +> »
         { <sym> <!before '>'> <O(|%multiplicative)> }
@@ -3637,10 +3641,10 @@ grammar P6 is STD {
         { <sym> <O(|%multiplicative, iffy => 1)> }
 
     token infix:sym« ~< »
-        { <sym> <!before '<'> <O(|%multiplicative)> }
+        { <sym> <O(|%multiplicative)> }
 
     token infix:sym« ~> »
-        { <sym> <!before '>'> <O(|%multiplicative)> }
+        { <sym> <O(|%multiplicative)> }
 
 
     ## additive
@@ -4945,7 +4949,7 @@ grammar Regex is STD {
     token metachar:var {
         <!before '$$'>
         <?before <sigil>>
-        [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <variable> <.ws> <.check_variable($<variable>)> ]
+        [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <variable> <.check_variable($<variable>)> ]
         $<binding> = ( <.ws> '=' <.ws> <quantified_atom> )?
         { $<sym> = $<variable>.Str; }
     }
@@ -5825,6 +5829,7 @@ method lookup_compiler_var($name, $default = Nil) {
 ####################
 
 method panic (Str $s) {
+    self.deb("panic $s") if $*DEBUG;
     my $m;
     my $here = self;
 
@@ -5862,6 +5867,7 @@ method panic (Str $s) {
     }
 
     $m ~= $here.locmess;
+    $m ~= "\n" unless $m ~~ /\n$/;
 
     if $highvalid and %$*HIGHEXPECT {
         my @keys = sort keys %$*HIGHEXPECT;
@@ -5914,12 +5920,15 @@ method worry (Str $s) {
 }
 
 method sorry (Str $s) {
+    self.deb("sorry $s") if $*DEBUG;
+    self.panic($s) if $*IN_SUPPOSE;
     note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
         unless $*FATALS++;
     if $s {
-        self.panic($s) if $*FATALS > 3;
+        self.panic($s) if $*FATALS > 10;
         my $m = $s;
-        $m ~= self.locmess ~ "\n" unless $m ~~ /\n$/;
+        $m ~= self.locmess;
+        $m ~= "\n" unless $m ~~ /\n$/;
         note $m;
     }
     self;
@@ -5967,14 +5976,23 @@ method lineof ($p) {
 }
 
 method SETGOAL { }
-method FAILGOAL (Str $stop, Str $name) {
-    self.panic("Unable to parse $name; couldn't find final '$stop'");
+method FAILGOAL (Str $stop, Str $name, $startpos) {
+    my $s = "'$stop'";
+    $s = '"\'"' if $s eq "'''";
+    self.panic("Unable to parse $name" ~ $startpos.locmess ~ "\nCouldn't find final $s; gave up");
 }
 
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
+
 method obs (Str $old, Str $new, Str $when = ' in Perl 6') {
     %$*HIGHEXPECT = ();
     self.panic("Unsupported use of $old;$when please use $new");
+}
+
+method sorryobs (Str $old, Str $new, Str $when = ' in Perl 6') {
+    %$*HIGHEXPECT = ();
+    self.sorry("Unsupported use of $old;$when please use $new");
+    self;
 }
 
 method worryobs (Str $old, Str $new, Str $when = ' in Perl 6') {

@@ -1075,6 +1075,7 @@ sub suppose { my $self = shift;
     local $::HIGHWATER = -1;
     local $::HIGHMESS;
     local $::HIGHEXPECT = {};
+    local $::IN_SUPPOSE = 1;
     my @all;
     eval {
         @all = $block->($self);
