@@ -1252,7 +1252,7 @@ grammar P6 is STD {
         :my $*NEWPKG;
         :my $*NEWPAD;
         :my $*QSIGIL ::= '';
-        :my $*IN_META = 0;
+        :my $*IN_META = '';
         :my $*QUASIMODO;
         :my $*SCOPE = "";
         :my $*LEFTSIGIL;
@@ -2506,7 +2506,7 @@ grammar P6 is STD {
     }
 
     token variable {
-        :my $*IN_META = 0;
+        :my $*IN_META = '';
         :my $sigil = '';
         :my $twigil = '';
         :my $name;
@@ -2519,7 +2519,7 @@ grammar P6 is STD {
         || '&'
             [
             | <twigil>? <sublongname> { $name = $<sublongname>.Str }
-            | :dba('infix noun') '[' ~ ']' <infixish(1)>
+            | :dba('infix noun') '[' ~ ']' <infixish('[]')>
             ]
         || '$::' <name>? # XXX
         || '$:' <name> # XXX
@@ -3239,7 +3239,7 @@ grammar P6 is STD {
                 %<O><dba> = 'adverb';
             }
         |   [
-            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish(1)> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix=infix_circumfix_meta_operator> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix=infix_prefix_meta_operator>    { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix>                               { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
@@ -3322,8 +3322,8 @@ grammar P6 is STD {
         $<s> = (
             '['
             [
-            || <op=.infixish(1)> <?before ']'>
-            || \\<op=.infixish(1)> <?before ']'>
+            || <op=.infixish('red')> <?before ']'>
+            || \\<op=.infixish('tri')> <?before ']'>
             || <!>
             ]
             ']' ['«'|<?>]
@@ -3353,7 +3353,7 @@ grammar P6 is STD {
     }
 
     token infix_prefix_meta_operator:sym<!> {
-        <sym> <!before '!'> {} [ <infixish(1)> || <.panic: "Negation metaoperator not followed by valid infix"> ]
+        <sym> <!before '!'> {} [ <infixish('neg')> || <.panic: "Negation metaoperator not followed by valid infix"> ]
 
         [
         || <?{ $<infixish>.Str eq '=' }>
@@ -3368,20 +3368,20 @@ grammar P6 is STD {
     }
 
     token infix_prefix_meta_operator:sym<R> {
-        <sym> {} <infixish(1)>
+        <sym> {} <infixish('R')>
         <.can_meta($<infixish>, "reverse the args of")>
         <?{ $<O> = $<infixish><O>; }>
     }
 
     token infix_prefix_meta_operator:sym<S> {
-        <sym> {} <infixish(1)>
+        <sym> {} <infixish('S')>
         <.can_meta($<infixish>, "sequence the args of")>
         <?{ $<O> = $<infixish><O>; }>
     }
 
     token infix_prefix_meta_operator:sym<X> {
         <sym> <?before \S> {}
-        [ <infixish(1)>
+        [ <infixish('X')>
             <.can_meta($<infixish>[0], "cross with")>
             <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
         ]?
@@ -3390,7 +3390,7 @@ grammar P6 is STD {
 
     token infix_prefix_meta_operator:sym<Z> {
         <sym> <?before \S> {}
-        [ <infixish(1)>
+        [ <infixish('Z')>
             <.can_meta($<infixish>[0], "zip with")>
             <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
         ]?
@@ -3402,7 +3402,7 @@ grammar P6 is STD {
         | '«'
         | '»'
         ]
-        {} <infixish(1)> [ '«' | '»' || <.panic: "Missing « or »"> ]
+        {} <infixish('hyper')> [ '«' | '»' || <.panic: "Missing « or »"> ]
         <.can_meta($<infixish>, "hyper with")>
         <?{ $<O> := $<infixish><O>; }>
     }
@@ -3412,7 +3412,7 @@ grammar P6 is STD {
         | '<<'
         | '>>'
         ]
-        {} <infixish(1)> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
+        {} <infixish('HYPER')> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
         <.can_meta($<infixish>, "hyper with")>
         <?{ $<O> := $<infixish><O>; }>
     }
@@ -3622,17 +3622,11 @@ grammar P6 is STD {
     token infix:sym<+&>
         { <sym> <O(|%multiplicative)> }
 
-    token infix:sym« +< »
-        { <sym> <!before '<'> <O(|%multiplicative)> }
-
     token infix:sym« << »
-        { <sym> \s <.sorryobs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
+        { <sym> <!{ $*IN_META eq 'HYPER' }> <?before \s> <.sorryobs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
 
     token infix:sym« >> »
-        { <sym> \s <.sorryobs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
-
-    token infix:sym« +> »
-        { <sym> <!before '>'> <O(|%multiplicative)> }
+        { <sym> <!{ $*IN_META eq 'HYPER' }> <?before \s> <.sorryobs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
 
     token infix:sym<~&>
         { <sym> <O(|%multiplicative)> }
@@ -3640,12 +3634,18 @@ grammar P6 is STD {
     token infix:sym<?&>
         { <sym> <O(|%multiplicative, iffy => 1)> }
 
+    # try to allow both of >>op<< and >>op<<< without allowing op<<
     token infix:sym« ~< »
-        { <sym> <O(|%multiplicative)> }
+        { <sym> [ <!{ $*IN_META eq 'HYPER' }> || <?before '<<'> || <!before '<'> ] <O(|%multiplicative)> }
 
     token infix:sym« ~> »
-        { <sym> <O(|%multiplicative)> }
+        { <sym> [ <!{ $*IN_META eq 'HYPER' }> || <?before '>>'> || <!before '>'> ] <O(|%multiplicative)> }
 
+    token infix:sym« +< »
+        { <sym> [ <!{ $*IN_META eq 'HYPER' }> || <?before '<<'> || <!before '<'> ] <O(|%multiplicative)> }
+
+    token infix:sym« +> »
+        { <sym> [ <!{ $*IN_META eq 'HYPER' }> || <?before '>>'> || <!before '>'> ] <O(|%multiplicative)> }
 
     ## additive
     token infix:sym<+>
