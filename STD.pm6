@@ -2145,8 +2145,8 @@ grammar P6 is STD {
         [
         || <?{ $*QSIGIL }>
             [
-            || <?{ $*QSIGIL eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
-            ||                          <POST>+! <?after <[ \] } > ) ]> > 
+            || <?{ $*QSIGIL eq '$' }> [ [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > ]?
+            ||                          [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > 
             || { $*VAR = 0; }
             ]
         || <!{ $*QSIGIL }>
