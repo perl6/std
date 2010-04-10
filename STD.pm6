@@ -1303,7 +1303,7 @@ grammar P6 is STD {
             if @*WORRIES {
                 note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
             }
-            die "Compilation failed\n" if $*FATALS;
+            die "Check failed\n" if $*FATALS;
         }}
     }
 
@@ -5910,7 +5910,7 @@ method panic (Str $s) {
         unless $*FATALS++;
     note $m;
     self.explain_mystery();
-    die "Compilation failed\n";
+    die "Parse failed\n";
 }
 
 method worry (Str $s) {
@@ -5927,8 +5927,7 @@ method sorry (Str $s) {
     if $s {
         self.panic($s) if $*FATALS > 10;
         my $m = $s;
-        $m ~= self.locmess;
-        $m ~= "\n" unless $m ~~ /\n$/;
+        $m ~= self.locmess ~ "\n" unless $m ~~ /\n$/;
         note $m;
     }
     self;
