@@ -1664,6 +1664,7 @@ grammar P6 is STD {
     }
     token statement_control:when {
         <sym> :s
+        <?before ('True'|'False')»<.dumbsmart($0.Str)>>?
         <xblock>
     }
     rule statement_control:default {<sym> <block> }
@@ -1696,7 +1697,7 @@ grammar P6 is STD {
 
     rule statement_mod_cond:if     {<sym> <modifier_expr> }
     rule statement_mod_cond:unless {<sym> <modifier_expr> }
-    rule statement_mod_cond:when   {<sym> <modifier_expr> }
+    rule statement_mod_cond:when   {<sym> <?before \h*('True'|'False')»<.dumbsmart($0.Str)>>? <modifier_expr> }
 
     rule statement_mod_loop:while {<sym> <modifier_expr> }
     rule statement_mod_loop:until {<sym> <modifier_expr> }
@@ -3762,7 +3763,16 @@ grammar P6 is STD {
         { <sym> <O(|%chaining)> }
 
     token infix:sym<~~>
-        { <sym> <O(|%chaining)> }
+        { <sym> <O(|%chaining)> <?before \h* ('True'|'False') » <.dumbsmart($0.Str)>>? }
+
+    method dumbsmart ($litbool) {
+        self.worry("Smartmatch against $litbool always " ~
+            ($litbool eq 'True' ?? 'matches' !! 'fails') ~
+            "; if you mean to test the topic for\n    truthiness, please use " ~
+            ($litbool eq 'True' ?? ':so or *.so or ?*' !! ':!so or *.not or !*') ~
+            ' instead');
+        self;
+    }
 
     # XXX should move to inside meta !
     token infix:sym<!~>
