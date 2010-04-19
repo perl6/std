@@ -4989,7 +4989,7 @@ grammar Regex is STD {
     token backslash:z { <sym> <.obs('\\z as end-of-string matcher', '$')> }
     token backslash:Z { <sym> <.obs('\\Z as end-of-string matcher', '\\n?$')> }
     token backslash:misc { $<litchar>=(\W) }
-    token backslash:oldbackref { (\d+) { my $d = $0.Str; $¢.sorryobs("the 1-based special form '\\$d' as a backreference", "the 0-based variable '\$" ~ ($d - 1) ~ "' instead" ); } }
+    token backslash:oldbackref { (<[1..9]>\d*) { my $d = $0.Str; $¢.sorryobs("the 1-based special form '\\$d' as a backreference", "the 0-based variable '\$" ~ ($d - 1) ~ "' instead" ); } }
     token backslash:oops { <.sorry: "Unrecognized regex backslash sequence"> . }
 
     token assertion:sym<...> { <sym> }
