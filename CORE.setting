@@ -178,6 +178,8 @@ my subset Ordering of Mu where Signature | KeyExtractor | Comparator | OrderingP
 
 my class Instant { }
 my class Duration { }
+my class Date { }
+my class DateTime { }
 
 my class IO { }
 
@@ -359,6 +361,8 @@ my proto asech { }
 my proto acosech { }
 my proto acotanh { }
 my proto atan2 { }
+
+my proto today { }
 
 my proto gmtime { }
 my proto localtime { }

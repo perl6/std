@@ -3144,6 +3144,9 @@ grammar P6 is STD {
     token term:sym<proceed>
         { <sym> » <O(|%term)> }
 
+    token term:sym<now>
+        { <sym> » <O(|%term)> }
+
     token term:sym<self>
         { <sym> » <O(|%term)> }
 
