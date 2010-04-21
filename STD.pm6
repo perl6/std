@@ -2865,9 +2865,15 @@ grammar P6 is STD {
         :my $*IN_DECL = 'enum';
         :my $*DECLARAND;
         <sym> <.ws>
-        [ <longname> { $¢.add_name($<longname>[0].Str); } <.ws> ]?
+        [
+        | <name=identifier> { $¢.add_name($<name>.Str); }
+        | <name=variable> { $¢.add_variable($<name>.Str); }
+        | <?>
+        ]
+        { $*IN_DECL = ''; }
+        <.ws>
         <trait>* <?before <[ < ( « ]> > <term> <.ws>
-            {$¢.add_enum($<longname>, $<term>.Str); }
+            {$¢.add_enum($<name>, $<term>.Str); }
     }
 
     token type_declarator:constant {
