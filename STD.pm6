@@ -2632,7 +2632,7 @@ grammar P6 is STD {
             <right=EXPR(item %item_assignment)>
         || 
             { $lang = $lang2.unbalanced($stop); }
-            <right=.nibble($lang)> $stop
+            <right=.nibble($lang)> $stop || <.panic: "Malformed replacement part; couldn't find final $stop">
         ]
     }
 
@@ -2648,7 +2648,7 @@ grammar P6 is STD {
             <.ws> <quibble($lang2)>
         || 
             { $lang = $lang2.unbalanced($stop); }
-            <right=.nibble($lang)> $stop
+            <right=.nibble($lang)> $stop || <.panic: "Malformed replacement part; couldn't find final $stop">
         ]
     }
 
