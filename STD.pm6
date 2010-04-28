@@ -4809,7 +4809,12 @@ grammar Regex is STD {
         :temp %*RX;
         [ \s* < || | && & > ]?
         <EXPR>
-        [ <?before <stopper> || $*GOAL > || <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)"> . ]
+        [
+        || <?before <stopper> || $*GOAL >
+        || $$ <.panic: "Regex not terminated">
+        || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
+        || <.panic: "Regex not terminated">
+        ]
     }
 
     token termish {
@@ -4818,7 +4823,9 @@ grammar Regex is STD {
         || <term=.quant_atom_list>
         || <?before <stopper> | <[&|~]> > <.sorry: "Null pattern not allowed">
         || <?before <[ \] \) \> ]> > <.panic: "Unmatched closing bracket">
-        || <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
+        || $$ <.panic: "Regex not terminated">
+        || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
+        || <.panic: "Regex not terminated">
         ]
     }
     token quant_atom_list {
@@ -5850,6 +5857,8 @@ method lookup_compiler_var($name, $default = Nil) {
 
 method panic (Str $s) {
     self.deb("panic $s") if $*DEBUG;
+    die "Recursive panic" if $*IN_PANIC;
+    $*IN_PANIC++;
     my $m;
     my $here = self;
 
@@ -5899,10 +5908,7 @@ method panic (Str $s) {
         }
     }
     if $m ~~ /infix|nofun/ and not $m ~~ /regex/ {
-        die "Recursive panic" if $*IN_PANIC;
-        $*IN_PANIC++;
         my @t = $here.suppose( sub { $here.termish } );
-        $*IN_PANIC--;
         if @t {
             my $endpos = $here.pos;
             my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
@@ -5930,6 +5936,7 @@ method panic (Str $s) {
         unless $*FATALS++;
     note $m;
     self.explain_mystery();
+    $*IN_PANIC--;
     die "Parse failed\n";
 }
 

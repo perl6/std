@@ -583,6 +583,7 @@ sub cursor_tweak { my $self = shift;
 sub cursor_incr { my $self = shift;
     my $tpos = $self->{_pos} + 1;
 
+    $self->panic("Unexpected EOF") if $tpos > length($::ORIG);
     if ($DEBUG & DEBUG::cursors) {
         my $peek = substr($::ORIG,$tpos,20);
         $peek =~ s/\n/\\n/g;
@@ -598,6 +599,7 @@ sub cursor_incr { my $self = shift;
 sub cursor { my $self = shift;
     my $tpos = shift;
 
+    $self->panic("Unexpected EOF") if $tpos > length($::ORIG);
     if ($DEBUG & DEBUG::cursors) {
         my $peek = substr($::ORIG,$tpos,20);
         $peek =~ s/\n/\\n/g;
@@ -614,6 +616,7 @@ sub cursor { my $self = shift;
 sub cursor_force { my $self = shift;
     my $tpos = shift;
 
+    $self->panic("Unexpected EOF") if $tpos > length($::ORIG);
     if ($DEBUG & DEBUG::cursors) {
         my $peek = substr($::ORIG,$tpos,20);
         $peek =~ s/\n/\\n/g;
