@@ -2027,7 +2027,7 @@ sub _AUTOLEXgen { my $self = shift;
                         $final = $1;
                         last;
                     }
-                    if ($chars =~ /^(\.\S+)/) {
+                    if ($chars =~ /^(\.\S*)/) {
                         $final = $1;
                         last;
                     }
@@ -2602,6 +2602,23 @@ sub is_pure { my $self = shift;
     return 1 if $self->{_pure};
     # visit kids here?
     return 0;
+}
+
+sub looks_like_cclass { my $self = shift;
+    my $innards = shift;
+    my $prev = substr($::ORIG,$self->{_pos}-2,2);
+
+    return 0 if $prev =~ /=\s*$/;       # don't complain on $var = [\S] capture
+    return 0 if $innards =~ / .* /;
+    $innards =~ s/(\\[btnrf0])/" . $1 . "/eg;
+    $innards =~ s/(\\x\w\w)/" . $1 . "/eg;
+    $innards =~ s/(\\0[0-7]{1,3})/" . $1 . "/eg;
+    return 0 if $innards =~ /[|*+?]/;
+    $self->worry("Horizontal whitespace should be matched with \\h instead") if $innards =~ /^[ \t\b\r]*$/;
+    $self->worry("Vertical whitespace should be matched with \\v instead") if $innards =~ /^[\n\f]*$/;
+    $innards =~ s/[\-\\]//g;
+    return 0 if $innards =~ /(.).*\1/;
+    return 1;
 }
 
 ## vim: expandtab sw=4

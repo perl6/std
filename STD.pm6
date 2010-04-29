@@ -795,7 +795,7 @@ method truly ($bool,$opt) {
 token charname {
     [
     | <radint>
-    | <[a..z A..Z]><-[ \] , # ]>*?<[a..z A..Z ) ]> <?before \s*<[ \] , # ]>>
+    | <[a..z A..Z]><-[ \] , \# ]>*?<[a..z A..Z ) ]> <?before \s*<[ \] , \# ]>>
     ] || <.sorry: "Unrecognized character name"> .*?<?terminator>
 }
 
@@ -993,7 +993,7 @@ token ws {
 
     :dba('whitespace')
     [
-        | \h+ <![#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
+        | \h+ <![\#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
         | <?before \w> <?after \w> :::
             { @*MEMOS[$startpos]<ws>:delete; }
             <.sorry: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
@@ -1276,7 +1276,6 @@ grammar P6 is STD {
             %*LANG<Q>       = ::STD::Q ;
             %*LANG<Quasi>   = ::STD::Quasi ;
             %*LANG<Regex>   = ::STD::Regex ;
-            %*LANG<Trans>   = ::STD::Trans ;
             %*LANG<P5>      = ::STD::P5 ;
             %*LANG<P5Regex> = ::STD::P5::Regex ;
 
@@ -2194,9 +2193,9 @@ grammar P6 is STD {
         :dba('colon pair')
         [
         | '!' :: [ <identifier> || <.panic: "Malformed False pair; expected identifier">]
-            [ <?[ \[ \( \< \{ ]> <.panic: "Extra argument not allowed; pair already has False argument"> ]?
+            [ <?before <[ \[ \( \< \{ ]>> <.panic: "Extra argument not allowed; pair already has False argument"> ]?
             { $key = $<identifier>.Str; $value = 0; }
-        | $<num> = [\d+] <identifier> [ <?[ \[ \( \< \{ ]> <.sorry("Extra argument not allowed; pair already has argument of " ~ $<num>.Str)> <.circumfix> ]?
+        | $<num> = [\d+] <identifier> [ <?before <[ \[ \( \< \{ ]>> <.sorry("Extra argument not allowed; pair already has argument of " ~ $<num>.Str)> <.circumfix> ]?
         | <identifier>
             { $key = $<identifier>.Str; }
             [
@@ -2638,12 +2637,12 @@ grammar P6 is STD {
 
     token tribble ($l, $lang2 = $l) {
         :my ($lang, $start, $stop);
-        :my $*TRSTATE = '';
+        :my $*CCSTATE = '';
         <babble($l)>
         { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
 
         $start <left=.nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
-        { $*TRSTATE = ''; }
+        { $*CCSTATE = ''; }
         [ <?{ $start ne $stop }>
             <.ws> <quibble($lang2)>
         || 
@@ -2747,7 +2746,7 @@ grammar P6 is STD {
         <!old_rx_mods>
     }
     token quote:tr {
-        <sym> » <!before '('> <pat=.tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:tr))>
+        <sym> » <!before '('> <pat=.tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
         <!old_tr_mods>
     }
 
@@ -3439,7 +3438,7 @@ grammar P6 is STD {
         { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
 
     token postcircumfix:sym<[ ]>
-        { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-[1]\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
+        { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-1\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
 
     token postcircumfix:sym<{ }>
         { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> <.curlycheck> }
@@ -4300,7 +4299,7 @@ grammar Q is STD {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)!) { self.panic("Too late for :qq") }
-        multi method tweak (:trans(:$tr)!) { self.panic("Too late for :tr") }
+        multi method tweak (:cclass(:$cc)!) { self.panic("Too late for :cc") }
         # end tweaks (DO NOT ERASE)
 
     } # end role
@@ -4313,42 +4312,44 @@ grammar Q is STD {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)!) { self.panic("Too late for :qq") }
-        multi method tweak (:trans(:$tr)!) { self.panic("Too late for :tr") }
+        multi method tweak (:cclass(:$cc)!) { self.panic("Too late for :cc") }
         # end tweaks (DO NOT ERASE)
 
     } # end role
 
-    role tr {
+    role cc {
         token stopper { \' }
 
-        method trstate ($s) {
-            if $*TRSTATE eq '..' {
-                $*TRSTATE = '';
+        method ccstate ($s) {
+            if $*CCSTATE eq '..' {
+                $*CCSTATE = '';
             }
             else {
-                $*TRSTATE = $s;
+                $*CCSTATE = $s;
             }
             self;
         }
 
         # (must not allow anything to match . in nibbler or we'll lose track of state)
-        token escape:ws { <?before \s> <.ws> }
-        token escape:ch { $<ch> = [\S] <.trstate($<ch>.Str)> }
-        token escape:sym<#> { '#' <.sorry: "Please backslash # for literal char or put whitespace in front for comment"> }
+        token escape:ws { \s+ [ <?before '#'> <.ws> ]? }
+        token escape:sym<#> { '#' <.panic: "Please backslash # for literal char or put whitespace in front for comment"> }
 
-        token escape:sym<\\> { <sym> <item=.backslash>  <.trstate('\\' ~ $<item>.Str)> }
+        token escape:sym<\\> { <sym> <item=.backslash>  <.ccstate('\\' ~ $<item>.Str)> }
 
         token escape:sym<..> { <sym>
             [
-            || <?{ $*TRSTATE eq '' or $*TRSTATE eq '..' }> <.sorry: "Range missing start character on the left">
+            || <?{ $*CCSTATE eq '' or $*CCSTATE eq '..' }> <.sorry: "Range missing start character on the left">
             || <?before \s* <!stopper> <!before '..'> \S >
             || <.sorry: "Range missing stop character on the right">
             ]
-            { $*TRSTATE = '..'; }
+            { $*CCSTATE = '..'; }
         }
 
-        token escape:sym<-> { '-' <?{ $*TRSTATE ne '' }> \s* <!stopper> \S <.obs('- as character range','..')> }
+        token escape:sym<-> { '-' <?{ $*CCSTATE ne '' }> \s* <!stopper> \S <.obs('- as character range','..')> }
+        token escape:ch { $<ch> = [\S] <.ccstate($<ch>.Str)> }
 
+        token backslash:sym<-> { <text=.sym> }
+        token backslash:sym<#> { <text=.sym> }
         token backslash:sym<\\> { <text=.sym> }
         token backslash:stopper { <text=.stopper> }
         token backslash:a { <sym> }
@@ -4369,7 +4370,7 @@ grammar Q is STD {
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
         multi method tweak (:double(:$qq)!) { self.panic("Too late for :qq") }
-        multi method tweak (:trans(:$tr)!) { self.panic("Too late for :tr") }
+        multi method tweak (:cclass(:$cc)!) { self.panic("Too late for :cc") }
         # end tweaks (DO NOT ERASE)
 
     } # end role
@@ -4391,7 +4392,7 @@ grammar Q is STD {
     multi method tweak (:single(:$q)!) { self.truly($q,':q'); self.mixin( ::q ); }
 
     multi method tweak (:double(:$qq)!) { self.truly($qq, ':qq'); self.mixin( ::qq ); }
-    multi method tweak (:trans(:$tr)!) { self.truly($tr, ':tr'); self.mixin( ::tr ); }
+    multi method tweak (:cclass(:$cc)!) { self.truly($cc, ':cc'); self.mixin( ::cc ); }
 
     multi method tweak (:backslash(:$b)!)   { self.mixin($b ?? ::b1 !! ::b0) }
     multi method tweak (:scalar(:$s)!)      { self.mixin($s ?? ::s1 !! ::s0) }
@@ -4409,10 +4410,6 @@ grammar Q is STD {
 
     multi method tweak (:$regex!) {
         return %*LANG<Regex>;
-    }
-
-    multi method tweak (:$trans!) {
-        return %*LANG<Trans>;
     }
 
     multi method tweak (*%x) {
@@ -4812,6 +4809,7 @@ grammar Regex is STD {
         [
         || <?before <stopper> || $*GOAL >
         || $$ <.panic: "Regex not terminated">
+        || '-' <?{ $*GOAL eq ']' }> <.sorry("Invalid regex metacharacter; for a character class, use <[...]> instead of [...]\n  (and use .. instead of - to indicate a range)")>
         || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
         || <.panic: "Regex not terminated">
         ]
@@ -4919,9 +4917,15 @@ grammar Regex is STD {
     }
 
     token metachar:sym<[ ]> {
-        '[' {} [:lang(self.unbalanced(']')) <nibbler>]
-        [ ']' || <.panic: "Unable to parse regex; couldn't find right bracket"> ]
-        { $/<sym> := <[ ]> }
+        :dba("bracketed regex")
+        '[' ~ ']' [:lang(self.unbalanced(']')) <nibbler>]
+        {{
+            $/<sym> := <[ ]>;
+            my $innards = $<nibbler>.Str;
+            if self.looks_like_cclass($innards) {
+                self.worry("This appears to be an old-school character class; please use <[$innards]> if you\n    mean a character class, or put whitespace inside like [ $innards ] to disable\n    this warning");
+            }
+        }}
     }
 
     token metachar:sym<( )> {
@@ -5054,12 +5058,13 @@ grammar Regex is STD {
 
     token sign { '+' | '-' | <?> }
     token cclass_elem {
+        :my $*CCSTATE = '';
         :dba('character class element')
         <sign>
         <.normspace>?
         [
         | <name>
-        | <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))> # XXX parse as q[] for now
+        | <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
         ]
         <.normspace>?
     }
@@ -5856,9 +5861,9 @@ method lookup_compiler_var($name, $default = Nil) {
 ####################
 
 method panic (Str $s) {
-    self.deb("panic $s") if $*DEBUG;
     die "Recursive panic" if $*IN_PANIC;
     $*IN_PANIC++;
+    self.deb("panic $s") if $*DEBUG;
     my $m;
     my $here = self;
 
@@ -5932,10 +5937,15 @@ method panic (Str $s) {
         $m ~= "Other potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
     }
 
+    $*IN_PANIC--;
+    die $m if $*IN_SUPPOSE;     # just throw the exception back to the supposer
+    $*IN_PANIC++;
+
     note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
         unless $*FATALS++;
     note $m;
     self.explain_mystery();
+
     $*IN_PANIC--;
     die "Parse failed\n";
 }
@@ -5948,14 +5958,17 @@ method worry (Str $s) {
 
 method sorry (Str $s) {
     self.deb("sorry $s") if $*DEBUG;
-    self.panic($s) if $*IN_SUPPOSE;
     note $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
-        unless $*FATALS++;
+        unless $*IN_SUPPOSE or $*FATALS++;
     if $s {
-        self.panic($s) if $*FATALS > 10;
         my $m = $s;
         $m ~= self.locmess ~ "\n" unless $m ~~ /\n$/;
-        note $m;
+        if $*FATALS > 10 or $*IN_SUPPOSE {
+            die $m;
+        }
+        else {
+            note $m unless %*WORRIES{$m}++;
+        }
     }
     self;
 }
