@@ -362,9 +362,6 @@ my $core = Stash::->new( _file => $file, _line => __LINE__,
     '&wait' => NAME::->new( name => '&wait', file => $file, line => __LINE__ ),
     '&kill' => NAME::->new( name => '&kill', file => $file, line => __LINE__ ),
     '&sleep' => NAME::->new( name => '&sleep', file => $file, line => __LINE__ ),
-    # Temporary hack
-    '$LexicalPrelude' => NAME::->new( name => '&sleep', file => $file, line => __LINE__ ),
-    '$OUT' => NAME::->new( name => '&sleep', file => $file, line => __LINE__ ),
 );
 
 sub fixup {
