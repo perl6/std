@@ -4348,20 +4348,17 @@ grammar Q is STD {
         token escape:sym<-> { '-' <?{ $*CCSTATE ne '' }> \s* <!stopper> \S <.obs('- as character range','..')> }
         token escape:ch { $<ch> = [\S] <.ccstate($<ch>.Str)> }
 
-        token backslash:sym<-> { <text=.sym> }
-        token backslash:sym<#> { <text=.sym> }
-        token backslash:sym<\\> { <text=.sym> }
         token backslash:stopper { <text=.stopper> }
-        token backslash:a { <sym> }
-        token backslash:b { <sym> }
-        token backslash:c { <sym> <charspec> }
-        token backslash:e { <sym> }
-        token backslash:f { <sym> }
-        token backslash:n { <sym> }
-        token backslash:o { :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
-        token backslash:r { <sym> }
-        token backslash:t { <sym> }
-        token backslash:x { :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
+        token backslash:a { :i <sym> }
+        token backslash:b { :i <sym> }
+        token backslash:c { :i <sym> <charspec> }
+        token backslash:e { :i <sym> }
+        token backslash:f { :i <sym> }
+        token backslash:n { :i <sym> }
+        token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
+        token backslash:r { :i <sym> }
+        token backslash:t { :i <sym> }
+        token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
         token backslash:sym<0> { <sym> }
 
         # keep random backslashes like q does
@@ -4809,7 +4806,6 @@ grammar Regex is STD {
         [
         || <?before <stopper> || $*GOAL >
         || $$ <.panic: "Regex not terminated">
-        || '-' <?{ $*GOAL eq ']' }> <.sorry("Invalid regex metacharacter; for a character class, use <[...]> instead of [...]\n  (and use .. instead of - to indicate a range)")>
         || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
         || <.panic: "Regex not terminated">
         ]
@@ -4904,6 +4900,10 @@ grammar Regex is STD {
         { $/<sym> := $<mod_internal><sym> }
     }
 
+    token metachar:sym<-> {
+        '-' <?{ $*GOAL eq ']' }> <.sorry("Invalid regex metacharacter (must be quoted to match literally)")>
+    }
+
     token metachar:sym<:> {
         <sym>
     }
@@ -4918,19 +4918,14 @@ grammar Regex is STD {
 
     token metachar:sym<[ ]> {
         :dba("bracketed regex")
-        '[' ~ ']' [:lang(self.unbalanced(']')) <nibbler>]
-        {{
-            $/<sym> := <[ ]>;
-            my $innards = $<nibbler>.Str;
-            if self.looks_like_cclass($innards) {
-                self.worry("This appears to be an old-school character class; please use <[$innards]> if you\n    mean a character class, or put whitespace inside like [ $innards ] to disable\n    this warning");
-            }
-        }}
+        '[' ~ ']' <nibbler>
+        { $¢.check_old_cclass($<nibbler>.Str); }
+        { $/<sym> := <[ ]>; }
     }
 
     token metachar:sym<( )> {
-        '(' {} [:lang(self.unbalanced(')')) <nibbler>]
-        [ ')' || <.panic: "Unable to parse regex; couldn't find right parenthesis"> ]
+        :dba("capture parens")
+        '(' ~ ')' <nibbler>
         { $/<sym> := <( )> }
     }
 
@@ -4977,11 +4972,12 @@ grammar Regex is STD {
     token metachar:sym<" "> { <?before '"'> [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <quote>] }
 
     token metachar:var {
+        :my $*QSIGIL ::= '$';
         <!before '$$'>
         <?before <sigil>>
-        [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <variable> <.check_variable($<variable>)> ]
+        [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <termish> ]
         $<binding> = ( <.ws> '=' <.ws> <quantified_atom> )?
-        { $<sym> = $<variable>.Str; }
+        { $<sym> = $<termish><term>.Str; }
     }
 
     token backslash:unspace { <?before \s> <.SUPER::ws> }

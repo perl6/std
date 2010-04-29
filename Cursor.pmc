@@ -2604,21 +2604,150 @@ sub is_pure { my $self = shift;
     return 0;
 }
 
-sub looks_like_cclass { my $self = shift;
+sub check_old_cclass { my $self = shift;
     my $innards = shift;
-    my $prev = substr($::ORIG,$self->{_pos}-2,2);
 
-    return 0 if $prev =~ /=\s*$/;       # don't complain on $var = [\S] capture
-    return 0 if $innards =~ / .* /;
-    $innards =~ s/(\\[btnrf0])/" . $1 . "/eg;
-    $innards =~ s/(\\x\w\w)/" . $1 . "/eg;
-    $innards =~ s/(\\0[0-7]{1,3})/" . $1 . "/eg;
-    return 0 if $innards =~ /[|*+?]/;
-    $self->worry("Horizontal whitespace should be matched with \\h instead") if $innards =~ /^[ \t\b\r]*$/;
-    $self->worry("Vertical whitespace should be matched with \\v instead") if $innards =~ /^[\n\f]*$/;
-    $innards =~ s/[\-\\]//g;
-    return 0 if $innards =~ /(.).*\1/;
-    return 1;
+    my $prev = substr($::ORIG,$self->{_pos}-length($innards)-4,2);
+    return $self if $prev =~ /=\s*$/;       # don't complain on $var = [\S] capture
+
+    my $cclass = '';
+    my $single = '';
+    my $singleok = 1;
+    my $double = '';
+    my $doubleok = 1;
+
+    my $last = '';
+    my %seen;
+
+    my $i = $innards;
+    my $neg = '';
+    $neg = '-' if $i =~ s/^\^//;
+    my $digits = 0;
+    $i =~ s/0-9/\\d/;
+    while ($i ne '') {
+        if ($i =~ s/^-(.)/$1/) {
+            $singleok = $doubleok = 0;
+            $cclass .= $last ? '..' : '\\-';
+            $last = '';
+        }
+        elsif ($i =~ /^\|./ and $cclass ne '') {
+            return $self;       # probable alternation
+        }
+        elsif ($i =~ s/^\|//) {
+            $last = '';
+            $singleok = $doubleok = 0;
+            $cclass .= '|';
+        }
+        elsif ($i =~ /^[*+?]/ and $cclass ne '') {
+            return $self;       # probable quantifier
+        }
+        elsif ($i =~ s/^\\?'//) {
+            $last = "'";
+            $single .= '\\' . $last;
+            $double .= $last;
+            $cclass .= $last;
+        }
+        elsif ($i =~ s/^\\?"//) {
+            $last = '"';
+            $single .= $last;
+            $double .= '\\' . $last;
+            $cclass .= $last;
+        }
+        elsif ($i =~ s/^(\\[btnrf0])//) {
+            $last = eval '"' . $1 . '"';
+            $singleok = 0;
+            $double .= $1;
+            $cclass .= $1;
+        }
+        elsif ($i =~ s/(\\x\w\w)//) {
+            $last = eval '"' . $1 . '"';
+            $single .= $last;
+            $double .= $1;
+            $cclass .= $1;
+        }
+        elsif ($i =~ s/(\\0[0-7]{1,3})//) {
+            $last = eval '"' . $1 . '"';
+            $single .= $last;
+            $double .= "\\o" . substr($1,1);
+            $cclass .= "\\o" . substr($1,1);
+        }
+        elsif ($i =~ s/^(\\[sSwWdD])//) {
+            $singleok = $doubleok = 0;
+            $last = '';
+            $cclass .= $1;
+        }
+        elsif ($i =~ s/^(\\?\t)//) {
+            $last = "\t";
+            $single .= $last;
+            $double .= '\\t';
+            $cclass .= '\\t';
+        }
+        elsif ($i =~ s/^(\\?\x20)//) {
+            $last = ' ';
+            $single .= $last;
+            $double .= $last;
+            $cclass .= '\\x20';
+        }
+        elsif ($i =~ s/^\.//) {
+            $last = '.';
+            $singleok = $doubleok = 0;
+            $cclass .= '.';
+        }
+        elsif ($i =~ s/^\\(.)//) {
+            $last = $1;
+            $single .= $last;
+            $double .= '\\' . $last;
+            $cclass .= '\\' . $last;
+        }
+        elsif ($i =~ s/^(.)//s) {
+            $last = $1;
+            $cclass .= $last;
+            $single .= $last;
+            $double .= $last;
+        }
+        else {
+            die "can't happen";
+        }
+
+        if ($last ne '' and $seen{$last}++) {
+            return $self;       # dup likely indicates not a character class
+        }
+    }
+
+    my $common = "[$innards] appears to be an old-school character class;";
+
+    # XXX not Unicodey yet
+    if ($neg) {
+        return $self->worry("$common non-digits should be matched with \\D instead") if $cclass eq '\\d';
+        if ($singleok) {
+            return $self->worry("$common non-horizontal whitespace should be matched with \\H instead") if $single =~ /^[ \t\b\r]*$/;
+            return $self->worry("$common non-vertical whitespace should be matched with \\V instead") if $single =~ /^[\n\f]*$/;
+            return $self->worry("$common non-whitespace should be matched with \\S instead") if $single =~ /^[ \t\b\r\n\f]*$/;
+            return $self->worry("$common please use <-[$cclass]> if you mean a character class");
+        }
+        elsif ($doubleok) {
+            return $self->worry("$common please use <-[$cclass]> if you mean a character class");
+        }
+    }
+    else {
+        return $self->worry("$common digits should be matched with \\d instead") if $cclass eq '\\d';
+        if ($singleok) {
+            return $self->worry("$common horizontal whitespace should be matched with \\h instead") if $single =~ /^[ \t\b\r]*$/;
+            return $self->worry("$common vertical whitespace should be matched with \\v instead") if $single =~ /^[\n\f]*$/;
+            return $self->worry("$common whitespace should be matched with \\s instead") if $single =~ /^[ \t\b\r\n\f]*$/;
+            return $self->worry("$common please use <[$cclass]> if you\n    mean a character class, or quote it like '$single' to match\n    string as a unit");
+        }
+        elsif ($doubleok) {
+            return $self->worry("$common please use <[$cclass]> if you\n    mean a character class, or quote it like \"$double\" to match\n    string as a unit");
+        }
+    }
+    if ($::FATALS) {
+        return $self->worry("$common please use <${neg}[$cclass]> if you mean a character class");
+    }
+    else {
+        return $self->worry("$common please use <${neg}[$cclass]> if you\n    mean a character class, or put whitespace inside like [ $innards ] to disable\n    this warning");
+    }
+    $self;
 }
 
 ## vim: expandtab sw=4
