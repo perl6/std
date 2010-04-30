@@ -2719,6 +2719,7 @@ sub check_old_cclass { my $self = shift;
     # XXX not Unicodey yet
     if ($neg) {
         return $self->worry("$common non-digits should be matched with \\D instead") if $cclass eq '\\d';
+        return $self->worry("$common non-newlines should be matched with \\N instead") if $cclass eq '\\n';
         if ($singleok) {
             return $self->worry("$common non-(horizontal whitespace) should be matched with \\H instead") if $single =~ /\A[ \t\b\r]*\z/;
             return $self->worry("$common non-(vertical whitespace) should be matched with \\V instead") if $single =~ /\A[\n\f]*\z/;
