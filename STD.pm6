@@ -1708,18 +1708,6 @@ grammar P6 is STD {
     # module names #
     ################
 
-    token def_module_name {
-        <longname>
-        [ :dba('generic role')
-            <?before '['>
-            <?{ ($*PKGDECL//'') eq 'role' }>
-            <.newpad>
-            '[' ~ ']' <signature>
-            { $*IN_DECL = ''; }
-            <.finishpad>
-        ]?
-    }
-
     token module_name:normal {
         <longname>
         [ <?before '['> :dba('generic role') '[' ~ ']' <arglist> ]?
@@ -1872,14 +1860,17 @@ grammar P6 is STD {
         :my $*DECLARAND;
         :my $*NEWPKG;
         :my $*NEWPAD;
+        :my $outer = $*CURPAD;
         :temp $*CURPKG;
+        :temp $*CURPAD;
         { $*SCOPE ||= 'our'; }
         [
-            [
-                <def_module_name>{
-                    $longname = $<def_module_name>[0]<longname>;
-                    $¢.add_name($longname.Str);
-                }
+            [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname.Str); } ]?
+            <.newpad>
+            [ :dba('generic role')
+                <?{ ($*PKGDECL//'') eq 'role' }>
+                '[' ~ ']' <signature>
+                { $*IN_DECL = ''; }
             ]?
             <trait>*
             <.getdecl>
@@ -1901,16 +1892,21 @@ grammar P6 is STD {
                     }
                     $*begin_compunit = 0;
                 }}
-                <block>
+                <blockoid>
+                <.checkyada>
                 ]
             || <?before ';'>
                 [
                 || <?{ $*begin_compunit }>
                     {{
                         $longname orelse $¢.panic("Compilation unit cannot be anonymous");
+                        $outer == $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition must be at outermost level");
                         my $shortname = $longname.<name>.Str;
                         $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
                         $*begin_compunit = 0;
+
+                        # XXX throws away any role sig above
+                        $*CURPAD = $outer;
 
                         # throw out null core when compiling the real CORE
                         if $shortname eq 'CORE' and $*CORE.id ~~ /NULL/ {
