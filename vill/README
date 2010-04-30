@@ -20,8 +20,8 @@ B. References
 1. OVERVIEW
 
 Perl 6 is a new dialect of Perl.  The official grammar for Perl 6 is
-called STD.pm, and it is (self referentially) written in Perl 6.  There
-is a STD.pm based Perl 6 source code parser called 'viv', written in
+called STD.pm6, and it is (self referentially) written in Perl 6.  There
+is a STD.pm6 based Perl 6 source code parser called 'viv', written in
 Perl 5 to help bootstrap new Perl 6 implementations.  Viv converts
 source code written in Perl 6 into Viv Abstract Syntax Tree (VAST) form.
 See more info at http://perl6.org or chat in #perl6 on irc.freenode.net.
@@ -47,14 +47,14 @@ to explore LLVM.  Perhaps in time there will be enough functionality to
 make it useful in a similar way to NQP (Not Quite Perl 6).
 
 The slowest part of 'vill' is 'viv', because that runs as a separate
-Perl 5 child process.  The medium term plan will be to use the STD.pm
+Perl 5 child process.  The medium term plan will be to use the STD.pm6
 grammar, but replace the 'viv' parser with a new one to be written in C.
 This new parser would call a new Perl 6 compatible regex engine (p6re),
 probably also written in C. Patrick R. Michaud gave some maybe
 useful code for that: http://trac.parrot.org/parrot/changeset/7051/ ;-)
 The full Perl 6 regex language is too much to aim for, because action
 methods are allowed to contain arbitrary Perl 6 code.  A particular
-subset of the regex language is needed by STD.pm, and the plan would be
+subset of the regex language is needed by STD.pm6, and the plan would be
 to fake what cannot be implemented, using STD specific workarounds.
 
 If the dependency on 'viv' can be removed, the ugly 'vill' name will no
@@ -84,7 +84,7 @@ project, because Parrot is a high level virtual machine allowing any
 number of different languages to share code and data.
 
 Much credit is due to the creators of the other tools, namely Larry Wall
-for STD.pm and viv, Chris Lattner for LLVM, and Matthew Wilson for
+for STD.pm6 and viv, Chris Lattner for LLVM, and Matthew Wilson for
 Sprixel.  The authors of 'vill' are named in the CREDITS file.
 
 2. GETTING STARTED
@@ -483,6 +483,12 @@ the parts that contains viv and vill:
     sudo cpan -i Moose
     cd pugs/src/perl6
     time make
+
+ffi:
+
+The Foreign Function Interface library:
+
+    sudo apt-get install libffi-dev
 
 LLVM:
 

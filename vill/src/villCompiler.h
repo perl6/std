@@ -5,6 +5,7 @@
 #include "llvm/LLVMContext.h"  // llvmContext Value
 #include "llvm/Module.h"       // Module Value
 #include "yaml_compose.h"      // graph_node Value
+// #undef NDEBUG           // #undef: assert() on, #define: assert() off
 
 using namespace llvm;
 

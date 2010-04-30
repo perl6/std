@@ -39,7 +39,7 @@ objects = src/arglist.o src/args.o src/ast_mapentry.o \
 
 # The first target is the default when make is run without arguments.
 # Build the main executable by linking all the object files together.
-vill: $(objects) src/villCompiler.h src/llvm-version2.6 Makefile
+vill: $(objects) src/villCompiler.h src/llvm-version2.7 Makefile
 	@echo 'Link *.o -> ./vill'
 	@c++ $(objects) `llvm-config --cxxflags --ldflags --libs bitwriter` \
 	  -O3 -o vill
@@ -392,11 +392,11 @@ clean:
 # effect of causing every plain 'make' to do a top level recompile/link.
 # A more elegant solution that avoids unnecessary rebuilds would be very
 # welcome.
-src/llvm-version2.6:
+src/llvm-version2.7:
 	@find src -name 'llvm-version*' -exec rm {} \;
 	@export VERSION=`llvm-config --version`; echo $$VERSION > \
 	  src/llvm-version$$VERSION
-	@test -e src/llvm-version2.6
+	@test -e src/llvm-version2.7
 
 # test does a quick sanity check with some arbitrary example files
 test: vill test/yaml_compose_roundtrip test/yaml_parse_roundtrip \
