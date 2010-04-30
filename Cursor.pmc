@@ -2655,7 +2655,7 @@ sub check_old_cclass { my $self = shift;
         }
         elsif ($i =~ s/^(\\[btnrf0])//) {
             $last = eval '"' . $1 . '"';
-            $singleok = 0;
+            $single .= $last;
             $double .= $1;
             $cclass .= $1;
         }
@@ -2720,9 +2720,9 @@ sub check_old_cclass { my $self = shift;
     if ($neg) {
         return $self->worry("$common non-digits should be matched with \\D instead") if $cclass eq '\\d';
         if ($singleok) {
-            return $self->worry("$common non-horizontal whitespace should be matched with \\H instead") if $single =~ /^[ \t\b\r]*$/;
-            return $self->worry("$common non-vertical whitespace should be matched with \\V instead") if $single =~ /^[\n\f]*$/;
-            return $self->worry("$common non-whitespace should be matched with \\S instead") if $single =~ /^[ \t\b\r\n\f]*$/;
+            return $self->worry("$common non-(horizontal whitespace) should be matched with \\H instead") if $single =~ /\A[ \t\b\r]*\z/;
+            return $self->worry("$common non-(vertical whitespace) should be matched with \\V instead") if $single =~ /\A[\n\f]*\z/;
+            return $self->worry("$common non-whitespace should be matched with \\S instead") if $single =~ /\A[ \t\b\r\n\f]*\z/;
             return $self->worry("$common please use <-[$cclass]> if you mean a character class");
         }
         elsif ($doubleok) {
@@ -2732,9 +2732,11 @@ sub check_old_cclass { my $self = shift;
     else {
         return $self->worry("$common digits should be matched with \\d instead") if $cclass eq '\\d';
         if ($singleok) {
-            return $self->worry("$common horizontal whitespace should be matched with \\h instead") if $single =~ /^[ \t\b\r]*$/;
-            return $self->worry("$common vertical whitespace should be matched with \\v instead") if $single =~ /^[\n\f]*$/;
-            return $self->worry("$common whitespace should be matched with \\s instead") if $single =~ /^[ \t\b\r\n\f]*$/;
+            return $self->worry("$common horizontal whitespace should be matched with \\h instead") if $single =~ /\A[ \t\b\r]*\z/;
+            return $self->worry("$common vertical whitespace should be matched with \\v instead") if $single =~ /\A[\n\f]*\z/;
+            return $self->worry("$common whitespace should be matched with \\s instead") if $single =~ /\A[ \t\b\r\n\f]*\z/;
+        }
+        if ($singleok and $single eq $double) {
             return $self->worry("$common please use <[$cclass]> if you\n    mean a character class, or quote it like '$single' to match\n    string as a unit");
         }
         elsif ($doubleok) {
