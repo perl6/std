@@ -1900,7 +1900,7 @@ grammar P6 is STD {
                 || <?{ $*begin_compunit }>
                     {{
                         $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-                        $outer == $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition must be at outermost level");
+                        $outer == $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
                         my $shortname = $longname.<name>.Str;
                         $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
                         $*begin_compunit = 0;
@@ -4811,7 +4811,7 @@ grammar Regex is STD {
         <.ws>
         [
         || <term=.quant_atom_list>
-        || <?before <stopper> | <[&|~]> > <.sorry: "Null pattern not allowed">
+        || <?before <stopper> | <[&|~]> > <.panic: "Null pattern not allowed">
         || <?before <[ \] \) \> ]> > {{
                 my $c = substr($*ORIG,$¢.pos,1);
                 if $*GOAL eq $c {
