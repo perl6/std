@@ -4812,7 +4812,15 @@ grammar Regex is STD {
         [
         || <term=.quant_atom_list>
         || <?before <stopper> | <[&|~]> > <.sorry: "Null pattern not allowed">
-        || <?before <[ \] \) \> ]> > <.panic: "Unmatched closing bracket">
+        || <?before <[ \] \) \> ]> > {{
+                my $c = substr($*ORIG,$¢.pos,1);
+                if $*GOAL eq $c {
+                    $¢.panic("Null pattern not allowed");
+                }
+                else {
+                    $¢.panic("Unmatched closing $c");
+                }
+            }}
         || $$ <.panic: "Regex not terminated">
         || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
         || <.panic: "Regex not terminated">
