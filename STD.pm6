@@ -1045,6 +1045,7 @@ token vws {
 # 2) override moreinput method
 method moreinput () {
     $*moreinput.() if $*moreinput;
+    self;
 }
 
 token unv {
@@ -4976,7 +4977,7 @@ grammar Regex is STD {
     token metachar:sym<" "> { <?before '"'> [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <quote>] }
 
     token metachar:var {
-        :my $*QSIGIL ::= '$';
+        :my $*QSIGIL ::= substr($*ORIG,self.pos,1);
         <!before '$$'>
         <?before <sigil>>
         [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <termish> ]

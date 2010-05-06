@@ -124,6 +124,7 @@ my class int8 { }
 my class int16 { }
 my class int32 { }
 my class int64 { }
+my class int128 { }
 
 my role Rational { }
 my class Rat { }
@@ -133,6 +134,7 @@ my class rat8 { }
 my class rat16 { }
 my class rat32 { }
 my class rat64 { }
+my class rat128 { }
 
 my class UInt { }
 my class uint { }
@@ -143,6 +145,7 @@ my class uint8 { }
 my class uint16 { }
 my class uint32 { }
 my class uint64 { }
+my class uint128 { }
 
 my role Buf { }
 my class buf { }
