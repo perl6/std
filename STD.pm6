@@ -1171,6 +1171,7 @@ token integer {
     | <decint>
     ]
     <!!before ['.' <?before \s | ',' | '=' | <terminator> > <.sorry: "Decimal point must be followed by digit">]? >
+    [ <?before '_' '_'+\d> <.sorry: "Only isolated underscores are allowed inside numbers"> ]?
 }
 
 token radint {
@@ -1197,6 +1198,7 @@ token dec_number {
     | $<coeff> = [<int=.decint>                    ] <escale>
     ]
     [ <?before '.' \d> <.sorry: "Number contains two decimal points (missing 'v' for version number?)"> ['.'\d+]+ ]?
+    [ <?before '_' '_'+\d> <.sorry: "Only isolated underscores are allowed inside numbers"> ]?
 }
 
 token alnumint {

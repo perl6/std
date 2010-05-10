@@ -287,6 +287,7 @@ my proto reduce { }
 my proto sort { }
 my proto min { }
 my proto max { }
+my proto minmax { }
 my proto uniq { }
 my proto push { }
 my proto rotate { }
