@@ -20,6 +20,7 @@ our $PREFIX = "";
 
 #    $::DEBUG |= -1;
 sub qm { my $s = shift;
+    $s = $s->[0] if ref $s eq 'ARRAY';	# only count first token of circumfix or postcircumfix
     my $r = '';
     for (split(//,$s)) {
 	if ($_ eq " ") { $r .= '\x20' }

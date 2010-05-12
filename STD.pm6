@@ -306,6 +306,7 @@ regex stdstopper {
     [
     | <?terminator>
     | <?unitstopper>
+    | <?before <stopper> >
     | $                                 # unlikely, check last (normal LTM behavior)
     ]
     { @*MEMOS[$¢.pos]<endstmt> ||= 1; }
@@ -1494,6 +1495,7 @@ grammar P6 is STD {
                 ]?
             ]
         | <?before ';'>
+        | <?before <stopper> >
         | {} <.panic: "Bogus statement">
         ]
 

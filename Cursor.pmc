@@ -2250,6 +2250,7 @@ sub add_macro { my $lang = shift;
     state $GEN = "500";
     $lang->{_from} = $start->{_from};
     my $name = $lang->Str;
+    $name =~ s/:<<(.*)>>$/:«$1»/;
     my $WHAT = ref $lang;
     if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
         my ($sym) = $name =~ /:sym(.*)/;
@@ -2257,7 +2258,12 @@ sub add_macro { my $lang = shift;
         $sym =~ s/^\(\s*(.*\S)\s*\)$/$1/g;
         $sym =~ s/^\[\s*(.*\S)\s*\]$/$1/g;
         $sym =~ s/^\{\s*(.*\S)\s*\}$/$1/g;
-        $sym =~ s/\\x\[(.*)\]/\\x{$1}/g;
+        if ( $sym =~ s/\\x\[(.*)\]/\\x{$1}/g) {
+            $sym = '«' . eval($sym) . '»';
+        }
+        elsif ($sym =~ s/\\c\[(.*)\]/\\N{$1}/g ) {
+            $sym = '«' . eval("use charnames ':full'; $sym") . '»';
+        }
 
         # unfortunately p5 doesn't understand q«...»
         if ($sym =~ s/^«\s*(.*\S)\s*»$/$1/) {
@@ -2266,6 +2272,12 @@ sub add_macro { my $lang = shift;
                 $ok = $try, last if index($sym,$try) < 0;
             }
             $sym = $ok . $sym . $ok;
+        }
+        if ($sym =~ / /) {
+            $sym = '[qw' . $sym . ']';
+        }
+        else {
+            $sym = 'q' . $sym;
         }
 
         my $rule = "token $name { <sym> }";
@@ -2285,6 +2297,9 @@ sub add_macro { my $lang = shift;
             $mangle =~ s/\\x\[(.*)\]/\\x{$1}/g;
             @list = eval $mangle;
         }
+        elsif ($mangle =~ m/^\(\"(.*)\"\)$/) {
+            @list = eval $sym;
+        }
         else {
             @list = $mangle;
         }
@@ -2298,7 +2313,7 @@ sub add_macro { my $lang = shift;
             $coercion = 'additive';
         }
         elsif ($name =~ /^prefix:/) {
-            if ($sym =~ /^\W/) {
+            if ($sym =~ /^.\W/) {
                 $coercion = 'symbolic_unary';
             }
             else {
@@ -2308,13 +2323,21 @@ sub add_macro { my $lang = shift;
         elsif ($name =~ /^postfix:/) {
             $coercion = 'methodcall';
         }
+        elsif ($name =~ /^circumfix:/) {
+            $coercion = 'term';
+        }
+        elsif ($name =~ /^postcircumfix:/) {
+            $coercion = 'methodcall';
+        }
         elsif ($name =~ /^term:/) {
             $coercion = 'term';
         }
 
         state $genpkg = 'ANON000';
         $genpkg++;
-        my $e = <<"END";
+        my $e;
+        if (@list == 1) {
+            $e = <<"END";
 package $genpkg;
 use Moose ':all' => { -prefix => 'moose_' };
 moose_extends('$WHAT');
@@ -2331,7 +2354,7 @@ my \$retree = {
             'min' => 12345,
             'name' => 'sym',
             'rest' => '',
-            'sym' => q$sym,
+            'sym' => $sym,
         }, 'RE_method'),
     }, 'RE_ast'),
 };
@@ -2343,7 +2366,7 @@ sub $mangle {
     my \$self = shift;
     local \$CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
     my %args = \@_;
-    my \$sym = \$args{sym} // q$sym;
+    my \$sym = \$args{sym} // $sym;
 
     my \$xact = ['RULE $mangle', 0, \$::XACT];
     local \$::XACT = \$xact;
@@ -2370,6 +2393,209 @@ sub $mangle {
 }
 1;
 END
+        }
+        else {
+            for (@list) {
+                if (/'/) {
+                    s/(.*)/"$1"/;
+                }
+                else {
+                    s/(.*)/'$1'/;
+                }
+            }
+            my $starter = $list[0];
+            my $stopper = $list[1];
+
+            $e = <<"END";
+package $genpkg;
+use Moose ':all' => { -prefix => 'moose_' };
+moose_extends('$WHAT');
+
+# $rule
+
+my \$retree = {
+ '$mangle' => bless({
+  'kind' => 'token',
+  'min' => 12347,
+  'pkg' => undef,
+  're' =>  bless({
+    'decl' => [],
+    'a' => 0,
+    'dba' => '$category expression',
+    'i' => 0,
+    'min' => 12347,
+    'r' => 1,
+    's' => 0,
+    'zyg' => [
+        bless({
+          'a' => 0,
+          'dba' => '$category expression',
+          'i' => 0,
+          'min' => 1,
+          'r' => 1,
+          's' => 0,
+          'text' => $starter,
+        }, 'RE_string'),
+        bless({
+          'a' => 0,
+          'dba' => '$category expression',
+          'i' => 0,
+          'min' => 0,
+          'r' => 1,
+          's' => 0,
+          'text' => ':',
+        }, 'RE_meta'),
+        bless({
+          'a' => 0,
+          'dba' => '$category expression',
+          'i' => 0,
+          'min' => 12345,
+          'name' => 'semilist',
+          'r' => 1,
+          'rest' => '',
+          's' => 0,
+        }, 'RE_method'),
+        bless({
+          'decl' => [],
+          'min' => 1,
+          're' =>  bless({
+            'a' => 0,
+            'dba' => '$category expression',
+            'i' => 0,
+            'min' => 1,
+            'r' => 1,
+            's' => 0,
+            'zyg' => [
+                bless({
+                  'a' => 0,
+                  'dba' => '$category expression',
+                  'i' => 0,
+                  'min' => 1,
+                  'r' => 1,
+                  's' => 0,
+                  'text' => ')',
+                }, 'RE_string'),
+                bless({
+                  'min' => 0,
+                  'name' => 'FAILGOAL',
+                  'nobind' => 1,
+                }, 'RE_method'),
+            ],
+          }, 'RE_first'),
+        }, 'RE_bracket'),
+        bless({
+          'min' => 0,
+          'name' => 'O',
+          'rest' => '(|%term)',
+        }, 'RE_method'),
+    ],
+  }, 'RE_sequence'),
+ }, 'RE_ast'),
+ 'stopper' => bless({
+  'decl' => [],
+  'kind' => 'token',
+  'min' => 1,
+  'pkg' => undef,
+  're' => bless({
+    'a' => 0,
+    'dba' => 'stopper',
+    'i' => 0,
+    'min' => 1,
+    'r' => 1,
+    's' => 0,
+    'text' => $stopper,
+   }, 'RE_string'),
+  }, 'RE_ast'),
+};
+
+our \$CATEGORY = '$category';
+
+sub ${mangle}__PEEK { \$_[0]->_AUTOLEXpeek('$mangle',\$retree) }
+sub $mangle {
+    no warnings 'recursion';
+    my \$self = shift;
+    local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+    my %args = \@_;
+    local \$::sym = \$args{sym} // $sym;
+    return () if \$::GOAL eq $starter;
+
+    my \$C = \$self->cursor_xact("RULE $mangle");
+    my \$xact = \$C->xact;
+    my \$S = \$C->{'_pos'};
+    \$C->{'sym'} = ref \$sym ? join(' ', \@\$sym) : \$sym;
+
+    \$self->_MATCHIFYr(\$S, "$mangle", 
+    do {
+      if (my (\$C) = (\$C->_EXACT($starter))) {
+        do {
+          if (my (\$C) = (((local \$::GOAL = $stopper , my \$goalpos = \$C), \$C)[-1])) {
+            do {
+              if (my (\$C) = (\$C->_SUBSUMEr(['semilist'], sub {
+                my \$C = shift;
+                \$C->semilist
+              }))) {
+                do {
+                  if (my (\$C) = (\$C->_BRACKETr(sub {
+                  my \$C=shift;
+                  do {
+                    my \$C = \$C->cursor_xact('ALT ||');
+                    my \$xact = \$C->xact;
+                    my \@gather;
+                    do {
+                      push \@gather, \$C->_EXACT($stopper)
+                    }
+                    or \$xact->[-2] or
+                    do {
+                      push \@gather, \$C->FAILGOAL($stopper , '$category expression',\$goalpos)};
+                    \@gather;
+                  }
+                }))) {
+                    \$C->_SUBSUMEr(['O'], sub {
+                        my \$C = shift;
+                        \$C->O(%STD::$coercion)
+                      });
+                  }
+                  else {
+                    ();
+                  }
+                };
+              }
+              else {
+                ();
+              }
+            };
+          }
+          else {
+            ();
+          }
+        };
+      }
+      else {
+        ();
+      }
+    }
+    );
+}
+
+sub stopper__PEEK { \$_[0]->_AUTOLEXpeek('stopper',\$retree) }
+sub stopper {
+    no warnings 'recursion';
+    my \$self = shift;
+    local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+
+
+    my \$C = \$self->cursor_xact("RULE stopper");
+    my \$xact = \$C->xact;
+    my \$S = \$C->{'_pos'};
+
+    \$self->_MATCHIFYr(\$S, "stopper", 
+        \$C->_EXACT($stopper)
+    );
+}
+
+1;
+END
+        }
         $lang->deb("derive $genpkg from $WHAT adding $mangle") if $DEBUG & DEBUG::mixins;
         eval $e or die "Can't create $name: $@\n";
         $::LANG{'MAIN'} = $lang->cursor_fresh($genpkg);
