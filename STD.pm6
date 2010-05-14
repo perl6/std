@@ -3852,14 +3852,19 @@ grammar P6 is STD {
         '??'
         <.ws>
         <EXPR(item %item_assignment)>
-        [ '!!' ||
-            [
-            || <?before '='> <.panic: "Assignment not allowed within ??!!">
-            || <?before '::'> <.panic: "Please use !! rather than ::">
-            || <?before <infixish>>    # Note: a tight infix would have parsed right
-                <.panic: "Precedence too loose within ??!!; use ??()!! instead ">
-            || <.panic: "Found ?? but no !!; possible precedence problem">
-            ]
+        [ '!!'
+        || <?before '::'<-[=]>> <.panic: "Please use !! rather than ::">
+        || <infixish> {{
+                my $b = $<infixish>.Str;
+                if $b eq ':' {
+                    $¢.panic("Please use !! rather than $b");
+                }
+                else {
+                    $¢.panic("Precedence of $b is too loose to use between ?? and !!; please use parens around inner expression");
+                }
+            }}
+        || <?before \N*? [\n\N*?]?> '!!' <.sorry("Bogus code found before the !!")> <.panic("Confused")>
+        || <.sorry("Found ?? but no !!")> <.panic("Confused")>
         ]
         <O(|%conditional, _reducecheck => 'raise_middle')>
     }
