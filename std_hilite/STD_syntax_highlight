@@ -125,8 +125,11 @@ HELP
 
     # slurp the file for parsing and redspans
     $src_text = Encode::decode('utf8', read_file($file) );
+    local $::FILE = { name => $file || '-' };
     $loc[length($src_text) - 1] = [];
-    $parser = STD->parse($src_text,rule=>$what,actions => 'Actions');
+    $parser = STD->initparse($src_text,setting=>"CORE",rule=>$what,actions => 'Actions');;
+
+    $parser->you_were_here;
 
     # and finally print out the html code
     highlight_match();
