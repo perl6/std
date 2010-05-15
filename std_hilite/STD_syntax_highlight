@@ -112,19 +112,20 @@ HELP
     $file = shift @ARGV;
     my $what = shift @ARGV // 'TOP';
 
+    my $fh;
     #what is the meaning of your input file?
     if(!$file || $file eq '-') {
         # i think you mean standard input
-        $file = \*STDIN;        
+        $fh = \*STDIN; # Cursor already set encoding
     } else {
         # no it is should be a file, let me check
-        unless(-r $file) {
+        unless(open $fh, '<:utf8', $file) {
             die "Could not open '$file' for reading\n";
         }
     }
 
     # slurp the file for parsing and redspans
-    $src_text = Encode::decode('utf8', read_file($file) );
+    $src_text = read_file($fh);
     local $::FILE = { name => $file || '-' };
     $loc[length($src_text) - 1] = [];
     $parser = STD->initparse($src_text,setting=>"CORE",rule=>$what,actions => 'Actions');;
