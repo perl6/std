@@ -1093,7 +1093,7 @@ sub indent {
 
 { package VAST::package_def; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-	my $def_module_name = $self->{longname}[0]->Str;
+	my $def_module_name = $self->{longname}[0]{name}->Str;
 	my @extends;
 	for (@{$self->{trait}}) {
 	    my $t = $_->Str;
