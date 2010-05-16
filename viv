@@ -1094,6 +1094,9 @@ sub indent {
 { package VAST::package_def; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my $def_module_name = $self->{longname}[0]{name}->Str;
+	if ($self->{decl}{inpkg}[0] =~ /GLOBAL::(.*)/) {
+	    $def_module_name = "$1::$def_module_name";
+	}
 	my @extends;
 	for (@{$self->{trait}}) {
 	    my $t = $_->Str;
@@ -1163,7 +1166,10 @@ use YAML::XS;
 $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "\n" } if $::DEBUG;
 
 END
-	    $out .= $self->{statementlist}->emit_p5($lvl+1);
+	    $out .= $self->{statementlist}->emit_p5($lvl+1)
+		if $self->{statementlist};
+	    $out .= $self->{blockoid}{statementlist}->emit_p5($lvl+1)
+		if $self->{blockoid}{statementlist};
 	}
 	$out;
     }
