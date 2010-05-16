@@ -44,6 +44,9 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
     # write simple ansi-colored output to STDOUT
     STD_syntax_highlight --ansi-text=- foo.pl
 
+    # write output with mIRC color codes to STDOUT
+    STD_syntax_highlight --mirc-text=- foo.pl
+
     # write yaml output to STDOUT (can be useful to build filters)
     STD_syntax_highlight --yaml=- foo.pl
 =head1 SUBROUTINES
@@ -53,7 +56,8 @@ STD_syntax_highlight - Highlights Perl 6 source code using STD.pm
 =cut
 
 my ($clean_html,$help) = (0,0);
-my ($full_html,$simple_html,$snippet_html,$ansi_text,$yaml) = (0,0,0,0,0);
+my ($full_html,$simple_html,$snippet_html,$ansi_text,$mirc_text,$yaml)
+    = (0,0,0,0,0,0);
 my ($file, $parser, $src_text); 
 
 # These are needed for redspans
@@ -71,6 +75,7 @@ sub main {
         "simple-html=s"=>\$simple_html,
         "snippet-html=s"=>\$snippet_html,
         "ansi-text=s"=>\$ansi_text,
+        "mirc-text=s"=>\$mirc_text,
         "yaml=s"=>\$yaml,
         "help"=>\$help
     );
@@ -104,7 +109,7 @@ HELP
     }
 
     #default is --simple-html=- if no option is selected
-    if(!($simple_html || $full_html || $snippet_html || $yaml) && !$ansi_text) {
+    if(!($simple_html || $full_html || $snippet_html || $yaml) && !$ansi_text && !$mirc_text) {
         $ansi_text = '-';    
     }
 
@@ -174,6 +179,10 @@ sub highlight_match {
     if($ansi_text) {
         my $text = highlight_perl6_ansi();
         write_output $ansi_text, $text;
+    }
+    if($mirc_text) {
+        my $text = highlight_perl6_mirc();
+        write_output $mirc_text, $text;
     }
     if($yaml) {
         my $text = highlight_perl6_yaml();
@@ -402,6 +411,45 @@ sub highlight_perl6_ansi {
     };
 
     redspans_traverse(\&spit_ansi_text,%colors); 
+
+    $str;
+}
+
+
+=item highlight_perl6_mirc
+
+This is same as C<highlight_perl6_full> when --mirc-text is used.
+No more javascript tree viewer or anything fancy. 
+Only nodes that have a color are printed. Not optimal but works ;-)
+=cut
+sub highlight_perl6_mirc {
+    my $str = "";
+    my %colors = ();
+
+    require String::IRC;
+
+    my $MIRC = "STD_syntax_highlight.mirc";
+    open MIRC_FILE, $MIRC
+        or die "Could not open $MIRC: $OS_ERROR\n";
+    my $line;
+    while($line = <MIRC_FILE>) {
+        if($line =~ /^(\w+)=(.+)$/) {
+            $colors{$1} = $2;
+        }
+    }
+    close MIRC_FILE;
+
+    local *spit_mirc_text = sub {
+        my ($i, $buffer, $rule, $tree) = @ARG;
+        if($rule) {
+            my $color = $colors{$rule};
+            $str .= String::IRC->new($buffer)->$color;
+        } else {
+            $str .= $buffer;
+        }
+    };
+
+    redspans_traverse(\&spit_mirc_text,%colors); 
 
     $str;
 }
