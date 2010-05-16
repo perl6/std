@@ -4,7 +4,8 @@
 #
 use strict;
 use 5.010;
-use warnings;
+use warnings FATAL => 'all';
+use Carp::Always;
 
 use STD;
 use utf8;
@@ -16,6 +17,8 @@ use YAML::XS; # An attempt to replace this with YAML::Syck passed the
               # sequences shown as [] became followed by an empty line.
               # See also: YAML::Syck in package VAST::package_def below.
 use Encode;
+use JSON -convert_blessed_universally;
+use Scalar::Util 'blessed', 'refaddr';
 
 my $OPT_match = 0;
 my $OPT_log = 0;
@@ -29,14 +32,15 @@ sub USAGE {
     print <<'END';
 viv [switches] filename
     where switches can be:
-    	-e	use following argument as program
-    	--ast	spit out an abstract syntax tree (default)
-    	--p5	spit out a Perl 5 representation (partially impl)
-    	--p6	spit out a Perl 6 representation
-    	--stab	include the symbol table
-    	--pos	include position info in AST
-    	--match	include match tree info in AST
-    	--log	emit debugging info to standard error
+    	-e		use following argument as program
+    	--yaml		spit out a parsable abstract syntax tree
+    	--concise	spit out a short syntaxe tree (default)
+    	--p5		spit out a Perl 5 representation (partially impl)
+    	--p6		spit out a Perl 6 representation
+    	--stab		include the symbol table
+    	--pos		include position info in AST
+    	--match		include match tree info in AST
+    	--log		emit debugging info to standard error
 END
     exit;
 }
@@ -44,7 +48,7 @@ END
 use Actions;
 
 sub MAIN {
-    my $output = 'ast';
+    my $output = 'concise';
 
     USAGE() unless @_;
     while (@_) {
@@ -53,8 +57,11 @@ sub MAIN {
 	if ($switch eq '--eval' or $switch eq '-e') {
 	    $PROG .= Encode::decode_utf8(shift(@_)) . "\n";
 	}
-	elsif ($switch eq '--ast' or $switch eq '-a') {
-	    $output = 'ast';
+	elsif ($switch eq '--yaml' or $switch eq '-y') {
+	    $output = 'yaml';
+	}
+	elsif ($switch eq '--concise' or $switch eq '-c') {
+	    $output = 'concise';
 	}
 	elsif ($switch eq '--p5' or $switch eq '-5') {
 	    $output = 'p5';
@@ -96,10 +103,13 @@ sub MAIN {
         no warnings;
         $r->{stabs} = $STD::ALL;
     }
-    if ($output eq 'ast') {
+    if ($output eq 'yaml') {
 	my $x = Dump($r);
 #	$x =~ s/\n.*: \[\]$//mg;
 	print $x;
+    }
+    elsif ($output eq 'concise') {
+	say concise($r, 80);
     }
     elsif ($output eq 'p6') {
 	say $r->ret(0,$r->emit_p6(0));
@@ -112,6 +122,103 @@ sub MAIN {
     }
 }
 
+sub hang {
+    my ($leader, $arg) = @_;
+
+    $arg =~ s/\n/\n$leader/g;
+
+    return $arg;
+}
+
+sub listify {
+    my $r = "";
+    for my $i (0 .. $#_) {
+	$r .= ($i == $#_) ? "\n└─" : "\n├─";
+	$r .= hang($i == $#_ ? "  " : "│ ", $_[$i]);
+    }
+    $r;
+}
+
+sub shred {
+    my ($first, $rest, $tx) = @_;
+    my $out = "";
+
+    while (length $tx > $first) {
+	$out .= substr($tx, 0, $first);
+	$out .= "\n";
+	$tx = substr($tx, $first);
+	$first = $rest;
+    }
+
+    $out . $tx;
+}
+
+sub concise {
+    my ($node, $width) = @_;
+
+    $width = 30 if $width < 30;
+
+    if (!ref $node) {
+	return defined($node) ? shred($width, $width, "$node") : "undef";
+    } elsif (blessed($node) && ref($node) =~ /^VAST/) {
+	my @pos = @{blessed $node->{"."}
+			? [ $node->{"."} ]
+			: $node->{"."} // []};
+	my %nam = %$node;
+
+	delete $nam{"."};
+
+	# don't list the same node twice
+	my %inpos = map { ref($_) ? (refaddr($_) , 1) : () } @pos;
+
+	@pos = map { concise($_, $width-2) } @pos;
+
+	my @oobnam;
+	my $title = blessed $node;
+	my $x = length($title);
+	for my $ch (sort keys %nam) {
+	    next if $ch eq '_fate';
+	    if (ref $nam{$ch}) {
+		# hide named children that are just (lists of) positional children
+		if ($inpos{refaddr($nam{$ch})}) { next }
+		if (ref($nam{$ch}) eq 'ARRAY') {
+		    my $all = 1;
+		    for (@{$nam{$ch}}) { $all = 0 unless ref $_ && $inpos{refaddr $_} }
+		    next if $all;
+		}
+	    }
+
+	    my $repr = concise($nam{$ch}, $width-4);
+
+	    if ($repr !~ /\n/ && length $repr < 30) {
+		if ($x + length($ch) + length($repr) + 6 > $width) {
+		    $title .= ",\n";
+		    $x = 4;
+		} else {
+		    $title .= ", ";
+		    $x += 2;
+		}
+		$title .= "$ch: $repr";
+		$x += length("$ch: $repr");
+	    } else {
+		my $hang = " " x (length($ch)+2);
+		push @oobnam, "$ch: " . hang($hang, $repr);
+	    }
+	}
+
+	$title = hang((@pos ? "│ " : "  ") . (@oobnam ? "│ " : "  "), $title);
+
+	my $result = $title;
+
+	$result .= hang(@pos ? "│ " : "  ", listify(@oobnam));
+	$result .= listify(@pos);
+
+	return $result;
+    } else {
+	my $d = Dump($node);
+	return substr($d, 4, length($d)-5);
+    }
+}
  
 # viv should likely be abstracted into a module instead of doing this hack... - pmurias
 sub VIV::SET_OPT {
