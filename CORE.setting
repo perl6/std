@@ -383,6 +383,122 @@ my proto wait { }
 my proto kill { }
 my proto sleep { }
 
+my proto infix:<=> ($x,$y) { }
+my proto postfix:<i> ($x) { }
+my proto infix:<.> ($x,$y) { }
+my proto postfix:['->'] ($x) { }
+my proto postfix:<++> ($x) { }
+my proto postfix:«--» ($x) { }
+my proto prefix:<++> ($x) { }
+my proto prefix:«--» ($x) { }
+my proto infix:<**> ($x,$y) { }
+my proto prefix:<!> ($x) { }
+my proto prefix:<+> ($x) { }
+my proto prefix:<-> ($x) { }
+my proto prefix:<~~> ($x) { }
+my proto prefix:<~> ($x) { }
+my proto prefix:<??> ($x) { }
+my proto prefix:<?> ($x) { }
+my proto prefix:<~^> ($x) { }
+my proto prefix:<+^> ($x) { }
+my proto prefix:<?^> ($x) { }
+my proto prefix:<^^> ($x) { }
+my proto prefix:<^> ($x) { }
+my proto prefix:<||> ($x) { }
+my proto prefix:<|> ($x) { }
+my proto infix:<*> ($x,$y) { }
+my proto infix:</> ($x,$y) { }
+my proto infix:<div> ($x,$y) { }
+my proto infix:<%> ($x,$y) { }
+my proto infix:<mod> ($x,$y) { }
+my proto infix:<+&> ($x,$y) { }
+my proto infix:« << » ($x,$y) { }
+my proto infix:« >> » ($x,$y) { }
+my proto infix:<~&> ($x,$y) { }
+my proto infix:<?&> ($x,$y) { }
+my proto infix:« ~< » ($x,$y) { }
+my proto infix:« ~> » ($x,$y) { }
+my proto infix:« +< » ($x,$y) { }
+my proto infix:« +> » ($x,$y) { }
+my proto infix:<+> ($x,$y) { }
+my proto infix:<-> ($x,$y) { }
+my proto infix:<+|> ($x,$y) { }
+my proto infix:<+^> ($x,$y) { }
+my proto infix:<~|> ($x,$y) { }
+my proto infix:<~^> ($x,$y) { }
+my proto infix:<?|> ($x,$y) { }
+my proto infix:<?^> ($x,$y) { }
+my proto infix:<x> ($x,$y) { }
+my proto infix:<xx> ($x,$y) { }
+my proto infix:<~> ($x,$y) { }
+my proto infix:<&> ($x,$y) { }
+my proto infix:<|> ($x,$y) { }
+my proto infix:<^> ($x,$y) { }
+my proto infix:« <=> » ($x,$y) { }
+my proto infix:<..> ($x,$y) { }
+my proto infix:<^..> ($x,$y) { }
+my proto infix:<..^> ($x,$y) { }
+my proto infix:<^..^> ($x,$y) { }
+my proto infix:<==> ($x,$y) { }
+my proto infix:<!=> ($x,$y) { }
+my proto infix:« < » ($x,$y) { }
+my proto infix:« <= » ($x,$y) { }
+my proto infix:« > » ($x,$y) { }
+my proto infix:« >= » ($x,$y) { }
+my proto infix:<~~> ($x,$y) { }
+my proto infix:<!~> ($x,$y) { }
+my proto infix:<=~> ($x,$y) { }
+my proto infix:<eq> ($x,$y) { }
+my proto infix:<ne> ($x,$y) { }
+my proto infix:<lt> ($x,$y) { }
+my proto infix:<le> ($x,$y) { }
+my proto infix:<gt> ($x,$y) { }
+my proto infix:<ge> ($x,$y) { }
+my proto infix:<=:=> ($x,$y) { }
+my proto infix:<===> ($x,$y) { }
+my proto infix:<eqv> ($x,$y) { }
+my proto infix:<before> ($x,$y) { }
+my proto infix:<after> ($x,$y) { }
+my proto infix:<&&> ($x,$y) { }
+my proto infix:<||> ($x,$y) { }
+my proto infix:<^^> ($x,$y) { }
+my proto infix:<//> ($x,$y) { }
+my proto infix:<min> ($x,$y) { }
+my proto infix:<max> ($x,$y) { }
+my proto infix:<?? !!> ($x,$y) { }
+my proto infix:<!!> ($x,$y) { }
+my proto infix:<?> ($x,$y) { }
+my proto infix:<ff> ($x,$y) { }
+my proto infix:<^ff> ($x,$y) { }
+my proto infix:<ff^> ($x,$y) { }
+my proto infix:<^ff^> ($x,$y) { }
+my proto infix:<fff> ($x,$y) { }
+my proto infix:<^fff> ($x,$y) { }
+my proto infix:<fff^> ($x,$y) { }
+my proto infix:<^fff^> ($x,$y) { }
+my proto infix:<=> ($x,$y) { }
+my proto infix:<:=> ($x,$y) { }
+my proto infix:<::=> ($x,$y) { }
+my proto infix:<.=> ($x,$y) { }
+my proto infix:« => » ($x,$y) { }
+my proto prefix:<so> ($x) { }
+my proto prefix:<not> ($x) { }
+my proto infix:<,> ($x,$y) { }
+my proto infix:<:> ($x,$y) { }
+my proto infix:<X> ($x,$y) { }
+my proto infix:<Z> ($x,$y) { }
+my proto infix:<minmax> ($x,$y) { }
+my proto infix:<...> ($x,$y) { }
+my proto infix:<and> ($x,$y) { }
+my proto infix:<andthen> ($x,$y) { }
+my proto infix:<or> ($x,$y) { }
+my proto infix:<orelse> ($x,$y) { }
+my proto infix:<xor> ($x,$y) { }
+my proto infix:« <== » ($x,$y) { }
+my proto infix:« ==> » ($x,$y) { }
+my proto infix:« <<== » ($x,$y) { }
+my proto infix:« ==>> » ($x,$y) { }
+
 my package PROCESS {
     my %ENV is export;
 }

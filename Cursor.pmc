@@ -1943,7 +1943,7 @@ sub _AUTOLEXgen { my $self = shift;
                 for my $class ($self->meta->linearized_isa) {
                     for my $method (sort $class->meta->get_method_list) {
                         if (substr($method,0,$protolen) eq $protopat) {
-                            next if substr($method,-6,6) eq '__PEEK';
+                            next if $method =~ /__PEEK/;
                             my $callname = $class . '::' . $method . '__PEEK';
                             my $peeklex = $self->$callname();
                             if ($peeklex and $peeklex->{PATS}) {
@@ -2246,13 +2246,12 @@ sub trim_heredoc { my $doc = shift;
 }
 
 sub add_macro { my $lang = shift;
-    my $start = shift;
+    my $name = shift;
     state $GEN = "500";
-    $lang->{_from} = $start->{_from};
-    my $name = $lang->Str;
     $name =~ s/:<<(.*)>>$/:«$1»/;
     my $WHAT = ref $lang;
     if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
+        my $cat = $1;
         my ($sym) = $name =~ /:sym(.*)/;
         $sym =~ s/^<\s*(.*\S)\s*>$/<$1>/g;
         $sym =~ s/^\(\s*(.*\S)\s*\)$/$1/g;
@@ -2272,6 +2271,12 @@ sub add_macro { my $lang = shift;
                 $ok = $try, last if index($sym,$try) < 0;
             }
             $sym = $ok . $sym . $ok;
+        }
+        {
+            my $canon = substr($sym,1,length($sym)-2);
+            $canon =~ s/([<>])/\\$1/g;
+            my $canonname = $cat . ':<' . $canon . '>';
+            $lang->add_my_name($canonname);
         }
         if ($sym =~ / /) {
             $sym = '[qw' . $sym . ']';

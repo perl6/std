@@ -2554,15 +2554,14 @@ grammar P6 is STD {
         :dba('new name to be defined')
         <name>
         [
-        | <colonpair>+ { $¢.add_macro($<name>) if $*IN_DECL; }
+        | <colonpair>+ { $¢.add_macro(substr($*ORIG, self.pos, $¢.pos - self.pos)) if $*IN_DECL; }
         | { $¢.add_routine($<name>.Str) if $*IN_DECL; }
         ]
     }
 
     token subshortname {
         [
-        | <category>
-            [ <colonpair>+ { $¢.add_macro($<category>) if $*IN_DECL; } ]?
+        | <category> <colonpair>+
         | <desigilname>
         ]
     }
@@ -2866,7 +2865,7 @@ grammar P6 is STD {
         :my $*DECLARAND;
         <sym> <.ws>
         [
-        | <name=identifier> { $¢.add_name($<name>.Str); }
+        | <name=longname> { $¢.add_name($<name>.Str); }
         | <name=variable> { $¢.add_variable($<name>.Str); }
         | <?>
         ]
@@ -5381,6 +5380,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
     $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
+    return self.add_macro(substr($name,1)) if $name ~~ /^\&\w+\:/;
     if $shortname ~~ /\:/ {
         $shortname ~~ s/\:.*//;
     }
