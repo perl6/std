@@ -1946,22 +1946,22 @@ grammar P6 is STD {
 
     token multi_declarator:multi {
         :my $*MULTINESS = 'multi';
-        <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed multi'> ]
+        <sym> <.ws> [ <declarator> || <routine_def('multi')> || <.panic: 'Malformed multi'> ]
     }
     token multi_declarator:proto {
         :my $*MULTINESS = 'proto';
-        <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed proto'> ]
+        <sym> <.ws> [ <declarator> || <routine_def('proto')> || <.panic: 'Malformed proto'> ]
     }
     token multi_declarator:only {
         :my $*MULTINESS = 'only';
-        <sym> <.ws> [ <declarator> || <routine_def> || <.panic: 'Malformed only'> ]
+        <sym> <.ws> [ <declarator> || <routine_def('only')> || <.panic: 'Malformed only'> ]
     }
     token multi_declarator:null {
         :my $*MULTINESS = '';
         <declarator>
     }
 
-    token routine_declarator:sub       { <sym> <routine_def> }
+    token routine_declarator:sub       { <sym> <routine_def('sub')> }
     token routine_declarator:method    { <sym> <method_def> }
     token routine_declarator:submethod { <sym> <method_def> }
     token routine_declarator:macro     { <sym> <macro_def> }
@@ -1989,14 +1989,15 @@ grammar P6 is STD {
         return self;
     }
 
-    rule routine_def () {
+    rule routine_def ($d) {
         :temp $*CURPAD;
-        :my $*IN_DECL = 'routine';
+        :my $*IN_DECL = $d;
         :my $*DECLARAND;
         [
             [ $<sigil>=['&''*'?] <deflongname>? | <deflongname> ]?
             <.newpad(1)>
             [ <multisig> | <trait> ]*
+            [ <!before '{'> <.panic: "Malformed block"> ]?
             <!{
                 $*IN_DECL = '';
             }>
@@ -2043,6 +2044,7 @@ grammar P6 is STD {
             [ '&'<deflongname>? | <deflongname> ]?
             <.newpad(1)>
             [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
+            [ <!before '{'> <.panic: "Malformed block"> ]?
             { $*IN_DECL = ''; }
             <.finishpad>
             <regex_block>:!s
@@ -2059,9 +2061,7 @@ grammar P6 is STD {
             [ '&'<deflongname>? | <deflongname> ]?
             <.newpad(1)>
             [ <multisig> | <trait> ]*
-            <!{
-                $*IN_DECL = '';
-            }>
+            [ <!before '{'> <.panic: "Malformed block"> ]?
             { $*IN_DECL = ''; }
             <blockoid>:!s
             <.checkyada>
@@ -5722,6 +5722,8 @@ method pad_can_find_name ($pad, $name, $varbind) {
 }
 
 method add_routine ($name) {
+    
+    @*MEMOS[self.pos]<wasname> = $name if self.is_name($name);
     my $vname = '&' ~ $name;
     self.add_name($vname);
     self;
@@ -5961,6 +5963,14 @@ method panic (Str $s) {
                 $m ~~ s|Confused|Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'|;
             }
         }
+    }
+    elsif my $type = @*MEMOS[$here.pos - 1]<wasname> {
+        my @t = $here.suppose( sub { $here.identifier } );
+        my $name = @t[0].Str;
+        my $s = $*SCOPE ?? "'$*SCOPE'" !! '(missing) scope declarator';
+        my $d = $*IN_DECL;
+        $d = "$*MULTINESS $d" if $*MULTINESS and $*MULTINESS ne $d;
+        $m ~~ s|Malformed block|Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.|;
     }
 
     if @*WORRIES {
