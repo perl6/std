@@ -4016,9 +4016,15 @@ grammar P6 is STD {
     {
         :my $name;
         :my $pos;
+        :my $isname = 0;
         <identifier> <?before [<unsp>|'(']? > <![:]>
-        { $name = $<identifier>.Str; $pos = $¢.pos; }
-        <args( $¢.is_name($name) )>
+        {{
+            $name = $<identifier>.Str;
+            $pos = $¢.pos;
+            $isname = $¢.is_name($name);
+            $¢.check_nodecl($name) if $isname;
+        }}
+        <args($isname)>
         { self.add_mystery($<identifier>,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
         {{
             if $*BORG and $*BORG.<block> {
@@ -4076,6 +4082,7 @@ grammar P6 is STD {
         ||  <?{
                 $¢.is_name($name) or substr($name,0,2) eq '::'
             }>
+            { $¢.check_nodecl($name); }
 
             # parametric type?
             :dba('type parameter')
@@ -4100,6 +4107,12 @@ grammar P6 is STD {
             }}
         ]
         <O(%term)>
+    }
+
+    method check_nodecl($name) {
+        if $name lt 'a' {
+            @*MEMOS[self.pos]<nodecl> = $name;
+        }
     }
 
     ## loose and
@@ -5939,6 +5952,13 @@ method panic (Str $s) {
             }
             else {
                 $m ~~ s|Confused|Two terms in a row|;
+            }
+        }
+        elsif my $type = @*MEMOS[$here.pos - 1]<nodecl> {
+            my @t = $here.suppose( sub { $here.variable } );
+            if @t {
+                my $variable = @t[0].Str;
+                $m ~~ s|Confused|Bare type $type cannot declare $variable without a preceding scope declarator such as 'my'|;
             }
         }
     }
