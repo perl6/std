@@ -1072,7 +1072,7 @@ sub suppose { my $self = shift;
     no warnings 'recursion';
 
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    local $::FATALS;
+    local $::FATALS = 0;
     local @::WORRIES;
     local %::WORRIES;
     local $::HIGHWATER = -1;
