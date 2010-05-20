@@ -440,10 +440,20 @@ sub indent {
 
 
 { package VAST::assertion__S_method; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my $name = $self->{'.'}[0]{longname}->Str;
+	"\$C->$name"
+    }
 }
 
 
 { package VAST::assertion__S_name; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my $name = $self->{longname}->Str;
+	# This is actually just binding a method.  Should be factored.
+	my $r = $::RATCHET ? 'r' : '';
+	"\$C->_SUBSUME$r(['$name'], sub { my \$C = \$_[0]; \$C->$name })"
+    }
 }
 
 
@@ -856,6 +866,9 @@ sub indent {
 
 
 { package VAST::metachar__S_Lt_Gt; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	$self->{assertion}->emit_p5($lvl)
+    }
 }
 
 
