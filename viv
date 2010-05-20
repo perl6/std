@@ -273,6 +273,13 @@ sub indent {
 	substr($::ORIG, $b, $e - $b);
     }
 
+    sub kids { my $self = shift;
+	my $key = shift() // '.';
+	return () unless exists $self->{$key};
+	my $entry = $self->{$key};
+	return ref($entry) eq 'ARRAY' ? @$entry : $entry;
+    }
+
     sub emit_p6 { my $self = shift;
 	my $lvl = shift;
 	my $text = '';
@@ -1018,7 +1025,6 @@ sub indent {
 { package VAST::Named_unary; our @ISA = 'VAST::Base';
 }
 
-
 { package VAST::nibbler; our @ISA = 'VAST::Base';
 }
 
@@ -1256,6 +1262,24 @@ END
 { package VAST::quantified_atom; our @ISA = 'VAST::Base';
 }
 
+# For regex methods, emit_p5 returns an expression which, when evaluated
+# in list (lazycat) context, produces the new set of cursors, given one
+# previous cursor in the lexical $C.  We can probably do better but this
+# is the gimme5-compatible approach for now.
+{ package VAST::quant_atom_list; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+        my @kids = map { scalar $_->emit_p5($lvl+1) } $self->kids;
+	while (@kids >= 2) {
+	    my ($a, $b) = splice @kids, -2;
+	    # TODO this sucks
+	    push @kids, $::RATCHET 
+		? "do { if (my (\$C) = ($a)) {\n$b;\n} else { (); } }"
+		: "Cursor::lazymap(sub { my \$C = \$_[0];\n$b\n},\n$a\n)";
+	}
+	$kids[0];
+    }
+}
+
 
 { package VAST::quantifier; our @ISA = 'VAST::Base';
 }
@@ -1333,6 +1357,7 @@ END
 
 { package VAST::regex_declarator__S_regex; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
+	local $::RATCHET = 0;
 	my $comment = substr($::ORIG, $self->{BEG},100);
 	$comment =~ s/\s*\{.*//s;
         my $t = join '', $self->SUPER::emit_p5($lvl+1);
@@ -1344,6 +1369,7 @@ END
 
 { package VAST::regex_declarator__S_rule; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
+	local $::RATCHET = 1;
 	my $comment = substr($::ORIG, $self->{BEG},100);
 	$comment =~ s/\s*\{.*//s;
         my $t = join '', $self->SUPER::emit_p5($lvl+1);
@@ -1355,6 +1381,7 @@ END
 
 { package VAST::regex_declarator__S_token; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
+	local $::RATCHET = 1;
 	my $comment = substr($::ORIG, $self->{BEG},100);
 	$comment =~ s/\s*\{.*//s;
         my $t = join '', $self->SUPER::emit_p5($lvl+1);
