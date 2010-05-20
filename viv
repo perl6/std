@@ -1373,8 +1373,7 @@ END
 	local $::RATCHET = 0;
 	my $comment = substr($::ORIG, $self->{BEG},100);
 	$comment =~ s/\s*\{.*//s;
-        my $t = join '', $self->SUPER::emit_p5($lvl+1);
-	$t =~ s/regex/sub/;
+        my $t = $self->{regex_def}->emit_p5($lvl+1);
         $self->ret($lvl,"## $comment\n$t");
     }
 }
@@ -1385,8 +1384,7 @@ END
 	local $::RATCHET = 1;
 	my $comment = substr($::ORIG, $self->{BEG},100);
 	$comment =~ s/\s*\{.*//s;
-        my $t = join '', $self->SUPER::emit_p5($lvl+1);
-	$t =~ s/rule/sub/;
+        my $t = $self->{regex_def}->emit_p5($lvl+1);
         $self->ret($lvl,"## $comment\n$t");
     }
 }
@@ -1395,30 +1393,33 @@ END
 { package VAST::regex_declarator__S_token; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	local $::RATCHET = 1;
-	my $comment = substr($::ORIG, $self->{BEG},100);
+	my $comment = substr($::ORIG, $self->{BEG}, 100);
 	$comment =~ s/\s*\{.*//s;
-        my $t = join '', $self->SUPER::emit_p5($lvl+1);
-	$t =~ s/token/sub/;
+        my $t = $self->{regex_def}->emit_p5($lvl+1);
         $self->ret($lvl,"## $comment\n$t");
     }
 }
 
 { package VAST::regex_def; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @b = $self->SUPER::emit_p5($lvl+1);
-	my @e = '';
-	while (@b) {
-	    my $t = pop(@b);
-	    if ($t =~ s/^\{//) {
-		$t = " {\n    my \$self = shift;\n" . pop(@b) . $t;
-		unshift(@e,$t);
-		last;
-	    }
-	    unshift(@e,$t);
-	}
-	my $block = join('', @b, @e);
-	$block =~ s/(.*[^ ]) +\}\n/$1\n}\n/s;
-        $self->ret($lvl,$block);
+	my $name = $self->{deflongname}[0]->Str;
+	my $body = $self->{regex_block}{nibble}->emit_p5($lvl+1);
+
+	my $r = $::RATCHET ? 'r' : '';
+	$self->ret($lvl, <<TEXT);
+sub $name {
+    no warnings 'recursion';
+    my \$self = shift;
+
+    local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+
+    my \$C = \$self->cursor_xact("RULE $name");
+    my \$xact = \$C->xact;
+    my \$S = \$C->{'_pos'};
+
+    \$self->_MATCHIFY$r(\$S, "$name", $body);
+}
+TEXT
     }
 }
 
