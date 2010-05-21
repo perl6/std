@@ -2250,13 +2250,19 @@ sub add_macro { my $lang = shift;
     state $GEN = "500";
     $name =~ s/:<<(.*)>>$/:«$1»/;
     my $WHAT = ref $lang;
-    if ($name =~ s/^(\w+):(?=[«<({[])/$1:sym/) {
+
+    # :() is a signature modifier, not an operator
+    if ($name =~ /^\w+:\(/) {
+        # XXX canonicalize sig here eventually
+        $lang->add_my_name($name);
+        return $lang;
+    }
+
+    if ($name =~ s/^(\w+):(?=[«<{[])/$1:sym/) {
         my $cat = $1;
         my ($sym) = $name =~ /:sym(.*)/;
         $sym =~ s/^<\s*(.*\S)\s*>$/<$1>/g;
-        $sym =~ s/^\(\s*(.*\S)\s*\)$/$1/g;
         $sym =~ s/^\[\s*(.*\S)\s*\]$/$1/g;
-        $sym =~ s/^\{\s*(.*\S)\s*\}$/$1/g;
         if ( $sym =~ s/\\x\[(.*)\]/\\x{$1}/g) {
             $sym = '«' . eval($sym) . '»';
         }
@@ -2496,21 +2502,6 @@ my \$retree = {
     ],
   }, 'RE_sequence'),
  }, 'RE_ast'),
- 'stopper' => bless({
-  'decl' => [],
-  'kind' => 'token',
-  'min' => 1,
-  'pkg' => undef,
-  're' => bless({
-    'a' => 0,
-    'dba' => 'stopper',
-    'i' => 0,
-    'min' => 1,
-    'r' => 1,
-    's' => 0,
-    'text' => $stopper,
-   }, 'RE_string'),
-  }, 'RE_ast'),
 };
 
 our \$CATEGORY = '$category';
@@ -2579,22 +2570,6 @@ sub $mangle {
         ();
       }
     }
-    );
-}
-
-sub stopper__PEEK { \$_[0]->_AUTOLEXpeek('stopper',\$retree) }
-sub stopper {
-    no warnings 'recursion';
-    my \$self = shift;
-    local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
-
-
-    my \$C = \$self->cursor_xact("RULE stopper");
-    my \$xact = \$C->xact;
-    my \$S = \$C->{'_pos'};
-
-    \$self->_MATCHIFYr(\$S, "stopper", 
-        \$C->_EXACT($stopper)
     );
 }
 

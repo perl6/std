@@ -1496,6 +1496,7 @@ grammar P6 is STD {
             ]
         | <?before ';'>
         | <?before <stopper> >
+        | <?before $*GOAL> <?{ $*GOAL ne '' }>
         | {} <.panic: "Bogus statement">
         ]
 
@@ -1514,6 +1515,7 @@ grammar P6 is STD {
         || ';'
         || <?{ (@*MEMOS[$¢.pos]<endstmt>//0) >= 2 }> <.ws>
         || <?before ')' | ']' | '}' >
+        || <?before $*GOAL> <?{ $*GOAL ne '' }>
         || $
         || <?stopper>
         || <?before <.suppose <statement_control> > > <.backup_ws> { $*HIGHWATER = -1; } <.panic: "Missing semicolon">
