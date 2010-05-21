@@ -1110,87 +1110,82 @@ sub indent {
 
 
 { package VAST::package_def; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
+    sub p5_module_name {  my $self = shift;
 	my $def_module_name = $self->{longname}[0]{name}->Str;
 	if ($self->{decl}{inpkg}[0] =~ /GLOBAL::(.*)/) {
 	    $def_module_name = "$1::$def_module_name";
 	}
+	$def_module_name;
+    }
+    sub emit_p5_header {  my $self = shift;
+	my $header = "";
+	my $name = $self->p5_module_name;
 	my @extends;
 	for (@{$self->{trait}}) {
 	    my $t = $_->Str;
 	    push(@extends, $t =~ /^is\s+(\S+)/);
 	}
 	@extends = 'Cursor' if $::PKGDECL eq 'grammar' && !@extends;
-	my $block = $self->{block};
-	my $out;
-	if ($block) {
-	    $out = "{ package $def_module_name;\n";
-	}
-	else {
-	    $::PKG = $def_module_name;
-	    $out = "package $def_module_name;\n";
-	}
+
 	my $meta = $::PKGDECL eq 'role' ? 'Moose::Role' : 'Moose';
 
-	my $moose;
-	$moose .= <<"END";
+	$header .= <<"END";
 use $meta ':all' => { -prefix => "moose_" };
 END
 
-	$moose .= <<"END" for @extends;
+	$header .= <<"END" for @extends;
 use $_; # for base class as well as DEBUG constants
 moose_extends('$_');
 END
 
-	$moose .= <<"END";
+	$header .= <<"END";
 
 no warnings 'qw', 'recursion';
-END
-
-	if ($block) {
-	    my $b = $block->emit_p5($lvl+1);
-	    $b =~ s/{//;
-	    $out .= ::indent($moose);
-	    $out .= $b;
-	    my $comment = $self->{comment};
-	    if ($comment) {
-		$out .= $block->gap($comment);
-		$out .= $comment->emit_p5($lvl+1);
-	    }
-	    else {
-		$out .= "\n";
-	    }
-	}
-	else {
-	    $out .= $moose;
-	    $out .= <<"END";
-
 my \$retree;
 
 \$DB::deep = \$DB::deep = 1000; # suppress used-once warning
 
-sub BUILD {
-    my \$self = shift;
-END
-
-	$out .= <<'END' if $::PKG eq 'STD';
-    $self->_AUTOLEXpeek('termish',$retree);
-END
-
-	$out .= <<'END';
-}
-
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "\n" } if $::DEBUG;
+\$SIG{__WARN__} = sub { die \@_,"   statement started at line ", 'STD'->lineof(\$::LASTSTATE), "\n" } if \$::DEBUG;
 
 END
-	    $out .= $self->{statementlist}->emit_p5($lvl+1)
-		if $self->{statementlist};
-	    $out .= $self->{blockoid}{statementlist}->emit_p5($lvl+1)
-		if $self->{blockoid}{statementlist};
+	$header;
+    }
+
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	my $block = $self->{blockoid}{statementlist} // $self->{statementlist};
+	my $body =
+	    $self->emit_p5_header . $block->emit_p5($lvl+1);
+	my $name  = $self->p5_module_name;
+
+	if (my ($sig) = $self->kids('signature')) {
+	    my @parm = map { $_->Str } $sig->kids('parameter');
+	    my $plist = join ", ", @parm;
+
+	    $body = <<EOT . $body;
+    package $name;
+    require "mangle.pl";
+    our \%INSTANTIATED;
+    sub __instantiate__ { my \$self = shift;
+        my ($plist) = \@_;
+        my \$mangle = ::mangle($plist);
+        my \$mixin = "${name}::" . \$mangle;
+        return \$mixin if \$INSTANTIATED{\$mixin}++;
+        ::deb("         instantiating \$mixin") if \$::DEBUG & DEBUG::mixins;
+        my \$eval = "package \$mixin" . q{;
+EOT
+	    $body .= <<EOT;
+	};
+	eval \$eval;
+	return \$mixin;
+    }
+EOT
+	} else {
+	    $body = "package $name;\n" . $body;
 	}
-	$out;
+
+	$self->ret($lvl, "{ $body }");
     }
 }
 
@@ -1372,7 +1367,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	local $::RATCHET = 0;
 	my $comment = substr($::ORIG, $self->{BEG},100);
-	$comment =~ s/\s*\{.*//s;
+	$comment =~ s/\n.*//s;
         my $t = $self->{regex_def}->emit_p5($lvl+1);
         $self->ret($lvl,"## $comment\n$t");
     }
@@ -1383,7 +1378,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	local $::RATCHET = 1;
 	my $comment = substr($::ORIG, $self->{BEG},100);
-	$comment =~ s/\s*\{.*//s;
+	$comment =~ s/\n.*//s;
         my $t = $self->{regex_def}->emit_p5($lvl+1);
         $self->ret($lvl,"## $comment\n$t");
     }
@@ -1394,7 +1389,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	local $::RATCHET = 1;
 	my $comment = substr($::ORIG, $self->{BEG}, 100);
-	$comment =~ s/\s*\{.*//s;
+	$comment =~ s/\n.*//s;
         my $t = $self->{regex_def}->emit_p5($lvl+1);
         $self->ret($lvl,"## $comment\n$t");
     }
@@ -1604,6 +1599,12 @@ TEXT
 
 
 { package VAST::statementlist; our @ISA = 'VAST::Base';
+    # For some reason the default version misbehaves and incorporates p6
+    # statement text XXX
+    sub emit_p5 { my $self = shift; my $lvl = shift;
+	$self->ret($lvl, join("\n", map { $_->emit_p5($lvl+1) }
+		$self->kids('statement')));
+    }
 }
 
 
@@ -1741,10 +1742,7 @@ TEXT
 
 { package VAST::term__S_regex_declarator; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-	my $txt = $self->Str;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-	$txt =~ s/^/## /mg;
-        $self->ret($lvl,$txt,@t);
+        $self->ret($lvl,$self->{regex_declarator}->emit_p5($lvl+1));
     }
 }
 
