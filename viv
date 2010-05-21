@@ -372,6 +372,10 @@ sub indent {
 	return substr($::ORIG, $beg, $end - $beg);
     }
 
+    sub re_ast {  my $self = shift; my $type = shift;
+	return bless { a => 0, i => 0, r => $::RATCHET, s => $::SIGSPACE,
+	    dba => $::DBA, @_ }, "RE_$type";
+    }
 }
 
 { package VAST::Str; our @ISA = 'VAST::Base';
@@ -444,6 +448,10 @@ sub indent {
 	my $name = $self->{'.'}[0]{longname}->Str;
 	"\$C->$name"
     }
+    sub re_ast {  my $self = shift;
+	my $name = $self->{'.'}[0]{longname}->Str;
+	$self->SUPER::re_ast(method => name => $name);
+    }
 }
 
 
@@ -454,6 +462,10 @@ sub indent {
 	my $r = $::RATCHET ? 'r' : '';
 	"\$C->_SUBSUME$r(['$name'], sub { my \$C = \$_[0]; \$C->$name })"
     }
+    sub re_ast {  my $self = shift;
+	my $name = $self->{longname}->Str;
+	$self->SUPER::re_ast(method =>, name => $name);
+    }
 }
 
 
@@ -462,6 +474,9 @@ sub indent {
 
 
 { package VAST::atom; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	$self->{metachar}->re_ast;
+    }
 }
 
 
@@ -869,6 +884,9 @@ sub indent {
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	$self->{assertion}->emit_p5($lvl)
     }
+    sub re_ast {  my $self = shift;
+	$self->{assertion}->re_ast;
+    }
 }
 
 
@@ -1155,8 +1173,16 @@ END
 
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my $block = $self->{blockoid}{statementlist} // $self->{statementlist};
-	my $body =
-	    $self->emit_p5_header . $block->emit_p5($lvl+1);
+	local $::RETREE = {};
+	my $body1 = $self->emit_p5_header;
+	my $body3 = $block->emit_p5($lvl+1);
+	my $body2 = '';
+
+	if (%{$::RETREE}) {
+	    $body2 = "\$retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));\n" .
+		::Dump($::RETREE) . "RETREE_END\n";
+	}
+	my $body = $body1 . $body2 . $body3;
 	my $name  = $self->p5_module_name;
 
 	if (my ($sig) = $self->kids('signature')) {
@@ -1268,6 +1294,9 @@ EOT
 
 
 { package VAST::quantified_atom; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	$self->{atom}->re_ast; #XXX
+    }
 }
 
 # For regex methods, emit_p5 returns an expression which, when evaluated
@@ -1285,6 +1314,10 @@ EOT
 		: "Cursor::lazymap(sub { my \$C = \$_[0];\n$b\n},\n$a\n)";
 	}
 	$kids[0];
+    }
+    sub re_ast {  my $self = shift;
+	$self->SUPER::re_ast(sequence => zyg =>
+	    [ map { $_->re_ast } $self->kids("quantified_atom") ]);
     }
 }
 
@@ -1366,6 +1399,8 @@ EOT
 { package VAST::regex_declarator__S_regex; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	local $::RATCHET = 0;
+	local $::SIGSPACE = 0;
+	local $::REGEX_DECLARATOR = 'regex';
 	my $comment = substr($::ORIG, $self->{BEG},100);
 	$comment =~ s/\n.*//s;
         my $t = $self->{regex_def}->emit_p5($lvl+1);
@@ -1377,6 +1412,8 @@ EOT
 { package VAST::regex_declarator__S_rule; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	local $::RATCHET = 1;
+	local $::SIGSPACE = 1;
+	local $::REGEX_DECLARATOR = 'rule';
 	my $comment = substr($::ORIG, $self->{BEG},100);
 	$comment =~ s/\n.*//s;
         my $t = $self->{regex_def}->emit_p5($lvl+1);
@@ -1388,6 +1425,8 @@ EOT
 { package VAST::regex_declarator__S_token; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	local $::RATCHET = 1;
+	local $::SIGSPACE = 0;
+	local $::REGEX_DECLARATOR = 'token';
 	my $comment = substr($::ORIG, $self->{BEG}, 100);
 	$comment =~ s/\n.*//s;
         my $t = $self->{regex_def}->emit_p5($lvl+1);
@@ -1396,12 +1435,22 @@ EOT
 }
 
 { package VAST::regex_def; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	my $bodyast = $self->{regex_block}{nibble}{"."}->re_ast;
+	# XXX find out what pkg, decl do and get the right values, also min
+	$self->SUPER::re_ast(ast => kind => $::REGEX_DECLARATOR,
+	    pkg => '~', decl => [], re => $bodyast);
+    }
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my $name = $self->{deflongname}[0]->Str;
+	local $::DBA = $name;
 	my $body = $self->{regex_block}{nibble}->emit_p5($lvl+1);
+
+	$::RETREE->{$name} = $self->re_ast;
 
 	my $r = $::RATCHET ? 'r' : '';
 	$self->ret($lvl, <<TEXT);
+sub ${name}__PEEK { \$_[0]->_AUTOLEXpeek('$name', \$retree) }
 sub $name {
     no warnings 'recursion';
     my \$self = shift;
