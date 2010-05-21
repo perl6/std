@@ -1077,24 +1077,24 @@ sub indent {
 
 { package VAST::package_declarator__S_class; our @ISA = 'VAST::package_declarator';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-	$t[0] =~ s/\S.*//s;
-        $self->ret($lvl,@t);
+	local $::PKGDECL = 'class';
+        $self->ret($lvl,$self->{package_def}->emit_p5($lvl+1));
     }
 }
 
 
 { package VAST::package_declarator__S_grammar; our @ISA = 'VAST::package_declarator';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-	$t[0] =~ s/\S.*//s;
-        $self->ret($lvl,@t);
+	local $::PKGDECL = 'grammar';
+        $self->ret($lvl,$self->{package_def}->emit_p5($lvl+1));
     }
 }
 
 
 { package VAST::package_declarator__S_role; our @ISA = 'VAST::package_declarator';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
+	local $::PKGDECL = 'role';
+        $self->ret($lvl,$self->{package_def}->emit_p5($lvl+1));
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] =~ s/\S.*//s;
         $self->ret($lvl,@t);
@@ -1103,9 +1103,8 @@ sub indent {
 
 { package VAST::package_declarator__S_knowhow; our @ISA = 'VAST::package_declarator';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @t = $self->SUPER::emit_p5($lvl+1);
-	$t[0] =~ s/\S.*//s;
-        $self->ret($lvl,@t);
+	local $::PKGDECL = 'knowhow';
+        $self->ret($lvl,$self->{package_def}->emit_p5($lvl+1));
     }
 }
 
@@ -1121,7 +1120,7 @@ sub indent {
 	    my $t = $_->Str;
 	    push(@extends, $t =~ /^is\s+(\S+)/);
 	}
-	@extends = 'Cursor' unless @extends;
+	@extends = 'Cursor' if $::PKGDECL eq 'grammar' && !@extends;
 	my $block = $self->{block};
 	my $out;
 	if ($block) {
@@ -1131,10 +1130,11 @@ sub indent {
 	    $::PKG = $def_module_name;
 	    $out = "package $def_module_name;\n";
 	}
+	my $meta = $::PKGDECL eq 'role' ? 'Moose::Role' : 'Moose';
 
 	my $moose;
 	$moose .= <<"END";
-use Moose ':all' => { -prefix => "moose_" };
+use $meta ':all' => { -prefix => "moose_" };
 END
 
 	$moose .= <<"END" for @extends;
