@@ -1512,13 +1512,21 @@ grammar P6 is STD {
     token eat_terminator {
         [
         || ';'
-        || <?{ @*MEMOS[$¢.pos]<endstmt> }> <.ws>
-        || <?terminator>
+        || <?{ (@*MEMOS[$¢.pos]<endstmt>//0) >= 2 }> <.ws>
+        || <?before ')' | ']' | '}' >
         || $
         || <?stopper>
-        || {{ if @*MEMOS[$¢.pos]<ws> { $¢.pos = @*MEMOS[$¢.pos]<ws>; } }}   # undo any line transition
-            <.panic: "Confused">
+        || <?before <.suppose <statement_control> > > <.backup_ws> { $*HIGHWATER = -1; } <.panic: "Missing semicolon">
+        || <.panic: "Confused">
         ]
+    }
+
+    # undo any line transition
+    method backup_ws () {
+        if @*MEMOS[self.pos]<ws> {
+            return self.cursor(@*MEMOS[self.pos]<ws>);
+        }
+        return self;
     }
 
     #####################
@@ -4890,7 +4898,7 @@ grammar Regex is STD {
     }
 
     # sequence stoppers
-    token metachar:sym« > » { '>'  :: <fail> }
+    token metachar:sym« > » { '>'<!before '>'> :: <fail> }
     token metachar:sym<&&>  { '&&' :: <fail> }
     token metachar:sym<&>   { '&'  :: <fail> }
     token metachar:sym<||>  { '||' :: <fail> }
@@ -5938,7 +5946,7 @@ method panic (Str $s) {
         }
     }
     if $m ~~ /infix|nofun/ and not $m ~~ /regex/ {
-        my @t = $here.suppose( sub { $here.termish } );
+        my @t = $here.suppose( sub { $here.term } );
         if @t {
             my $endpos = $here.pos;
             my $startpos = @*MEMOS[$endpos]<ws> // $endpos;
