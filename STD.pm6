@@ -5464,10 +5464,12 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
         if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
             $curstash.{"&$shortname"} //= $curstash.{$shortname};
             $sid ~= "::$name";
-            $*NEWPAD = $curstash.{$name ~ '::'} //= ($p // Stash.new(
-                'PARENT::' => $curstash.idref,
-                '!file' => $*FILE, '!line' => self.line,
-                '!id' => [$sid] ));
+            if $name !~~ /\:\</ {
+                $*NEWPAD = $curstash.{$name ~ '::'} = ($p // Stash.new(
+                    'PARENT::' => $curstash.idref,
+                    '!file' => $*FILE, '!line' => self.line,
+                    '!id' => [$sid] ));
+            }
         }
     }
     self;
