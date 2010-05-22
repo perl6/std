@@ -2983,7 +2983,7 @@ grammar P6 is STD {
                     when '*' {
                     }
                     default {
-                        self.worry("Illegal to use $twigil twigil in signature");
+                        self.panic("You may not use the $twigil twigil in a signature");
                     }
                 }
             }}
@@ -5192,6 +5192,7 @@ method newpad ($needsig = 0) {
         );
     }
     $*CURPAD.<!NEEDSIG> = 1 if $needsig;
+    $*CURPAD.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
     $ALL.{$id} = $*CURPAD;
     self;
 }
@@ -5763,20 +5764,39 @@ method add_constant($name,$value) {
 }
 
 method add_placeholder($name) {
+    my $decl = $*CURPAD.<!IN_DECL>;
+    $decl = ' ' ~ $decl if $decl;
     my $*IN_DECL = 'variable';
+
     if $*SIGNUM {
-        return self.sorry("Placeholder variable $name not allowed in signature");
+        return self.sorry("Placeholder variable $name is not allowed in the$decl signature");
     }
     elsif my $siggy = $*CURPAD.<$?SIGNATURE> {
         return self.sorry("Placeholder variable $name cannot override existing signature $siggy");
     }
     if not $*CURPAD.<!NEEDSIG> {
-        return self.sorry("Placeholder variable $name cannot be used in this kind of block");
+        if $*CURPAD === $*UNIT {
+            return self.sorry("Placeholder variable $name may not be used outside of a block");
+        }
+        return self.sorry("Placeholder variable $name may not be used here because the surrounding$decl block takes no signature");
     }
-    self.add_my_name($name);
-    $name ~~ s/\^//;
-    $name = ':' ~ $name if $name ~~ s/\://;
-    $*CURPAD.{'%?PLACEHOLDERS'}{$name}++;
+    if $name ~~ /\:\:/ {
+        return self.sorry("Placeholder variable $name may not be package qualified");
+    }
+
+    my $varname = $name;
+    my $twigil;
+    my $signame;
+    $twigil = '^' if $varname ~~ s/\^//;
+    $signame = $twigil = ':' if $varname ~~ s/\://;
+    $signame ~= $varname;
+    return self if $*CURPAD.{'%?PLACEHOLDERS'}{$signame}++;
+
+    if $*CURPAD{$varname} {
+        return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
+    }
+ 
+    self.add_my_name($varname);
     self;
 }
 

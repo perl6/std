@@ -961,7 +961,7 @@ sub indent {
 	while (@b) {
 	    my $t = pop(@b);
 	    if ($t =~ s/^\{//) {
-		$t = " {\n    my \$self = shift;\n" . pop(@b) . $t;
+		$t = " {\n    no warnings 'recursion';\n    my \$self = shift;\n" . pop(@b) . $t;
 		unshift(@e,$t);
 		last;
 	    }
