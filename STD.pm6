@@ -5764,7 +5764,7 @@ method add_constant($name,$value) {
 }
 
 method add_placeholder($name) {
-    my $decl = $*CURPAD.<!IN_DECL>;
+    my $decl = $*CURPAD.<!IN_DECL> // '';
     $decl = ' ' ~ $decl if $decl;
     my $*IN_DECL = 'variable';
 
