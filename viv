@@ -585,6 +585,15 @@ sub indent {
 
 
 { package VAST::colonpair; our @ISA = 'VAST::Base';
+    sub adverbs { my $self = shift;
+	if (Scalar::Util::blessed $self->{v} &&
+		$self->{v}->isa('VAST::coloncircumfix') &&
+		(my ($val) = $self->{v}->Str =~ /^[<«](.*).$/)) {
+	    return $self->{k} => $val;
+	} else {
+	    die "Unsupported compile-time adverb " . $self->Str;
+	}
+    }
 }
 
 
@@ -636,6 +645,9 @@ sub indent {
 
 
 { package VAST::deflongname; our @ISA = 'VAST::Base';
+    sub adverbs { my $self = shift;
+	map { $_->adverbs } $self->kids('colonpair');
+    }
 }
 
 
@@ -817,6 +829,9 @@ sub indent {
 
 
 { package VAST::longname; our @ISA = 'VAST::Base';
+    sub adverbs { my $self = shift;
+	map { $_->adverbs } $self->kids('colonpair');
+    }
 }
 
 
@@ -1191,6 +1206,7 @@ END
 	local $::PROTO = {};
 	local $::PROTOSIG = {};
 	local $::PKG = $self->p5_module_name;
+	local $::MULTIRX_SEQUENCE = 0;
 	my $body1 = $self->emit_p5_header;
 	my $body3 = $block->emit_p5($lvl+1);
 	my $body2 = '';
@@ -1520,31 +1536,38 @@ EOT
 
 
     sub emit_p5 {  my $self = shift; my $lvl = shift;
-	my $name = $self->{deflongname}[0]->Str;
+	my $name = $self->{deflongname}[0]{name}->Str;
 	if (defined $::MULTINESS && $::MULTINESS eq 'proto') {
 	    return $self->ret($lvl, $self->protoregex($name));
 	}
+	my $p5name = $name;
+	my %adv = $self->{deflongname}[0]->adverbs;
+
+	if (defined $::PROTO && $::PROTO->{$name}) {
+	    $p5name = sprintf "%s__S_%03d%s", $name, $::MULTIRX_SEQUENCE++,
+		::mangle(split " ", $adv{sym});
+	}
 	local $::DBA = $name;
-	local $::NAME = $name;
+	local $::NAME = $p5name;
 	local $::ALT = 0;
 	my $body = $self->{regex_block}{nibble}->emit_p5($lvl+1);
 
-	$::RETREE->{$name} = $self->re_ast;
+	$::RETREE->{$p5name} = $self->re_ast;
 
 	my $r = $::RATCHET ? 'r' : '';
 	$self->ret($lvl, <<TEXT);
-sub ${name}__PEEK { \$_[0]->_AUTOLEXpeek('$name', \$retree) }
-sub $name {
+sub ${p5name}__PEEK { \$_[0]->_AUTOLEXpeek('$p5name', \$retree) }
+sub $p5name {
     no warnings 'recursion';
     my \$self = shift;
 
     local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
 
-    my \$C = \$self->cursor_xact("RULE $name");
+    my \$C = \$self->cursor_xact("RULE $p5name");
     my \$xact = \$C->xact;
     my \$S = \$C->{'_pos'};
 
-    \$self->_MATCHIFY$r(\$S, "$name", $body);
+    \$self->_MATCHIFY$r(\$S, "$p5name", $body);
 }
 TEXT
     }
