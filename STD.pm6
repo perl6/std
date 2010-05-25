@@ -2564,7 +2564,7 @@ grammar P6 is STD {
         :dba('new name to be defined')
         <name>
         [
-        | <colonpair>+ { $¢.add_macro(substr($*ORIG, self.pos, $¢.pos - self.pos)) if $*IN_DECL; }
+        | <colonpair>+ { $¢.add_categorical(substr($*ORIG, self.pos, $¢.pos - self.pos)) if $*IN_DECL; }
         | { $¢.add_routine($<name>.Str) if $*IN_DECL; }
         ]
     }
@@ -5409,7 +5409,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
     $name = my $shortname = shift @components;
     return self unless defined $name and $name ne '';
     return self if $name eq '$' or $name eq '@' or $name eq '%';
-    return self.add_macro(substr($name,1)) if $name ~~ /^\&\w+\:/;
+    return self.add_categorical(substr($name,1)) if $name ~~ /^\&\w+\:/;
     if $shortname ~~ /\:/ {
         $shortname ~~ s/\:.*//;
     }

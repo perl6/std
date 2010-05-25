@@ -2245,7 +2245,7 @@ sub trim_heredoc { my $doc = shift;
     $stopper;
 }
 
-sub add_macro { my $lang = shift;
+sub add_categorical { my $lang = shift;
     my $name = shift;
     state $GEN = "500";
     $name =~ s/:<<(.*)>>$/:«$1»/;
