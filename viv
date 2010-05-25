@@ -1137,7 +1137,7 @@ sub indent {
     }
     sub emit_p5_header {  my $self = shift;
 	my $header = "";
-	my $name = $self->p5_module_name;
+	my $name = $::PKG;
 	my @extends;
 	for (@{$self->{trait}}) {
 	    my $t = $_->Str;
@@ -1174,6 +1174,7 @@ END
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my $block = $self->{blockoid}{statementlist} // $self->{statementlist};
 	local $::RETREE = {};
+	local $::PKG = $self->p5_module_name;
 	my $body1 = $self->emit_p5_header;
 	my $body3 = $block->emit_p5($lvl+1);
 	my $body2 = '';
@@ -1183,7 +1184,7 @@ END
 		::Dump($::RETREE) . "RETREE_END\n";
 	}
 	my $body = $body1 . $body2 . $body3;
-	my $name  = $self->p5_module_name;
+	my $name  = $::PKG;
 
 	if (my ($sig) = $self->kids('signature')) {
 	    my @parm = map { $_->Str } $sig->kids('parameter');
@@ -1444,6 +1445,8 @@ EOT
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my $name = $self->{deflongname}[0]->Str;
 	local $::DBA = $name;
+	local $::NAME = $name;
+	local $::ALT = 0;
 	my $body = $self->{regex_block}{nibble}->emit_p5($lvl+1);
 
 	$::RETREE->{$name} = $self->re_ast;
@@ -1491,19 +1494,86 @@ TEXT
 }
 
 
-{ package VAST::rxinfix; our @ISA = 'VAST::Base';
+{ package VAST::regex_infix; our @ISA = 'VAST::Base';
 }
 
 
-{ package VAST::rxinfix__S_Tilde; our @ISA = 'VAST::Base';
+{ package VAST::regex_infix__S_Tilde; our @ISA = 'VAST::Base';
 }
 
 
-{ package VAST::rxinfix__S_Vert; our @ISA = 'VAST::Base';
+{ package VAST::regex_infix__S_Vert; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;  my $lvl = shift;
+	my @children = map { "sub { my \$C = shift; " .
+	    $_->emit_p5($lvl+1) . " }\n" } $self->kids('args');
+	my $altid = ($self->{_altid} //= $::ALT++);
+	my $altname = $::NAME . "_$altid";
+
+	$self->ret($lvl, <<"END");
+do {
+  my \@result = do {
+    my (\$tag, \$try);
+    my \@try;
+    my \$relex;
+
+    my \$fate;
+    my \$x;
+    if (\$fate = \$C->{'_fate'} and \$fate->[1] eq '$altname') {
+        \$C->deb("Fate passed to $altname: ", ::fatestr(\$fate)) if \$::DEBUG & DEBUG::fates;
+        (\$C->{'_fate'}, \$tag, \$try) = \@\$fate;
+        \@try = (\$try);
+        \$x = 'ALT $altname';    # some outer ltm is controlling us
+    }
+    else {
+        \$x = 'ALTLTM $altname'; # we are top level ltm
+    }
+    my \$C = \$C->cursor_xact(\$x);
+    my \$xact = \$C->{_xact};
+
+    my \@gather = ();
+    for (;;) {
+        unless (\@try) {
+            \$relex //= \$C->cursor_fate('$::PKG', '$altname', \$retree);
+            \@try = \$relex->(\$C) or last;
+        }
+        \$try = shift(\@try) // next;
+
+        if (ref \$try) {
+            (\$C->{'_fate'}, \$tag, \$try) = \@\$try;	# next candidate fate
+        }
+
+        \$C->deb("$altname trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
+        push \@gather, ((
+@{[ join(",\n", @children) ]}
+        )[\$try])->(\$C);
+        last if \@gather;
+        last if \$xact->[-2];  # committed?
+    }
+    \@gather;
+  };
+  \@result;
+}
+END
+    }
+
+    sub re_ast {  my $self = shift;
+	my $altid = ($self->{_altid} //= $::ALT++);
+	my $altname = $::NAME . "_$altid";
+
+	my @kids = map { $_->re_ast } $self->kids('args');
+
+	my $ix = 0;
+	for (@kids) { $_->{alt} = "$altname $ix"; $ix++; }
+
+	my $ast = $self->SUPER::re_ast(any => altname => $altname,
+	    name => $altname, zyg => \@kids);
+	$::RETREE->{$altname} = $ast;
+	$ast;
+    }
 }
 
 
-{ package VAST::rxinfix__S_VertVert; our @ISA = 'VAST::Base';
+{ package VAST::regex_infix__S_VertVert; our @ISA = 'VAST::Base';
 }
 
 
