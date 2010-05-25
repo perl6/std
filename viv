@@ -4,8 +4,8 @@
 #
 use strict;
 use 5.010;
-use warnings FATAL => 'all';
-use Carp::Always;
+#use warnings FATAL => 'all';
+#use Carp::Always;
 
 use STD;
 use utf8;
@@ -1574,6 +1574,25 @@ END
 
 
 { package VAST::regex_infix__S_VertVert; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;  my $lvl = shift;
+	my @children = map { "sub { my \$C = shift; " .
+	    $_->emit_p5($lvl+1) . " }\n" } $self->kids('args');
+
+	$self->ret($lvl, <<'EOH'
+do {
+    my $C = $C->cursor_xact('ALT ||');
+    my $xact = $C->xact;
+    my @gather;
+EOH
+	    . join("\n    or \$xact->[-2] or\n",
+		map { "do { push \@gather, " . $_->emit_p5($lvl+1) . "}" }
+		    $self->kids('args'))
+	    . ";\n    \@gather\n}");
+    }
+    sub re_ast {  my $self = shift;
+	return $self->SUPER::re_ast(first => zyg =>
+	    [ map { $_->re_ast } $self->kids('args') ]);
+    }
 }
 
 
