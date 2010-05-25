@@ -458,13 +458,20 @@ sub indent {
 { package VAST::assertion__S_name; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift; my $lvl = shift;
 	my $name = $self->{longname}->Str;
-	# This is actually just binding a method.  Should be factored.
 	my $r = $::RATCHET ? 'r' : '';
+	if ($name eq 'sym') {
+	    my $t = $::SYM;
+	    $t =~ s/(\W)/\\$1/g;
+	    $t = "(?i:$t)" if defined $::IGNORECASE;
+	    return $self->ret($lvl, "\$C->_SUBSUME$r(['$name'], sub { my \$C = \$_[0]; \$C->_PATTERN(qr/\\G$t/) })");
+	}
+	# This is actually just binding a method.  Should be factored.
 	"\$C->_SUBSUME$r(['$name'], sub { my \$C = \$_[0]; \$C->$name })"
     }
     sub re_ast {  my $self = shift;
 	my $name = $self->{longname}->Str;
-	$self->SUPER::re_ast(method =>, name => $name);
+	$self->SUPER::re_ast(method =>, name => $name,
+	    $name eq 'sym' ? (sym => $::SYM) : ());
     }
 }
 
@@ -1542,6 +1549,7 @@ EOT
 	}
 	my $p5name = $name;
 	my %adv = $self->{deflongname}[0]->adverbs;
+	local $::SYM = $adv{sym};
 
 	if (defined $::PROTO && $::PROTO->{$name}) {
 	    $p5name = sprintf "%s__S_%03d%s", $name, $::MULTIRX_SEQUENCE++,
@@ -1566,6 +1574,7 @@ sub $p5name {
     my \$C = \$self->cursor_xact("RULE $p5name");
     my \$xact = \$C->xact;
     my \$S = \$C->{'_pos'};
+    @{[ $::SYM ? '$C->{sym} = "' . ((my $x = $::SYM) =~ s/(\W)/\\$1/g) . '";' : '' ]}
 
     \$self->_MATCHIFY$r(\$S, "$p5name", $body);
 }
