@@ -3947,14 +3947,14 @@ grammar P6 is STD {
     }
 
     method check_doteq {
-        # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt' > || ]
+        # [ <?before \w+';' | 'new'|'sort'|'subst'|'trans'|'reverse'|'uniq'|'map'|'samecase'|'substr'|'flip'|'fmt'|'pick' > || ]
         return self if self.<left><scope_declarator>;
         my $ok = 0;
 
         try {
             my $methop = self.<right><methodop>;
             my $name = $methop.<longname>.Str;
-            if $name eq 'new' or $name eq 'sort' or $name eq 'subst' or $name eq 'trans' or $name eq 'reverse' or $name eq 'uniq' or $name eq 'map' or $name eq 'samecase' or $name eq 'substr' or $name eq 'flip' or $name eq 'fmt' {
+            if $name eq 'new' or $name eq 'sort' or $name eq 'subst' or $name eq 'trans' or $name eq 'reverse' or $name eq 'uniq' or $name eq 'map' or $name eq 'samecase' or $name eq 'substr' or $name eq 'flip' or $name eq 'fmt' or $name eq 'pick' {
                 $ok = 1;
             }
             elsif not $methop.<args>[0] {
@@ -4380,17 +4380,22 @@ grammar Q is STD {
         token backslash:a { :i <sym> }
         token backslash:b { :i <sym> }
         token backslash:c { :i <sym> <charspec> }
+        token backslash:d { :i <sym> { $*CCSTATE = '' } }
         token backslash:e { :i <sym> }
         token backslash:f { :i <sym> }
+        token backslash:h { :i <sym> { $*CCSTATE = '' } }
         token backslash:n { :i <sym> }
         token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
         token backslash:r { :i <sym> }
+        token backslash:s { :i <sym> { $*CCSTATE = '' } }
         token backslash:t { :i <sym> }
+        token backslash:v { :i <sym> { $*CCSTATE = '' } }
+        token backslash:w { :i <sym> { $*CCSTATE = '' } }
         token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
         token backslash:sym<0> { <sym> }
 
-        # keep random backslashes like q does
-        token backslash:misc { . }
+        # keep random backslashes like qq does
+        token backslash:misc { {} [ (\W) { $<text> = $0.Str; } | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
 
         # begin tweaks (DO NOT ERASE)
         multi method tweak (:single(:$q)!) { self.panic("Too late for :q") }
