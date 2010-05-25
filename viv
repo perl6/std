@@ -841,6 +841,12 @@ sub indent {
 
 
 { package VAST::metachar__S_Bra_Ket; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift; my $lvl = shift;
+	$self->{nibbler}->emit_p5($lvl)
+    }
+    sub re_ast {  my $self = shift;
+	$self->{nibbler}->re_ast;
+    }
 }
 
 
