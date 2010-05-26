@@ -490,10 +490,11 @@ sub indent {
 
 { package VAST::assertion__S_method; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	my $name = $self->{'.'}[0]{longname}->Str;
+	my $name = $self->{assertion}{longname}->Str;
 	$self->SUPER::re_ast(method =>, name => $name,
 	    ($name eq 'sym' ? (sym => $::SYM) : ()),
-	    nobind => 1, min => 12345);
+	    nobind => 1, min => 12345,
+	    arglist => $self->{assertion}{arglist}[0]);
     }
 }
 
@@ -503,7 +504,7 @@ sub indent {
 	my $name = $self->{longname}->Str;
 	$self->SUPER::re_ast(method =>, name => $name,
 	    ($name eq 'sym' ? (sym => $::SYM) : ()),
-	    min => 12345);
+	    min => 12345, arglist => $self->{arglist}[0]);
     }
 }
 
