@@ -378,6 +378,14 @@ sub indent {
 	return bless { a => 0, i => 0, r => $::RATCHET, s => $::SIGSPACE,
 	    dba => $::DBA, @_ }, "RE_$type";
     }
+
+    sub base_re_quantifier { my $self = shift; my $x = shift; my $min = shift;
+	my $qm = $self->{quantmod}->Str;
+	$qm =~ s/:(.)/$1/;
+	$qm ||= $::RATCHET ? ':' : '!';
+	$qm =~ s/\+/!/;
+	return [ $self->{SYM}, $qm, $x, $min ];
+    }
 }
 
 { package VAST::Str; our @ISA = 'VAST::Base';
@@ -1333,7 +1341,17 @@ EOT
 
 { package VAST::quantified_atom; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	$self->{atom}->re_ast; #XXX
+	if (!@{$self->{quantifier}}) {
+	    return $self->{atom}->re_ast;
+	}
+
+	my $quant = $self->{quantifier}[0]->re_quantifier;
+
+	local $::RATCHET = $quant->[1] eq ':' ? 'r' : '';
+	my $ast = $self->{atom}->re_ast;
+
+	$self->SUPER::re_ast(quantified_atom => atom => $ast, quant => $quant,
+	    min => $ast->{min} * $quant->[3]);
     }
 }
 
@@ -1351,18 +1369,32 @@ EOT
 
 
 { package VAST::quantifier__S_Plus; our @ISA = 'VAST::Base';
+    sub re_quantifier { my $self = shift;
+	$self->base_re_quantifier("", 1);
+    }
 }
 
 
 { package VAST::quantifier__S_Question; our @ISA = 'VAST::Base';
+    sub re_quantifier { my $self = shift;
+	$self->base_re_quantifier("", 0);
+    }
 }
 
 
 { package VAST::quantifier__S_Star; our @ISA = 'VAST::Base';
+    sub re_quantifier { my $self = shift;
+	$self->base_re_quantifier("", 0);
+    }
 }
 
 
 { package VAST::quantifier__S_StarStar; our @ISA = 'VAST::Base';
+    sub re_quantifier { my $self = shift;
+	my ($range) = $self->Str =~ /.*(\d+\.\.\d+)$/;
+	$self->base_re_quantifier($self->{embeddedblock} //
+	    $range // $self->{quantified_atom}->re_ast, 1);
+    }
 }
 
 
@@ -1564,6 +1596,7 @@ sub $p5name {
     my \$xact = \$C->xact;
     my \$S = \$C->{'_pos'};
 TEXT
+	    . join("", map { "    \$C->{'$_'} = [];\n" } sort keys %$::BINDINGS)
 	    . ($::SYM ? '$C->{sym} = "' . ((my $x = $::SYM) =~ s/(\W)/\\$1/g) . '";' : '')
 	    . <<END
     \$self->_MATCHIFY$r(\$S, "$p5name", $body);
@@ -2451,6 +2484,99 @@ END
     }
 }
 
+{ package RE_quantified_atom; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $result;
+	local $::PLURALITY = 2;
+        if (ref $$self{atom}) {
+            my $quant = "";
+            my $rep = "_REP";
+            my $q = $$self{quant};
+	    my $atom = $$self{atom}->walk;
+	    if ($q) {
+		if ($atom =~ m{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) $ }sx ) {
+		    my $a = "(?:$1)";
+		    my ($qfer,$how,$rest) = @{$$self{quant}};
+		    my $h = $how eq '!' ? '' :
+			    $how eq '?' ? '?' :
+					  '+';
+		    if ($how eq '?' or $::REV) {
+			;
+		    }
+		    elsif ($qfer eq '**') {
+			$h = $how eq '!' ? 'g' :
+			     $how eq '?' ? 'f' :
+					   'r';
+			if (ref $rest) {
+			    if (ref $rest eq "RE_block") {
+				$rep = "_REPINDIRECT$::REV";
+				$rest = $rest->walk;
+			    }
+			    else {
+				$rep = "_REPSEP$::REV";
+				$rest = " sub { my \$C=shift;\n" . ::indent($rest->walk) . "\n}";
+			    }
+			}
+			else {
+			    $rest = "'$rest'";
+			}
+			$quant = "\$C->$rep$h( $rest, ";
+			return $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
+		    }
+		    else {
+			return "\$C->_PATTERN\(qr/\\G($a$qfer$h)/\)";
+		    }
+		}
+
+		my ($qfer,$how,$rest) = @{$$self{quant}};
+		my $h = $how eq '!' ? 'g' :
+			$how eq '?' ? 'f' :
+				      'r';
+		if ($qfer eq '*') {
+		    $quant = "\$C->_STAR$h$::REV(";
+		}
+		elsif ($qfer eq '+') {
+		    $quant = "\$C->_PLUS$h$::REV(";
+		}
+		elsif ($qfer eq '?') {
+		    $quant = "\$C->_OPT$h$::REV(";
+		}
+		elsif ($qfer eq '**') {
+		    if (ref $rest) {
+			if (ref $rest eq "RE_block") {
+			    $rep = "_REPINDIRECT$::REV";
+			    $rest = $rest->walk;
+			}
+			else {
+			    $rep = "_REPSEP$::REV";
+			    $rest = " sub { my \$C=shift;\n" . ::indent($rest->walk()) . "\n}";
+			}
+		    }
+		    else {
+			$rest = "'$rest'";
+		    }
+		    $quant = "\$C->$rep$h( $rest, ";
+		}
+		return $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
+	    }
+            else {
+                return $atom;
+            }
+        }
+        else {
+            return '"' . $$self{atom} . '"';
+        }
+        $result;
+    }
+}
+
+{ package RE_qw; use base "REbase";
+    sub walk {
+        my $self = shift;
+        "\$C->_ARRAY$::REV( qw$$self{text} )";
+    }
+}
 
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);
