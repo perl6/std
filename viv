@@ -4,8 +4,10 @@
 #
 use strict;
 use 5.010;
-#use warnings FATAL => 'all';
-#use Carp::Always;
+use warnings FATAL => 'all';
+use Carp::Always;
+
+use List::Util qw/sum/;
 
 use STD;
 use utf8;
@@ -444,34 +446,21 @@ sub indent {
 
 
 { package VAST::assertion__S_method; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-	my $name = $self->{'.'}[0]{longname}->Str;
-	"\$C->$name"
-    }
     sub re_ast {  my $self = shift;
 	my $name = $self->{'.'}[0]{longname}->Str;
-	$self->SUPER::re_ast(method => name => $name);
+	$self->SUPER::re_ast(method =>, name => $name,
+	    ($name eq 'sym' ? (sym => $::SYM) : ()),
+	    nobind => 1, min => 12345);
     }
 }
 
 
 { package VAST::assertion__S_name; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-	my $name = $self->{longname}->Str;
-	my $r = $::RATCHET ? 'r' : '';
-	if ($name eq 'sym') {
-	    my $t = $::SYM;
-	    $t =~ s/(\W)/\\$1/g;
-	    $t = "(?i:$t)" if defined $::IGNORECASE;
-	    return $self->ret($lvl, "\$C->_SUBSUME$r(['$name'], sub { my \$C = \$_[0]; \$C->_PATTERN(qr/\\G$t/) })");
-	}
-	# This is actually just binding a method.  Should be factored.
-	"\$C->_SUBSUME$r(['$name'], sub { my \$C = \$_[0]; \$C->$name })"
-    }
     sub re_ast {  my $self = shift;
 	my $name = $self->{longname}->Str;
 	$self->SUPER::re_ast(method =>, name => $name,
-	    $name eq 'sym' ? (sym => $::SYM) : ());
+	    ($name eq 'sym' ? (sym => $::SYM) : ()),
+	    min => 12345);
     }
 }
 
@@ -863,9 +852,6 @@ sub indent {
 
 
 { package VAST::metachar__S_Bra_Ket; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-	$self->{nibbler}->emit_p5($lvl)
-    }
     sub re_ast {  my $self = shift;
 	$self->{nibbler}->re_ast;
     }
@@ -909,9 +895,6 @@ sub indent {
 
 
 { package VAST::metachar__S_Lt_Gt; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-	$self->{assertion}->emit_p5($lvl)
-    }
     sub re_ast {  my $self = shift;
 	$self->{assertion}->re_ast;
     }
@@ -1339,25 +1322,11 @@ EOT
     }
 }
 
-# For regex methods, emit_p5 returns an expression which, when evaluated
-# in list (lazycat) context, produces the new set of cursors, given one
-# previous cursor in the lexical $C.  We can probably do better but this
-# is the gimme5-compatible approach for now.
 { package VAST::quant_atom_list; our @ISA = 'VAST::Base';
-    sub emit_p5 {  my $self = shift; my $lvl = shift;
-        my @kids = map { scalar $_->emit_p5($lvl+1) } $self->kids;
-	while (@kids >= 2) {
-	    my ($a, $b) = splice @kids, -2;
-	    # TODO this sucks
-	    push @kids, $::RATCHET 
-		? "do { if (my (\$C) = ($a)) {\n$b;\n} else { (); } }"
-		: "Cursor::lazymap(sub { my \$C = \$_[0];\n$b\n},\n$a\n)";
-	}
-	$kids[0];
-    }
     sub re_ast {  my $self = shift;
-	$self->SUPER::re_ast(sequence => zyg =>
-	    [ map { $_->re_ast } $self->kids("quantified_atom") ]);
+	my @kids = map { $_->re_ast } $self->kids("quantified_atom");
+	$self->SUPER::re_ast(sequence => zyg => \@kids,
+	    min => ::sum(0, map { $_->{min} } @kids));
     }
 }
 
@@ -1477,9 +1446,8 @@ EOT
 { package VAST::regex_def; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my $bodyast = $self->{regex_block}{nibble}{"."}->re_ast;
-	# XXX find out what pkg, decl do and get the right values, also min
 	$self->SUPER::re_ast(ast => kind => $::REGEX_DECLARATOR,
-	    pkg => '~', decl => [], re => $bodyast);
+	    min => $bodyast->{min}, decl => [], re => $bodyast);
     }
     sub protoregex {  my $self = shift;  my $name = shift;
 	$::PROTO->{$name} = 1;
@@ -1550,6 +1518,11 @@ EOT
 	my $p5name = $name;
 	my %adv = $self->{deflongname}[0]->adverbs;
 	local $::SYM = $adv{sym};
+	local $::REV = 0;
+	local $::PLURALITY = 1;
+	local $::DECL = [];
+	local $::NEEDORIGARGS = 0;
+	local $::BINDINGS = {};
 
 	if (defined $::PROTO && $::PROTO->{$name}) {
 	    $p5name = sprintf "%s__S_%03d%s", $name, $::MULTIRX_SEQUENCE++,
@@ -1558,12 +1531,13 @@ EOT
 	local $::DBA = $name;
 	local $::NAME = $p5name;
 	local $::ALT = 0;
-	my $body = $self->{regex_block}{nibble}->emit_p5($lvl+1);
+	my $ast = $self->re_ast;
 
-	$::RETREE->{$p5name} = $self->re_ast;
+	$::RETREE->{$p5name} = $ast;
 
 	my $r = $::RATCHET ? 'r' : '';
-	$self->ret($lvl, <<TEXT);
+	my $body = $ast->walk;
+	$self->ret($lvl, <<TEXT
 sub ${p5name}__PEEK { \$_[0]->_AUTOLEXpeek('$p5name', \$retree) }
 sub $p5name {
     no warnings 'recursion';
@@ -1574,11 +1548,13 @@ sub $p5name {
     my \$C = \$self->cursor_xact("RULE $p5name");
     my \$xact = \$C->xact;
     my \$S = \$C->{'_pos'};
-    @{[ $::SYM ? '$C->{sym} = "' . ((my $x = $::SYM) =~ s/(\W)/\\$1/g) . '";' : '' ]}
-
+TEXT
+	    . ($::SYM ? '$C->{sym} = "' . ((my $x = $::SYM) =~ s/(\W)/\\$1/g) . '";' : '')
+	    . <<END
     \$self->_MATCHIFY$r(\$S, "$p5name", $body);
 }
-TEXT
+END
+	    );
     }
 }
 
@@ -1796,6 +1772,7 @@ EOH
     sub emit_p5 {  my $self = shift; my $lvl = shift;
         my @t = $self->SUPER::emit_p5($lvl+1);
 	$t[0] = '$M';
+	$::NEEDMATCH++;
         $self->ret($lvl,@t);
     }
 }
@@ -2204,6 +2181,181 @@ EOH
 }
 
 { package VAST::XXX; our @ISA = 'VAST::Base';
+}
+
+{ package REbase;
+    sub walk {
+        my $self = shift;
+        my $result = "";
+        if ($$self{zyg}) {
+            foreach my $kid (@{$$self{zyg}}) {
+                my $x = $kid->walk;
+                $result .= $x if defined $x;
+            }
+        }
+        else {
+            return ref $self;
+        }
+        return $result;
+    }
+
+    sub bind { my $self = shift; my $re = shift;
+	return $re unless @_;
+	my $ratchet = $::RATCHET ? 'r' : '';
+	$re = "\$C->_SUBSUME$ratchet([" .
+	    join(',', map {"'$_'"} @_) .
+	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re, 2) . "\n  })";
+	$re;
+    }
+
+    sub remove_leading_ws { }   # this tree node not interested
+}
+
+{ package RE_sequence;
+    sub wrapone {
+        my ($self, $outer, $inner) = @_;
+        if (!$$self{r}) {
+            "Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
+                ::indent($inner) .
+            "\n}, $outer)";
+        }
+        else {
+	    my $oi = $outer . $inner;
+	    if ($oi =~ s{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) \$C->_PATTERN\(qr/\\G(.*?)/\) $ }{\$C->_PATTERN(qr/\\G$1$2/)}sx) {
+		$oi;
+	    }
+	    else {
+		my $in = ::indent($inner,2);
+		substr(<<"END",0,-1);
+do {
+  if (my (\$C) = ($outer)) {
+$in;
+  }
+  else {
+    ();
+  }
+}
+END
+	    }
+        }
+    }
+
+    sub walk {
+        my $self = shift;
+        my @result;
+        my @decl;
+        if ($$self{zyg}) {
+            my @kids = @{$$self{zyg}};
+
+            while (@kids and ref $kids[0] eq 'RE_decl') {
+                push @decl, shift(@kids)->walk;
+            }
+
+            @kids = reverse @kids if $::REV;
+            foreach my $kid (@kids) {
+                my $r = $kid->walk;
+                push @result, $r;
+            }
+        }
+        my $result = pop @result;
+        for (reverse @result) {
+            $result = $self->wrapone($_,$result);
+        }
+        join('', @decl, $result || '');
+    }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        if ($$self{zyg}) {
+            my @kids = @{$$self{zyg}};
+
+            shift(@kids) while
+                @kids and
+                ref $kids[0] eq 'RE_method' and
+                $kids[0]->{name} eq 'ws';
+
+            $kids[0]->remove_leading_ws() if @kids;
+            @{$$self{zyg}} = @kids;
+        }
+    }
+}
+
+{ package RE_method; use base "REbase";
+    sub walk {
+        my $self = shift;
+        local $::NEEDMATCH = 0;
+        my $name = $$self{name};
+        die "Can't reverse $name" if $::REV;
+	my $re;
+
+        if ($name eq "sym") {
+            $$self{sym} = $::SYM;
+            $$self{endsym} = $::ENDSYM if defined $::ENDSYM;
+	    if ($$self{i}) {
+		return "\$C->_PATTERN(qr/\\G(?i:" . quotemeta($::SYM) . ")/)";
+	    }
+	    else {
+		return "\$C->_PATTERN(qr/\\G" . quotemeta($::SYM) . "/)";
+	    }
+        }
+        elsif ($name eq "alpha") {
+            return "\$C->_PATTERN(qr/\\G[_[:alpha:]]/)";
+        }
+        elsif ($name eq "_ALNUM") {
+            return "\$C->_PATTERN(qr/\\G\\w/)";
+        }
+        elsif ($name eq "nextsame") {
+            $::NEEDORIGARGS++;
+            $re = '$self->SUPER::' . $::NAME . '(@origargs)';
+        }
+        elsif ($name =~ /^\w/) {
+            my $al = $self->{arglist};
+	    $al = "(" . $al->emit_p5(0) . ")" if defined $al;
+            $re = '$C->' . $name . $al;
+        }
+        else {
+            my $al = $self->{arglist};
+	    $al = "(" . $al->emit_p5(0) . ")" if defined $al;
+            $re = <<"END";
+do {
+  if (not $name) {
+    \$C;
+  }
+  elsif (ref $name eq 'Regexp') {
+    if (\$::ORIG =~ m/$name/gc) {
+      \$C->cursor(\$+[0]);
+    }
+    else {
+      ();
+    }
+  }
+  else {
+    \$C->$name$al;
+  }
+}
+END
+        }
+	if ($name =~ /^\w/ and not $self->{nobind}) {
+	    $::BINDINGS->{$name} += $::PLURALITY;
+	    $re = $self->bind($re, $name);
+	}
+        $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $::NEEDMATCH;
+	$self->bind($re);
+    }
+}
+
+{ package RE_ast; use base "REbase";
+    sub walk {
+        my $self = shift;
+        if ($$self{decl}) {
+            for my $decl (@{$$self{decl}}) {
+                push @$::DECL, "    " . $decl->walk . "\n";
+            }
+        }
+        if ($$self{re}) {
+            return $$self{re}->walk;
+        }
+    }
 }
 
 
