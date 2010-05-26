@@ -622,6 +622,8 @@ sub indent {
 		$self->{v}->isa('VAST::coloncircumfix') &&
 		(my ($val) = $self->{v}->Str =~ /^[<«](.*).$/)) {
 	    return $self->{k} => $val;
+	} elsif ($self->{v} == 1) {
+	    return "sym" => $self->{k};
 	} else {
 	    die "Unsupported compile-time adverb " . $self->Str;
 	}
