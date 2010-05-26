@@ -471,7 +471,11 @@ sub indent {
 
 { package VAST::atom; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	$self->{metachar}->re_ast;
+	if (exists $self->{TEXT}) {
+	    $self->SUPER::re_ast(string => text => $self->{TEXT}, min => 1);
+	} else {
+	    $self->{metachar}->re_ast;
+	}
     }
 }
 
@@ -891,6 +895,10 @@ sub indent {
 
 
 { package VAST::metachar__S_Double_Double; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	my $text = $self->{quote}{nibble}->Str;
+	$self->SUPER::re_ast(double => text => $text, min => length($text));
+    }
 }
 
 
@@ -922,6 +930,10 @@ sub indent {
 
 
 { package VAST::metachar__S_Single_Single; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	my $text = $self->{quote}{nibble}->Str;
+	$self->SUPER::re_ast(string => text => $text, min => length($text));
+    }
 }
 
 
@@ -1518,7 +1530,7 @@ EOT
 	my $p5name = $name;
 	my %adv = $self->{deflongname}[0]->adverbs;
 	local $::SYM = $adv{sym};
-	local $::REV = 0;
+	local $::REV = '';
 	local $::PLURALITY = 1;
 	local $::DECL = [];
 	local $::NEEDORIGARGS = 0;
@@ -2138,6 +2150,36 @@ END
     }
 
     sub remove_leading_ws { }   # this tree node not interested
+}
+
+{ package RE_double; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+	$text = "(?<=$text)" if $::REV;
+	if ($$self{i}) {
+	    '$C->_PATTERN(qr/\\G(?i:' . $text . ')/")';
+	}
+	else {
+	    '$C->_EXACT("' . $text . '")';
+	}
+    }
+}
+
+{ package RE_string; use base "REbase";
+    sub walk {
+        my $self = shift;
+	if ($$self{i}) {
+            my $text = quotemeta($$self{text});
+            $text = "(?<=$text)" if $::REV;
+	    '$C->_PATTERN(qr/\\G(?i:' . $text . ')/)';
+	}
+	else {
+            my $text = $$self{text};
+            $text =~ s/([\\'])/\\$1/g;
+            "\$C->_EXACT$::REV('$text')";
+	}
+    }
 }
 
 { package RE_sequence;
