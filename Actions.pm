@@ -6,6 +6,7 @@ package Actions;
 
 our $AUTOLOAD;
 my $SEQ = 1;
+our %GENCLASS;
 
 sub AUTOLOAD {
     my $self = shift;
@@ -392,6 +393,7 @@ sub gen_class {
 	print STDERR "Existing class $class\n" if $OPT_log;
 	return;
     }
+    $GENCLASS{$class} = $base;
     print STDERR "Creating class $class\n" if $OPT_log;
     @{$class . '::ISA'} = $base;
 }

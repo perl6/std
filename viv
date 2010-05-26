@@ -103,6 +103,9 @@ sub MAIN {
 	my $raw = retrieve($_[0]);
 	$::ORIG = $raw->{ORIG};
 	$r = $raw->{AST};
+	for my $cl (keys %{$raw->{GENCLASS}}) {
+	    Actions::gen_class($cl, $raw->{GENCLASS}->{$cl});
+	}
     }
     elsif (@_ and -f $_[0]) {
 	$r = STD->parsefile($_[0], actions => 'Actions')->{'_ast'};
@@ -137,7 +140,8 @@ sub MAIN {
 	print fixpod($r->ret(0,$r->emit_p5(0)));
     }
     elsif ($output eq 'store') {
-	Storable::store_fd({ AST => $r, ORIG => $::ORIG }, \*STDOUT);
+	Storable::store_fd({ AST => $r, GENCLASS => \%Actions::GENCLASS,
+		ORIG => $::ORIG }, \*STDOUT);
     }
     else {
 	die "Unknown output mode";
