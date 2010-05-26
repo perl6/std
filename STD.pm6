@@ -1401,6 +1401,7 @@ grammar P6 is STD {
     token regex_block {
         # encapsulate braided languages
         :temp %*LANG;
+        :temp %*RX;
 
         :my $lang = %*LANG<Regex>;
         :my $*GOAL ::= '}';
@@ -1976,9 +1977,9 @@ grammar P6 is STD {
     token routine_declarator:submethod { <sym> <method_def> }
     token routine_declarator:macro     { <sym> <macro_def> }
 
-    token regex_declarator:regex { <sym>       <regex_def> }
-    token regex_declarator:token { <sym>       <regex_def> }
-    token regex_declarator:rule  { <sym>       <regex_def> }
+    token regex_declarator:regex { <sym>       <regex_def(:!r,:!s)> }
+    token regex_declarator:token { <sym>       <regex_def(:r,:!s)> }
+    token regex_declarator:rule  { <sym>       <regex_def(:r,:s)> }
 
     rule multisig {
         :my $signum = 0;
@@ -2046,10 +2047,12 @@ grammar P6 is STD {
         ] || <.panic: "Malformed method">
     }
 
-    rule regex_def () {
+    rule regex_def (:$r, :$s) {
         :temp $*CURPAD;
         :my $*IN_DECL = 'regex';
+        :temp %*RX;
         :my $*DECLARAND;
+        { %*RX<s> = $s; %*RX<r> = $r; }
         [
             [ '&'<deflongname>? | <deflongname> ]?
             <.newpad(1)>
@@ -4822,7 +4825,7 @@ grammar Regex is STD {
     proto token regex_infix { <...> }
 
     token ws {
-        <?{ $*RX<s> }>
+        <?{ %*RX<s> }>
         || [ <?before \s | '#'> <.nextsame> ]?   # still get all the pod goodness, hopefully
     }
 

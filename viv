@@ -926,6 +926,9 @@ sub indent {
 
 
 { package VAST::metachar__S_sigwhite; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	$self->SUPER::re_ast(method => name => 'ws', nobind => 1, min => 12345);
+    }
 }
 
 
