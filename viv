@@ -2310,12 +2310,12 @@ END
         }
         elsif ($name =~ /^\w/) {
             my $al = $self->{arglist};
-	    $al = "(" . $al->emit_p5(0) . ")" if defined $al;
+	    $al = defined $al ? ("(" . $al->emit_p5(0) . ")") : "";
             $re = '$C->' . $name . $al;
         }
         else {
             my $al = $self->{arglist};
-	    $al = "(" . $al->emit_p5(0) . ")" if defined $al;
+	    $al = defined $al ? ("(" . $al->emit_p5(0) . ")") : "";
             $re = <<"END";
 do {
   if (not $name) {
