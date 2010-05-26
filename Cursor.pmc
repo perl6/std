@@ -996,8 +996,9 @@ sub _BRACKET { my $self = shift;
     my $block = shift;
     no warnings 'recursion';
 
+    my $oldlang = ref($self);
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
-    lazymap(sub { bless($_[0],ref($self))->retm() },
+    lazymap(sub { bless($_[0],$oldlang)->retm() },
         $block->($self));
 }
 
@@ -1005,9 +1006,10 @@ sub _BRACKETr { my $self = shift;
     my $block = shift;
     no warnings 'recursion';
 
+    my $oldlang = ref($self);
     local $CTX = $self->callm if $DEBUG & DEBUG::trace_call;
     my ($val) = $block->($self) or return ();
-    bless($val,ref($self))->retm();
+    bless($val,$oldlang)->retm();
 }
 
 sub _PAREN { my $self = shift;

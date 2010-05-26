@@ -1132,7 +1132,7 @@ token embeddedblock {
 
     <.newpad>
     <.finishpad>
-    '{' :: [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <statementlist> ]
+    '{' :: [ :lang(%*LANG<MAIN>) <statementlist> ]
     [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
 }
 
@@ -1497,7 +1497,6 @@ grammar P6 is STD {
             ]
         | <?before ';'>
         | <?before <stopper> >
-        | <?before $*GOAL> <?{ $*GOAL ne '' }>
         | {} <.panic: "Bogus statement">
         ]
 
@@ -1516,7 +1515,6 @@ grammar P6 is STD {
         || ';'
         || <?{ (@*MEMOS[$¢.pos]<endstmt>//0) >= 2 }> <.ws>
         || <?before ')' | ']' | '}' >
-        || <?before $*GOAL> <?{ $*GOAL ne '' }>
         || $
         || <?stopper>
         || <?before <.suppose <statement_control> > > <.backup_ws> { $*HIGHWATER = -1; } <.panic: "Missing semicolon">
@@ -4830,7 +4828,7 @@ grammar Regex is STD {
     }
 
     token normspace {
-        <?before \s | '#'> [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <.ws> ]
+        <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
     }
 
     token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr($::ORIG,$¢.pos,1) ~ "') or use a backslashed form like \\x" ~ sprintf("%02x", ord(substr($::ORIG,$¢.pos,1)))> }  # no unspace in regexen
@@ -4840,9 +4838,9 @@ grammar Regex is STD {
         [ \s* < || | && & > ]?
         <EXPR>
         [
-        || <?before <stopper> || $*GOAL >
+        || <?infixstopper>
         || $$ <.panic: "Regex not terminated">
-        || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
+        || (\W)<.sorry("Unrecognized regex metacharacter " ~ $0.Str ~ " (must be quoted to match literally)")>
         || <.panic: "Regex not terminated">
         ]
     }
@@ -4880,7 +4878,11 @@ grammar Regex is STD {
     }
     regex infixstopper {
         :dba('infix stopper')
-        <?before <stopper> >
+        [
+        | <?before <[\) \} \]]> >
+        | <?before '>' <-[>)]> >
+        | <?before <stopper> >
+        ]
     }
 
     token regex_infix:sym<||> { <sym> <O(|%tight_or)>  }
@@ -5012,15 +5014,15 @@ grammar Regex is STD {
         >
     }
 
-    token metachar:sym<' '> { <?before "'"> [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <quote>] }
-    token metachar:sym<" "> { <?before '"'> [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <quote>] }
+    token metachar:sym<' '> { <?before "'"> [:lang(%*LANG<MAIN>) <quote>] }
+    token metachar:sym<" "> { <?before '"'> [:lang(%*LANG<MAIN>) <quote>] }
 
     token metachar:var {
         :my $*QSIGIL ::= substr($*ORIG,self.pos,1);
         <!before '$$'>
         <?before <sigil>>
-        [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <termish> ]
-        $<binding> = ( <.ws> '=' <.ws> <quantified_atom> )?
+        [:lang(%*LANG<MAIN>) <termish> ]
+        $<binding> = ( \s* '=' \s* <quantified_atom> )?
         { $<sym> = $<termish><term>.Str; }
     }
 
@@ -5077,12 +5079,12 @@ grammar Regex is STD {
     token assertion:name { [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <longname> ]
                                     [
                                     | <?before '>' >
-                                    | <.ws> <nibbler>
+                                    | <.ws> <nibbler> <.ws>
                                     | '=' <assertion>
                                     | ':' <.ws>
                                         [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <arglist> ]
                                     | '(' {}
-                                        [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <arglist> ]
+                                        [ :lang(%*LANG<MAIN>) <arglist> ]
                                         [ ')' || <.panic: "Assertion call missing right parenthesis"> ]
                                     ]?
     }
@@ -5109,9 +5111,9 @@ grammar Regex is STD {
         <.normspace>?
     }
 
-    token mod_arg { :dba('modifier argument') '(' ~ ')' [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <semilist> ] }
+    token mod_arg { :dba('modifier argument') '(' ~ ')' [:lang(%*LANG<MAIN>) <semilist> ] }
 
-    token mod_internal:sym<:my>    { ':' <?before ['my'|'state'|'our'|'anon'|'constant'|'temp'|'let'] \s > [:lang($¢.cursor_fresh(%*LANG<MAIN>)) <statement> <eat_terminator> ] }
+    token mod_internal:sym<:my>    { ':' <?before ['my'|'state'|'our'|'anon'|'constant'|'temp'|'let'] \s > [:lang(%*LANG<MAIN>) <statement> <eat_terminator> ] }
 
     # XXX needs some generalization
 
@@ -5138,7 +5140,7 @@ grammar Regex is STD {
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] <.require_P5> [ :lang( $¢.cursor_fresh( %*LANG<P5Regex> ).unbalanced($*GOAL) ) <nibbler> ] }
 
     token mod_internal:p6adv {
-        <?before ':' ['dba'|'lang'] » > [ :lang($¢.cursor_fresh(%*LANG<MAIN>)) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
+        <?before ':' ['dba'|'lang'] » > [ :lang(%*LANG<MAIN>) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
     }
 
     token mod_internal:oops { (':'\w+) <.sorry: "Unrecognized regex modifier " ~ $0.Str > }

@@ -347,6 +347,7 @@ sub $name {
     my \$subs;
 
     local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+    local \$::GOAL = \$::GOAL;
 
     my \$C = \$self->cursor_xact('RULE $name');
     my \$S = \$C->{'_pos'};
@@ -1206,7 +1207,8 @@ sub atom {
 	my $nest = quantified_atom();
 
 	@STUFFED = ($nest, $checkbrack);
-        return bless { text => ':', min => 0, extra => "local \$::GOAL = $goaltext, my \$goalpos = \$C", %adverbs }, "RE_meta";
+        
+        return bless { text => ':', min => 0, extra => "local \$::GOAL = $goaltext, my \$goalpos = \$C, do { unless ($goaltext eq ')' or $goaltext eq ']' or $goaltext eq '}') { my \$newlang = \$C->unbalanced(\$::GOAL); \$C = bless(\$C, (ref(\$newlang) || \$newlang))}}", %adverbs }, "RE_meta";
     }
     if (s/^ (\w+) (?! \s* [*+?]) //x) {
         my $word = $1;
@@ -1271,7 +1273,7 @@ sub atom {
             $adverbs{$adverb} = $code;
 	    ws();
 	    if ($adverb eq 'lang') {
-		$code = "my \$newlang = $code;  \$C = \$C->cursor_fresh(\$newlang); ";
+		$code = "my \$newlang = $code; \$C = bless(\$C, (ref(\$newlang) || \$newlang)); ";
 		return bless { text => $code, min => 0, max => 0, noquant => 1, %adverbs }, "RE_decl";
 	    }
 	    elsif ($adverb eq 'dba') {
