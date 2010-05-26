@@ -21,10 +21,12 @@ use YAML::XS; # An attempt to replace this with YAML::Syck passed the
 use Encode;
 use JSON -convert_blessed_universally;
 use Scalar::Util 'blessed', 'refaddr';
+use Storable;
 
 my $OPT_match = 0;
 my $OPT_log = 0;
 my $OPT_stab = 0;
+my $OPT_thaw = 0;
 my $PROG = '';
 my @did_ws;
 
@@ -39,6 +41,8 @@ viv [switches] filename
     	--concise	spit out a short syntaxe tree (default)
     	--p5		spit out a Perl 5 representation (partially impl)
     	--p6		spit out a Perl 6 representation
+    	--freeze	generate a Storable representation
+    	--thaw		use existing Storable of AST from filename
     	--stab		include the symbol table
     	--pos		include position info in AST
     	--match		include match tree info in AST
@@ -71,6 +75,9 @@ sub MAIN {
 	elsif ($switch eq '--p6' or $switch eq '-6') {
 	    $output = 'p6';
 	}
+	elsif ($switch eq '--freeze') {
+	    $output = 'store';
+	}
 	elsif ($switch eq '--stab' or $switch eq '-s') {
 	    $OPT_stab = 1;
 	}
@@ -83,13 +90,21 @@ sub MAIN {
 	elsif ($switch eq '--match' or $switch eq '-m') {
 	    $OPT_match = 1;	# attach match object
 	}
+	elsif ($switch eq '--thaw') {
+	    $OPT_thaw = 1;
+	}
 	elsif ($switch eq '--help') {
 	    USAGE();
 	}
     }
 #    USAGE() unless -r $_[0];
     my $r;
-    if (@_ and -f $_[0]) {
+    if ($OPT_thaw) {
+	my $raw = retrieve($_[0]);
+	$::ORIG = $raw->{ORIG};
+	$r = $raw->{AST};
+    }
+    elsif (@_ and -f $_[0]) {
 	$r = STD->parsefile($_[0], actions => 'Actions')->{'_ast'};
     }
     else {
@@ -100,10 +115,12 @@ sub MAIN {
 	}
 	$r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
     }
-    $::ORIG =~ s/\n;\z//;
-    if ($OPT_stab) {
-        no warnings;
-        $r->{stabs} = $STD::ALL;
+    unless ($OPT_thaw) {
+	$::ORIG =~ s/\n;\z//;
+	if ($OPT_stab) {
+	    no warnings;
+	    $r->{stabs} = $STD::ALL;
+	}
     }
     if ($output eq 'yaml') {
 	my $x = Dump($r);
@@ -118,6 +135,9 @@ sub MAIN {
     }
     elsif ($output eq 'p5') {
 	print fixpod($r->ret(0,$r->emit_p5(0)));
+    }
+    elsif ($output eq 'store') {
+	Storable::store_fd({ AST => $r, ORIG => $::ORIG }, \*STDOUT);
     }
     else {
 	die "Unknown output mode";
