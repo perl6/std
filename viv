@@ -1894,6 +1894,9 @@ END
 	my @lefts = @{ $left->{zyg} };
 	my @rights = @{ $right->{zyg} };
 
+	pop @lefts while $lefts[-1]->isa('RE_method') && $lefts[-1]{name} eq 'ws';
+	shift @rights while $rights[0]->isa('RE_method') && $rights[0]{name} eq 'ws';
+
 	my $opener = pop @lefts;
 	my ($closer, $inner) = splice @rights, 0, 2;
 
