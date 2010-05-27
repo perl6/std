@@ -1034,6 +1034,17 @@ sub indent {
 
 
 { package VAST::metachar__S_Paren_Thesis; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	local $::DBA = $::DBA;
+	local $::RATCHET = $::RATCHET;
+	local $::SIGSPACE = $::SIGSPACE;
+	local $::IGNORECASE = $::IGNORECASE;
+	local @::DECLAST;
+
+	my $bodyast = $self->{nibbler}{"."}->re_ast;
+	RE_bindpos->new(var => $::PAREN++,
+	    atom => RE_paren->new(decl => \@::DECLAST, re => $bodyast));
+    }
 }
 
 
@@ -1799,6 +1810,7 @@ EOT
 	# Disable ratchet optimizations if any backtracky tokens are encountered
 	local $::MAYBACKTRACK = !$::RATCHET;
 	local $::IGNORECASE = 0;
+	local $::PAREN = 0;
 	local %::BINDINGS;
 
 	my $spcsig = $self->kids('signature') ?
@@ -3139,6 +3151,47 @@ END
         }
     }
 }
+
+{ package RE_paren; use base "REbase";
+    sub calc_min { $_[0]{re}{min} }
+    sub walk {
+        my $self = shift;
+	my $re;
+	{
+	    local %::BINDINGS;
+	    $re = ::indent($$self{re}->walk);
+	    if (%::BINDINGS) {
+		for my $binding ( keys %::BINDINGS ) {
+		    next unless $::BINDINGS{$binding} > 1;
+		    my $re = <<"END" . $re;
+	\$C->{'$binding'} = [];
+END
+		}
+	    }
+	}
+        $re = "do { \$C->_$::REV"."PAREN( sub { my \$C=shift;\n" . ::indent($re) . "\n})}";
+	$re;
+    }
+
+    # yes, () would capture the ws, but we're guaranteed to be past it already
+    sub remove_leading_ws {
+        my $self = shift;
+        my $re = $$self{re};
+        $re->remove_leading_ws();
+    }
+}
+
+{ package RE_bindpos; use base "REbase";
+    sub calc_min { $_[0]{atom}{min} }
+    sub walk {
+        my $self = shift;
+        my $var = $$self{var};
+	$::BINDINGS{$var} += $::PLURALITY;
+        my $re = ::indent($$self{atom}->walk);
+        $self->bind($re, $var);
+    }
+}
+
 
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);
