@@ -1148,6 +1148,12 @@ EOT
 
 	if ($key eq 'dba') {
 	    $::DBA = eval ($self->{quotepair}{circumfix}[0]->Str);
+	} elsif ($key eq 'lang') {
+	    my $lang = $self->{quotepair}{circumfix}[0]->p5;
+	    return RE_decl->new(body => <<BODY);
+my \$newlang = $lang;
+\$C = bless(\$C, (ref(\$newlang) || \$newlang));
+BODY
 	} else {
 	    die "unhandled internal adverb $key";
 	}
