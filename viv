@@ -1670,7 +1670,7 @@ TEXT
     my \$S = \$C->{'_pos'};
 TEXT
 	    . join("", map { "    \$C->{'$_'} = [];\n" } sort keys %$::BINDINGS)
-	    . ($::SYM ? '$C->{sym} = "' . ((my $x = $::SYM) =~ s/(\W)/\\$1/g) . '";' : '')
+	    . ($::SYM ? '$C->{sym} = "' . quotemeta($::SYM) . '";' : '')
 	    . <<END
     \$self->_MATCHIFY$r(\$S, "$p5name", $body);
 }
