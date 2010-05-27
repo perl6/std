@@ -4957,7 +4957,7 @@ grammar Regex is STD {
     }
 
     token metachar:sym<:> {
-        <sym>
+        <sym> <?before \s> <.panic: "Backtrack control ':' does not seem to have a preceding atom to control">
     }
 
     token metachar:sym<::> {
@@ -5154,6 +5154,7 @@ grammar Regex is STD {
     token quantifier:sym<*>  { <sym> <quantmod> }
     token quantifier:sym<+>  { <sym> <quantmod> }
     token quantifier:sym<?>  { <sym> <quantmod> }
+    token quantifier:sym<:>  { <sym> {} <?before \s> }
     token quantifier:sym<**> { <sym> :: <normspace>? <quantmod> <normspace>?
         [
         | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
