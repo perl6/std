@@ -914,10 +914,13 @@ sub indent {
 
 
 { package VAST::metachar; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	$self->SUPER::re_ast(meta => text => $self->Str, min => 0);
+    }
 }
 
 
-{ package VAST::metachar__S_Back; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_Back; our @ISA = 'VAST::metachar';
 }
 
 
@@ -928,19 +931,20 @@ sub indent {
 }
 
 
-{ package VAST::metachar__S_Caret; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_Caret; our @ISA = 'VAST::metachar';
 }
 
 
-{ package VAST::metachar__S_CaretCaret; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_CaretCaret; our @ISA = 'VAST::metachar';
 }
 
-
-{ package VAST::metachar__S_ColonColon; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_ColonColon; our @ISA = 'VAST::metachar';
 }
 
+{ package VAST::metachar__S_ColonColonColon; our @ISA = 'VAST::metachar';
+}
 
-{ package VAST::metachar__S_ColonColonColon; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_ColonColonKet; our @ISA = 'VAST::metachar';
 }
 
 
@@ -948,15 +952,15 @@ sub indent {
 }
 
 
-{ package VAST::metachar__S_Dollar; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_Dollar; our @ISA = 'VAST::metachar';
 }
 
 
-{ package VAST::metachar__S_DollarDollar; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_DollarDollar; our @ISA = 'VAST::metachar';
 }
 
 
-{ package VAST::metachar__S_Dot; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_Dot; our @ISA = 'VAST::metachar';
 }
 
 
@@ -979,7 +983,7 @@ sub indent {
 }
 
 
-{ package VAST::metachar__S_Nch; our @ISA = 'VAST::Base';
+{ package VAST::metachar__S_Nch; our @ISA = 'VAST::metachar';
 }
 
 
@@ -2709,6 +2713,128 @@ END
             return $re if $re =~ /^\$C->before/;
             "\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
         }
+    }
+}
+
+{ package RE_meta; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+        my $not = 0;
+        my $code = "";
+        if ($text =~ /^(\\[A-Z])(.*)/) {
+            $text = lc($1) . $2;
+            $not = 1;
+        }
+        if ($text eq '.') {
+	    if ($::REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=(?s:.))/)";
+	    }
+	    else {
+		$code = "\$C->cursor_incr()";
+	    }
+        }
+        elsif ($text eq '.*') {
+            $code = "\$C->_SCANg$::REV()";
+        }
+        elsif ($text eq '.*?') {
+            $code = "\$C->_SCANf$::REV()";
+	    #$MAYBACKTRACK = 1;
+        }
+        elsif ($text eq '^') {
+	    $code = "\$C->_PATTERN(qr/\\G\\A/)";
+        }
+        elsif ($text eq '^^') {
+	    $code = "\$C->_PATTERN(qr/\\G(?m:^)/)";
+        }
+        elsif ($text eq '$') {
+	    $code = "\$C->_PATTERN(qr/\\G\\z/)";
+        }
+        elsif ($text eq '$$') {
+	    $code = "\$C->_PATTERN(qr/\\G(?m:\$)/)";
+        }
+        elsif ($text eq ':') {
+	    # WTF?
+	    my $extra = $self->{extra} || '';
+            $code = "(($extra), \$C)[-1]";
+        }
+        elsif ($text eq '::') {
+            $code = "\$C->_COMMITLTM$::REV()";
+        }
+        elsif ($text eq '::>') {
+            $code = "\$C->_COMMITBRANCH$::REV()";
+        }
+        elsif ($text eq ':::') {
+            $code = "\$C->_COMMITRULE$::REV()";
+        }
+        elsif ($text eq '\\d') {
+	    if ($::REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=\\d)/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G\\d/)";
+	    }
+        }
+        elsif ($text eq '\\w') {
+	    if ($::REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=\\w)/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G\\w/)";
+	    }
+        }
+        elsif ($text eq '\\s') {
+	    if ($::REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=\\s)/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G\\s/)";
+	    }
+        }
+        elsif ($text eq '\\h') {
+	    if ($::REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=[\\x20\\t\\r])/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G[\\x20\\t\\r]/)";
+	    }
+        }
+        elsif ($text eq '\\v') {
+	    if ($::REV) {
+		$code = "\$C->_PATTERN(qr/\\G(?<=[\\n])/)";
+	    }
+	    else {
+		$code = "\$C->_PATTERN(qr/\\G[\\n]/)";
+	    }
+        }
+        elsif ($text eq '»') {
+	    $code = "\$C->_PATTERN(qr/\\G\\b/)";
+        }
+        elsif ($text eq '«') {
+	    $code = "\$C->_PATTERN(qr/\\G\\b/)";
+        }
+        elsif ($text eq '>>') {
+            $code = "\$C->_RIGHTWB$::REV()";
+        }
+        elsif ($text eq '<<') {
+            $code = "\$C->_LEFTWB$::REV()";
+        }
+        elsif ($text eq '<(') {
+            $code = "\$C->_LEFTRESULT$::REV()";
+        }
+        elsif ($text eq ')>') {
+            $code = "\$C->_RIGHTRESULT$::REV()";
+        }
+        elsif ($text eq '<~~>') {
+            $code = "\$C->$::NAME()";
+        }
+        else {
+            $code = "\$C->_EXACT$::REV(\"$text\")";
+        }
+        if ($not) { # XXX or maybe just .NOT on the end...
+            $code = "\$C->_NOTCHAR( sub { my \$C=shift;\n" . ::indent($code) . "\n})";
+        }
+        $code;
     }
 }
 
