@@ -1188,6 +1188,20 @@ BODY
 
 
 { package VAST::mod_internal__S_Colons; our @ISA = 'VAST::Base';
+    # note that most of this is handled in the parser
+    sub re_ast { my $self = shift;
+	$::SIGSPACE = 1;
+	RE_noop->new;
+    }
+}
+
+
+{ package VAST::mod_internal__S_ColonBangs; our @ISA = 'VAST::Base';
+    # note that most of this is handled in the parser
+    sub re_ast { my $self = shift;
+	$::SIGSPACE = 0;
+	RE_noop->new;
+    }
 }
 
 
