@@ -1652,6 +1652,8 @@ EOT
 	local $::PLURALITY = 1;
 	local $::DECL = [];
 	local $::NEEDORIGARGS = 0;
+	# Disable ratchet optimizations if any backtracky tokens are encountered
+	local $::MAYBACKTRACK = !$::RATCHET;
 	local %::BINDINGS;
 
 	my $spcsig = $self->kids('signature') ?
@@ -2269,7 +2271,7 @@ END
 
     sub bind { my $self = shift; my $re = shift;
 	return $re unless @_;
-	my $ratchet = $::RATCHET ? 'r' : '';
+	my $ratchet = $::MAYBACKTRACK ? '' : 'r';
 	$re = "\$C->_SUBSUME$ratchet([" .
 	    join(',', map {"'$_'"} @_) .
 	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re, 2) . "\n  })";
@@ -2312,7 +2314,7 @@ END
 { package RE_sequence;
     sub wrapone {
         my ($self, $outer, $inner) = @_;
-        if (!$$self{r}) {
+        if ($::MAYBACKTRACK) {
             "Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
                 ::indent($inner) .
             "\n}, $outer)";
@@ -2581,6 +2583,7 @@ END
     sub walk {
         my $self = shift;
         my $result;
+	$::MAYBACKTRACK = 1 unless $$self{quant}[1] eq ':';
 	local $::PLURALITY = 2;
         if (ref $$self{atom}) {
             my $quant = "";
@@ -2739,7 +2742,7 @@ END
         }
         elsif ($text eq '.*?') {
             $code = "\$C->_SCANf$::REV()";
-	    #$MAYBACKTRACK = 1;
+	    $::MAYBACKTRACK = 1;
         }
         elsif ($text eq '^') {
 	    $code = "\$C->_PATTERN(qr/\\G\\A/)";
