@@ -529,9 +529,11 @@ sub indent {
 		$self->SUPER::re_ast(method => name => $::ENDSYM, min => 12345, nobind => 1) ]);
 	}
 
+	my $al = $self->{arglist}[0];
+	$al = defined $al ? "(" . $al->p5 . ")" : "";
 	$self->SUPER::re_ast(method =>, name => $name,
 	    ($name eq 'sym' ? (sym => $::SYM) : ()),
-	    min => 12345, arglist => $self->{arglist}[0]);
+	    min => 12345, arglist => $al);
     }
 }
 
@@ -1778,8 +1780,47 @@ END
 { package VAST::regex_infix; our @ISA = 'VAST::Base';
 }
 
-
+# This is really a tight ternary op, but STD parses it as a loose infix,
+# so we need to reassociate.  Also, the backend handling is very "fossily"
 { package VAST::regex_infix__S_Tilde; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	my ($left, $right) = map { $_->re_ast } $self->kids('args');
+	die "internal error: erroneous optimization"
+	    unless $left->isa("RE_sequence") && $right->isa("RE_sequence");
+	my @lefts = @{ $left->{zyg} };
+	my @rights = @{ $right->{zyg} };
+
+	my $opener = pop @lefts;
+	my ($closer, $inner) = splice @rights, 0, 2;
+
+	my @middle;
+
+	my $strcloser = $closer->{text}; #XXX
+
+	push @middle, $opener;
+	push @middle, $self->SUPER::re_ast(meta => min => 0, text => ':',
+	    extra => <<FRAG);
+local \$::GOAL = '$strcloser',
+my \$goalpos = \$C,
+do {
+    unless ('$strcloser' eq ')' or '$strcloser' eq ']' or '$strcloser' eq '}') {
+        my \$newlang = \$C->unbalanced(\$::GOAL);
+        \$C = bless(\$C, (ref(\$newlang) || \$newlang))
+    }
+}
+FRAG
+	push @middle, $inner;
+	my $l = length($strcloser);
+	push @middle, $self->SUPER::re_ast(bracket => min => $l,
+	    decl => [], re => $self->SUPER::re_ast(first => min => $l, zyg => [
+		$self->SUPER::re_ast(string => min => $l, text => $strcloser),
+		$self->SUPER::re_ast(method => name => 'FAILGOAL', nobind => 1,
+		    arglist => "('$strcloser' , 'indirect name', \$goalpos)")]));
+
+	my @all = (@lefts, @middle, @rights);
+	$self->SUPER::re_ast(sequence => min => ::sum(map { $_->{min} } @all),
+	    zyg => \@all);
+    }
 }
 
 
@@ -2583,12 +2624,10 @@ END
         }
         elsif ($name =~ /^\w/) {
             my $al = $self->{arglist};
-	    $al = defined $al ? ("(" . $al->p5 . ")") : "";
             $re = '$C->' . $name . $al;
         }
         else {
             my $al = $self->{arglist};
-	    $al = defined $al ? ("(" . $al->p5 . ")") : "";
             $re = <<"END";
 do {
   if (not $name) {
@@ -2809,7 +2848,6 @@ END
 	    $code = "\$C->_PATTERN(qr/\\G(?m:\$)/)";
         }
         elsif ($text eq ':') {
-	    # WTF?
 	    my $extra = $self->{extra} || '';
             $code = "(($extra), \$C)[-1]";
         }
