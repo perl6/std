@@ -683,9 +683,14 @@ sub indent {
 
 { package VAST::colonpair; our @ISA = 'VAST::Base';
     sub adverbs { my $self = shift;
+	my $val;
 	if (Scalar::Util::blessed $self->{v} &&
 		$self->{v}->isa('VAST::coloncircumfix') &&
-		(my ($val) = $self->{v}->Str =~ /^[<«](.*).$/)) {
+		(($val) = $self->{v}->Str =~ /^[<«](.*).$/)) {
+	    return $self->{k} => $val;
+	} elsif (Scalar::Util::blessed $self->{v} &&
+		$self->{v}->isa('VAST::coloncircumfix') &&
+		(($val) = $self->{v}->Str =~ /^\['([^']*)'\]$/)) {
 	    return $self->{k} => $val;
 	} elsif ($self->{v} == 1) {
 	    return "sym" => $self->{k};
