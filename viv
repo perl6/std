@@ -962,6 +962,13 @@ sub indent {
 
 
 { package VAST::metachar__S_Cur_Ly; our @ISA = 'VAST::Base';
+    sub re_ast { my $self = shift;
+        local $::NEEDMATCH = 0;
+        my $text = $self->{embeddedblock}{statementlist}->p5;
+        $text = "my \$M = \$C;\n" . $text if $::NEEDMATCH;
+	$self->SUPER::re_ast(block => body => $text, context => 'void',
+	    min => 0);
+    }
 }
 
 
@@ -2897,6 +2904,23 @@ END
     sub walk {
         my $self = shift;
         $$self{body} . ";\n";
+    }
+}
+
+{ package RE_block; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $ctx = $$self{context};
+        my $text = $$self{body};
+        if ($ctx eq 'void') {
+            "scalar(do {\n" . ::indent($text) . "\n}, \$C)";
+        }
+        elsif ($ctx eq 'bool') {
+            "((\$C) x !!do {\n" . ::indent($text) . "\n})";
+        }
+        else {
+            " sub { my \$C=shift;\n" . ::indent($text) . "\n}";
+        }
     }
 }
 
