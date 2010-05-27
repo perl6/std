@@ -1099,7 +1099,18 @@ sub indent {
 }
 
 
-{ package VAST::mod_internal__S_adv; our @ISA = 'VAST::Base';
+{ package VAST::mod_internal__S_p6adv; our @ISA = 'VAST::Base';
+    sub re_ast { my $self = shift;
+	my $key = $self->{quotepair}{k};
+
+	if ($key eq 'dba') {
+	    $::DBA = eval ($self->{quotepair}{circumfix}[0]->Str);
+	} else {
+	    die "unhandled internal adverb $key";
+	}
+
+	$self->SUPER::re_ast(noop => min => 0);
+    }
 }
 
 
