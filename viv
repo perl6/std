@@ -1197,6 +1197,15 @@ BODY
     }
 }
 
+# TODO This is not quite right, since part of the semantic of ratchet is
+# implemented via $::MAYBACKTRACK and propagated up
+{ package VAST::mod_internal__S_Colonr; our @ISA = 'VAST::Base';
+    sub re_ast { my $self = shift;
+	$::RATCHET = 1;
+	RE_noop->new;
+    }
+}
+
 
 { package VAST::mod_internal__S_Colonmy; our @ISA = 'VAST::Base';
     sub re_ast { my $self = shift;
