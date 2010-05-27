@@ -22,6 +22,7 @@ use Encode;
 use JSON -convert_blessed_universally;
 use Scalar::Util 'blessed', 'refaddr';
 use Storable;
+use Try::Tiny;
 
 my $OPT_match = 0;
 my $OPT_log = 0;
@@ -389,16 +390,25 @@ sub indent {
 
     sub p5 { my $self = shift; my $lvl = @context;
 	my @text;
-	say ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
+	say STDERR ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
 	$context[$lvl] = $self;
 	# print STDERR "HERE " . ref($self) . "\n";
-	splice(@context,$lvl);
-	my @bits = $self->emit_p5;
+	my @bits = ::try {
+	    $self->emit_p5;
+	} ::catch {
+	    my $char = $self->{BEG} // $self->{_from} // 0;
+	    my $line = 1 + (substr($::ORIG, 0, $char) =~ y/\n/\n/);
+	    say STDERR "!!! FAILED at $char (L$line)";
+	    print STDERR $_;
+	    "<<< ERROR >>>";
+	};
 	my $val = join '', @bits;
 	my @c = map { ref $_ } @context;
 	my $c = "@c " . ref($self);
 	$c =~ s/VAST:://g;
-	print STDERR ' ' x ($lvl-1), "$c returns $val\n" if $OPT_log;
+	say ' ' x ($lvl-1), "$c returns $val\n" if $OPT_log;
+	# Note that we may have skipped levels, so you can't just pop
+	splice(@context,$lvl);
 	wantarray ? @bits : $val;
     }
 
