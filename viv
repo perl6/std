@@ -1056,6 +1056,10 @@ sub indent {
 
 
 { package VAST::metachar__S_var; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	# We don't un6 because some things need to un6 specially - backrefs
+	RE_var->new(var => $self->{SYM});
+    }
 }
 
 
@@ -3082,6 +3086,30 @@ END
         my $self = shift;
         my $re = $$self{re};
         $re->remove_leading_ws();
+    }
+}
+
+{ package RE_var; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $var = $$self{var};
+        if ($var =~ /^\$/) {
+            if ($var =~ /^\$(\d+)$/) {
+                $self->bind("\$C->_BACKREFp$::REV($1)");
+            }
+            elsif ($var =~ /^\$<(.*)>$/) {
+                $self->bind("\$C->_BACKREFn$::REV('$1')");
+            }
+            else {
+                $self->bind("\$C->_EXACT$::REV($var)");
+            }
+        }
+        elsif ($var =~ /^\@/) {
+            $self->bind("\$C->_ARRAY$::REV($var)");
+        }
+        elsif ($var =~ /^\%/) {
+            $self->bind("\$C->_HASH$::REV($var)");
+        }
     }
 }
 
