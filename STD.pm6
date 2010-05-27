@@ -1558,7 +1558,9 @@ grammar P6 is STD {
         [
         || <.spacey> <arglist>
             {{
+                my %*MYSTERY;
                 $¢.do_import($<term>, $<arglist>);
+                $¢.explain_mystery();
             }}
         || {{ $¢.do_import($<term>, ''); }}
         ]
@@ -1569,6 +1571,7 @@ grammar P6 is STD {
         :my $longname;
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
+        :my %*MYSTERY;
         <sym> <.ws>
         [
         | <version>
@@ -1588,13 +1591,16 @@ grammar P6 is STD {
             ]
         ]
         <.ws>
+        <.explain_mystery>
     }
 
 
     token statement_control:no {
+        :my %*MYSTERY;
         <sym> <.ws>
         <module_name>[<.spacey><arglist>]?
         <.ws>
+        <.explain_myster>
     }
 
 
@@ -1682,7 +1688,7 @@ grammar P6 is STD {
     }
     rule statement_control:default {<sym> <block> }
 
-    token statement_prefix:BEGIN   { <sym> <blast> }
+    token statement_prefix:BEGIN   { :my %*MYSTERY; <sym> <blast> <.explain_mystery> }
     token statement_prefix:CHECK   { <sym> <blast> }
     token statement_prefix:INIT    { <sym> <blast> }
     token statement_prefix:START   { <sym> <blast> }
@@ -5639,6 +5645,7 @@ method explain_mystery() {
         }
     }
     self.sorry($m) if $m;
+    self;
 }
 
 method load_setting ($setting) {

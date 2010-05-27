@@ -14,6 +14,7 @@ use utf8;
 use NAME;
 use Stash;
 use RE_ast;
+#use Carp::Always;
 
 my $TRIE = 1;
 my $STORABLE = 1;
