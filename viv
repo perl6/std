@@ -1287,12 +1287,37 @@ EOT
     }
 }
 
-
+# Perl5 invocations don't carry enough context for a proper binder; in
+# particular we can't distinguish named stuff from positionals
 { package VAST::parameter; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
-        my @t = $self->SUPER::emit_p5;
-	my $t = 'my ' . join('',@t) . " = shift";
-        $t;
+	my $t;
+	my $pvar = $self->{param_var};
+	my $named = 0;
+	my $pname;
+	if (!$pvar) {
+	    $pvar = $self->{named_param}{param_var};
+	    $pname = $pvar->{name}[0]{TEXT};
+	    $t = "delete \$args{$pname}";
+	    $named = 1;
+	} else {
+	    $pname = $pvar->{name}[0]{TEXT};
+	    $t = "shift";
+	}
+	my $sigil = $pvar->{sigil}{SYM};
+	my $twigil = $pvar->{twigil}[0] ? $pvar->{twigil}[0]{SYM} : '';
+
+	if (my ($dv) = $self->kids('default_value')) {
+	    $t .= " // " . $dv->{"."}->p5;
+	}
+
+	if ($twigil eq '*') {
+	    $t = "local ${sigil}::${pname} = $t";
+	} else {
+	    $t = "my ${sigil}${pname} = $t";
+	}
+
+	$named, $t;
     }
 }
 
@@ -1751,7 +1776,15 @@ END
 	}
 
 	# signature stuff is just parsing code
-	join '', map { $_->p5 . ";\n" } $self->kids('parameter');
+	my @seg = ('', '');
+	for my $pv ($self->kids('parameter')) {
+	    my ($named, $st) = $pv->p5;
+	    $seg[$named] .= $st . ";\n";
+	}
+
+	if ($seg[1]) { $seg[1] = "my %args = \@_;\n" . $seg[1]; }
+
+	$seg[0] . $seg[1];
     }
 }
 
