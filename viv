@@ -1105,6 +1105,22 @@ sub indent {
 	my $name = $self->{longname} ? $self->{longname}->p5 . " " : "";
 	my $sig  = $self->{multisig}[0] ? $self->{multisig}[0]->p5 : "";
 	my $body = $self->{blockoid}{statementlist}->p5;
+
+	if ($::MULTINESS eq 'multi') {
+	    $::MULTIMETHODS{$name} .= <<EOT
+{
+    local \@_ = \@_;
+    return do {
+        my \$self = shift;
+EOT
+	    . ::indent($sig . $body, 2) . <<EOT
+    };
+}
+EOT
+	    ;
+	    return '';
+	}
+
 	# not quite right, this should be an expression
 	"sub " . $name . "{\n" . 
 	    ::indent("no warnings 'recursion';\nmy \$self = shift;\n" .
@@ -1343,6 +1359,7 @@ END
 	local $::PROTOSIG = {};
 	local $::PKG = $self->p5_module_name;
 	local $::MULTIRX_SEQUENCE = 0;
+	local %::MULTIMETHODS;
 	my $body1 = $self->emit_p5_header;
 	my $body3 = $block->p5;
 	my $body2 = '';
@@ -1380,7 +1397,19 @@ EOT
 	    $body = "package $name;\n" . $body;
 	}
 
-	"{ $body }";
+	my $finalmulti;
+
+	for my $mm (sort keys %::MULTIMETHODS) {
+	    $finalmulti .= "sub $mm {\n    no warnings 'recursion';\n" .
+		::indent($::MULTIMETHODS{$mm}, 1) . <<EOFINAL
+    \$_[0]->SUPER::$mm(\@_);
+}
+
+EOFINAL
+		;
+	}
+
+	"{ $body $finalmulti }";
     }
 }
 
@@ -1407,7 +1436,7 @@ EOT
 	# Is it valid?
 	my $check = '';
 	if ($self->{quant} eq '!' || $self->{quant} eq '' && $posit) {
-	    $check .= $::MULTINESS eq 'multi' ? "last" :
+	    $check .= $::MULTINESS eq 'multi' ? "last " :
 		"die 'Required argument $pname omitted' ";
 	    $check .= $posit ? 'unless @_'
 		: 'unless ' . join(" || ", map ("exists \$args{$_}", @names));
