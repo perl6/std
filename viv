@@ -959,6 +959,7 @@ sub indent {
 	local $::DBA = $::DBA;
 	local $::RATCHET = $::RATCHET;
 	local $::SIGSPACE = $::SIGSPACE;
+	local $::IGNORECASE = $::IGNORECASE;
 	local @::DECLAST;
 
 	my $bodyast = $self->{nibbler}{"."}->re_ast;
@@ -1161,6 +1162,10 @@ EOT
 
 
 { package VAST::mod_internal__S_Coloni; our @ISA = 'VAST::Base';
+    sub re_ast { my $self = shift;
+	$::IGNORECASE = 1;
+	RE_noop->new;
+    }
 }
 
 
@@ -1773,6 +1778,7 @@ EOT
 	local $::NEEDORIGARGS = 0;
 	# Disable ratchet optimizations if any backtracky tokens are encountered
 	local $::MAYBACKTRACK = !$::RATCHET;
+	local $::IGNORECASE = 0;
 	local %::BINDINGS;
 
 	my $spcsig = $self->kids('signature') ?
@@ -2403,8 +2409,9 @@ FRAG
 
 { package REbase;
     sub new {  my $class = shift;
-	my $self = bless { a => 0, i => 0, r => $::RATCHET ? 1 : 0,
-	    s => $::SIGSPACE ? 1 : 0, dba => $::DBA, @_ }, $class;
+	my $self = bless { a => 0, i => $::IGNORECASE ? 1 : 0,
+	    r => $::RATCHET ? 1 : 0, s => $::SIGSPACE ? 1 : 0,
+	    dba => $::DBA, @_ }, $class;
 	$self->{min} //= $self->calc_min;
 	$self;
     }
