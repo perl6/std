@@ -4,7 +4,6 @@
 #
 use strict;
 use 5.010;
-use Carp::Always;
 use warnings FATAL => 'all';
 
 use List::Util qw/sum min/;
@@ -395,6 +394,7 @@ sub indent {
 	$context[$lvl] = $self;
 	# print STDERR "HERE " . ref($self) . "\n";
 	my @bits = ::try {
+	    local $SIG{__DIE__} = sub { die &Carp::longmess };
 	    $self->emit_p5;
 	} ::catch {
 	    my $char = $self->{BEG} // $self->{_from} // 0;
