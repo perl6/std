@@ -482,6 +482,17 @@ sub indent {
 
 
 { package VAST::assertion__S_Bra; our @ISA = 'VAST::Base';
+    sub re_ast { my $self = shift;
+	my $cclass = $self->Str;
+        $cclass =~ s/\\x([0-9a-fA-F]{3,4})/\\x\{$1\}/g;
+	$self->SUPER::re_ast(cclass => min => 1, text => $cclass);
+    }
+}
+
+{ package VAST::assertion__S_Minus; our @ISA = 'VAST::assertion__S_Bra';
+}
+
+{ package VAST::assertion__S_Plus; our @ISA = 'VAST::assertion__S_Bra';
 }
 
 
@@ -2838,6 +2849,24 @@ END
             $code = "\$C->_NOTCHAR( sub { my \$C=shift;\n" . ::indent($code) . "\n})";
         }
         $code;
+    }
+}
+
+{ package RE_cclass; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $text = $$self{text};
+        $text =~ s!(\/|\\\/)!\\$1!g;
+        $text =~ s/\s//g;
+        $text =~ s/\.\./-/g;
+	$text =~ s/^-\[/[^/;
+	$text = "(?<=$text)" if $::REV;
+	if ($$self{i}) {
+	    $self->bind("\$C->_PATTERN(qr/\\G(?i:$text)/)");
+	}
+	else {
+	    $self->bind("\$C->_PATTERN(qr/\\G$text/)");
+	}
     }
 }
 
