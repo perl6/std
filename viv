@@ -474,7 +474,8 @@ sub indent {
 
 { package VAST::assertion__S_Bang; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	my $ast = $self->{assertion}->re_ast;
+	my $ast = $self->{assertion} ? $self->{assertion}->re_ast
+	    : $self->SUPER::re_ast(noop => min => 0);
 	$ast->{nobind} = 1;
 	$self->SUPER::re_ast(assertion => assert => '!', min => 0, re => $ast);
     }
@@ -537,7 +538,8 @@ sub indent {
 
 { package VAST::assertion__S_Question; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	my $ast = $self->{assertion}->re_ast;
+	my $ast = $self->{assertion} ? $self->{assertion}->re_ast
+	    : $self->SUPER::re_ast(noop => min => 0);
 	$ast->{nobind} = 1;
 	$self->SUPER::re_ast(assertion => assert => '?', min => 0, re => $ast);
     }
@@ -2867,6 +2869,13 @@ END
 	else {
 	    $self->bind("\$C->_PATTERN(qr/\\G$text/)");
 	}
+    }
+}
+
+{ package RE_noop; use base "REbase";
+    sub walk {
+        my $self = shift;
+        '$C';
     }
 }
 
