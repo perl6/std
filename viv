@@ -473,6 +473,11 @@ sub indent {
 
 
 { package VAST::assertion__S_Bang; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	my $ast = $self->{assertion}->re_ast;
+	$ast->{nobind} = 1;
+	$self->SUPER::re_ast(assertion => assert => '!', min => 0, re => $ast);
+    }
 }
 
 
@@ -520,6 +525,11 @@ sub indent {
 
 
 { package VAST::assertion__S_Question; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	my $ast = $self->{assertion}->re_ast;
+	$ast->{nobind} = 1;
+	$self->SUPER::re_ast(assertion => assert => '?', min => 0, re => $ast);
+    }
 }
 
 
@@ -2684,6 +2694,21 @@ END
 	    $::BINDINGS{$name} += $::PLURALITY;
 	}
 	$self->bind($re);
+    }
+}
+
+{ package RE_assertion; use base "REbase";
+    sub walk {
+        my $self = shift;
+        if ($$self{assert} eq '!') {
+            my $re = $$self{re}->walk;
+            "\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+        }
+        else {
+            my $re = $$self{re}->walk;
+            return $re if $re =~ /^\$C->before/;
+            "\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+        }
     }
 }
 
