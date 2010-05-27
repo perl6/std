@@ -4,7 +4,7 @@
 #
 use strict;
 use 5.010;
-#use Carp::Always;
+use Carp::Always;
 use warnings FATAL => 'all';
 
 use List::Util qw/sum min/;
@@ -1401,6 +1401,8 @@ EOT
 	}
 	$posit = 1 unless @names;
 	my $pname = $pvar->{name}[0]{TEXT};
+	my $sigil = $pvar->{sigil}{SYM};
+	my $twigil = $pvar->{twigil}[0] ? $pvar->{twigil}[0]{SYM} : '';
 
 	# Is it valid?
 	my $check = '';
@@ -1423,11 +1425,12 @@ EOT
 	for (reverse @names) {
 	    $value = "exists \$args{$_} ? delete \$args{$_} : $value";
 	}
+	if ($self->{quant} eq '*') {
+	    $value = ($sigil eq '%') ? '%args' : '@_';
+	    $posit = 0 if $sigil eq '%';
+	}
 
 	# Store it somewhere useful
-	my $sigil = $pvar->{sigil}{SYM};
-	my $twigil = $pvar->{twigil}[0] ? $pvar->{twigil}[0]{SYM} : '';
-
 	if ($twigil eq '*' && $pname eq 'endsym') {
 	    # XXX this optimization needs to be refactored, I think
 	    my ($dv) = $self->kids('default_value');
