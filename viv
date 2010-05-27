@@ -939,7 +939,14 @@ sub indent {
 
 { package VAST::metachar__S_Bra_Ket; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	$self->{nibbler}->re_ast;
+	local $::DBA = $::DBA;
+	local $::RATCHET = $::RATCHET;
+	local $::SIGSPACE = $::SIGSPACE;
+	local @::DECLAST;
+
+	my $bodyast = $self->{nibbler}{"."}->re_ast;
+	$self->SUPER::re_ast(bracket => min => $bodyast->{min},
+	    decl => \@::DECLAST, re => $bodyast);
     }
 }
 
@@ -2924,14 +2931,34 @@ END
         my $ctx = $$self{context};
         my $text = $$self{body};
         if ($ctx eq 'void') {
-            "scalar(do {\n" . ::indent($text) . "\n}, \$C)";
+            return "scalar(do {\n" . ::indent($text) . "\n}, \$C)";
         }
         elsif ($ctx eq 'bool') {
-            "((\$C) x !!do {\n" . ::indent($text) . "\n})";
+            return "((\$C) x !!do {\n" . ::indent($text) . "\n})";
         }
         else {
-            " sub { my \$C=shift;\n" . ::indent($text) . "\n}";
+            return " sub { my \$C=shift;\n" . ::indent($text) . "\n}";
         }
+    }
+}
+
+{ package RE_bracket; use base "REbase";
+    sub walk {
+        my $self = shift;
+	my $re;
+	{
+            local $::MAYBACKTRACK = $::MAYBACKTRACK;
+	    $re = ::indent($$self{re}->walk);
+	}
+	my $ratchet = $::MAYBACKTRACK ? '' : 'r';
+        $re = "\$C->_BRACKET$ratchet(sub {\n  my \$C=shift;\n" . $re . "\n})";
+	$re;
+    }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        my $re = $$self{re};
+        $re->remove_leading_ws();
     }
 }
 
