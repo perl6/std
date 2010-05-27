@@ -421,11 +421,6 @@ sub indent {
 	return substr($::ORIG, $beg, $end - $beg);
     }
 
-    sub re_ast {  my $self = shift; my $type = shift;
-	return bless { a => 0, i => 0, r => $::RATCHET, s => $::SIGSPACE,
-	    dba => $::DBA, @_ }, "RE_$type";
-    }
-
     sub base_re_quantifier { my $self = shift; my $x = shift; my $min = shift;
 	my $qm = $self->{quantmod}->Str;
 	$qm =~ s/:(.)/$1/;
@@ -486,9 +481,9 @@ sub indent {
 { package VAST::assertion__S_Bang; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my $ast = $self->{assertion} ? $self->{assertion}->re_ast
-	    : $self->SUPER::re_ast(noop => min => 0);
+	    : RE_noop->new;
 	$ast->{nobind} = 1;
-	$self->SUPER::re_ast(assertion => assert => '!', min => 0, re => $ast);
+	RE_assertion->new(assert => '!', re => $ast);
     }
 }
 
@@ -497,7 +492,7 @@ sub indent {
     sub re_ast { my $self = shift;
 	my $cclass = $self->Str;
         $cclass =~ s/\\x([0-9a-fA-F]{3,4})/\\x\{$1\}/g;
-	$self->SUPER::re_ast(cclass => min => 1, text => $cclass);
+	RE_cclass->new(text => $cclass);
     }
 }
 
@@ -513,8 +508,7 @@ sub indent {
         local $::NEEDMATCH = 0;
         my $text = $self->{embeddedblock}{statementlist}->p5;
         $text = "my \$M = \$C;\n" . $text if $::NEEDMATCH;
-	$self->SUPER::re_ast(block => body => $text, context => 'bool',
-	    min => 0);
+	RE_block->new(body => $text, context => 'bool');
     }
 }
 
@@ -537,21 +531,20 @@ sub indent {
 	my $name = $self->{longname}->Str;
 
 	if ($self->{nibbler}[0]) {
-	    return $self->SUPER::re_ast(method_re => name => $name,
-		min => 12345, re => $self->{nibbler}[0]{"."}->re_ast);
+	    return RE_method_re->new(name => $name,
+		re => $self->{nibbler}[0]{"."}->re_ast);
 	}
 
 	if ($name eq 'sym' && defined $::ENDSYM) {
-	    return $self->SUPER::re_ast(sequence => min => 24690, zyg => [
-		$self->SUPER::re_ast(method => name => $name, sym => $::SYM, min => 12345, arglist => ''),
-		$self->SUPER::re_ast(method => name => $::ENDSYM, min => 12345, nobind => 1, arglist => '') ]);
+	    return RE_sequence->new(
+		RE_method->new(name => $name, sym => $::SYM),
+		RE_method->new(name => $::ENDSYM, nobind => 1));
 	}
 
 	my $al = $self->{arglist}[0];
 	$al = defined $al ? "(" . $al->p5 . ")" : "";
-	$self->SUPER::re_ast(method =>, name => $name,
-	    ($name eq 'sym' ? (sym => $::SYM) : ()),
-	    min => 12345, arglist => $al);
+	RE_method->new(name => $name, ($name eq 'sym' ? (sym => $::SYM) : ()),
+	    arglist => $al);
     }
 }
 
@@ -559,9 +552,9 @@ sub indent {
 { package VAST::assertion__S_Question; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my $ast = $self->{assertion} ? $self->{assertion}->re_ast
-	    : $self->SUPER::re_ast(noop => min => 0);
+	    : RE_noop->new;
 	$ast->{nobind} = 1;
-	$self->SUPER::re_ast(assertion => assert => '?', min => 0, re => $ast);
+	RE_assertion->new(assert => '?', re => $ast);
     }
 }
 
@@ -569,7 +562,7 @@ sub indent {
 { package VAST::atom; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	if (exists $self->{TEXT}) {
-	    $self->SUPER::re_ast(string => text => $self->{TEXT}, min => 1);
+	    RE_string->new(text => $self->{TEXT});
 	} else {
 	    $self->{metachar}->re_ast;
 	}
@@ -948,7 +941,7 @@ sub indent {
 
 { package VAST::metachar; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	$self->SUPER::re_ast(meta => text => $self->Str, min => 0);
+	RE_meta->new(text => $self->Str);
     }
 }
 
@@ -965,8 +958,7 @@ sub indent {
 	local @::DECLAST;
 
 	my $bodyast = $self->{nibbler}{"."}->re_ast;
-	$self->SUPER::re_ast(bracket => min => $bodyast->{min},
-	    decl => \@::DECLAST, re => $bodyast);
+	RE_bracket->new(decl => \@::DECLAST, re => $bodyast);
     }
 }
 
@@ -993,8 +985,7 @@ sub indent {
         local $::NEEDMATCH = 0;
         my $text = $self->{embeddedblock}{statementlist}->p5;
         $text = "my \$M = \$C;\n" . $text if $::NEEDMATCH;
-	$self->SUPER::re_ast(block => body => $text, context => 'void',
-	    min => 0);
+	RE_block->new(body => $text, context => 'void');
     }
 }
 
@@ -1014,7 +1005,7 @@ sub indent {
 { package VAST::metachar__S_Double_Double; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my $text = $self->{quote}{nibble}->Str;
-	$self->SUPER::re_ast(double => text => $text, min => length($text));
+	RE_double->new(text => $text);
     }
 }
 
@@ -1047,8 +1038,7 @@ sub indent {
 
 { package VAST::metachar__S_sigwhite; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	$self->SUPER::re_ast(method => name => 'ws', nobind => 1, min => 12345,
-	    arglist => '');
+	RE_method->new(name => 'ws', nobind => 1);
     }
 }
 
@@ -1056,7 +1046,7 @@ sub indent {
 { package VAST::metachar__S_Single_Single; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my $text = $self->{quote}{nibble}->Str;
-	$self->SUPER::re_ast(string => text => $text, min => length($text));
+	RE_string->new(text => $text);
     }
 }
 
@@ -1153,7 +1143,7 @@ EOT
 	    die "unhandled internal adverb $key";
 	}
 
-	$self->SUPER::re_ast(noop => min => 0);
+	RE_noop->new;
     }
 }
 
@@ -1172,9 +1162,8 @@ EOT
         my $text = $self->{statement}->p5;
         $text = 'my $M = $C; ' . $text if $::NEEDMATCH;
 
-	push @::DECLAST, $self->SUPER::re_ast(decl => min => 0, max => 0,
-	    body => $text);
-	$self->SUPER::re_ast(noop => min => 0);
+	push @::DECLAST, RE_decl->new(body => $text);
+	RE_noop->new;
     }
 }
 
@@ -1560,16 +1549,14 @@ EOFINAL
 	local $::RATCHET = $quant->[1] eq ':' ? 'r' : '';
 	my $ast = $self->{atom}->re_ast;
 
-	$self->SUPER::re_ast(quantified_atom => atom => $ast, quant => $quant,
-	    min => $ast->{min} * $quant->[3]);
+	RE_quantified_atom->new(atom => $ast, quant => $quant);
     }
 }
 
 { package VAST::quant_atom_list; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my @kids = map { $_->re_ast } $self->kids("quantified_atom");
-	$self->SUPER::re_ast(sequence => zyg => \@kids,
-	    min => ::sum(0, map { $_->{min} } @kids));
+	RE_sequence->new(@kids);
     }
 }
 
@@ -1699,9 +1686,8 @@ EOFINAL
 
 { package VAST::regex_def; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	my $bodyast = $self->{regex_block}{nibble}{"."}->re_ast;
-	$self->SUPER::re_ast(ast => kind => $::REGEX_DECLARATOR,
-	    min => $bodyast->{min}, decl => \@::DECLAST, re => $bodyast);
+	RE_ast->new(kind => $::REGEX_DECLARATOR, decl => \@::DECLAST,
+	    re => $self->{regex_block}{nibble}{"."}->re_ast);
     }
     sub protoregex {  my $self = shift;  my $name = shift;
 	$::PROTO->{$name} = 1;
@@ -1870,8 +1856,7 @@ END
 	my $strcloser = $closer->{text}; #XXX
 
 	push @middle, $opener;
-	push @middle, $self->SUPER::re_ast(meta => min => 0, text => ':',
-	    extra => <<FRAG);
+	push @middle, RE_meta->new(text => ':', extra => <<FRAG);
 local \$::GOAL = '$strcloser',
 my \$goalpos = \$C,
 do {
@@ -1882,16 +1867,12 @@ do {
 }
 FRAG
 	push @middle, $inner;
-	my $l = length($strcloser);
-	push @middle, $self->SUPER::re_ast(bracket => min => $l,
-	    decl => [], re => $self->SUPER::re_ast(first => min => $l, zyg => [
-		$self->SUPER::re_ast(string => min => $l, text => $strcloser),
-		$self->SUPER::re_ast(method => name => 'FAILGOAL', nobind => 1,
-		    arglist => "('$strcloser' , 'indirect name', \$goalpos)")]));
+	push @middle, RE_bracket->new(decl => [], re => RE_first->new(
+		RE_string->new(text => $strcloser),
+		RE_method->new(name => 'FAILGOAL', nobind => 1,
+		    arglist => "('$strcloser' , 'indirect name', \$goalpos)")));
 
-	my @all = (@lefts, @middle, @rights);
-	$self->SUPER::re_ast(sequence => min => ::sum(map { $_->{min} } @all),
-	    zyg => \@all);
+	RE_sequence->new(@lefts, @middle, @rights);
     }
 }
 
@@ -1900,21 +1881,15 @@ FRAG
     sub re_ast {  my $self = shift;
 	my $altname = $::NAME . "_" . $::ALT++;
 
-	my @kids = map { $_->re_ast } $self->kids('args');
-
-	return $self->SUPER::re_ast(any => altname => $altname,
-	    name => $altname, zyg => \@kids,
-	    min => ::min(1_000_000_000, map { $_->{min} } @kids));
+	RE_any->new(altname => $altname,
+	    zyg => [map { $_->re_ast } $self->kids('args')]);
     }
 }
 
 
 { package VAST::regex_infix__S_VertVert; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	my @kids = map { $_->re_ast } $self->kids('args');
-
-	return $self->SUPER::re_ast(first => zyg => \@kids,
-	    min => ::min(1_000_000_000, map { $_->{min} } @kids));
+	RE_first->new(map { $_->re_ast } $self->kids('args'));
     }
 }
 
@@ -2419,6 +2394,15 @@ FRAG
 }
 
 { package REbase;
+    sub new {  my $class = shift;
+	my $self = bless { a => 0, i => 0, r => $::RATCHET ? 1 : 0,
+	    s => $::SIGSPACE ? 1 : 0, dba => $::DBA, @_ }, $class;
+	$self->{min} //= $self->calc_min;
+	$self;
+    }
+
+    sub calc_min { 0 }
+
     sub walk {
         my $self = shift;
         my $result = "";
@@ -2447,6 +2431,7 @@ FRAG
 }
 
 { package RE_double; use base "REbase";
+    sub calc_min { length $_[0]{text} }
     sub walk {
         my $self = shift;
         my $text = $$self{text};
@@ -2461,6 +2446,7 @@ FRAG
 }
 
 { package RE_string; use base "REbase";
+    sub calc_min { length $_[0]->{text} }
     sub walk {
         my $self = shift;
 	if ($$self{i}) {
@@ -2477,6 +2463,15 @@ FRAG
 }
 
 { package RE_sequence;
+    sub calc_min { my $self = shift;
+	::sum(0, map { $_->{min} } @{ $self->{zyg} });
+    }
+
+    sub new {
+	my ($class, @zyg) = @_;
+	$class->SUPER::new(zyg => \@zyg);
+    }
+
     sub wrapone {
         my ($self, $outer, $inner) = @_;
         if ($::MAYBACKTRACK) {
@@ -2546,6 +2541,7 @@ END
 }
 
 { package RE_any; use base "REbase";
+    sub calc_min { ::min(1_000_000_000, map { $_->{min} } @{$_[0]{zyg}}) }
     sub walk {
         my $self = shift;
         my @result;
@@ -2631,6 +2627,13 @@ END
 }
 
 { package RE_first; use base "REbase";
+    sub calc_min { ::min(1_000_000_000, map { $_->{min} } @{$_[0]{zyg}}) }
+
+    sub new {
+	my ($class, @zyg) = @_;
+	$class->SUPER::new(zyg => \@zyg);
+    }
+
     sub walk {
         my $self = shift;
         my @result;
@@ -2667,6 +2670,7 @@ END
 }
 
 { package RE_method; use base "REbase";
+    sub calc_min { 12345 }
     sub walk {
         my $self = shift;
         local $::NEEDMATCH = 0;
@@ -2695,11 +2699,11 @@ END
             $re = '$self->SUPER::' . $::NAME . '(@origargs)';
         }
         elsif ($name =~ /^\w/) {
-            my $al = $self->{arglist};
+            my $al = $self->{arglist} // '';
             $re = '$C->' . $name . $al;
         }
         else {
-            my $al = $self->{arglist};
+            my $al = $self->{arglist} // '';
             $re = <<"END";
 do {
   if (not $name) {
@@ -2729,6 +2733,7 @@ END
 }
 
 { package RE_ast; use base "REbase";
+    sub calc_min { $_[0]{re}{min} }
     sub walk {
         my $self = shift;
         if ($$self{decl}) {
@@ -2743,6 +2748,7 @@ END
 }
 
 { package RE_quantified_atom; use base "REbase";
+    sub calc_min { $_[0]{quant}[3] * $_[0]{atom}{min} }
     sub walk {
         my $self = shift;
         my $result;
@@ -2838,6 +2844,7 @@ END
 }
 
 { package RE_method_re; use base "REbase";
+    sub calc_min { 12345 } # "many"
     sub walk {
         my $self = shift;
         my $re = $$self{re};
@@ -3004,6 +3011,7 @@ END
 }
 
 { package RE_cclass; use base "REbase";
+    sub calc_min { 1 }
     sub walk {
         my $self = shift;
         my $text = $$self{text};
@@ -3053,6 +3061,7 @@ END
 }
 
 { package RE_bracket; use base "REbase";
+    sub calc_min { $_[0]->{re}->{min} }
     sub walk {
         my $self = shift;
 	my $re;
