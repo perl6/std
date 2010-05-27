@@ -1025,18 +1025,14 @@ sub indent {
 
 { package VAST::method_def; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
-        my @b = $self->SUPER::emit_p5;
-	my @e = '';
-	while (@b) {
-	    my $t = pop(@b);
-	    if ($t =~ s/^\{//) {
-		$t = " {\n    no warnings 'recursion';\n    my \$self = shift;\n" . pop(@b) . $t;
-		unshift(@e,$t);
-		last;
-	    }
-	    unshift(@e,$t);
-	}
-        @b,@e;
+	my $name = $self->{longname} ? $self->{longname}->p5 . " " : "";
+	my $sig  = $self->{multisig}[0]->p5;
+	my $body = $self->{blockoid}{statementlist}->p5;
+	# not quite right, this should be an expression
+	"sub " . $name . "{\n" . 
+	    ::indent("no warnings 'recursion';\nmy \$self = shift;\n" .
+		$sig . $body, 1)
+	. "}";
     }
 }
 
@@ -1112,12 +1108,10 @@ sub indent {
 { package VAST::Multiplicative; our @ISA = 'VAST::Base';
 }
 
-
+# We don't currently do MMD so no need for later sigs
 { package VAST::multisig; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
-        my @t = $self->SUPER::emit_p5;
-	pop(@t);shift(@t);
-        @t;
+	$self->{signature}[0]->p5;
     }
 }
 
@@ -1297,7 +1291,7 @@ EOT
 { package VAST::parameter; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
-	my $t = '    my ' . join('',@t) . " = shift;\n";
+	my $t = 'my ' . join('',@t) . " = shift";
         $t;
     }
 }
@@ -1651,9 +1645,7 @@ END
     sub emit_p5 {  my $self = shift;
 	my $comment = substr($::ORIG, $self->{BEG},100);
 	$comment =~ s/\s*\{.*//s;
-        my $t = join '', $self->SUPER::emit_p5;
-	$t =~ s/method/sub/;
-        "## $comment\n$t";
+        "## $comment\n" . $self->{method_def}->p5;
     }
 }
 
@@ -1752,6 +1744,15 @@ END
 
 
 { package VAST::signature; our @ISA = 'VAST::Base';
+    sub emit_p5 { my $self = shift;
+	for ($self->kids('param_sep')) {
+	    next if $_->{TEXT} =~ /,/;
+	    die "Unusual parameter separators not yet supported";
+	}
+
+	# signature stuff is just parsing code
+	join '', map { $_->p5 . ";\n" } $self->kids('parameter');
+    }
 }
 
 
@@ -1825,10 +1826,8 @@ END
 
 
 { package VAST::statementlist; our @ISA = 'VAST::Base';
-    # For some reason the default version misbehaves and incorporates p6
-    # statement text XXX
     sub emit_p5 { my $self = shift;
-	join("\n", map { $_->p5 } $self->kids('statement'));
+	join("", map { $_->p5 . ";\n" } $self->kids('statement'));
     }
 }
 
