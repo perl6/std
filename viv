@@ -1397,7 +1397,7 @@ EOT
 	    $body = "package $name;\n" . $body;
 	}
 
-	my $finalmulti;
+	my $finalmulti = '';
 
 	for my $mm (sort keys %::MULTIMETHODS) {
 	    $finalmulti .= "sub $mm {\n    no warnings 'recursion';\n" .
