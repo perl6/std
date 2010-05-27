@@ -1054,6 +1054,13 @@ sub indent {
 
 
 { package VAST::metachar__S_qw; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	# XXX
+	my @elems = split(' ', $self->{circumfix}{nibble}->Str);
+	shift @elems;
+	my $l = ::min(1_000_000_000, map { length } @elems);
+	RE_qw->new(min => $l, text => $self->Str);
+    }
 }
 
 
