@@ -589,6 +589,9 @@ sub indent {
 
 
 { package VAST::blockoid; our @ISA = 'VAST::Base';
+    sub emit_p5 { my $self = shift;
+	"{\n" . ::indent($self->{statementlist}->p5, 1) . "}";
+    }
 }
 
 
