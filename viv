@@ -502,6 +502,12 @@ sub indent {
 { package VAST::assertion__S_name; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my $name = $self->{longname}->Str;
+	if ($name eq 'sym' && defined $::ENDSYM) {
+	    return $self->SUPER::re_ast(sequence => min => 24690, zyg => [
+		$self->SUPER::re_ast(method => name => $name, sym => $::SYM, min => 12345),
+		$self->SUPER::re_ast(method => name => $::ENDSYM, min => 12345, nobind => 1) ]);
+	}
+
 	$self->SUPER::re_ast(method =>, name => $name,
 	    ($name eq 'sym' ? (sym => $::SYM) : ()),
 	    min => 12345, arglist => $self->{arglist}[0]);
@@ -1310,6 +1316,14 @@ EOT
 	my $sigil = $pvar->{sigil}{SYM};
 	my $twigil = $pvar->{twigil}[0] ? $pvar->{twigil}[0]{SYM} : '';
 
+	if ($twigil eq '*' && $pname eq 'endsym') {
+	    # XXX this optimization needs to be refactored, I think
+	    my ($dv) = $self->kids('default_value');
+	    $::ENDSYM = $dv->{"."}->Str;
+	    $::ENDSYM = substr($::ENDSYM, 1, length($::ENDSYM)-2);
+	    return (0, '');
+	}
+
 	if (my ($dv) = $self->kids('default_value')) {
 	    $t .= " // " . $dv->{"."}->p5;
 	}
@@ -1615,12 +1629,17 @@ EOT
 	my $p5name = $name;
 	my %adv = $self->{deflongname}[0]->adverbs;
 	local $::SYM = $adv{sym};
+	local $::ENDSYM;
 	local $::REV = '';
 	local $::PLURALITY = 1;
 	local $::DECL = [];
 	local $::NEEDORIGARGS = 0;
 	local $::BINDINGS = {};
 
+	my $spcsig = $self->kids('signature') ?
+	    (($self->kids('signature'))[0])->p5 : '';
+	my $defsig = $::PROTO && $::PROTOSIG->{$name}
+	    ? $::PROTOSIG->{$name}->p5 : '';
 	if (defined $::PROTO && $::PROTO->{$name}) {
 	    $p5name = sprintf "%s__S_%03d%s", $name, $::MULTIRX_SEQUENCE++,
 		::mangle(split " ", $adv{sym});
@@ -1639,6 +1658,10 @@ sub ${p5name}__PEEK { \$_[0]->_AUTOLEXpeek('$p5name', \$retree) }
 sub $p5name {
     no warnings 'recursion';
     my \$self = shift;
+
+TEXT
+	. ::indent($defsig . $spcsig, 1)
+	. <<TEXT
 
     local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
 
