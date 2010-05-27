@@ -1392,12 +1392,14 @@ EOT
 	my @names;
 	my $posit = 0;
 
-	if (!$pvar) {
-	    $pvar = $self->{named_param}{param_var};
-	    push @names, $pvar->{name}[0]{TEXT};
-	} else {
-	    $posit = 1;
+	my $np = $self->{named_param};
+	while ($np) {
+	    $pvar = $np->{param_var};
+	    push @names, $np->{name} ? $np->{name}{TEXT}
+		: $np->{param_var}{name}[0]{TEXT};
+	    $np = $np->{named_param};
 	}
+	$posit = 1 unless @names;
 	my $pname = $pvar->{name}[0]{TEXT};
 
 	# Is it valid?
