@@ -993,6 +993,9 @@ sub indent {
 
 
 { package VAST::metachar__S_mod; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+	$self->{mod_internal}->re_ast;
+    }
 }
 
 
@@ -1102,6 +1105,15 @@ sub indent {
 
 
 { package VAST::mod_internal__S_Colonmy; our @ISA = 'VAST::Base';
+    sub re_ast { my $self = shift;
+        local $::NEEDMATCH = 0;
+        my $text = $self->{statement}->p5;
+        $text = 'my $M = $C; ' . $text if $::NEEDMATCH;
+
+	push @::DECLAST, $self->SUPER::re_ast(decl => min => 0, max => 0,
+	    body => $text);
+	$self->SUPER::re_ast(noop => min => 0);
+    }
 }
 
 
@@ -1590,7 +1602,7 @@ EOT
     sub re_ast {  my $self = shift;
 	my $bodyast = $self->{regex_block}{nibble}{"."}->re_ast;
 	$self->SUPER::re_ast(ast => kind => $::REGEX_DECLARATOR,
-	    min => $bodyast->{min}, decl => [], re => $bodyast);
+	    min => $bodyast->{min}, decl => \@::DECLAST, re => $bodyast);
     }
     sub protoregex {  my $self = shift;  my $name = shift;
 	$::PROTO->{$name} = 1;
@@ -1663,7 +1675,8 @@ EOT
 	local $::ENDSYM;
 	local $::REV = '';
 	local $::PLURALITY = 1;
-	local $::DECL = [];
+	local @::DECL;
+	local @::DECLAST;
 	local $::NEEDORIGARGS = 0;
 	# Disable ratchet optimizations if any backtracky tokens are encountered
 	local $::MAYBACKTRACK = !$::RATCHET;
@@ -1694,6 +1707,7 @@ sub $p5name {
 
 TEXT
 	. ::indent($defsig . $spcsig, 1)
+	. ::indent(join("", @::DECL), 1)
 	. <<TEXT
 
     local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
@@ -2583,7 +2597,7 @@ END
         my $self = shift;
         if ($$self{decl}) {
             for my $decl (@{$$self{decl}}) {
-                push @$::DECL, "    " . $decl->walk . "\n";
+                push @::DECL, $decl->walk;
             }
         }
         if ($$self{re}) {
@@ -2876,6 +2890,13 @@ END
     sub walk {
         my $self = shift;
         '$C';
+    }
+}
+
+{ package RE_decl; use base "REbase";
+    sub walk {
+        my $self = shift;
+        $$self{body} . ";\n";
     }
 }
 
