@@ -4,7 +4,7 @@
 #
 use strict;
 use 5.010;
-use Carp::Always;
+#use Carp::Always;
 use warnings FATAL => 'all';
 
 use List::Util qw/sum min/;
@@ -32,6 +32,7 @@ my $PROG = '';
 my @did_ws;
 
 my @context;
+$::MULTINESS = '';
 
 sub USAGE {
     print <<'END';
@@ -1387,19 +1388,41 @@ EOT
 # particular we can't distinguish named stuff from positionals
 { package VAST::parameter; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
-	my $t;
 	my $pvar = $self->{param_var};
-	my $named = 0;
-	my $pname;
+	my @names;
+	my $posit = 0;
+
 	if (!$pvar) {
 	    $pvar = $self->{named_param}{param_var};
-	    $pname = $pvar->{name}[0]{TEXT};
-	    $t = "delete \$args{$pname}";
-	    $named = 1;
+	    push @names, $pvar->{name}[0]{TEXT};
 	} else {
-	    $pname = $pvar->{name}[0]{TEXT};
-	    $t = "shift";
+	    $posit = 1;
 	}
+	my $pname = $pvar->{name}[0]{TEXT};
+
+	# Is it valid?
+	my $check = '';
+	if ($self->{quant} eq '!' || $self->{quant} eq '' && $posit) {
+	    $check .= $::MULTINESS eq 'multi' ? "last" :
+		"die 'Required argument $pname omitted' ";
+	    $check .= $posit ? 'unless @_'
+		: 'unless ' . join(" || ", map ("exists \$args{$_}", @names));
+	    $check .= ";\n"
+	}
+
+	# Get the value
+	my $value = "undef";
+	if (my ($dv) = $self->kids('default_value')) {
+	    $value = $dv->{"."}->p5;
+	}
+	if ($posit) {
+	    $value = '@_ ? shift() : ' . $value;
+	}
+	for (reverse @names) {
+	    $value = "exists \$args{$_} ? delete \$args{$_} : $value";
+	}
+
+	# Store it somewhere useful
 	my $sigil = $pvar->{sigil}{SYM};
 	my $twigil = $pvar->{twigil}[0] ? $pvar->{twigil}[0]{SYM} : '';
 
@@ -1411,17 +1434,14 @@ EOT
 	    return (0, '');
 	}
 
-	if (my ($dv) = $self->kids('default_value')) {
-	    $t .= " // " . $dv->{"."}->p5;
-	}
-
+	my $assn;
 	if ($twigil eq '*') {
-	    $t = "local ${sigil}::${pname} = $t";
+	    $assn = "local ${sigil}::${pname} = $value";
 	} else {
-	    $t = "my ${sigil}${pname} = $t";
+	    $assn = "my ${sigil}${pname} = $value";
 	}
 
-	$named, $t;
+	(!$posit), ($check . $assn);
     }
 }
 
