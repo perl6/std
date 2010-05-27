@@ -4,7 +4,7 @@
 #
 use strict;
 use 5.010;
-#use Carp::Always;
+use Carp::Always;
 use warnings FATAL => 'all';
 
 use List::Util qw/sum min/;
@@ -490,11 +490,9 @@ sub indent {
 
 { package VAST::assertion__S_method; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	my $name = $self->{assertion}{longname}->Str;
-	$self->SUPER::re_ast(method =>, name => $name,
-	    ($name eq 'sym' ? (sym => $::SYM) : ()),
-	    nobind => 1, min => 12345,
-	    arglist => $self->{assertion}{arglist}[0]);
+	my $ast = $self->{assertion}->re_ast;
+	$ast->{nobind} = 1;
+	$ast;
     }
 }
 
@@ -502,6 +500,12 @@ sub indent {
 { package VAST::assertion__S_name; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my $name = $self->{longname}->Str;
+
+	if ($self->{nibbler}[0]) {
+	    return $self->SUPER::re_ast(method_re => name => $name,
+		min => 12345, re => $self->{nibbler}[0]{"."}->re_ast);
+	}
+
 	if ($name eq 'sym' && defined $::ENDSYM) {
 	    return $self->SUPER::re_ast(sequence => min => 24690, zyg => [
 		$self->SUPER::re_ast(method => name => $name, sym => $::SYM, min => 12345),
@@ -1634,7 +1638,7 @@ EOT
 	local $::PLURALITY = 1;
 	local $::DECL = [];
 	local $::NEEDORIGARGS = 0;
-	local $::BINDINGS = {};
+	local %::BINDINGS;
 
 	my $spcsig = $self->kids('signature') ?
 	    (($self->kids('signature'))[0])->p5 : '';
@@ -1669,7 +1673,9 @@ TEXT
     my \$xact = \$C->xact;
     my \$S = \$C->{'_pos'};
 TEXT
-	    . join("", map { "    \$C->{'$_'} = [];\n" } sort keys %$::BINDINGS)
+	    . join("", map  { "    \$C->{'$_'} = [];\n" }
+		       grep { $::BINDINGS{$_} > 1 }
+		       sort keys %::BINDINGS)
 	    . ($::SYM ? '$C->{sym} = "' . quotemeta($::SYM) . '";' : '')
 	    . <<END
     \$self->_MATCHIFY$r(\$S, "$p5name", $body);
@@ -2365,16 +2371,17 @@ END
         my $alt = 0;
         my $altname = $self->{altname};
         if ($$self{zyg}) {
-	    my $B = $::BINDINGS;
+	    my %B = %::BINDINGS;
             for my $kid (@{$$self{zyg}}) {
-		local $::BINDINGS = {};
+		local %::BINDINGS;
                 my $r = $kid->walk;
-		for my $b (keys %$::BINDINGS) {
-		    $B->{$b} = 2 if $::BINDINGS->{$b} > 1 or $B->{$b};
+		for my $b (keys %::BINDINGS) {
+		    $B{$b} = 2 if $::BINDINGS{$b} > 1 or $B{$b};
 		}
                 push @result, $r;
                 $kid->{alt} = $altname . ' ' . $alt++;
             }
+	    %::BINDINGS = %B;
         }
         if (@result == 1) {
             $result[0];
@@ -2447,14 +2454,15 @@ END
         my $self = shift;
         my @result;
         if ($$self{zyg}) {
-	    my $B = $::BINDINGS;
+	    my %B = %::BINDINGS;
             foreach my $kid (@{$$self{zyg}}) {
-		local $::BINDINGS = {};
+		local %::BINDINGS;
                 push @result, $kid->walk;
-		for my $b (keys %$::BINDINGS) {
-		    $B->{$b} = 2 if $::BINDINGS->{$b} > 1 or $B->{$b};
+		for my $b (keys %::BINDINGS) {
+		    $B{$b} = 2 if $::BINDINGS{$b} > 1 or $B{$b};
 		}
             }
+	    %::BINDINGS = %B;
         }
         if (@result == 1) {
             $result[0];
@@ -2533,7 +2541,7 @@ do {
 END
         }
 	if ($name =~ /^\w/ and not $self->{nobind}) {
-	    $::BINDINGS->{$name} += $::PLURALITY;
+	    $::BINDINGS{$name} += $::PLURALITY;
 	    $re = $self->bind($re, $name);
 	}
         $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $::NEEDMATCH;
@@ -2646,6 +2654,36 @@ END
     sub walk {
         my $self = shift;
         "\$C->_ARRAY$::REV( qw$$self{text} )";
+    }
+}
+
+{ package RE_method_re; use base "REbase";
+    sub walk {
+        my $self = shift;
+        my $re = $$self{re};
+        my $name = $$self{name};
+        die("Can't reverse $name") if $::REV and $name ne 'before';
+        local $::REV = $name eq 'after' ? '_rev' : '';
+	{
+	    local %::BINDINGS;
+	    $re = ::indent($re->walk);
+	    if (%::BINDINGS) {
+		for my $binding ( keys %::BINDINGS ) {
+		    next unless $::BINDINGS{$binding} > 1;
+		    $re = <<"END" . $re;
+	\$C->{'$binding'} = [];
+END
+		}
+	    }
+	}
+        $::REV = '';
+
+        $re = '$C->' . $name . "(sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+	if ($name =~ /^\w/ and not $self->{nobind}) {
+	    $re = $self->bind($re, $name);
+	    $::BINDINGS{$name} += $::PLURALITY;
+	}
+	$self->bind($re);
     }
 }
 
