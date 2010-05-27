@@ -394,7 +394,11 @@ sub indent {
 	$context[$lvl] = $self;
 	# print STDERR "HERE " . ref($self) . "\n";
 	my @bits = ::try {
-	    local $SIG{__DIE__} = sub { die &Carp::longmess };
+	    local $SIG{__DIE__} = sub {
+		my @args = @_;
+		$args[-1] =~ s/ at .*? line .*?\n$//s if $args[-1] =~ /\n$/s;
+		die Carp::longmess(@args);
+	    };
 	    $self->emit_p5;
 	} ::catch {
 	    my $char = $self->{BEG} // $self->{_from} // 0;
