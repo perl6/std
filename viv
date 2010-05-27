@@ -508,6 +508,13 @@ sub indent {
 
 
 { package VAST::assertion__S_Cur_Ly; our @ISA = 'VAST::Base';
+    sub re_ast { my $self = shift;
+        local $::NEEDMATCH = 0;
+        my $text = $self->{embeddedblock}{statementlist}->p5;
+        $text = "my \$M = \$C;\n" . $text if $::NEEDMATCH;
+	$self->SUPER::re_ast(block => body => $text, context => 'bool',
+	    min => 0);
+    }
 }
 
 
