@@ -1085,7 +1085,7 @@ sub indent {
 { package VAST::method_def; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
 	my $name = $self->{longname} ? $self->{longname}->p5 . " " : "";
-	my $sig  = $self->{multisig}[0]->p5;
+	my $sig  = $self->{multisig}[0] ? $self->{multisig}[0]->p5 : "";
 	my $body = $self->{blockoid}{statementlist}->p5;
 	# not quite right, this should be an expression
 	"sub " . $name . "{\n" . 
