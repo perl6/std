@@ -543,8 +543,8 @@ sub indent {
 
 	if ($name eq 'sym' && defined $::ENDSYM) {
 	    return $self->SUPER::re_ast(sequence => min => 24690, zyg => [
-		$self->SUPER::re_ast(method => name => $name, sym => $::SYM, min => 12345),
-		$self->SUPER::re_ast(method => name => $::ENDSYM, min => 12345, nobind => 1) ]);
+		$self->SUPER::re_ast(method => name => $name, sym => $::SYM, min => 12345, arglist => ''),
+		$self->SUPER::re_ast(method => name => $::ENDSYM, min => 12345, nobind => 1, arglist => '') ]);
 	}
 
 	my $al = $self->{arglist}[0];
@@ -1047,7 +1047,8 @@ sub indent {
 
 { package VAST::metachar__S_sigwhite; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	$self->SUPER::re_ast(method => name => 'ws', nobind => 1, min => 12345);
+	$self->SUPER::re_ast(method => name => 'ws', nobind => 1, min => 12345,
+	    arglist => '');
     }
 }
 
