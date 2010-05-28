@@ -711,7 +711,7 @@ sub indent {
 
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
     sub emit_p5 { my $self = shift;
-	$self->{statementlist}->p5, "\n";
+	"use 5.010;\n" . $self->{statementlist}->p5, "\n";
     }
     sub emit_p6 { my $self = shift;
 	substr($::ORIG, 0, $self->{statementlist}{BEG}),
