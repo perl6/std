@@ -1850,7 +1850,10 @@ EOT
 
 	$::RETREE->{$p5name} = $ast;
 
-	my $body = $ast->walk->str;
+	my $urbody = $ast->walk;
+	say STDERR "<<< " . $urbody . ": " . $urbody->str if $OPT_log;
+	my ($body, $ratchet) = $urbody->uncut;
+	say STDERR "<<< " . $body . ": " . $body->str if $OPT_log;
 	$ast->{dba_needed} = 1;
 	$ast->clean;
 
@@ -1876,7 +1879,7 @@ TEXT
 		       sort keys %::BINDINGS)
 	    . ($::SYM ? '$C->{sym} = "' . quotemeta($::SYM) . '";' : '')
 	    . <<END
-    \$self->_MATCHIFY(\$S, "$p5name", $body);
+    \$self->_MATCHIFY$ratchet(\$S, "$p5name", ${\ $body->str });
 }
 END
 	    ;
@@ -1908,7 +1911,7 @@ END
 { package VAST::regex_infix; our @ISA = 'VAST::Base';
 }
 
-# This is really a tight ternary op, but STD parses it as a loose infix,
+# This is really a tight ternary op, but XXX STD parses it as a loose infix,
 # so we need to reassociate.  Also, the backend handling is very "fossily"
 { package VAST::regex_infix__S_Tilde; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
@@ -2506,9 +2509,12 @@ FRAG
 
     sub calc_min { 0 }
 
-    sub walk {  my $self = shift; my $exp = $self->_walk;
+    sub walk {  my $self = shift;
+	say STDERR "--> $self" if $OPT_log;
+	my $exp = $self->_walk;
+	say STDERR "<-- $exp: ", $exp->str if $OPT_log;
 	if ($self->{r}) {
-	    return DEEP::raw("do { if (my (\$C) = (" . $exp->str . ")) { (\$C) } else { () } }");
+	    return DEEP::cut($exp);
 	} else {
 	    return $exp;
 	}
@@ -2589,9 +2595,14 @@ FRAG
 
     sub wrapone {
         my ($self, $outer, $inner) = @_;
-	"Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
-	    ::indent($inner) .
-	"\n}, $outer)";
+	my ($out1, $outr) = $outer->uncut;
+	if ($outr) {
+	    DEEP::raw("do { if (my (\$C) = (" . $out1->str . ")) { " . $inner->str . " } else { () } }");
+	} else {
+	    DEEP::raw("Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
+		::indent($inner->str) .
+		"\n}, $outer->str)");
+	}
     }
 
     sub _walk {
@@ -2607,7 +2618,7 @@ FRAG
 
             @kids = reverse @kids if $::REV;
             foreach my $kid (@kids) {
-                my $r = $kid->walk->str;
+                my $r = $kid->walk;
                 push @result, $r;
             }
         }
@@ -2615,7 +2626,9 @@ FRAG
         for (reverse @result) {
             $result = $self->wrapone($_,$result);
         }
-	DEEP::raw(join('', @decl, $result || ''));
+	@decl ?
+	    DEEP::raw(join('', @decl, $result ? $result->str : '')) :
+	    $result // DEEP::raw('');
     }
 
     sub kids { my $self = shift; map { \$_ } @{$self->{zyg}} }
@@ -3244,12 +3257,8 @@ END
     }
     sub _walk {
         my $self = shift;
-	my $re;
-	{
-	    $re = ::indent($$self{re}->walk->str);
-	}
-	# should use r in some cases
-	DEEP::raw("\$C->_BRACKET(sub {\n  my \$C=shift;\n" . $re . "\n})");
+	my ($re, $r) = $$self{re}->walk->uncut;
+	DEEP::raw("\$C->_BRACKET$r(sub {\n  my \$C=shift;\n" . ::indent($re->str) . "\n})");
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3337,13 +3346,36 @@ END
     sub kids { my $self = shift; \$self->{atom} }
 }
 
-{ package DEEP::raw;
+{ package DEEPbase;
+    sub maybacktrack { 1 }
+
+    sub uncut { my $self = shift; $self, ($self->maybacktrack ? '' : 'r') }
+}
+
+{ package DEEP::raw; our @ISA = 'DEEPbase';
     sub DEEP::raw {
 	my $text = shift;
 	bless { text => $text }, "DEEP::raw";
     }
 
     sub str { shift()->{text} }
+}
+
+{ package DEEP::cut; our @ISA = 'DEEPbase';
+    sub DEEP::cut {
+	my $child = shift;
+	bless { child => $child }, "DEEP::cut";
+    }
+
+    sub str { my $self = shift;
+	"do { if (my (\$C) = (" . $self->{child}->str . ")) { (\$C) } else { () } }";
+    }
+
+    sub uncut {
+	my $self = shift;
+	my ($child_uncut) = $self->{child}->uncut;
+	$child_uncut, 'r';
+    }
 }
 
 if ($0 eq __FILE__) {
