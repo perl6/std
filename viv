@@ -2110,6 +2110,11 @@ FRAG
 
 
 { package VAST::statement_control__S_if; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+	join("\n", ("if " . $self->{xblock}->p5)
+		 , (map { "elsif " .$_->p5 } @{$self->{elsif}})
+		 , (map { "else " . $_->p5 } @{$self->{else}}));
+    }
 }
 
 
