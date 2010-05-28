@@ -1850,7 +1850,7 @@ EOT
 
 	$::RETREE->{$p5name} = $ast;
 
-	my $body = $ast->walk;
+	my $body = $ast->walk->str;
 	$ast->{dba_needed} = 1;
 	$ast->clean;
 
@@ -2508,7 +2508,7 @@ FRAG
 
     sub walk {  my $self = shift; my $exp = $self->_walk;
 	if ($self->{r}) {
-	    return "do { if (my (\$C) = ($exp)) { (\$C) } else { () } }"
+	    return DEEP::raw("do { if (my (\$C) = (" . $exp->str . ")) { (\$C) } else { () } }");
 	} else {
 	    return $exp;
 	}
@@ -2519,23 +2519,24 @@ FRAG
         my $result = "";
         if ($$self{zyg}) {
             foreach my $kid (@{$$self{zyg}}) {
-                my $x = $kid->walk;
+                my $x = $kid->walk->str;
                 $result .= $x if defined $x;
             }
         }
         else {
             return ref $self;
         }
-        return $result;
+        return DEEP::raw($result);
     }
 
     sub bind { my $self = shift; my $re = shift;
 	return $re unless @_;
 	# SUBSUMEr if we can prove single return
+	$re = $re->str;
 	$re = "\$C->_SUBSUME([" .
 	    join(',', map {"'$_'"} @_) .
 	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re, 2) . "\n  })";
-	$re;
+	DEEP::raw($re);
     }
 
     sub remove_leading_ws { }   # this tree node not interested
@@ -2550,10 +2551,10 @@ FRAG
 	$text = "(?<=$text)" if $::REV;
 	# XXX needs quoting
 	if ($$self{i}) {
-	    '$C->_PATTERN(qr/\\G(?i:' . $text . ')/")';
+	    DEEP::raw('$C->_PATTERN(qr/\\G(?i:' . $text . ')/")');
 	}
 	else {
-	    '$C->_EXACT("' . $text . '")';
+	    DEEP::raw('$C->_EXACT("' . $text . '")');
 	}
     }
 }
@@ -2566,12 +2567,12 @@ FRAG
 	if ($$self{i}) {
             my $text = quotemeta($$self{text});
             $text = "(?<=$text)" if $::REV;
-	    '$C->_PATTERN(qr/\\G(?i:' . $text . ')/)';
+	    DEEP::raw('$C->_PATTERN(qr/\\G(?i:' . $text . ')/)');
 	}
 	else {
             my $text = $$self{text};
             $text =~ s/([\\'])/\\$1/g;
-            "\$C->_EXACT$::REV('$text')";
+	    DEEP::raw("\$C->_EXACT$::REV('$text')");
 	}
     }
 }
@@ -2601,12 +2602,12 @@ FRAG
             my @kids = @{$$self{zyg}};
 
             while (@kids and ref $kids[0] eq 'RE_decl') {
-                push @decl, shift(@kids)->walk;
+                push @decl, shift(@kids)->walk->str;
             }
 
             @kids = reverse @kids if $::REV;
             foreach my $kid (@kids) {
-                my $r = $kid->walk;
+                my $r = $kid->walk->str;
                 push @result, $r;
             }
         }
@@ -2614,7 +2615,7 @@ FRAG
         for (reverse @result) {
             $result = $self->wrapone($_,$result);
         }
-        join('', @decl, $result || '');
+	DEEP::raw(join('', @decl, $result || ''));
     }
 
     sub kids { my $self = shift; map { \$_ } @{$self->{zyg}} }
@@ -2664,7 +2665,7 @@ FRAG
 	    my %B = %::BINDINGS;
             for my $kid (@{$$self{zyg}}) {
 		local %::BINDINGS;
-                my $r = $kid->walk;
+                my $r = $kid->walk->str;
 		for my $b (keys %::BINDINGS) {
 		    $B{$b} = 2 if $::BINDINGS{$b} > 1 or $B{$b};
 		}
@@ -2674,7 +2675,7 @@ FRAG
 	    %::BINDINGS = %B;
         }
         if (@result == 1) {
-            $result[0];
+	    DEEP::raw($result[0]);
         }
         else {
             for (@result) { $_ = "sub { my \$C=shift;\n" . ::indent($_) . "\n}," }
@@ -2728,7 +2729,7 @@ END
   @result;
 }
 END
-            $result;
+            DEEP::raw($result);
         }
     }
 
@@ -2774,7 +2775,7 @@ END
 	    my %B = %::BINDINGS;
             foreach my $kid (@{$$self{zyg}}) {
 		local %::BINDINGS;
-                push @result, $kid->walk;
+                push @result, $kid->walk->str;
 		for my $b (keys %::BINDINGS) {
 		    $B{$b} = 2 if $::BINDINGS{$b} > 1 or $B{$b};
 		}
@@ -2782,7 +2783,7 @@ END
 	    %::BINDINGS = %B;
         }
         if (@result == 1) {
-            $result[0];
+	    DEEP::raw($result[0]);
         }
         else {
             die("Can't reverse serial disjunction") if $::REV;
@@ -2790,7 +2791,7 @@ END
             my $result = "do {\n  my \$C = \$C->cursor_xact('ALT ||');\n  my \$xact = \$C->xact;\n  my \@gather;\n" .
                             ::indent(join("\n}\nor \$xact->[-2] or\n", @result)) .
                           "};\n  \@gather;\n}";
-	    $result;
+	    DEEP::raw($result);
         }
     }
 
@@ -2823,17 +2824,17 @@ END
             $$self{sym} = $::SYM;
             $$self{endsym} = $::ENDSYM if defined $::ENDSYM;
 	    if ($$self{i}) {
-		return "\$C->_PATTERN(qr/\\G(?i:" . quotemeta($::SYM) . ")/)";
+		return DEEP::raw("\$C->_PATTERN(qr/\\G(?i:" . quotemeta($::SYM) . ")/)");
 	    }
 	    else {
-		return "\$C->_PATTERN(qr/\\G" . quotemeta($::SYM) . "/)";
+		return DEEP::raw("\$C->_PATTERN(qr/\\G" . quotemeta($::SYM) . "/)");
 	    }
         }
         elsif ($name eq "alpha") {
-            return "\$C->_PATTERN(qr/\\G[_[:alpha:]]/)";
+            return DEEP::raw("\$C->_PATTERN(qr/\\G[_[:alpha:]]/)");
         }
         elsif ($name eq "_ALNUM") {
-            return "\$C->_PATTERN(qr/\\G\\w/)";
+            return DEEP::raw("\$C->_PATTERN(qr/\\G\\w/)");
         }
         elsif ($name eq "nextsame") {
             $::NEEDORIGARGS++;
@@ -2866,10 +2867,10 @@ END
         }
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $::BINDINGS{$name} += $::PLURALITY;
-	    $re = $self->bind($re, $name);
+	    $re = $self->bind(DEEP::raw($re), $name)->str;
 	}
         $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $::NEEDMATCH;
-	$self->bind($re);
+	DEEP::raw($re);
     }
 }
 
@@ -2884,11 +2885,11 @@ END
         my $self = shift;
         if ($$self{decl}) {
             for my $decl (@{$$self{decl}}) {
-                push @::DECL, $decl->walk;
+                push @::DECL, $decl->walk->str;
             }
         }
         if ($$self{re}) {
-            return $$self{re}->walk;
+            $$self{re}->walk;
         }
     }
 
@@ -2916,7 +2917,7 @@ END
             my $quant = "";
             my $rep = "_REP";
             my $q = $$self{quant};
-	    my $atom = $$self{atom}->walk;
+	    my $atom = $$self{atom}->walk->str;
 	    if ($q) {
 		if ($atom =~ m{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) $ }sx ) {
 		    my $a = "(?:$1)";
@@ -2934,21 +2935,21 @@ END
 			if (ref $rest) {
 			    if (ref $rest eq "RE_block") {
 				$rep = "_REPINDIRECT$::REV";
-				$rest = $rest->walk;
+				$rest = $rest->walk->str;
 			    }
 			    else {
 				$rep = "_REPSEP$::REV";
-				$rest = " sub { my \$C=shift;\n" . ::indent($rest->walk) . "\n}";
+				$rest = " sub { my \$C=shift;\n" . ::indent($rest->walk->str) . "\n}";
 			    }
 			}
 			else {
 			    $rest = "'$rest'";
 			}
 			$quant = "\$C->$rep$h( $rest, ";
-			return $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
+			return DEEP::raw($quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})");
 		    }
 		    else {
-			return "\$C->_PATTERN\(qr/\\G($a$qfer$h)/\)";
+			return DEEP::raw("\$C->_PATTERN\(qr/\\G($a$qfer$h)/\)");
 		    }
 		}
 
@@ -2981,16 +2982,16 @@ END
 		    }
 		    $quant = "\$C->$rep$h( $rest, ";
 		}
-		return $quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})";
+		return DEEP::raw($quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})");
 	    }
             else {
-                return $atom;
+                return DEEP::raw($atom);
             }
         }
         else {
-            return '"' . $$self{atom} . '"';
+            return DEEP::raw('"' . $$self{atom} . '"');
         }
-        $result;
+	DEEP::raw($result);
     }
 
     sub kids { my $self = shift; \$self->{atom} }
@@ -2999,7 +3000,7 @@ END
 { package RE_qw; use base "REbase";
     sub _walk {
         my $self = shift;
-        "\$C->_ARRAY$::REV( qw$$self{text} )";
+	DEEP::raw("\$C->_ARRAY$::REV( qw$$self{text} )");
     }
 }
 
@@ -3013,7 +3014,7 @@ END
         local $::REV = $name eq 'after' ? '_rev' : '';
 	{
 	    local %::BINDINGS;
-	    $re = ::indent($re->walk);
+	    $re = ::indent($re->walk->str);
 	    if (%::BINDINGS) {
 		for my $binding ( keys %::BINDINGS ) {
 		    next unless $::BINDINGS{$binding} > 1;
@@ -3025,12 +3026,12 @@ END
 	}
         $::REV = '';
 
-        $re = '$C->' . $name . "(sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+        $re = DEEP::raw('$C->' . $name . "(sub { my \$C=shift;\n" . ::indent($re) . "\n})");
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $re = $self->bind($re, $name);
 	    $::BINDINGS{$name} += $::PLURALITY;
 	}
-	$self->bind($re);
+	$re;
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3041,12 +3042,12 @@ END
         my $self = shift;
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk;
-            "\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+	    DEEP::raw("\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re->str) . "\n})");
         }
         else {
             my $re = $$self{re}->walk;
-            return $re if $re =~ /^\$C->before/;
-            "\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
+            return $re if $re->str =~ /^\$C->before/; #XXX
+            DEEP::raw("\$C->before( sub { my \$C=shift;\n" . ::indent($re->str) . "\n})");
         }
     }
     # TODO: Investigate what the LTM engine is doing with assertions and
@@ -3171,7 +3172,7 @@ END
         if ($not) { # XXX or maybe just .NOT on the end...
             $code = "\$C->_NOTCHAR( sub { my \$C=shift;\n" . ::indent($code) . "\n})";
         }
-        $code;
+	DEEP::raw($code);
     }
 }
 
@@ -3187,10 +3188,10 @@ END
 	$text =~ s/^-\[/[^/;
 	$text = "(?<=$text)" if $::REV;
 	if ($$self{i}) {
-	    $self->bind("\$C->_PATTERN(qr/\\G(?i:$text)/)");
+	    DEEP::raw("\$C->_PATTERN(qr/\\G(?i:$text)/)");
 	}
 	else {
-	    $self->bind("\$C->_PATTERN(qr/\\G$text/)");
+	    DEEP::raw("\$C->_PATTERN(qr/\\G$text/)");
 	}
     }
 }
@@ -3198,7 +3199,7 @@ END
 { package RE_noop; use base "REbase";
     sub _walk {
         my $self = shift;
-        '$C';
+	DEEP::raw('$C');
     }
 }
 
@@ -3209,7 +3210,7 @@ END
     }
     sub _walk {
         my $self = shift;
-        $$self{body} . ";\n";
+	DEEP::raw($$self{body} . ";\n");
     }
 }
 
@@ -3222,15 +3223,15 @@ END
     sub _walk {
         my $self = shift;
         my $ctx = $$self{context};
-        my $text = $$self{body};
+        my $text = ::indent($$self{body});
         if ($ctx eq 'void') {
-            return "scalar(do {\n" . ::indent($text) . "\n}, \$C)";
+            return DEEP::raw("scalar(do {\n$text\n}, \$C)");
         }
         elsif ($ctx eq 'bool') {
-            return "((\$C) x !!do {\n" . ::indent($text) . "\n})";
+            return DEEP::raw("((\$C) x !!do {\n$text\n})");
         }
         else {
-            return " sub { my \$C=shift;\n" . ::indent($text) . "\n}";
+            return DEEP::raw(" sub { my \$C=shift;\n$text\n}");
         }
     }
 }
@@ -3245,10 +3246,10 @@ END
         my $self = shift;
 	my $re;
 	{
-	    $re = ::indent($$self{re}->walk);
+	    $re = ::indent($$self{re}->walk->str);
 	}
 	# should use r in some cases
-        "\$C->_BRACKET(sub {\n  my \$C=shift;\n" . $re . "\n})";
+	DEEP::raw("\$C->_BRACKET(sub {\n  my \$C=shift;\n" . $re . "\n})");
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3266,20 +3267,20 @@ END
         my $var = $$self{var};
         if ($var =~ /^\$/) {
             if ($var =~ /^\$(\d+)$/) {
-                $self->bind("\$C->_BACKREFp$::REV($1)");
+		DEEP::raw("\$C->_BACKREFp$::REV($1)");
             }
             elsif ($var =~ /^\$<(.*)>$/) {
-                $self->bind("\$C->_BACKREFn$::REV('$1')");
+		DEEP::raw("\$C->_BACKREFn$::REV('$1')");
             }
             else {
-                $self->bind("\$C->_EXACT$::REV($var)");
+		DEEP::raw("\$C->_EXACT$::REV($var)");
             }
         }
         elsif ($var =~ /^\@/) {
-            $self->bind("\$C->_ARRAY$::REV($var)");
+	    DEEP::raw("\$C->_ARRAY$::REV($var)");
         }
         elsif ($var =~ /^\%/) {
-            $self->bind("\$C->_HASH$::REV($var)");
+	    DEEP::raw("\$C->_HASH$::REV($var)");
         }
     }
 }
@@ -3295,7 +3296,7 @@ END
 	my $re;
 	{
 	    local %::BINDINGS;
-	    $re = ::indent($$self{re}->walk);
+	    $re = ::indent($$self{re}->walk->str);
 	    if (%::BINDINGS) {
 		for my $binding ( keys %::BINDINGS ) {
 		    next unless $::BINDINGS{$binding} > 1;
@@ -3306,7 +3307,7 @@ END
 	    }
 	}
         $re = "do { \$C->_$::REV"."PAREN( sub { my \$C=shift;\n" . ::indent($re) . "\n})}";
-	$re;
+	DEEP::raw($re);
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3329,13 +3330,21 @@ END
         my $self = shift;
         my $var = $$self{var};
 	$::BINDINGS{$var} += $::PLURALITY;
-        my $re = ::indent($$self{atom}->walk);
+        my $re = $$self{atom}->walk;
         $self->bind($re, $var);
     }
 
     sub kids { my $self = shift; \$self->{atom} }
 }
 
+{ package DEEP::raw;
+    sub DEEP::raw {
+	my $text = shift;
+	bless { text => $text }, "DEEP::raw";
+    }
+
+    sub str { shift()->{text} }
+}
 
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);
