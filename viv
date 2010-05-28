@@ -23,10 +23,10 @@ use Scalar::Util 'blessed', 'refaddr';
 use Storable;
 use Try::Tiny;
 
-my $OPT_match = 0;
-my $OPT_log = 0;
-my $OPT_stab = 0;
-my $OPT_thaw = 0;
+our $OPT_match = 0;
+our $OPT_log = 0;
+our $OPT_stab = 0;
+our $OPT_thaw = 0;
 my $PROG = '';
 my @did_ws;
 

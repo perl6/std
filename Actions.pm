@@ -1,14 +1,14 @@
 use YAML::XS;
 use strict;
 use warnings;
+our $OPT_log;
+our $OPT_match;
 package Actions;
 
 # Generic ast translation done via autoload
 
 our $AUTOLOAD;
 my $SEQ = 1;
-my $OPT_log = 0;
-my $OPT_match = 0;
 our %GENCLASS;
 
 sub AUTOLOAD {
