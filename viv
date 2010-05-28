@@ -1197,8 +1197,6 @@ BODY
     }
 }
 
-# TODO This is not quite right, since part of the semantic of ratchet is
-# implemented via $::MAYBACKTRACK and propagated up
 { package VAST::mod_internal__S_Colonr; our @ISA = 'VAST::Base';
     sub re_ast { my $self = shift;
 	$::RATCHET = 1;
@@ -1611,7 +1609,6 @@ EOFINAL
 
 	my $quant = $self->{quantifier}[0]->re_quantifier;
 
-	local $::RATCHET = $quant->[1] eq ':' ? 'r' : '';
 	my $ast = $self->{atom}->re_ast;
 
 	RE_quantified_atom->new(atom => $ast, quant => $quant);
@@ -1828,8 +1825,6 @@ EOT
 	local @::DECL;
 	local @::DECLAST;
 	local $::NEEDORIGARGS = 0;
-	# Disable ratchet optimizations if any backtracky tokens are encountered
-	local $::MAYBACKTRACK = !$::RATCHET;
 	local $::IGNORECASE = 0;
 	local $::PAREN = 0;
 	local %::BINDINGS;
@@ -1849,7 +1844,6 @@ EOT
 
 	$::RETREE->{$p5name} = $ast;
 
-	my $r = $::RATCHET ? 'r' : '';
 	my $body = $ast->walk;
 	<<TEXT
 sub ${p5name}__PEEK { \$_[0]->_AUTOLEXpeek('$p5name', \$retree) }
@@ -1873,7 +1867,7 @@ TEXT
 		       sort keys %::BINDINGS)
 	    . ($::SYM ? '$C->{sym} = "' . quotemeta($::SYM) . '";' : '')
 	    . <<END
-    \$self->_MATCHIFY$r(\$S, "$p5name", $body);
+    \$self->_MATCHIFY(\$S, "$p5name", $body);
 }
 END
 	    ;
@@ -2474,7 +2468,15 @@ FRAG
 
     sub calc_min { 0 }
 
-    sub walk {
+    sub walk {  my $self = shift; my $exp = $self->_walk;
+	if ($self->{r}) {
+	    return "do { if (my (\$C) = ($exp)) { (\$C) } else { () } }"
+	} else {
+	    return $exp;
+	}
+    }
+
+    sub _walk {
         my $self = shift;
         my $result = "";
         if ($$self{zyg}) {
@@ -2491,8 +2493,8 @@ FRAG
 
     sub bind { my $self = shift; my $re = shift;
 	return $re unless @_;
-	my $ratchet = $::MAYBACKTRACK ? '' : 'r';
-	$re = "\$C->_SUBSUME$ratchet([" .
+	# SUBSUMEr if we can prove single return
+	$re = "\$C->_SUBSUME([" .
 	    join(',', map {"'$_'"} @_) .
 	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re, 2) . "\n  })";
 	$re;
@@ -2503,10 +2505,11 @@ FRAG
 
 { package RE_double; use base "REbase";
     sub calc_min { length $_[0]{text} }
-    sub walk {
+    sub _walk {
         my $self = shift;
         my $text = $$self{text};
 	$text = "(?<=$text)" if $::REV;
+	# XXX needs quoting
 	if ($$self{i}) {
 	    '$C->_PATTERN(qr/\\G(?i:' . $text . ')/")';
 	}
@@ -2518,7 +2521,7 @@ FRAG
 
 { package RE_string; use base "REbase";
     sub calc_min { length $_[0]->{text} }
-    sub walk {
+    sub _walk {
         my $self = shift;
 	if ($$self{i}) {
             my $text = quotemeta($$self{text});
@@ -2545,33 +2548,12 @@ FRAG
 
     sub wrapone {
         my ($self, $outer, $inner) = @_;
-        if ($::MAYBACKTRACK) {
-            "Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
-                ::indent($inner) .
-            "\n}, $outer)";
-        }
-        else {
-	    my $oi = $outer . $inner;
-	    if ($oi =~ s{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) \$C->_PATTERN\(qr/\\G(.*?)/\) $ }{\$C->_PATTERN(qr/\\G$1$2/)}sx) {
-		$oi;
-	    }
-	    else {
-		my $in = ::indent($inner,2);
-		substr(<<"END",0,-1);
-do {
-  if (my (\$C) = ($outer)) {
-$in;
-  }
-  else {
-    ();
-  }
-}
-END
-	    }
-        }
+	"Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
+	    ::indent($inner) .
+	"\n}, $outer)";
     }
 
-    sub walk {
+    sub _walk {
         my $self = shift;
         my @result;
         my @decl;
@@ -2613,7 +2595,7 @@ END
 
 { package RE_any; use base "REbase";
     sub calc_min { ::min(1_000_000_000, map { $_->{min} } @{$_[0]{zyg}}) }
-    sub walk {
+    sub _walk {
         my $self = shift;
         my @result;
         my $alt = 0;
@@ -2705,7 +2687,7 @@ END
 	$class->SUPER::new(zyg => \@zyg);
     }
 
-    sub walk {
+    sub _walk {
         my $self = shift;
         my @result;
         if ($$self{zyg}) {
@@ -2728,7 +2710,7 @@ END
             my $result = "do {\n  my \$C = \$C->cursor_xact('ALT ||');\n  my \$xact = \$C->xact;\n  my \@gather;\n" .
                             ::indent(join("\n}\nor \$xact->[-2] or\n", @result)) .
                           "};\n  \@gather;\n}";
-            $result;
+	    $result;
         }
     }
 
@@ -2742,7 +2724,7 @@ END
 
 { package RE_method; use base "REbase";
     sub calc_min { 12345 }
-    sub walk {
+    sub _walk {
         my $self = shift;
         local $::NEEDMATCH = 0;
         my $name = $$self{name};
@@ -2805,7 +2787,7 @@ END
 
 { package RE_ast; use base "REbase";
     sub calc_min { $_[0]{re}{min} }
-    sub walk {
+    sub _walk {
         my $self = shift;
         if ($$self{decl}) {
             for my $decl (@{$$self{decl}}) {
@@ -2820,10 +2802,16 @@ END
 
 { package RE_quantified_atom; use base "REbase";
     sub calc_min { $_[0]{quant}[3] * $_[0]{atom}{min} }
-    sub walk {
+    # handles cutting itself
+    sub new {
+	my $class = shift;
+	my $self  = $class->SUPER::new(@_);
+	$self->{r} = 0;
+	$self;
+    }
+    sub _walk {
         my $self = shift;
         my $result;
-	$::MAYBACKTRACK = 1 unless $$self{quant}[1] eq ':';
 	local $::PLURALITY = 2;
         if (ref $$self{atom}) {
             my $quant = "";
@@ -2908,7 +2896,7 @@ END
 }
 
 { package RE_qw; use base "REbase";
-    sub walk {
+    sub _walk {
         my $self = shift;
         "\$C->_ARRAY$::REV( qw$$self{text} )";
     }
@@ -2916,7 +2904,7 @@ END
 
 { package RE_method_re; use base "REbase";
     sub calc_min { 12345 } # "many"
-    sub walk {
+    sub _walk {
         my $self = shift;
         my $re = $$self{re};
         my $name = $$self{name};
@@ -2946,7 +2934,7 @@ END
 }
 
 { package RE_assertion; use base "REbase";
-    sub walk {
+    sub _walk {
         my $self = shift;
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk;
@@ -2961,7 +2949,7 @@ END
 }
 
 { package RE_meta; use base "REbase";
-    sub walk {
+    sub _walk {
         my $self = shift;
         my $text = $$self{text};
         my $not = 0;
@@ -2983,7 +2971,6 @@ END
         }
         elsif ($text eq '.*?') {
             $code = "\$C->_SCANf$::REV()";
-	    $::MAYBACKTRACK = 1;
         }
         elsif ($text eq '^') {
 	    $code = "\$C->_PATTERN(qr/\\G\\A/)";
@@ -3083,7 +3070,7 @@ END
 
 { package RE_cclass; use base "REbase";
     sub calc_min { 1 }
-    sub walk {
+    sub _walk {
         my $self = shift;
         my $text = $$self{text};
         $text =~ s!(\/|\\\/)!\\$1!g;
@@ -3101,21 +3088,21 @@ END
 }
 
 { package RE_noop; use base "REbase";
-    sub walk {
+    sub _walk {
         my $self = shift;
         '$C';
     }
 }
 
 { package RE_decl; use base "REbase";
-    sub walk {
+    sub _walk {
         my $self = shift;
         $$self{body} . ";\n";
     }
 }
 
 { package RE_block; use base "REbase";
-    sub walk {
+    sub _walk {
         my $self = shift;
         my $ctx = $$self{context};
         my $text = $$self{body};
@@ -3133,16 +3120,14 @@ END
 
 { package RE_bracket; use base "REbase";
     sub calc_min { $_[0]->{re}->{min} }
-    sub walk {
+    sub _walk {
         my $self = shift;
 	my $re;
 	{
-            local $::MAYBACKTRACK = $::MAYBACKTRACK;
 	    $re = ::indent($$self{re}->walk);
 	}
-	my $ratchet = $::MAYBACKTRACK ? '' : 'r';
-        $re = "\$C->_BRACKET$ratchet(sub {\n  my \$C=shift;\n" . $re . "\n})";
-	$re;
+	# should use r in some cases
+        "\$C->_BRACKET(sub {\n  my \$C=shift;\n" . $re . "\n})";
     }
 
     sub remove_leading_ws {
@@ -3153,7 +3138,7 @@ END
 }
 
 { package RE_var; use base "REbase";
-    sub walk {
+    sub _walk {
         my $self = shift;
         my $var = $$self{var};
         if ($var =~ /^\$/) {
@@ -3178,7 +3163,7 @@ END
 
 { package RE_paren; use base "REbase";
     sub calc_min { $_[0]{re}{min} }
-    sub walk {
+    sub _walk {
         my $self = shift;
 	my $re;
 	{
@@ -3207,7 +3192,7 @@ END
 
 { package RE_bindpos; use base "REbase";
     sub calc_min { $_[0]{atom}{min} }
-    sub walk {
+    sub _walk {
         my $self = shift;
         my $var = $$self{var};
 	$::BINDINGS{$var} += $::PLURALITY;
