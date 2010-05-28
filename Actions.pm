@@ -1,11 +1,14 @@
 use YAML::XS;
-
+use strict;
+use warnings;
 package Actions;
 
 # Generic ast translation done via autoload
 
 our $AUTOLOAD;
 my $SEQ = 1;
+my $OPT_log = 0;
+my $OPT_match = 0;
 our %GENCLASS;
 
 sub AUTOLOAD {
@@ -37,7 +40,7 @@ sub hoistast {
     my @all;
     my @fake;
     for my $k (keys %$node) {
-	print STDERR $node->{_reduced}, " $k\n" if $OPT_log;
+	print STDERR $node->{_reduced} // 'ANON', " $k\n" if $OPT_log;
 	my $v = $node->{$k};
 	if ($k eq 'O') {
 	    for my $key (keys %$v) {
@@ -78,7 +81,7 @@ sub hoistast {
 	    if (ref $v) {
 		for (@$v) {
 		    next unless ref $_;     # XXX skip keys?
-		    push @all, $_->{'_ast'};
+		    push @all, $_->{'_ast'} //= hoistast($_);
 		}
 	    }
 	}
@@ -117,7 +120,11 @@ sub hoistast {
 #		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
 	    }
 	    elsif (ref($v)) {
-		if (exists $v->{'_ast'}) {
+		if ($v->isa('Cursor') && !$v->{_reduced}) {
+		    $r{$k} = $v->{'_ast'} //= hoistast($v);
+		    next;
+		}
+		elsif (exists $v->{'_ast'}) {
 		    push @fake, $v->{'_ast'};
 		    $r{$k} = $v->{'_ast'};
 		}
