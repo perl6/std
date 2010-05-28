@@ -2343,7 +2343,7 @@ FRAG
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
 	if (my ($pkg) = ($t[0] =~ /^::(.*)/)) {
-	    if ($t[1] =~ /^\s*\[/) {
+	    if (defined $t[1] && $t[1] =~ /^\s*\[/) {
 		$t[1] =~ s/^\s*\[/->__instantiate__(/;
 		$t[1] =~ s/\]\s*$/)/;
 		$t[0] = "STD::$pkg"; # XXX we need our handling
