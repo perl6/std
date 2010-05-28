@@ -188,9 +188,10 @@ sub concise {
     if (!ref $node) {
 	return defined($node) ? shred($width, $width, "$node") : "undef";
     } elsif (blessed($node) && ref($node) =~ /^VAST/) {
-	my @pos = @{ref($node->{"."}) ne 'ARRAY'
-			? [ $node->{"."} ]
-			: $node->{"."} // []};
+	my @pos =
+	    ref($node->{"."}) eq 'ARRAY' ? @{$node->{"."}} :
+	    defined($node->{"."})        ? $node->{"."}    :
+	    ();
 	my %nam = %$node;
 
 	delete $nam{"."};
