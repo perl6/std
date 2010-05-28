@@ -2288,6 +2288,9 @@ TEXT
 	if ($t[0] eq 'invert') {
 	    $t[0] = 'reverse';
 	}
+	if ($t[0] eq 'note') {
+	    $t[0] = 'print STDERR';
+	}
         @t;
     }
 }
