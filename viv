@@ -2471,6 +2471,19 @@ FRAG
 
 
 { package VAST::variable; our @ISA = 'VAST::Base';
+    sub emit_p5 { my $self = shift;
+	my @t = $self->SUPER::emit_p5;
+	if (@t >= 2 && $t[0] eq '$') {
+	    if ($t[1] =~ /^\d+$/) {
+		$t[1] = "M->{$t[1]}";
+		$::NEEDMATCH = 1;
+	    } elsif ($t[1] =~ /^{/) {
+		$t[0] = "\$M->";
+		$::NEEDMATCH = 1;
+	    }
+	}
+	@t;
+    }
 }
 
 
