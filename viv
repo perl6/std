@@ -741,6 +741,14 @@ sub indent {
 
 
 { package VAST::declarator; our @ISA = 'VAST::Base';
+    sub emit_p5 { my $self = shift;
+	if ($self->{signature}) {
+	    return "(" . join(", ", map { $_->{param_var}->Str }
+		$self->{signature}->kids('parameter')) . ")";
+	} else {
+	    return $self->SUPER::emit_p5;
+	}
+    }
 }
 
 
