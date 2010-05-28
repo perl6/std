@@ -2678,7 +2678,7 @@ FRAG
 	    my %B = %::BINDINGS;
             for my $kid (@{$$self{zyg}}) {
 		local %::BINDINGS;
-                my $r = $kid->walk->p5;
+                my $r = $kid->walk;
 		for my $b (keys %::BINDINGS) {
 		    $B{$b} = 2 if $::BINDINGS{$b} > 1 or $B{$b};
 		}
@@ -2688,10 +2688,10 @@ FRAG
 	    %::BINDINGS = %B;
         }
         if (@result == 1) {
-	    DEEP::raw($result[0]);
+	    $result[0];
         }
         else {
-            for (@result) { $_ = "sub { my \$C=shift;\n" . ::indent($_) . "\n}," }
+            for (@result) { $_ = DEEP::chunk($_)->p5; }
 	    $::RETREE->{$self->{altname}} = $self;
 	    $self->{dba_needed} = 1;
             my $result = <<"END";
@@ -2729,7 +2729,7 @@ do {
 
         \$C->deb("$altname trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
         push \@gather, ((
-@{[ ::indent(join("\n", @result),3) ]}
+@{[ ::indent(join(",\n", @result),3) ]}
 END
 
             $result .= <<'END';
@@ -2952,14 +2952,15 @@ END
 			    }
 			    else {
 				$rep = "_REPSEP$::REV";
-				$rest = " sub { my \$C=shift;\n" . ::indent($rest->walk->p5) . "\n}";
+				$rest = DEEP::chunk($rest->walk)->p5;
 			    }
 			}
 			else {
 			    $rest = "'$rest'";
 			}
 			$quant = "\$C->$rep$h( $rest, ";
-			return DEEP::raw($quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})");
+			return DEEP::raw($quant .
+			    DEEP::chunk(DEEP::raw($atom))->p5 . ")");
 		    }
 		    else {
 			return DEEP::raw("\$C->_PATTERN\(qr/\\G($a$qfer$h)/\)");
@@ -2987,7 +2988,7 @@ END
 			}
 			else {
 			    $rep = "_REPSEP$::REV";
-			    $rest = " sub { my \$C=shift;\n" . ::indent($rest->walk()) . "\n}";
+			    $rest = DEEP::chunk($rest->walk)->p5;
 			}
 		    }
 		    else {
@@ -2995,7 +2996,7 @@ END
 		    }
 		    $quant = "\$C->$rep$h( $rest, ";
 		}
-		return DEEP::raw($quant . "sub { my \$C=shift;\n" . ::indent($atom) . "\n})");
+		return DEEP::raw($quant . DEEP::chunk(DEEP::raw($atom)) . ")");
 	    }
             else {
                 return DEEP::raw($atom);
@@ -3027,7 +3028,7 @@ END
         local $::REV = $name eq 'after' ? '_rev' : '';
 	{
 	    local %::BINDINGS;
-	    $re = ::indent($re->walk->p5);
+	    $re = ::indent($re->walk->p5block);
 	    if (%::BINDINGS) {
 		for my $binding ( keys %::BINDINGS ) {
 		    next unless $::BINDINGS{$binding} > 1;
@@ -3039,7 +3040,7 @@ END
 	}
         $::REV = '';
 
-        $re = DEEP::raw('$C->' . $name . "(sub { my \$C=shift;\n" . ::indent($re) . "\n})");
+        $re = DEEP::raw('$C->' . $name . "(" . DEEP::chunk(DEEP::raw($re, isblock => 1)) . ")");
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $re = $self->bind($re, $name);
 	    $::BINDINGS{$name} += $::PLURALITY;
@@ -3055,12 +3056,12 @@ END
         my $self = shift;
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk;
-	    DEEP::raw("\$C->_NOTBEFORE( sub { my \$C=shift;\n" . ::indent($re->p5) . "\n})");
+	    DEEP::raw("\$C->_NOTBEFORE( " . DEEP::chunk($re)->p5 .")");
         }
         else {
             my $re = $$self{re}->walk;
             return $re if $re->p5 =~ /^\$C->before/; #XXX
-            DEEP::raw("\$C->before( sub { my \$C=shift;\n" . ::indent($re->p5) . "\n})");
+            DEEP::raw("\$C->before( " . DEEP::chunk($re)->p5 . ")");
         }
     }
     # TODO: Investigate what the LTM engine is doing with assertions and
@@ -3258,7 +3259,7 @@ END
     sub _walk {
         my $self = shift;
 	my ($re, $r) = $$self{re}->walk->uncut;
-	DEEP::raw("\$C->_BRACKET$r(sub {\n  my \$C=shift;\n" . ::indent($re->p5block) . "\n})");
+	DEEP::raw("\$C->_BRACKET$r(" . DEEP::chunk($re)->p5 . ")");
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3315,7 +3316,7 @@ END
 		}
 	    }
 	}
-        $re = "do { \$C->_$::REV"."PAREN( sub { my \$C=shift;\n" . ::indent($re) . "\n})}";
+        $re = "\$C->_$::REV"."PAREN( " . DEEP::chunk(DEEP::raw($re))->p5 . ")";
 	DEEP::raw($re);
     }
 
@@ -3352,10 +3353,6 @@ END
     sub uncut { my $self = shift; $self, ($self->maybacktrack ? '' : 'r') }
 
     sub p5block { shift()->p5 }
-
-    sub _do {
-	"do {\n" . ::indent($_[0]) . "\n}"
-    }
 }
 
 { package DEEP::raw; our @ISA = 'DEEPbase';
@@ -3377,7 +3374,13 @@ END
     sub p5block { my $self = shift; $self->{text} }
 }
 
-{ package DEEP::cut; our @ISA = 'DEEPbase';
+{ package DEEPblockbase; our @ISA = 'DEEPbase';
+    sub p5 { my $self = shift;
+	"do {\n" . ::indent($self->p5block) . "\n}";
+    }
+}
+
+{ package DEEP::cut; our @ISA = 'DEEPblockbase';
     sub DEEP::cut {
 	my $child = shift;
 	bless { child => $child }, "DEEP::cut";
@@ -3387,12 +3390,23 @@ END
 	"if (my (\$C) = (" . $self->{child}->p5 . ")) { (\$C) } else { () }";
     }
 
-    sub p5 { DEEPbase::_do(&p5block) }
-
     sub uncut {
 	my $self = shift;
 	my ($child_uncut) = $self->{child}->uncut;
 	$child_uncut, 'r';
+    }
+}
+
+# NOT a regex bit, but a value
+{ package DEEP::chunk; our @ISA = 'DEEPbase';
+    sub DEEP::chunk {
+	my $child = shift;
+	bless { child => $child }, "DEEP::chunk";
+    }
+
+    sub p5 {
+	my $self = shift;
+        " sub { my \$C=shift;\n" . ::indent($self->{child}->p5block) . "\n}";
     }
 }
 
