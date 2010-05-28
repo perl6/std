@@ -319,6 +319,7 @@ sub indent {
 		}
 		if (ref($kid) eq 'HASH') {
 		    print STDERR ::Dump($self);
+		    die "in a weird place";
 		}
 		push @text, scalar $kid->p6;
 		$last = $kid->{END};
@@ -372,6 +373,7 @@ sub indent {
 		}
 		if (ref($kid) eq 'HASH') {
 		    print STDERR ::Dump($self);
+		    die "in a weird place";
 		}
 		push @text, scalar $kid->p5;
 		$last = $kid->{END};

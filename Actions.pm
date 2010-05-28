@@ -81,7 +81,7 @@ sub hoistast {
 	    if (ref $v) {
 		for (@$v) {
 		    next unless ref $_;     # XXX skip keys?
-		    push @all, $_->{'_ast'} //= hoistast($_);
+		    push @all, $_->{'_ast'} if defined $_->{'_ast'};
 		}
 	    }
 	}
