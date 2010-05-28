@@ -1840,7 +1840,7 @@ EOT
 	local $::DBA = $name;
 	local $::NAME = $p5name;
 	local $::ALT = 0;
-	my $ast = $self->re_ast;
+	my $ast = $self->re_ast->optimize;
 
 	$::RETREE->{$p5name} = $ast;
 
@@ -2466,6 +2466,11 @@ FRAG
 	$self;
     }
 
+    sub optimize { shift }
+    # NOTE THAT AFTER CALLING THESE re/zyg ARE INVALID
+    sub _optre  { $_[0]{re}->optimize }
+    sub _optzyg { map { $_->optimize } @{$_[0]{zyg}} }
+
     sub calc_min { 0 }
 
     sub walk {  my $self = shift; my $exp = $self->_walk;
@@ -2577,6 +2582,24 @@ FRAG
         join('', @decl, $result || '');
     }
 
+    sub optimize { my $self = shift;
+	my @ok;
+
+	for my $k ($self->_optzyg) {
+	    next if $k->isa('RE_noop');
+	    if ($k->isa('RE_sequence')) {
+		push @ok, @{$k->{zyg}};
+	    } else {
+		push @ok, $k;
+	    }
+	}
+
+	return RE_noop->new if @ok == 0;
+	return $ok[0] if @ok == 1;
+	$self->{zyg} = \@ok;
+	$self;
+    }
+
     sub remove_leading_ws {
         my $self = shift;
         if ($$self{zyg}) {
@@ -2670,6 +2693,23 @@ END
             $result;
         }
     }
+
+    sub optimize { my $self = shift;
+	my @ok;
+
+	for my $k ($self->_optzyg) {
+	    if ($k->isa('RE_any')) {
+		push @ok, @{$k->{zyg}};
+	    } else {
+		push @ok, $k;
+	    }
+	}
+
+	return $ok[0] if @ok == 1;
+	$self->{zyg} = \@ok;
+	$self;
+    }
+
 
     sub remove_leading_ws {
         my $self = shift;
@@ -2798,6 +2838,12 @@ END
             return $$self{re}->walk;
         }
     }
+
+    sub optimize { my $self = shift;
+	$$self{re} = $$self{re}->optimize;
+	for (@{$$self{decl}}) { $_ = $_->optimize }
+	$self;
+    }
 }
 
 { package RE_quantified_atom; use base "REbase";
@@ -2807,6 +2853,10 @@ END
 	my $class = shift;
 	my $self  = $class->SUPER::new(@_);
 	$self->{r} = 0;
+	$self;
+    }
+    sub optimize { my $self = shift;
+	$self->{atom} = $self->{atom}->optimize;
 	$self;
     }
     sub _walk {
@@ -2931,6 +2981,10 @@ END
 	}
 	$self->bind($re);
     }
+    sub optimize { my $self = shift;
+	$self->{re} = $self->{re}->optimize;
+	$self;
+    }
 }
 
 { package RE_assertion; use base "REbase";
@@ -2945,6 +2999,12 @@ END
             return $re if $re =~ /^\$C->before/;
             "\$C->before( sub { my \$C=shift;\n" . ::indent($re) . "\n})";
         }
+    }
+    # TODO: Investigate what the LTM engine is doing with assertions and
+    # optimize harder.
+    sub optimize { my $self = shift;
+	$self->{re} = $self->{re}->optimize;
+	$self;
     }
 }
 
@@ -3130,6 +3190,8 @@ END
         "\$C->_BRACKET(sub {\n  my \$C=shift;\n" . $re . "\n})";
     }
 
+    sub optimize { $_[0]{re} = $_[0]{re}->optimize; $_[0] }
+
     sub remove_leading_ws {
         my $self = shift;
         my $re = $$self{re};
@@ -3182,6 +3244,8 @@ END
 	$re;
     }
 
+    sub optimize { $_[0]{re} = $_[0]{re}->optimize; $_[0] }
+
     # yes, () would capture the ws, but we're guaranteed to be past it already
     sub remove_leading_ws {
         my $self = shift;
@@ -3199,6 +3263,8 @@ END
         my $re = ::indent($$self{atom}->walk);
         $self->bind($re, $var);
     }
+
+    sub optimize { $_[0]{atom} = $_[0]{atom}->optimize; $_[0] }
 }
 
 
