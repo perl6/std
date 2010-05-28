@@ -1995,7 +1995,7 @@ FRAG
 	my $decl = $scoped->{declarator} // $multi->{declarator};
 	my $vdecl = $decl->{variable_declarator};
 	my $var = $vdecl->{variable};
-	"has '" . $var->{desigilname}->Str . "' => (" . join (", ",
+	"moose_has '" . $var->{desigilname}->Str . "' => (" . join (", ",
 	    ($typename ? ("isa => '" . $typename->Str . "'") : ())
 	) . ")";
     }
