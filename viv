@@ -546,9 +546,9 @@ sub indent {
 	}
 
 	my $al = $self->{arglist}[0];
-	$al = defined $al ? "(" . $al->p5 . ")" : "";
+	$al = defined $al ? "(" . $al->p5 . ")" : undef;
 	RE_method->new(name => $name, ($name eq 'sym' ? (sym => $::SYM) : ()),
-	    arglist => $al);
+	    rest => $al);
     }
 }
 
@@ -1833,7 +1833,7 @@ EOT
 	    (($self->kids('signature'))[0])->p5 : '';
 	my $defsig = $::PROTO && $::PROTOSIG->{$name}
 	    ? $::PROTOSIG->{$name}->p5 : '';
-	if (defined $::PROTO && $::PROTO->{$name}) {
+	if (defined $adv{sym}) {
 	    $p5name = sprintf "%s__S_%03d%s", $name, $::MULTIRX_SEQUENCE++,
 		::mangle(split " ", $adv{sym});
 	}
@@ -1845,6 +1845,9 @@ EOT
 	$::RETREE->{$p5name} = $ast;
 
 	my $body = $ast->walk;
+	$ast->{dba_needed} = 1;
+	$ast->clean;
+
 	<<TEXT
 sub ${p5name}__PEEK { \$_[0]->_AUTOLEXpeek('$p5name', \$retree) }
 sub $p5name {
@@ -1934,7 +1937,7 @@ FRAG
 	push @middle, RE_bracket->new(decl => [], re => RE_first->new(
 		RE_string->new(text => $strcloser),
 		RE_method->new(name => 'FAILGOAL', nobind => 1,
-		    arglist => "('$strcloser' , 'indirect name', \$goalpos)")));
+		    rest => "('$strcloser' , 'indirect name', \$goalpos)")));
 
 	RE_sequence->new(@lefts, @middle, @rights);
     }
@@ -2482,6 +2485,19 @@ FRAG
 	$self;
     }
 
+    sub clean { my $self = shift;
+	for my $kid ($self->kids) {
+	    $$kid->clean;
+	}
+	delete $self->{r};
+	delete $self->{s};
+	delete $self->{a};
+	delete $self->{i} unless $self->{i_needed};
+	delete $self->{i_needed};
+	delete $self->{dba} unless $self->{dba_needed};
+	delete $self->{dba_needed};
+    }
+
     sub calc_min { 0 }
 
     sub walk {  my $self = shift; my $exp = $self->_walk;
@@ -2524,6 +2540,7 @@ FRAG
     sub _walk {
         my $self = shift;
         my $text = $$self{text};
+	$$self{i_needed} = 1;
 	$text = "(?<=$text)" if $::REV;
 	# XXX needs quoting
 	if ($$self{i}) {
@@ -2539,6 +2556,7 @@ FRAG
     sub calc_min { length $_[0]->{text} }
     sub _walk {
         my $self = shift;
+	$$self{i_needed} = 1;
 	if ($$self{i}) {
             my $text = quotemeta($$self{text});
             $text = "(?<=$text)" if $::REV;
@@ -2655,6 +2673,7 @@ FRAG
         else {
             for (@result) { $_ = "sub { my \$C=shift;\n" . ::indent($_) . "\n}," }
 	    $::RETREE->{$self->{altname}} = $self;
+	    $self->{dba_needed} = 1;
             my $result = <<"END";
 do {
   my \@result = do {
@@ -2781,6 +2800,11 @@ END
 
 { package RE_method; use base "REbase";
     sub calc_min { 12345 }
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	delete $self->{nobind};
+	$self->{rest} = defined $self->{rest};
+    }
     sub _walk {
         my $self = shift;
         local $::NEEDMATCH = 0;
@@ -2789,6 +2813,7 @@ END
 	my $re;
 
         if ($name eq "sym") {
+	    $$self{i_needed} = 1;
             $$self{sym} = $::SYM;
             $$self{endsym} = $::ENDSYM if defined $::ENDSYM;
 	    if ($$self{i}) {
@@ -2809,11 +2834,11 @@ END
             $re = '$self->SUPER::' . $::NAME . '(@origargs)';
         }
         elsif ($name =~ /^\w/) {
-            my $al = $self->{arglist} // '';
+            my $al = $self->{rest} // '';
             $re = '$C->' . $name . $al;
         }
         else {
-            my $al = $self->{arglist} // '';
+            my $al = $self->{rest} // '';
             $re = <<"END";
 do {
   if (not $name) {
@@ -2844,6 +2869,11 @@ END
 
 { package RE_ast; use base "REbase";
     sub calc_min { $_[0]{re}{min} }
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	delete $self->{decl};
+	delete $self->{kind};
+    }
     sub _walk {
         my $self = shift;
         if ($$self{decl}) {
@@ -2862,6 +2892,10 @@ END
 { package RE_quantified_atom; use base "REbase";
     sub calc_min { $_[0]{quant}[3] * $_[0]{atom}{min} }
     # handles cutting itself
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	splice @{$self->{quant}}, ($self->{quant}[0] eq '**' ? 3 : 1);
+    }
     sub new {
 	my $class = shift;
 	my $self  = $class->SUPER::new(@_);
@@ -3140,6 +3174,7 @@ END
     sub _walk {
         my $self = shift;
         my $text = $$self{text};
+	$self->{i_needed} = 1;
         $text =~ s!(\/|\\\/)!\\$1!g;
         $text =~ s/\s//g;
         $text =~ s/\.\./-/g;
@@ -3162,6 +3197,10 @@ END
 }
 
 { package RE_decl; use base "REbase";
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	delete $self->{body};
+    }
     sub _walk {
         my $self = shift;
         $$self{body} . ";\n";
@@ -3169,6 +3208,11 @@ END
 }
 
 { package RE_block; use base "REbase";
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	delete $self->{context};
+	delete $self->{body};
+    }
     sub _walk {
         my $self = shift;
         my $ctx = $$self{context};
@@ -3187,6 +3231,10 @@ END
 
 { package RE_bracket; use base "REbase";
     sub calc_min { $_[0]->{re}->{min} }
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	delete $self->{decl};
+    }
     sub _walk {
         my $self = shift;
 	my $re;
@@ -3232,6 +3280,10 @@ END
 
 { package RE_paren; use base "REbase";
     sub calc_min { $_[0]{re}{min} }
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	delete $self->{decl};
+    }
     sub _walk {
         my $self = shift;
 	my $re;
@@ -3263,6 +3315,10 @@ END
 
 { package RE_bindpos; use base "REbase";
     sub calc_min { $_[0]{atom}{min} }
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	delete $self->{var};
+    }
     sub _walk {
         my $self = shift;
         my $var = $$self{var};
