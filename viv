@@ -1608,6 +1608,12 @@ EOFINAL
     }
 }
 
+{ package VAST::SYM_prefix__S_Vert; our @ISA = 'VAST::Symbolic_unary';
+    sub emit_p5 {  my $self = shift;
+	('');
+    }
+}
+
 
 { package VAST::SYM_prefix__S_temp; our @ISA = 'VAST::Named_unary';
     sub emit_p5 {  my $self = shift;
