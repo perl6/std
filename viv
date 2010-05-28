@@ -2546,6 +2546,7 @@ FRAG
     }
 
     sub remove_leading_ws { }   # this tree node not interested
+    sub has_trailing_ws { 0 }
 }
 
 { package RE_double; use base "REbase";
@@ -2633,8 +2634,16 @@ FRAG
 
     sub kids { my $self = shift; map { \$_ } @{$self->{zyg}} }
 
-    sub optimize { my $self = shift()->SUPER::optimize;
+    sub optimize { my $self = shift;
 	my @ok;
+
+	my $afterspace = 0;
+	for my $kid ($self->kids) {
+	    $$kid->remove_leading_ws if $afterspace;
+	    $afterspace = $$kid->has_trailing_ws($afterspace);
+	}
+
+	$self = $self->SUPER::optimize;
 
 	for my $k (@{$self->{zyg}}) {
 	    next if $k->isa('RE_noop');
@@ -2653,17 +2662,23 @@ FRAG
 
     sub remove_leading_ws {
         my $self = shift;
-        if ($$self{zyg}) {
-            my @kids = @{$$self{zyg}};
 
-            shift(@kids) while
-                @kids and
-                ref $kids[0] eq 'RE_method' and
-                $kids[0]->{name} eq 'ws';
+	for my $kid ($self->kids) {
+	    my $l = $$kid->has_trailing_ws(1);
+	    $$kid->remove_leading_ws;
+	    last unless $l;
+	}
+    }
 
-            $kids[0]->remove_leading_ws() if @kids;
-            @{$$self{zyg}} = @kids;
-        }
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+
+	for my $kid ($self->kids) {
+	    $before = $$kid->has_trailing_ws($before);
+	}
+
+	$before;
     }
 }
 
@@ -2764,12 +2779,17 @@ END
 	$self;
     }
 
+    # can't remove leading ws because that affects LTM
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+	my $after = 1;
 
-    sub remove_leading_ws {
-        my $self = shift;
-        for my $kid (@{$$self{zyg}}) {
-            $kid->remove_leading_ws();
-        }
+	for my $kid ($self->kids) {
+	    $after &&= $$kid->has_trailing_ws($before);
+	}
+
+	$after;
     }
 }
 
@@ -2815,6 +2835,18 @@ END
         for my $kid (@{$$self{zyg}}) {
             $kid->remove_leading_ws();
         }
+    }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+	my $after = 1;
+
+	for my $kid ($self->kids) {
+	    $after &&= $$kid->has_trailing_ws($before);
+	}
+
+	$after;
     }
 }
 
@@ -2884,6 +2916,18 @@ END
 	}
         $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $::NEEDMATCH;
 	DEEP::raw($re);
+    }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	return $self->{name} eq 'ws';
+    }
+
+    sub remove_leading_ws {
+	my $self = shift;
+	if ($self->{name} eq 'ws' && $self->{nobind}) {
+	    bless $self, 'RE_noop';
+	}
     }
 }
 
@@ -3067,6 +3111,19 @@ END
     # TODO: Investigate what the LTM engine is doing with assertions and
     # optimize harder.
 
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+
+	$before; # Transparent
+    }
+
+    sub remove_leading_ws {
+	my $self = shift;
+
+	$self->{re}->remove_leading_ws;
+    }
+
     sub kids { my $self = shift; \$self->{re} }
 }
 
@@ -3215,6 +3272,13 @@ END
         my $self = shift;
 	DEEP::raw('$C');
     }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+
+	$before;
+    }
 }
 
 { package RE_decl; use base "REbase";
@@ -3225,6 +3289,13 @@ END
     sub _walk {
         my $self = shift;
 	DEEP::raw($$self{body} . ";\n");
+    }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+
+	$before;
     }
 }
 
@@ -3248,6 +3319,13 @@ END
             return DEEP::raw(" sub { my \$C=shift;\n$text\n}");
         }
     }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+
+	$before;
+    }
 }
 
 { package RE_bracket; use base "REbase";
@@ -3268,6 +3346,12 @@ END
         my $self = shift;
         my $re = $$self{re};
         $re->remove_leading_ws();
+    }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+	$$self{re}->has_trailing_ws($before);
     }
 }
 
@@ -3328,6 +3412,12 @@ END
         my $re = $$self{re};
         $re->remove_leading_ws();
     }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+	$$self{re}->has_trailing_ws($before);
+    }
 }
 
 { package RE_bindpos; use base "REbase";
@@ -3345,6 +3435,18 @@ END
     }
 
     sub kids { my $self = shift; \$self->{atom} }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        my $re = $$self{atom};
+        $re->remove_leading_ws();
+    }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+	$$self{atom}->has_trailing_ws($before);
+    }
 }
 
 { package DEEPbase;
