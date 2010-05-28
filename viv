@@ -339,7 +339,7 @@ sub indent {
 
     sub p6 { my $self = shift; my $lvl = @context;
 	my @text;
-	say ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
+	say STDERR ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
 	$context[$lvl] = $self;
 	# print STDERR "HERE " . ref($self) . "\n";
 	splice(@context,$lvl);
@@ -414,7 +414,7 @@ sub indent {
 	my @c = map { ref $_ } @context;
 	my $c = "@c";
 	$c =~ s/VAST:://g;
-	say ' ' x ($lvl-1), "$c returns $val\n" if $OPT_log;
+	say STDERR ' ' x ($lvl-1), "$c returns $val\n" if $OPT_log;
 	# Note that we may have skipped levels, so you can't just pop
 	splice(@context,$lvl);
 	wantarray ? @bits : $val;
