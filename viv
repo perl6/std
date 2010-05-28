@@ -1090,7 +1090,7 @@ sub indent {
 	    RE_bindnamed->new(var => $1, atom =>
 		$self->{binding}{quantified_atom}->re_ast);
 	} else {
-	    RE_var->new(var => $self->{SYM});
+	    RE_var->new(var => $self->{termish}->p5);
 	}
     }
 }
@@ -3421,11 +3421,9 @@ END
         my $self = shift;
         my $var = $$self{var};
         if ($var =~ /^\$/) {
-            if ($var =~ /^\$(\d+)$/) {
-		DEEP::raw("\$C->_BACKREFp$::REV($1)");
-            }
-            elsif ($var =~ /^\$<(.*)>$/) {
-		DEEP::raw("\$C->_BACKREFn$::REV('$1')");
+            if ($var =~ /^\$M->{(.*)}/) {
+		my $p = (substr($1,0,1) eq "'") ? "n" : "p";
+		DEEP::raw("\$C->_BACKREF$p$::REV($1)");
             }
             else {
 		DEEP::raw("\$C->_EXACT$::REV($var)");
