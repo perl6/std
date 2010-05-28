@@ -549,9 +549,10 @@ sub indent {
 	}
 
 	my $al = $self->{arglist}[0];
+	local $::NEEDMATCH = 0;
 	$al = defined $al ? "(" . $al->p5 . ")" : undef;
 	RE_method->new(name => $name, ($name eq 'sym' ? (sym => $::SYM) : ()),
-	    rest => $al);
+	    rest => $al, need_match => $::NEEDMATCH);
     }
 }
 
@@ -2936,6 +2937,7 @@ END
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{nobind};
+	delete $self->{need_match};
 	$self->{rest} = defined $self->{rest};
     }
     sub _walk {
@@ -2995,7 +2997,7 @@ END
 	    $::BINDINGS{$name} += $::PLURALITY;
 	    $re = $self->bind(DEEP::raw($re), $name)->p5;
 	}
-        $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $::NEEDMATCH;
+        $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $self->{need_match};
 	DEEP::raw($re);
     }
 
