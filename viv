@@ -2458,6 +2458,15 @@ FRAG
 }
 
 { package REbase;
+    sub kids { }
+    sub clone {
+	my $self = shift;
+	my $dopp = bless { %$self }, ref($self);
+	for my $dkid ($dopp->kids) {
+	    $$dkid = $$dkid->clone;
+	}
+	$dopp;
+    }
     sub new {  my $class = shift;
 	my $self = bless { a => 0, i => $::IGNORECASE ? 1 : 0,
 	    r => $::RATCHET ? 1 : 0, s => $::SIGSPACE ? 1 : 0,
@@ -2466,10 +2475,12 @@ FRAG
 	$self;
     }
 
-    sub optimize { shift }
-    # NOTE THAT AFTER CALLING THESE re/zyg ARE INVALID
-    sub _optre  { $_[0]{re}->optimize }
-    sub _optzyg { map { $_->optimize } @{$_[0]{zyg}} }
+    sub optimize { my $self = shift;
+	for my $kid ($self->kids) {
+	    $$kid = $$kid->optimize;
+	}
+	$self;
+    }
 
     sub calc_min { 0 }
 
@@ -2582,10 +2593,12 @@ FRAG
         join('', @decl, $result || '');
     }
 
-    sub optimize { my $self = shift;
+    sub kids { my $self = shift; map { \$_ } @{$self->{zyg}} }
+
+    sub optimize { my $self = shift()->SUPER::optimize;
 	my @ok;
 
-	for my $k ($self->_optzyg) {
+	for my $k (@{$self->{zyg}}) {
 	    next if $k->isa('RE_noop');
 	    if ($k->isa('RE_sequence')) {
 		push @ok, @{$k->{zyg}};
@@ -2694,10 +2707,12 @@ END
         }
     }
 
-    sub optimize { my $self = shift;
+    sub kids { my $self = shift; map { \$_ } @{$self->{zyg}} }
+
+    sub optimize { my $self = shift()->SUPER::optimize;
 	my @ok;
 
-	for my $k ($self->_optzyg) {
+	for my $k (@{$self->{zyg}}) {
 	    if ($k->isa('RE_any')) {
 		push @ok, @{$k->{zyg}};
 	    } else {
@@ -2753,6 +2768,8 @@ END
 	    $result;
         }
     }
+
+    sub kids { my $self = shift; map { \$_ } @{$self->{zyg}} }
 
     sub remove_leading_ws {
         my $self = shift;
@@ -2839,11 +2856,7 @@ END
         }
     }
 
-    sub optimize { my $self = shift;
-	$$self{re} = $$self{re}->optimize;
-	for (@{$$self{decl}}) { $_ = $_->optimize }
-	$self;
-    }
+    sub kids { my $self = shift; \$self->{re}, map { \$_ } @{$self->{decl}}; }
 }
 
 { package RE_quantified_atom; use base "REbase";
@@ -2853,10 +2866,6 @@ END
 	my $class = shift;
 	my $self  = $class->SUPER::new(@_);
 	$self->{r} = 0;
-	$self;
-    }
-    sub optimize { my $self = shift;
-	$self->{atom} = $self->{atom}->optimize;
 	$self;
     }
     sub _walk {
@@ -2943,6 +2952,8 @@ END
         }
         $result;
     }
+
+    sub kids { my $self = shift; \$self->{atom} }
 }
 
 { package RE_qw; use base "REbase";
@@ -2981,10 +2992,8 @@ END
 	}
 	$self->bind($re);
     }
-    sub optimize { my $self = shift;
-	$self->{re} = $self->{re}->optimize;
-	$self;
-    }
+
+    sub kids { my $self = shift; \$self->{re} }
 }
 
 { package RE_assertion; use base "REbase";
@@ -3002,10 +3011,8 @@ END
     }
     # TODO: Investigate what the LTM engine is doing with assertions and
     # optimize harder.
-    sub optimize { my $self = shift;
-	$self->{re} = $self->{re}->optimize;
-	$self;
-    }
+
+    sub kids { my $self = shift; \$self->{re} }
 }
 
 { package RE_meta; use base "REbase";
@@ -3190,7 +3197,7 @@ END
         "\$C->_BRACKET(sub {\n  my \$C=shift;\n" . $re . "\n})";
     }
 
-    sub optimize { $_[0]{re} = $_[0]{re}->optimize; $_[0] }
+    sub kids { my $self = shift; \$self->{re} }
 
     sub remove_leading_ws {
         my $self = shift;
@@ -3244,7 +3251,7 @@ END
 	$re;
     }
 
-    sub optimize { $_[0]{re} = $_[0]{re}->optimize; $_[0] }
+    sub kids { my $self = shift; \$self->{re} }
 
     # yes, () would capture the ws, but we're guaranteed to be past it already
     sub remove_leading_ws {
@@ -3264,7 +3271,7 @@ END
         $self->bind($re, $var);
     }
 
-    sub optimize { $_[0]{atom} = $_[0]{atom}->optimize; $_[0] }
+    sub kids { my $self = shift; \$self->{atom} }
 }
 
 
