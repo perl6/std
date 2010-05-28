@@ -1083,7 +1083,13 @@ sub indent {
 { package VAST::metachar__S_var; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	# We don't un6 because some things need to un6 specially - backrefs
-	RE_var->new(var => $self->{SYM});
+	if ($self->{binding}) {
+	    $self->{SYM} =~ /^\$<(.*)>$/ or die "Can't bind backref to " . $self->{SYM};
+	    RE_bindnamed->new(var => $1, atom =>
+		$self->{binding}{quantified_atom}->re_ast);
+	} else {
+	    RE_var->new(var => $self->{SYM});
+	}
     }
 }
 
@@ -3422,6 +3428,35 @@ END
 }
 
 { package RE_bindpos; use base "REbase";
+    sub calc_min { $_[0]{atom}{min} }
+    sub clean { my $self = shift;
+	$self->SUPER::clean;
+	delete $self->{var};
+    }
+    sub _walk {
+        my $self = shift;
+        my $var = $$self{var};
+	$::BINDINGS{$var} += $::PLURALITY;
+        my $re = $$self{atom}->walk;
+        $self->bind($re, $var);
+    }
+
+    sub kids { my $self = shift; \$self->{atom} }
+
+    sub remove_leading_ws {
+        my $self = shift;
+        my $re = $$self{atom};
+        $re->remove_leading_ws();
+    }
+
+    sub has_trailing_ws {
+	my $self = shift;
+	my $before = shift;
+	$$self{atom}->has_trailing_ws($before);
+    }
+}
+
+{ package RE_bindnamed; use base "REbase";
     sub calc_min { $_[0]{atom}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
