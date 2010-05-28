@@ -1948,24 +1948,28 @@ END
 
 	my $strcloser = $closer->{text}; #XXX
 
+	my $begin = <<TEXT;
+local \$::GOAL = "${\ quotemeta $strcloser}";
+my \$goalpos = \$C;
+TEXT
+	if ($strcloser !~ /^[])}]$/) {
+	    $begin .= <<TEXT;
+my \$newlang = \$C->unbalanced(\$::GOAL);
+\$C = bless(\$C, (ref(\$newlang) || \$newlang))
+TEXT
+	}
+
 	push @middle, $opener;
-	push @middle, RE_meta->new(text => ':', extra => <<FRAG);
-local \$::GOAL = '$strcloser',
-my \$goalpos = \$C,
-do {
-    unless ('$strcloser' eq ')' or '$strcloser' eq ']' or '$strcloser' eq '}') {
-        my \$newlang = \$C->unbalanced(\$::GOAL);
-        \$C = bless(\$C, (ref(\$newlang) || \$newlang))
-    }
-}
-FRAG
 	push @middle, $inner;
 	push @middle, RE_bracket->new(decl => [], re => RE_first->new(
 		RE_string->new(text => $strcloser),
 		RE_method->new(name => 'FAILGOAL', nobind => 1,
-		    rest => "('$strcloser' , 'indirect name', \$goalpos)")));
+		    rest => "(\$::GOAL, '${\ $self->{dba} }', \$goalpos)")));
 
-	RE_sequence->new(@lefts, @middle, @rights);
+	my $middle = RE_bracket->new(decl => [RE_decl->new(body => $begin)], re =>
+	    RE_sequence->new(@middle));
+
+	RE_sequence->new(@lefts, $middle, @rights);
     }
 }
 
@@ -3406,7 +3410,8 @@ END
     sub _walk {
         my $self = shift;
 	my ($re, $r) = $$self{re}->walk->uncut;
-	DEEP::raw("\$C->_BRACKET$r(" . DEEP::chunk($re)->p5 . ")");
+	my @decl = map { $_->walk } @{$$self{decl}};
+	DEEP::raw("\$C->_BRACKET$r(" . DEEP::chunk($re, @decl)->p5 . ")");
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3599,12 +3604,14 @@ END
 { package DEEP::chunk; our @ISA = 'DEEPbase';
     sub DEEP::chunk {
 	my $child = shift;
-	bless { child => $child }, "DEEP::chunk";
+	bless { child => $child, decl => \@_ }, "DEEP::chunk";
     }
 
     sub p5 {
 	my $self = shift;
-        " sub { my \$C=shift;\n" . ::indent($self->{child}->p5block) . "\n}";
+        " sub { my \$C=shift;\n"
+	    . ::indent(join("", map { $_->p5block . ";\n" } @{ $self->{decl} }))
+	    . ::indent($self->{child}->p5block) . "\n}";
     }
 }
 
