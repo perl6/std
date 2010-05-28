@@ -2291,6 +2291,12 @@ TEXT
 	if ($t[0] eq 'note') {
 	    $t[0] = 'print STDERR';
 	}
+	if ($t[0] eq 'False') {
+	    $t[0] = '0';
+	}
+	if ($t[0] eq 'True') {
+	    $t[0] = '1';
+	}
         @t;
     }
 }
