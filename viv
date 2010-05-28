@@ -412,7 +412,7 @@ sub indent {
 	};
 	my $val = join '', @bits;
 	my @c = map { ref $_ } @context;
-	my $c = "@c " . ref($self);
+	my $c = "@c";
 	$c =~ s/VAST:://g;
 	say ' ' x ($lvl-1), "$c returns $val\n" if $OPT_log;
 	# Note that we may have skipped levels, so you can't just pop
