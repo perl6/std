@@ -2251,6 +2251,9 @@ FRAG
 	    $t[0] = '\\';
 	    $t[1] =~ s/^\s+//;
 	}
+	if ($t[0] eq 'invert') {
+	    $t[0] = 'reverse';
+	}
         @t;
     }
 }
@@ -2618,7 +2621,7 @@ FRAG
 	} else {
 	    DEEP::raw("Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
 		::indent($inner->p5) .
-		"\n}, $outer->p5)");
+		"\n}, ${\ $outer->p5 })");
 	}
     }
 
@@ -3056,7 +3059,7 @@ END
 		    }
 		    $quant = "\$C->$rep$h( $rest, ";
 		}
-		return DEEP::raw($quant . DEEP::chunk(DEEP::raw($atom)) . ")");
+		return DEEP::raw($quant . DEEP::chunk(DEEP::raw($atom))->p5 . ")");
 	    }
             else {
                 return DEEP::raw($atom);
@@ -3100,7 +3103,7 @@ END
 	}
         $::REV = '';
 
-        $re = DEEP::raw('$C->' . $name . "(" . DEEP::chunk(DEEP::raw($re, isblock => 1)) . ")");
+        $re = DEEP::raw('$C->' . $name . "(" . DEEP::chunk(DEEP::raw($re, isblock => 1))->p5 . ")");
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $re = $self->bind($re, $name);
 	    $::BINDINGS{$name} += $::PLURALITY;
@@ -3298,6 +3301,13 @@ END
 }
 
 { package RE_decl; use base "REbase";
+    # because cutting one of these would be a disaster
+    sub new {
+	my $class = shift;
+	my $self  = $class->SUPER::new(@_);
+	$self->{r} = 0;
+	$self;
+    }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{body};
