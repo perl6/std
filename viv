@@ -2332,6 +2332,13 @@ FRAG
 }
 
 { package VAST::term__S_name; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	if ($t[0] =~ /^::(.*)/) {
+	    $t[0] = "'$1'";
+	}
+        @t;
+    }
 }
 
 
