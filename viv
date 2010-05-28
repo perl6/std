@@ -2342,8 +2342,14 @@ FRAG
 { package VAST::term__S_name; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
-	if ($t[0] =~ /^::(.*)/) {
-	    $t[0] = "'$1'";
+	if (my ($pkg) = ($t[0] =~ /^::(.*)/)) {
+	    if ($t[1] =~ /^\s*\[/) {
+		$t[1] =~ s/^\s*\[/->__instantiate__(/;
+		$t[1] =~ s/\]\s*$/)/;
+		$t[0] = "STD::$pkg"; # XXX we need our handling
+	    } else {
+		$t[0] = "'$pkg'";
+	    }
 	}
         @t;
     }
