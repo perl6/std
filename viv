@@ -1607,6 +1607,12 @@ EOFINAL
 	    return $self->{atom}->re_ast;
 	}
 
+	if ($self->{quantifier}[0]{SYM} eq ':') {
+	    my $ast = $self->{atom}->re_ast;
+	    $ast->{r} = 1;
+	    return $ast;
+	}
+
 	my $quant = $self->{quantifier}[0]->re_quantifier;
 
 	my $ast = $self->{atom}->re_ast;
