@@ -1988,6 +1988,17 @@ FRAG
 
 
 { package VAST::scope_declarator__S_has; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+	my $scoped = $self->{scoped};
+	my $typename = $scoped->{typename}[0];
+	my $multi = $scoped->{multi_declarator};
+	my $decl = $scoped->{declarator} // $multi->{declarator};
+	my $vdecl = $decl->{variable_declarator};
+	my $var = $vdecl->{variable};
+	"has '" . $var->{desigilname}->Str . "' => (" . join (", ",
+	    ($typename ? ("isa => '" . $typename->Str . "'") : ())
+	) . ")";
+    }
 }
 
 
