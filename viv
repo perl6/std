@@ -1522,16 +1522,16 @@ EOT
 	my $finalmulti = '';
 
 	for my $mm (sort keys %::MULTIMETHODS) {
-	    $finalmulti .= "sub $mm {\n    no warnings 'recursion';\n" .
+	    $finalmulti .= "moose_around $mm => sub {\n    my \$orig = shift;\n    no warnings 'recursion';\n" .
 		::indent($::MULTIMETHODS{$mm}, 1) . <<EOFINAL
-    \$_[0]->SUPER::$mm(\@_);
-}
+    \$_[0]->\$orig(\@_);
+};
 
 EOFINAL
 		;
 	}
 
-	"{ $body $finalmulti }";
+	"{ $body $finalmulti 1; }";
     }
 }
 
