@@ -1553,10 +1553,11 @@ EOFINAL
 	my $pname = $pvar->{name}[0]{TEXT};
 	my $sigil = $pvar->{sigil}{SYM};
 	my $twigil = $pvar->{twigil}[0] ? $pvar->{twigil}[0]{SYM} : '';
+	my ($dv) = $self->kids('default_value');
 
 	# Is it valid?
 	my $check = '';
-	if ($self->{quant} eq '!' || $self->{quant} eq '' && $posit) {
+	if (($self->{quant} eq '!' || $self->{quant} eq '' && $posit) && !$dv) {
 	    $check .= $::MULTINESS eq 'multi' ? "last " :
 		"die 'Required argument $pname omitted' ";
 	    $check .= $posit ? 'unless @_'
@@ -1566,7 +1567,7 @@ EOFINAL
 
 	# Get the value
 	my $value = "undef";
-	if (my ($dv) = $self->kids('default_value')) {
+	if ($dv) {
 	    $value = $dv->{"."}->p5;
 	}
 	if ($posit) {
