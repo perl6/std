@@ -2748,7 +2748,7 @@ TEXT
             my @kids = @{$$self{zyg}};
 
             while (@kids and ref $kids[0] eq 'RE_decl') {
-                push @decl, shift(@kids)->walk->p5;
+                push @decl, shift(@kids)->walk->p5block;
             }
 
             @kids = reverse @kids if $::REV;
@@ -2762,7 +2762,7 @@ TEXT
             $result = $self->wrapone($_,$result);
         }
 	@decl ?
-	    DEEP::raw(join('', @decl, $result ? $result->p5 : '')) :
+	    DEEP::raw(join('', @decl, $result ? $result->p5 : ''), isblock => 1) :
 	    $result // DEEP::raw('');
     }
 
