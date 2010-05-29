@@ -1488,7 +1488,7 @@ END
 
 	if (%{$::RETREE}) {
 	    $body2 = "\$retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));\n" .
-		::Dump($::RETREE) . "RETREE_END\n";
+		Encode::decode_utf8(::Dump($::RETREE)) . "RETREE_END\n";
 	}
 	my $body = $body1 . $body2 . $body3;
 	my $name  = $::PKG;
