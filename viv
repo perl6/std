@@ -1670,11 +1670,10 @@ EOFINAL
 }
 
 
-{ package VAST::SYM_prefix__S_temp; our @ISA = 'VAST::Named_unary';
+{ package VAST::prefix__S_temp; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
-        my @t = $self->SUPER::emit_p5;
-	$t[0] = 'local';
-        @t;
+	my $arg = $self->{arg}->p5;
+	"local $arg = $arg";
     }
 }
 
