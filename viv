@@ -869,6 +869,22 @@ sub indent {
     }
 }
 
+{ package VAST::SYM_infix__S_orelse; our @ISA = 'VAST::Loose_or';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = ' or ';
+        @t;
+    }
+}
+
+{ package VAST::SYM_infix__S_andthen; our @ISA = 'VAST::Loose_and';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = ' and ';
+        @t;
+    }
+}
+
 { package VAST::SYM_infix__S_PlusVert; our @ISA = 'VAST::Additive';
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
