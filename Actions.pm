@@ -4,6 +4,7 @@ use warnings;
 our $OPT_log;
 our $OPT_match;
 package Actions;
+use Scalar::Util 'refaddr';
 
 # Generic ast translation done via autoload
 
@@ -38,6 +39,7 @@ sub hoistast {
     my $text = $node->Str;
     my %r;
     my @all;
+    my %allused;
     my @fake;
     for my $k (keys %$node) {
 	print STDERR $node->{_reduced} // 'ANON', " $k\n" if $OPT_log;
@@ -81,7 +83,10 @@ sub hoistast {
 	    if (ref $v) {
 		for (@$v) {
 		    next unless ref $_;     # XXX skip keys?
-		    push @all, $_->{'_ast'} if defined $_->{'_ast'};
+		    push @all, $_->{'_ast'} if defined $_->{'_ast'}
+			and !($allused{refaddr $_}++);
+		    # don't generate multiple entries for a multi-named
+		    # capture
 		}
 	    }
 	}

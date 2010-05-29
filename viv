@@ -840,6 +840,14 @@ sub indent {
 { package VAST::infix; our @ISA = 'VAST::Base';
 }
 
+{ package VAST::infix_prefix_meta_operator__S_Bang; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[1] = '~' if $t[1] eq '=~';
+        @t;
+    }
+}
+
 { package VAST::SYM_infix__S_ColonEqual; our @ISA = 'VAST::Item_assignment';
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
