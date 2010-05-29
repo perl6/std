@@ -1425,10 +1425,10 @@ BODY
 
 	$header .= <<"END";
 use $meta ':all' => { -prefix => "moose_" };
+use Cursor; # for DEBUG::, etc
 END
 
 	$header .= <<"END" for @extends;
-use $_; # for base class as well as DEBUG constants
 moose_extends('$_');
 END
 
