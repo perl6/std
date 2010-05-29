@@ -644,7 +644,7 @@ sub indent {
 
 { package VAST::blockoid; our @ISA = 'VAST::Base';
     sub emit_p5 { my $self = shift;
-	"{\n" . ::indent($self->{statementlist}->p5, 1) . "}";
+	"{\n" . ::indent(scalar($self->{statementlist}->p5), 1) . "}";
     }
 }
 
@@ -2184,7 +2184,12 @@ TEXT
 
 { package VAST::statementlist; our @ISA = 'VAST::Base';
     sub emit_p5 { my $self = shift;
-	join("", map { $_->p5 . ";\n" } $self->kids('statement'));
+	my @stmts = $self->kids('statement');
+	# XXX mostly for the benefit of hashes
+	if (@stmts == 1) {
+	    return $stmts[0]->p5;
+	}
+	join("", map { $_->p5 . ";\n" } @stmts);
     }
 }
 
