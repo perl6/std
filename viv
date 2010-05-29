@@ -2077,7 +2077,8 @@ TEXT
 	my $vdecl = $decl->{variable_declarator};
 	my $var = $vdecl->{variable};
 	"moose_has '" . $var->{desigilname}->Str . "' => (" . join (", ",
-	    ($typename ? ("isa => '" . $typename->Str . "'") : ())
+	    ($typename ? ("isa => '" . $typename->Str . "'") : ()),
+	    ("is => 'rw'")
 	) . ")";
     }
 }
