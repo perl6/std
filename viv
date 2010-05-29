@@ -844,6 +844,8 @@ sub indent {
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
 	$t[1] = '~' if $t[1] eq '=~';
+	$t[1] = '=' if $t[1] eq '==';
+	@t = ('ne', '') if $t[1] eq 'eq';
         @t;
     }
 }
