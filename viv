@@ -1524,7 +1524,7 @@ EOT
 	for my $mm (sort keys %::MULTIMETHODS) {
 	    $finalmulti .= "moose_around $mm => sub {\n    my \$orig = shift;\n    no warnings 'recursion';\n" .
 		::indent($::MULTIMETHODS{$mm}, 1) . <<EOFINAL
-    \$_[0]->\$orig(\@_);
+    \$orig->(\@_);
 };
 
 EOFINAL
