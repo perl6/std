@@ -178,7 +178,6 @@ sub new {
         $args{'_' . $name} = shift;
     }
     my $self = bless \%args, ref $class || $class;
-    $self->BUILD;
     $self->{_xact} = ['MATCH',0,0];
     $self;
 }

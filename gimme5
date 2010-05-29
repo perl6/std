@@ -296,13 +296,10 @@ my \$retree;
 
 \$DB::deep = \$DB::deep = 1000; # suppress used-once warning
 
-sub BUILD {
-    my \$self = shift;
 END
 
 
 	$out .= <<'END';
-}
 
 use YAML::XS;
 
