@@ -2022,7 +2022,15 @@ TEXT
 }
 
 
+# type erase
 { package VAST::scoped; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+	if (@{$self->{typename}}) {
+	    " " . $self->{multi_declarator}->p5;
+	} else {
+	    $self->SUPER::emit_p5;
+	}
+    }
 }
 
 
