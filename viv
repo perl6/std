@@ -1558,8 +1558,10 @@ EOFINAL
 	# Is it valid?
 	my $check = '';
 	if (($self->{quant} eq '!' || $self->{quant} eq '' && $posit) && !$dv) {
+	    # XXX STD/gimme5 doesn't use ? correctly; will be fixed after
+	    # bootstrap
 	    $check .= $::MULTINESS eq 'multi' ? "last " :
-		"die 'Required argument $pname omitted' ";
+		"1"; #"die 'Required argument $pname omitted' ";
 	    $check .= $posit ? 'unless @_'
 		: 'unless ' . join(" || ", map ("exists \$args{$_}", @names));
 	    $check .= ";\n"
