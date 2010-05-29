@@ -885,6 +885,14 @@ sub indent {
     }
 }
 
+{ package VAST::SYM_infix__S_leg; our @ISA = 'VAST::Structural_infix';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = 'cmp';
+        @t;
+    }
+}
+
 { package VAST::SYM_infix__S_EqualEqualEqual; our @ISA = 'VAST::Chaining';
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
@@ -2353,7 +2361,7 @@ TEXT
 	    $t[0] = '\\';
 	    $t[1] =~ s/^\s+//;
 	}
-	if ($t[0] eq 'map' || $t[0] eq 'grep') {
+	if ($t[0] eq 'map' || $t[0] eq 'grep' || $t[0] eq 'sort') {
 	    # XXX this should be more robust, but it belongs in DEEP after
 	    # all arguments are collected anyway
 	    $t[1] =~ s/}\s*,/} /;
@@ -2524,6 +2532,14 @@ TEXT
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
 	$t[0] = '::';
+        @t;
+    }
+}
+
+{ package VAST::twigil__S_Caret; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = ''; #XXX only correct for sorts
         @t;
     }
 }
