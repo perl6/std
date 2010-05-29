@@ -1741,7 +1741,10 @@ EOFINAL
 }
 
 
-{ package VAST::quote__S_Fre_Nch; our @ISA = 'VAST::Base';
+{ package VAST::circumfix__S_Fre_Nch; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+	'split(/ /, "' . $self->{nibble}->p5 . '", -1)'
+    }
 }
 
 
