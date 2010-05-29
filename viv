@@ -542,6 +542,11 @@ sub indent {
 		re => $self->{nibbler}[0]{"."}->re_ast);
 	}
 
+	if ($self->{assertion}[0]) {
+	    return RE_bindnamed->new(var => $name,
+		atom => $self->{assertion}[0]->re_ast);
+	}
+
 	if ($name eq 'sym' && defined $::ENDSYM) {
 	    return RE_sequence->new(
 		RE_method->new(name => $name, sym => $::SYM),
