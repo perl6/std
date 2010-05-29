@@ -1920,6 +1920,7 @@ sub $p5name {
     my \$self = shift;
 
 TEXT
+	. ($::NEEDORIGARGS ? "    my \@origargs = \@_;\n" : "")
 	. ::indent($defsig . $spcsig, 1)
 	. ::indent(join("", @::DECL), 1)
 	. <<TEXT
