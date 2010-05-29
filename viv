@@ -2175,6 +2175,11 @@ TEXT
 
 
 { package VAST::statement_control__S_when; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	if ($t[1] =~ s/^\s*\(\s*\*\s*\)//) { $t[0] = 'default'; }
+        @t;
+    }
 }
 
 
