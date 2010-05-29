@@ -2325,6 +2325,11 @@ TEXT
 	    $t[0] = '\\';
 	    $t[1] =~ s/^\s+//;
 	}
+	if ($t[0] eq 'map' || $t[0] eq 'grep') {
+	    # XXX this should be more robust, but it belongs in DEEP after
+	    # all arguments are collected anyway
+	    $t[1] =~ s/}\s*,/} /;
+	}
 	if ($t[0] eq 'invert') {
 	    $t[0] = 'reverse';
 	}
