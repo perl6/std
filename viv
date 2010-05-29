@@ -1433,6 +1433,7 @@ BODY
     sub p5_module_name {  my $self = shift;
 	my $def_module_name = $self->{longname}[0]{name}->Str;
 	if ($self->{decl}{inpkg}[0] =~ /GLOBAL::(.*)/) {
+	    $::OUR{$def_module_name} = "$1::$def_module_name";
 	    $def_module_name = "$1::$def_module_name";
 	}
 	$def_module_name;
@@ -2474,10 +2475,11 @@ TEXT
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
 	if (my ($pkg) = ($t[0] =~ /^::(.*)/)) {
+	    $pkg = $::OUR{$pkg} // $pkg;
 	    if (defined $t[1] && $t[1] =~ /^\s*\[/) {
 		$t[1] =~ s/^\s*\[/->__instantiate__(/;
 		$t[1] =~ s/\]\s*$/)/;
-		$t[0] = "STD::$pkg"; # XXX we need our handling
+		$t[0] = "$pkg";
 	    } else {
 		$t[0] = "'$pkg'";
 	    }
