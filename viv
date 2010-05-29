@@ -2240,6 +2240,11 @@ TEXT
 
 
 { package VAST::statement_prefix__S_try; our @ISA = 'VAST::Base';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = 'eval';
+        @t;
+    }
 }
 
 
