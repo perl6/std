@@ -1018,6 +1018,9 @@ sub indent {
 
 
 { package VAST::metachar__S_Back; our @ISA = 'VAST::metachar';
+    sub re_ast {  my $self = shift;
+	RE_meta->new(text => $self->Str, min => 1);
+    }
 }
 
 
@@ -1071,6 +1074,9 @@ sub indent {
 
 
 { package VAST::metachar__S_Dot; our @ISA = 'VAST::metachar';
+    sub re_ast {  my $self = shift;
+	RE_meta->new(text => $self->Str, min => 1);
+    }
 }
 
 
