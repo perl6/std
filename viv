@@ -885,6 +885,14 @@ sub indent {
     }
 }
 
+{ package VAST::SYM_infix__S_EqualEqualEqual; our @ISA = 'VAST::Chaining';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = '=='; # only correct for objects (and ints)
+        @t;
+    }
+}
+
 { package VAST::SYM_infix__S_orelse; our @ISA = 'VAST::Loose_or';
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
