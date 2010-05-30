@@ -1622,7 +1622,7 @@ grammar P6 is STD {
     token statement_control:unless {
         <sym> :s
         <xblock>
-        [ <!before 'else'> || <.panic: "unless does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
+        [ <!before 'else'> || <.panic: "\"unless\" does not take \"else\" in Perl 6; please rewrite using \"if\""> ]
     }
 
 
@@ -4932,7 +4932,7 @@ grammar Regex is STD {
         ]
     }
 
-    token metachar:quant { <quantifier> <.sorry: "quantifier quantifies nothing"> }
+    token metachar:quant { <quantifier> <.sorry: "Quantifier quantifies nothing"> }
 
     # "normal" metachars
 
