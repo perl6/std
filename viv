@@ -1484,9 +1484,11 @@ BODY
 	my $header = "";
 	my $name = $::PKG;
 	my @extends;
+	my @does;
 	for (@{$self->{trait}}) {
 	    my $t = $_->Str;
 	    push(@extends, $t =~ /^is\s+(\S+)/);
+	    push(@does,    $t =~ /^does\s+(\S+)/);
 	}
 	@extends = 'Cursor' if $::PKGDECL eq 'grammar' && !@extends;
 
@@ -1499,6 +1501,10 @@ END
 
 	$header .= <<"END" for @extends;
 moose_extends('$_');
+END
+
+	$header .= <<"END" for @does;
+moose_with('$_');
 END
 
 	$header .= <<"END";
