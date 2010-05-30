@@ -725,12 +725,12 @@ sub rd {
     sub adverbs { my $self = shift;
 	my $val;
 	if (Scalar::Util::blessed $self->{v} &&
-		$self->{v}->isa('VAST::coloncircumfix') &&
-		(($val) = $self->{v}->Str =~ /^[<«](.*).$/)) {
-	    return $self->{k} => $val;
-	} elsif (Scalar::Util::blessed $self->{v} &&
-		$self->{v}->isa('VAST::coloncircumfix') &&
-		(($val) = $self->{v}->Str =~ /^\['([^']*)'\]$/)) {
+		$self->{v}->isa('VAST::coloncircumfix')) {
+	    my $s = $self->{v}->Str;
+	    my $val = $s =~ /^<(.*)>$/ ? ::unsingle($1) :
+		      $s =~ /^«(.*)»$/ ? ::undouble($1) :
+		      $s =~ /^\['(.*)'\]$/ ? ::unsingle($1) :
+		      die "Unparsable coloncircumfix";
 	    return $self->{k} => $val;
 	} elsif ($self->{v} == 1) {
 	    return "sym" => $self->{k};
