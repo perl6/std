@@ -1490,6 +1490,8 @@ BODY
 	    push(@extends, $t =~ /^is\s+(\S+)/);
 	    push(@does,    $t =~ /^does\s+(\S+)/);
 	}
+	@extends = map { $::OUR{$_} // $_ } @extends;
+	@does    = map { $::OUR{$_} // $_ } @does;
 	@extends = 'Cursor' if $::PKGDECL eq 'grammar' && !@extends;
 
 	my $meta = $::PKGDECL eq 'role' ? 'Moose::Role' : 'Moose';
