@@ -2756,7 +2756,7 @@ TEXT
 	say STDERR "--> $self" if $OPT_log;
 	my $exp = $self->_walk;
 	say STDERR "<-- $exp: ", $exp->p5 if $OPT_log;
-	if ($self->{r}) {
+	if ($self->{r} && $exp->maybacktrack) {
 	    return DEEP::cut($exp);
 	} else {
 	    return $exp;
@@ -2801,10 +2801,10 @@ TEXT
 	# XXX needs interpolation
 	if ($$self{i}) {
 	    $text = $::REV ? "(?<=" . ::rd($text) . ")" : ::rd($text);
-	    DEEP::raw('$C->_PATTERN(qr/\\G(?i:' . $text . ')/")');
+	    DEEP::raw('$C->_PATTERN(qr/\\G(?i:' . $text . ')/")', precut => 1);
 	}
 	else {
-	    DEEP::raw("\$C->_EXACT(\"" . ::rd($text) . "\")");
+	    DEEP::raw("\$C->_EXACT(\"" . ::rd($text) . "\")", precut => 1);
 	}
     }
 }
@@ -2822,7 +2822,7 @@ TEXT
 	else {
             my $text = $$self{text};
             $text =~ s/([\\'])/\\$1/g;
-	    DEEP::raw("\$C->_EXACT$::REV('$text')");
+	    DEEP::raw("\$C->_EXACT$::REV('$text')", precut => 1);
 	}
     }
 }
@@ -3211,12 +3211,6 @@ END
 	$self->SUPER::clean;
 	splice @{$self->{quant}}, ($self->{quant}[0] eq '**' ? 3 : 1);
     }
-    sub new {
-	my $class = shift;
-	my $self  = $class->SUPER::new(@_);
-	$self->{r} = 0;
-	$self;
-    }
     sub _walk {
         my $self = shift;
         my $result;
@@ -3225,7 +3219,9 @@ END
             my $quant = "";
             my $rep = "_REP";
             my $q = $$self{quant};
-	    my $atom = $$self{atom}->walk->p5;
+	    my $atom = $$self{atom}->walk;
+	    my $atom_is_cut = !$atom->maybacktrack;
+	    $atom = $atom->p5;
 	    if ($q) {
 		if ($atom =~ m{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) $ }sx ) {
 		    my $a = "(?:$1)";
@@ -3255,10 +3251,12 @@ END
 			}
 			$quant = "\$C->$rep$h( $rest, ";
 			return DEEP::raw($quant .
-			    DEEP::chunk(DEEP::raw($atom))->p5 . ")");
+			    DEEP::chunk(DEEP::raw($atom))->p5 . ")",
+			    precut => ($h eq 'r'));
 		    }
 		    else {
-			return DEEP::raw("\$C->_PATTERN\(qr/\\G($a$qfer$h)/\)");
+			return DEEP::raw("\$C->_PATTERN\(qr/\\G($a$qfer$h)/\)",
+			    precut => ($h eq '+' && $atom_is_cut));
 		    }
 		}
 
@@ -3291,10 +3289,10 @@ END
 		    }
 		    $quant = "\$C->$rep$h( $rest, ";
 		}
-		return DEEP::raw($quant . DEEP::chunk(DEEP::raw($atom))->p5 . ")");
+		return DEEP::raw($quant . DEEP::chunk(DEEP::raw($atom))->p5 . ")", precut => ($h eq 'r'));
 	    }
             else {
-                return DEEP::raw($atom);
+                return DEEP::raw($atom, precut => $atom_is_cut);
             }
         }
         else {
@@ -3384,6 +3382,7 @@ END
         my $text = $$self{text};
         my $not = 0;
         my $code = "";
+	my $bt = 0;
         if ($text =~ /^(\\[A-Z])(.*)/) {
             $text = lc($1) . $2;
             $not = 1;
@@ -3398,9 +3397,11 @@ END
         }
         elsif ($text eq '.*') {
             $code = "\$C->_SCANg$::REV()";
+	    $bt = 1;
         }
         elsif ($text eq '.*?') {
             $code = "\$C->_SCANf$::REV()";
+	    $bt = 1;
         }
         elsif ($text eq '^') {
 	    $code = "\$C->_PATTERN(qr/\\G\\A/)";
@@ -3487,6 +3488,7 @@ END
         }
         elsif ($text eq '<~~>') {
             $code = "\$C->$::NAME()";
+	    $bt = 1;
         }
         else {
             $code = "\$C->_EXACT$::REV(\"$text\")";
@@ -3494,7 +3496,7 @@ END
         if ($not) { # XXX or maybe just .NOT on the end...
             $code = "\$C->_NOTCHAR( sub { my \$C=shift;\n" . ::indent($code) . "\n})";
         }
-	DEEP::raw($code);
+	DEEP::raw($code, precut => !$bt);
     }
 }
 
@@ -3510,10 +3512,10 @@ END
 	$text =~ s/^-\[/[^/;
 	$text = "(?<=$text)" if $::REV;
 	if ($$self{i}) {
-	    DEEP::raw("\$C->_PATTERN(qr/\\G(?i:$text)/)");
+	    DEEP::raw("\$C->_PATTERN(qr/\\G(?i:$text)/)", precut => 1);
 	}
 	else {
-	    DEEP::raw("\$C->_PATTERN(qr/\\G$text/)");
+	    DEEP::raw("\$C->_PATTERN(qr/\\G$text/)", precut => 1);
 	}
     }
 }
@@ -3521,7 +3523,7 @@ END
 { package RE_noop; use base "REbase";
     sub _walk {
         my $self = shift;
-	DEEP::raw('$C');
+	DEEP::raw('$C', precut => 1);
     }
 
     sub has_trailing_ws {
