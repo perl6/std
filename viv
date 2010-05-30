@@ -1712,6 +1712,15 @@ EOFINAL
 { package VAST::quant_atom_list; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my @kids = map { $_->re_ast } $self->kids("quantified_atom");
+	# XXX STD work around misparsing of whitespace near quantifiers
+	for my $i (0 .. @kids - 2) {
+	    if ($kids[$i+1]->isa('RE_quantified_atom')
+		    && $kids[$i+1]{atom}->isa('RE_method')
+		    && $kids[$i+1]{atom}{name} eq 'ws') {
+		$kids[$i+1]{atom} = $kids[$i];
+		$kids[$i] = RE_noop->new;
+	    }
+	}
 	RE_sequence->new(@kids);
     }
 }
