@@ -2039,7 +2039,7 @@ TEXT
 	push @middle, RE_bracket->new(decl => [], re => RE_first->new(
 		RE_string->new(text => $strcloser),
 		RE_method->new(name => 'FAILGOAL', nobind => 1,
-		    rest => "(\$::GOAL, '${\ $self->{dba} }', \$goalpos)")));
+		    rest => "(\$::GOAL, '$::DBA', \$goalpos)")));
 
 	my $middle = RE_bracket->new(decl => [RE_decl->new(body => $begin)], re =>
 	    RE_sequence->new(@middle));
