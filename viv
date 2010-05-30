@@ -2974,7 +2974,14 @@ END
 	$self;
     }
 
-    # can't remove leading ws because that affects LTM
+    # yes, this affects LTM, but S05 specs it
+    sub remove_leading_ws {
+        my $self = shift;
+        for my $kid (@{$$self{zyg}}) {
+            $kid->remove_leading_ws();
+        }
+    }
+
     sub has_trailing_ws {
 	my $self = shift;
 	my $before = shift;
