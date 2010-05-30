@@ -280,6 +280,37 @@ sub indent {
     $x;
 }
 
+sub unsingle {
+    my $in = $_[0];
+    my $out = '';
+    while ($in ne '') {
+	$out .= $1 if $in =~ s/^\\([\\'])//;
+	$out .= $1 if $in =~ s/^(.)//;
+    }
+    $out;
+}
+
+# XXX this is only used for backslash escapes in regexes
+sub undouble {
+    my $in = $_[0];
+    my $out = '';
+    my %trans = ( 'n' => "\n" );
+    while ($in ne '') {
+	$out .= $trans{$1} // $1 if $in =~ s/^\\(.)//;
+	$out .= $1 if $in =~ s/^(.)//;
+    }
+    $out;
+}
+
+sub rd {
+    my $in = shift;
+    my $out = '';
+    for my $ch (split //, $in) {
+	$out .= $ch eq "\n" ? '\n' : quotemeta($ch);
+    }
+    $out;
+}
+
 ###################################################################
 
 { package VAST::Base;
@@ -1087,7 +1118,7 @@ sub indent {
 
 { package VAST::metachar__S_Double_Double; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	my $text = $self->{quote}{nibble}->Str;
+	my $text = ::undouble($self->{quote}{nibble}->Str);
 	RE_double->new(text => $text);
     }
 }
@@ -1146,7 +1177,7 @@ sub indent {
 
 { package VAST::metachar__S_Single_Single; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	my $text = $self->{quote}{nibble}->Str;
+	my $text = ::unsingle($self->{quote}{nibble}->Str);
 	RE_string->new(text => $text);
     }
 }
@@ -2759,13 +2790,13 @@ TEXT
         my $self = shift;
         my $text = $$self{text};
 	$$self{i_needed} = 1;
-	$text = "(?<=$text)" if $::REV;
-	# XXX needs quoting
+	# XXX needs interpolation
 	if ($$self{i}) {
+	    $text = $::REV ? "(?<=" . ::rd($text) . ")" : ::rd($text);
 	    DEEP::raw('$C->_PATTERN(qr/\\G(?i:' . $text . ')/")');
 	}
 	else {
-	    DEEP::raw('$C->_EXACT("' . $text . '")');
+	    DEEP::raw("\$C->_EXACT(\"" . ::rd($text) . "\")");
 	}
     }
 }
@@ -2778,7 +2809,7 @@ TEXT
 	if ($$self{i}) {
             my $text = quotemeta($$self{text});
             $text = "(?<=$text)" if $::REV;
-	    DEEP::raw('$C->_PATTERN(qr/\\G(?i:' . $text . ')/)');
+	    DEEP::raw("\$C->_PATTERN(qr/\\G(?i:" . ::rd($text) . ")/)");
 	}
 	else {
             my $text = $$self{text};
@@ -3081,10 +3112,10 @@ END
             $$self{sym} = $::SYM;
             $$self{endsym} = $::ENDSYM if defined $::ENDSYM;
 	    if ($$self{i}) {
-		return DEEP::raw("\$C->_PATTERN(qr/\\G(?i:" . quotemeta($::SYM) . ")/)");
+		return DEEP::raw("\$C->_PATTERN(qr/\\G(?i:" . ::rd($::SYM) . ")/)");
 	    }
 	    else {
-		return DEEP::raw("\$C->_PATTERN(qr/\\G" . quotemeta($::SYM) . "/)");
+		return DEEP::raw("\$C->_PATTERN(qr/\\G" . ::rd($::SYM) . "/)");
 	    }
         }
         elsif ($name eq "alpha") {
