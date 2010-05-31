@@ -3304,6 +3304,20 @@ END
     }
 
     sub kids { my $self = shift; \$self->{atom} }
+
+    sub optimize {
+	my $self = shift()->SUPER::optimize;
+	if ($self->{quant}[0] eq '*' &&
+		$self->{quant}[1] ne ':' &&
+		$self->{atom}->isa('RE_meta') &&
+		$self->{atom}{text} eq '.') {
+	    delete $self->{atom};
+	    $self->{text} = ($self->{quant}[1] eq '?') ? '.*?' : '.*';
+	    delete $self->{quant};
+	    bless $self, 'RE_meta';
+	}
+	$self;
+    }
 }
 
 { package RE_qw; use base "REbase";
@@ -3572,13 +3586,13 @@ END
         my $ctx = $$self{context};
         my $text = ::indent($$self{body});
         if ($ctx eq 'void') {
-            return DEEP::raw("scalar(do {\n$text\n}, \$C)");
+            return DEEP::raw("scalar(do {\n$text\n}, \$C)", precut => 1);
         }
         elsif ($ctx eq 'bool') {
-            return DEEP::raw("((\$C) x !!do {\n$text\n})");
+            return DEEP::raw("((\$C) x !!do {\n$text\n})", precut => 1);
         }
         else {
-            return DEEP::raw(" sub { my \$C=shift;\n$text\n}");
+            return DEEP::raw(" sub { my \$C=shift;\n$text\n}", precut => 1);
         }
     }
 
