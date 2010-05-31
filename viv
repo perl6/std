@@ -1558,6 +1558,7 @@ END
         return \$mixin if \$INSTANTIATED{\$mixin}++;
         ::deb("         instantiating \$mixin") if \$::DEBUG & DEBUG::mixins;
         my \$eval = "package \$mixin" . q{;
+	    sub _PARAMS { { ${\ join(", ", map { "'$_' => $_" } @parm) } } }
 EOT
 	    $body .= <<EOT;
 	};
