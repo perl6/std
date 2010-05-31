@@ -732,8 +732,8 @@ sub rd {
 	if (Scalar::Util::blessed $self->{v} &&
 		$self->{v}->isa('VAST::coloncircumfix')) {
 	    my $s = $self->{v}->Str;
-	    my $val = $s =~ /^<(.*)>$/ ? ::unsingle($1) :
-		      $s =~ /^«(.*)»$/ ? ::undouble($1) :
+	    my $val = $s =~ /^<\s*(.*?)\s*>$/ ? ::unsingle($1) :
+		      $s =~ /^«\s*(.*?)\s*»$/ ? ::undouble($1) :
 		      $s =~ /^\['(.*)'\]$/ ? ::unsingle($1) :
 		      die "Unparsable coloncircumfix";
 	    return $self->{k} => $val;
