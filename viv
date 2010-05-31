@@ -2015,7 +2015,7 @@ sub $p5name {
 
 TEXT
 	. ($::NEEDORIGARGS ? "    my \@origargs = \@_;\n" : "")
-	. ::indent($defsig . $spcsig, 1)
+	. ::indent($defsig || $spcsig, 1)
 	. ::indent(join("", @::DECL), 1)
 	. <<TEXT
 
