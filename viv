@@ -1260,6 +1260,8 @@ EOT
 	}
 
 	# not quite right, this should be an expression
+	($name eq 'EXPR' ? # XXX STD
+	    "sub EXPR__PEEK { \$_[0]->_AUTOLEXpeek(\'EXPR\',\$retree) }\n" : '').
 	"sub " . $name . "{\n" . 
 	    ::indent("no warnings 'recursion';\nmy \$self = shift;\n" .
 		$sig . $body, 1)
@@ -2092,6 +2094,8 @@ TEXT
 	}
 
 	push @middle, $opener;
+	# XXX STD break LTM for gimme5 bug-compatibility
+	push @middle, RE_block->new(body => '', context => 'void');
 	push @middle, $inner;
 	push @middle, RE_bracket->new(decl => [], re => RE_first->new(
 		RE_string->new(text => $strcloser),
@@ -3114,6 +3118,9 @@ END
 	$self->SUPER::clean;
 	delete $self->{nobind};
 	delete $self->{need_match};
+	# XXX STD gimme5 bug-compatibility; special_variable:['$/'] causes
+	# a LTM conflict with $<a>, without this
+	$self->{sym} = "['\$<']" if $self->{sym} && $self->{sym} eq '$<';
 	$self->{rest} = defined $self->{rest};
     }
     sub _walk {
