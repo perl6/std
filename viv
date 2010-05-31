@@ -32,6 +32,9 @@ my @did_ws;
 
 my @context;
 $::MULTINESS = '';
+# XXX STD Global trait tables simulate inheritence
+local $::PROTO = {};
+local $::PROTOSIG = {};
 
 sub USAGE {
     print <<'END';
@@ -1534,8 +1537,6 @@ END
     sub emit_p5 {  my $self = shift;
 	my $block = $self->{blockoid}{statementlist} // $self->{statementlist};
 	local $::RETREE = {};
-	local $::PROTO = {};
-	local $::PROTOSIG = {};
 	local $::PKG = $self->p5_module_name;
 	local $::MULTIRX_SEQUENCE = 0;
 	local %::MULTIMETHODS;
