@@ -1744,7 +1744,9 @@ EOFINAL
 
 	my $ast = $self->{atom}->re_ast;
 
-	RE_quantified_atom->new(atom => $ast, quant => $quant);
+	my $r = RE_quantified_atom->new(atom => $ast, quant => $quant);
+	$r->{r} = 0 if $quant->[1] ne ':';
+	$r;
     }
 }
 
