@@ -2793,12 +2793,7 @@ TEXT
 
     sub bind { my $self = shift; my $re = shift;
 	return $re unless @_;
-	# SUBSUMEr if we can prove single return
-	$re = $re->p5;
-	$re = "\$C->_SUBSUME([" .
-	    join(',', map {"'$_'"} @_) .
-	    "], sub {\n" . ::indent("my \$C = shift;\n" . $re, 2) . "\n  })";
-	DEEP::raw($re);
+	DEEP::bind($re, @_);
     }
 
     sub remove_leading_ws { }   # this tree node not interested
@@ -3177,12 +3172,13 @@ do {
 }
 END
         }
+        $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $self->{need_match};
+	$re = DEEP::raw($re);
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $::BINDINGS{$name} += $::PLURALITY;
-	    $re = $self->bind(DEEP::raw($re), $name)->p5;
+	    $re = $self->bind($re, $name);
 	}
-        $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $self->{need_match};
-	DEEP::raw($re);
+	$re;
     }
 
     sub has_trailing_ws {
@@ -3803,6 +3799,12 @@ END
 { package DEEP::cut; our @ISA = 'DEEPblockbase';
     sub DEEP::cut {
 	my $child = shift;
+	if (!$child->maybacktrack) {
+	    return $child;
+	}
+	if ($child->isa('DEEP::bind')) {
+	    return DEEP::bind(DEEP::cut($child->{child}), @{$child->{names}});
+	}
 	bless { child => $child }, "DEEP::cut";
     }
 
@@ -3817,6 +3819,27 @@ END
     }
 }
 
+{ package DEEP::bind; our @ISA = 'DEEPbase';
+    sub DEEP::bind {
+	my $child = shift;
+	my @names = @_;
+	if ($child->isa('DEEP::bind')) {
+	    push @names, @{$child->{names}};
+	    $child = $child->{child};
+	}
+	bless { child => $child, names => \@names }, "DEEP::bind";
+    }
+
+    sub maybacktrack { $_[0]{child}->maybacktrack }
+
+    sub p5 { my $self = shift;
+	my ($chinner, $r) = $self->{child}->uncut;
+	"\$C->_SUBSUME$r([" .
+	    join(',', map {"'$_'"} @{$self->{names}}) .
+	    "], sub {\n" . ::indent("my \$C = shift;\n" .
+	    $chinner->p5block, 2) . "\n})";
+    }
+}
 # NOT a regex bit, but a value
 { package DEEP::chunk; our @ISA = 'DEEPbase';
     sub DEEP::chunk {
