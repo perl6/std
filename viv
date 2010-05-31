@@ -667,6 +667,11 @@ sub rd {
 
 
 { package VAST::backslash__S_x; our @ISA = 'VAST::Base';
+    sub emit_p5 { my $self = shift;
+	my @t = $self->SUPER::emit_p5;
+	$t[1] = "{$t[1]}";
+	@t;
+    }
 }
 
 
