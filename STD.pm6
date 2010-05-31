@@ -1600,7 +1600,7 @@ grammar P6 is STD {
         <sym> <.ws>
         <module_name>[<.spacey><arglist>]?
         <.ws>
-        <.explain_myster>
+        <.explain_mystery>
     }
 
 
