@@ -23,17 +23,21 @@ snap: $(FIXINS) check lex/STD/termish
 	-mv snap snap.old
 	mv snap.new snap
 
-STD_P5.pm5: STD_P5.pm6 gimme5
-	perl gimme5 $< >STD_P5.pm5
+boot/syml/CORE.syml: CORE.setting
+	STD5PREFIX=boot/ PERL5LIB=boot perl std
 
-STD_P5.pmc: STD_P5.pm5
-	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD_P5.pm5 >$@
-
-STD.pm5: STD.pm6 gimme5
-	perl gimme5 $< >STD.pm5
-
-STD.pmc: STD.pm5
-	perl -p -e 'next if /^---/../\A\w+\Z/;' -e 's/\A[ \t]+//;' STD.pm5 >$@
+# .store files depend little on viv; ideally it should be factored into two
+# programs; this rule is missing a few dependencies!
+# boot/STD.pm because boot/STD.pmc doesn't take precedence over ./STD.pm
+STD.store: STD.pm6 boot/STD.pm Actions.pm boot/syml/CORE.syml
+	STD5PREFIX=boot/ PERL5LIB=boot perl viv --freeze STD.pm6 > STD.store
+STD.pmc: STD.store viv
+	perl -Iboot viv -5 --thaw STD.store > STD.pmc
+	rm -rf lex syml/*.pad.store
+STD_P5.store: STD_P5.pm6 boot/STD.pm Actions.pm boot/syml/CORE.syml
+	STD5PREFIX=boot/ PERL5LIB=boot perl viv --freeze STD_P5.pm6 > STD_P5.store
+STD_P5.pmc: STD_P5.store viv
+	perl -Iboot viv -5 --thaw STD_P5.store > STD_P5.pmc
 	rm -rf lex syml/*.pad.store
 
 syml/CORE.syml: CORE.setting
@@ -57,7 +61,7 @@ clean:
 
 # purge is an alias for distclean
 distclean purge: clean
-	rm -rf STD.pmc STD_P5.pmc STD.pm5
+	rm -rf STD.pmc STD_P5.pmc
 
 snaptest: snap all
 	cd snap; ../teststd ../../../t
