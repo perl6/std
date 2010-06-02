@@ -1575,6 +1575,7 @@ EOT
 	    $body .= <<EOT;
 	};
 	eval \$eval;
+	die \$@ if \$@;
 	return \$mixin;
     }
 EOT

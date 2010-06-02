@@ -7289,6 +7289,7 @@ sub stopper {
 ;
 	};
 	eval $eval;
+	die $@ if $@;
 	return $mixin;
     }
   1; };
@@ -7368,6 +7369,7 @@ sub stopper {
 ;
 	};
 	eval $eval;
+	die $@ if $@;
 	return $mixin;
     }
   1; };
@@ -7420,6 +7422,7 @@ sub unitstopper {
 }
 	};
 	eval $eval;
+	die $@ if $@;
 	return $mixin;
     }
   1; };

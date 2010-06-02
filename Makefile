@@ -48,6 +48,9 @@ check: STD.pmc STD_P5.pmc
 	/usr/local/bin/perl -c STD.pmc
 	/usr/local/bin/perl -c STD_P5.pmc
 
+reboot: STD.pmc
+	cp STD.pmc boot/STD.pm
+
 # pre-generate common sublexers
 lex/STD/termish: STD.pmc STD_P5.pmc syml/CORE.syml
 	@echo 'Generating STD lexers...'
