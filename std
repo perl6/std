@@ -41,3 +41,30 @@ else {
     warn "ok @ARGV\n";
 }
 
+{ package VAST::Additive; }
+{ package VAST::Autoincrement; }
+{ package VAST::Base; }
+{ package VAST::Chaining; }
+{ package VAST::Comma; }
+{ package VAST::Concatenation; }
+{ package VAST::Conditional; }
+{ package VAST::Exponentiation; }
+{ package VAST::Item_assignment; }
+{ package VAST::Junctive_and; }
+{ package VAST::Junctive_or; }
+{ package VAST::List_assignment; }
+{ package VAST::List_infix; }
+{ package VAST::List_prefix; }
+{ package VAST::Loose_and; }
+{ package VAST::Loose_or; }
+{ package VAST::Loose_unary; }
+{ package VAST::Methodcall; }
+{ package VAST::Multiplicative; }
+{ package VAST::Named_unary; }
+{ package VAST::Replication; }
+{ package VAST::Sequencer; }
+{ package VAST::Structural_infix; }
+{ package VAST::Symbolic_unary; }
+{ package VAST::Term; }
+{ package VAST::Tight_and; }
+{ package VAST::Tight_or; }
