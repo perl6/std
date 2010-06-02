@@ -27,6 +27,7 @@ our $OPT_match = 0;
 our $OPT_log = 0;
 our $OPT_stab = 0;
 our $OPT_thaw = 0;
+our $OPT_keep_going = 0;
 my $PROG = '';
 my @did_ws;
 
@@ -51,6 +52,7 @@ viv [switches] filename
     	--pos		include position info in AST
     	--match		include match tree info in AST
     	--log		emit debugging info to standard error
+    	--keep-going	continue after output errors
 END
     exit;
 }
@@ -96,6 +98,9 @@ sub MAIN {
 	}
 	elsif ($switch eq '--thaw') {
 	    $OPT_thaw = 1;
+	}
+	elsif ($switch eq '--keep-going' or $switch eq '-k') {
+	    $OPT_keep_going = 1;
 	}
 	elsif ($switch eq '--help') {
 	    USAGE();
@@ -430,12 +435,12 @@ sub rd {
 	say STDERR ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
 	$context[$lvl] = $self;
 	# print STDERR "HERE " . ref($self) . "\n";
-	my @bits = ::try {
-	    local $SIG{__DIE__} = sub {
-		my @args = @_;
-		$args[-1] =~ s/ at .*? line .*?\n$//s if $args[-1] =~ /\n$/s;
-		die Carp::longmess(@args);
-	    };
+	local $SIG{__DIE__} = sub {
+	    my @args = @_;
+	    $args[-1] =~ s/ at .*? line .*?\n$//s if $args[-1] =~ /\n$/s;
+	    die Carp::longmess(@args);
+	};
+	my @bits = !$OPT_keep_going ? $self->emit_p5 : (::try {
 	    $self->emit_p5;
 	} ::catch {
 	    my $char = $self->{BEG} // $self->{_from} // 0;
@@ -443,7 +448,7 @@ sub rd {
 	    say STDERR "!!! FAILED at $char (L$line)";
 	    print STDERR $_;
 	    "<<< ERROR >>>";
-	};
+	});
 	my $val = join '', @bits;
 	my @c = map { ref $_ } @context;
 	my $c = "@c";
