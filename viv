@@ -3233,7 +3233,12 @@ END
             my $quant = "";
             my $rep = "_REP";
             my $q = $$self{quant};
+	    my $bind = $::BINDINSIDE;
+	    undef $::BINDINSIDE;
 	    my $atom = $$self{atom}->walk;
+	    if ($bind) { #XXX STD
+		$atom = $self->bind($atom, $bind);
+	    }
 	    my $atom_is_cut = !$atom->maybacktrack;
 	    $atom = $atom->p5;
 	    if ($q) {
@@ -3745,7 +3750,12 @@ END
     sub _walk {
         my $self = shift;
         my $var = $$self{var};
+	# XXX STD for gimme5 bug-compatibility, names push inside quantifiers
 	$::BINDINGS{$var} += $::PLURALITY;
+	if ($$self{atom}->isa('RE_quantified_atom')) {
+	    local $::BINDINSIDE = $var;
+	    return $$self{atom}->walk;
+	}
         my $re = $$self{atom}->walk;
         $self->bind($re, $var);
     }
