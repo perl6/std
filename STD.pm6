@@ -5146,7 +5146,7 @@ grammar Regex is STD {
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] <.require_P5> [ :lang( $¢.cursor_fresh( %*LANG<P5Regex> ).unbalanced($*GOAL) ) <nibbler> ] }
 
     token mod_internal:p6adv {
-        <?before ':' ['dba'|'lang'] » > [ :lang(%*LANG<MAIN>) <quotepair> ] { $/<sym> := «: $<quotepair><key>» }
+        <?before ':' ['dba'|'lang'] » > [ :lang(%*LANG<MAIN>) <quotepair> ] { $/<sym> := ':' ~ $<quotepair><key> }
     }
 
     token mod_internal:oops { (':'\w+) <.sorry: "Unrecognized regex modifier " ~ $0.Str > }
