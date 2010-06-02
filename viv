@@ -1487,8 +1487,10 @@ BODY
     sub p5_module_name {  my $self = shift;
 	my $def_module_name = $self->{longname}[0]{name}->Str;
 	if ($self->{decl}{inpkg}[0] =~ /GLOBAL::(.*)/) {
-	    $::OUR{$def_module_name} = "$1::$def_module_name";
-	    $def_module_name = "$1::$def_module_name";
+	    my $mod = $1;
+	    for ($mod) { s/::::/::/g; s/^:://; s/::$//; } # XXX STD misparse?
+	    $::OUR{$def_module_name} = "${mod}::$def_module_name";
+	    $def_module_name = "${mod}::$def_module_name";
 	}
 	$def_module_name;
     }

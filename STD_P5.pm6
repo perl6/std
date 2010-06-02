@@ -9,7 +9,7 @@ grammar STD::P5 is STD;
 
 use DEBUG;
 
-method TOP ($STOP = undef) {
+method TOP ($STOP?) {
     if defined $STOP {
         my $*GOAL ::= $STOP;
         self.unitstop($STOP).comp_unit;
@@ -169,9 +169,9 @@ token ws {
 
     :dba('whitespace')
     [
-        | \h+ <![#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
+        | \h+ <![\#\s\\]> { @*MEMOS[$¢.pos]<ws> = $startpos; }   # common case
         | <?before \w> <?after \w> :::
-            { @*MEMOS[$startpos]<ws> = undef; }
+            { @*MEMOS[$startpos]<ws> :delete; }
             <.panic: "Whitespace is required between alphanumeric tokens">        # must \s+ between words
     ]
     ||
@@ -184,10 +184,10 @@ token ws {
 
     {{
         if ($¢.pos == $startpos) {
-            @*MEMOS[$¢.pos]<ws> = undef;
+            @*MEMOS[$¢.pos]<ws> :delete;
         }
         else {
-            @*MEMOS[$¢.pos]<ws> = $startpos;
+            @*MEMOS[$¢.pos]<ws> :delete;
             @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
                 if @*MEMOS[$startpos]<endstmt> :exists;
         }
@@ -195,7 +195,7 @@ token ws {
 }
 
 token unsp {
-    <...>
+    <!>
 }
 
 token vws {
@@ -295,7 +295,7 @@ rule comp_unit {
         self.load_setting($*SETTINGNAME);
         my $oid = $*SETTING.id;
         my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
-        $*CURPAD = STASH.new(
+        $*CURPAD = Stash.new(
             'OUTER::' => [$oid],
             '!file' => $*FILE, '!line' => 0,
             '!id' => [$id],
@@ -1974,7 +1974,7 @@ method unitstop ($stop) { self.mixin( ::unitstop[$stop] ); }
 token charname {
     [
     | <radint>
-    | <[a..z A..Z]><-[ \] , # ]>*?<[a..z A..Z ) ]> <?before \s*<[ \] , # ]>>
+    | <[a..z A..Z]><-[ \] , \# ]>*?<[a..z A..Z ) ]> <?before \s*<[ \] , \# ]>>
     ] || <.panic: "Unrecognized character name">
 }
 
