@@ -30,14 +30,14 @@ boot/syml/CORE.syml: CORE.setting
 # programs; this rule is missing a few dependencies!
 # boot/STD.pm because boot/STD.pmc doesn't take precedence over ./STD.pm
 STD.store: STD.pm6 boot/STD.pm Actions.pm boot/syml/CORE.syml
-	STD5PREFIX=boot/ PERL5LIB=boot perl viv --freeze STD.pm6 > STD.store
+	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o STD.store --freeze STD.pm6
 STD.pmc: STD.store viv
-	perl -Iboot viv -5 --thaw STD.store > STD.pmc
+	perl -Iboot viv -5 -o STD.pmc --thaw STD.store
 	rm -rf lex syml/*.pad.store
 STD_P5.store: STD_P5.pm6 boot/STD.pm Actions.pm boot/syml/CORE.syml
-	STD5PREFIX=boot/ PERL5LIB=boot perl viv --freeze STD_P5.pm6 > STD_P5.store
+	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o STD_P5.store --freeze STD_P5.pm6
 STD_P5.pmc: STD_P5.store viv
-	perl -Iboot viv -5 --thaw STD_P5.store > STD_P5.pmc
+	perl -Iboot viv -5 -o STD_P5.pmc --thaw STD_P5.store
 	rm -rf lex syml/*.pad.store
 
 syml/CORE.syml: CORE.setting

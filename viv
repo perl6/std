@@ -28,6 +28,7 @@ our $OPT_log = 0;
 our $OPT_stab = 0;
 our $OPT_thaw = 0;
 our $OPT_keep_going = 0;
+our $OPT_output_file = undef;
 my $PROG = '';
 my @did_ws;
 
@@ -42,6 +43,7 @@ sub USAGE {
 viv [switches] filename
     where switches can be:
     	-e		use following argument as program
+    	-o		send output to following argument instead of STDOUT
     	--yaml		spit out a parsable abstract syntax tree
     	--concise	spit out a short syntaxe tree (default)
     	--p5		spit out a Perl 5 representation (partially impl)
@@ -59,6 +61,19 @@ END
 
 use Actions;
 
+sub spew {
+    my $bits = shift;
+    if (defined $OPT_output_file) {
+	open my $out, ">", $OPT_output_file
+	    or die "cannot open $OPT_output_file for writing: $!";
+	binmode $out, ":utf8";
+	print $out $bits or die "cannot write: $!";
+	close $out or die "cannot close: $!";
+    } else {
+	print $bits;
+    }
+}
+
 sub MAIN {
     my $output = 'concise';
 
@@ -68,6 +83,9 @@ sub MAIN {
 	my $switch = shift @_;
 	if ($switch eq '--eval' or $switch eq '-e') {
 	    $PROG .= Encode::decode_utf8(shift(@_)) . "\n";
+	}
+	elsif ($switch eq '--output' or $switch eq '-o') {
+	    $OPT_output_file = shift(@_);
 	}
 	elsif ($switch eq '--yaml' or $switch eq '-y') {
 	    $output = 'yaml';
@@ -137,20 +155,22 @@ sub MAIN {
     if ($output eq 'yaml') {
 	my $x = Dump($r);
 #	$x =~ s/\n.*: \[\]$//mg;
-	print $x;
+	spew $x;
     }
     elsif ($output eq 'concise') {
-	say concise($r, 80);
+	spew concise($r, 80);
     }
     elsif ($output eq 'p6') {
-	say $r->p6;
+	spew $r->p6;
     }
     elsif ($output eq 'p5') {
-	print fixpod($r->p5);
+	spew fixpod($r->p5);
     }
     elsif ($output eq 'store') {
-	Storable::store_fd({ AST => $r, GENCLASS => \%Actions::GENCLASS,
-		ORIG => $::ORIG }, \*STDOUT);
+	my $data = { AST => $r, GENCLASS => \%Actions::GENCLASS,
+	    ORIG => $::ORIG };
+	defined($OPT_output_file) ? store($data, $OPT_output_file)
+	    : Storable::store_fd($data, \*STDOUT);
     }
     else {
 	die "Unknown output mode";
