@@ -60,7 +60,7 @@ cat:
 	cat try5.out
 
 clean:
-	rm -rf lex try5.* *.pad.store syml STD.pmc STD_P5.pmc STD.pm5 STD_P5.pm5
+	rm -rf lex try5.* *.pad.store syml boot/lex boot/syml STD.pmc STD_P5.pmc STD.store STD_P5.store
 
 # purge is an alias for distclean
 distclean purge: clean
