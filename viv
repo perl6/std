@@ -1253,7 +1253,7 @@ sub rd {
 	    $::MULTIMETHODS{$name} .= <<EOT
 {
     local \@_ = \@_;
-    return do {
+    return scalar do { # work around #38809
         my \$self = shift;
 EOT
 	    . ::indent($sig . $body, 2) . <<EOT

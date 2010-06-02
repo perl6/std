@@ -52319,7 +52319,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_004misc", do {
     no warnings 'recursion';
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{single} || exists $args{q};
@@ -52328,7 +52328,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_004misc", do {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{double} || exists $args{qq};
@@ -52337,7 +52337,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_004misc", do {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{cclass} || exists $args{cc};
@@ -52541,7 +52541,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_000misc", do {
     no warnings 'recursion';
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{single} || exists $args{q};
@@ -52550,7 +52550,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_000misc", do {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{double} || exists $args{qq};
@@ -52559,7 +52559,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_000misc", do {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{cclass} || exists $args{cc};
@@ -53889,7 +53889,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_023misc", do {
     no warnings 'recursion';
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{single} || exists $args{q};
@@ -53898,7 +53898,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_023misc", do {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{double} || exists $args{qq};
@@ -53907,7 +53907,7 @@ $C->{sym} = "misc";    $self->_MATCHIFYr($S, "backslash__S_023misc", do {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{cclass} || exists $args{cc};
@@ -53951,7 +53951,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     no warnings 'recursion';
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{g};
@@ -53960,7 +53960,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{i};
@@ -53969,7 +53969,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{m};
@@ -53978,7 +53978,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{s};
@@ -53987,7 +53987,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{x};
@@ -53996,7 +53996,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{p};
@@ -54005,7 +54005,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{c};
@@ -54053,7 +54053,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     no warnings 'recursion';
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{single} || exists $args{q};
@@ -54064,7 +54064,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{double} || exists $args{qq};
@@ -54075,7 +54075,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{cclass} || exists $args{cc};
@@ -54086,7 +54086,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{backslash} || exists $args{b};
@@ -54095,7 +54095,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{scalar} || exists $args{s};
@@ -54104,7 +54104,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{array} || exists $args{a};
@@ -54113,7 +54113,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{hash} || exists $args{h};
@@ -54122,7 +54122,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{function} || exists $args{f};
@@ -54131,7 +54131,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{closure} || exists $args{c};
@@ -54140,7 +54140,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{path} || exists $args{p};
@@ -54149,7 +54149,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{exec} || exists $args{x};
@@ -54158,7 +54158,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{words} || exists $args{w};
@@ -54167,7 +54167,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{quotewords} || exists $args{ww};
@@ -54176,7 +54176,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{heredoc} || exists $args{to};
@@ -54187,7 +54187,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{regex};
@@ -54196,7 +54196,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             my %x = %args;
@@ -54367,7 +54367,7 @@ $C->{sym} = "unquote";    $self->_MATCHIFYr($S, "term__S_000unquote", Cursor::la
     no warnings 'recursion';
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{ast};
@@ -54376,7 +54376,7 @@ $C->{sym} = "unquote";    $self->_MATCHIFYr($S, "term__S_000unquote", Cursor::la
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{lang};
@@ -54385,7 +54385,7 @@ $C->{sym} = "unquote";    $self->_MATCHIFYr($S, "term__S_000unquote", Cursor::la
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{unquote};
@@ -54394,7 +54394,7 @@ $C->{sym} = "unquote";    $self->_MATCHIFYr($S, "term__S_000unquote", Cursor::la
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{COMPILING};
@@ -54405,7 +54405,7 @@ $C->{sym} = "unquote";    $self->_MATCHIFYr($S, "term__S_000unquote", Cursor::la
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             my %x = %args;
@@ -63390,7 +63390,7 @@ sub quantmod {
     no warnings 'recursion';
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{Perl5} || exists $args{P5};
@@ -63401,7 +63401,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{overlap} || exists $args{ov};
@@ -63412,7 +63412,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{exhaustive} || exists $args{ex};
@@ -63423,7 +63423,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{continue} || exists $args{c};
@@ -63434,7 +63434,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{pos} || exists $args{p};
@@ -63445,7 +63445,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{sigspace} || exists $args{s};
@@ -63456,7 +63456,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{ratchet} || exists $args{r};
@@ -63467,7 +63467,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{global} || exists $args{g};
@@ -63478,7 +63478,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{ignorecase} || exists $args{i};
@@ -63489,7 +63489,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{ignoreaccent} || exists $args{a};
@@ -63500,7 +63500,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{samecase} || exists $args{ii};
@@ -63511,7 +63511,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{sameaccent} || exists $args{aa};
@@ -63522,7 +63522,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{nth};
@@ -63533,7 +63533,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{st} || exists $args{nd};
@@ -63544,7 +63544,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{rd} || exists $args{th};
@@ -63555,7 +63555,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{x};
@@ -63566,7 +63566,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{bytes};
@@ -63577,7 +63577,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{codes};
@@ -63588,7 +63588,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{graphs};
@@ -63599,7 +63599,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{chars};
@@ -63610,7 +63610,7 @@ sub quantmod {
     }
     {
         local @_ = @_;
-        return do {
+        return scalar do { # work around #38809
             my $self = shift;
             my %args = @_;
             last unless exists $args{rw};
