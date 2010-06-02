@@ -127,6 +127,7 @@ sub hoistast {
 	    elsif (ref($v)) {
 		if ($v->isa('Cursor') && !$v->{_reduced}) {
 		    $r{$k} = $v->{'_ast'} //= hoistast($v);
+		    bless $r{$k}, 'VAST::Str';
 		    next;
 		}
 		elsif (exists $v->{'_ast'}) {
