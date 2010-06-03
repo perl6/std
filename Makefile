@@ -34,6 +34,9 @@ STD.store: STD.pm6 boot/STD.pm Actions.pm boot/syml/CORE.syml
 STD.pmc: STD.store viv
 	perl -Iboot viv --no-indent -5 -o STD.pmc --thaw STD.store
 	rm -rf lex syml/*.pad.store
+# for debugging
+STD.pm5: STD.store viv
+	perl -Iboot viv -5 -o STD.pm5 --thaw STD.store
 STD_P5.store: STD_P5.pm6 boot/STD.pm Actions.pm boot/syml/CORE.syml
 	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o STD_P5.store --freeze STD_P5.pm6
 STD_P5.pmc: STD_P5.store viv
