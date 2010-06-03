@@ -4483,7 +4483,7 @@ grammar Quasi is STD::P6 {
 # Operator Precedence Parser #
 ##############################
 
-method EXPR ($preclvl) {
+method EXPR ($preclvl?) {
     my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
     my $*LEFTSIGIL = '';
