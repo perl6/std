@@ -307,6 +307,10 @@ sub fixpod {
     join('', @text);
 }
 
+# rules of thumb: a block (0 or more statements) is a chunk of text, use
+# indent.  for expressions, the overall philosophy is that the indentation
+# of a line should be proportional to the number of outstanding syntactic
+# groups
 sub indent {
     my $x = shift || '';
     my $i = shift || 1;
@@ -1957,7 +1961,7 @@ sub $name {
     my \$S = \$C->{'_pos'};
 
     my \@result = do {
-	my (\$tag, \$try);
+        my (\$tag, \$try);
         my \@try;
         my \$relex;
         my \$x;
@@ -1978,24 +1982,24 @@ sub $name {
         my \$C = \$C->cursor_xact(\$x);
         my \$xact = \$C->{_xact};
 
-	my \@gather = ();
+        my \@gather = ();
         for (;;) {
             unless (\@try) {
                 \$relex //= \$C->cursor_fate('$::PKG', '$name:*', \$retree);
                 \@try = \$relex->(\$C) or last;
             }
-	    \$try = shift(\@try) // next;
-    
+            \$try = shift(\@try) // next;
+
             if (ref \$try) {
-                (\$C->{'_fate'}, \$tag, \$try) = \@\$try;	# next candidate fate
+                (\$C->{'_fate'}, \$tag, \$try) = \@\$try;       # next candidate fate
             }
-    
-	    \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
-	    push \@gather, \$C->\$try(\@_);
+
+            \$C->deb("$name trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
+            push \@gather, \$C->\$try(\@_);
             last if \@gather;
             last if \$xact->[-2];  # committed?
-	}
-	\$self->_MATCHIFYr(\$S, "$name", \@gather);
+        }
+        \$self->_MATCHIFYr(\$S, "$name", \@gather);
     };
     \@result;
 }
@@ -2042,33 +2046,34 @@ EOT
 	$ast->{dba_needed} = 1;
 	$ast->clean;
 
-	<<TEXT
+	<<HDR
 sub ${p5name}__PEEK { \$_[0]->_AUTOLEXpeek('$p5name', \$retree) }
 sub $p5name {
-    no warnings 'recursion';
-    my \$self = shift;
+HDR
+	. ::indent(<<IHDR
+no warnings 'recursion';
+my \$self = shift;
 
-TEXT
+IHDR
 	. ($::NEEDORIGARGS ? "    my \@origargs = \@_;\n" : "")
 	. ::indent($defsig || $spcsig, 1)
 	. ::indent(join("", @::DECL), 1)
 	. <<TEXT
 
-    local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
+local \$::CTX = \$self->callm() if \$::DEBUG & DEBUG::trace_call;
 
-    my \$C = \$self->cursor_xact("RULE $p5name");
-    my \$xact = \$C->xact;
-    my \$S = \$C->{'_pos'};
+my \$C = \$self->cursor_xact("RULE $p5name");
+my \$xact = \$C->xact;
+my \$S = \$C->{'_pos'};
 TEXT
-	    . join("", map  { "    \$C->{'$_'} = [];\n" }
+	    . join("", map  { "\$C->{'$_'} = [];\n" }
 		       grep { $::BINDINGS{$_} > 1 }
 		       sort keys %::BINDINGS)
-	    . ($::SYM ? '$C->{sym} = "' . quotemeta($::SYM) . '";' : '')
+	    . ($::SYM ? '$C->{sym} = "' . ::rd($::SYM) . "\";\n" : '')
 	    . <<END
-    \$self->_MATCHIFY$ratchet(\$S, "$p5name", ${\ $body->p5 });
-}
+\$self->_MATCHIFY$ratchet(\$S, "$p5name", ${\ $body->p5 });
 END
-	    ;
+	    , 1) . "}\n";
     }
 }
 
@@ -2883,11 +2888,10 @@ TEXT
         my ($self, $outer, $inner) = @_;
 	my ($out1, $outr) = $outer->uncut;
 	if ($outr) {
-	    DEEP::raw("if (my (\$C) = (" . $out1->p5 . ")) { " . $inner->p5block . " } else { () }", isblock => 1, precut => !$inner->maybacktrack);
+	    DEEP::raw("if (my (\$C) = (" . ::hang($out1->p5, "    ") . ")) {\n" . ::indent($inner->p5block) . "} else { () }\n", isblock => 1, precut => !$inner->maybacktrack);
 	} else {
-	    DEEP::raw("Cursor::lazymap(sub {\n  my \$C=\$_[0];\n" .
-		::indent($inner->p5) .
-		"\n}, ${\ $outer->p5 })");
+	    DEEP::raw(::hang("Cursor::lazymap(" . DEEP::chunk($inner)->p5 .
+		",\n" . $outer->p5 . ")", "    "));
 	}
     }
 
@@ -2913,8 +2917,8 @@ TEXT
             $result = $self->wrapone($_,$result);
         }
 	@decl ?
-	    DEEP::raw(join('', @decl, $result ? $result->p5 : ''), isblock => 1) :
-	    $result // DEEP::raw('');
+	    DEEP::raw(join('', @decl, $result ? $result->p5 . "\n" : ''), isblock => 1) :
+	    $result // DEEP::raw('', isblock => 1);
     }
 
     sub kids { my $self = shift; map { \$_ } @{$self->{zyg}} }
@@ -2991,12 +2995,10 @@ TEXT
 	    $result[0];
         }
         else {
-            for (@result) { $_ = DEEP::chunk($_)->p5; }
 	    $::RETREE->{$self->{altname}} = $self;
 	    $self->{dba_needed} = 1;
             my $result = <<"END";
 do {
-  my \@result = do {
     my (\$tag, \$try);
     my \@try;
     my \$relex;
@@ -3024,25 +3026,27 @@ do {
         \$try = shift(\@try) // next;
 
         if (ref \$try) {
-            (\$C->{'_fate'}, \$tag, \$try) = \@\$try;	# next candidate fate
+            (\$C->{'_fate'}, \$tag, \$try) = \@\$try;   # next candidate fate
         }
 
         \$C->deb("$altname trying \$tag \$try") if \$::DEBUG & DEBUG::try_processing;
         push \@gather, ((
-@{[ ::indent(join(",\n", @result),3) ]}
 END
-
-            $result .= <<'END';
-        )[$try])->($C);
-        last if @gather;
-        last if $xact->[-2];  # committed?
+                for my $i (0 .. @result - 1) {
+                    $result .= ::indent(DEEP::chunk($result[$i])->p5block, 3);
+                    if ($i != @result - 1) {
+                        substr($result, -1, 1) = ",\n";
+                    }
+                }
+                $result .= <<END;
+        )[\$try])->(\$C);
+        last if \@gather;
+        last if \$xact->[-2];  # committed?
     }
-    @gather;
-  };
-  @result;
-}
+    \@gather;
+};
 END
-            DEEP::raw($result);
+            DEEP::raw($result, isblock => 1);
         }
     }
 
@@ -3112,10 +3116,13 @@ END
         }
         else {
             die("Can't reverse serial disjunction") if $::REV;
-            for (@result) { $_ = ::indent($_); s/^ */do {\n  push \@gather, /; }
-            my $result = "do {\n  my \$C = \$C->cursor_xact('ALT ||');\n  my \$xact = \$C->xact;\n  my \@gather;\n" .
-                            ::indent(join("\n}\nor \$xact->[-2] or\n", @result)) .
-                          "};\n  \@gather;\n}";
+            for (@result) { $_ = "do {\n" . ::indent("push \@gather, $_\n") . "}"; }
+	    # We need to force the scope here because of the my $C
+            my $result = "do {" . ::indent(
+		"my \$C = \$C->cursor_xact('ALT ||');\n" .
+		"my \$xact = \$C->xact;\nmy \@gather;\n" .
+		join("\nor \$xact->[-2] or\n", @result) . ";\n" .
+                "\@gather;\n") . "}";
 	    DEEP::raw($result);
         }
     }
@@ -3206,7 +3213,7 @@ do {
 }
 END
         }
-        $re = 'do { my $M = $C;' . "\n" . ::indent($re) . "\n; }" if $self->{need_match};
+        $re = "do {\n" . ::indent("my \$M = \$C;\n$re") . "\n}" if $self->{need_match};
 	$re = DEEP::raw($re);
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $::BINDINGS{$name} += $::PLURALITY;
@@ -3302,7 +3309,7 @@ END
 			}
 			$quant = "\$C->$rep$h( $rest, ";
 			return DEEP::raw($quant .
-			    DEEP::chunk(DEEP::raw($atom))->p5 . ")",
+			    ::hang(DEEP::chunk(DEEP::raw($atom))->p5, "    ") . ")",
 			    precut => ($h eq 'r'));
 		    }
 		    else {
@@ -3340,7 +3347,7 @@ END
 		    }
 		    $quant = "\$C->$rep$h( $rest, ";
 		}
-		return DEEP::raw($quant . DEEP::chunk(DEEP::raw($atom))->p5 . ")", precut => ($h eq 'r'));
+		return DEEP::raw($quant . ::hang(DEEP::chunk(DEEP::raw($atom))->p5, "    ") . ")", precut => ($h eq 'r'));
 	    }
             else {
                 return DEEP::raw($atom, precut => $atom_is_cut);
@@ -3386,19 +3393,19 @@ END
         local $::REV = $name eq 'after' ? '_rev' : '';
 	{
 	    local %::BINDINGS;
-	    $re = ::indent($re->walk->p5block);
+	    $re = $re->walk->p5block;
 	    if (%::BINDINGS) {
 		for my $binding ( keys %::BINDINGS ) {
 		    next unless $::BINDINGS{$binding} > 1;
 		    $re = <<"END" . $re;
-	\$C->{'$binding'} = [];
+\$C->{'$binding'} = [];
 END
 		}
 	    }
 	}
         $::REV = '';
 
-        $re = DEEP::raw('$C->' . $name . "(" . DEEP::chunk(DEEP::raw($re, isblock => 1))->p5 . ")");
+        $re = DEEP::raw('$C->' . $name . "(" . ::hang(DEEP::chunk(DEEP::raw($re, isblock => 1))->p5, "    ") . ")");
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $re = $self->bind($re, $name);
 	    $::BINDINGS{$name} += $::PLURALITY;
@@ -3414,12 +3421,12 @@ END
         my $self = shift;
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk;
-	    DEEP::raw("\$C->_NOTBEFORE( " . DEEP::chunk($re)->p5 .")");
+	    DEEP::raw("\$C->_NOTBEFORE(" . ::hang(DEEP::chunk($re)->p5, "    ") .")");
         }
         else {
             my $re = $$self{re}->walk;
             return $re if $re->p5 =~ /^\$C->before/; #XXX
-            DEEP::raw("\$C->before( " . DEEP::chunk($re)->p5 . ")");
+            DEEP::raw("\$C->before(" . ::hang(DEEP::chunk($re)->p5, "    ") . ")");
         }
     }
     # TODO: Investigate what the LTM engine is doing with assertions and
@@ -3635,13 +3642,13 @@ END
         my $ctx = $$self{context};
         my $text = ::indent($$self{body});
         if ($ctx eq 'void') {
-            return DEEP::raw("scalar(do {\n$text\n}, \$C)", precut => 1);
+            return DEEP::raw("scalar(do {\n" . ::indent($text) . "}, \$C)", precut => 1);
         }
         elsif ($ctx eq 'bool') {
-            return DEEP::raw("((\$C) x !!do {\n$text\n})", precut => 1);
+            return DEEP::raw("((\$C) x !!do {\n" . ::indent($text) . "})", precut => 1);
         }
         else {
-            return DEEP::raw(" sub { my \$C=shift;\n$text\n}", precut => 1);
+            return DEEP::raw("sub {\n" . ::indent("my \$C=shift;\n" . $text) . "}", precut => 1);
         }
     }
 
@@ -3663,7 +3670,7 @@ END
         my $self = shift;
 	my ($re, $r) = $$self{re}->walk->uncut;
 	my @decl = map { $_->walk } @{$$self{decl}};
-	DEEP::raw("\$C->_BRACKET$r(" . DEEP::chunk($re, @decl)->p5 . ")");
+	DEEP::raw("\$C->_BRACKET$r(" . ::hang(DEEP::chunk($re, @decl)->p5, "    ") . ")");
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3714,17 +3721,17 @@ END
 	my $re;
 	{
 	    local %::BINDINGS;
-	    $re = ::indent($$self{re}->walk->p5block);
+	    $re = $$self{re}->walk->p5block;
 	    if (%::BINDINGS) {
 		for my $binding ( keys %::BINDINGS ) {
 		    next unless $::BINDINGS{$binding} > 1;
 		    my $re = <<"END" . $re;
-	\$C->{'$binding'} = [];
+\$C->{'$binding'} = [];
 END
 		}
 	    }
 	}
-        $re = "\$C->_$::REV"."PAREN( " . DEEP::chunk(DEEP::raw($re))->p5 . ")";
+        $re = "\$C->_$::REV"."PAREN( " . ::hang(DEEP::chunk(DEEP::raw($re))->p5, "    ") . ")";
 	DEEP::raw($re);
     }
 
@@ -3812,7 +3819,7 @@ END
 
     sub uncut { my $self = shift; $self, ($self->maybacktrack ? '' : 'r') }
 
-    sub p5block { shift()->p5 }
+    sub p5block { shift()->p5 . "\n" }
 }
 
 { package DEEP::raw; our @ISA = 'DEEPbase';
@@ -3827,16 +3834,19 @@ END
     }
 
     sub p5 { my $self = shift;
-	$self->{isblock} ? ("do {\n" . ::indent($self->{text}) . "\n}")
+	$self->{isblock} ? ("do {\n" . ::indent($self->{text}) . "}")
 	    : $self->{text};
     }
 
-    sub p5block { my $self = shift; $self->{text} }
+    sub p5block {
+	my $self = shift;
+	$self->{isblock} ? $self->{text} : $self->{text} . "\n";
+    }
 }
 
 { package DEEPblockbase; our @ISA = 'DEEPbase';
     sub p5 { my $self = shift;
-	"do {\n" . ::indent($self->p5block) . "\n}";
+	"do {\n" . ::indent($self->p5block) . "}";
     }
 }
 
@@ -3853,7 +3863,7 @@ END
     }
 
     sub p5block { my $self = shift;
-	"if (my (\$C) = (" . $self->{child}->p5 . ")) { (\$C) } else { () }";
+	"if (my (\$C) = (" . ::hang($self->{child}->p5, "    ") . ")) { (\$C) } else { () }\n";
     }
 
     sub uncut {
@@ -3881,7 +3891,7 @@ END
 	"\$C->_SUBSUME$r([" .
 	    join(',', map {"'$_'"} @{$self->{names}}) .
 	    "], sub {\n" . ::indent("my \$C = shift;\n" .
-	    $chinner->p5block, 2) . "\n})";
+	    $chinner->p5block) . "})";
     }
 }
 # NOT a regex bit, but a value
@@ -3893,9 +3903,10 @@ END
 
     sub p5 {
 	my $self = shift;
-        " sub { my \$C=shift;\n"
-	    . ::indent(join("", map { $_->p5block . ";\n" } @{ $self->{decl} }))
-	    . ::indent($self->{child}->p5block) . "\n}";
+        "sub {\n" . ::indent(
+	    "my \$C=shift;\n" .
+	    join("", map { $_->p5block } @{ $self->{decl} }) .
+	    $self->{child}->p5block) . "}";
     }
 }
 
