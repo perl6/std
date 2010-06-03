@@ -18,7 +18,6 @@ use YAML::XS; # An attempt to replace this with YAML::Syck passed the
               # sequences shown as [] became followed by an empty line.
               # See also: YAML::Syck in package VAST::package_def below.
 use Encode;
-use JSON -convert_blessed_universally;
 use Scalar::Util 'blessed', 'refaddr';
 use Storable;
 use Try::Tiny;
