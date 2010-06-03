@@ -2862,15 +2862,11 @@ TEXT
     sub _walk {
         my $self = shift;
 	$$self{i_needed} = 1;
-	if ($$self{i}) {
-            my $text = ::rd($$self{text});
-            $text = "(?<=$text)" if $::REV;
-	    DEEP::raw("\$C->_PATTERN(qr/\\G(?i:$text)/)");
-	}
-	else {
-            my $text = ::rd($$self{text});
-	    DEEP::raw("\$C->_EXACT$::REV(\"$text\")", precut => 1);
-	}
+	my $text = ::rd($$self{text});
+	$text = "(?<=$text)" if $::REV;
+	$text = "(?i:$text)" if $$self{i};
+	DEEP::p5regex($text, has_meta => ($::REV || $$self{i}),
+	    needs_bracket => !($::REV || $$self{i}) && $$self{min} != 1);
     }
 }
 
@@ -3172,17 +3168,17 @@ END
             $$self{sym} = $::SYM;
             $$self{endsym} = $::ENDSYM if defined $::ENDSYM;
 	    if ($$self{i}) {
-		return DEEP::raw("\$C->_PATTERN(qr/\\G(?i:" . ::rd($::SYM) . ")/)");
+		return DEEP::p5regex("(?i:" . ::rd($::SYM) . ")");
 	    }
 	    else {
-		return DEEP::raw("\$C->_PATTERN(qr/\\G" . ::rd($::SYM) . "/)");
+		return DEEP::p5regex(::rd($::SYM), has_meta => 0);
 	    }
         }
         elsif ($name eq "alpha") {
-            return DEEP::raw("\$C->_PATTERN(qr/\\G[_[:alpha:]]/)");
+            return DEEP::p5regex("[_[:alpha:]]");
         }
         elsif ($name eq "_ALNUM") {
-            return DEEP::raw("\$C->_PATTERN(qr/\\G\\w/)");
+            return DEEP::p5regex("\\w");
         }
         elsif ($name eq "nextsame") {
             $::NEEDORIGARGS++;
@@ -3268,95 +3264,56 @@ END
         my $self = shift;
         my $result;
 	local $::PLURALITY = 2;
-        if (ref $$self{atom}) {
-            my $quant = "";
-            my $rep = "_REP";
-            my $q = $$self{quant};
-	    my $bind = $::BINDINSIDE;
-	    undef $::BINDINSIDE;
-	    my $atom = $$self{atom}->walk;
-	    if ($bind) { #XXX STD
-		$atom = $self->bind($atom, $bind);
-	    }
-	    my $atom_is_cut = !$atom->maybacktrack;
-	    $atom = $atom->p5;
-	    if ($q) {
-		if ($atom =~ m{ ^ \$C->_PATTERN\(qr/\\G(.*?)/\) $ }sx ) {
-		    my $a = "(?:$1)";
-		    my ($qfer,$how,$rest) = @{$$self{quant}};
-		    my $h = $how eq '!' ? '' :
-			    $how eq '?' ? '?' :
-					  '+';
-		    if ($how eq '?' or $::REV) {
-			;
-		    }
-		    elsif ($qfer eq '**') {
-			$h = $how eq '!' ? 'g' :
-			     $how eq '?' ? 'f' :
-					   'r';
-			if (ref $rest) {
-			    if (ref $rest eq "RE_block") {
-				$rep = "_REPINDIRECT$::REV";
-				$rest = $rest->walk->p5;
-			    }
-			    else {
-				$rep = "_REPSEP$::REV";
-				$rest = DEEP::chunk($rest->walk)->p5;
-			    }
-			}
-			else {
-			    $rest = "'$rest'";
-			}
-			$quant = "\$C->$rep$h( $rest, ";
-			return DEEP::raw($quant .
-			    ::hang(DEEP::chunk(DEEP::raw($atom))->p5, "    ") . ")",
-			    precut => ($h eq 'r'));
-		    }
-		    else {
-			return DEEP::raw("\$C->_PATTERN\(qr/\\G($a$qfer$h)/\)",
-			    precut => ($h eq '+' && $atom_is_cut));
-		    }
-		}
+	my $quant = "";
+	my $rep = "_REP";
+	my $q = $$self{quant};
+	my $bind = $::BINDINSIDE;
+	undef $::BINDINSIDE;
+	my $atom = $$self{atom}->walk;
+	if ($bind) { #XXX STD
+	    $atom = $self->bind($atom, $bind);
+	}
+	my $atom_is_cut = !$atom->maybacktrack;
+	my ($qfer,$how,$rest) = @{$$self{quant}};
+	my $hc = $how eq '!' ? 'g' :
+		 $how eq '?' ? 'f' :
+			       'r';
+	my $hr = $how eq '!' ? '' :
+		 $how eq '?' ? '?' :
+			       '+';
+	if ($atom->isa('DEEP::p5regex') && $hc eq 'r' && !$::REV && $qfer ne '**') {
+	    my $a = $atom->{text};
+	    $a = $atom->{needs_cut} ? "(?>$a)" :
+		 $atom->{needs_bracket} ? "(?:$a)" : $a;
+	    return DEEP::p5regex("$a$qfer$hr", needs_bracket => 1);
+	}
 
-		my ($qfer,$how,$rest) = @{$$self{quant}};
-		my $h = $how eq '!' ? 'g' :
-			$how eq '?' ? 'f' :
-				      'r';
-		if ($qfer eq '*') {
-		    $quant = "\$C->_STAR$h$::REV(";
+	if ($qfer eq '*') {
+	    $quant = "\$C->_STAR$hc$::REV(";
+	}
+	elsif ($qfer eq '+') {
+	    $quant = "\$C->_PLUS$hc$::REV(";
+	}
+	elsif ($qfer eq '?') {
+	    $quant = "\$C->_OPT$hc$::REV(";
+	}
+	elsif ($qfer eq '**') {
+	    if (ref $rest) {
+		if (ref $rest eq "RE_block") {
+		    $rep = "_REPINDIRECT$::REV";
+		    $rest = $rest->walk;
 		}
-		elsif ($qfer eq '+') {
-		    $quant = "\$C->_PLUS$h$::REV(";
+		else {
+		    $rep = "_REPSEP$::REV";
+		    $rest = DEEP::chunk($rest->walk)->p5;
 		}
-		elsif ($qfer eq '?') {
-		    $quant = "\$C->_OPT$h$::REV(";
-		}
-		elsif ($qfer eq '**') {
-		    if (ref $rest) {
-			if (ref $rest eq "RE_block") {
-			    $rep = "_REPINDIRECT$::REV";
-			    $rest = $rest->walk;
-			}
-			else {
-			    $rep = "_REPSEP$::REV";
-			    $rest = DEEP::chunk($rest->walk)->p5;
-			}
-		    }
-		    else {
-			$rest = "'$rest'";
-		    }
-		    $quant = "\$C->$rep$h( $rest, ";
-		}
-		return DEEP::raw($quant . ::hang(DEEP::chunk(DEEP::raw($atom))->p5, "    ") . ")", precut => ($h eq 'r'));
 	    }
-            else {
-                return DEEP::raw($atom, precut => $atom_is_cut);
-            }
-        }
-        else {
-            return DEEP::raw('"' . $$self{atom} . '"');
-        }
-	DEEP::raw($result);
+	    else {
+		$rest = "'$rest'";
+	    }
+	    $quant = "\$C->$rep$hc( $rest, ";
+	}
+	return DEEP::raw($quant . ::hang(DEEP::chunk($atom)->p5, "    ") . ")", precut => ($hc eq 'r'));
     }
 
     sub kids { my $self = shift; \$self->{atom} }
@@ -3459,9 +3416,10 @@ END
             $text = lc($1) . $2;
             $not = 1;
         }
+	# to return yourself, you must either be a symbol or handle $not
         if ($text eq '.') {
 	    if ($::REV) {
-		$code = "\$C->_PATTERN(qr/\\G(?<=(?s:.))/)";
+		return DEEP::p5regex("(?<=(?s:.)");
 	    }
 	    else {
 		$code = "\$C->cursor_incr()";
@@ -3476,16 +3434,16 @@ END
 	    $bt = 1;
         }
         elsif ($text eq '^') {
-	    $code = "\$C->_PATTERN(qr/\\G\\A/)";
+	    return DEEP::p5regex('\A');
         }
         elsif ($text eq '^^') {
-	    $code = "\$C->_PATTERN(qr/\\G(?m:^)/)";
+	    return DEEP::p5regex('(?m:^)');
         }
         elsif ($text eq '$') {
-	    $code = "\$C->_PATTERN(qr/\\G\\z/)";
+	    return DEEP::p5regex('\z');
         }
         elsif ($text eq '$$') {
-	    $code = "\$C->_PATTERN(qr/\\G(?m:\$)/)";
+	    return DEEP::p5regex('(?m:$)');
         }
         elsif ($text eq ':') {
 	    my $extra = $self->{extra} || '';
@@ -3502,49 +3460,49 @@ END
         }
         elsif ($text eq '\\d') {
 	    if ($::REV) {
-		$code = "\$C->_PATTERN(qr/\\G(?<=\\d)/)";
+		return DEEP::p5regex($not ? '(?<=\D)' : '(?<=\d)');
 	    }
 	    else {
-		$code = "\$C->_PATTERN(qr/\\G\\d/)";
+		return DEEP::p5regex($not ? '\D' : '\d');
 	    }
         }
         elsif ($text eq '\\w') {
 	    if ($::REV) {
-		$code = "\$C->_PATTERN(qr/\\G(?<=\\w)/)";
+		return DEEP::p5regex($not ? '(?<=\W)' : '(?<=\w)');
 	    }
 	    else {
-		$code = "\$C->_PATTERN(qr/\\G\\w/)";
+		return DEEP::p5regex($not ? '\W' : '\w');
 	    }
         }
         elsif ($text eq '\\s') {
 	    if ($::REV) {
-		$code = "\$C->_PATTERN(qr/\\G(?<=\\s)/)";
+		return DEEP::p5regex($not ? '(?<=\W)' : '(?<=\w)');
 	    }
 	    else {
-		$code = "\$C->_PATTERN(qr/\\G\\s/)";
+		return DEEP::p5regex($not ? '\S' : '\s');
 	    }
         }
         elsif ($text eq '\\h') {
 	    if ($::REV) {
-		$code = "\$C->_PATTERN(qr/\\G(?<=[\\x20\\t\\r])/)";
+		return DEEP::p5regex($not ? '(?<=[^\x20\t\r])' : '(?<=[\x20\t\r])');
 	    }
 	    else {
-		$code = "\$C->_PATTERN(qr/\\G[\\x20\\t\\r]/)";
+		return DEEP::p5regex($not ? '[^\x20\t\r]' : '[\x20\t\r]');
 	    }
         }
         elsif ($text eq '\\v') {
 	    if ($::REV) {
-		$code = "\$C->_PATTERN(qr/\\G(?<=[\\n])/)";
+		return DEEP::p5regex($not ? '(?<=[^\n])' : '(?<=[\n])');
 	    }
 	    else {
-		$code = "\$C->_PATTERN(qr/\\G[\\n]/)";
+		return DEEP::p5regex($not ? '[^\n]' : '\n');
 	    }
         }
         elsif ($text eq '»') {
-	    $code = "\$C->_PATTERN(qr/\\G\\b/)";
+	    return DEEP::p5regex('\b');
         }
         elsif ($text eq '«') {
-	    $code = "\$C->_PATTERN(qr/\\G\\b/)";
+	    return DEEP::p5regex('\b');
         }
         elsif ($text eq '>>') {
             $code = "\$C->_RIGHTWB$::REV()";
@@ -3584,10 +3542,10 @@ END
 	$text =~ s/^-\[/[^/;
 	$text = "(?<=$text)" if $::REV;
 	if ($$self{i}) {
-	    DEEP::raw("\$C->_PATTERN(qr/\\G(?i:$text)/)", precut => 1);
+	    DEEP::p5regex("(?i:$text)");
 	}
 	else {
-	    DEEP::raw("\$C->_PATTERN(qr/\\G$text/)", precut => 1);
+	    DEEP::p5regex($text, needs_bracket => 1);
 	}
     }
 }
@@ -3908,6 +3866,22 @@ END
 	    join("", map { $_->p5block } @{ $self->{decl} }) .
 	    $self->{child}->p5block) . "}";
     }
+}
+
+{ package DEEP::p5regex; our @ISA = 'DEEPbase';
+    sub DEEP::p5regex {
+	my $text = shift;
+	bless { text => $text, has_meta => 1, @_ }, "DEEP::p5regex";
+    }
+
+    sub p5 {
+	my $self = shift;
+	$self->{has_meta} ?
+	    "\$C->_PATTERN(qr/\\G" . $self->{text} . "/)" :
+	    "\$C->_EXACT(\"" . $self->{text} . "\")";
+    }
+
+    sub maybacktrack { 0 }
 }
 
 if ($0 eq __FILE__) {
