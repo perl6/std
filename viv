@@ -48,6 +48,7 @@ viv [switches] filename
     	--concise	spit out a short syntaxe tree (default)
     	--p5		spit out a Perl 5 representation (partially impl)
     	--p6		spit out a Perl 6 representation
+    	--no-indent	disable output indentation for faster parsing
     	--freeze	generate a Storable representation
     	--thaw		use existing Storable of AST from filename
     	--stab		include the symbol table
@@ -110,6 +111,11 @@ sub MAIN {
 	}
 	elsif ($switch eq '--pos' or $switch eq '-p') {
 	    # obsolete, ignored
+	}
+	elsif ($switch eq '--no-indent') {
+	    no warnings 'redefine';
+	    *indent = \&no_indent;
+	    *hang = \&no_indent;
 	}
 	elsif ($switch eq '--match' or $switch eq '-m') {
 	    $OPT_match = 1;	# attach match object
@@ -177,8 +183,10 @@ sub MAIN {
     }
 }
 
+sub no_indent { $_[0] }
+
 sub hang {
-    my ($leader, $arg) = @_;
+    my ($arg, $leader) = @_;
 
     $arg =~ s/\n/\n$leader/g;
 
@@ -189,7 +197,7 @@ sub listify {
     my $r = "";
     for my $i (0 .. $#_) {
 	$r .= ($i == $#_) ? "\n└─" : "\n├─";
-	$r .= hang($i == $#_ ? "  " : "│ ", $_[$i]);
+	$r .= hang($_[$i], $i == $#_ ? "  " : "│ ");
     }
     $r;
 }
@@ -258,15 +266,15 @@ sub concise {
 		$x += length("$ch: $repr");
 	    } else {
 		my $hang = " " x (length($ch)+2);
-		push @oobnam, "$ch: " . hang($hang, $repr);
+		push @oobnam, "$ch: " . hang($repr, $hang);
 	    }
 	}
 
-	$title = hang((@pos ? "│ " : "  ") . (@oobnam ? "│ " : "  "), $title);
+	$title = hang($title, (@pos ? "│ " : "  ") . (@oobnam ? "│ " : "  "));
 
 	my $result = $title;
 
-	$result .= hang(@pos ? "│ " : "  ", listify(@oobnam));
+	$result .= hang(listify(@oobnam), @pos ? "│ " : "  ");
 	$result .= listify(@pos);
 
 	return $result;
