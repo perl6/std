@@ -1716,7 +1716,7 @@ grammar P6 is STD {
 
     rule statement_mod_cond:if     {<sym> <modifier_expr> }
     rule statement_mod_cond:unless {<sym> <modifier_expr> }
-    rule statement_mod_cond:when   {<sym> <?before \h*('True'|'False')»<.dumbsmart($0.Str)>>? <modifier_expr> }
+    rule statement_mod_cond:when   {<sym> <?before \h*('True'|'False')»<.dumbsmart($0[0].Str)>>? <modifier_expr> }
 
     rule statement_mod_loop:while {<sym> <modifier_expr> }
     rule statement_mod_loop:until {<sym> <modifier_expr> }
@@ -3788,7 +3788,7 @@ grammar P6 is STD {
         { <sym> <O(|%chaining)> }
 
     token infix:sym<~~>
-        { <sym> <O(|%chaining)> <?before \h* ('True'|'False') » <.dumbsmart($0.Str)>>? }
+        { <sym> <O(|%chaining)> <?before \h* ('True'|'False') » <.dumbsmart($0[0].Str)>>? }
 
     method dumbsmart ($litbool) {
         self.worry("Smartmatch against $litbool always " ~
