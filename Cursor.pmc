@@ -2707,7 +2707,7 @@ sub do_import { my $self = shift;
         my $text = $args->Str;
         return $self unless $text;
         while ($text =~ s/^\s*:?(OUR|MY|STATE|HAS|AUGMENT|SUPERSEDE)?<(.*?)>,?//) {
-            my $scope = lc($1) || 'my';
+            my $scope = lc($1 // 'my');
             my $imports = $2;
             local $::SCOPE = $scope;
             @imports = split ' ', $imports;
