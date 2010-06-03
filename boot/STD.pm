@@ -6340,19 +6340,19 @@ if (my ($C) = (do {
         $C->deb("nofun_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 },
  sub { my $C=shift;
-$C->_EXACT('.(')
+$C->_EXACT("\.\(")
 },
  sub { my $C=shift;
-$C->_EXACT('\\')
+$C->_EXACT("\\")
 },
  sub { my $C=shift;
-$C->_EXACT('\'')
+$C->_EXACT("\'")
 },
  sub { my $C=shift;
-$C->_EXACT('-')
+$C->_EXACT("\-")
 },
  sub { my $C=shift;
 $C->_EXACT("\'")
@@ -6700,7 +6700,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT(':{')
+$C->_EXACT("\:\{")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['colonpair'], sub {
 my $C = shift;
@@ -6813,7 +6813,7 @@ local $::QSIGIL = '';
     $C->{'EXPR'} = [];
     $C->{'identifier'} = [];
     $self->_MATCHIFYr($S, "morename", do {
-if (my ($C) = ($C->_EXACT('::'))) { $C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:\:"))) { $C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -6860,7 +6860,7 @@ if (my ($C) = (do {
         $C->deb("morename_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 },
  sub { my $C=shift;
 if (my ($C) = ($C->_PATTERN(qr/\G[_[:alpha:]]/))) { ($C) } else { () }
@@ -6922,7 +6922,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -6933,7 +6933,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -6969,7 +6969,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('::')
+$C->_EXACT("\:\:")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->panic("Name component may not be null"))) { ($C) } else { () } } else { () }
 })) { ($C) } else { () }
@@ -7445,32 +7445,32 @@ sub unitstopper {
 sub balanced {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument start omitted' unless @_;
 my $start = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument stop omitted' unless @_;
 my $stop = @_ ? shift() : undef;
 $self->mixin( STD::startstop->__instantiate__($start,$stop) )};
 ## method unbalanced ($stop)
 sub unbalanced {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument stop omitted' unless @_;
 my $stop = @_ ? shift() : undef;
 $self->mixin( STD::stop->__instantiate__($stop) )};
 ## method unitstop ($stop)
 sub unitstop {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument stop omitted' unless @_;
 my $stop = @_ ? shift() : undef;
 $self->mixin( STD::unitstop->__instantiate__($stop) )};
 ## method truly ($bool,$opt)
 sub truly {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument bool omitted' unless @_;
 my $bool = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument opt omitted' unless @_;
 my $opt = @_ ? shift() : undef;
 return $self if $bool;
 $self->sorry("Can't negate $opt adverb");
@@ -7595,7 +7595,7 @@ sub charnames {
     my $S = $C->{'_pos'};
     $C->{'charname'} = [];
     $self->_MATCHIFYr($S, "charnames", $C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },  sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -7666,7 +7666,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -7677,7 +7677,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -7865,7 +7865,7 @@ $C
 sub nibble {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument lang omitted' unless @_;
 my $lang = @_ ? shift() : undef;
 $self->cursor_fresh($lang)->nibbler};
 ## token nibbler {
@@ -8006,7 +8006,7 @@ sub babble {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument l omitted' unless @_;
 my $l = @_ ? shift() : undef;
 my $lang = $l;
 my $start;
@@ -8202,7 +8202,7 @@ sub quibble {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument l omitted' unless @_;
 my $l = @_ ? shift() : undef;
 my ($lang, $start, $stop);
 
@@ -8278,7 +8278,7 @@ my $value;
     my $S = $C->{'_pos'};
     $C->{'circumfix'} = [];
     $self->_MATCHIFYr($S, "quotepair", do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -8315,7 +8315,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('!'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\!"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
@@ -8323,7 +8323,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->sorry("Argument not allowed on negated pair"))) { $C->_SUBSUMEr(['circumfix'], sub {
 my $C = shift;
@@ -8365,7 +8365,7 @@ if (my ($C) = ($C->unsp)) { ($C) } else { () }
 }
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -8405,7 +8405,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->sorry("2nd argument not allowed on pair"))) { $C->_SUBSUMEr(['circumfix'], sub {
 my $C = shift;
@@ -8481,7 +8481,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('\'')
+  push @gather, $C->_EXACT("\'")
 }
 or $xact->[-2] or
 do {
@@ -8518,7 +8518,7 @@ my $newlang = $C->unbalanced($::GOAL);
 $C = bless($C, (ref($newlang) || $newlang))
 ;
 ;
-if (my ($C) = ($C->_EXACT('"'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\""))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -8529,7 +8529,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('"')
+  push @gather, $C->_EXACT("\"")
 }
 or $xact->[-2] or
 do {
@@ -8566,7 +8566,7 @@ my $newlang = $C->unbalanced($::GOAL);
 $C = bless($C, (ref($newlang) || $newlang))
 ;
 ;
-if (my ($C) = ($C->_EXACT('«'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("«"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -8577,7 +8577,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('»')
+  push @gather, $C->_EXACT("»")
 }
 or $xact->[-2] or
 do {
@@ -8614,7 +8614,7 @@ my $newlang = $C->unbalanced($::GOAL);
 $C = bless($C, (ref($newlang) || $newlang))
 ;
 ;
-if (my ($C) = ($C->_EXACT('<<'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\<\<"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -8625,7 +8625,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('>>')
+  push @gather, $C->_EXACT("\>\>")
 }
 or $xact->[-2] or
 do {
@@ -8662,7 +8662,7 @@ my $newlang = $C->unbalanced($::GOAL);
 $C = bless($C, (ref($newlang) || $newlang))
 ;
 ;
-if (my ($C) = ($C->_EXACT('<'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\<"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
@@ -8670,7 +8670,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('STDIN>')
+$C->_EXACT("STDIN\>")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->obs('<STDIN>', '$' . '*IN.lines'))) { ($C) } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -8680,7 +8680,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->obs('<>', "lines() to read input,\n  or ('') to represent the null string,\n  or () to represent Nil"))) { ($C) } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -8695,7 +8695,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('>')
+  push @gather, $C->_EXACT("\>")
 }
 or $xact->[-2] or
 do {
@@ -8935,7 +8935,7 @@ do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT('#')
+$C->_EXACT("\#")
 }
         )[$try])->($C);
         last if @gather;
@@ -9065,7 +9065,7 @@ do {
 $C->_PATTERN(qr/\G[\n]/)
 },
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('#DEBUG -1'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\#DEBUG\ \-1"))) { if (my ($C) = (scalar(do {
 say "DEBUG";
 $::DEBUG = -1;
 
@@ -9076,20 +9076,20 @@ $C->_PATTERN(qr/\G[\n]/)
 }))) { $C->_PATTERN(qr/\G[\n]/) } else { () } } else { () } } else { () }
 },
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('<<<<<<<'))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\<\<\<\<\<\<\<"))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_PATTERN(qr/\G[\n]/))) { $C->_EXACT('=======') } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G[\n]/))) { $C->_EXACT("\=\=\=\=\=\=\=") } else { () }
 }
 }, $C->_SCANf())
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_PATTERN(qr/\G[\n]/))) { $C->_EXACT('>>>>>>>') } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G[\n]/))) { $C->_EXACT("\>\>\>\>\>\>\>") } else { () }
 }
 }, $C->_SCANf()) } else { () }
 })) { ($C) } else { () }
@@ -9102,10 +9102,10 @@ $C->_PATTERN(qr/\G[\n]/)
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('======='))) { if (my ($C) = ($C->_COMMITLTM())) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\=\=\=\=\=\=\="))) { if (my ($C) = ($C->_COMMITLTM())) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_PATTERN(qr/\G[\n]/))) { if (my ($C) = ($C->_EXACT('>>>>>>>'))) { if (my ($C) = ($C->_STARr( sub { my $C=shift;
+if (my ($C) = ($C->_PATTERN(qr/\G[\n]/))) { if (my ($C) = ($C->_EXACT("\>\>\>\>\>\>\>"))) { if (my ($C) = ($C->_STARr( sub { my $C=shift;
 $C->_NOTCHAR( sub { my $C=shift;
 $C->_PATTERN(qr/\G[\n]/)
 })
@@ -9191,7 +9191,7 @@ if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT('='))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT("\="))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -9230,7 +9230,7 @@ do {
 $C->_PATTERN(qr/\G\w/)
 },
  sub { my $C=shift;
-$C->_EXACT('\\')
+$C->_EXACT("\\")
 }
         )[$try])->($C);
         last if @gather;
@@ -9280,7 +9280,7 @@ sub comment__S_054SharpGraveParenDotDotDotThesis {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\#\`\(\.\.\.\)";    $self->_MATCHIFYr($S, "comment__S_054SharpGraveParenDotDotDotThesis", do {
-if (my ($C) = ($C->_EXACT('#`'))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\#\`"))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my $C = $C->cursor_xact('ALT ||');
   my $xact = $C->xact;
@@ -9316,7 +9316,7 @@ sub comment__S_055SharpParenDotDotDotThesis {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\#\(\.\.\.\)";    $self->_MATCHIFYr($S, "comment__S_055SharpParenDotDotDotThesis", do {
-if (my ($C) = ($C->_EXACT('#'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\#"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->opener)) { ($C) } else { () }
 }))) { if (my ($C) = ($C->suppose( sub { my $C=shift;
 if (my ($C) = (Cursor::lazymap(sub {
@@ -9361,7 +9361,7 @@ do {
         $C->deb("comment__S_055SharpParenDotDotDotThesis_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('#')
+$C->_EXACT("\#")
 },
  sub { my $C=shift;
 $C->_PATTERN(qr/\G(?m:$)/)
@@ -9403,7 +9403,7 @@ sub comment__S_056SharpEqualParenDotDotDotThesis {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\#\=\(\.\.\.\)";    $self->_MATCHIFYr($S, "comment__S_056SharpEqualParenDotDotDotThesis", do {
-if (my ($C) = ($C->_EXACT('#='))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\#\="))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->opener)) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['quibble'], sub {
 my $C = shift;
@@ -9425,7 +9425,7 @@ sub comment__S_057SharpEqual {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\#\=";    $self->_MATCHIFYr($S, "comment__S_057SharpEqual", do {
-if (my ($C) = ($C->_EXACT('#='))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['attachment'], sub {
+if (my ($C) = ($C->_EXACT("\#\="))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['attachment'], sub {
 my $C = shift;
 $C->_BRACKETr( sub { my $C=shift;
 $C->_STARr( sub { my $C=shift;
@@ -9451,7 +9451,7 @@ sub comment__S_058Sharp {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\#";    $self->_MATCHIFYr($S, "comment__S_058Sharp", do {
-if (my ($C) = ($C->_EXACT('#'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\#"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { $C->_STARr( sub { my $C=shift;
 $C->_NOTCHAR( sub { my $C=shift;
@@ -9529,7 +9529,7 @@ sub pod_comment {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "pod_comment", do {
-if (my ($C) = ($C->_PATTERN(qr/\G(?m:^)/))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT('='))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->_PATTERN(qr/\G(?m:^)/))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT("\="))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->unsp)) { ($C) } else { () }
 }
@@ -9570,7 +9570,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('begin'))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])++)/))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("begin"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])++)/))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -9584,11 +9584,11 @@ if (my ($C) = (Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_EXACT("\n"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT('='))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT("\="))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->unsp)) { ($C) } else { () }
 }
-}))) { if (my ($C) = ($C->_EXACT('end'))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])++)/))) { if (my ($C) = ($C->_BACKREFn('identifier'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { $C->_STARr( sub { my $C=shift;
+}))) { if (my ($C) = ($C->_EXACT("end"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])++)/))) { if (my ($C) = ($C->_BACKREFn('identifier'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { $C->_STARr( sub { my $C=shift;
 $C->_NOTCHAR( sub { my $C=shift;
 $C->_EXACT("\n")
 })
@@ -9631,7 +9631,7 @@ $C->identifier
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('begin'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("begin"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my $C = $C->cursor_xact('ALT ||');
   my $xact = $C->xact;
@@ -9641,7 +9641,7 @@ do {
 }
 or $xact->[-2] or
 do {
-  push @gather, $C->_EXACT('#')
+  push @gather, $C->_EXACT("\#")
 }
 or $xact->[-2] or
 do {
@@ -9664,11 +9664,11 @@ do {
 if (my ($C) = (Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT("\n"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT('='))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\n"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT("\="))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->unsp)) { ($C) } else { () }
 }
-}))) { if (my ($C) = ($C->_EXACT('end'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { $C->_STARr( sub { my $C=shift;
+}))) { if (my ($C) = ($C->_EXACT("end"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { $C->_STARr( sub { my $C=shift;
 $C->_NOTCHAR( sub { my $C=shift;
 $C->_EXACT("\n")
 })
@@ -9689,7 +9689,7 @@ $self->panic("=begin without matching =end")
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('for'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("for"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my $C = $C->cursor_xact('ALT ||');
   my $xact = $C->xact;
@@ -9706,7 +9706,7 @@ do {
 }
 or $xact->[-2] or
 do {
-  push @gather, $C->_EXACT('#')
+  push @gather, $C->_EXACT("\#")
 }
 or $xact->[-2] or
 do {
@@ -9753,7 +9753,7 @@ if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_PATTERN(qr/\G(?m:^)/))) { if (my ($C) = ($C->_EXACT('=cut'))) { $C->_PATTERN(qr/\G\b/) } else { () } } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G(?m:^)/))) { if (my ($C) = ($C->_EXACT("\=cut"))) { $C->_PATTERN(qr/\G\b/) } else { () } } else { () }
 }
 }, $C->_SCANf()))) { ($C) } else { () }
 }))) { ($C) } else { () }
@@ -9817,7 +9817,7 @@ local $::CURPAD = $::CURPAD;
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "embeddedblock", do {
-if (my ($C) = ($C->newpad)) { if (my ($C) = ($C->finishpad)) { if (my ($C) = ($C->_EXACT('{'))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->newpad)) { if (my ($C) = ($C->finishpad)) { if (my ($C) = ($C->_EXACT("\{"))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 my $newlang = ($::LANG{'MAIN'});
 $C = bless($C, (ref($newlang) || $newlang));
 ;
@@ -9831,7 +9831,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('}')
+  push @gather, $C->_EXACT("\}")
 }
 or $xact->[-2] or
 do {
@@ -9858,7 +9858,7 @@ sub binints {
     my $S = $C->{'_pos'};
     $C->{'binint'} = [];
     $self->_MATCHIFYr($S, "binints", $C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },  sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -9892,7 +9892,7 @@ sub binint {
 if (my ($C) = ($C->_PATTERN(qr/\G((?:[0-1])++)/))) { $C->_STARr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('_'))) { $C->_PATTERN(qr/\G((?:[0-1])++)/) } else { () }
+if (my ($C) = ($C->_EXACT("_"))) { $C->_PATTERN(qr/\G((?:[0-1])++)/) } else { () }
 }))) { ($C) } else { () }
 }
 }) } else { () }
@@ -9913,7 +9913,7 @@ sub octints {
     my $S = $C->{'_pos'};
     $C->{'octint'} = [];
     $self->_MATCHIFYr($S, "octints", $C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },  sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -9947,7 +9947,7 @@ sub octint {
 if (my ($C) = ($C->_PATTERN(qr/\G((?:[0-7])++)/))) { $C->_STARr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('_'))) { $C->_PATTERN(qr/\G((?:[0-7])++)/) } else { () }
+if (my ($C) = ($C->_EXACT("_"))) { $C->_PATTERN(qr/\G((?:[0-7])++)/) } else { () }
 }))) { ($C) } else { () }
 }
 }) } else { () }
@@ -9968,7 +9968,7 @@ sub hexints {
     my $S = $C->{'_pos'};
     $C->{'hexint'} = [];
     $self->_MATCHIFYr($S, "hexints", $C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },  sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -10002,7 +10002,7 @@ sub hexint {
 if (my ($C) = ($C->_PATTERN(qr/\G((?:[0-9a-fA-F])++)/))) { $C->_STARr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('_'))) { $C->_PATTERN(qr/\G((?:[0-9a-fA-F])++)/) } else { () }
+if (my ($C) = ($C->_EXACT("_"))) { $C->_PATTERN(qr/\G((?:[0-9a-fA-F])++)/) } else { () }
 }))) { ($C) } else { () }
 }
 }) } else { () }
@@ -10023,7 +10023,7 @@ sub decints {
     my $S = $C->{'_pos'};
     $C->{'decint'} = [];
     $self->_MATCHIFYr($S, "decints", $C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },  sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -10057,7 +10057,7 @@ sub decint {
 if (my ($C) = ($C->_PATTERN(qr/\G((?:\d)++)/))) { $C->_STARr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('_'))) { $C->_PATTERN(qr/\G((?:\d)++)/) } else { () }
+if (my ($C) = ($C->_EXACT("_"))) { $C->_PATTERN(qr/\G((?:\d)++)/) } else { () }
 }))) { ($C) } else { () }
 }
 }) } else { () }
@@ -10114,7 +10114,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('0'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("0"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -10151,7 +10151,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('b'))) { $C->_SUBSUMEr(['binint'], sub {
+if (my ($C) = ($C->_EXACT("b"))) { $C->_SUBSUMEr(['binint'], sub {
 my $C = shift;
 $C->binint
 }) } else { () }
@@ -10159,7 +10159,7 @@ $C->binint
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('o'))) { $C->_SUBSUMEr(['octint'], sub {
+if (my ($C) = ($C->_EXACT("o"))) { $C->_SUBSUMEr(['octint'], sub {
 my $C = shift;
 $C->octint
 }) } else { () }
@@ -10167,7 +10167,7 @@ $C->octint
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('x'))) { $C->_SUBSUMEr(['hexint'], sub {
+if (my ($C) = ($C->_EXACT("x"))) { $C->_SUBSUMEr(['hexint'], sub {
 my $C = shift;
 $C->hexint
 }) } else { () }
@@ -10175,7 +10175,7 @@ $C->hexint
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('d'))) { $C->_SUBSUMEr(['decint'], sub {
+if (my ($C) = ($C->_EXACT("d"))) { $C->_SUBSUMEr(['decint'], sub {
 my $C = shift;
 $C->decint
 }) } else { () }
@@ -10231,7 +10231,7 @@ if (my ($C) = ($C->before( sub { my $C=shift;
 $C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('.'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\."))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 	$C->{'terminator'} = [];
 if (my ($C) = (do {
@@ -10272,10 +10272,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -10304,8 +10304,8 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('_'))) { if (my ($C) = ($C->_PLUSr( sub { my $C=shift;
-$C->_EXACT('_')
+if (my ($C) = ($C->_EXACT("_"))) { if (my ($C) = ($C->_PLUSr( sub { my $C=shift;
+$C->_EXACT("_")
 }))) { $C->_PATTERN(qr/\G\d/) } else { () } } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->sorry("Only isolated underscores are allowed inside numbers"))) { ($C) } else { () } } else { () }
@@ -10372,7 +10372,7 @@ $C->integer
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT(':'))) { $C->_PATTERN(qr/\G\d/) } else { () }
+if (my ($C) = ($C->_EXACT("\:"))) { $C->_PATTERN(qr/\G\d/) } else { () }
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -10486,7 +10486,7 @@ $C->escale
 }, $C->_SUBSUMEr(['coeff'], sub {
 my $C = shift;
 $C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('.'))) { $C->_SUBSUMEr(['frac'], sub {
+if (my ($C) = ($C->_EXACT("\."))) { $C->_SUBSUMEr(['frac'], sub {
 my $C = shift;
 $C->decint
 }) } else { () }
@@ -10508,7 +10508,7 @@ $C->_BRACKETr( sub { my $C=shift;
 Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('.'))) { $C->_SUBSUMEr(['frac'], sub {
+if (my ($C) = ($C->_EXACT("\."))) { $C->_SUBSUMEr(['frac'], sub {
 my $C = shift;
 $C->decint
 }) } else { () }
@@ -10551,12 +10551,12 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('.'))) { $C->_PATTERN(qr/\G\d/) } else { () }
+if (my ($C) = ($C->_EXACT("\."))) { $C->_PATTERN(qr/\G\d/) } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->sorry("Number contains two decimal points (missing 'v' for version number?)"))) { $C->_PLUSr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('.'))) { $C->_PATTERN(qr/\G((?:\d)++)/) } else { () }
+if (my ($C) = ($C->_EXACT("\."))) { $C->_PATTERN(qr/\G((?:\d)++)/) } else { () }
 }))) { ($C) } else { () }
 }
 }) } else { () } } else { () }
@@ -10567,8 +10567,8 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('_'))) { if (my ($C) = ($C->_PLUSr( sub { my $C=shift;
-$C->_EXACT('_')
+if (my ($C) = ($C->_EXACT("_"))) { if (my ($C) = ($C->_PLUSr( sub { my $C=shift;
+$C->_EXACT("_")
 }))) { $C->_PATTERN(qr/\G\d/) } else { () } } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->sorry("Only isolated underscores are allowed inside numbers"))) { ($C) } else { () } } else { () }
@@ -10594,7 +10594,7 @@ sub alnumint {
 if (my ($C) = ($C->_PATTERN(qr/\G((?:[0-9a-zA-Z])++)/))) { $C->_STARr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('_'))) { $C->_PATTERN(qr/\G((?:[0-9a-zA-Z])++)/) } else { () }
+if (my ($C) = ($C->_EXACT("_"))) { $C->_PATTERN(qr/\G((?:[0-9a-zA-Z])++)/) } else { () }
 }))) { ($C) } else { () }
 }
 }) } else { () }
@@ -10616,7 +10616,7 @@ sub rad_number {
     $C->{'base'} = [];
     $C->{'exp'} = [];
     $self->_MATCHIFYr($S, "rad_number", do {
-if (my ($C) = ($C->_EXACT(':'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\:"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
@@ -10632,7 +10632,7 @@ do {
   my @gather;
 do {
   push @gather, do {
-if (my ($C) = ($C->_EXACT('<'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\<"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -10671,7 +10671,7 @@ do {
 $C->_SUBSUMEr(['coeff'], sub {
 my $C = shift;
 $C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('.'))) { $C->_SUBSUMEr(['frac'], sub {
+if (my ($C) = ($C->_EXACT("\."))) { $C->_SUBSUMEr(['frac'], sub {
 my $C = shift;
 $C->alnumint
 }) } else { () }
@@ -10685,7 +10685,7 @@ $C->_BRACKETr( sub { my $C=shift;
 Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('.'))) { $C->_SUBSUMEr(['frac'], sub {
+if (my ($C) = ($C->_EXACT("\."))) { $C->_SUBSUMEr(['frac'], sub {
 my $C = shift;
 $C->alnumint
 }) } else { () }
@@ -10720,7 +10720,7 @@ $C->alnumint
 }))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('*'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\*"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -10731,7 +10731,7 @@ do {
 do {
   push @gather, do {
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('**'))) { $C->_SUBSUMEr(['exp'], sub {
+if (my ($C) = ($C->_EXACT("\*\*"))) { $C->_SUBSUMEr(['exp'], sub {
 my $C = shift;
 $C->radint
 }) } else { () }
@@ -10753,7 +10753,7 @@ $C->radint
 })) } else { () }
 }))) { ($C) } else { () }
 }
-}))) { $C->_EXACT('>') } else { () } } else { () } } else { () }
+}))) { $C->_EXACT("\>") } else { () } } else { () } } else { () }
 }
 }
 or $xact->[-2] or
@@ -10762,7 +10762,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('[')
+$C->_EXACT("\[")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['circumfix'], sub {
 my $C = shift;
@@ -10777,7 +10777,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['circumfix'], sub {
 my $C = shift;
@@ -10837,7 +10837,7 @@ sub terminator__S_060Ket {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\]";    $self->_MATCHIFYr($S, "terminator__S_060Ket", do {
-if (my ($C) = ($C->_EXACT(']'))) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("\]"))) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () }
@@ -10857,7 +10857,7 @@ sub terminator__S_061Ly {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\}";    $self->_MATCHIFYr($S, "terminator__S_061Ly", do {
-if (my ($C) = ($C->_EXACT('}'))) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("\}"))) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () }
@@ -28459,7 +28459,7 @@ if (my ($C) = (do {
 if (my ($C) = ($C->lambda)) { ($C) } else { () }
 },
  sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }
         )[$try])->($C);
         last if @gather;
@@ -28558,7 +28558,7 @@ $C->lambda
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->newpad(1))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -28631,10 +28631,10 @@ sub lambda {
         $C->deb("lambda_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('->')
+$C->_EXACT("\-\>")
 },
  sub { my $C=shift;
-$C->_EXACT('<->')
+$C->_EXACT("\<\-\>")
 }
         )[$try])->($C);
         last if @gather;
@@ -28702,7 +28702,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }
@@ -28783,7 +28783,7 @@ local $::GOAL = "\}";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('{'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\{"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -28794,7 +28794,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('}')
+  push @gather, $C->_EXACT("\}")
 }
 or $xact->[-2] or
 do {
@@ -28939,7 +28939,7 @@ $C->quotepair
 }))
 }))) { ($C) } else { () }
 }
-}))) { if (my ($C) = ($C->_EXACT('{'))) { Cursor::lazymap(sub {
+}))) { if (my ($C) = ($C->_EXACT("\{"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -28948,7 +28948,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('}')
+  push @gather, $C->_EXACT("\}")
 }
 or $xact->[-2] or
 do {
@@ -29181,7 +29181,7 @@ my $label;
     $self->_MATCHIFYr($S, "label", Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 $C->_PATTERN(qr/\G\s/)
 }))) { ($C) } else { () }
@@ -29427,7 +29427,7 @@ $C->EXPR
  sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT(';')
+$C->_EXACT("\;")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 },
@@ -29501,16 +29501,16 @@ if (my ($C) = (do {
         $C->deb("statement_2 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(';')
+$C->_EXACT("\;")
 },
  sub { my $C=shift;
-$C->_EXACT(')')
+$C->_EXACT("\)")
 },
  sub { my $C=shift;
-$C->_EXACT(']')
+$C->_EXACT("\]")
 },
  sub { my $C=shift;
-$C->_EXACT('}')
+$C->_EXACT("\}")
 }
         )[$try])->($C);
         last if @gather;
@@ -29551,7 +29551,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(';')
+  push @gather, $C->_EXACT("\;")
 }
 or $xact->[-2] or
 do {
@@ -29605,13 +29605,13 @@ if (my ($C) = (do {
         $C->deb("eat_terminator_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(')')
+$C->_EXACT("\)")
 },
  sub { my $C=shift;
-$C->_EXACT(']')
+$C->_EXACT("\]")
 },
  sub { my $C=shift;
-$C->_EXACT('}')
+$C->_EXACT("\}")
 }
         )[$try])->($C);
         last if @gather;
@@ -29693,7 +29693,7 @@ my $longname;
     $C->{'version'} = [];
 $C->{sym} = "need";    $self->_MATCHIFYr($S, "statement_control__S_000need", do {
 if (my ($C) = ($C->_PATTERN(qr/\Gneed/))) { if (my ($C) = ($C->spacey)) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },  sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -30055,12 +30055,12 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('else'))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT('if'))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->sorry( "Please use 'elsif'"))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("else"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT("if"))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->sorry( "Please use 'elsif'"))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
 })) { ($C) } else { () }
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('elsif'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("elsif"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->spacey)) { ($C) } else { () }
 }))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -30088,7 +30088,7 @@ $C->xblock
 }))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('else'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("else"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->spacey)) { ($C) } else { () }
 }))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -30136,7 +30136,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { $C->_EXACT('else') } else { () }
+if (my ($C) = ($C->ws)) { $C->_EXACT("else") } else { () }
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }
@@ -30178,17 +30178,17 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('my')
-}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('$'))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\w)++)/))) { if (my ($C) = ($C->ws)) { $C->_EXACT('=') } else { () } } else { () } } else { () } } else { () } } else { () }
+$C->_EXACT("my")
+}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\$"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\w)++)/))) { if (my ($C) = ($C->ws)) { $C->_EXACT("\=") } else { () } } else { () } } else { () } } else { () } } else { () }
 }))) { ($C) } else { () }
 }
-}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('<'))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('$')
-}))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\w)++)/))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('>'))) { if (my ($C) = ($C->ws)) { $C->_EXACT(')') } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
+}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\<"))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("\$")
+}))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\w)++)/))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\>"))) { if (my ($C) = ($C->ws)) { $C->_EXACT("\)") } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->panic( "This appears to be Perl 5 code"))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -30332,10 +30332,10 @@ do {
         $C->deb("statement_control__S_008repeat_1 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('while')
+$C->_EXACT("while")
 },
  sub { my $C=shift;
-$C->_EXACT('until')
+$C->_EXACT("until")
 }
         )[$try])->($C);
         last if @gather;
@@ -30421,10 +30421,10 @@ do {
         $C->deb("statement_control__S_008repeat_2 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('while')
+$C->_EXACT("while")
 },
  sub { my $C=shift;
-$C->_EXACT('until')
+$C->_EXACT("until")
 }
         )[$try])->($C);
         last if @gather;
@@ -30474,7 +30474,7 @@ if (my ($C) = ($C->_PATTERN(qr/\Gloop/))) { if (my ($C) = ($C->spacey)) { if (my
 $C->_SUBSUMEr(['eee'], sub {
 my $C = shift;
 $C->_PAREN(  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my $C = $C->cursor_xact('ALT ||');
   my $xact = $C->xact;
@@ -30486,17 +30486,17 @@ $C->_SUBSUMEr(['e1'], sub {
 my $C = shift;
 $C->EXPR
 })
-}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT(';'))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\;"))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 $C->_SUBSUMEr(['e2'], sub {
 my $C = shift;
 $C->EXPR
 })
-}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT(';'))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\;"))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 $C->_SUBSUMEr(['e3'], sub {
 my $C = shift;
 $C->EXPR
 })
-}))) { if (my ($C) = ($C->ws)) { $C->_EXACT(')') } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
+}))) { if (my ($C) = ($C->ws)) { $C->_EXACT("\)") } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
 }
 }
 or $xact->[-2] or
@@ -30511,7 +30511,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->sorry("Whitespace required before block"))) { ($C) } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -30547,8 +30547,8 @@ if (my ($C) = ($C->ws)) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('my')
-}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('$'))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\w)++)/))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
+$C->_EXACT("my")
+}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\$"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\w)++)/))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
 })) { ($C) } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->panic( "This appears to be Perl 5 code"))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () }
@@ -30560,19 +30560,19 @@ if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->EXPR)) { ($C) } else { () }
 }
-}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT(';'))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\;"))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->EXPR)) { ($C) } else { () }
 }
-}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT(';'))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\;"))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->EXPR)) { ($C) } else { () }
 }
-}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT(')'))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
+}))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\)"))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
 })) { ($C) } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->obs('C-style "for (;;)" loop', '"loop (;;)"'))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () }
@@ -30699,10 +30699,10 @@ if (my ($C) = (do {
         $C->deb("statement_control__S_013when_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('True')
+$C->_EXACT("True")
 },
  sub { my $C=shift;
-$C->_EXACT('False')
+$C->_EXACT("False")
 }
         )[$try])->($C);
         last if @gather;
@@ -31198,7 +31198,7 @@ $C->modifier_expr
 });
 }
 ;
-## rule statement_mod_cond:when   {<sym> <?before \h*('True'|'False')»<.dumbsmart($0.Str)>>? <modifier_
+## rule statement_mod_cond:when   {<sym> <?before \h*('True'|'False')»<.dumbsmart($0[0].Str)>>? <modifi
 sub statement_mod_cond__S_034when__PEEK { $_[0]->_AUTOLEXpeek('statement_mod_cond__S_034when', $retree) }
 sub statement_mod_cond__S_034when {
     no warnings 'recursion';
@@ -31222,7 +31222,7 @@ if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = (do { my $M = $C;
-$C->dumbsmart($M->{0}->Str)
+$C->dumbsmart($M->{0}->[0]->Str)
 ; })) { ($C) } else { () } } else { () }
 }
 }, $C->_SUBSUMEr(['0'], sub {
@@ -31263,10 +31263,10 @@ if (my ($C) = (do {
         $C->deb("statement_mod_cond__S_034when_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('True')
+$C->_EXACT("True")
 },
  sub { my $C=shift;
-$C->_EXACT('False')
+$C->_EXACT("False")
 }
         )[$try])->($C);
         last if @gather;
@@ -31419,14 +31419,14 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('[')
+$C->_EXACT("\[")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -31437,7 +31437,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -31512,7 +31512,7 @@ sub vnum {
 $C->_PATTERN(qr/\G((?:\d)++)/)
 },
  sub { my $C=shift;
-$C->_EXACT('*')
+$C->_EXACT("\*")
 }
         )[$try])->($C);
         last if @gather;
@@ -31539,19 +31539,19 @@ sub version__S_040v {
     my $S = $C->{'_pos'};
     $C->{'vnum'} = [];
 $C->{sym} = "v";    $self->_MATCHIFYr($S, "version__S_040v", do {
-if (my ($C) = ($C->_EXACT('v'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("v"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 $C->_PATTERN(qr/\G((?:\d)++)/)
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT('.')
+$C->_EXACT("\.")
 },  sub { my $C=shift;
 $C->_SUBSUMEr(['vnum'], sub {
 my $C = shift;
 $C->vnum
 })
 }))) { $C->_OPTr( sub { my $C=shift;
-$C->_EXACT('+')
+$C->_EXACT("\+")
 }) } else { () } } else { () } } else { () } } else { () }
 });
 }
@@ -31636,7 +31636,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -31647,7 +31647,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -31687,7 +31687,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -31698,7 +31698,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -31722,7 +31722,7 @@ local $::GOAL = "\}";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('{'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\{"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -31733,7 +31733,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('}')
+  push @gather, $C->_EXACT("\}")
 }
 or $xact->[-2] or
 do {
@@ -31755,7 +31755,7 @@ $C->semilist
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('<')
+$C->_EXACT("\<")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['postcircumfix'], sub {
 my $C = shift;
@@ -31796,7 +31796,7 @@ sub scoped {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument SCOPE omitted' unless @_;
 local $::SCOPE = @_ ? shift() : undef;
 
     local $::CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
@@ -32437,7 +32437,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -32448,7 +32448,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -32483,7 +32483,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { $C->_EXACT('{') } else { () }
+if (my ($C) = ($C->ws)) { $C->_EXACT("\{") } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = (scalar(do {
@@ -32520,7 +32520,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { $C->_EXACT(';') } else { () }
+if (my ($C) = ($C->ws)) { $C->_EXACT("\;") } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -32659,7 +32659,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 $C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT(','))) { if (my ($C) = ($C->ws)) { scalar(do {
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\,"))) { if (my ($C) = ($C->ws)) { scalar(do {
 $::MEMOS[$C->{'_pos'}]->{'declend'} = $::SCOPE
 }, $C) } else { () } } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -32678,7 +32678,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -32689,7 +32689,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -33056,18 +33056,18 @@ my $signum = 0;
     $C->{'signature'} = [];
     $self->_MATCHIFYr($S, "multisig", do {
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT('|')
+$C->_EXACT("\|")
 },  sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT(':')
+$C->_EXACT("\:")
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -33078,7 +33078,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -33117,7 +33117,7 @@ sub routine_def {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument d omitted' unless @_;
 my $d = @_ ? shift() : undef;
 local $::CURPAD = $::CURPAD;
 local $::IN_DECL = $d;
@@ -33192,8 +33192,8 @@ $C->deflongname
 }, $C->_SUBSUMEr(['sigil'], sub {
 my $C = shift;
 $C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('&'))) { $C->_OPTr( sub { my $C=shift;
-$C->_EXACT('*')
+if (my ($C) = ($C->_EXACT("\&"))) { $C->_OPTr( sub { my $C=shift;
+$C->_EXACT("\*")
 }) } else { () }
 })
 })) } else { () }
@@ -33302,7 +33302,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { $C->_EXACT('{') } else { () }
+if (my ($C) = ($C->ws)) { $C->_EXACT("\{") } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->panic( "Malformed block"))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -33502,7 +33502,7 @@ $C->multisig
 if (my ($C) = (Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('.'))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\."))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -33544,7 +33544,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -33555,7 +33555,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -33580,7 +33580,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -33591,7 +33591,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -33616,7 +33616,7 @@ local $::GOAL = "\}";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('{'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\{"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -33627,7 +33627,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('}')
+  push @gather, $C->_EXACT("\}")
 }
 or $xact->[-2] or
 do {
@@ -33649,7 +33649,7 @@ $C->signature
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { $C->_EXACT('<') } else { () }
+if (my ($C) = ($C->ws)) { $C->_EXACT("\<") } else { () }
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -33796,7 +33796,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('&'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\&"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 $C->_SUBSUMEr(['deflongname'], sub {
 my $C = shift;
 $C->deflongname
@@ -33869,11 +33869,11 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT(':')
-}))) { if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
+$C->_EXACT("\:")
+}))) { if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->ws)) { $C->_EXACT(')') } else { () }
+if (my ($C) = ($C->ws)) { $C->_EXACT("\)") } else { () }
 }
 }, $C->_SUBSUMEr(['signature'], sub {
 my $C = shift;
@@ -33911,7 +33911,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { $C->_EXACT('{') } else { () }
+if (my ($C) = ($C->ws)) { $C->_EXACT("\{") } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->panic( "Malformed block"))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -34007,7 +34007,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('&'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\&"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 $C->_SUBSUMEr(['deflongname'], sub {
 my $C = shift;
 $C->deflongname
@@ -34118,7 +34118,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { $C->_EXACT('{') } else { () }
+if (my ($C) = ($C->ws)) { $C->_EXACT("\{") } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->panic( "Malformed block"))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () } } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -34409,10 +34409,10 @@ do {
         $C->deb("trait_mod__S_073of_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('of')
+$C->_EXACT("of")
 },
  sub { my $C=shift;
-$C->_EXACT('returns')
+$C->_EXACT("returns")
 }
         )[$try])->($C);
         last if @gather;
@@ -34766,7 +34766,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('\\')
+$C->_EXACT("\\")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['POST'], sub {
 my $C = shift;
@@ -34797,7 +34797,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('\\')
+$C->_EXACT("\\")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['POST'], sub {
 my $C = shift;
@@ -34972,13 +34972,13 @@ if (my ($C) = (do {
         $C->deb("term__S_080multi_declarator_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('multi')
+$C->_EXACT("multi")
 },
  sub { my $C=shift;
-$C->_EXACT('proto')
+$C->_EXACT("proto")
 },
  sub { my $C=shift;
-$C->_EXACT('only')
+$C->_EXACT("only")
 }
         )[$try])->($C);
         last if @gather;
@@ -35204,7 +35204,7 @@ sub fatarrow {
     $self->_MATCHIFYr($S, "fatarrow", Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT('=>'))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['val'], sub {
+if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT("\=\>"))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['val'], sub {
 my $C = shift;
 $C->EXPR(\%item_assignment)
 }) } else { () } } else { () } } else { () }
@@ -35221,7 +35221,7 @@ sub coloncircumfix {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument front omitted' unless @_;
 my $front = @_ ? shift() : undef;
 
     local $::CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
@@ -35266,7 +35266,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('<>'))) { if (my ($C) = ($C->worry("Pair with <> really means a Nil value, not null string; use :$front" . "('') to represent the null string,\n  or :$front" . "() to represent Nil more accurately"))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\<\>"))) { if (my ($C) = ($C->worry("Pair with <> really means a Nil value, not null string; use :$front" . "('') to represent the null string,\n  or :$front" . "() to represent Nil more accurately"))) { ($C) } else { () } } else { () }
 })) { ($C) } else { () }
 },
  sub { my $C=shift;
@@ -35302,7 +35302,7 @@ my $value;
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "colonpair", do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -35338,7 +35338,7 @@ do {
         $C->deb("colonpair_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('!'))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\!"))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my $C = $C->cursor_xact('ALT ||');
   my $xact = $C->xact;
@@ -35454,7 +35454,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -35465,7 +35465,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -35597,12 +35597,12 @@ sub special_variable__S_093DollarBangCur_Ly {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\$\!\{\ \}";    $self->_MATCHIFYr($S, "special_variable__S_093DollarBangCur_Ly", do {
-if (my ($C) = ($C->_EXACT('$!'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\$\!"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 local $::GOAL = "\}";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('{'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\{"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -35666,7 +35666,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('}')
+  push @gather, $C->_EXACT("\}")
 }
 or $xact->[-2] or
 do {
@@ -35705,7 +35705,7 @@ if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT('='))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
+if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_EXACT("\="))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 $C->_PATTERN(qr/\G[=]/)
 }))) { ($C) } else { () } } else { () } } else { () }
 })) { ($C) } else { () }
@@ -35771,10 +35771,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -35849,7 +35849,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -35995,7 +35995,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36055,7 +36055,7 @@ sub special_variable__S_101DollarCaretX {
 $C->{sym} = "\$\^X";    $self->_MATCHIFYr($S, "special_variable__S_101DollarCaretX", Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('^'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\^"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_NOTCHAR( sub { my $C=shift;
@@ -36130,10 +36130,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36208,7 +36208,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36283,10 +36283,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36365,7 +36365,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36440,10 +36440,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36518,10 +36518,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36596,7 +36596,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36671,7 +36671,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36706,7 +36706,7 @@ sub special_variable__S_110DollarPlusBra_Ket {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\$\+\[\ \]";    $self->_MATCHIFYr($S, "special_variable__S_110DollarPlusBra_Ket", do {
-if (my ($C) = ($C->_EXACT('$+['))) { if (my ($C) = ($C->obs('@+ variable', '.to method'))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\$\+\["))) { if (my ($C) = ($C->obs('@+ variable', '.to method'))) { ($C) } else { () } } else { () }
 });
 }
 ;
@@ -36723,7 +36723,7 @@ sub special_variable__S_111AtPlusBra_Ket {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\@\+\[\ \]";    $self->_MATCHIFYr($S, "special_variable__S_111AtPlusBra_Ket", do {
-if (my ($C) = ($C->_EXACT('@+['))) { if (my ($C) = ($C->obs('@+ variable', '.to method'))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\@\+\["))) { if (my ($C) = ($C->obs('@+ variable', '.to method'))) { ($C) } else { () } } else { () }
 });
 }
 ;
@@ -36740,7 +36740,7 @@ sub special_variable__S_112AtPlusCur_Ly {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\@\+\{\ \}";    $self->_MATCHIFYr($S, "special_variable__S_112AtPlusCur_Ly", do {
-if (my ($C) = ($C->_EXACT('@+{'))) { if (my ($C) = ($C->obs('%+ variable', '.to method'))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\@\+\{"))) { if (my ($C) = ($C->obs('%+ variable', '.to method'))) { ($C) } else { () } } else { () }
 });
 }
 ;
@@ -36797,7 +36797,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36872,7 +36872,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -36907,7 +36907,7 @@ sub special_variable__S_115DollarMinusBra_Ket {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\$\-\[\ \]";    $self->_MATCHIFYr($S, "special_variable__S_115DollarMinusBra_Ket", do {
-if (my ($C) = ($C->_EXACT('$-['))) { if (my ($C) = ($C->obs('@- variable', '.from method'))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\$\-\["))) { if (my ($C) = ($C->obs('@- variable', '.from method'))) { ($C) } else { () } } else { () }
 });
 }
 ;
@@ -36924,7 +36924,7 @@ sub special_variable__S_116AtMinusBra_Ket {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\@\-\[\ \]";    $self->_MATCHIFYr($S, "special_variable__S_116AtMinusBra_Ket", do {
-if (my ($C) = ($C->_EXACT('@-['))) { if (my ($C) = ($C->obs('@- variable', '.from method'))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\@\-\["))) { if (my ($C) = ($C->obs('@- variable', '.from method'))) { ($C) } else { () } } else { () }
 });
 }
 ;
@@ -36941,7 +36941,7 @@ sub special_variable__S_117PercentMinusCur_Ly {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\%\-\{\ \}";    $self->_MATCHIFYr($S, "special_variable__S_117PercentMinusCur_Ly", do {
-if (my ($C) = ($C->_EXACT('@-{'))) { if (my ($C) = ($C->obs('%- variable', '.from method'))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\@\-\{"))) { if (my ($C) = ($C->obs('%- variable', '.from method'))) { ($C) } else { () } } else { () }
 });
 }
 ;
@@ -36998,7 +36998,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37035,10 +37035,10 @@ sub special_variable__S_119DollarCurCaret_Ly {
 $C->{sym} = "\$\{\^\ \}";    $self->_MATCHIFYr($S, "special_variable__S_119DollarCurCaret_Ly", Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('{^'))) { if (my ($C) = ($C->_COMMITLTM())) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\{\^"))) { if (my ($C) = ($C->_COMMITLTM())) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('}'))) { if (my ($C) = (do { my $M = $C;
+if (my ($C) = ($C->_EXACT("\}"))) { if (my ($C) = (do { my $M = $C;
 $C->obscaret($M->{'sigil'}->Str . '{^' . $M->{'text'}->Str . '}', $M->{'sigil'}->Str, $M->{'text'}->Str)
 ; })) { ($C) } else { () } } else { () }
 }
@@ -37059,11 +37059,11 @@ $C->sigil
 sub obscaret {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument var omitted' unless @_;
 my $var = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument sigil omitted' unless @_;
 my $sigil = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
 my $repl;
 given ($sigil) {
@@ -37177,9 +37177,9 @@ sub special_variable__S_120ColonColonCur_Ly {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:\:\{\ \}";    $self->_MATCHIFYr($S, "special_variable__S_120ColonColonCur_Ly", do {
-if (my ($C) = ($C->_EXACT('::'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:\:"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () } } else { () }
 });
@@ -37200,12 +37200,12 @@ sub special_variable__S_121DollarCur_Ly {
 $C->{sym} = "\$\{\ \}";    $self->_MATCHIFY($S, "special_variable__S_121DollarCur_Ly", Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('{'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\{"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('}'))) { scalar(do {
+if (my ($C) = ($C->_EXACT("\}"))) { scalar(do {
 my $M = $C;
 {
 my $sigil = $M->{'sigil'}->Str;
@@ -37287,10 +37287,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37365,7 +37365,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37440,10 +37440,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37518,10 +37518,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37617,10 +37617,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37695,7 +37695,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37774,10 +37774,10 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37852,7 +37852,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -37889,7 +37889,7 @@ sub special_variable__S_131DollarLt {
 $C->{sym} = "\$\<";    $self->_MATCHIFYr($S, "special_variable__S_131DollarLt", do {
 if (my ($C) = ($C->_PATTERN(qr/\G\$\</))) { if (my ($C) = ($C->_COMMITLTM())) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\w)++)/))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { $C->_EXACT('>') } else { () } } else { () } } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\w)++)/))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { $C->_EXACT("\>") } else { () } } else { () } } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->obs('$< variable', '$*UID'))) { ($C) } else { () } } else { () } } else { () } } else { () }
 });
@@ -37948,7 +37948,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -38023,7 +38023,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -38098,7 +38098,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['terminator'], sub {
@@ -38171,7 +38171,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('$')
+$C->_EXACT("\$")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -38273,7 +38273,7 @@ $C->twigil
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('::'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:\:"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -38309,13 +38309,13 @@ do {
         $C->deb("variable_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 },
  sub { my $C=shift;
-$C->_EXACT('<')
+$C->_EXACT("\<")
 },
  sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }
         )[$try])->($C);
         last if @gather;
@@ -38344,7 +38344,7 @@ or $xact->[-2] or
 do {
   push @gather, do {
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('&'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\&"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -38404,7 +38404,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -38415,7 +38415,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -38448,7 +38448,7 @@ $C->infixish('[]')
 or $xact->[-2] or
 do {
   push @gather, do {
-if (my ($C) = ($C->_EXACT('$::'))) { $C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\$\:\:"))) { $C->_OPTr( sub { my $C=shift;
 $C->_SUBSUMEr(['name'], sub {
 my $C = shift;
 $C->name
@@ -38460,7 +38460,7 @@ or $xact->[-2] or
 do {
   push @gather, do {
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('$:'))) { $C->_SUBSUMEr(['name'], sub {
+if (my ($C) = ($C->_EXACT("\$\:"))) { $C->_SUBSUMEr(['name'], sub {
 my $C = shift;
 $C->name
 }) } else { () }
@@ -38589,10 +38589,10 @@ if (my ($C) = (do {
         $C->deb("variable_3 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('<')
+$C->_EXACT("\<")
 },
  sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }
         )[$try])->($C);
         last if @gather;
@@ -38704,7 +38704,7 @@ do {
 if (my ($C) = ($C->unsp)) { ($C) } else { () }
 },
  sub { my $C=shift;
-$C->_EXACT('\\')
+$C->_EXACT("\\")
 },
  sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
@@ -38722,7 +38722,7 @@ $C
 
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['postcircumfix'], sub {
 my $C = shift;
@@ -39032,7 +39032,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('::?'))) { $C->_SUBSUMEr(['identifier'], sub {
+if (my ($C) = ($C->_EXACT("\:\:\?"))) { $C->_SUBSUMEr(['identifier'], sub {
 my $C = shift;
 $C->identifier
 }) } else { () }
@@ -39079,7 +39079,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('[')
+$C->_EXACT("\[")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['param'], sub {
 my $C = shift;
@@ -39096,7 +39096,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['whence'], sub {
 my $C = shift;
@@ -39107,7 +39107,7 @@ $C->postcircumfix
 }))) { $C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('of'))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['typename'], sub {
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("of"))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['typename'], sub {
 my $C = shift;
 $C->typename
 }) } else { () } } else { () } } else { () }
@@ -39165,7 +39165,7 @@ do {
         $C->deb("number_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('NaN'))) { $C->_PATTERN(qr/\G\b/) } else { () }
+if (my ($C) = ($C->_EXACT("NaN"))) { $C->_PATTERN(qr/\G\b/) } else { () }
 },
  sub { my $C=shift;
 $C->_SUBSUMEr(['integer'], sub {
@@ -39186,7 +39186,7 @@ $C->rad_number
 })
 },
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('Inf'))) { $C->_PATTERN(qr/\G\b/) } else { () }
+if (my ($C) = ($C->_EXACT("Inf"))) { $C->_PATTERN(qr/\G\b/) } else { () }
 }
         )[$try])->($C);
         last if @gather;
@@ -39216,7 +39216,7 @@ $C->{sym} = "rational";    $self->_MATCHIFYr($S, "strtonum__S_138rational", do {
 if (my ($C) = ($C->_PATTERN(qr/\G((?:[+\-])?+)/))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('/'))) { $C->_SUBSUMEr(['de'], sub {
+if (my ($C) = ($C->_EXACT("\/"))) { $C->_SUBSUMEr(['de'], sub {
 my $C = shift;
 $C->integer
 }) } else { () }
@@ -39255,8 +39255,8 @@ $C->number
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('\\')
-}))) { $C->_EXACT('i') } else { () }
+$C->_EXACT("\\")
+}))) { $C->_EXACT("i") } else { () }
 }
 }, $C->_SUBSUMEr(['im'], sub {
 my $C = shift;
@@ -39291,9 +39291,9 @@ sub sibble {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument l omitted' unless @_;
 my $l = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument lang2 omitted' unless @_;
 my $lang2 = @_ ? shift() : undef;
 my ($lang, $start, $stop);
 
@@ -39434,7 +39434,7 @@ sub tribble {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument l omitted' unless @_;
 my $l = @_ ? shift() : undef;
 my $lang2 = @_ ? shift() : $l;
 my ($lang, $start, $stop);
@@ -39538,7 +39538,7 @@ sub quasiquibble {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument l omitted' unless @_;
 my $l = @_ ? shift() : undef;
 local %::LANG = %::LANG;
 my ($lang, $start, $stop);
@@ -39647,7 +39647,7 @@ sub quote__S_141SlashSlash {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\/\/";    $self->_MATCHIFYr($S, "quote__S_141SlashSlash", do {
-if (my ($C) = ($C->_EXACT('/'))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { if (my ($C) = ($C->_EXACT('/'))) { if (my ($C) = ($C->sorry("Null regex not allowed"))) { ($C) } else { () } } else { () } } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\/"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { if (my ($C) = ($C->_EXACT("\/"))) { if (my ($C) = ($C->sorry("Null regex not allowed"))) { ($C) } else { () } } else { () } } else { () } } else { () }
 });
 }
 ;
@@ -39664,7 +39664,7 @@ sub quote__S_142Slash_Slash {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\/\ \/";    $self->_MATCHIFYr($S, "quote__S_142Slash_Slash", do {
-if (my ($C) = ($C->_EXACT('/'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\/"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -39673,7 +39673,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('/')
+  push @gather, $C->_EXACT("\/")
 }
 or $xact->[-2] or
 do {
@@ -39709,7 +39709,7 @@ my $qm;
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "qq";    $self->_MATCHIFYr($S, "quote__S_143qq", do {
-if (my ($C) = ($C->_EXACT('qq'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("qq"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -39750,7 +39750,7 @@ if (my ($C) = (Cursor::lazymap(sub {
 do {
 if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = (scalar(do {
 my $M = $C;
@@ -39769,7 +39769,7 @@ $C->quote_mod
 if (my ($C) = (do {
 if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['quibble'], sub {
 my $C = shift;
@@ -39804,7 +39804,7 @@ my $qm;
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "q";    $self->_MATCHIFYr($S, "quote__S_144q", do {
-if (my ($C) = ($C->_EXACT('q'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("q"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -39845,7 +39845,7 @@ if (my ($C) = (Cursor::lazymap(sub {
 do {
 if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = (scalar(do {
 my $M = $C;
@@ -39864,7 +39864,7 @@ $C->quote_mod
 if (my ($C) = (do {
 if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['quibble'], sub {
 my $C = shift;
@@ -39899,7 +39899,7 @@ my $qm;
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "Q";    $self->_MATCHIFYr($S, "quote__S_145Q", do {
-if (my ($C) = ($C->_EXACT('Q'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("Q"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -39940,7 +39940,7 @@ if (my ($C) = (Cursor::lazymap(sub {
 do {
 if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = (scalar(do {
 my $M = $C;
@@ -39959,7 +39959,7 @@ $C->quote_mod
 if (my ($C) = (do {
 if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['quibble'], sub {
 my $C = shift;
@@ -40160,7 +40160,7 @@ sub quote__S_157rx {
 $C->{sym} = "rx";    $self->_MATCHIFYr($S, "quote__S_157rx", do {
 if (my ($C) = ($C->_PATTERN(qr/\Grx/))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -40191,7 +40191,7 @@ sub quote__S_158m {
 $C->{sym} = "m";    $self->_MATCHIFYr($S, "quote__S_158m", do {
 if (my ($C) = ($C->_PATTERN(qr/\Gm/))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -40222,7 +40222,7 @@ sub quote__S_159mm {
 $C->{sym} = "mm";    $self->_MATCHIFYr($S, "quote__S_159mm", do {
 if (my ($C) = ($C->_PATTERN(qr/\Gmm/))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -40253,7 +40253,7 @@ sub quote__S_160s {
 $C->{sym} = "s";    $self->_MATCHIFYr($S, "quote__S_160s", do {
 if (my ($C) = ($C->_PATTERN(qr/\Gs/))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -40284,7 +40284,7 @@ sub quote__S_161ss {
 $C->{sym} = "ss";    $self->_MATCHIFYr($S, "quote__S_161ss", do {
 if (my ($C) = ($C->_PATTERN(qr/\Gss/))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -40315,7 +40315,7 @@ sub quote__S_162tr {
 $C->{sym} = "tr";    $self->_MATCHIFYr($S, "quote__S_162tr", do {
 if (my ($C) = ($C->_PATTERN(qr/\Gtr/))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -40350,7 +40350,7 @@ $self->is_known('&y') or $self->is_known('y')
 })
 }))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
@@ -40461,7 +40461,7 @@ sub quote__S_164quasi {
 $C->{sym} = "quasi";    $self->_MATCHIFYr($S, "quote__S_164quasi", do {
 if (my ($C) = ($C->_PATTERN(qr/\Gquasi/))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['quasiquibble'], sub {
 my $C = shift;
@@ -40484,7 +40484,7 @@ sub capterm {
     my $S = $C->{'_pos'};
     $C->{'capture'} = [];
     $self->_MATCHIFYr($S, "capterm", do {
-if (my ($C) = ($C->_EXACT('\\'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\\"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -40520,12 +40520,12 @@ do {
         $C->deb("capterm_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 $C->_SUBSUMEr(['capture'], sub {
 my $C = shift;
 $C->capture
 })
-}))) { $C->_EXACT(')') } else { () } } else { () }
+}))) { $C->_EXACT("\)") } else { () } } else { () }
 },
  sub { my $C=shift;
 if (my ($C) = (do {
@@ -40604,7 +40604,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT(':('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\:\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -40615,7 +40615,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -40682,16 +40682,16 @@ do {
         $C->deb("param_sep_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(',')
+$C->_EXACT("\,")
 },
  sub { my $C=shift;
-$C->_EXACT(':')
+$C->_EXACT("\:")
 },
  sub { my $C=shift;
-$C->_EXACT(';')
+$C->_EXACT("\;")
 },
  sub { my $C=shift;
-$C->_EXACT(';;')
+$C->_EXACT("\;\;")
 }
         )[$try])->($C);
         last if @gather;
@@ -40829,19 +40829,19 @@ if (my ($C) = (do {
         $C->deb("signature_1 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('-->')
+$C->_EXACT("\-\-\>")
 },
  sub { my $C=shift;
-$C->_EXACT(')')
+$C->_EXACT("\)")
 },
  sub { my $C=shift;
-$C->_EXACT(']')
+$C->_EXACT("\]")
 },
  sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 },
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT(':'))) { $C->_PATTERN(qr/\G\s/) } else { () }
+if (my ($C) = ($C->_EXACT("\:"))) { $C->_PATTERN(qr/\G\s/) } else { () }
 }
         )[$try])->($C);
         last if @gather;
@@ -40892,7 +40892,7 @@ $::IN_DECL = ''
 }, $C))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('-->'))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\-\-\>"))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
@@ -40980,7 +40980,7 @@ $C->trait
 }))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('w'))) { if (my ($C) = ($C->_EXACT('h'))) { if (my ($C) = ($C->_EXACT('e'))) { if (my ($C) = ($C->_EXACT('r'))) { if (my ($C) = ($C->_EXACT('e'))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("w"))) { if (my ($C) = ($C->_EXACT("h"))) { if (my ($C) = ($C->_EXACT("e"))) { if (my ($C) = ($C->_EXACT("r"))) { if (my ($C) = ($C->_EXACT("e"))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->ws)) { ($C) } else { () }
@@ -41229,7 +41229,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }
@@ -41240,7 +41240,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_PATTERN(qr/\G((?:[^\n=])*+)/))) { $C->_EXACT('=') } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G((?:[^\n=])*+)/))) { $C->_EXACT("\=") } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->panic("Malformed constant"))) { ($C) } else { () } } else { () }
 })) { ($C) } else { () }
@@ -41320,7 +41320,7 @@ $C->typename
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('w'))) { if (my ($C) = ($C->_EXACT('h'))) { if (my ($C) = ($C->_EXACT('e'))) { if (my ($C) = ($C->_EXACT('r'))) { if (my ($C) = ($C->_EXACT('e'))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['EXPR'], sub {
+if (my ($C) = ($C->_EXACT("w"))) { if (my ($C) = ($C->_EXACT("h"))) { if (my ($C) = ($C->_EXACT("e"))) { if (my ($C) = ($C->_EXACT("r"))) { if (my ($C) = ($C->_EXACT("e"))) { if (my ($C) = ($C->ws)) { $C->_SUBSUMEr(['EXPR'], sub {
 my $C = shift;
 $C->EXPR(\%chaining)
 }) } else { () } } else { () } } else { () } } else { () } } else { () } } else { () }
@@ -41395,7 +41395,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -41406,7 +41406,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -41431,7 +41431,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -41442,7 +41442,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -41462,7 +41462,7 @@ $C->signature
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('w'))) { if (my ($C) = ($C->_EXACT('h'))) { if (my ($C) = ($C->_EXACT('e'))) { if (my ($C) = ($C->_EXACT('r'))) { if (my ($C) = ($C->_EXACT('e'))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("w"))) { if (my ($C) = ($C->_EXACT("h"))) { if (my ($C) = ($C->_EXACT("e"))) { if (my ($C) = ($C->_EXACT("r"))) { if (my ($C) = ($C->_EXACT("e"))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->ws)) { ($C) } else { () }
@@ -41500,7 +41500,7 @@ local $::GOAL = ')';
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "named_param", do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -41539,7 +41539,7 @@ do {
 if (my ($C) = (Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -41606,7 +41606,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -41697,7 +41697,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -41708,7 +41708,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -41731,7 +41731,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -41742,7 +41742,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -41996,7 +41996,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('**'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\*\*"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
 $quant = '**';
@@ -42011,7 +42011,7 @@ $C->param_var
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('*'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\*"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
 $quant = '*';
@@ -42026,7 +42026,7 @@ $C->param_var
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('|'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\|"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
 $quant = '|';
@@ -42041,7 +42041,7 @@ $C->param_var
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('\\'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\\"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
 $quant = '\\';
@@ -42162,14 +42162,14 @@ do {
         $C->deb("parameter_3 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('?'))) { scalar(do {
+if (my ($C) = ($C->_EXACT("\?"))) { scalar(do {
 $quant = '?';
 $kind = '?' ;
 
 }, $C) } else { () }
 },
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('!'))) { scalar(do {
+if (my ($C) = ($C->_EXACT("\!"))) { scalar(do {
 $quant = '!';
 $kind //= '!' ;
 
@@ -42215,7 +42215,7 @@ $kind = '!' ;
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('**'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\*\*"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
 $quant = '**';
@@ -42230,7 +42230,7 @@ $C->param_var
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('*'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\*"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
 $quant = '*';
@@ -42245,7 +42245,7 @@ $C->param_var
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('|'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\|"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
 $quant = '|';
@@ -42260,7 +42260,7 @@ $C->param_var
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('\\'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\\"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
 $quant = '\\';
@@ -42381,14 +42381,14 @@ do {
         $C->deb("parameter_5 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('?'))) { scalar(do {
+if (my ($C) = ($C->_EXACT("\?"))) { scalar(do {
 $quant = '?';
 $kind = '?' ;
 
 }, $C) } else { () }
 },
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('!'))) { scalar(do {
+if (my ($C) = ($C->_EXACT("\!"))) { scalar(do {
 $quant = '!';
 $kind //= '!' ;
 
@@ -42480,7 +42480,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT(':')
+$C->_EXACT("\:")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->sorry("Can't put a default on the invocant parameter"))) { ($C) } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -42508,7 +42508,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT(':')
+$C->_EXACT("\:")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 (($C) x !!do {
@@ -42570,7 +42570,7 @@ local $::IN_DECL = '';
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "default_value", do {
-if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT('='))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
+if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_EXACT("\="))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->ws)) { ($C) } else { () }
@@ -42893,12 +42893,12 @@ sub term__S_179new {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "new";    $self->_MATCHIFYr($S, "term__S_179new", do {
-if (my ($C) = ($C->_EXACT('new'))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])++)/))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("new"))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])++)/))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT(':')
+$C->_EXACT("\:")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->obs("C++ constructor syntax", "method call syntax"))) { ($C) } else { () } } else { () } } else { () }
 }
@@ -42932,7 +42932,7 @@ $C->O(%term)
 }, $C->_SUBSUMEr(['sym'], sub {
 my $C = shift;
 $C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('::?'))) { $C->_SUBSUMEr(['identifier'], sub {
+if (my ($C) = ($C->_EXACT("\:\:\?"))) { $C->_SUBSUMEr(['identifier'], sub {
 my $C = shift;
 $C->identifier
 }) } else { () }
@@ -42979,7 +42979,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { $C->_EXACT('$/') } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { $C->_EXACT("\$\/") } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->obs('$/ variable as input record separator',
                  "the filehandle's .slurp method"))) { ($C) } else { () } } else { () }
@@ -42998,7 +42998,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('(')
+  push @gather, $C->_EXACT("\(")
 }
 or $xact->[-2] or
 do {
@@ -43131,7 +43131,7 @@ if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
@@ -43171,7 +43171,7 @@ do {
 $C->_PATTERN(qr/\G\d/)
 },
  sub { my $C=shift;
-$C->_EXACT('$')
+$C->_EXACT("\$")
 }
         )[$try])->($C);
         last if @gather;
@@ -43193,7 +43193,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('()')
+$C->_EXACT("\(\)")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->obs('rand()', 'rand'))) { ($C) } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -43295,10 +43295,10 @@ if (my ($C) = (do {
         $C->deb("infix__S_190lambda_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 },
  sub { my $C=shift;
-$C->_EXACT('->')
+$C->_EXACT("\-\>")
 }
         )[$try])->($C);
         last if @gather;
@@ -43367,7 +43367,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -43378,7 +43378,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -43425,7 +43425,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -43436,7 +43436,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -43476,7 +43476,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -43487,7 +43487,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -43724,7 +43724,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -43735,7 +43735,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -43831,7 +43831,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 (($C) x !!do {
@@ -43903,7 +43903,7 @@ $C->dottyop
 my $C = shift;
 $C->_PAREN(  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('.'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\."))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -43942,8 +43942,8 @@ do {
 $C->_PATTERN(qr/\G[+*?=]/)
 },
  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('^'))) { $C->_OPTr( sub { my $C=shift;
-$C->_EXACT('!')
+if (my ($C) = ($C->_EXACT("\^"))) { $C->_OPTr( sub { my $C=shift;
+$C->_EXACT("\!")
 }) } else { () }
 }
         )[$try])->($C);
@@ -44001,7 +44001,7 @@ sub privop {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "privop", do {
-if (my ($C) = ($C->_EXACT('!'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\!"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
@@ -44182,7 +44182,7 @@ do {
 if (my ($C) = ($C->unsp)) { ($C) } else { () }
 },
  sub { my $C=shift;
-$C->_EXACT('\\')
+$C->_EXACT("\\")
 }
         )[$try])->($C);
         last if @gather;
@@ -44201,7 +44201,7 @@ if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('.'))) { $C->_OPTr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\."))) { $C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->unsp)) { ($C) } else { () }
 }
@@ -44320,9 +44320,9 @@ $::LEFTSIGIL = '@'
 sub can_meta {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument op omitted' unless @_;
 my $op = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument meta omitted' unless @_;
 my $meta = @_ ? shift() : undef;
 !$op->{'O'}->{'fiddly'} ||
             $self->sorry("Can't " . $meta . " " . $op->{'sym'} . " because " . $op->{'O'}->{'dba'} . " operators are too fiddly");
@@ -44367,7 +44367,7 @@ do {
   my @gather;
 do {
   push @gather, $C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 })
 }
 or $xact->[-2] or
@@ -44436,10 +44436,10 @@ do {
 }, $C->_SUBSUME(['s'], sub {
 my $C = shift;
 $C->_PAREN(  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('['))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\["))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT(']'))) { $C->_BRACKET( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\]"))) { $C->_BRACKET( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -44475,7 +44475,7 @@ do {
         $C->deb("prefix_circumfix_meta_operator__S_196reduce_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('«')
+$C->_EXACT("«")
 },
  sub { my $C=shift;
 $C->before(  sub { my $C=shift;
@@ -44502,7 +44502,7 @@ do {
   push @gather, Cursor::lazymap(sub {
   my $C=$_[0];
 $C->before( sub { my $C=shift;
-$C->_EXACT(']')
+$C->_EXACT("\]")
 })
 }, $C->_SUBSUME(['op'], sub {
 my $C = shift;
@@ -44515,7 +44515,7 @@ do {
 if (my ($C) = ($C->_EXACT("\\"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 $C->before( sub { my $C=shift;
-$C->_EXACT(']')
+$C->_EXACT("\]")
 })
 }, $C->_SUBSUME(['op'], sub {
 my $C = shift;
@@ -44534,9 +44534,9 @@ $C
 })
 }))
 }, $C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('['))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\["))) { Cursor::lazymap(sub {
   my $C=$_[0];
-$C->_EXACT(']')
+$C->_EXACT("\]")
 }, $C->_PLUSg( sub { my $C=shift;
 $C->_NOTCHAR( sub { my $C=shift;
 $C->_PATTERN(qr/\G\s/)
@@ -44595,7 +44595,7 @@ $C->{sym} = "«";    $self->_MATCHIFYr($S, "prefix_postfix_meta_operator__S_197F
 if (my ($C) = ($C->_PATTERN(qr/\G«/))) { ($C) } else { () }
 },
  sub { my $C=shift;
-$C->_EXACT('<<')
+$C->_EXACT("\<\<")
 }
         )[$try])->($C);
         last if @gather;
@@ -44660,7 +44660,7 @@ do {
 if (my ($C) = ($C->_PATTERN(qr/\G»/))) { ($C) } else { () }
 },
  sub { my $C=shift;
-$C->_EXACT('>>')
+$C->_EXACT("\>\>")
 }
         )[$try])->($C);
         last if @gather;
@@ -44690,7 +44690,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }};
@@ -44715,7 +44715,7 @@ sub infix_prefix_meta_operator__S_199Bang {
 $C->{sym} = "\!";    $self->_MATCHIFYr($S, "infix_prefix_meta_operator__S_199Bang", do {
 if (my ($C) = ($C->_PATTERN(qr/\G\!/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('!')
+$C->_EXACT("\!")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = (scalar(do {
 
@@ -45013,10 +45013,10 @@ do {
         $C->deb("infix_circumfix_meta_operator__S_204Fre_Nch_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('«')
+$C->_EXACT("«")
 },
  sub { my $C=shift;
-$C->_EXACT('»')
+$C->_EXACT("»")
 }
         )[$try])->($C);
         last if @gather;
@@ -45074,10 +45074,10 @@ if (my ($C) = (do {
         $C->deb("infix_circumfix_meta_operator__S_204Fre_Nch_1 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('«')
+$C->_EXACT("«")
 },
  sub { my $C=shift;
-$C->_EXACT('»')
+$C->_EXACT("»")
 }
         )[$try])->($C);
         last if @gather;
@@ -45162,10 +45162,10 @@ do {
         $C->deb("infix_circumfix_meta_operator__S_205LtLt_GtGt_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('<<')
+$C->_EXACT("\<\<")
 },
  sub { my $C=shift;
-$C->_EXACT('>>')
+$C->_EXACT("\>\>")
 }
         )[$try])->($C);
         last if @gather;
@@ -45223,10 +45223,10 @@ if (my ($C) = (do {
         $C->deb("infix_circumfix_meta_operator__S_205LtLt_GtGt_1 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('<<')
+$C->_EXACT("\<\<")
 },
  sub { my $C=shift;
-$C->_EXACT('>>')
+$C->_EXACT("\>\>")
 }
         )[$try])->($C);
         last if @gather;
@@ -45268,7 +45268,7 @@ sub infix_postfix_meta_operator__S_206Equal {
     no warnings 'recursion';
     my $self = shift;
 
-1unless @_;
+die 'Required argument op omitted' unless @_;
 my $op = @_ ? shift() : undef;
 
     local $::CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
@@ -45277,7 +45277,7 @@ my $op = @_ ? shift() : undef;
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\=";    $self->_MATCHIFYr($S, "infix_postfix_meta_operator__S_206Equal", do {
-if (my ($C) = ($C->_EXACT('='))) { if (my ($C) = ($C->can_meta($op, "make assignment out of"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\="))) { if (my ($C) = ($C->can_meta($op, "make assignment out of"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my $C = $C->cursor_xact('ALT ||');
   my $xact = $C->xact;
@@ -45326,7 +45326,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -45337,7 +45337,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -45377,7 +45377,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -45388,7 +45388,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -45431,7 +45431,7 @@ local $::GOAL = "\}";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('{'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\{"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -45442,7 +45442,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('}')
+  push @gather, $C->_EXACT("\}")
 }
 or $xact->[-2] or
 do {
@@ -45483,7 +45483,7 @@ my $pos;
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\<\ \>";    $self->_MATCHIFYr($S, "postcircumfix__S_210Lt_Gt", do {
-if (my ($C) = ($C->_EXACT('<'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\<"))) { if (my ($C) = (scalar(do {
 $pos = $C->{'_pos'} 
 }, $C))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -45494,7 +45494,7 @@ do {
   push @gather, do {
 if (my ($C) = (Cursor::lazymap(sub {
   my $C=$_[0];
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }, $C->_SUBSUMEr(['nibble'], sub {
 my $C = shift;
 $C->nibble($C->cursor_fresh( $::LANG{'Q'} )->tweak('q' => 1)->tweak('w' => 1)->balanced('<','>'))
@@ -45552,7 +45552,7 @@ $C->sigil
 })
 },
  sub { my $C=shift;
-$C->_EXACT(':')
+$C->_EXACT("\:")
 }
         )[$try])->($C);
         last if @gather;
@@ -45598,7 +45598,7 @@ sub postcircumfix__S_211LtLt_GtGt {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\<\<\ \>\>";    $self->_MATCHIFYr($S, "postcircumfix__S_211LtLt_GtGt", do {
-if (my ($C) = ($C->_EXACT('<<'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\<\<"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -45607,7 +45607,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('>>')
+  push @gather, $C->_EXACT("\>\>")
 }
 or $xact->[-2] or
 do {
@@ -45641,7 +45641,7 @@ sub postcircumfix__S_212Fre_Nch {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "«\ »";    $self->_MATCHIFYr($S, "postcircumfix__S_212Fre_Nch", do {
-if (my ($C) = ($C->_EXACT('«'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("«"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -45650,7 +45650,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('»')
+  push @gather, $C->_EXACT("»")
 }
 or $xact->[-2] or
 do {
@@ -45851,13 +45851,13 @@ if (my ($C) = (do {
         $C->deb("methodop_1 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('$')
+$C->_EXACT("\$")
 },
  sub { my $C=shift;
-$C->_EXACT('@')
+$C->_EXACT("\@")
 },
  sub { my $C=shift;
-$C->_EXACT('&')
+$C->_EXACT("\&")
 }
         )[$try])->($C);
         last if @gather;
@@ -45907,7 +45907,7 @@ do {
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('"'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\""))) { Cursor::lazymap(sub {
   my $C=$_[0];
 $C->_PATTERN(qr/\G\s/)
 }, $C->_STARf( sub { my $C=shift;
@@ -45966,13 +45966,13 @@ if (my ($C) = (do {
         $C->deb("methodop_2 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 },
  sub { my $C=shift;
-$C->_EXACT('.(')
+$C->_EXACT("\.\(")
 },
  sub { my $C=shift;
-$C->_EXACT('\\')
+$C->_EXACT("\\")
 }
         )[$try])->($C);
         last if @gather;
@@ -46059,7 +46059,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
   my @result = do {
@@ -46099,7 +46099,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }
         )[$try])->($C);
         last if @gather;
@@ -46166,7 +46166,7 @@ sub semiarglist {
     $C->{'arglist'} = [];
     $self->_MATCHIFYr($S, "semiarglist", do {
 if (my ($C) = ($C->_REPSEPr(  sub { my $C=shift;
-$C->_EXACT(';')
+$C->_EXACT("\;")
 },  sub { my $C=shift;
 $C->_SUBSUMEr(['arglist'], sub {
 my $C = shift;
@@ -46317,7 +46317,7 @@ sub circumfix__S_214Cur_Ly {
 $C->{sym} = "\{\ \}";    $self->_MATCHIFYr($S, "circumfix__S_214Cur_Ly", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -46372,7 +46372,7 @@ sub infix__S_216Dot {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\.";    $self->_MATCHIFYr($S, "infix__S_216Dot", do {
-if (my ($C) = ($C->_EXACT('.'))) { if (my ($C) = ($C->_PATTERN(qr/\G[\]\)\},:\s\$"']/))) { if (my ($C) = ($C->obs('. to concatenate strings', '~'))) { ($C) } else { () } } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\."))) { if (my ($C) = ($C->_PATTERN(qr/\G[\]\)\},:\s\$"']/))) { if (my ($C) = ($C->obs('. to concatenate strings', '~'))) { ($C) } else { () } } else { () } } else { () }
 });
 }
 ;
@@ -46389,7 +46389,7 @@ sub postfix__S_217MinusGt {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\-\>";    $self->_MATCHIFYr($S, "postfix__S_217MinusGt", do {
-if (my ($C) = ($C->_EXACT('->'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\-\>"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -47078,7 +47078,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('<<')
+$C->_EXACT("\<\<")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }
@@ -47088,7 +47088,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('<')
+$C->_EXACT("\<")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }};
@@ -47133,7 +47133,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>>')
+$C->_EXACT("\>\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }
@@ -47143,7 +47143,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }};
@@ -47188,7 +47188,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('<<')
+$C->_EXACT("\<\<")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }
@@ -47198,7 +47198,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('<')
+$C->_EXACT("\<")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }};
@@ -47243,7 +47243,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>>')
+$C->_EXACT("\>\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }
@@ -47253,7 +47253,7 @@ do {
   push @gather, do {
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 }};
@@ -47281,7 +47281,7 @@ sub infix__S_251Plus {
 $C->{sym} = "\+";    $self->_MATCHIFYr($S, "infix__S_251Plus", do {
 if (my ($C) = ($C->_PATTERN(qr/\G\+/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('+')
+$C->_EXACT("\+")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
@@ -47305,7 +47305,7 @@ sub infix__S_252Minus {
 $C->{sym} = "\-";    $self->_MATCHIFYr($S, "infix__S_252Minus", do {
 if (my ($C) = ($C->_PATTERN(qr/\G\-/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('-')
+$C->_EXACT("\-")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
@@ -47807,10 +47807,10 @@ if (my ($C) = (do {
         $C->deb("infix__S_274DotDot_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(')')
+$C->_EXACT("\)")
 },
  sub { my $C=shift;
-$C->_EXACT(']')
+$C->_EXACT("\]")
 }
         )[$try])->($C);
         last if @gather;
@@ -47907,7 +47907,7 @@ sub infix__S_278EqualEqual {
 $C->{sym} = "\=\=";    $self->_MATCHIFYr($S, "infix__S_278EqualEqual", do {
 if (my ($C) = ($C->_PATTERN(qr/\G\=\=/))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('=')
+$C->_EXACT("\=")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
@@ -48045,7 +48045,7 @@ if (my ($C) = ($C->_PATTERN(qr/\G((?:[\x20\t\r])*+)/))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = (do { my $M = $C;
-$C->dumbsmart($M->{0}->Str)
+$C->dumbsmart($M->{0}->[0]->Str)
 ; })) { ($C) } else { () } } else { () }
 }
 }, $C->_SUBSUMEr(['0'], sub {
@@ -48086,10 +48086,10 @@ if (my ($C) = (do {
         $C->deb("infix__S_284TildeTilde_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('True')
+$C->_EXACT("True")
 },
  sub { my $C=shift;
-$C->_EXACT('False')
+$C->_EXACT("False")
 }
         )[$try])->($C);
         last if @gather;
@@ -48118,7 +48118,7 @@ $C->O(%chaining)
 sub dumbsmart {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument litbool omitted' unless @_;
 my $litbool = @_ ? shift() : undef;
 $self->worry("Smartmatch against $litbool always " .
             ($litbool eq 'True' ? 'matches' : 'fails') .
@@ -48521,7 +48521,7 @@ local $::GOAL = '!!';
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\?\?\ \!\!";    $self->_MATCHIFYr($S, "infix__S_304QuestionQuestion_BangBang", do {
-if (my ($C) = ($C->_EXACT('??'))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\?\?"))) { if (my ($C) = ($C->ws)) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -48530,7 +48530,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('!!')
+  push @gather, $C->_EXACT("\!\!")
 }
 or $xact->[-2] or
 do {
@@ -48538,7 +48538,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('::'))) { $C->_PATTERN(qr/\G[^=]/) } else { () }
+if (my ($C) = ($C->_EXACT("\:\:"))) { $C->_PATTERN(qr/\G[^=]/) } else { () }
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->panic("Please use !! rather than ::"))) { ($C) } else { () } } else { () }
 })) { ($C) } else { () }
@@ -48590,7 +48590,7 @@ $C->_EXACT("\n")
 })
 })))) { ($C) } else { () }
 }))) { ($C) } else { () }
-}))) { if (my ($C) = ($C->_EXACT('!!'))) { if (my ($C) = ($C->sorry("Bogus code found before the !!"))) { if (my ($C) = ($C->panic("Confused"))) { ($C) } else { () } } else { () } } else { () } } else { () }
+}))) { if (my ($C) = ($C->_EXACT("\!\!"))) { if (my ($C) = ($C->sorry("Bogus code found before the !!"))) { if (my ($C) = ($C->panic("Confused"))) { ($C) } else { () } } else { () } } else { () } } else { () }
 })) { ($C) } else { () }
 }
 }
@@ -48680,13 +48680,13 @@ if (my ($C) = ($C->_PATTERN(qr/\G\?/))) { if (my ($C) = (scalar(do {
 
 }, $C))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('?')
+$C->_EXACT("\?")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (Cursor::lazymap(sub {
   my $C=$_[0];
-$C->_EXACT(':')
+$C->_EXACT("\:")
 }, $C->_STARf( sub { my $C=shift;
 $C->_PATTERN(qr/\G[^;]/)
 })))) { ($C) } else { () }
@@ -49075,7 +49075,7 @@ sub infix__S_323Colon {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:";    $self->_MATCHIFYr($S, "infix__S_323Colon", do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
   my @result = do {
@@ -49373,7 +49373,7 @@ $C->unsp
 })
 },
  sub { my $C=shift;
-$C->_EXACT('(')
+$C->_EXACT("\(")
 }
         )[$try])->($C);
         last if @gather;
@@ -49497,7 +49497,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -49508,7 +49508,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -49532,7 +49532,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -49543,7 +49543,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -49615,7 +49615,7 @@ or $xact->[-2] or
 do {
   push @gather, do {
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 $C->_PATTERN(qr/\G\s/)
 }))) { ($C) } else { () }
@@ -49686,7 +49686,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('[')
+$C->_EXACT("\[")
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['postcircumfix'], sub {
 my $C = shift;
@@ -49699,7 +49699,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->after( sub { my $C=shift;
-$C->_EXACT_rev('::')
+$C->_EXACT_rev("\:\:")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
@@ -49739,16 +49739,16 @@ do {
         $C->deb("term__S_332name_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('«')
+$C->_EXACT("«")
 },
  sub { my $C=shift;
-$C->_EXACT('<')
+$C->_EXACT("\<")
 },
  sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 },
  sub { my $C=shift;
-$C->_EXACT('<<')
+$C->_EXACT("\<\<")
 }
         )[$try])->($C);
         last if @gather;
@@ -49816,7 +49816,7 @@ $C->longname
 sub check_nodecl {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
 if ($name lt 'a') {
 $::MEMOS[$self->{'_pos'}]->{'nodecl'} = $name}};
@@ -50013,7 +50013,7 @@ sub terminator__S_342Semi {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\;";    $self->_MATCHIFYr($S, "terminator__S_342Semi", do {
-if (my ($C) = ($C->_EXACT(';'))) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("\;"))) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () }
@@ -50033,7 +50033,7 @@ sub terminator__S_343if {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "if";    $self->_MATCHIFYr($S, "terminator__S_343if", do {
-if (my ($C) = ($C->_EXACT('if'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("if"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () } } else { () } } else { () }
@@ -50053,7 +50053,7 @@ sub terminator__S_344unless {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "unless";    $self->_MATCHIFYr($S, "terminator__S_344unless", do {
-if (my ($C) = ($C->_EXACT('unless'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("unless"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () } } else { () } } else { () }
@@ -50073,7 +50073,7 @@ sub terminator__S_345while {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "while";    $self->_MATCHIFYr($S, "terminator__S_345while", do {
-if (my ($C) = ($C->_EXACT('while'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("while"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () } } else { () } } else { () }
@@ -50093,7 +50093,7 @@ sub terminator__S_346until {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "until";    $self->_MATCHIFYr($S, "terminator__S_346until", do {
-if (my ($C) = ($C->_EXACT('until'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("until"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () } } else { () } } else { () }
@@ -50113,7 +50113,7 @@ sub terminator__S_347for {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "for";    $self->_MATCHIFYr($S, "terminator__S_347for", do {
-if (my ($C) = ($C->_EXACT('for'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("for"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () } } else { () } } else { () }
@@ -50133,7 +50133,7 @@ sub terminator__S_348given {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "given";    $self->_MATCHIFYr($S, "terminator__S_348given", do {
-if (my ($C) = ($C->_EXACT('given'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("given"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () } } else { () } } else { () }
@@ -50153,7 +50153,7 @@ sub terminator__S_349when {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "when";    $self->_MATCHIFYr($S, "terminator__S_349when", do {
-if (my ($C) = ($C->_EXACT('when'))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("when"))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { if (my ($C) = ($C->nofun)) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () } } else { () } } else { () }
@@ -50173,7 +50173,7 @@ sub terminator__S_350MinusMinusGt {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\-\-\>";    $self->_MATCHIFYr($S, "terminator__S_350MinusMinusGt", do {
-if (my ($C) = ($C->_EXACT('-->'))) { $C->_SUBSUMEr(['O'], sub {
+if (my ($C) = ($C->_EXACT("\-\-\>"))) { $C->_SUBSUMEr(['O'], sub {
 my $C = shift;
 $C->O(%terminator)
 }) } else { () }
@@ -50193,7 +50193,7 @@ sub terminator__S_351BangBang {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\!\!";    $self->_MATCHIFYr($S, "terminator__S_351BangBang", do {
-if (my ($C) = ($C->_EXACT('!!'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\!\!"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 (($C) x !!do {
 $::GOAL eq '!!' 
 })
@@ -50268,7 +50268,7 @@ $::GOAL eq '!!'
 })
 })
 }, $C->before( sub { my $C=shift;
-$C->_EXACT('!!')
+$C->_EXACT("\!\!")
 }))
 },
  sub { my $C=shift;
@@ -50315,7 +50315,7 @@ do {
         $C->deb("infixstopper_1 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 },
  sub { my $C=shift;
 $C->_SUBSUME(['lambda'], sub {
@@ -50678,7 +50678,7 @@ sub backslash__S_001qq {
 $C->{sym} = "qq";    $self->_MATCHIFYr($S, "backslash__S_001qq", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('q')
+$C->_EXACT("q")
 }))) { ($C) } else { () }
 }))) { scalar(do {
 my $M = $C;
@@ -50878,7 +50878,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -50889,7 +50889,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -51009,7 +51009,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -51020,7 +51020,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -51169,7 +51169,7 @@ sub escape__S_000Cur_Ly {
 $C->{sym} = "\{\ \}";    $self->_MATCHIFYr($S, "escape__S_000Cur_Ly", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 my $newlang = ($::LANG{'MAIN'});
@@ -51300,7 +51300,7 @@ do {
 if (my ($C) = (do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('$')
+$C->_EXACT("\$")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 my $newlang = ($::LANG{'MAIN'});
@@ -51441,7 +51441,7 @@ local $::QSIGIL = '@';
 $C->{sym} = "\@";    $self->_MATCHIFYr($S, "escape__S_000At", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('@')
+$C->_EXACT("\@")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -51625,7 +51625,7 @@ local $::QSIGIL = '%';
 $C->{sym} = "\%";    $self->_MATCHIFYr($S, "escape__S_000Percent", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('%')
+$C->_EXACT("\%")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -51809,7 +51809,7 @@ local $::QSIGIL = '&';
 $C->{sym} = "\&";    $self->_MATCHIFYr($S, "escape__S_000Amp", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('&')
+$C->_EXACT("\&")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -51936,7 +51936,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
 sub postprocess {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $s->parsepath }  1; };
 { package STD::Q::p0;
@@ -51957,7 +51957,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
 sub postprocess {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::w1;
@@ -51978,7 +51978,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
 sub postprocess {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $s->words }  1; };
 { package STD::Q::w0;
@@ -51999,7 +51999,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
 sub postprocess {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::ww1;
@@ -52020,7 +52020,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
 sub postprocess {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $s->words }  1; };
 { package STD::Q::ww0;
@@ -52041,7 +52041,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
 sub postprocess {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::x1;
@@ -52062,7 +52062,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
 sub postprocess {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $s->run }  1; };
 { package STD::Q::x0;
@@ -52083,7 +52083,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::
 sub postprocess {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::q;
@@ -52233,7 +52233,7 @@ sub backslash__S_001qq {
 $C->{sym} = "qq";    $self->_MATCHIFYr($S, "backslash__S_001qq", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('q')
+$C->_EXACT("q")
 }))) { ($C) } else { () }
 }))) { scalar(do {
 my $M = $C;
@@ -53132,7 +53132,7 @@ sub stopper {
 sub ccstate {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 if ($::CCSTATE eq '..') {
 $::CCSTATE = ''}
@@ -53158,7 +53158,7 @@ do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('#')
+$C->_EXACT("\#")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->ws)) { ($C) } else { () } } else { () }
 }))) { ($C) } else { () }
@@ -53180,7 +53180,7 @@ sub escape__S_001Sharp {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\#";    $self->_MATCHIFYr($S, "escape__S_001Sharp", do {
-if (my ($C) = ($C->_EXACT('#'))) { if (my ($C) = ($C->panic("Please backslash # for literal char or put whitespace in front for comment"))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\#"))) { if (my ($C) = ($C->panic("Please backslash # for literal char or put whitespace in front for comment"))) { ($C) } else { () } } else { () }
 });
 }
 ;
@@ -53249,7 +53249,7 @@ if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { if (my ($C) = ($C->_NOTBEFORE(
 if (my ($C) = ($C->stopper)) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('..')
+$C->_EXACT("\.\.")
 }))) { ($C) } else { () }
 }))) { $C->_NOTCHAR( sub { my $C=shift;
 $C->_PATTERN(qr/\G\s/)
@@ -53284,7 +53284,7 @@ sub escape__S_004Minus {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\-";    $self->_MATCHIFYr($S, "escape__S_004Minus", do {
-if (my ($C) = ($C->_EXACT('-'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\-"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 (($C) x !!do {
 $::CCSTATE ne '' 
 })
@@ -53536,7 +53536,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_PATTERN(qr/\G(?i:\\\[)/))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_PATTERN(qr/\G(?i:\[)/))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -53548,7 +53548,7 @@ do {
   my @gather;
 do {
   push @gather, do {
-if (my ($C) = ($C->_PATTERN(qr/\G(?i:\\\])/))) { ($C) } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G(?i:\])/))) { ($C) } else { () }
 }
 }
 or $xact->[-2] or
@@ -53726,7 +53726,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_PATTERN(qr/\G(?i:\\\[)/))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_PATTERN(qr/\G(?i:\[)/))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -53738,7 +53738,7 @@ do {
   my @gather;
 do {
   push @gather, do {
-if (my ($C) = ($C->_PATTERN(qr/\G(?i:\\\])/))) { ($C) } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G(?i:\])/))) { ($C) } else { () }
 }
 }
 or $xact->[-2] or
@@ -54417,11 +54417,10 @@ $self->sorry("Unrecognized quasiquote modifier: " . join('',@k));
 };
 
  1; };
-## method EXPR ($preclvl)
+## method EXPR ($preclvl?)
 sub EXPR {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
 my $preclvl = @_ ? shift() : undef;
 local $::CTX = $self->callm if $::DEBUG & DEBUG::trace_call;
 my $preclim = $preclvl ? $preclvl->{'prec'} // $LOOSEST : $LOOSEST;
@@ -58628,7 +58627,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT('#')
+$C->_EXACT("\#")
 }
         )[$try])->($C);
         last if @gather;
@@ -58701,7 +58700,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT('#')
+$C->_EXACT("\#")
 }
         )[$try])->($C);
         last if @gather;
@@ -58737,7 +58736,7 @@ sub unsp {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "unsp", do {
-if (my ($C) = ($C->_EXACT('\\'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\\"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
   my @result = do {
@@ -58777,7 +58776,7 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT('#')
+$C->_EXACT("\#")
 }
         )[$try])->($C);
         last if @gather;
@@ -59117,7 +59116,7 @@ $C->_PATTERN(qr/\G[\)\}\]]/)
 },
  sub { my $C=shift;
 $C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('>'))) { $C->_PATTERN(qr/\G[^>)]/) } else { () }
+if (my ($C) = ($C->_EXACT("\>"))) { $C->_PATTERN(qr/\G[^>)]/) } else { () }
 })
 },
  sub { my $C=shift;
@@ -59368,9 +59367,9 @@ sub metachar__S_010Gt {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\>";    $self->_MATCHIFYr($S, "metachar__S_010Gt", do {
-if (my ($C) = ($C->_EXACT('>'))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\>"))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
 my $C = shift;
@@ -59392,7 +59391,7 @@ sub metachar__S_011AmpAmp {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\&\&";    $self->_MATCHIFYr($S, "metachar__S_011AmpAmp", do {
-if (my ($C) = ($C->_EXACT('&&'))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
+if (my ($C) = ($C->_EXACT("\&\&"))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
 my $C = shift;
 $C->fail
 }) } else { () } } else { () }
@@ -59412,7 +59411,7 @@ sub metachar__S_012Amp {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\&";    $self->_MATCHIFYr($S, "metachar__S_012Amp", do {
-if (my ($C) = ($C->_EXACT('&'))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
+if (my ($C) = ($C->_EXACT("\&"))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
 my $C = shift;
 $C->fail
 }) } else { () } } else { () }
@@ -59432,7 +59431,7 @@ sub metachar__S_013VertVert {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\|\|";    $self->_MATCHIFYr($S, "metachar__S_013VertVert", do {
-if (my ($C) = ($C->_EXACT('||'))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
+if (my ($C) = ($C->_EXACT("\|\|"))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
 my $C = shift;
 $C->fail
 }) } else { () } } else { () }
@@ -59452,7 +59451,7 @@ sub metachar__S_014Vert {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\|";    $self->_MATCHIFYr($S, "metachar__S_014Vert", do {
-if (my ($C) = ($C->_EXACT('|'))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
+if (my ($C) = ($C->_EXACT("\|"))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
 my $C = shift;
 $C->fail
 }) } else { () } } else { () }
@@ -59472,7 +59471,7 @@ sub metachar__S_015Ket {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\]";    $self->_MATCHIFYr($S, "metachar__S_015Ket", do {
-if (my ($C) = ($C->_EXACT(']'))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
+if (my ($C) = ($C->_EXACT("\]"))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
 my $C = shift;
 $C->fail
 }) } else { () } } else { () }
@@ -59492,7 +59491,7 @@ sub metachar__S_016Thesis {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\)";    $self->_MATCHIFYr($S, "metachar__S_016Thesis", do {
-if (my ($C) = ($C->_EXACT(')'))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
+if (my ($C) = ($C->_EXACT("\)"))) { if (my ($C) = ($C->_COMMITLTM())) { $C->_SUBSUMEr(['fail'], sub {
 my $C = shift;
 $C->fail
 }) } else { () } } else { () }
@@ -59512,7 +59511,7 @@ sub metachar__S_017Semi {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\;";    $self->_MATCHIFYr($S, "metachar__S_017Semi", do {
-if (my ($C) = ($C->_EXACT(';'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\;"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -59637,7 +59636,7 @@ sub metachar__S_021Cur_Ly {
 $C->{sym} = "\{\ \}";    $self->_MATCHIFYr($S, "metachar__S_021Cur_Ly", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('{')
+$C->_EXACT("\{")
 }))) { ($C) } else { () }
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -59690,7 +59689,7 @@ sub metachar__S_023Minus {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\-";    $self->_MATCHIFYr($S, "metachar__S_023Minus", do {
-if (my ($C) = ($C->_EXACT('-'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\-"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 (($C) x !!do {
 $::GOAL eq ']' 
 })
@@ -59767,7 +59766,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('['))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\["))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -59778,7 +59777,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(']')
+  push @gather, $C->_EXACT("\]")
 }
 or $xact->[-2] or
 do {
@@ -59821,7 +59820,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -59832,7 +59831,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -59866,7 +59865,7 @@ sub metachar__S_029LtParen {
     my $C = $self->cursor_xact("RULE metachar__S_029LtParen");
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
-$C->{sym} = "\<\(";    $self->_MATCHIFYr($S, "metachar__S_029LtParen", $C->_EXACT('<('));
+$C->{sym} = "\<\(";    $self->_MATCHIFYr($S, "metachar__S_029LtParen", $C->_EXACT("\<\("));
 }
 ;
 ## token metachar:sym« )> » { ')>' }
@@ -59881,7 +59880,7 @@ sub metachar__S_030ThesisGt {
     my $C = $self->cursor_xact("RULE metachar__S_030ThesisGt");
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
-$C->{sym} = "\)\>";    $self->_MATCHIFYr($S, "metachar__S_030ThesisGt", $C->_EXACT(')>'));
+$C->{sym} = "\)\>";    $self->_MATCHIFYr($S, "metachar__S_030ThesisGt", $C->_EXACT("\)\>"));
 }
 ;
 ## token metachar:sym« << » { '<<' }
@@ -59896,7 +59895,7 @@ sub metachar__S_031LtLt {
     my $C = $self->cursor_xact("RULE metachar__S_031LtLt");
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
-$C->{sym} = "\<\<";    $self->_MATCHIFYr($S, "metachar__S_031LtLt", $C->_EXACT('<<'));
+$C->{sym} = "\<\<";    $self->_MATCHIFYr($S, "metachar__S_031LtLt", $C->_EXACT("\<\<"));
 }
 ;
 ## token metachar:sym« >> » { '>>' }
@@ -59911,7 +59910,7 @@ sub metachar__S_032GtGt {
     my $C = $self->cursor_xact("RULE metachar__S_032GtGt");
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
-$C->{sym} = "\>\>";    $self->_MATCHIFYr($S, "metachar__S_032GtGt", $C->_EXACT('>>'));
+$C->{sym} = "\>\>";    $self->_MATCHIFYr($S, "metachar__S_032GtGt", $C->_EXACT("\>\>"));
 }
 ;
 ## token metachar:sym< « > { '«' }
@@ -59926,7 +59925,7 @@ sub metachar__S_033Fre {
     my $C = $self->cursor_xact("RULE metachar__S_033Fre");
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
-$C->{sym} = "«";    $self->_MATCHIFYr($S, "metachar__S_033Fre", $C->_EXACT('«'));
+$C->{sym} = "«";    $self->_MATCHIFYr($S, "metachar__S_033Fre", $C->_EXACT("«"));
 }
 ;
 ## token metachar:sym< » > { '»' }
@@ -59941,7 +59940,7 @@ sub metachar__S_034Nch {
     my $C = $self->cursor_xact("RULE metachar__S_034Nch");
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
-$C->{sym} = "»";    $self->_MATCHIFYr($S, "metachar__S_034Nch", $C->_EXACT('»'));
+$C->{sym} = "»";    $self->_MATCHIFYr($S, "metachar__S_034Nch", $C->_EXACT("»"));
 }
 ;
 ## token metachar:qw {
@@ -59959,7 +59958,7 @@ sub metachar__S_035qw {
 $C->{sym} = "qw";    $self->_MATCHIFYr($S, "metachar__S_035qw", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('<'))) { $C->_PATTERN(qr/\G\s/) } else { () }
+if (my ($C) = ($C->_EXACT("\<"))) { $C->_PATTERN(qr/\G\s/) } else { () }
 }))) { ($C) } else { () }
 }))) { $C->_SUBSUMEr(['circumfix'], sub {
 my $C = shift;
@@ -59987,7 +59986,7 @@ my $newlang = $C->unbalanced($::GOAL);
 $C = bless($C, (ref($newlang) || $newlang))
 ;
 ;
-if (my ($C) = ($C->_EXACT('<'))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\<"))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -59998,7 +59997,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT('>')
+  push @gather, $C->_EXACT("\>")
 }
 or $xact->[-2] or
 do {
@@ -60130,7 +60129,7 @@ sub metachar__S_042Dollar {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\$";    $self->_MATCHIFYr($S, "metachar__S_042Dollar", do {
-if (my ($C) = ($C->_EXACT('$'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\$"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = (do {
   my @result = do {
@@ -60170,19 +60169,19 @@ if (my ($C) = (do {
 $C->_PATTERN(qr/\G\s/)
 },
  sub { my $C=shift;
-$C->_EXACT('|')
+$C->_EXACT("\|")
 },
  sub { my $C=shift;
-$C->_EXACT('&')
+$C->_EXACT("\&")
 },
  sub { my $C=shift;
-$C->_EXACT(')')
+$C->_EXACT("\)")
 },
  sub { my $C=shift;
-$C->_EXACT(']')
+$C->_EXACT("\]")
 },
  sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 },
  sub { my $C=shift;
 $C->_PATTERN(qr/\G\z/)
@@ -60248,7 +60247,7 @@ sub metachar__S_044Double_Double {
 $C->{sym} = "\"\ \"";    $self->_MATCHIFYr($S, "metachar__S_044Double_Double", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('"')
+$C->_EXACT("\"")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 my $newlang = ($::LANG{'MAIN'});
@@ -60278,7 +60277,7 @@ local $::QSIGIL = substr($::ORIG,$self->{'_pos'},1);
 $C->{sym} = "var";    $self->_MATCHIFYr($S, "metachar__S_045var", do {
 if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('$$')
+$C->_EXACT("\$\$")
 }))) { ($C) } else { () }
 }))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
@@ -60300,7 +60299,7 @@ $C->_SUBSUMEr(['binding'], sub {
 my $C = shift;
 $C->_PAREN(  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { if (my ($C) = ($C->_EXACT('='))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { $C->_SUBSUMEr(['quantified_atom'], sub {
+if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { if (my ($C) = ($C->_EXACT("\="))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)*+)/))) { $C->_SUBSUMEr(['quantified_atom'], sub {
 my $C = shift;
 $C->quantified_atom
 }) } else { () } } else { () } } else { () }
@@ -60348,7 +60347,7 @@ sub backslash__S_0470 {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "backslash__S_0470", do {
-if (my ($C) = ($C->_EXACT('0'))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("0"))) { if (my ($C) = ($C->_NOTBEFORE(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 $C->_PATTERN(qr/\G[0-7]/)
 }))) { ($C) } else { () }
@@ -60579,7 +60578,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_PATTERN(qr/\G(?i:\\\[)/))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_PATTERN(qr/\G(?i:\[)/))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -60591,7 +60590,7 @@ do {
   my @gather;
 do {
   push @gather, do {
-if (my ($C) = ($C->_PATTERN(qr/\G(?i:\\\])/))) { ($C) } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G(?i:\])/))) { ($C) } else { () }
 }
 }
 or $xact->[-2] or
@@ -60774,7 +60773,7 @@ local $::GOAL = "\]";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_PATTERN(qr/\G(?i:\\\[)/))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_PATTERN(qr/\G(?i:\[)/))) { if (my ($C) = (scalar(do {
 
 }, $C))) { Cursor::lazymap(sub {
   my $C=$_[0];
@@ -60786,7 +60785,7 @@ do {
   my @gather;
 do {
   push @gather, do {
-if (my ($C) = ($C->_PATTERN(qr/\G(?i:\\\])/))) { ($C) } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G(?i:\])/))) { ($C) } else { () }
 }
 }
 or $xact->[-2] or
@@ -61014,7 +61013,7 @@ do {
  sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 },
@@ -61088,7 +61087,7 @@ do {
  sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 },
@@ -61162,7 +61161,7 @@ do {
  sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 },
@@ -61250,7 +61249,7 @@ sub assertion__S_079method {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "method";    $self->_MATCHIFYr($S, "assertion__S_079method", do {
-if (my ($C) = ($C->_EXACT('.'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\."))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -61385,7 +61384,7 @@ do {
  sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 },
@@ -61404,7 +61403,7 @@ $C->nibbler
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('='))) { $C->_SUBSUMEr(['assertion'], sub {
+if (my ($C) = ($C->_EXACT("\="))) { $C->_SUBSUMEr(['assertion'], sub {
 my $C = shift;
 $C->assertion
 }) } else { () }
@@ -61412,7 +61411,7 @@ $C->assertion
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->ws)) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 my $newlang = ($C->cursor_fresh($::LANG{'MAIN'})->unbalanced('>'));
 $C = bless($C, (ref($newlang) || $newlang));
 ;
@@ -61425,7 +61424,7 @@ $C->arglist
 },
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 my $newlang = ($::LANG{'MAIN'});
@@ -61441,7 +61440,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -61484,7 +61483,7 @@ sub assertion__S_081Bra {
 $C->{sym} = "\[";    $self->_MATCHIFYr($S, "assertion__S_081Bra", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('[')
+$C->_EXACT("\[")
 }))) { ($C) } else { () }
 }))) { $C->_PLUSr( sub { my $C=shift;
 $C->_SUBSUMEr(['cclass_elem'], sub {
@@ -61511,7 +61510,7 @@ sub assertion__S_082Plus {
 $C->{sym} = "\+";    $self->_MATCHIFYr($S, "assertion__S_082Plus", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('+')
+$C->_EXACT("\+")
 }))) { ($C) } else { () }
 }))) { $C->_PLUSr( sub { my $C=shift;
 $C->_SUBSUMEr(['cclass_elem'], sub {
@@ -61538,7 +61537,7 @@ sub assertion__S_083Minus {
 $C->{sym} = "\-";    $self->_MATCHIFYr($S, "assertion__S_083Minus", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('-')
+$C->_EXACT("\-")
 }))) { ($C) } else { () }
 }))) { $C->_PLUSr( sub { my $C=shift;
 $C->_SUBSUMEr(['cclass_elem'], sub {
@@ -61630,7 +61629,7 @@ do {
  sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-$C->_EXACT('>')
+$C->_EXACT("\>")
 }))) { ($C) } else { () }
 }))) { ($C) } else { () }
 },
@@ -61718,10 +61717,10 @@ sub sign {
         $C->deb("sign_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('+')
+$C->_EXACT("\+")
 },
  sub { my $C=shift;
-$C->_EXACT('-')
+$C->_EXACT("\-")
 },
  sub { my $C=shift;
 if (my ($C) = ($C->before(  sub { my $C=shift;
@@ -61810,7 +61809,7 @@ $C->quibble($C->cursor_fresh( $::LANG{'Q'} )->tweak('cc' => 1))
 }, $C->_SUBSUMEr(['before'], sub {
 my $C = shift;
 $C->before( sub { my $C=shift;
-$C->_EXACT('[')
+$C->_EXACT("\[")
 })
 })))) { ($C) } else { () }
 }
@@ -61852,7 +61851,7 @@ local $::GOAL = "\)";
 my $goalpos = $C;
 ;
 ;
-if (my ($C) = ($C->_EXACT('('))) { if (my ($C) = (scalar(do {
+if (my ($C) = ($C->_EXACT("\("))) { if (my ($C) = (scalar(do {
 
 }, $C))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 my $newlang = ($::LANG{'MAIN'});
@@ -61868,7 +61867,7 @@ do {
   my $xact = $C->xact;
   my @gather;
 do {
-  push @gather, $C->_EXACT(')')
+  push @gather, $C->_EXACT("\)")
 }
 or $xact->[-2] or
 do {
@@ -61894,7 +61893,7 @@ sub mod_internal__S_088Colonmy {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:my";    $self->_MATCHIFYr($S, "mod_internal__S_088Colonmy", do {
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->before(  sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
@@ -61932,25 +61931,25 @@ do {
         $C->deb("mod_internal__S_088Colonmy_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('my')
+$C->_EXACT("my")
 },
  sub { my $C=shift;
-$C->_EXACT('state')
+$C->_EXACT("state")
 },
  sub { my $C=shift;
-$C->_EXACT('our')
+$C->_EXACT("our")
 },
  sub { my $C=shift;
-$C->_EXACT('anon')
+$C->_EXACT("anon")
 },
  sub { my $C=shift;
-$C->_EXACT('constant')
+$C->_EXACT("constant")
 },
  sub { my $C=shift;
-$C->_EXACT('temp')
+$C->_EXACT("temp")
 },
  sub { my $C=shift;
-$C->_EXACT('let')
+$C->_EXACT("let")
 }
         )[$try])->($C);
         last if @gather;
@@ -62038,10 +62037,10 @@ do {
         $C->deb("mod_internal__S_089Coloni_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(':i')
+$C->_EXACT("\:i")
 },
  sub { my $C=shift;
-$C->_EXACT(':ignorecase')
+$C->_EXACT("\:ignorecase")
 }
         )[$try])->($C);
         last if @gather;
@@ -62113,10 +62112,10 @@ do {
         $C->deb("mod_internal__S_090ColonBangi_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(':!i')
+$C->_EXACT("\:\!i")
 },
  sub { my $C=shift;
-$C->_EXACT(':!ignorecase')
+$C->_EXACT("\:\!ignorecase")
 }
         )[$try])->($C);
         last if @gather;
@@ -62193,10 +62192,10 @@ do {
         $C->deb("mod_internal__S_091ColoniParen_Thesis_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(':i')
+$C->_EXACT("\:i")
 },
  sub { my $C=shift;
-$C->_EXACT(':ignorecase')
+$C->_EXACT("\:ignorecase")
 }
         )[$try])->($C);
         last if @gather;
@@ -62224,7 +62223,7 @@ sub mod_internal__S_092Colon0i {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:0i";    $self->_MATCHIFYr($S, "mod_internal__S_092Colon0i", do {
-if (my ($C) = ($C->_EXACT(':'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\:"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -62263,10 +62262,10 @@ do {
         $C->deb("mod_internal__S_092Colon0i_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('i')
+$C->_EXACT("i")
 },
  sub { my $C=shift;
-$C->_EXACT('ignorecase')
+$C->_EXACT("ignorecase")
 }
         )[$try])->($C);
         last if @gather;
@@ -62348,10 +62347,10 @@ do {
         $C->deb("mod_internal__S_093Colona_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(':a')
+$C->_EXACT("\:a")
 },
  sub { my $C=shift;
-$C->_EXACT(':ignoreaccent')
+$C->_EXACT("\:ignoreaccent")
 }
         )[$try])->($C);
         last if @gather;
@@ -62423,10 +62422,10 @@ do {
         $C->deb("mod_internal__S_094ColonBanga_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(':!a')
+$C->_EXACT("\:\!a")
 },
  sub { my $C=shift;
-$C->_EXACT(':!ignoreaccent')
+$C->_EXACT("\:\!ignoreaccent")
 }
         )[$try])->($C);
         last if @gather;
@@ -62503,10 +62502,10 @@ do {
         $C->deb("mod_internal__S_095ColonaParen_Thesis_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(':a')
+$C->_EXACT("\:a")
 },
  sub { my $C=shift;
-$C->_EXACT(':ignoreaccent')
+$C->_EXACT("\:ignoreaccent")
 }
         )[$try])->($C);
         last if @gather;
@@ -62534,7 +62533,7 @@ sub mod_internal__S_096Colon0a {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:0a";    $self->_MATCHIFYr($S, "mod_internal__S_096Colon0a", do {
-if (my ($C) = ($C->_EXACT(':'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\:"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -62573,10 +62572,10 @@ do {
         $C->deb("mod_internal__S_096Colon0a_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('a')
+$C->_EXACT("a")
 },
  sub { my $C=shift;
-$C->_EXACT('ignoreaccent')
+$C->_EXACT("ignoreaccent")
 }
         )[$try])->($C);
         last if @gather;
@@ -62614,8 +62613,8 @@ sub mod_internal__S_097Colons {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:s";    $self->_MATCHIFYr($S, "mod_internal__S_097Colons", do {
-if (my ($C) = ($C->_EXACT(':s'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('igspace')
+if (my ($C) = ($C->_EXACT("\:s"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("igspace")
 }))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { scalar(do {
 $::RX{'s'} = 1 
 }, $C) } else { () } } else { () } } else { () }
@@ -62635,8 +62634,8 @@ sub mod_internal__S_098ColonBangs {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:\!s";    $self->_MATCHIFYr($S, "mod_internal__S_098ColonBangs", do {
-if (my ($C) = ($C->_EXACT(':!s'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('igspace')
+if (my ($C) = ($C->_EXACT("\:\!s"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("igspace")
 }))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { scalar(do {
 $::RX{'s'} = 0 
 }, $C) } else { () } } else { () } } else { () }
@@ -62656,8 +62655,8 @@ sub mod_internal__S_099ColonsParen_Thesis {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:s\(\ \)";    $self->_MATCHIFYr($S, "mod_internal__S_099ColonsParen_Thesis", do {
-if (my ($C) = ($C->_EXACT(':s'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('igspace')
+if (my ($C) = ($C->_EXACT("\:s"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("igspace")
 }))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
@@ -62684,11 +62683,11 @@ sub mod_internal__S_100Colon0s {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:0s";    $self->_MATCHIFYr($S, "mod_internal__S_100Colon0s", do {
-if (my ($C) = ($C->_EXACT(':'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\:"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('s'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('igspace')
+if (my ($C) = ($C->_EXACT("s"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("igspace")
 }))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { scalar(do {
 my $M = $C;
 $::RX{'s'} = $M->{0} 
@@ -62716,8 +62715,8 @@ sub mod_internal__S_101Colonr {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:r";    $self->_MATCHIFYr($S, "mod_internal__S_101Colonr", do {
-if (my ($C) = ($C->_EXACT(':r'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('atchet')
+if (my ($C) = ($C->_EXACT("\:r"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("atchet")
 }))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { scalar(do {
 $::RX{'r'} = 1 
 }, $C) } else { () } } else { () } } else { () }
@@ -62737,8 +62736,8 @@ sub mod_internal__S_102ColonBangr {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:\!r";    $self->_MATCHIFYr($S, "mod_internal__S_102ColonBangr", do {
-if (my ($C) = ($C->_EXACT(':!r'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('atchet')
+if (my ($C) = ($C->_EXACT("\:\!r"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("atchet")
 }))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { scalar(do {
 $::RX{'r'} = 0 
 }, $C) } else { () } } else { () } } else { () }
@@ -62758,8 +62757,8 @@ sub mod_internal__S_103ColonrParen_Thesis {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:r\(\ \)";    $self->_MATCHIFYr($S, "mod_internal__S_103ColonrParen_Thesis", do {
-if (my ($C) = ($C->_EXACT(':r'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('atchet')
+if (my ($C) = ($C->_EXACT("\:r"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("atchet")
 }))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { Cursor::lazymap(sub {
   my $C=$_[0];
 scalar(do {
@@ -62786,11 +62785,11 @@ sub mod_internal__S_104Colon0r {
     my $xact = $C->xact;
     my $S = $C->{'_pos'};
 $C->{sym} = "\:0r";    $self->_MATCHIFYr($S, "mod_internal__S_104Colon0r", do {
-if (my ($C) = ($C->_EXACT(':'))) { Cursor::lazymap(sub {
+if (my ($C) = ($C->_EXACT("\:"))) { Cursor::lazymap(sub {
   my $C=$_[0];
 do {
-if (my ($C) = ($C->_EXACT('r'))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT('atchet')
+if (my ($C) = ($C->_EXACT("r"))) { if (my ($C) = ($C->_OPTr( sub { my $C=shift;
+$C->_EXACT("atchet")
 }))) { if (my ($C) = ($C->_PATTERN(qr/\G\b/))) { scalar(do {
 my $M = $C;
 $::RX{'r'} = $M->{0} 
@@ -62854,10 +62853,10 @@ do {
         $C->deb("mod_internal__S_105ColonPerl5_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT(':Perl5')
+$C->_EXACT("\:Perl5")
 },
  sub { my $C=shift;
-$C->_EXACT(':P5')
+$C->_EXACT("\:P5")
 }
         )[$try])->($C);
         last if @gather;
@@ -62895,7 +62894,7 @@ sub mod_internal__S_106p6adv {
 $C->{sym} = "p6adv";    $self->_MATCHIFYr($S, "mod_internal__S_106p6adv", do {
 if (my ($C) = ($C->before(  sub { my $C=shift;
 if (my ($C) = ($C->before( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT(':'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\:"))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -62931,10 +62930,10 @@ do {
         $C->deb("mod_internal__S_106p6adv_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('dba')
+$C->_EXACT("dba")
 },
  sub { my $C=shift;
-$C->_EXACT('lang')
+$C->_EXACT("lang")
 }
         )[$try])->($C);
         last if @gather;
@@ -62957,7 +62956,7 @@ $C->quotepair
 })
 }))) { scalar(do {
 my $M = $C;
-$M->{'sym'} = [split(/ /, ": $M->{'quotepair'}->{'key'}", -1)] 
+$M->{'sym'} = ':' . $M->{'quotepair'}->{'k'} 
 }, $C) } else { () } } else { () }
 });
 }
@@ -62984,7 +62983,7 @@ $C->sorry("Unrecognized regex modifier " . $M->{0}->Str )
 }, $C->_SUBSUMEr(['0'], sub {
 my $C = shift;
 $C->_PAREN(  sub { my $C=shift;
-if (my ($C) = ($C->_EXACT(':'))) { $C->_PATTERN(qr/\G((?:\w)++)/) } else { () }
+if (my ($C) = ($C->_EXACT("\:"))) { $C->_PATTERN(qr/\G((?:\w)++)/) } else { () }
 })
 })));
 }
@@ -63136,14 +63135,14 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_PATTERN(qr/\G((?:\d)++)/))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)++)/))) { if (my ($C) = ($C->_EXACT('..'))) { if (my ($C) = ($C->panic("Spaces not allowed in bare range"))) { ($C) } else { () } } else { () } } else { () } } else { () }
+if (my ($C) = ($C->_PATTERN(qr/\G((?:\d)++)/))) { if (my ($C) = ($C->_PATTERN(qr/\G((?:\s)++)/))) { if (my ($C) = ($C->_EXACT("\.\."))) { if (my ($C) = ($C->panic("Spaces not allowed in bare range"))) { ($C) } else { () } } else { () } } else { () } } else { () }
 })) { ($C) } else { () }
 },
  sub { my $C=shift;
 if (my ($C) = ($C->_PATTERN(qr/\G((?:\d)++)/))) { $C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
-if (my ($C) = ($C->_EXACT('..'))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
+if (my ($C) = ($C->_EXACT("\.\."))) { if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
 do {
   my @result = do {
     my ($tag, $try);
@@ -63182,7 +63181,7 @@ do {
 $C->_PATTERN(qr/\G((?:\d)++)/)
 },
  sub { my $C=shift;
-$C->_EXACT('*')
+$C->_EXACT("\*")
 },
  sub { my $C=shift;
 if (my ($C) = ($C->panic("Malformed range"))) { ($C) } else { () }
@@ -63281,7 +63280,7 @@ do {
         push @gather, ((
  sub { my $C=shift;
 if (my ($C) = (do {
-if (my ($C) = ($C->_EXACT('!'))) { if (my ($C) = ($C->_PATTERN(qr/\G\~\~/))) { ($C) } else { () } } else { () }
+if (my ($C) = ($C->_EXACT("\!"))) { if (my ($C) = ($C->_PATTERN(qr/\G\~\~/))) { ($C) } else { () } } else { () }
 })) { ($C) } else { () }
 },
  sub { my $C=shift;
@@ -63323,7 +63322,7 @@ sub quantmod {
     my $S = $C->{'_pos'};
     $self->_MATCHIFYr($S, "quantmod", do {
 if (my ($C) = ($C->_OPTr( sub { my $C=shift;
-$C->_EXACT(':')
+$C->_EXACT("\:")
 }))) { $C->_OPTr( sub { my $C=shift;
 do {
 if (my ($C) = ($C->_BRACKETr( sub { my $C=shift;
@@ -63362,13 +63361,13 @@ do {
         $C->deb("quantmod_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
         push @gather, ((
  sub { my $C=shift;
-$C->_EXACT('?')
+$C->_EXACT("\?")
 },
  sub { my $C=shift;
-$C->_EXACT('!')
+$C->_EXACT("\!")
 },
  sub { my $C=shift;
-$C->_EXACT('+')
+$C->_EXACT("\+")
 }
         )[$try])->($C);
         last if @gather;
@@ -63712,7 +63711,7 @@ $self;
 sub is_name {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument n omitted' unless @_;
 my $n = @_ ? shift() : undef;
 my $curpad = @_ ? shift() : $::CURPAD;
 my $name = $n;
@@ -63769,7 +63768,7 @@ return 0;
 sub find_stash {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument n omitted' unless @_;
 my $n = @_ ? shift() : undef;
 my $curpad = @_ ? shift() : $::CURPAD;
 my $name = $n;
@@ -63819,7 +63818,7 @@ return ();
 sub find_top_pkg {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
 $self->deb("find_top_pkg $name") if $::DEBUG & DEBUG::symtab;
 $name .= '::' unless $name =~ /\:\:$/;
@@ -63848,7 +63847,7 @@ return 0;
 sub add_name {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
 my $scope = $::SCOPE || 'my';
 my $pkgdecl = $::PKGDECL || 'symbol';
@@ -63871,7 +63870,7 @@ $self;
 sub add_my_name {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument n omitted' unless @_;
 my $n = @_ ? shift() : undef;
 my $d = @_ ? shift() : ();
 my $p = @_ ? shift() : ();
@@ -63966,7 +63965,7 @@ $self;
 sub add_our_name {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument n omitted' unless @_;
 my $n = @_ ? shift() : undef;
 my $name = $n;
 $self->deb("add_our_name $name in " . $::CURPKG->id) if $::DEBUG & DEBUG::symtab;
@@ -64058,11 +64057,11 @@ $self;
 sub add_mystery {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument token omitted' unless @_;
 my $token = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument pos omitted' unless @_;
 my $pos = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument ctx omitted' unless @_;
 my $ctx = @_ ? shift() : undef;
 my $name = $token->Str;
 return $self if $::IN_PANIC;
@@ -64127,7 +64126,7 @@ $self;
 sub load_setting {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument setting omitted' unless @_;
 my $setting = @_ ? shift() : undef;
 $ALL = $self->load_pad($setting);
 $::CORE = $ALL->{'CORE'};
@@ -64144,7 +64143,7 @@ $::CURPKG = $::GLOBAL;
 sub is_known {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument n omitted' unless @_;
 my $n = @_ ? shift() : undef;
 my $curpad = @_ ? shift() : $::CURPAD;
 my $name = $n;
@@ -64199,11 +64198,11 @@ return 0;
 sub pad_can_find_name {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument pad omitted' unless @_;
 my $pad = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument varbind omitted' unless @_;
 my $varbind = @_ ? shift() : undef;
 $self->deb("Looking in ", $pad->id) if $::DEBUG & DEBUG::symtab;
 if ($pad->{$name}) {
@@ -64237,7 +64236,7 @@ return 0;
 sub add_routine {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
 $::MEMOS[$self->{'_pos'}]->{'wasname'} = $name if $self->is_name($name);
 my $vname = '&' . $name;
@@ -64248,7 +64247,7 @@ $self;
 sub add_variable {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
 my $scope = $::SCOPE || 'our';
 return $self if $scope eq 'anon';
@@ -64262,9 +64261,9 @@ $self;
 sub add_constant {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument value omitted' unless @_;
 my $value = @_ ? shift() : undef;
 local $::IN_DECL = 'constant';
 $self->deb("add_constant $name = $value in", $::CURPAD->id) if $::DEBUG & DEBUG::symtab;
@@ -64277,7 +64276,7 @@ $self;
 sub add_placeholder {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
 my $decl = $::CURPAD->{'!IN_DECL'} // '';
 $decl = ' ' . $decl if $decl;
@@ -64309,7 +64308,7 @@ $self;
 sub check_variable {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument variable omitted' unless @_;
 my $variable = @_ ? shift() : undef;
 my $name = $variable->Str;
 $self->deb("check_variable $name") if $::DEBUG & DEBUG::symtab;
@@ -64371,7 +64370,7 @@ $self;
 sub lookup_compiler_var {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
 my $default = @_ ? shift() : ();
 my $lex = $::CURPAD->{$name};
@@ -64468,7 +64467,7 @@ return 0;
 sub panic {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 die "Recursive panic" if $::IN_PANIC;
 $::IN_PANIC++;
@@ -64553,7 +64552,7 @@ die "Parse failed\n";
 sub worry {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 my $m = $s . $self->locmess;
 push @::WORRIES, $m unless $::WORRIES{$s}++;
@@ -64563,7 +64562,7 @@ $self;
 sub sorry {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $self->deb("sorry $s") if $::DEBUG;
 print STDERR $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
@@ -64607,7 +64606,7 @@ $self->lineof($self->{'_pos'})};
 sub lineof {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument p omitted' unless @_;
 my $p = @_ ? shift() : undef;
 return 1 unless defined $p;
 my $line = $::MEMOS[$p]->{'L'};
@@ -64633,11 +64632,11 @@ my $self = shift;
 sub FAILGOAL {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument stop omitted' unless @_;
 my $stop = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument name omitted' unless @_;
 my $name = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument startpos omitted' unless @_;
 my $startpos = @_ ? shift() : undef;
 my $s = "'$stop'";
 $s = '"\'"' if $s eq "'''";
@@ -64647,9 +64646,9 @@ $self->panic("Unable to parse $name" . $startpos->locmess . "\nCouldn't find fin
 sub obs {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument old omitted' unless @_;
 my $old = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument new omitted' unless @_;
 my $new = @_ ? shift() : undef;
 my $when = @_ ? shift() : ' in Perl 6';
 %$::HIGHEXPECT = ();
@@ -64659,9 +64658,9 @@ $self->panic("Unsupported use of $old;$when please use $new");
 sub sorryobs {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument old omitted' unless @_;
 my $old = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument new omitted' unless @_;
 my $new = @_ ? shift() : undef;
 my $when = @_ ? shift() : ' in Perl 6';
 %$::HIGHEXPECT = ();
@@ -64672,9 +64671,9 @@ $self;
 sub worryobs {
 no warnings 'recursion';
 my $self = shift;
-1unless @_;
+die 'Required argument old omitted' unless @_;
 my $old = @_ ? shift() : undef;
-1unless @_;
+die 'Required argument new omitted' unless @_;
 my $new = @_ ? shift() : undef;
 my $when = @_ ? shift() : ' in Perl 6';
 $self->worry("Unsupported use of $old;$when please use $new");
