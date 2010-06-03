@@ -169,7 +169,7 @@ sub MAIN {
 	spew $r->p6;
     }
     elsif ($output eq 'p5') {
-	spew fixpod($r->p5);
+	spew fixpod($r->p5) . "\n";
     }
     elsif ($output eq 'store') {
 	my $data = { AST => $r, GENCLASS => \%Actions::GENCLASS,
