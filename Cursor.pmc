@@ -64,7 +64,12 @@ our $CLEAR = color 'clear';
 
 use LazyMap qw(lazymap eager);
 
-use Moose ':all' => { -prefix => 'moose_' };
+BEGIN {
+    require Moose;
+    # this prevents us from inheriting from Moose::Object, which saves a
+    # good 20 seconds on DESTROY/DEMOLISHALL
+    Moose::Meta::Class->create('Cursor');
+}
 
 $::PERL6HERE = $ENV{PERL6HERE} // '⏏';
 Encode::_utf8_on($::PERL6HERE);
