@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl
 
-# The start of a gimme5 replacement based on STD parsing.
-#
+# Translate Perl 6 to Perl 5, among other things
+
 use strict;
 use 5.010;
 use warnings FATAL => 'all';
