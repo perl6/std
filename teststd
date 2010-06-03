@@ -16,6 +16,9 @@ You can press CTRL-C when you feel bored.
 WARNING
 
 my $dir_to_test = shift @ARGV || '../../t/spec/';
+my $pkgdir = (-e "$dir_to_test/packages") ? "$dir_to_test/packages" :
+    "$dir_to_test/spec/packages";
+$ENV{PERL6LIB} = "lib:$pkgdir:.";
 my $fail = 0;
 my $success = 0;
 my @files = sort `find $dir_to_test -name '*.t'`;

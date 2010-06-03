@@ -2647,7 +2647,7 @@ sub do_need { my $self = shift;
             @::PERL6LIB = split ':', $ENV{PERL6LIB}
         }
         else {
-            @::PERL6LIB = qw( ./lib ../lib t/spec/packages ../t/spec/packages . .. );
+            @::PERL6LIB = qw( ./lib . );
         }
     }
     $modfile =~ s/::/\//g;
