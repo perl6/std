@@ -3170,9 +3170,6 @@ END
 	$self->SUPER::clean;
 	delete $self->{nobind};
 	delete $self->{need_match};
-	# XXX STD gimme5 bug-compatibility; special_variable:['$/'] causes
-	# a LTM conflict with $<a>, without this
-	$self->{sym} = "['\$<']" if $self->{sym} && $self->{sym} eq '$<';
 	$self->{rest} = defined $self->{rest};
     }
     sub _walk {

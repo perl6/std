@@ -2494,7 +2494,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym['$<'] {
-        <sym> :: <!before \s* \w+ \s* '>' >
+        <sym> <?before \h* <[ = , ; ? : ! ) \] } ]> <!before \S* '>'> >
         <.obs('$< variable', '$*UID')>
     }
 
