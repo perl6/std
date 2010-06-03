@@ -2858,14 +2858,13 @@ TEXT
         my $self = shift;
 	$$self{i_needed} = 1;
 	if ($$self{i}) {
-            my $text = quotemeta($$self{text});
+            my $text = ::rd($$self{text});
             $text = "(?<=$text)" if $::REV;
-	    DEEP::raw("\$C->_PATTERN(qr/\\G(?i:" . ::rd($text) . ")/)");
+	    DEEP::raw("\$C->_PATTERN(qr/\\G(?i:$text)/)");
 	}
 	else {
-            my $text = $$self{text};
-            $text =~ s/([\\'])/\\$1/g;
-	    DEEP::raw("\$C->_EXACT$::REV('$text')", precut => 1);
+            my $text = ::rd($$self{text});
+	    DEEP::raw("\$C->_EXACT$::REV(\"$text\")", precut => 1);
 	}
     }
 }
