@@ -31,6 +31,20 @@ our $OPT_output_file = undef;
 my $PROG = '';
 my @did_ws;
 
+BEGIN {
+    # Let's say you have a tricky optimization that breaks the build.  You want
+    # to know exactly which rewrite is culpable?  Try bisecting with
+    # VIV_OPTLIMIT, after wrapping the rewrite in if (DARE_TO_OPTIMIZE).
+    my $optlimit = $ENV{VIV_OPTLIMIT};
+    if (defined $optlimit) {
+	*DARE_TO_OPTIMIZE = Sub::Name::subname(DARE_TO_OPTIMIZE => sub {
+		$optlimit-- > 0
+	});
+    } else {
+	constant->import(DARE_TO_OPTIMIZE => 1);
+    }
+};
+
 my @context;
 $::MULTINESS = '';
 # XXX STD Global trait tables simulate inheritence
@@ -2883,7 +2897,7 @@ TEXT
         my ($self, $outer, $inner) = @_;
 	my ($out1, $outr) = $outer->uncut;
 	if ($outr) {
-	    DEEP::ratchet($inner, $outer);
+	    DEEP::ratchet($inner, $out1);
 	} else {
 	    DEEP::raw(::hang("Cursor::lazymap(" . DEEP::chunk($inner)->p5 .
 		",\n" . $outer->p5 . ")", "    "));
@@ -3817,7 +3831,7 @@ END
 
 { package DEEPblockbase; our @ISA = 'DEEPbase';
     sub p5 { my $self = shift;
-	"do {\n" . ::indent($self->p5block) . "}";
+	"do {\n" . ::indent($self->p5block(sh => 1)) . "}";
     }
 }
 
@@ -3864,7 +3878,7 @@ END
 	"\$C->_SUBSUME$r([" .
 	    join(',', map {"'$_'"} @{$self->{names}}) .
 	    "], sub {\n" . ::indent("my \$C = shift;\n" .
-	    $chinner->p5block) . "})";
+	    $chinner->p5block(cl => 1, sh => 1)) . "})";
     }
 }
 
@@ -3872,29 +3886,40 @@ END
     sub DEEP::ratchet {
 	my $child = shift;
 	my @before = @_;
-	# TODO: Work out what the problem is here
-	#if ($child->isa('DEEP::ratchet')) {
-	#    push @before, @{$child->{before}};
-	#    $child = $child->{child};
-	#}
-	#my ($chinner, $chr) = $child->uncut;
-	#if ($chr) {
-	#    push @before, $chinner;
-	#    $child = DEEP::raw('$C', precut => 1);
-	#}
+	if (::DARE_TO_OPTIMIZE) {
+	    if ($child->isa('DEEP::ratchet')) {
+		push @before, @{$child->{before}};
+		$child = $child->{child};
+	    }
+	    my ($chinner, $chr) = $child->uncut;
+	    if ($chr && $chinner != $child) {
+		push @before, $chinner;
+		$child = DEEP::raw('$C', precut => 1);
+	    }
+	}
 	bless { child => $child, before => \@before }, "DEEP::ratchet";
     }
 
     sub maybacktrack { $_[0]{child}->maybacktrack }
 
-    sub p5block { my $self = shift;
-	my $bl = '';
-	for my $insn (@{$self->{before}}) {
-	    my $cont = ::hang($insn->p5, "        ");
-	    $bl .= !$bl ? "if (my (\$C) = ($cont)"
-		        : "\nand my (\$C) = ($cont)";
+    sub p5block { my $self = shift; my %a = @_;
+	if (@{$self->{before}} == 1) {
+	    my $pre = $self->{before}[0];
+	    return "if (my (\$C) = (" . ::hang($pre->p5, " " x 8). ")) {\n" .
+		::indent($self->{child}->p5block) . "} else { () }\n";
 	}
-	$bl . ") {\n" . ::indent($self->{child}->p5block) . "} else { () }\n";
+	my $conditional = join ::hang("\nand ", "    "),
+	    map { "(\$C) = (" . ::hang($_->p5, " " x 8) . ")" }
+	    @{$self->{before}};
+
+	my $guts = ($conditional ?
+	    "if ($conditional) {\n" .
+		::indent($self->{child}->p5block) . "} else { () }\n"
+	    : $self->{child}->p5block(cl => 1, sh => 1));
+
+	$guts = "my \$C = \$C;\n" . $guts unless $a{cl};
+	$guts = "do {\n" . ::indent($guts) . "};\n" unless $a{sh};
+	$guts;
     }
 }
 # NOT a regex bit, but a value
@@ -3909,7 +3934,7 @@ END
         "sub {\n" . ::indent(
 	    "my \$C=shift;\n" .
 	    join("", map { $_->p5block } @{ $self->{decl} }) .
-	    $self->{child}->p5block) . "}";
+	    $self->{child}->p5block(cl => 1, sh => 1)) . "}";
     }
 }
 
