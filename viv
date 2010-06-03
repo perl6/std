@@ -2897,16 +2897,36 @@ TEXT
         my @decl;
         if ($$self{zyg}) {
             my @kids = @{$$self{zyg}};
+	    my @ckids;
 
             while (@kids and ref $kids[0] eq 'RE_decl') {
                 push @decl, shift(@kids)->walk->p5block;
             }
 
-            @kids = reverse @kids if $::REV;
-            foreach my $kid (@kids) {
-                my $r = $kid->walk;
-                push @result, $r;
-            }
+	    @kids = map { $_->walk } @kids;
+
+	    while (@kids) {
+		my $rx = '';
+		my $hm = 0;
+
+		while (@kids && $kids[0]->isa('DEEP::p5regex')) {
+		    my $rk = shift(@kids);
+		    $rx .= $rk->cutre(0);
+		    $hm ||= $rk->{has_meta};
+		}
+
+		if ($rx) {
+		    push @ckids, DEEP::p5regex($rx, needs_bracket => 1,
+			has_meta => $hm);
+		}
+
+		if (@kids) {
+		    push @ckids, shift(@kids);
+		}
+	    }
+
+            @ckids = reverse @ckids if $::REV;
+	    @result = @ckids;
         }
         my $result = pop @result;
         for (reverse @result) {
@@ -3282,10 +3302,7 @@ END
 		 $how eq '?' ? '?' :
 			       '+';
 	if ($atom->isa('DEEP::p5regex') && $hc eq 'r' && !$::REV && $qfer ne '**') {
-	    my $a = $atom->{text};
-	    $a = $atom->{needs_cut} ? "(?>$a)" :
-		 $atom->{needs_bracket} ? "(?:$a)" : $a;
-	    return DEEP::p5regex("$a$qfer$hr", needs_bracket => 1);
+	    return DEEP::p5regex($atom->cutre(1) . "$qfer$hr", needs_bracket => 1);
 	}
 
 	if ($qfer eq '*') {
@@ -3879,6 +3896,15 @@ END
 	$self->{has_meta} ?
 	    "\$C->_PATTERN(qr/\\G" . $self->{text} . "/)" :
 	    "\$C->_EXACT(\"" . $self->{text} . "\")";
+    }
+
+    sub cutre {
+	my $self = shift;
+	my $btoo = shift;
+	$self->{needs_cut} ? "(?>" . $self->{text} . ")"
+			   : ($btoo && $self->{needs_bracket}
+				? "(?:" . $self->{text} . ")"
+				: $self->{text});
     }
 
     sub maybacktrack { 0 }
