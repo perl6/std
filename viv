@@ -2808,12 +2808,11 @@ TEXT
     sub walk {  my $self = shift;
 	say STDERR "--> $self" if $OPT_log;
 	my $exp = $self->_walk;
-	say STDERR "<-- $exp: ", $exp->p5 if $OPT_log;
 	if ($self->{r} && $exp->maybacktrack) {
-	    return DEEP::cut($exp);
-	} else {
-	    return $exp;
+	    $exp = DEEP::cut($exp);
 	}
+	say STDERR "<-- $exp: ", $exp->p5 if $OPT_log;
+	$exp;
     }
 
     sub _walk {
@@ -2884,7 +2883,7 @@ TEXT
         my ($self, $outer, $inner) = @_;
 	my ($out1, $outr) = $outer->uncut;
 	if ($outr) {
-	    DEEP::raw("if (my (\$C) = (" . ::hang($out1->p5, "    ") . ")) {\n" . ::indent($inner->p5block) . "} else { () }\n", isblock => 1, precut => !$inner->maybacktrack);
+	    DEEP::ratchet($inner, $outer);
 	} else {
 	    DEEP::raw(::hang("Cursor::lazymap(" . DEEP::chunk($inner)->p5 .
 		",\n" . $outer->p5 . ")", "    "));
@@ -3841,6 +3840,8 @@ END
 	"if (my (\$C) = (" . ::hang($self->{child}->p5, "    ") . ")) { (\$C) } else { () }\n";
     }
 
+    sub maybacktrack { 0 }
+
     sub uncut {
 	my $self = shift;
 	my ($child_uncut) = $self->{child}->uncut;
@@ -3867,6 +3868,36 @@ END
 	    join(',', map {"'$_'"} @{$self->{names}}) .
 	    "], sub {\n" . ::indent("my \$C = shift;\n" .
 	    $chinner->p5block) . "})";
+    }
+}
+
+{ package DEEP::ratchet; our @ISA = 'DEEPblockbase';
+    sub DEEP::ratchet {
+	my $child = shift;
+	my @before = @_;
+	# TODO: Work out what the problem is here
+	#if ($child->isa('DEEP::ratchet')) {
+	#    push @before, @{$child->{before}};
+	#    $child = $child->{child};
+	#}
+	#my ($chinner, $chr) = $child->uncut;
+	#if ($chr) {
+	#    push @before, $chinner;
+	#    $child = DEEP::raw('$C', precut => 1);
+	#}
+	bless { child => $child, before => \@before }, "DEEP::ratchet";
+    }
+
+    sub maybacktrack { $_[0]{child}->maybacktrack }
+
+    sub p5block { my $self = shift;
+	my $bl = '';
+	for my $insn (@{$self->{before}}) {
+	    my $cont = ::hang($insn->p5, "        ");
+	    $bl .= !$bl ? "if (my (\$C) = ($cont)"
+		        : "\nand my (\$C) = ($cont)";
+	}
+	$bl . ") {\n" . ::indent($self->{child}->p5block) . "} else { () }\n";
     }
 }
 # NOT a regex bit, but a value
