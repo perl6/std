@@ -2928,7 +2928,7 @@ TEXT
 		    $hm ||= $rk->{has_meta};
 		}
 
-		if ($rx) {
+		if ($rx ne '') {
 		    push @ckids, DEEP::p5regex($rx, needs_bracket => 1,
 			has_meta => $hm);
 		}
