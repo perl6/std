@@ -1,21 +1,20 @@
 =head1 Perl 6 Parser Stuff in the Pugs Repo
 
-This is a start of some notes about what's going on in this magical
-directory of pugs/src/perl6.  It is the home of STD.pm, the canonical
-Perl 6 grammar, which is written in Perl 6, setting us all a typical
-chicken-or-egg bootstrapping challenge.  So Larry has devised a cunning
-Perl 6 to Perl 5 translator for just this job, called "gimme5".  Running
-C<make> tells gimme5 to convert STD.pm into a Perl 5 script called
-"viv".
-
-Using "viv" with the -e option will output an Abstract Syntax Tree for
-your input program.  The AST is in YAML format.
+Welcome to pugs/src/perl6.  This is the home of STD.pm6, the canonical
+Perl 6 grammar, which is written in Perl 6 (of course).  It is also the
+home of viv, a retargettable Perl 6 metacompiler which can translate
+STD.pm6 into Perl 5 (and eventually other things).  The metacompiler
+relies on STD.pm6 to parse itself, requiring a stored bootstrap version
+of the compiled STD.pm.  This is also the home of Cursor, the canonical
+implementation of the Perl 6 rules engine; it co-evolves with viv and
+executes the actual rules.  This is also the home of a collection of
+minor tools used in the development of STD.pm6 and viv.
 
 =head1 Prerequisites
 
 You'll need the following Perl bits to run stuff:
 
-* Perl 5.10.0 in /usr/local/bin/ 
+* Perl 5.10.0 or later in /usr/local/bin/ 
   (using current perl with eg `sudo ln -s /usr/bin/perl /usr/local/bin`)
 
 * YAML::XS       (eg sudo apt-get install libyaml-libyaml-perl)
@@ -24,14 +23,67 @@ You'll need the following Perl bits to run stuff:
 
 =head1 Running Stuff
 
-You can get started by using the following Makefile commands:
+You can get started by using the Makefile command, C<make>.  This will convert
+the Perl 6 grammar into a Perl 5 module, C<STD>.  C<STD> has a fairly simple
+API; just call C<parse> as a class method with the source you want to parse as
+a parameter, and look at the result.  Another module, C<Actions>, is provided
+which converts C<STD>'s output into a more object-oriented form; see C<viv>'s
+source for an example of the latter's use.  (Both methods have more options
+when you need them.)
+
+The following tools are provided which leverage the power of C<STD>:
+
+* C<tryfile> parses a file of Perl 6 code and reports 'ok' or 'FAILED', plus the
+  time taken and memory used.
+
+* C<std> does the same, but also tests Actions.
+
+* C<redspans> parses a file, reporting what rules matched which tokens.
+
+* C<reds> appears to be an older, non-working version of redspans.
+
+* C<sprixel> is a (bit rotten) Perl 6 to Javascript compiler.
+
+* C<STD_syntax_highlight> is a syntax highlighter with multiple output formats.
+
+* C<teststd> uses STD to check the syntax of the Perl 6 Specification Tests.
+
+* C<tloop> is an interactive STD syntax checker.
+
+* C<vill> is a prototype STD-based LLVM-based Perl 6 JIT compiler.
+
+* C<viv> is a retargettable metacompiler for the static subset of Perl 6.
+
+See the headers of the respective programs for more details, and don't hesitate
+to ask around as quite a bit of this is underdocumented.
+
+=head1 Working the Makefile
+
+To regenerate perl 5 files from perl 6 STD.pm6, STD_P5.pm6, and Cursor.pm6
+changes:
 
  make
- make all
- make check
- make try
- make try cat
+
+To do that, but without running the self test (bootstrap):
+
+ make fast
+
+To remake only one file:
+
+ make STD.pmc
+
+To update the first stage, allowing new STD.pm6 or Cursor.pm6 features to be
+used while building future versions of STD.pm6 or Cursor.pm6:
+
+ make reboot
+
+To remove all generated files:
+
  make clean
- make distclean
- make help
+
+To test the ability to parse the Perl 6 test suite (this is a very effective
+regression test, but B<slow> - 20-75 minutes; also, it runs in a snapshot of
+the current directory, so you can continue hacking):
+
+ make snaptest
 
