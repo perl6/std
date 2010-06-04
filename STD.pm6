@@ -3662,16 +3662,16 @@ grammar P6 is STD {
 
     # try to allow both of >>op<< and >>op<<< without allowing op<<
     token infix:sym« ~< »
-        { <sym> [ <!{ $*IN_META eq 'HYPER' }> || <?before '<<'> || <!before '<'> ] <O(|%multiplicative)> }
+        { <sym> [ <!{ $*IN_META }> || <?before '<<'> || <!before '<'> ] <O(|%multiplicative)> }
 
     token infix:sym« ~> »
-        { <sym> [ <!{ $*IN_META eq 'HYPER' }> || <?before '>>'> || <!before '>'> ] <O(|%multiplicative)> }
+        { <sym> [ <!{ $*IN_META }> || <?before '>>'> || <!before '>'> ] <O(|%multiplicative)> }
 
     token infix:sym« +< »
-        { <sym> [ <!{ $*IN_META eq 'HYPER' }> || <?before '<<'> || <!before '<'> ] <O(|%multiplicative)> }
+        { <sym> [ <!{ $*IN_META }> || <?before '<<'> || <!before '<'> ] <O(|%multiplicative)> }
 
     token infix:sym« +> »
-        { <sym> [ <!{ $*IN_META eq 'HYPER' }> || <?before '>>'> || <!before '>'> ] <O(|%multiplicative)> }
+        { <sym> [ <!{ $*IN_META }> || <?before '>>'> || <!before '>'> ] <O(|%multiplicative)> }
 
     ## additive
     token infix:sym<+>
