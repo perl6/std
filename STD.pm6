@@ -5987,7 +5987,7 @@ method panic (Str $s) {
             $m ~= "    expecting @keys\n" unless @keys[0] eq 'whitespace';
         }
     }
-    if $m ~~ /infix|nofun/ and not $m ~~ /regex/ {
+    if $m ~~ /infix|nofun/ and not $m ~~ /regex/ and not $m ~~ /infix_circumfix/ {
         my @t = $here.suppose( sub { $here.term } );
         if @t {
             my $endpos = $here.pos;
