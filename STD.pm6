@@ -2436,6 +2436,7 @@ grammar P6 is STD {
             my $bad = $sigil ~ '{' ~ $text ~ '}';
             $text = $text - 1 if $text ~~ /^\d+$/;
             if $text !~~ /^(\w|\:)+$/ {
+                return () if $*QSIGIL;
                 $¢.obs($bad, $sigil ~ '(' ~ $text ~ ')');
             }
             elsif $*QSIGIL {
