@@ -6063,54 +6063,6 @@ method sorry (Str $s) {
     self;
 }
 
-method locmess () {
-    my $pos = self.pos;
-    my $line = self.lineof($pos);
-
-    # past final newline?
-    if $pos >= @*MEMOS - 1 {
-        $pos = $pos - 1;
-        $line = $line ~ " (EOF)";
-    }
-
-    my $pre = substr($*ORIG, 0, $pos);
-    $pre = substr($pre, -40, 40);
-    1 while $pre ~~ s!.*\n!!;
-    $pre = '<BOL>' if $pre eq '';
-    my $post = substr($*ORIG, $pos, 40);
-    1 while $post ~~ s!(\n.*)!!;
-    $post = '<EOL>' if $post eq '';
-    " at " ~ $*FILE<name> ~ " line $line:\n------> " ~ $Cursor::GREEN ~ $pre ~ $Cursor::YELLOW ~ $*PERL6HERE ~ $Cursor::RED ~ 
-        "$post$Cursor::CLEAR";
-}
-
-method line {
-    self.lineof(self.pos);
-}
-
-method lineof ($p) {
-    return 1 unless defined $p;
-    my $line = @*MEMOS[$p]<L>;
-    return $line if $line;
-    $line = 0;
-    my $pos = 0;
-    my @text = split(/^/,$*ORIG);   # XXX p5ism, should be ^^
-    for @text {
-        $line++;
-        @*MEMOS[$pos++]<L> = $line
-            for 1 .. chars($_);
-    }
-    @*MEMOS[$pos++]<L> = $line;
-    return @*MEMOS[$p]<L> // 0;
-}
-
-method SETGOAL { }
-method FAILGOAL (Str $stop, Str $name, $startpos) {
-    my $s = "'$stop'";
-    $s = '"\'"' if $s eq "'''";
-    self.panic("Unable to parse $name" ~ $startpos.locmess ~ "\nCouldn't find final $s; gave up");
-}
-
 # "when" arg assumes more things will become obsolete after Perl 6 comes out...
 
 method obs (Str $old, Str $new, Str $when = ' in Perl 6') {

@@ -1582,7 +1582,7 @@ my \$retree;
 
 use YAML::XS;
 
-\$SIG{__WARN__} = sub { die \@_,"   statement started at line ", 'STD'->lineof(\$::LASTSTATE), "\n" } if \$::DEBUG;
+\$SIG{__WARN__} = sub { die \@_,"   statement started at line ", 'Cursor'->lineof(\$::LASTSTATE), "\n" } if \$::DEBUG;
 
 END
 	$header;
