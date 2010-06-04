@@ -177,7 +177,7 @@ sub MAIN {
 	spew $x;
     }
     elsif ($output eq 'concise') {
-	spew concise($r, 80);
+	spew concise($r, 80) . "\n";
     }
     elsif ($output eq 'p6') {
 	spew $r->p6;
