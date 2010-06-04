@@ -77,6 +77,7 @@ use Actions;
 
 sub spew {
     my $bits = shift;
+    $bits .= "\n" unless $bits ~~ /\n\z/;
     if (defined $OPT_output_file) {
 	open my $out, ">", $OPT_output_file
 	    or die "cannot open $OPT_output_file for writing: $!";
@@ -177,13 +178,13 @@ sub MAIN {
 	spew $x;
     }
     elsif ($output eq 'concise') {
-	spew concise($r, 80) . "\n";
+	spew concise($r, 80);
     }
     elsif ($output eq 'p6') {
 	spew $r->p6;
     }
     elsif ($output eq 'p5') {
-	spew fixpod($r->p5) . "\n";
+	spew fixpod($r->p5);
     }
     elsif ($output eq 'store') {
 	my $data = { AST => $r, GENCLASS => \%Actions::GENCLASS,
