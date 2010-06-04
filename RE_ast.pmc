@@ -118,7 +118,7 @@ sub here {
 
 { package RE_cclass; our @ISA = 'REbase';
     sub longest { my $self = shift; my ($C) = @_; ::here($self->{'text'});
-        $Cursor::fakepos++;
+        $CursorBase::fakepos++;
         my $cc = $self->{'text'};
         Encode::_utf8_on($cc);
         $cc =~ s/^\-\[/[^/;
@@ -148,7 +148,7 @@ sub here {
             $fixed = $text;
         }
         if ($fixed ne '') {
-            $Cursor::fakepos++;
+            $CursorBase::fakepos++;
             ::qm($fixed);
         }
         $fixed =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
@@ -219,7 +219,7 @@ sub here {
                 return $IMP;
             }
             elsif ($_ eq 'sym') {
-                $Cursor::fakepos++;
+                $CursorBase::fakepos++;
                 my $sym = $self->{'sym'};
                 Encode::_utf8_on($sym);
                 my $text = ::qm($sym);
@@ -230,7 +230,7 @@ sub here {
                 return '\w' . $IMP;
             }
             elsif ($_ eq 'alpha') {
-                $Cursor::fakepos++;
+                $CursorBase::fakepos++;
                 return '[_[:alpha:]\pL]';
             }
             my $lexer;
@@ -322,7 +322,7 @@ sub here {
 { package RE_quantified_atom; our @ISA = 'REbase';
     sub longest { my $self = shift; my ($C) = @_; 
         ::here();
-        my $oldfakepos = $Cursor::fakepos++;
+        my $oldfakepos = $CursorBase::fakepos++;
         my $a = $self->{atom};
         my @atom = $a->longest($C);
         return unless @atom;
@@ -336,14 +336,14 @@ sub here {
             return "$atom+";
         }
         elsif ($self->{'quant'}[0] eq '*') {
-            $Cursor::fakepos = $oldfakepos;
+            $CursorBase::fakepos = $oldfakepos;
             if (@atom > 1) {
                 return map { $_ . $IMP } @atom,'';
             }
             return "$atom*";
         }
         elsif ($self->{'quant'}[0] eq '?') {
-            $Cursor::fakepos = $oldfakepos;
+            $CursorBase::fakepos = $oldfakepos;
             if (@atom > 1) {
                 return @atom,'';
             }
@@ -354,7 +354,7 @@ sub here {
             if ($x =~ /^\d/) {
                 $x =~ s/\.\./,/;
                 $x =~ s/\*//;
-                $Cursor::fakepos = $oldfakepos if $x =~ m/^0/;
+                $CursorBase::fakepos = $oldfakepos if $x =~ m/^0/;
                 return $atom . "{$x}";
             }
             else {
@@ -370,7 +370,7 @@ sub here {
         my $text = $self->{'text'};
         Encode::_utf8_on($text);
         ::here($text);
-        $Cursor::fakepos++;
+        $CursorBase::fakepos++;
         $text =~ s/^<\s*//;
         $text =~ s/\s*>$//;
         $text =~ s/\s+/|/;
@@ -433,7 +433,7 @@ sub here {
         my $text = $self->{'text'};
         Encode::_utf8_on($text);
         ::here($text);
-        $Cursor::fakepos++ if $self->{'min'};
+        $CursorBase::fakepos++ if $self->{'min'};
         $text = ::qm($text);
         $text =~ s/([[:alpha:]])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
         $text;
@@ -457,24 +457,24 @@ sub here {
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
         my @result;
-        my $oldfakepos = $Cursor::fakepos;
-        my $minfakepos = $Cursor::fakepos + 1;
+        my $oldfakepos = $CursorBase::fakepos;
+        my $minfakepos = $CursorBase::fakepos + 1;
         my $base = $::ALT // '';
         $base .= ' ' if $base;
         my %autolexbase = %::AUTOLEXED;
         for my $alt (@$alts) {
             local %::AUTOLEXED = %autolexbase;    # alts are independent
-            $Cursor::fakepos = $oldfakepos;
+            $CursorBase::fakepos = $oldfakepos;
             local $::ALT = $base . $alt->{alt};
             {
                 local $::PREFIX = $::PREFIX . ' ' . $::ALT;
                 my @pat = ($alt->longest($C));
                 push @result, map { /#FATE/ or s/$/\t(?#FATE $::PREFIX)/; $_ } @pat;
             }
-            $minfakepos = $oldfakepos if $Cursor::fakepos == $oldfakepos;
+            $minfakepos = $oldfakepos if $CursorBase::fakepos == $oldfakepos;
         }
         $C->deb(join("\n", @result)) if $::DEBUG & DEBUG::longest_token_pattern_generation;
-        $Cursor::fakepos = $minfakepos;  # Did all branches advance?
+        $CursorBase::fakepos = $minfakepos;  # Did all branches advance?
         @result;
     }
 }
@@ -485,7 +485,7 @@ sub here {
         my $var = $self->{var};
         if (my $p = $C->_PARAMS) {
             my $text = $p->{$var} || return $IMP;
-            $Cursor::fakepos++ if length($text);
+            $CursorBase::fakepos++ if length($text);
             $text = ::qm($text);
             return $text;
         }

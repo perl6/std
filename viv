@@ -2899,7 +2899,7 @@ TEXT
 	if ($outr) {
 	    DEEP::ratchet($inner, $out1);
 	} else {
-	    DEEP::raw(::hang("Cursor::lazymap(" . DEEP::chunk($inner)->p5 .
+	    DEEP::raw(::hang("LazyMap::lazymap(" . DEEP::chunk($inner)->p5 .
 		",\n" . $outer->p5 . ")", "    "));
 	}
     }
