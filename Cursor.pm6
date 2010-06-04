@@ -1,9 +1,9 @@
-# fake Cursor file to get symbols into p6 symbol tables
-class Cursor;
-our $BLUE;
-our $GREEN;
-our $CYAN;
-our $MAGENTA;
-our $YELLOW;
-our $RED;
-our $CLEAR;
+use CursorBase;
+class Cursor is CursorBase;
+our $BLUE    = $CursorBase::BLUE;
+our $GREEN   = $CursorBase::GREEN;
+our $CYAN    = $CursorBase::CYAN;
+our $MAGENTA = $CursorBase::MAGENTA;
+our $YELLOW  = $CursorBase::YELLOW;
+our $RED     = $CursorBase::RED;
+our $CLEAR   = $CursorBase::CLEAR;

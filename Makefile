@@ -29,15 +29,19 @@ boot/syml/CORE.syml: CORE.setting
 # .store files depend little on viv; ideally it should be factored into two
 # programs; this rule is missing a few dependencies!
 # boot/STD.pm because boot/STD.pmc doesn't take precedence over ./STD.pm
-STD.store: STD.pm6 boot/STD.pm Actions.pm boot/syml/CORE.syml
+STD.store: STD.pm6 boot/STD.pm boot/Cursor.pmc Actions.pm boot/syml/CORE.syml
 	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o STD.store --freeze STD.pm6
 STD.pmc: STD.store viv
 	perl -Iboot viv --no-indent -5 -o STD.pmc --thaw STD.store
 	rm -rf lex syml/*.pad.store
+Cursor.store: Cursor.pm6 boot/STD.pm boot/Cursor.pmc Actions.pm boot/syml/CORE.syml
+	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o Cursor.store --freeze Cursor.pm6
+Cursor.pmc: Cursor.store viv
+	perl -Iboot viv --no-indent -5 -o Cursor.pmc --thaw Cursor.store
 # for debugging
 STD.pm5: STD.store viv
 	perl -Iboot viv -5 -o STD.pm5 --thaw STD.store
-STD_P5.store: STD_P5.pm6 boot/STD.pm Actions.pm boot/syml/CORE.syml
+STD_P5.store: STD_P5.pm6 boot/STD.pm boot/Cursor.pmc Actions.pm boot/syml/CORE.syml
 	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o STD_P5.store --freeze STD_P5.pm6
 STD_P5.pmc: STD_P5.store viv
 	perl -Iboot viv --no-indent -5 -o STD_P5.pmc --thaw STD_P5.store
@@ -47,15 +51,17 @@ syml/CORE.syml: CORE.setting
 	-rm -f syml/CORE.syml.store
 	-./std CORE.setting
 
-check: STD.pmc STD_P5.pmc
+check: STD.pmc STD_P5.pmc Cursor.pmc
 	/usr/local/bin/perl -c STD.pmc
+	/usr/local/bin/perl -c Cursor.pmc
 	/usr/local/bin/perl -c STD_P5.pmc
 
-reboot: STD.pmc
+reboot: STD.pmc Cursor.pmc
 	cp STD.pmc boot/STD.pm
+	cp Cursor.pmc boot/Cursor.pmc
 
 # pre-generate common sublexers
-lex/STD/termish: STD.pmc STD_P5.pmc syml/CORE.syml
+lex/STD/termish: Cursor.pmc STD.pmc STD_P5.pmc syml/CORE.syml
 	@echo 'Generating STD lexers...'
 	./tryfile STD.pm6
 
@@ -63,7 +69,7 @@ cat:
 	cat try5.out
 
 clean:
-	rm -rf lex try5.* *.pad.store syml boot/lex boot/syml STD.pmc STD_P5.pmc STD.store STD_P5.store
+	rm -rf lex try5.* *.pad.store syml boot/lex boot/syml STD.pmc STD_P5.pmc STD.store STD_P5.store Cursor.store Cursor.pmc STD.pm5
 
 # purge is an alias for distclean
 distclean purge: clean
