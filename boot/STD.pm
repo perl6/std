@@ -12,7 +12,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -7351,7 +7351,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -7426,7 +7426,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -7507,7 +7507,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -8023,8 +8023,7 @@ $C->{'stopper'} = [];
 $self->_MATCHIFYr($S, "nibbler", do {
 my $C = $C;
 if (($C) = (scalar(do {
-my $M = $C;
-$M->{'_from'} = $self->{'_pos'}}, $C))
+$self->from = $self->{'_pos'}}, $C))
 and ($C) = ($C->_STARr(sub {
 my $C=shift;
 if (my ($C) = ($C->_BRACKETr(sub {
@@ -8120,7 +8119,7 @@ my $M = $C;
 {
 push @nibbles, $C->makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to or !@nibbles;
 $M->{'nibbles'} = \@nibbles;
-$M->{'_pos'} = $C->{'_pos'};
+$self->pos = $C->{'_pos'};
 delete $M->{'nibbler'};
 delete $M->{'escape'};
 delete $M->{'starter'};
@@ -8194,7 +8193,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 moose_has 'delim' => (isa => 'Str', is => 'rw');
@@ -8212,7 +8211,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -11239,7 +11238,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -35631,6 +35630,7 @@ no warnings 'recursion';
 my $self = shift;
 
 local $::SCOPE = "";
+local $::MULTINESS = "";
 local $::OFTYPE;
 local $::VAR;
 
@@ -38540,7 +38540,9 @@ my $text = $M->{'text'}->Str;
 my $bad = $sigil . '{' . $text . '}';
 $text = $text - 1 if $text =~ /^\d+$/;
 if ($text !~ /^(\w|\:)+$/) {
-$C->obs($bad, $sigil . '(' . $text . ')')}
+return () if $::QSIGIL;
+$C->obs($bad, $sigil . '(' . $text . ')');
+}
 elsif ($::QSIGIL) {
 $C->obs($bad, '{' . $sigil . $text . '}')}
 else {
@@ -42026,8 +42028,8 @@ my $M = $C;
 given ($M->{0}->Str) {
 $_ =~ /i/ and $C->worryobs('/i',':i');
 $_ =~ /g/ and $C->worryobs('/g',':g');
-$_ =~ /s/ and $C->worryobs('/s','^^ and $$ anchors');
-$_ =~ /m/ and $C->worryobs('/m','. or \N');
+$_ =~ /m/ and $C->worryobs('/m','^^ and $$ anchors');
+$_ =~ /s/ and $C->worryobs('/s','. or \N');
 $_ =~ /x/ and $C->worryobs('/x','normal default whitespace');
 $_ =~ /c/ and $C->worryobs('/c',':c or :p');
 $_ =~ /e/ and $C->worryobs('/e','interpolated {...} or s{} = ... form');
@@ -52982,7 +52984,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 { package STD::Q::b1;
@@ -52996,7 +52998,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -53723,7 +53725,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -53768,7 +53770,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -53851,7 +53853,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -53896,7 +53898,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -54000,7 +54002,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -54045,7 +54047,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -54194,7 +54196,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -54239,7 +54241,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -54388,7 +54390,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -54433,7 +54435,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -54582,7 +54584,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -54627,7 +54629,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method postprocess ($s)
@@ -54648,7 +54650,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method postprocess ($s)
@@ -54669,7 +54671,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method postprocess ($s)
@@ -54690,7 +54692,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method postprocess ($s)
@@ -54711,7 +54713,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method postprocess ($s)
@@ -54732,7 +54734,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method postprocess ($s)
@@ -54753,7 +54755,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method postprocess ($s)
@@ -54774,7 +54776,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method postprocess ($s)
@@ -54795,7 +54797,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -55074,7 +55076,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -55292,7 +55294,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -56711,7 +56713,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 ## method tweak (:$g!)
@@ -57002,7 +57004,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -57234,11 +57236,11 @@ delete $_->{'_xact'}}
                 ;
 my $endpos = $chain[0]->{'_pos'};
 @chain = reverse @chain if @chain > 1;
-my $startpos = $chain[0]->{'_from'};
+my $startpos = $chain[0]->from;
 my $nop = $op->cursor_fresh();
 $nop->{'chain'} = [@chain];
 $nop->{'_arity'} = 'CHAIN';
-$nop->{'_from'} = $startpos;
+$nop->from = $startpos;
 $nop->{'_pos'} = $endpos;
 my @caps;
 my $i = 0;
@@ -57280,7 +57282,7 @@ delete $_->{'_xact'}}
                 ;
 my $endpos = $list[0]->{'_pos'};
 @list = reverse @list if @list > 1;
-my $startpos = $list[0]->{'_from'};
+my $startpos = $list[0]->from;
 @delims = reverse @delims if @delims > 1;
 my $nop = $op->cursor_fresh();
 $nop->{'sym'} = $sym;
@@ -57288,7 +57290,7 @@ $nop->{'O'} = $op->{'O'};
 $nop->{'list'} = [@list];
 $nop->{'delims'} = [@delims];
 $nop->{'_arity'} = 'LIST';
-$nop->{'_from'} = $startpos;
+$nop->from = $startpos;
 $nop->{'_pos'} = $endpos;
 if (@list) {
 my @caps;
@@ -57317,17 +57319,17 @@ delete $arg->{'_xact'};
 $op->{'arg'} = $arg;
 my $a = $op->{'~CAPS'};
 $op->{'_arity'} = 'UNARY';
-if ($arg->{'_from'} < $op->{'_from'}) {
-$op->{'_from'} = $arg->{'_from'};
+if ($arg->from < $op->from) {
+$op->from = $arg->from;
 unshift @$a, 'arg', $arg;
-push @termstack, $op->_REDUCE($op->{'_from'}, 'POSTFIX');
+push @termstack, $op->_REDUCE($op->from, 'POSTFIX');
 delete $termstack[-1]->{'PRE'};
 delete $termstack[-1]->{'POST'};
 }
 elsif ($arg->{'_pos'} > $op->{'_pos'}) {
 $op->{'_pos'} = $arg->{'_pos'};
 push @$a, 'arg', $arg;
-push @termstack, $op->_REDUCE($op->{'_from'}, 'PREFIX');
+push @termstack, $op->_REDUCE($op->from, 'PREFIX');
 delete $termstack[-1]->{'PRE'};
 delete $termstack[-1]->{'POST'};
 };
@@ -57342,7 +57344,7 @@ delete $right->{'_xact'};
 delete $left->{'_xact'};
 $op->{'right'} = $right;
 $op->{'left'} = $left;
-$op->{'_from'} = $left->{'_from'};
+$op->from = $left->from;
 $op->{'_pos'} = $right->{'_pos'};
 $op->{'_arity'} = 'BINARY';
 my $a = $op->{'~CAPS'};
@@ -57352,7 +57354,7 @@ $self->deb($op->dump) if $::DEBUG & DEBUG::EXPR;
 my $ck;
 if ($ck = $op->{'O'}->{'_reducecheck'}) {
 $op = $op->$ck};
-push @termstack, $op->_REDUCE($op->{'_from'}, 'INFIX');
+push @termstack, $op->_REDUCE($op->from, 'INFIX');
 delete $termstack[-1]->{'PRE'};
 delete $termstack[-1]->{'POST'};
 }
@@ -57473,7 +57475,7 @@ last;
 $reduce->() while 0+@opstack > 1;
 if (@termstack) {
 0+@termstack == 1 or $here->panic("Internal operator parser error, termstack == " . (0+@termstack));
-$termstack[0]->{'_from'} = $self->{'_pos'};
+$termstack[0]->from = $self->{'_pos'};
 $termstack[0]->{'_pos'} = $here->{'_pos'};
 };
 $self->_MATCHIFYr($S, "EXPR", @termstack);
@@ -57490,7 +57492,7 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'STD'->lineof($::LASTSTATE), "
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
 " } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
@@ -67718,13 +67720,13 @@ my $m;
 my $here = $self;
 my $highvalid = $self->{'_pos'} <= $::HIGHWATER;
 $here = $self->cursor($::HIGHWATER) if $highvalid;
-my $first = $here->lineof($::LAST_NIBBLE->{'_from'});
+my $first = $here->lineof($::LAST_NIBBLE->from);
 my $last = $here->lineof($::LAST_NIBBLE->{'_pos'});
 if ($first != $last) {
 if ($here->lineof($here->{'_pos'}) == $last) {
 $m .= "(Possible runaway string from line $first)\n"}
 else {
-$first = $here->lineof($::LAST_NIBBLE_MULTILINE->{'_from'});
+$first = $here->lineof($::LAST_NIBBLE_MULTILINE->from);
 $last = $here->lineof($::LAST_NIBBLE_MULTILINE->{'_pos'});
 if ($here->lineof($here->{'_pos'}) - $last < $last - $first)  {
 $m .= "(Possible runaway string from line $first to line $last)\n"};
@@ -67818,71 +67820,6 @@ else {
 print STDERR $m unless $::WORRIES{$m}++};
 };
 $self;
-};
-## method locmess ()
-sub locmess {
-no warnings 'recursion';
-my $self = shift;
-my $pos = $self->{'_pos'};
-my $line = $self->lineof($pos);
-if ($pos >= @::MEMOS - 1) {
-$pos = $pos - 1;
-$line = $line . " (EOF)";
-};
-my $pre = substr($::ORIG, 0, $pos);
-$pre = substr($pre, -40, 40);
-1 while $pre =~ s!.*\n!!;
-$pre = '<BOL>' if $pre eq '';
-my $post = substr($::ORIG, $pos, 40);
-1 while $post =~ s!(\n.*)!!;
-$post = '<EOL>' if $post eq '';
-" at " . $::FILE->{'name'} . " line $line:\n------> " . $Cursor::GREEN . $pre . $Cursor::YELLOW . $::PERL6HERE . $Cursor::RED . 
-        "$post$Cursor::CLEAR";
-};
-## method line
-sub line {
-no warnings 'recursion';
-my $self = shift;
-$self->lineof($self->{'_pos'})};
-## method lineof ($p)
-sub lineof {
-no warnings 'recursion';
-my $self = shift;
-die 'Required argument p omitted' unless @_;
-my $p = @_ ? shift() : undef;
-return 1 unless defined $p;
-my $line = $::MEMOS[$p]->{'L'};
-return $line if $line;
-$line = 0;
-my $pos = 0;
-my @text = split(/^/,$::ORIG);
-for (@text) {
-$line++;
-$::MEMOS[$pos++]->{'L'} = $line
-            for 1 .. length($_);
-}
-    ;
-$::MEMOS[$pos++]->{'L'} = $line;
-return $::MEMOS[$p]->{'L'} // 0;
-};
-## method SETGOAL
-sub SETGOAL {
-no warnings 'recursion';
-my $self = shift;
-};
-## method FAILGOAL (Str $stop, Str $name, $startpos)
-sub FAILGOAL {
-no warnings 'recursion';
-my $self = shift;
-die 'Required argument stop omitted' unless @_;
-my $stop = @_ ? shift() : undef;
-die 'Required argument name omitted' unless @_;
-my $name = @_ ? shift() : undef;
-die 'Required argument startpos omitted' unless @_;
-my $startpos = @_ ? shift() : undef;
-my $s = "'$stop'";
-$s = '"\'"' if $s eq "'''";
-$self->panic("Unable to parse $name" . $startpos->locmess . "\nCouldn't find final $s; gave up");
 };
 ## method obs (Str $old, Str $new, Str $when = ' in Perl 6')
 sub obs {

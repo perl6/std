@@ -829,7 +829,7 @@ token nibbler {
     :my @nibbles = ();
     :my $multiline = 0;
     :my $nibble;
-    { $<_from> = self.pos; }
+    { $.from = self.pos; }
     [ <!before <stopper> >
         [
         || <starter> <nibbler> <stopper>
@@ -866,7 +866,7 @@ token nibbler {
     {{
         push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to or !@nibbles;
         $<nibbles> = \@nibbles;
-        $<_pos> = $¢.pos;
+        $.pos = $¢.pos;
         $<nibbler> :delete;
         $<escape> :delete;
         $<starter> :delete;
@@ -3971,7 +3971,7 @@ grammar P6 is STD {
             }
         };
 
-        self.cursor_force(self.<infix><_pos>).worryobs('.= as append operator', '~=') unless $ok;
+        self.cursor_force(self.<infix>.pos).worryobs('.= as append operator', '~=') unless $ok;
         self;
     }
 
@@ -4488,7 +4488,7 @@ grammar Quasi is STD::P6 {
 method EXPR ($preclvl?) {
     my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
     my $preclim = $preclvl ?? $preclvl.<prec> // $LOOSEST !! $LOOSEST;
-    my $*LEFTSIGIL = '';
+    my $*LEFTSIGIL = '';        # XXX P6
     my $*PRECLIM = $preclim;
     my @termstack;
     my @opstack;
@@ -4519,14 +4519,14 @@ method EXPR ($preclvl?) {
                 for @chain {
                     $_.<_xact> :delete;
                 }
-                my $endpos = @chain[0]<_pos>;
+                my $endpos = @chain[0].pos;
                 @chain = reverse @chain if @chain > 1;
-                my $startpos = @chain[0]<_from>;
+                my $startpos = @chain[0].from;
                 my $nop = $op.cursor_fresh();
                 $nop<chain> = [@chain];
                 $nop<_arity> = 'CHAIN';
-                $nop<_from> = $startpos;
-                $nop<_pos> = $endpos;
+                $nop.from = $startpos;
+                $nop.pos = $endpos;
                 my @caps;
                 my $i = 0;
                 for @chain {
@@ -4566,9 +4566,9 @@ method EXPR ($preclvl?) {
                 for @delims {
                     $_.<_xact> :delete;
                 }
-                my $endpos = @list[0]<_pos>;
+                my $endpos = @list[0].pos;
                 @list = reverse @list if @list > 1;
-                my $startpos = @list[0]<_from>;
+                my $startpos = @list[0].from;
                 @delims = reverse @delims if @delims > 1;
                 my $nop = $op.cursor_fresh();
                 $nop<sym> = $sym;
@@ -4576,8 +4576,8 @@ method EXPR ($preclvl?) {
                 $nop<list> = [@list];
                 $nop<delims> = [@delims];
                 $nop<_arity> = 'LIST';
-                $nop<_from> = $startpos;
-                $nop<_pos> = $endpos;
+                $nop.from = $startpos;
+                $nop.pos = $endpos;
                 if @list {
                     my @caps;
                     push @caps, 'elem', @list[0] if @list[0];
@@ -4604,19 +4604,19 @@ method EXPR ($preclvl?) {
                 $op<arg> = $arg;
                 my $a = $op<~CAPS>;
                 $op<_arity> = 'UNARY';
-                if $arg<_from> < $op<_from> { # postfix
-                    $op<_from> = $arg<_from>;   # extend from to include arg
+                if $arg.from < $op.from { # postfix
+                    $op.from = $arg.from;   # extend from to include arg
 #                    note "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     unshift @$a, 'arg', $arg;
-                    push @termstack, $op._REDUCE($op<_from>, 'POSTFIX');
+                    push @termstack, $op._REDUCE($op.from, 'POSTFIX');
                     @termstack[*-1].<PRE>:delete;
                     @termstack[*-1].<POST>:delete;
                 }
-                elsif $arg<_pos> > $op<_pos> {   # prefix
-                    $op<_pos> = $arg<_pos>;     # extend pos to include arg
+                elsif $arg.pos > $op.pos {   # prefix
+                    $op.pos = $arg.pos;     # extend pos to include arg
 #                    note "OOPS ", $arg.Str, "\n" if @acaps > 1;
                     push @$a, 'arg', $arg;
-                    push @termstack, $op._REDUCE($op<_from>, 'PREFIX');
+                    push @termstack, $op._REDUCE($op.from, 'PREFIX');
                     @termstack[*-1].<PRE>:delete;
                     @termstack[*-1].<POST>:delete;
                 }
@@ -4631,8 +4631,8 @@ method EXPR ($preclvl?) {
                 $left<_xact> :delete;
                 $op<right> = $right;
                 $op<left> = $left;
-                $op<_from> = $left<_from>;
-                $op<_pos> = $right<_pos>;
+                $op.from = $left.from;
+                $op.pos = $right.pos;
                 $op<_arity> = 'BINARY';
 
                 my $a = $op<~CAPS>;
@@ -4644,7 +4644,7 @@ method EXPR ($preclvl?) {
                 if $ck = $op<O><_reducecheck> {
                     $op = $op.$ck;
                 }
-                push @termstack, $op._REDUCE($op<_from>, 'INFIX');
+                push @termstack, $op._REDUCE($op.from, 'INFIX');
                 @termstack[*-1].<PRE>:delete;
                 @termstack[*-1].<POST>:delete;
             }
@@ -4777,8 +4777,8 @@ method EXPR ($preclvl?) {
     &reduce() while +@opstack > 1;
     if @termstack {
         +@termstack == 1 or $here.panic("Internal operator parser error, termstack == " ~ (+@termstack));
-        @termstack[0]<_from> = self.pos;
-        @termstack[0]<_pos> = $here.pos;
+        @termstack[0].from = self.pos;
+        @termstack[0].pos = $here.pos;
     }
     self._MATCHIFYr($S, "EXPR", @termstack);
 }
@@ -5949,15 +5949,15 @@ method panic (Str $s) {
 
     $here = self.cursor($*HIGHWATER) if $highvalid;
 
-    my $first = $here.lineof($*LAST_NIBBLE.<_from>);
-    my $last = $here.lineof($*LAST_NIBBLE.<_pos>);
+    my $first = $here.lineof($*LAST_NIBBLE.from);
+    my $last = $here.lineof($*LAST_NIBBLE.pos);
     if $first != $last {
         if $here.lineof($here.pos) == $last {
             $m ~= "(Possible runaway string from line $first)\n";
         }
         else {
-            $first = $here.lineof($*LAST_NIBBLE_MULTILINE.<_from>);
-            $last = $here.lineof($*LAST_NIBBLE_MULTILINE.<_pos>);
+            $first = $here.lineof($*LAST_NIBBLE_MULTILINE.from);
+            $last = $here.lineof($*LAST_NIBBLE_MULTILINE.pos);
             # the bigger the string (in lines), the further back we suspect it
             if $here.lineof($here.pos) - $last < $last - $first  {
                 $m ~= "(Possible runaway string from line $first to line $last)\n";

@@ -94,9 +94,9 @@ BEGIN {
 
 sub _PARAMS {}  # overridden in parametric role packages
 
-sub from { $_[0]->{_from} // $_[0]->{_pos} }
+sub from :lvalue { $_[0]->{_from} //= $_[0]->{_pos} }
 sub to { $_[0]->{_pos} }
-sub pos { $_[0]->{_pos} }
+sub pos :lvalue { $_[0]->{_pos} }
 sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
 sub Str { no warnings; exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from})//'' : '' }
 sub xact { $_[0]->{_xact} // die "internal error: cursor has no xact!!!" }
@@ -256,8 +256,8 @@ sub initparse {
     local $::HIGHMESS = '';
     local $::HIGHEXPECT = {};
     local $::LASTSTATE;
-    local $::LAST_NIBBLE = { firstline => 0, lastline => 0 };
-    local $::LAST_NIBBLE_MULTILINE = { firstline => 0, lastline => 0 };
+    local $::LAST_NIBBLE = bless { firstline => 0, lastline => 0 }, 'Cursor';
+    local $::LAST_NIBBLE_MULTILINE = bless { firstline => 0, lastline => 0 }, 'Cursor';
     local $::GOAL = "(eof)";
     $text .= "\n" unless substr($text,-1,1) eq "\n";
     $::ORIG = $text;           # original string
