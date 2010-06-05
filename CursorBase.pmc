@@ -2651,7 +2651,7 @@ sub do_need { my $self = shift;
         }
     }
     $modfile =~ s/::/\//g;
-    my $ext;
+    my $ext = '';
     for my $d (@::PERL6LIB) {
         if (-f "$d/$modfile.pm6") {
             $ext = '.pm6';
@@ -2674,7 +2674,15 @@ sub do_need { my $self = shift;
     my $syml = $::TMP_PREFIX . 'syml';
     mkdir $syml unless -d $syml;
     if (not $ext) {
-        $self->worry("Can't locate module $module");
+        $ext = '.pm';
+        $ext = '.pm6' unless -f "$syml/$modfile$ext.syml";
+        if (-f "$syml/$modfile$ext.syml") {
+            $topsym = LoadFile("$syml/$modfile$ext.syml");
+            $self->worry("Can't locate module $module, only its symbol table file");
+        }
+        else {
+            $self->worry("Can't locate module $module");
+        }
     }
     elsif (-f "$syml/$modfile$ext.syml" and -M "$lib/$modfile$ext" > -M "$syml/$modfile$ext.syml") {
         $topsym = LoadFile("$syml/$modfile$ext.syml");
