@@ -2149,6 +2149,7 @@ grammar P6 is STD {
 
     token termish {
         :my $*SCOPE = "";
+        :my $*MULTINESS = "";
         :my $*OFTYPE;
         :my $*VAR;
         :dba('prefix or term')
