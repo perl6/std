@@ -8,6 +8,10 @@ my $failures = 0;
 if (not @ARGV) {
     @ARGV = grep { s/\.t\n/.t/} <STDIN>;
     s/^\s*[AU]*\s+// for @ARGV;
+    my $pkgs = $ARGV[0];
+    if ($pkgs =~ s[t/spec.*][t/spec/packages]) {
+	$ENV{PERL6LIB} ||= "lib:$pkgs";
+    }
 }
 
 for my $file (@ARGV) {
