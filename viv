@@ -1,6 +1,39 @@
 #!/usr/local/bin/perl
 
-# Translate Perl 6 to Perl 5, among other things
+=head1 NAME
+
+viv - A retargettable Perl 6 metacompiler
+
+=head1 DESCRIPTION
+
+C<viv> converts code, written in a subset of Perl 6, into code in Perl 5 (and
+eventually several other languages).  C<viv> is B<not a general compiler>; it
+makes little to no attempt to provide faithful Perl 6 semantics, so code
+intended to be run through viv needs to restrict itself to a "nice" subset of
+Perl 6.  Exactly what "nice" means hasn't been completely nailed down, but
+multithreading, the MOP, augmenting system classes, and operator overloading
+are all almost certainly out.
+
+* First, viv reads your source code (which must be encoded in UTF-8).  If the
+  --thaw option is provided, the source is expected to be in Storable format;
+  this eliminates parsing overhead and makes viv ~7 times faster.  Useful for
+  experimenting with modifications to viv itself.
+
+* Second, the source code is parsed into an object-oriented abstract syntax
+  tree using STD.pm6 and Actions.  If --freeze is passed, the process stops
+  here and a Storable dump is generated.
+
+* Translation of the parse tree into output code occurs in a single interleaved
+  pass, however it takes different paths for regex and non-regex code.
+  Non-regex code is mostly passed through, with targetted syntax-dependant
+  rewrites; as possible, we are changing this to generate DEEP.  Regexes are
+  converted into a narrowed REgex AST format, which is translated into DEEP and
+  additionally dumped for post-translation processing by the LTM engine.
+
+* The DEEP engine handles differences between output formats, taking advantage
+  of its much narrower form.
+
+=cut
 
 use strict;
 use 5.010;
