@@ -2783,8 +2783,8 @@ grammar P6 is STD {
             given $0.Str {
                 $_ ~~ /i/ and $¢.worryobs('/i',':i');
                 $_ ~~ /g/ and $¢.worryobs('/g',':g');
-                $_ ~~ /s/ and $¢.worryobs('/s','^^ and $$ anchors');
-                $_ ~~ /m/ and $¢.worryobs('/m','. or \N');
+                $_ ~~ /m/ and $¢.worryobs('/m','^^ and $$ anchors');
+                $_ ~~ /s/ and $¢.worryobs('/s','. or \N');
                 $_ ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
                 $_ ~~ /c/ and $¢.worryobs('/c',':c or :p');
                 $_ ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
