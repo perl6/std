@@ -3,7 +3,6 @@ use utf8;
 use CursorBase;
 { package Cursor;
 use Moose ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 moose_extends('CursorBase');
 
 no warnings 'qw', 'recursion';

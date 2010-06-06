@@ -2,7 +2,6 @@ use 5.010;
 use utf8;
 { package STD;
 use Moose ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 moose_extends('Cursor');
 
 no warnings 'qw', 'recursion';
@@ -7342,7 +7341,6 @@ return $start, $stop;
         my $eval = "package $mixin" . q{;
 	    sub _PARAMS { { '$start' => $start, '$stop' => $stop } }
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -7417,7 +7415,6 @@ $self->_MATCHIFYr($S, "stopper", $C->_EXACT($stop));
         my $eval = "package $mixin" . q{;
 	    sub _PARAMS { { '$stop' => $stop } }
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -7498,7 +7495,6 @@ $self->_MATCHIFYr($S, "stopper", $C->_EXACT($stop));
         my $eval = "package $mixin" . q{;
 	    sub _PARAMS { { '$stop' => $stop } }
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -8184,7 +8180,6 @@ $M->{'B'} = [$lang,$start,$stop];
 our @herestub_queue;
 { package STD::Herestub;
 use Moose ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -8202,7 +8197,6 @@ moose_has 'lang' => (is => 'rw');
   1; };
 { package STD::herestop;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -11228,7 +11222,6 @@ $C->O(%terminator)
 ;
 { package STD::P6;
 use Moose ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 moose_extends('STD');
 
 no warnings 'qw', 'recursion';
@@ -33381,6 +33374,7 @@ and ($C) = (scalar(do {
 {
 $longname  or  $C->panic("Compilation unit cannot be anonymous");
 $outer == $::UNIT or $C->panic("Semicolon form of " . $::PKGDECL . " definition not allowed in subscope;\n  please use block form");
+$::PKGDECL eq 'package' and $C->panic("Semicolon form of package definition indicates a Perl 5 module; unfortunately,\n  STD doesn't know how to parse Perl 5 code yet");
 my $shortname = $longname->{'name'}->Str;
 $::CURPKG = $::NEWPKG // $::CURPKG->{$shortname . '::'};
 $::begin_compunit = 0;
@@ -52974,7 +52968,6 @@ $::GOAL eq 'endargs' and $::MEMOS[$C->{'_pos'}]->{'endargs'} })
   1; };
 { package STD::Q;
 use Moose ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 moose_extends('STD');
 
 no warnings 'qw', 'recursion';
@@ -52989,7 +52982,6 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof(
 
 { package STD::Q::b1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53716,7 +53708,6 @@ $self->_MATCHIFYr($S, "backslash__S_0140", $C->_EXACT("0"));
   1; };
 { package STD::Q::b0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53761,7 +53752,6 @@ $C
   1; };
 { package STD::Q::c1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53844,7 +53834,6 @@ $C
   1; };
 { package STD::Q::c0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53889,7 +53878,6 @@ $C
   1; };
 { package STD::Q::s1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53993,7 +53981,6 @@ if (my ($C) = ($C->panic("Non-variable \$ must be backslashed"))) { ($C) } else 
   1; };
 { package STD::Q::s0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54038,7 +54025,6 @@ $C
   1; };
 { package STD::Q::a1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54187,7 +54173,6 @@ $C
   1; };
 { package STD::Q::a0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54232,7 +54217,6 @@ $C
   1; };
 { package STD::Q::h1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54381,7 +54365,6 @@ $C
   1; };
 { package STD::Q::h0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54426,7 +54409,6 @@ $C
   1; };
 { package STD::Q::f1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54575,7 +54557,6 @@ $C
   1; };
 { package STD::Q::f0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54620,7 +54601,6 @@ $C
   1; };
 { package STD::Q::p1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54641,7 +54621,6 @@ my $s = @_ ? shift() : undef;
 $s->parsepath }  1; };
 { package STD::Q::p0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54662,7 +54641,6 @@ my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::w1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54683,7 +54661,6 @@ my $s = @_ ? shift() : undef;
 $s->words }  1; };
 { package STD::Q::w0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54704,7 +54681,6 @@ my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::ww1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54725,7 +54701,6 @@ my $s = @_ ? shift() : undef;
 $s->words }  1; };
 { package STD::Q::ww0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54746,7 +54721,6 @@ my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::x1;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54767,7 +54741,6 @@ my $s = @_ ? shift() : undef;
 $s->run }  1; };
 { package STD::Q::x0;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54788,7 +54761,6 @@ my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::q;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -55061,7 +55033,6 @@ $self->panic("Too late for :cc")     };
  1; };
 { package STD::Q::qq;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 moose_with('STD::Q::b1');
 moose_with('STD::Q::c1');
 moose_with('STD::Q::s1');
@@ -55285,7 +55256,6 @@ $self->panic("Too late for :cc")     };
  1; };
 { package STD::Q::cc;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -56704,7 +56674,6 @@ $self->panic("Too late for :cc")     };
  1; };
 { package STD::Q::p5;
 use Moose::Role ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -56994,7 +56963,6 @@ $self->sorry("Unrecognized quote modifier: " . join('',@k));
  1; };
 { package STD::Quasi;
 use Moose ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 moose_extends('STD::P6');
 
 no warnings 'qw', 'recursion';
@@ -57231,13 +57199,11 @@ push @chain, pop(@opstack);
 }
                 ;
 push @chain, pop(@termstack);
-for (@chain) {
-delete $_->{'_xact'}}
-                ;
 my $endpos = $chain[0]->{'_pos'};
 @chain = reverse @chain if @chain > 1;
 my $startpos = $chain[0]->from;
 my $nop = $op->cursor_fresh();
+$nop->prepbind(@chain);
 $nop->{'chain'} = [@chain];
 $nop->{'_arity'} = 'CHAIN';
 $nop->from = $startpos;
@@ -57274,17 +57240,12 @@ if (@termstack and defined $termstack[0]) {
 push @list, pop(@termstack)}
 else {
 $self->worry("Missing final term in '" . $sym . "' list")};
-for (@list) {
-delete $_->{'_xact'}}
-                ;
-for (@delims) {
-delete $_->{'_xact'}}
-                ;
 my $endpos = $list[0]->{'_pos'};
 @list = reverse @list if @list > 1;
 my $startpos = $list[0]->from;
 @delims = reverse @delims if @delims > 1;
 my $nop = $op->cursor_fresh();
+$nop->prepbind(@list,@delims);
 $nop->{'sym'} = $sym;
 $nop->{'O'} = $op->{'O'};
 $nop->{'list'} = [@list];
@@ -57313,9 +57274,8 @@ when ('unary') {
 $self->deb("reducing") if $::DEBUG & DEBUG::EXPR;
 $self->deb("Termstack size: ", 0+@termstack) if $::DEBUG & DEBUG::EXPR;
 $self->deb($op->dump) if $::DEBUG & DEBUG::EXPR;
-my $nop = $op->cursor_fresh();
 my $arg = pop @termstack;
-delete $arg->{'_xact'};
+$op->prepbind($arg);
 $op->{'arg'} = $arg;
 my $a = $op->{'~CAPS'};
 $op->{'_arity'} = 'UNARY';
@@ -57340,8 +57300,7 @@ $self->deb("reducing") if $::DEBUG & DEBUG::EXPR;
 $self->deb("Termstack size: ", 0+@termstack) if $::DEBUG & DEBUG::EXPR;
 my $right = pop @termstack;
 my $left = pop @termstack;
-delete $right->{'_xact'};
-delete $left->{'_xact'};
+$op->prepbind($left,$right);
 $op->{'right'} = $right;
 $op->{'left'} = $left;
 $op->from = $left->from;
@@ -57482,7 +57441,6 @@ $self->_MATCHIFYr($S, "EXPR", @termstack);
 };
 { package STD::Regex;
 use Moose ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 moose_extends('STD');
 
 no warnings 'qw', 'recursion';

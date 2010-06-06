@@ -1596,7 +1596,6 @@ BODY
 
 	$header .= <<"END";
 use $meta ':all' => { -prefix => "moose_" };
-use Cursor; # for DEBUG::, etc
 END
 
 	$header .= <<"END" for @extends;
