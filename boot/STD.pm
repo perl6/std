@@ -2,6 +2,7 @@ use 5.010;
 use utf8;
 { package STD;
 use Moose ':all' => { -prefix => "moose_" };
+use Encode;
 moose_extends('Cursor');
 
 no warnings 'qw', 'recursion';
@@ -7341,6 +7342,7 @@ return $start, $stop;
         my $eval = "package $mixin" . q{;
 	    sub _PARAMS { { '$start' => $start, '$stop' => $stop } }
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -7415,6 +7417,7 @@ $self->_MATCHIFYr($S, "stopper", $C->_EXACT($stop));
         my $eval = "package $mixin" . q{;
 	    sub _PARAMS { { '$stop' => $stop } }
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -7495,6 +7498,7 @@ $self->_MATCHIFYr($S, "stopper", $C->_EXACT($stop));
         my $eval = "package $mixin" . q{;
 	    sub _PARAMS { { '$stop' => $stop } }
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -8180,6 +8184,7 @@ $M->{'B'} = [$lang,$start,$stop];
 our @herestub_queue;
 { package STD::Herestub;
 use Moose ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -8197,6 +8202,7 @@ moose_has 'lang' => (is => 'rw');
   1; };
 { package STD::herestop;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -11222,6 +11228,7 @@ $C->O(%terminator)
 ;
 { package STD::P6;
 use Moose ':all' => { -prefix => "moose_" };
+use Encode;
 moose_extends('STD');
 
 no warnings 'qw', 'recursion';
@@ -52968,6 +52975,7 @@ $::GOAL eq 'endargs' and $::MEMOS[$C->{'_pos'}]->{'endargs'} })
   1; };
 { package STD::Q;
 use Moose ':all' => { -prefix => "moose_" };
+use Encode;
 moose_extends('STD');
 
 no warnings 'qw', 'recursion';
@@ -52982,6 +52990,7 @@ $SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof(
 
 { package STD::Q::b1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53708,6 +53717,7 @@ $self->_MATCHIFYr($S, "backslash__S_0140", $C->_EXACT("0"));
   1; };
 { package STD::Q::b0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53752,6 +53762,7 @@ $C
   1; };
 { package STD::Q::c1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53834,6 +53845,7 @@ $C
   1; };
 { package STD::Q::c0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53878,6 +53890,7 @@ $C
   1; };
 { package STD::Q::s1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -53981,6 +53994,7 @@ if (my ($C) = ($C->panic("Non-variable \$ must be backslashed"))) { ($C) } else 
   1; };
 { package STD::Q::s0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54025,6 +54039,7 @@ $C
   1; };
 { package STD::Q::a1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54173,6 +54188,7 @@ $C
   1; };
 { package STD::Q::a0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54217,6 +54233,7 @@ $C
   1; };
 { package STD::Q::h1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54365,6 +54382,7 @@ $C
   1; };
 { package STD::Q::h0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54409,6 +54427,7 @@ $C
   1; };
 { package STD::Q::f1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54557,6 +54576,7 @@ $C
   1; };
 { package STD::Q::f0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54601,6 +54621,7 @@ $C
   1; };
 { package STD::Q::p1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54621,6 +54642,7 @@ my $s = @_ ? shift() : undef;
 $s->parsepath }  1; };
 { package STD::Q::p0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54641,6 +54663,7 @@ my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::w1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54661,6 +54684,7 @@ my $s = @_ ? shift() : undef;
 $s->words }  1; };
 { package STD::Q::w0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54681,6 +54705,7 @@ my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::ww1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54701,6 +54726,7 @@ my $s = @_ ? shift() : undef;
 $s->words }  1; };
 { package STD::Q::ww0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54721,6 +54747,7 @@ my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::x1;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54741,6 +54768,7 @@ my $s = @_ ? shift() : undef;
 $s->run }  1; };
 { package STD::Q::x0;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -54761,6 +54789,7 @@ my $s = @_ ? shift() : undef;
 $s }  1; };
 { package STD::Q::q;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -55033,6 +55062,7 @@ $self->panic("Too late for :cc")     };
  1; };
 { package STD::Q::qq;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 moose_with('STD::Q::b1');
 moose_with('STD::Q::c1');
 moose_with('STD::Q::s1');
@@ -55256,6 +55286,7 @@ $self->panic("Too late for :cc")     };
  1; };
 { package STD::Q::cc;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -56674,6 +56705,7 @@ $self->panic("Too late for :cc")     };
  1; };
 { package STD::Q::p5;
 use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
 
 no warnings 'qw', 'recursion';
 my $retree;
@@ -56963,6 +56995,7 @@ $self->sorry("Unrecognized quote modifier: " . join('',@k));
  1; };
 { package STD::Quasi;
 use Moose ':all' => { -prefix => "moose_" };
+use Encode;
 moose_extends('STD::P6');
 
 no warnings 'qw', 'recursion';
@@ -57441,6 +57474,7 @@ $self->_MATCHIFYr($S, "EXPR", @termstack);
 };
 { package STD::Regex;
 use Moose ':all' => { -prefix => "moose_" };
+use Encode;
 moose_extends('STD');
 
 no warnings 'qw', 'recursion';

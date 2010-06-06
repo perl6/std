@@ -1596,6 +1596,7 @@ BODY
 
 	$header .= <<"END";
 use $meta ':all' => { -prefix => "moose_" };
+use Encode;
 END
 
 	$header .= <<"END" for @extends;
