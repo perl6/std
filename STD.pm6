@@ -1921,6 +1921,7 @@ grammar P6 is STD {
                     {{
                         $longname orelse $¢.panic("Compilation unit cannot be anonymous");
                         $outer == $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
+                        $*PKGDECL eq 'package' and $¢.panic("Semicolon form of package definition indicates a Perl 5 module; unfortunately,\n  STD doesn't know how to parse Perl 5 code yet");
                         my $shortname = $longname.<name>.Str;
                         $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
                         $*begin_compunit = 0;
@@ -4516,13 +4517,11 @@ method EXPR ($preclvl?) {
                     push @chain, pop(@opstack);
                 }
                 push @chain, pop(@termstack);
-                for @chain {
-                    $_.<_xact> :delete;
-                }
                 my $endpos = @chain[0].pos;
                 @chain = reverse @chain if @chain > 1;
                 my $startpos = @chain[0].from;
                 my $nop = $op.cursor_fresh();
+                $nop.prepbind(@chain);
                 $nop<chain> = [@chain];
                 $nop<_arity> = 'CHAIN';
                 $nop.from = $startpos;
@@ -4560,17 +4559,12 @@ method EXPR ($preclvl?) {
                 else {
                     self.worry("Missing final term in '" ~ $sym ~ "' list");
                 }
-                for @list {
-                    $_.<_xact> :delete;
-                }
-                for @delims {
-                    $_.<_xact> :delete;
-                }
                 my $endpos = @list[0].pos;
                 @list = reverse @list if @list > 1;
                 my $startpos = @list[0].from;
                 @delims = reverse @delims if @delims > 1;
                 my $nop = $op.cursor_fresh();
+                $nop.prepbind(@list,@delims);
                 $nop<sym> = $sym;
                 $nop<O> = $op<O>;
                 $nop<list> = [@list];
@@ -4598,9 +4592,8 @@ method EXPR ($preclvl?) {
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
                 self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
-                my $nop = $op.cursor_fresh();
                 my $arg = pop @termstack;
-                $arg<_xact> :delete;
+                $op.prepbind($arg);
                 $op<arg> = $arg;
                 my $a = $op<~CAPS>;
                 $op<_arity> = 'UNARY';
@@ -4627,8 +4620,7 @@ method EXPR ($preclvl?) {
 
                 my $right = pop @termstack;
                 my $left = pop @termstack;
-                $right<_xact> :delete;
-                $left<_xact> :delete;
+                $op.prepbind($left,$right);
                 $op<right> = $right;
                 $op<left> = $left;
                 $op.from = $left.from;
@@ -4656,7 +4648,7 @@ method EXPR ($preclvl?) {
         self.deb("In loop, at ", $here.pos) if $*DEBUG +& DEBUG::EXPR;
         my $oldpos = $here.pos;
         $here = $here.cursor_fresh();
-        $*LEFTSIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';
+        $*LEFTSIGIL = @opstack[*-1]<O><prec> gt $item_assignment_prec ?? '@' !! '';     # XXX P6
         my @t = $here.$termish;
 
         if not @t or not $here = @t[0] or ($here.pos == $oldpos and $termish eq 'termish') {
@@ -4698,11 +4690,11 @@ method EXPR ($preclvl?) {
         @termstack[*-1].<POST>:delete;
         self.deb("after push: " ~ (0+@termstack)) if $*DEBUG +& DEBUG::EXPR;
 
-        last TERM if $preclim eq $methodcall_prec; # in interpolation, probably
+        last TERM if $preclim eq $methodcall_prec; # in interpolation, probably   # XXX P6
 
         loop {     # while we see adverbs
             $oldpos = $here.pos;
-            last TERM if (@*MEMOS[$oldpos]<endstmt> // 0) == 2;
+            last TERM if (@*MEMOS[$oldpos]<endstmt> // 0) == 2;   # XXX P6
             $here = $here.cursor_fresh.ws;
             my @infix = $here.cursor_fresh.infixish();
             last TERM unless @infix;
@@ -4718,7 +4710,7 @@ method EXPR ($preclvl?) {
             if not defined $inprec {
                 self.deb("No prec given in infix!") if $*DEBUG +& DEBUG::EXPR;
                 die $infix.dump if $*DEBUG +& DEBUG::EXPR;
-                $inprec = %terminator<prec>;
+                $inprec = %terminator<prec>;   # XXX lexical scope is wrong
             }
 
             if $inprec le $preclim {
