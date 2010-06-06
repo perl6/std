@@ -3,7 +3,7 @@
 
 FIXINS=Cursor.pmc CursorBase.pmc RE_ast.pmc LazyMap.pm Actions.pm lib/DEBUG.pm6 DEBUG.pmc lib/Test.pm6 \
 	CORE.setting NULL.pad std mangle.pl CORE.pad lib/NAME.pm6 NAME.pmc \
-	lib/Stash.pm6 Stash.pmc sprixel.pl ToJS.pm viv sprixelCORE.setting
+	lib/Stash.pm6 Stash.pmc
 
 all: $(FIXINS) check lex/STD/termish
 

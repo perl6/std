@@ -1,8 +1,0 @@
-my module CORE;
-
-use IO;
-use Int;
-use Str;
-
-
-YOU_ARE_HERE;

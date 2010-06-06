@@ -42,8 +42,6 @@ The following tools are provided which leverage the power of C<STD>:
 
 * C<reds> appears to be an older, non-working version of redspans.
 
-* C<sprixel> is a (bit rotten) Perl 6 to Javascript compiler.
-
 * C<STD_syntax_highlight> is a syntax highlighter with multiple output formats.
 
 * C<teststd> uses STD to check the syntax of the Perl 6 Specification Tests.
