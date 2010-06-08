@@ -1830,6 +1830,10 @@ EOFINAL
 	    return $self->{atom}->re_ast;
 	}
 
+	if ($self->{quantifier}[0]{SYM} eq '~') {
+	    return $self->tilde;
+	}
+
 	if ($self->{quantifier}[0]{SYM} eq ':') {
 	    my $ast = $self->{atom}->re_ast;
 	    $ast->{r} = 1;
@@ -1843,6 +1847,39 @@ EOFINAL
 	my $r = RE_quantified_atom->new(atom => $ast, quant => $quant);
 	$r->{r} = 0 if $quant->[1] ne ':';
 	$r;
+    }
+
+    sub tilde {  my $self = shift;
+	my $opener = $self->{atom}->re_ast;
+	my $closer = $self->{quantifier}[0]{quantified_atom}[0]->re_ast;
+	my $inner  = $self->{quantifier}[0]{quantified_atom}[1]->re_ast;
+
+	my @expn;
+
+	my $strcloser = $closer->{text};
+
+	my $begin = <<TEXT;
+local \$::GOAL = "${\ quotemeta $strcloser}";
+my \$goalpos = \$C;
+TEXT
+	if ($strcloser !~ /^[])}]$/) {
+	    $begin .= <<TEXT;
+my \$newlang = \$C->unbalanced(\$::GOAL);
+\$C = bless(\$C, (ref(\$newlang) || \$newlang))
+TEXT
+	}
+
+	push @expn, $opener;
+	# XXX STD break LTM for gimme5 bug-compatibility
+	push @expn, RE_block->new(body => '', context => 'void');
+	push @expn, $inner;
+	push @expn, RE_bracket->new(decl => [], re => RE_first->new(
+		RE_string->new(text => $strcloser),
+		RE_method->new(name => 'FAILGOAL', nobind => 1,
+		    rest => "(\$::GOAL, '$::DBA', \$goalpos)")));
+
+	RE_bracket->new(decl => [RE_decl->new(body => $begin)], re =>
+	    RE_sequence->new(@expn));
     }
 }
 
