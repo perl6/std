@@ -5020,7 +5020,7 @@ grammar Regex is STD {
         <!before '$$'>
         <?before <sigil>>
         [:lang(%*LANG<MAIN>) <termish> ]
-        $<binding> = ( \s* '=' \s* <quantified_atom> )?
+        $<binding> = ( \s* '=' \s* <atom> )?
         { $<sym> = $<termish><term>.Str; }
     }
 
