@@ -4889,12 +4889,14 @@ grammar Regex is STD {
     token regex_infix:sym<&&> { <sym> <O(|%tight_and)>  }
     token regex_infix:sym<|> { <sym> <O(|%junctive_or)>  }
     token regex_infix:sym<&> { <sym> <O(|%junctive_and)>  }
+    token regex_infix:sym<~> { <sym> <O(|%additive)>  }
 
     token quantified_atom {
         <!stopper>
         <!regex_infix>
         <atom>
-        [ <normspace>? <quantifier> ]?
+        <.ws>
+        [ <quantifier> <.ws> ]?
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Can't quantify zero-width atom">
     }
@@ -5020,7 +5022,7 @@ grammar Regex is STD {
         <!before '$$'>
         <?before <sigil>>
         [:lang(%*LANG<MAIN>) <termish> ]
-        $<binding> = ( \s* '=' \s* <atom> )?
+        $<binding> = ( \s* '=' \s* <quantified_atom> )?
         { $<sym> = $<termish><term>.Str; }
     }
 
@@ -5154,10 +5156,6 @@ grammar Regex is STD {
         | <embeddedblock>
         | <quantified_atom>
         ]
-    }
-
-    token quantifier:sym<~> {
-        <sym> <normspace>? <quantified_atom> <normspace>? <quantified_atom>
     }
 
     token quantifier:sym<~~> {
