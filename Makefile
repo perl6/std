@@ -1,5 +1,5 @@
 # Makefile for STD.pm6 viv etcetera in pugs/src/perl6
-.PHONY: six all sixfast clean
+.PHONY: six all sixfast clean stage0 stage1 stage2 stage3
 
 # technically viv is part of the frontend too, but it's used very little.  viv
 # should probably be refactored into independant programs
@@ -14,7 +14,7 @@ CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
 
 clean:
 	rm -rf lex syml STD_P5.pmc $(GENERATE) stage0/lex stage0/syml stage1/*\
-	    stage2/* stage*/.stamp .stamp .stamp5
+	    stage2/* stage3/* stage*/.stamp .stamp .stamp5
 
 six: .stamp
 all: .stamp .stamp5
@@ -27,6 +27,12 @@ all: .stamp .stamp5
 	cp stage2/STD_P5.pmc .
 	touch .stamp5
 
+stage0: stage0/.stamp
+stage1: stage1/.stamp
+stage2: stage2/.stamp
+stage3: stage3/.stamp
+
+########################################
 # stage0 is rather weird, in that it has its own copy of the invariant files
 # */.stamp indicates that the corresponding compiler is "usable"
 stage0/.stamp: $(addprefix stage0/,$(INVARIANT) $(GENERATE))
@@ -34,6 +40,9 @@ stage0/.stamp: $(addprefix stage0/,$(INVARIANT) $(GENERATE))
 	cd stage0 && ./std CORE.setting
 	touch stage0/.stamp
 
+########################################
+# stage 1 is built from the working STD.pm6 using a bootstrap compiler
+# it can be built very quickly, usually
 stage1/STD.store: $(STD_SOURCE) stage0/.stamp
 	cd stage0 && PERL6LIB=../lib:.. ./viv -o ../stage1/STD.store \
 	    --freeze ../STD.pm6
@@ -50,6 +59,9 @@ stage1/.stamp: stage1/STD.pmc stage1/Cursor.pmc $(INVARIANT)
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./std CORE.setting
 	touch stage1/.stamp
 
+########################################
+# stage 2 is built using the working STD.pm6, and serves to expose miscompiling
+# bugs in STD
 stage2/STD.store: $(STD_SOURCE) stage1/.stamp
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv \
 		   -o stage2/STD.store --freeze STD.pm6
@@ -73,6 +85,34 @@ stage2/STD_P5.pmc: stage2/STD_P5.store stage1/.stamp
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
 		   -o stage2/STD_P5.pmc --thaw stage2/STD_P5.store
 
+########################################
+# if the compiler is working correctly, stage3 will be the same as stage2
+stage3/STD.store: $(STD_SOURCE) stage2/.stamp
+	STD5PREFIX=stage2/ PERL5LIB=stage2/:. ./viv \
+		   -o stage3/STD.store --freeze STD.pm6
+stage3/Cursor.store: $(CURSOR_SOURCE) stage2/.stamp
+	STD5PREFIX=stage2/ PERL5LIB=stage2/:. ./viv \
+		   -o stage3/Cursor.store --freeze Cursor.pm6
+stage3/STD.pmc: stage3/STD.store stage2/.stamp
+	STD5PREFIX=stage2/ PERL5LIB=stage2/:. ./viv -5 --no-indent \
+		   -o stage3/STD.pmc --thaw stage3/STD.store
+stage3/Cursor.pmc: stage3/Cursor.store stage2/.stamp
+	STD5PREFIX=stage2/ PERL5LIB=stage2/:. ./viv -5 --no-indent \
+		   -o stage3/Cursor.pmc --thaw stage3/Cursor.store
+stage3/.stamp: stage3/STD.pmc stage3/Cursor.pmc $(INVARIANT)
+	cmp stage2/STD.pmc stage3/STD.pmc
+	cmp stage2/Cursor.pmc stage3/Cursor.pmc
+	rm -rf stage3/lex stage3/syml
+	cp -a stage2/lex stage2/syml stage3
+	touch stage3/.stamp
+
+########################################
+
+reboot: stage3/.stamp
+	cp -a $(INVARIANT) stage0
+	cp -a $(addprefix stage3/,$(GENERATE)) stage0
+	rm -rf stage0/lex stage0/syml
+
 
 slow: stage2
 	cp stage2/STD.pmc stage2/Cursor.pmc .
@@ -91,15 +131,7 @@ snap: $(FIXINS) check lex/STD/termish
 	-mv snap snap.old
 	mv snap.new snap
 
-
-#STD.pm5: STD.store viv
-#STD_P5.store: STD_P5.pm6 boot/STD.pm boot/Cursor.pmc Actions.pm boot/syml/CORE.syml
-#STD_P5.pmc: STD_P5.store viv
-
-#reboot: STD.pmc Cursor.pmc
-
-#clean distclean:
-
+#pm5
 #snap:
 #snaptest: snap all
 #test: all
@@ -113,10 +145,13 @@ help:
 	@echo
 	@echo 'six (default)   builds viv for Perl6'
 	@echo 'all             builds viv for Perl5 too'
-	@echo 'snap            copies runnable files and svn revision to snap/'
-	@echo 'clean           removes many generated files'
+	@echo 'reboot          builds third stage and updates stage0'
+	@echo 'clean           removes generated files'
+	@echo 'stage0          prepares bootstrap for usage'
+	@echo 'stage1          prepares stage 1 compiler (fast)'
+	@echo 'stage2          prepares stage 2 compiler'
+	@echo 'stage3          prepares stage 3 compiler (only for testing)'
+	@echo 'help            show this list'
 	@echo 'snaptest        run snapshot teststd on pugs/t/spec/*'
 	@echo 'test            run teststd on pugs/t/*'
-	@echo 'testt           run teststd on pugs/t/spec/*'
-	@echo 'help            show this list'
 	@echo
