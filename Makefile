@@ -1,5 +1,5 @@
 # Makefile for STD.pm6 viv etcetera in pugs/src/perl6
-.PHONY: six all sixfast
+.PHONY: six all sixfast clean
 
 # technically viv is part of the frontend too, but it's used very little.  viv
 # should probably be refactored into independant programs
@@ -11,6 +11,10 @@ GENERATE=STD.pmc Cursor.pmc
 STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
        lib/DEBUG.pm6
 CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
+
+clean:
+	rm -rf lex syml STD_P5.pmc $(GENERATE) stage0/lex stage0/syml stage1/*\
+	    stage2/* stage*/.stamp .stamp .stamp5
 
 six: .stamp
 all: .stamp .stamp5
