@@ -12,10 +12,6 @@ STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
        lib/DEBUG.pm6
 CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
 
-clean:
-	rm -rf lex syml STD_P5.pmc $(GENERATE) stage0/lex stage0/syml stage1/*\
-	    stage2/* stage3/* stage*/.stamp .stamp .stamp5
-
 six: .stamp
 all: .stamp .stamp5
 .stamp: stage2/.stamp
@@ -26,6 +22,10 @@ all: .stamp .stamp5
 	rm -rf lex/STD/P5
 	cp stage2/STD_P5.pmc .
 	touch .stamp5
+
+clean:
+	rm -rf lex syml STD_P5.pmc $(GENERATE) stage0/lex stage0/syml stage1/*\
+	    stage2/* stage3/* stage*/.stamp .stamp .stamp5
 
 stage0: stage0/.stamp
 stage1: stage1/.stamp
