@@ -1834,6 +1834,10 @@ EOFINAL
 	    return $self->{atom}->re_ast;
 	}
 
+	if ($self->{quantifier}[0]{SYM} eq '~') {
+	    return $self->_tilde;
+	}
+
 	if ($self->{quantifier}[0]{SYM} eq ':') {
 	    my $ast = $self->{atom}->re_ast;
 	    $ast->{r} = 1;
@@ -1847,6 +1851,38 @@ EOFINAL
 	my $r = RE_quantified_atom->new(atom => $ast, quant => $quant);
 	$r->{r} = 0 if $quant->[1] ne ':';
 	$r;
+    }
+
+    sub _tilde {  my $self = shift;
+	my $opener = $self->{atom}->re_ast;
+	my $closer = $self->{quantifier}[0]{quantified_atom}[0]->re_ast;
+	my $inner  = $self->{quantifier}[0]{quantified_atom}[1]->re_ast;
+
+	my $strcloser = $closer->{text}; #XXX
+
+	my $begin = <<TEXT;
+local \$::GOAL = "${\ quotemeta $strcloser}";
+my \$goalpos = \$C;
+TEXT
+	if ($strcloser !~ /^[])}]$/) {
+	    $begin .= <<TEXT;
+my \$newlang = \$C->unbalanced(\$::GOAL);
+\$C = bless(\$C, (ref(\$newlang) || \$newlang))
+TEXT
+	}
+
+	my @expn;
+	push @expn, $opener;
+	# XXX STD break LTM for gimme5 bug-compatibility
+	push @expn, RE_block->new(body => '', context => 'void');
+	push @expn, $inner;
+	push @expn, RE_bracket->new(decl => [], re => RE_first->new(
+		RE_string->new(text => $strcloser),
+		RE_method->new(name => 'FAILGOAL', nobind => 1,
+		    rest => "(\$::GOAL, '$::DBA', \$goalpos)")));
+
+	RE_bracket->new(decl => [RE_decl->new(body => $begin)], re =>
+	    RE_sequence->new(@expn));
     }
 }
 
@@ -2145,52 +2181,7 @@ END
 { package VAST::regex_infix; our @ISA = 'VAST::Base';
 }
 
-# This is really a tight ternary op, but XXX STD parses it as a loose infix,
-# so we need to reassociate.  Also, the backend handling is very "fossily"
 { package VAST::regex_infix__S_Tilde; our @ISA = 'VAST::Base';
-    sub re_ast {  my $self = shift;
-	my ($left, $right) = map { $_->re_ast } $self->kids('args');
-	die "internal error: erroneous optimization"
-	    unless $left->isa("RE_sequence") && $right->isa("RE_sequence");
-	my @lefts = @{ $left->{zyg} };
-	my @rights = @{ $right->{zyg} };
-
-	pop @lefts while ($lefts[-1]->isa('RE_method') && $lefts[-1]{name} eq 'ws' || $lefts[-1]->isa('RE_noop'));
-	shift @rights while ($rights[0]->isa('RE_method') && $rights[0]{name} eq 'ws' || $rights[0]->isa('RE_noop'));
-	splice @rights, 1, 1 while ($rights[1]->isa('RE_method') && $rights[1]{name} eq 'ws' || $rights[1]->isa('RE_noop'));
-
-	my $opener = pop @lefts;
-	my ($closer, $inner) = splice @rights, 0, 2;
-
-	my @middle;
-
-	my $strcloser = $closer->{text}; #XXX
-
-	my $begin = <<TEXT;
-local \$::GOAL = "${\ quotemeta $strcloser}";
-my \$goalpos = \$C;
-TEXT
-	if ($strcloser !~ /^[])}]$/) {
-	    $begin .= <<TEXT;
-my \$newlang = \$C->unbalanced(\$::GOAL);
-\$C = bless(\$C, (ref(\$newlang) || \$newlang))
-TEXT
-	}
-
-	push @middle, $opener;
-	# XXX STD break LTM for gimme5 bug-compatibility
-	push @middle, RE_block->new(body => '', context => 'void');
-	push @middle, $inner;
-	push @middle, RE_bracket->new(decl => [], re => RE_first->new(
-		RE_string->new(text => $strcloser),
-		RE_method->new(name => 'FAILGOAL', nobind => 1,
-		    rest => "(\$::GOAL, '$::DBA', \$goalpos)")));
-
-	my $middle = RE_bracket->new(decl => [RE_decl->new(body => $begin)], re =>
-	    RE_sequence->new(@middle));
-
-	RE_sequence->new(@lefts, $middle, @rights);
-    }
 }
 
 
