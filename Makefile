@@ -1,13 +1,61 @@
 # Makefile for STD.pm6 viv etcetera in pugs/src/perl6
-.PHONY: check try cat clean distclean purge test
+.PHONY:
 
-FIXINS=Cursor.pmc CursorBase.pmc RE_ast.pmc LazyMap.pm Actions.pm lib/DEBUG.pm6 DEBUG.pmc lib/Test.pm6 \
-	CORE.setting NULL.pad std mangle.pl CORE.pad lib/NAME.pm6 NAME.pmc \
-	lib/Stash.pm6 Stash.pmc
+# technically viv is part of the frontend too, but it's used very little.  viv
+# should probably be refactored into independant programs
+FRONTEND=Actions.pm CORE.setting CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc\
+	 NULL.pad RE_ast.pmc Stash.pmc mangle.pl std
+BACKEND=mangle.pl Actions.pm viv
+INVARIANT=$(FRONTEND) viv
+GENERATE=STD.pmc Cursor.pmc
+STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
+       lib/DEBUG.pm6
+CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
 
-all: $(FIXINS) check lex/STD/termish
+#all: $(FIXINS) check lex/STD/termish
 
-fast: $(FIXINS) check
+# stage0 is rather weird, in that it has its own copy of the invariant files
+# */.stamp indicates that the corresponding compiler is "usable"
+stage0/.stamp: $(addprefix stage0/,$(INVARIANT) $(GENERATE))
+	rm -rf stage0/lex stage0/syml
+	cd stage0 && ./std CORE.setting
+	touch stage0/.stamp
+
+stage1/STD.store: $(STD_SOURCE) stage0/.stamp
+	cd stage0 && PERL6LIB=../lib:.. ./viv -o ../stage1/STD.store \
+	    --freeze ../STD.pm6
+stage1/Cursor.store: $(CURSOR_SOURCE) stage0/.stamp
+	cd stage0 && PERL6LIB=../lib:.. ./viv -o ../stage1/Cursor.store \
+	    --freeze ../Cursor.pm6
+stage1/STD.pmc: stage1/STD.store stage0/.stamp
+	cd stage0 && PERL6LIB=../lib:.. ./viv -5 --no-indent \
+	    -o ../stage1/STD.pmc --thaw ../stage1/STD.store
+stage1/Cursor.pmc: stage1/Cursor.store stage0/.stamp
+	cd stage0 && PERL6LIB=../lib:.. ./viv -5 --no-indent \
+	    -o ../stage1/Cursor.pmc --thaw ../stage1/Cursor.store
+stage1/.stamp: stage1/STD.pmc stage1/Cursor.pmc $(INVARIANT)
+	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./std CORE.setting
+	touch stage1/.stamp
+
+stage2/STD.store: $(STD_SOURCE) stage1/.stamp
+	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv \
+		   -o stage2/STD.store --freeze STD.pm6
+stage2/Cursor.store: $(CURSOR_SOURCE) stage1/.stamp
+	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv \
+		   -o stage2/Cursor.store --freeze Cursor.pm6
+stage2/STD.pmc: stage2/STD.store stage1/.stamp
+	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
+		   -o stage2/STD.pmc --thaw stage2/STD.store
+stage2/Cursor.pmc: stage2/Cursor.store stage1/.stamp
+	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
+		   -o stage2/Cursor.pmc --thaw stage2/Cursor.store
+stage2/.stamp: stage2/STD.pmc stage2/Cursor.pmc $(INVARIANT)
+	STD5PREFIX=stage2/ PERL5LIB=stage2/:. ./std CORE.setting
+	touch stage2/.stamp
+
+
+slow: stage2
+	cp stage2/STD.pmc stage2/Cursor.pmc .
 
 snap: $(FIXINS) check lex/STD/termish
 	rm -rf snap.new
@@ -23,65 +71,19 @@ snap: $(FIXINS) check lex/STD/termish
 	-mv snap snap.old
 	mv snap.new snap
 
-boot/syml/CORE.syml: CORE.setting
-	STD5PREFIX=boot/ PERL5LIB=boot perl std
 
-# .store files depend little on viv; ideally it should be factored into two
-# programs; this rule is missing a few dependencies!
-# boot/STD.pm because boot/STD.pmc doesn't take precedence over ./STD.pm
-STD.store: STD.pm6 boot/STD.pm boot/Cursor.pmc Actions.pm boot/syml/CORE.syml
-	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o STD.store --freeze STD.pm6
-STD.pmc: STD.store viv
-	perl -Iboot viv --no-indent -5 -o STD.pmc --thaw STD.store
-	rm -rf lex syml/*.pad.store
-Cursor.store: Cursor.pm6 boot/STD.pm boot/Cursor.pmc Actions.pm boot/syml/CORE.syml
-	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o Cursor.store --freeze Cursor.pm6
-Cursor.pmc: Cursor.store viv
-	perl -Iboot viv --no-indent -5 -o Cursor.pmc --thaw Cursor.store
-# for debugging
-STD.pm5: STD.store viv
-	perl -Iboot viv -5 -o STD.pm5 --thaw STD.store
-STD_P5.store: STD_P5.pm6 boot/STD.pm boot/Cursor.pmc Actions.pm boot/syml/CORE.syml
-	STD5PREFIX=boot/ PERL5LIB=boot perl viv -o STD_P5.store --freeze STD_P5.pm6
-STD_P5.pmc: STD_P5.store viv
-	perl -Iboot viv --no-indent -5 -o STD_P5.pmc --thaw STD_P5.store
-	rm -rf lex syml/*.pad.store
+#STD.pm5: STD.store viv
+#STD_P5.store: STD_P5.pm6 boot/STD.pm boot/Cursor.pmc Actions.pm boot/syml/CORE.syml
+#STD_P5.pmc: STD_P5.store viv
 
-syml/CORE.syml: CORE.setting
-	-rm -f syml/CORE.syml.store
-	-./std CORE.setting
+#reboot: STD.pmc Cursor.pmc
 
-check: STD.pmc STD_P5.pmc Cursor.pmc
-	/usr/local/bin/perl -c STD.pmc
-	/usr/local/bin/perl -c Cursor.pmc
-	/usr/local/bin/perl -c STD_P5.pmc
+#clean distclean:
 
-reboot: STD.pmc Cursor.pmc
-	cp STD.pmc boot/STD.pm
-	cp Cursor.pmc boot/Cursor.pmc
-
-# pre-generate common sublexers
-lex/STD/termish: Cursor.pmc STD.pmc STD_P5.pmc syml/CORE.syml
-	@echo 'Generating STD lexers...'
-	./tryfile STD.pm6
-
-cat:
-	cat try5.out
-
-clean:
-	rm -rf lex try5.* *.pad.store syml boot/lex boot/syml STD.pmc STD_P5.pmc STD.store STD_P5.store Cursor.store Cursor.pmc STD.pm5
-
-# purge is an alias for distclean
-distclean purge: clean
-	rm -rf STD.pmc STD_P5.pmc
-
-snaptest: snap all
-	cd snap; ../teststd ../../../t
-
-test: all
-	./teststd
-testt: all
-	./teststd ../../t
+#snap:
+#snaptest: snap all
+#test: all
+#testt: all
 
 # List all targets with brief descriptions.
 # Gradual shaving of targets with Occam's Razor would be a Good Thing.
