@@ -656,6 +656,10 @@ sub rd {
 	my $name = $self->{longname}->Str;
 
 	if ($self->{nibbler}[0]) {
+	    local $::DBA = $::DBA;
+	    local $::RATCHET = $::RATCHET;
+	    local $::SIGSPACE = $::SIGSPACE;
+	    local $::IGNORECASE = $::IGNORECASE;
 	    return RE_method_re->new(name => $name,
 		re => $self->{nibbler}[0]{"."}->re_ast);
 	}
@@ -1263,7 +1267,9 @@ sub rd {
 
 { package VAST::metachar__S_sigwhite; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	RE_method->new(name => 'ws', nobind => 1);
+	$::SIGSPACE ?
+	    RE_method->new(name => 'ws', nobind => 1) :
+	    RE_noop->new;
     }
 }
 
@@ -1424,7 +1430,6 @@ BODY
 
 
 { package VAST::mod_internal__S_Colons; our @ISA = 'VAST::Base';
-    # note that most of this is handled in the parser
     sub re_ast { my $self = shift;
 	$::SIGSPACE = 1;
 	RE_noop->new;
@@ -1433,7 +1438,6 @@ BODY
 
 
 { package VAST::mod_internal__S_ColonBangs; our @ISA = 'VAST::Base';
-    # note that most of this is handled in the parser
     sub re_ast { my $self = shift;
 	$::SIGSPACE = 0;
 	RE_noop->new;
@@ -1852,9 +1856,11 @@ EOFINAL
 	# XXX STD work around misparsing of whitespace near quantifiers
 	for my $i (0 .. @kids - 2) {
 	    if ($kids[$i+1]->isa('RE_quantified_atom')
-		    && $kids[$i+1]{atom}->isa('RE_method')
-		    && $kids[$i+1]{atom}{name} eq 'ws') {
+		    && ($kids[$i+1]{atom}->isa('RE_method')
+		          && $kids[$i+1]{atom}{name} eq 'ws'
+		        || $kids[$i+1]{atom}->isa('RE_noop'))) {
 		$kids[$i+1]{atom} = $kids[$i];
+		$kids[$i+1]{min}  = $kids[$i+1]->calc_min;
 		$kids[$i] = RE_noop->new;
 	    }
 	}
@@ -2160,9 +2166,9 @@ END
 	my @lefts = @{ $left->{zyg} };
 	my @rights = @{ $right->{zyg} };
 
-	pop @lefts while $lefts[-1]->isa('RE_method') && $lefts[-1]{name} eq 'ws';
-	shift @rights while $rights[0]->isa('RE_method') && $rights[0]{name} eq 'ws';
-	splice @rights, 1, 1 while $rights[1]->isa('RE_method') && $rights[1]{name} eq 'ws';
+	pop @lefts while ($lefts[-1]->isa('RE_method') && $lefts[-1]{name} eq 'ws' || $lefts[-1]->isa('RE_noop'));
+	shift @rights while ($rights[0]->isa('RE_method') && $rights[0]{name} eq 'ws' || $rights[0]->isa('RE_noop'));
+	splice @rights, 1, 1 while ($rights[1]->isa('RE_method') && $rights[1]{name} eq 'ws' || $rights[1]->isa('RE_noop'));
 
 	my $opener = pop @lefts;
 	my ($closer, $inner) = splice @rights, 0, 2;

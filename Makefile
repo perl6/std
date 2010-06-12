@@ -56,6 +56,7 @@ stage1/Cursor.pmc: stage1/Cursor.store stage0/.stamp
 	cd stage0 && PERL6LIB=../lib:.. ./viv -5 --no-indent \
 	    -o ../stage1/Cursor.pmc --thaw ../stage1/Cursor.store
 stage1/.stamp: stage1/STD.pmc stage1/Cursor.pmc $(INVARIANT)
+	rm -rf stage1/lex stage1/syml
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./std CORE.setting
 	touch stage1/.stamp
 
@@ -75,6 +76,7 @@ stage2/Cursor.pmc: stage2/Cursor.store stage1/.stamp
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
 		   -o stage2/Cursor.pmc --thaw stage2/Cursor.store
 stage2/.stamp: stage2/STD.pmc stage2/Cursor.pmc $(INVARIANT)
+	rm -rf stage2/lex stage2/syml
 	STD5PREFIX=stage2/ PERL5LIB=stage2/:. ./std CORE.setting
 	touch stage2/.stamp
 # not part of the normal stage2, but built as if it were

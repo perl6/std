@@ -4822,10 +4822,8 @@ grammar Regex is STD {
 
     proto token regex_infix { <...> }
 
-    token ws {
-        <?{ %*RX<s> }>
-        || [ <?before \s | '#'> <.nextsame> ]?   # still get all the pod goodness, hopefully
-    }
+    # no such thing as ignored whitespace in a normal regex
+    token ws { <?> }
 
     token normspace {
         <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
@@ -4835,7 +4833,7 @@ grammar Regex is STD {
 
     rule nibbler {
         :temp %*RX;
-        [ \s* < || | && & > ]?
+        [ <.normspace>? < || | && & > ]?
         <EXPR>
         [
         || <?infixstopper>
@@ -5081,8 +5079,7 @@ grammar Regex is STD {
                                     | <?before '>' >
                                     | <.ws> <nibbler> <.ws>
                                     | '=' <assertion>
-                                    | ':' <.ws>
-                                        [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <arglist> ]
+                                    | ':' [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <.ws> <arglist> ]
                                     | '(' {}
                                         [ :lang(%*LANG<MAIN>) <arglist> ]
                                         [ ')' || <.panic: "Assertion call missing right parenthesis"> ]
