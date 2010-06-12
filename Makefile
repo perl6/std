@@ -1,5 +1,5 @@
 # Makefile for STD.pm6 viv etcetera in pugs/src/perl6
-.PHONY: six all sixfast clean stage0 stage1 stage2 stage3
+.PHONY: six all sixfast clean stage0 stage1 stage2 stage3 snap snaptest
 
 # technically viv is part of the frontend too, but it's used very little.  viv
 # should probably be refactored into independant programs
@@ -115,7 +115,7 @@ reboot: stage3/.stamp
 	cp -a $(addprefix stage3/,$(GENERATE)) stage0
 	rm -rf stage0/lex stage0/syml
 
-snaptest: stage3/.stamp .stamp5
+snap: stage3/.stamp .stamp5
 	rm -rf snap.new
 	mkdir snap.new
 	svn info |perl -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
@@ -123,9 +123,11 @@ snaptest: stage3/.stamp .stamp5
 	-rm -rf snap.old
 	-mv snap snap.old
 	mv snap.new snap
+
+snaptest: snap
 	cd snap && ./teststd $(realpath ../../t/spec)
 
-# List all targets with brief descriptions.
+#List all targets with brief descriptions.
 # Gradual shaving of targets with Occam's Razor would be a Good Thing.
 help:
 	@echo
