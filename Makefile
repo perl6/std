@@ -1,5 +1,5 @@
 # Makefile for STD.pm6 viv etcetera in pugs/src/perl6
-.PHONY:
+.PHONY: six all sixfast
 
 # technically viv is part of the frontend too, but it's used very little.  viv
 # should probably be refactored into independant programs
@@ -12,7 +12,16 @@ STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
        lib/DEBUG.pm6
 CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
 
-#all: $(FIXINS) check lex/STD/termish
+six: .stamp
+all: .stamp .stamp5
+.stamp: stage2/.stamp
+	rm -rf lex syml
+	cp -a stage2/lex stage2/syml stage2/STD.pmc stage2/Cursor.pmc .
+	touch .stamp
+.stamp5: stage2/STD_P5.pmc
+	rm -rf lex/STD/P5
+	cp stage2/STD_P5.pmc .
+	touch .stamp5
 
 # stage0 is rather weird, in that it has its own copy of the invariant files
 # */.stamp indicates that the corresponding compiler is "usable"
@@ -52,6 +61,13 @@ stage2/Cursor.pmc: stage2/Cursor.store stage1/.stamp
 stage2/.stamp: stage2/STD.pmc stage2/Cursor.pmc $(INVARIANT)
 	STD5PREFIX=stage2/ PERL5LIB=stage2/:. ./std CORE.setting
 	touch stage2/.stamp
+# not part of the normal stage2, but built as if it were
+stage2/STD_P5.store: $(STD_P5_SOURCE) stage1/.stamp
+	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv \
+		   -o stage2/STD_P5.store --freeze STD_P5.pm6
+stage2/STD_P5.pmc: stage2/STD_P5.store stage1/.stamp
+	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
+		   -o stage2/STD_P5.pmc --thaw stage2/STD_P5.store
 
 
 slow: stage2
@@ -91,18 +107,10 @@ help:
 	@echo
 	@echo 'In pugs/src/perl6 you can make these targets:'
 	@echo
-	@echo 'all (default)   builds viv'
-	@echo 'fast            same as check'
+	@echo 'six (default)   builds viv for Perl6'
+	@echo 'all             builds viv for Perl5 too'
 	@echo 'snap            copies runnable files and svn revision to snap/'
-	@echo 'STD_P5.pmc      (internal)'
-	@echo 'STD.pmc         (internal)'
-	@echo 'syml/CORE.syml  (internal)'
-	@echo 'check           validates STD.pmc and STD_P5.pmc in Perl 5'
-	@echo 'lex/STD/termish (internal)'
-	@echo 'cat             shows the output written by the last tryfile'
 	@echo 'clean           removes many generated files'
-	@echo 'distclean       removes even more generated files'
-	@echo 'purge           alias for distclean'
 	@echo 'snaptest        run snapshot teststd on pugs/t/spec/*'
 	@echo 'test            run teststd on pugs/t/*'
 	@echo 'testt           run teststd on pugs/t/spec/*'
