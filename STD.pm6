@@ -4893,8 +4893,7 @@ grammar Regex is STD {
         <!stopper>
         <!regex_infix>
         <atom>
-        <.ws>
-        [ <quantifier> <.ws> ]?
+        [ <normspace>? <quantifier> ]?
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Can't quantify zero-width atom">
     }
