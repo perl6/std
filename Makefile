@@ -113,29 +113,15 @@ reboot: stage3/.stamp
 	cp -a $(addprefix stage3/,$(GENERATE)) stage0
 	rm -rf stage0/lex stage0/syml
 
-
-slow: stage2
-	cp stage2/STD.pmc stage2/Cursor.pmc .
-
-snap: $(FIXINS) check lex/STD/termish
+snaptest: stage3/.stamp .stamp5
 	rm -rf snap.new
 	mkdir snap.new
-	@#svn info |grep ^Revision|cut -d' ' -f2  > snap.new/revision
 	svn info |perl -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
-	cp -r $(FIXINS) tryfile STD.pmc STD_P5.pmc syml snap.new
-	-cp -r lib snap.new
-	-cp -r setting snap.new
-	-cp -r sprixel snap.new
-	-cp -r lex snap.new
+	cp -r $(INVARIANT) $(addprefix stage3/,$(GENERATE) lex syml) stage2/STD_P5.pmc lib tryfile teststd snap.new
 	-rm -rf snap.old
 	-mv snap snap.old
 	mv snap.new snap
-
-#pm5
-#snap:
-#snaptest: snap all
-#test: all
-#testt: all
+	cd snap && ./teststd $(realpath ../../t/spec)
 
 # List all targets with brief descriptions.
 # Gradual shaving of targets with Occam's Razor would be a Good Thing.
@@ -152,6 +138,5 @@ help:
 	@echo 'stage2          prepares stage 2 compiler'
 	@echo 'stage3          prepares stage 3 compiler (only for testing)'
 	@echo 'help            show this list'
-	@echo 'snaptest        run snapshot teststd on pugs/t/spec/*'
-	@echo 'test            run teststd on pugs/t/*'
+	@echo 'snaptest        run snapshot teststd on pugs/t/*'
 	@echo
