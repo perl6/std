@@ -1569,6 +1569,10 @@ BODY
 
 
 { package VAST::package_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq {  my $self = shift;
+	local $::PKGDECL = $self->{SYM};
+	$self->{package_def}->psq;
+    }
 }
 
 
@@ -1604,7 +1608,7 @@ BODY
 
 
 { package VAST::package_def; our @ISA = 'VAST::Base';
-    sub p5_module_name {  my $self = shift;
+    sub module_name {  my $self = shift;
 	my $def_module_name = $self->{longname}[0]{name}->Str;
 	if ($self->{decl}{inpkg}[0] =~ /GLOBAL::(.*)/) {
 	    my $mod = $1;
@@ -1614,19 +1618,27 @@ BODY
 	}
 	$def_module_name;
     }
-    sub emit_p5_header {  my $self = shift;
-	my $header = "";
-	my $name = $::PKG;
+    sub superclasses {  my $self = shift;
 	my @extends;
-	my @does;
 	for (@{$self->{trait}}) {
 	    my $t = $_->Str;
 	    push(@extends, $t =~ /^is\s+(\S+)/);
-	    push(@does,    $t =~ /^does\s+(\S+)/);
 	}
 	@extends = map { $::OUR{$_} // $_ } @extends;
-	@does    = map { $::OUR{$_} // $_ } @does;
 	@extends = 'Cursor' if $::PKGDECL eq 'grammar' && !@extends;
+	@extends;
+    }
+    sub roles { my $self = shift;
+	my @does;
+	for (@{$self->{trait}}) {
+	    my $t = $_->Str;
+	    push(@does,    $t =~ /^does\s+(\S+)/);
+	}
+	@does    = map { $::OUR{$_} // $_ } @does;
+    }
+    sub emit_p5_header {  my $self = shift;
+	my $header = "";
+	my $name = $::PKG;
 
 	my $meta = $::PKGDECL eq 'role' ? 'Moose::Role' : 'Moose';
 
@@ -1635,11 +1647,11 @@ use $meta ':all' => { -prefix => "moose_" };
 use Encode;
 END
 
-	$header .= <<"END" for @extends;
+	$header .= <<"END" for $self->superclasses;
 moose_extends('$_');
 END
 
-	$header .= <<"END" for @does;
+	$header .= <<"END" for $self->roles;
 moose_with('$_');
 END
 
@@ -1661,7 +1673,7 @@ END
     sub emit_p5 {  my $self = shift;
 	my $block = $self->{blockoid}{statementlist} // $self->{statementlist};
 	local $::RETREE = {};
-	local $::PKG = $self->p5_module_name;
+	local $::PKG = $self->module_name;
 	local $::MULTIRX_SEQUENCE = 0;
 	local %::MULTIMETHODS;
 	my $body1 = $self->emit_p5_header;
@@ -1716,6 +1728,51 @@ EOFINAL
 	}
 
 	"{ $body $finalmulti 1; }";
+    }
+
+    sub psq_finish_multis { my $self = shift;
+	die "multis not yet implemented for psq";
+    }
+
+    sub psq_retree { my $self = shift;
+	die "LTM not yet implemented for psq";
+    }
+
+    sub psq_parameterized { my $self = shift;
+	die "roles not yet implemented for psq";
+    }
+
+    sub psq_plain { my $self = shift; my $body = shift;
+	die "roles not yet implemented for psq"
+	    if $::PKGDECL eq 'role' or $self->roles;
+	die "multiple inheritance not available in psq"
+	    if $self->superclasses > 1;
+	my ($is) = $self->superclasses;
+	"class " . $::PKG . " " . ($is ? "is $is " : "") .
+	    "{\n" . ::indent($body) . "\n}";
+    }
+
+    sub emit_psq {  my $self = shift;
+	my $block = $self->{blockoid}{statementlist} // $self->{statementlist};
+	local $::RETREE = {};
+	local $::PKG = $self->module_name;
+	local $::MULTIRX_SEQUENCE = 0;
+	local %::MULTIMETHODS;
+
+	my $body = $block->psq;
+	$body = $body . $self->psq_finish_multis
+	    if %::MULTIMETHODS;
+	$body = $self->psq_retree . $body
+	    if %$::RETREE;
+
+	if (my ($sig) = $self->kids('signature')) {
+	    $body = $self->psq_parameterized($body,
+		map { $_->Str } $sig->kids('parameter'));
+	} else {
+	    $body = $self->psq_plain($body);
+	}
+
+	$body;
     }
 }
 
@@ -2613,6 +2670,7 @@ END
 
 
 { package VAST::term__S_package_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq { $_[0]{package_declarator}->psq }
 }
 
 
