@@ -4131,7 +4131,9 @@ END
 	bless { name => $name, args => \@args }, "DEEP::call";
     }
 
-    my %psq_map;
+    my %psq_map = (
+	'note',		=> "System.Console.Error.WriteLine"
+    );
 
     sub psq { my $self = shift;
 	my $n = $self->{name};
