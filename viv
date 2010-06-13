@@ -851,7 +851,7 @@ TEMPLATE
 	substr($::ORIG, 0, $self->{statementlist}{BEG}),
 	$self->{statementlist}->p5;
     }
-
+    sub emit_psq { $_[0]{statementlist}->psq }
 }
 
 { package VAST::Concatenation; our @ISA = 'VAST::Base';
@@ -2334,6 +2334,25 @@ END
 
 
 { package VAST::statement; our @ISA = 'VAST::Base';
+    sub emit_psq {  my $self = shift;
+	if ($self->{label}) {
+	    return $self->{label}{identifier}->Str . ":\n" .
+		$self->{statement}->psq;
+	}
+
+	if ($self->{statement_control}) {
+	    return $self->{statement_control}->psq;
+	}
+
+	return "" if !$self->{EXPR};
+
+	my $body = $self->{EXPR}->psq . ";";
+	for my $m ($self->kids('statement_mod_cond'),
+		     $self->kids('statement_mod_loop')) {
+	    $body = $m->psq . " {\n" . ::indent($body) . "\n}";
+	}
+	$body;
+    }
 }
 
 
@@ -2393,6 +2412,10 @@ END
 	    return $stmts[0]->p5;
 	}
 	join("", map { $_->p5 . ";\n" } @stmts);
+    }
+    sub emit_psq { my $self = shift;
+	my @stmts = $self->kids('statement');
+	join("", map { $_->psq . "\n" } @stmts);
     }
 }
 
