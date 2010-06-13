@@ -30,6 +30,8 @@ our %LEXERS;       # per language, the cache of lexers, keyed by rule name
 our %FATECACHE; # fates we've already turned into linked lists
 my %lexer_cache = ();
 
+our %DFALEXERS = ();  # per language (class name), then keyed again by rule
+
 sub ::fatestr { my $f = shift;
     my $text = '';
     while ($f) {
@@ -482,6 +484,10 @@ sub cursor_fate { my $self = shift;
         local %::AUTOLEXED;
         $self->_AUTOLEXpeek($name,$retree);
     };
+    my $dfalexer = $::DFALEXERS{ref $self}->{$name} // do {
+        local %::AUTOLEXED;
+        $self->_AUTOLEXpeekDFA($name,$retree);
+    };
     if ($self->{_pos} >= $::HIGHWATER) {
         if ($self->{_pos} > $::HIGHWATER) {
             %$::HIGHEXPECT = ();
@@ -497,7 +503,7 @@ sub cursor_fate { my $self = shift;
     }
 
     my $re  = $self->cursor_fate_re($pkg, $name, $lexer, $P);
-    my $dfa = $self->cursor_fate_dfa($pkg, $name, $lexer, $P);
+    my $dfa = $self->cursor_fate_dfa($pkg, $name, $dfalexer, $P);
 
     my (@re, @dfa);
 
@@ -521,9 +527,38 @@ sub cursor_fate { my $self = shift;
 
 sub cursor_fate_dfa {
     my ($self, $pkg, $name, $lexer, $P) = @_;
-    #TBD
 
-    sub { () };
+    my $state = $lexer->{T};
+    my $p = $P;
+    my @rfates;
+
+    print ::LOG "=" x 10,"\n$p DFA for ${pkg}::$name in ", ref $self, "\n"
+            if $DEBUG & DEBUG::autolexer;
+    CH: {
+        push @rfates, @{$state->[0]};
+        my $ch = $::ORIG[$p++];
+        print ::LOG "--- ", pack("U", $ch), "\n" if $DEBUG & DEBUG::autolexer;
+        if ($state->[1]{$ch}) {
+            $state = $state->[1]{$ch};
+            print ::LOG "specific -> ", $state->{ID}, "\n"
+                if $DEBUG & DEBUG::autolexer;
+            redo;
+        }
+
+        for (my $i = 2; $i < @$state; $i += 2) {
+            print ::LOG $state->[$i]{NAME} if $DEBUG & DEBUG::autolexer;
+
+            if ($state->[$i]{$ch}) {
+                $state = $state->[$i+1];
+                print ::LOG " -> ", $state->{ID}, "\n" if $DEBUG & DEBUG::autolexer;
+                redo CH;
+            }
+
+            print ::LOG " -> NOT TAKEN\n" if $DEBUG & DEBUG::autolexer;
+        }
+    }
+
+    sub { @rfates ? pop(@rfates) : () };
 }
 
 sub cursor_fate_re {
@@ -1832,13 +1867,54 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 # JIT lexer generator
 #############################################################
 
+## NFA structure:
+##   array of (NFA node) ->
+##     0: array of fate (array of fate element)
+##     array of (str len 0 or 1) at odd index, new index at even
+## -1 represents the start node of the next
+## DFA structure:
+##   each DFA node is array:
+##     0: array of fates
+##     1: hash of specific cases (char => DFAnode)
+##    2n: reference to a uniprop hash
+##  2n+1: DFAnode is that hash existed
+## "DFA" lexer structure:
+##   {DFANODES} -> array of refs to all DFA nodes
+##   {DBA}, {FILE}, {NAME} same as "RE" lexer structure
+##   {T} -> ref to DFA root
+##   {NFA} -> NFA structure
+
+# This is the fast path handling for JIT DFA lexer generation (although it gets
+# short-circuited if the DFALEXERS entry exists, later).  The lexer generation
+# process sometimes recurses to this, which is tracked using %::AUTOLEXED; if
+# the value is already set, we need to suppress recursion.
+
+our $fakepos = 1;
+
+sub _AUTOLEXpeekDFA { my $self = shift;
+    my $key = shift;
+    my $retree = shift;
+
+    $self->deb("AUTOLEXpeekDFA $key") if $DEBUG & DEBUG::autolexer;
+    die "Null key" if $key eq '';
+    if ($::AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
+        die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$key};
+        $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
+        # Return a faked "immediate imperative" lexer, to end the token
+        # Note that this will only happen from inside RE_ast, so the other stuff
+        # that CursorBase itself uses isn't needed
+        return { NFA => [ [] ] };
+    }
+    $key = 'termish' if $key eq 'EXPR';
+    return $::DFALEXERS{ref $self}->{$key} //=
+        $self->_AUTOLEXgenDFA($key, $retree);
+}
+
 sub lexers { my $self = shift;
     my $lang = ref $self;
     $self->deb("LANG = $lang") if $DEBUG & DEBUG::autolexer;
     $::LEXERS{$lang} //= {};
 }
-
-our $fakepos = 1;
 
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
