@@ -92,8 +92,9 @@ viv [switches] filename
     	-o		send output to following argument instead of STDOUT
     	--yaml		spit out a parsable abstract syntax tree
     	--concise	spit out a short syntaxe tree (default)
-    	--p5		spit out a Perl 5 representation (partially impl)
+    	--p5		spit out a Perl 5 representation
     	--p6		spit out a Perl 6 representation
+    	--psq		spit out a Perlesque representation (very incomplete)
     	--no-indent	disable output indentation for faster parsing
     	--freeze	generate a Storable representation
     	--thaw		use existing Storable of AST from filename
@@ -146,6 +147,9 @@ sub MAIN {
 	}
 	elsif ($switch eq '--p6' or $switch eq '-6') {
 	    $output = 'p6';
+	}
+	elsif ($switch eq '--psq') {
+	    $output = 'psq';
 	}
 	elsif ($switch eq '--freeze') {
 	    $output = 'store';
@@ -215,6 +219,9 @@ sub MAIN {
     }
     elsif ($output eq 'p6') {
 	spew $r->p6;
+    }
+    elsif ($output eq 'psq') {
+	spew $r->psq;
     }
     elsif ($output eq 'p5') {
 	spew fixpod($r->p5);
@@ -455,21 +462,6 @@ sub rd {
 	wantarray ? @text : join('', @text);
     }
 
-    sub p6 { my $self = shift; my $lvl = @context;
-	my @text;
-	say STDERR ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
-	$context[$lvl] = $self;
-	# print STDERR "HERE " . ref($self) . "\n";
-	splice(@context,$lvl);
-	my @bits = $self->emit_p6;
-	my $val = join '', @bits;
-	my @c = map { ref $_ } @context;
-	my $c = "@c " . ref($self);
-	$c =~ s/VAST:://g;
-	print STDERR ' ' x ($lvl-1), "$c returns $val\n" if $OPT_log;
-	wantarray ? @bits : $val;
-    }
-
     sub emit_p5 { my $self = shift;
 	my @text;
 	if (exists $self->{'.'}) {
@@ -509,7 +501,9 @@ sub rd {
 	wantarray ? @text : join('', @text);
     }
 
-    sub p5 { my $self = shift; my $lvl = @context;
+    BEGIN {
+	my $tpl = <<'TEMPLATE';
+    sub VAST::Base::FORM { my $self = shift; my $lvl = @context;
 	my @text;
 	say STDERR ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
 	$context[$lvl] = $self;
@@ -519,8 +513,8 @@ sub rd {
 	    $args[-1] =~ s/ at .*? line .*?\n$//s if $args[-1] =~ /\n$/s;
 	    die Carp::longmess(@args);
 	};
-	my @bits = !$OPT_keep_going ? $self->emit_p5 : (::try {
-	    $self->emit_p5;
+	my @bits = !$OPT_keep_going ? $self->emit_FORM : (::try {
+	    $self->emit_FORM;
 	} ::catch {
 	    my $char = $self->{BEG} // $self->{_from} // 0;
 	    my $line = 1 + (substr($::ORIG, 0, $char) =~ y/\n/\n/);
@@ -536,6 +530,13 @@ sub rd {
 	# Note that we may have skipped levels, so you can't just pop
 	splice(@context,$lvl);
 	wantarray ? @bits : $val;
+    }
+TEMPLATE
+	for my $format (qw/p5 p6 psq/) {
+	    my $t = $tpl;
+	    $t =~ s/FORM/$format/g;
+	    eval $t;
+	}
     }
 
     sub gap { my $self = shift;
