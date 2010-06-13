@@ -477,9 +477,7 @@ sub cursor_fate { my $self = shift;
     # $_[0] is now ref to a $trystate;
 
     $self->deb("cursor_fate $pkg $name") if $DEBUG & DEBUG::cursors;
-    my $tag;
-    my $try;
-    
+
     my $lexer = $::LEXERS{ref $self}->{$name} // do {
         local %::AUTOLEXED;
         $self->_AUTOLEXpeek($name,$retree);
@@ -498,6 +496,38 @@ sub cursor_fate { my $self = shift;
         return sub {};
     }
 
+    my $re  = $self->cursor_fate_re($pkg, $name, $lexer, $P);
+    my $dfa = $self->cursor_fate_dfa($pkg, $name, $lexer, $P);
+
+    my (@re, @dfa);
+
+    sub {
+        @re  = $re ->() unless @re;
+        @dfa = $dfa->() unless @dfa;
+
+        return () unless @re || @dfa;
+
+        my $refate  = shift @re;
+        my $dfafate = shift @dfa;
+
+        if (::Dump($refate) ne ::Dump($dfafate)) {
+            warn "LTM engine redundant pair failure\n";
+            warn ::Dump($refate, $dfafate);
+        }
+
+        defined ($refate) ? ($refate) : ();
+    };
+}
+
+sub cursor_fate_dfa {
+    my ($self, $pkg, $name, $lexer, $P) = @_;
+    #TBD
+
+    sub { () };
+}
+
+sub cursor_fate_re {
+    my ($self, $pkg, $name, $lexer, $P) = @_;
     # A rudimentary trie walker.
 
     if (my $state = $lexer->{T}) {
