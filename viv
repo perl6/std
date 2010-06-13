@@ -62,6 +62,7 @@ our $OPT_thaw = 0;
 our $OPT_keep_going = 0;
 our $OPT_output_file = undef;
 my $PROG = '';
+my $U = 0;
 my @did_ws;
 
 BEGIN {
@@ -1421,8 +1422,8 @@ BODY
 { package VAST::mod_internal__S_Colonmy; our @ISA = 'VAST::Base';
     sub re_ast { my $self = shift;
         local $::NEEDMATCH = 0;
-        my $text = $self->{statement}->p5;
-        $text = 'my $M = $C; ' . $text if $::NEEDMATCH;
+        my $text = $self->{statement}->p5 . ";";
+        $text = "my \$M = \$C;\n" . $text if $::NEEDMATCH;
 
 	push @::DECLAST, RE_decl->new(body => $text);
 	RE_noop->new;
@@ -1874,7 +1875,7 @@ TEXT
 	if ($strcloser !~ /^[])}]$/) {
 	    $begin .= <<TEXT;
 my \$newlang = \$C->unbalanced(\$::GOAL);
-\$C = bless(\$C, (ref(\$newlang) || \$newlang))
+\$C = bless(\$C, (ref(\$newlang) || \$newlang));
 TEXT
 	}
 
@@ -2130,9 +2131,9 @@ EOT
 	$::RETREE->{$p5name} = $ast;
 
 	my $urbody = $ast->walk;
-	say STDERR "<<< " . $urbody . ": " . $urbody->p5 if $OPT_log;
+	say STDERR "<<< " . $urbody . ": " . $urbody->p5expr if $OPT_log;
 	my ($body, $ratchet) = $urbody->uncut;
-	say STDERR "<<< " . $body . ": " . $body->p5 if $OPT_log;
+	say STDERR "<<< " . $body . ": " . $body->p5expr if $OPT_log;
 	$ast->{dba_needed} = 1;
 	$ast->clean;
 
@@ -2161,7 +2162,7 @@ TEXT
 		       sort keys %::BINDINGS)
 	    . ($::SYM ? '$C->{sym} = "' . ::rd($::SYM) . "\";\n" : '')
 	    . <<END
-\$self->_MATCHIFY$ratchet(\$S, "$p5name", ${\ $body->p5 });
+\$self->_MATCHIFY$ratchet(\$S, "$p5name", ${\ $body->p5expr });
 END
 	    , 1) . "}\n";
     }
@@ -2882,7 +2883,7 @@ END
 	if ($self->{r} && $exp->maybacktrack) {
 	    $exp = DEEP::cut($exp);
 	}
-	say STDERR "<-- $exp: ", $exp->p5 if $OPT_log;
+	say STDERR "<-- $exp: ", $exp->p5expr if $OPT_log;
 	$exp;
     }
 
@@ -2956,8 +2957,8 @@ END
 	if ($outr) {
 	    DEEP::ratchet($inner, $out1);
 	} else {
-	    DEEP::raw(::hang("LazyMap::lazymap(" . DEEP::chunk($inner)->p5 .
-		",\n" . $outer->p5 . ")", "    "));
+	    DEEP::raw(::hang("LazyMap::lazymap(" . DEEP::chunk($inner)->p5expr .
+		",\n" . $outer->p5expr . ")", "    "));
 	}
     }
 
@@ -3003,7 +3004,7 @@ END
             $result = $self->wrapone($_,$result);
         }
 	@decl ?
-	    DEEP::raw(join('', @decl, $result ? $result->p5 . "\n" : ''), isblock => 1) :
+	    DEEP::raw(join('', @decl, $result ? $result->p5expr . "\n" : ''), isblock => 1) :
 	    $result // DEEP::raw('', isblock => 1);
     }
 
@@ -3119,10 +3120,11 @@ do {
         push \@gather, ((
 END
                 for my $i (0 .. @result - 1) {
-                    $result .= ::indent(DEEP::chunk($result[$i])->p5block, 3);
+                    $result .= ::indent(DEEP::chunk($result[$i])->p5expr, 3);
                     if ($i != @result - 1) {
-                        substr($result, -1, 1) = ",\n";
+			$result .= ",";
                     }
+		    $result .= "\n";
                 }
                 $result .= <<END;
         )[\$try])->(\$C);
@@ -3190,7 +3192,7 @@ END
 	    my %B = %::BINDINGS;
             foreach my $kid (@{$$self{zyg}}) {
 		local %::BINDINGS;
-                push @result, $kid->walk->p5;
+                push @result, $kid->walk->p5expr;
 		for my $b (keys %::BINDINGS) {
 		    $B{$b} = 2 if $::BINDINGS{$b} > 1 or $B{$b};
 		}
@@ -3329,7 +3331,7 @@ END
         my $self = shift;
         if ($$self{decl}) {
             for my $decl (@{$$self{decl}}) {
-                push @::DECL, $decl->walk->p5;
+                push @::DECL, $decl->walk->p5block;
             }
         }
         if ($$self{re}) {
@@ -3389,7 +3391,7 @@ END
 		}
 		else {
 		    $rep = "_REPSEP$::REV";
-		    $rest = DEEP::chunk($rest->walk)->p5;
+		    $rest = DEEP::chunk($rest->walk)->p5expr;
 		}
 	    }
 	    else {
@@ -3397,7 +3399,7 @@ END
 	    }
 	    $quant = "\$C->$rep$hc( $rest, ";
 	}
-	return DEEP::raw($quant . ::hang(DEEP::chunk($atom)->p5, "    ") . ")", precut => ($hc eq 'r'));
+	return DEEP::raw($quant . ::hang(DEEP::chunk($atom)->p5expr, "    ") . ")", precut => ($hc eq 'r'));
     }
 
     sub kids { my $self = shift; \$self->{atom} }
@@ -3446,7 +3448,7 @@ END
 	}
         $::REV = '';
 
-        $re = DEEP::raw('$C->' . $name . "(" . ::hang(DEEP::chunk(DEEP::raw($re, isblock => 1))->p5, "    ") . ")");
+        $re = DEEP::raw('$C->' . $name . "(" . ::hang(DEEP::chunk(DEEP::raw($re, isblock => 1))->p5expr, "    ") . ")");
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $re = $self->bind($re, $name);
 	    $::BINDINGS{$name} += $::PLURALITY;
@@ -3462,12 +3464,12 @@ END
         my $self = shift;
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk;
-	    DEEP::raw("\$C->_NOTBEFORE(" . ::hang(DEEP::chunk($re)->p5, "    ") .")");
+	    DEEP::raw("\$C->_NOTBEFORE(" . ::hang(DEEP::chunk($re)->p5expr, "    ") .")");
         }
         else {
             my $re = $$self{re}->walk;
-            return $re if $re->p5 =~ /^\$C->before/; #XXX
-            DEEP::raw("\$C->before(" . ::hang(DEEP::chunk($re)->p5, "    ") . ")");
+            return $re if $re->p5expr =~ /^\$C->before/; #XXX
+            DEEP::raw("\$C->before(" . ::hang(DEEP::chunk($re)->p5expr, "    ") . ")");
         }
     }
     # TODO: Investigate what the LTM engine is doing with assertions and
@@ -3662,7 +3664,7 @@ END
     }
     sub _walk {
         my $self = shift;
-	DEEP::raw($$self{body} . ";\n");
+	DEEP::raw($$self{body}, isblock => 1);
     }
 
     sub has_trailing_ws {
@@ -3712,7 +3714,7 @@ END
         my $self = shift;
 	my ($re, $r) = $$self{re}->walk->uncut;
 	my @decl = map { $_->walk } @{$$self{decl}};
-	DEEP::raw("\$C->_BRACKET$r(" . ::hang(DEEP::chunk($re, @decl)->p5, "    ") . ")");
+	DEEP::raw("\$C->_BRACKET$r(" . ::hang(DEEP::chunk($re, @decl)->p5expr, "    ") . ")");
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3773,7 +3775,7 @@ END
 		}
 	    }
 	}
-        $re = "\$C->_$::REV"."PAREN( " . ::hang(DEEP::chunk(DEEP::raw($re))->p5, "    ") . ")";
+        $re = "\$C->_$::REV"."PAREN( " . ::hang(DEEP::chunk(DEEP::raw($re))->p5expr, "    ") . ")";
 	DEEP::raw($re);
     }
 
@@ -3856,15 +3858,31 @@ END
     }
 }
 
+# DEEP is the lowest level of desugaring used by viv, but it still keeps a tree
+# structure.  Not all DEEP nodes are interchangable; some represent expression
+# bits, others statements with no sensible return value.
 { package DEEPbase;
+}
+
+{ package DEEPexpr;
     sub maybacktrack { 1 }
 
     sub uncut { my $self = shift; $self, ($self->maybacktrack ? '' : 'r') }
 
-    sub p5block { shift()->p5 . "\n" }
+    # p5 should return (is a block?), text; takes arguments sh (can shadow $C?)
+    # and ov (can overwrite $C?); non-block returns may not shadow
+    sub p5expr { my $self = shift;
+	my ($isbl, $text) = $self->p5(@_, sh => 1);
+	$isbl ? ("do {\n" . ::indent($text) . "\n}") : $text;
+    }
+
+    sub p5block { my $self = shift;
+	my ($isbl, $text) = $self->p5(@_);
+	$isbl ? $text : ($text . "\n");
+    }
 }
 
-{ package DEEP::raw; our @ISA = 'DEEPbase';
+{ package DEEP::raw; our @ISA = 'DEEPexpr';
     sub DEEP::raw {
 	my $text = shift;
 	bless { text => $text, @_ }, "DEEP::raw";
@@ -3876,23 +3894,11 @@ END
     }
 
     sub p5 { my $self = shift;
-	$self->{isblock} ? ("do {\n" . ::indent($self->{text}) . "}")
-	    : $self->{text};
-    }
-
-    sub p5block {
-	my $self = shift;
-	$self->{isblock} ? $self->{text} : $self->{text} . "\n";
+	$self->{isblock}, $self->{text};
     }
 }
 
-{ package DEEPblockbase; our @ISA = 'DEEPbase';
-    sub p5 { my $self = shift;
-	"do {\n" . ::indent($self->p5block(sh => 1)) . "}";
-    }
-}
-
-{ package DEEP::cut; our @ISA = 'DEEPblockbase';
+{ package DEEP::cut; our @ISA = 'DEEPexpr';
     sub DEEP::cut {
 	my $child = shift;
 	if (!$child->maybacktrack) {
@@ -3904,8 +3910,8 @@ END
 	bless { child => $child }, "DEEP::cut";
     }
 
-    sub p5block { my $self = shift;
-	"if (my (\$C) = (" . ::hang($self->{child}->p5, "    ") . ")) { (\$C) } else { () }\n";
+    sub p5 { my $self = shift;
+	1, "if (my (\$C) = (" . ::hang($self->{child}->p5expr, "    ") . ")) { (\$C) } else { () }\n";
     }
 
     sub maybacktrack { 0 }
@@ -3917,7 +3923,7 @@ END
     }
 }
 
-{ package DEEP::bind; our @ISA = 'DEEPbase';
+{ package DEEP::bind; our @ISA = 'DEEPexpr';
     sub DEEP::bind {
 	my $child = shift;
 	my @names = @_;
@@ -3932,14 +3938,14 @@ END
 
     sub p5 { my $self = shift;
 	my ($chinner, $r) = $self->{child}->uncut;
-	"\$C->_SUBSUME$r([" .
+	0, "\$C->_SUBSUME$r([" .
 	    join(',', map {"'$_'"} @{$self->{names}}) .
 	    "], sub {\n" . ::indent("my \$C = shift;\n" .
 	    $chinner->p5block(cl => 1, sh => 1)) . "})";
     }
 }
 
-{ package DEEP::ratchet; our @ISA = 'DEEPblockbase';
+{ package DEEP::ratchet; our @ISA = 'DEEPexpr';
     sub DEEP::ratchet {
 	my $child = shift;
 	my @before = @_;
@@ -3959,14 +3965,14 @@ END
 
     sub maybacktrack { $_[0]{child}->maybacktrack }
 
-    sub p5block { my $self = shift; my %a = @_;
+    sub p5 { my $self = shift; my %a = @_;
 	if (@{$self->{before}} == 1) {
 	    my $pre = $self->{before}[0];
-	    return "if (my (\$C) = (" . ::hang($pre->p5, " " x 8). ")) {\n" .
+	    return 1, "if (my (\$C) = (" . ::hang($pre->p5expr, " " x 8). ")) {\n" .
 		::indent($self->{child}->p5block) . "} else { () }\n";
 	}
 	my $conditional = join ::hang("\nand ", "    "),
-	    map { "(\$C) = (" . ::hang($_->p5, " " x 8) . ")" }
+	    map { "(\$C) = (" . ::hang($_->p5expr, " " x 8) . ")" }
 	    @{$self->{before}};
 
 	my $guts = ($conditional ?
@@ -3976,11 +3982,11 @@ END
 
 	$guts = "my \$C = \$C;\n" . $guts unless $a{cl};
 	$guts = "do {\n" . ::indent($guts) . "};\n" unless $a{sh};
-	$guts;
+	1, $guts;
     }
 }
 # NOT a regex bit, but a value
-{ package DEEP::chunk; our @ISA = 'DEEPbase';
+{ package DEEP::chunk; our @ISA = 'DEEPexpr';
     sub DEEP::chunk {
 	my $child = shift;
 	bless { child => $child, decl => \@_ }, "DEEP::chunk";
@@ -3988,14 +3994,14 @@ END
 
     sub p5 {
 	my $self = shift;
-        "sub {\n" . ::indent(
+        0, "sub {\n" . ::indent(
 	    "my \$C=shift;\n" .
 	    join("", map { $_->p5block } @{ $self->{decl} }) .
 	    $self->{child}->p5block(cl => 1, sh => 1)) . "}";
     }
 }
 
-{ package DEEP::p5regex; our @ISA = 'DEEPbase';
+{ package DEEP::p5regex; our @ISA = 'DEEPexpr';
     sub DEEP::p5regex {
 	my $text = shift;
 	bless { text => $text, has_meta => 1, @_ }, "DEEP::p5regex";
@@ -4003,7 +4009,7 @@ END
 
     sub p5 {
 	my $self = shift;
-	$self->{has_meta} ?
+	0, $self->{has_meta} ?
 	    "\$C->_PATTERN(qr/\\G" . $self->{text} . "/)" :
 	    "\$C->_EXACT(\"" . $self->{text} . "\")";
     }

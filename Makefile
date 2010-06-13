@@ -42,7 +42,8 @@ stage0/.stamp: $(addprefix stage0/,$(INVARIANT) $(GENERATE))
 
 ########################################
 # stage 1 is built from the working STD.pm6 using a bootstrap compiler
-# it can be built very quickly, usually
+# it can be built very quickly, usually.  Quirk: stage1/.stamp isn't always
+# updated when viv is, to avoid needless reparsing; check it yourself!
 stage1/STD.store: $(STD_SOURCE) stage0/.stamp
 	cd stage0 && PERL6LIB=../lib:.. ./viv -o ../stage1/STD.store \
 	    --freeze ../STD.pm6
@@ -55,7 +56,7 @@ stage1/STD.pmc: stage1/STD.store stage0/.stamp
 stage1/Cursor.pmc: stage1/Cursor.store stage0/.stamp
 	cd stage0 && PERL6LIB=../lib:.. ./viv -5 --no-indent \
 	    -o ../stage1/Cursor.pmc --thaw ../stage1/Cursor.store
-stage1/.stamp: stage1/STD.pmc stage1/Cursor.pmc $(INVARIANT)
+stage1/.stamp: stage1/STD.pmc stage1/Cursor.pmc $(FRONTEND)
 	rm -rf stage1/lex stage1/syml
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./std CORE.setting
 	touch stage1/.stamp
@@ -69,10 +70,10 @@ stage2/STD.store: $(STD_SOURCE) stage1/.stamp
 stage2/Cursor.store: $(CURSOR_SOURCE) stage1/.stamp
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv \
 		   -o stage2/Cursor.store --freeze Cursor.pm6
-stage2/STD.pmc: stage2/STD.store stage1/.stamp
+stage2/STD.pmc: stage2/STD.store stage1/.stamp $(BACKEND)
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
 		   -o stage2/STD.pmc --thaw stage2/STD.store
-stage2/Cursor.pmc: stage2/Cursor.store stage1/.stamp
+stage2/Cursor.pmc: stage2/Cursor.store stage1/.stamp $(BACKEND)
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
 		   -o stage2/Cursor.pmc --thaw stage2/Cursor.store
 stage2/.stamp: stage2/STD.pmc stage2/Cursor.pmc $(INVARIANT)
@@ -83,7 +84,7 @@ stage2/.stamp: stage2/STD.pmc stage2/Cursor.pmc $(INVARIANT)
 stage2/STD_P5.store: $(STD_P5_SOURCE) stage1/.stamp
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv \
 		   -o stage2/STD_P5.store --freeze STD_P5.pm6
-stage2/STD_P5.pmc: stage2/STD_P5.store stage1/.stamp
+stage2/STD_P5.pmc: stage2/STD_P5.store stage1/.stamp $(BACKEND)
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
 		   -o stage2/STD_P5.pmc --thaw stage2/STD_P5.store
 
