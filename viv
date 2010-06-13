@@ -557,6 +557,12 @@ TEMPLATE
     }
 }
 
+{ package VAST::ViaDEEP;
+    sub emit_psq {  my $self = shift;
+	$self->_deep->psqexpr;
+    }
+}
+
 { package VAST::InfixCall;
     sub emit_psq {  my $self = shift;
 	return DEEP::call("infix:<" . $self->{infix}{SYM} . ">",
@@ -605,6 +611,17 @@ TEMPLATE
 
 
 { package VAST::args; our @ISA = 'VAST::Base';
+    sub deepn { my $self = shift;
+	my $al = $self->{arglist}[0] // $self->{semiarglist}{arglist}[0];
+	return unless $al;
+	$al = $al->{EXPR} or return;
+
+	if ($al->isa('VAST::infix__S_Comma')) {
+	    return map { DEEP::raw($_->psq) } $al->kids('args');
+	} else {
+	    return DEEP::raw($al->psq);
+	}
+    }
 }
 
 
@@ -2549,7 +2566,7 @@ END
 }
 
 
-{ package VAST::term__S_identifier; our @ISA = 'VAST::Base';
+{ package VAST::term__S_identifier; our @ISA = ('VAST::ViaDEEP', 'VAST::Base');
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
 	if ($t[0] eq 'item') {
@@ -2580,6 +2597,13 @@ END
 	    $t[0] = '()';
 	}
         @t;
+    }
+
+    sub _deep { my $self = shift;
+	my $id = $self->{identifier}->Str;
+	my @args = $self->{args}->deepn;
+
+	DEEP::call($id, @args);
     }
 }
 
@@ -2660,7 +2684,7 @@ END
 { package VAST::term; our @ISA = 'VAST::Base';
 }
 
-{ package VAST::term__S_name; our @ISA = 'VAST::Base';
+{ package VAST::term__S_name; our @ISA = ('VAST::Base');
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
 	if (my ($pkg) = ($t[0] =~ /^::(.*)/)) {
@@ -4073,7 +4097,7 @@ END
 	    }
 	    else {
 		$np = sub { $n2 . "(" . join(", ",
-			map { $_->psqexpr } @_) };
+			map { $_->psqexpr } @_) . ")" };
 	    }
 	    $psq_map{$n} = $np;
 	}
