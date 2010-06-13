@@ -1522,6 +1522,12 @@ BODY
 
 
 { package VAST::number; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	die "unsupported literal format" unless $self->{integer}{decint};
+	my $str = $self->{integer}{decint};
+	$str =~ y/_//d;
+	$str;
+    }
 }
 
 
@@ -1971,6 +1977,10 @@ TEXT
 
 
 { package VAST::quote__S_Single_Single; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	my $str = $self->Str;
+	$str;
+    }
 }
 
 
@@ -2598,6 +2608,7 @@ END
 
 
 { package VAST::term__S_value; our @ISA = 'VAST::Base';
+    sub emit_psq { $_[0]{value}->psq}
 }
 
 
@@ -2774,10 +2785,12 @@ END
 
 
 { package VAST::value__S_number; our @ISA = 'VAST::Base';
+    sub emit_psq { $_[0]{number}->psq}
 }
 
 
 { package VAST::value__S_quote; our @ISA = 'VAST::Base';
+    sub emit_psq { $_[0]{quote}->psq}
 }
 
 
