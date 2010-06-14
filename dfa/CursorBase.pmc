@@ -1869,12 +1869,12 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 ## NFA structure:
 ##   array of (NFA node) ->
+##     0: non extensible (imperative) flag
 ##     0: array of fate (array of fate element)
 ##     array of (str len 0 or 1) at odd index, new index at even
-## -1 represents the start node of the next
 ## DFA structure:
 ##   each DFA node is array:
-##     0: array of fates
+##     0: array of object fates
 ##     1: hash of specific cases (char => DFAnode)
 ##    2n: reference to a uniprop hash
 ##  2n+1: DFAnode is that hash existed
@@ -1883,6 +1883,10 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 ##   {DBA}, {FILE}, {NAME} same as "RE" lexer structure
 ##   {T} -> ref to DFA root
 ##   {NFA} -> NFA structure
+## individual fates in the NFA end with a hook which can be 1 to stop adding
+## fates on the end; it's not always possible to associate a unique fate with
+## each NFA node, consider (a|b)*
+## A NFA or DFA node is accepting if it has a nonempty list of fates
 
 # This is the fast path handling for JIT DFA lexer generation (although it gets
 # short-circuited if the DFALEXERS entry exists, later).  The lexer generation
@@ -1903,7 +1907,7 @@ sub _AUTOLEXpeekDFA { my $self = shift;
         # Return a faked "immediate imperative" lexer, to end the token
         # Note that this will only happen from inside RE_ast, so the other stuff
         # that CursorBase itself uses isn't needed
-        return { NFA => [ [] ] };
+        return { NFA => [[1, [[1]]]] };
     }
     $key = 'termish' if $key eq 'EXPR';
     return $::DFALEXERS{ref $self}->{$key} //=

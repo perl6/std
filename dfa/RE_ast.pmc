@@ -11,8 +11,12 @@ use strict; use warnings;
 use DEBUG;
 use Encode;
 my $IMP = '(?#::)';
+my $DIMP = [1, [[1]] ];
 our $PURIFY = 0;        # ignore {*} IMPs?
 our $PREFIX = "";
+
+# The DFA engine has two priorities; top priority is to generate the correct
+# pattern prefixes; second is to generate as much fate as it can.
 
 #############################################################
 # longest token set generator
@@ -57,6 +61,11 @@ sub here {
         local $::ALT = '';
         $self->{'re'}->longest($C);
     }
+
+    sub nfa { my $self = shift; my $C = shift;
+        ::here();
+        $self->{'re'}->nfa($C);
+    }
 }
 
 { package RE_adverb; our @ISA = 'REbase';
@@ -83,6 +92,7 @@ sub here {
     sub longest { my $self = shift; my ($C) = @_; 
         return $IMP;
     }
+    sub nfa { $DIMP }
 }
 
 { package RE_block; our @ISA = 'REbase';
@@ -90,11 +100,15 @@ sub here {
         return '' if $PURIFY;
         return $IMP;
     }
+    sub nfa { $DIMP }
 }
 
 { package RE_bindvar; our @ISA = 'REbase';
     sub longest { my $self = shift; my ($C) = @_; ::here();
         $self->{'atom'}->longest($C);
+    }
+    sub nfa { my $self = shift; my $C = shift; ::here();
+        $self->{'atom'}->nfa($C);
     }
 }
 
@@ -102,17 +116,26 @@ sub here {
     sub longest { my $self = shift; my ($C) = @_; ::here();
         $self->{'atom'}->longest($C);
     }
+    sub nfa { my $self = shift; my $C = shift; ::here();
+        $self->{'atom'}->nfa($C);
+    }
 }
 
 { package RE_bindpos; our @ISA = 'REbase';
     sub longest { my $self = shift; my ($C) = @_; ::here();
         $self->{'atom'}->longest($C);
     }
+    sub nfa { my $self = shift; my $C = shift; ::here();
+        $self->{'atom'}->nfa($C);
+    }
 }
 
 { package RE_bracket; our @ISA = 'REbase';
     sub longest { my $self = shift; my ($C) = @_; ::here();
         $self->{'re'}->longest($C);
+    }
+    sub nfa { my $self = shift; my $C = shift; ::here();
+        $self->{'re'}->nfa($C);
     }
 }
 
@@ -256,6 +279,7 @@ sub here {
     sub longest { my $self = shift; my ($C) = @_; 
         return $IMP;
     }
+    sub nfa { $DIMP }
 }
 
 { package RE_method_re; our @ISA = 'REbase';
@@ -296,6 +320,7 @@ sub here {
     sub longest { my $self = shift; my ($C) = @_; 
         return $IMP;
     }
+    sub nfa { $DIMP }
 }
 
 { package RE_first; our @ISA = 'REbase';
@@ -316,6 +341,9 @@ sub here {
 { package RE_paren; our @ISA = 'REbase';
     sub longest { my $self = shift; my ($C) = @_; ::here();
         $self->{'re'}->longest($C);
+    }
+    sub nfa { my $self = shift; my $C = shift; ::here();
+        $self->{'re'}->nfa($C);
     }
 }
 
@@ -444,12 +472,14 @@ sub here {
     sub longest { my $self = shift; my ($C) = @_; 
         return $IMP;
     }
+    sub nfa { $DIMP }
 }
 
 { package RE_all; our @ISA = 'REbase';
     sub longest { my $self = shift; my ($C) = @_; 
         return $IMP;
     }
+    sub nfa { $DIMP }
 }
 
 { package RE_any; our @ISA = 'REbase';
