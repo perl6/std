@@ -182,6 +182,9 @@ sub MAIN {
 	    USAGE();
 	}
     }
+    if ($PROG eq '' && $_[0]) {
+      $PROG = do { local( @ARGV, $/ ) = $_[0] ; <> } ;
+    }
 #    USAGE() unless -r $_[0];
     my $r;
     if ($OPT_thaw) {
