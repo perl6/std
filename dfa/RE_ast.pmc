@@ -51,6 +51,19 @@ sub here {
     ::deb("\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]") if $::DEBUG & DEBUG::longest_token_pattern_generation;
 }
 
+sub nfarebase { my ($onto, $ary) = @_;
+    my $offs = @$onto;
+
+    for my $node (@$ary) {
+        for (my $ix = 3; $ix < @$node; $ix += 2) {
+            $node->[$ix] += $offs;
+        }
+        push @$onto, $node;
+    }
+
+    $offs;
+}
+
 { package REbase;
     sub longest { my $self = shift; my ($C) = @_;  ::here("UNIMPL @{[ref $self]}"); "$self" }
 }
@@ -454,6 +467,49 @@ sub here {
         }
         @$result;
     }
+
+    sub _nfa_recurse { my ($self, $C, $cache, $ix, $fates) = @_;
+        if ($ix == @{$self->{zyg}}) {
+            return [ 0, $fates ];
+        }
+
+        my $orig = $cache->[$ix] //= [$self->{zyg}[$ix]->nfa($C)];
+        my @out = @$orig;
+        my $max = @out - 1;
+
+        for my $j (0 .. $max) {
+            # Non-accepting can just be copied
+            next unless @{$out[$j][1]};
+            # Imperative acceptors stay accepting and in the same way
+            next if $out[$j][0];
+            # Otherwise, we need to glue on a copy of the sequence tail.
+            # We could share a single copy of the sequence tail if we were
+            # willing to lose deep fating... food for thought.
+            my @nfates;
+            for my $f1 (@$fates) {
+                if ($f1->[-1]) {
+                    # Non-extensible fate makes this easy
+                    push @nfates, $f1;
+                    next;
+                }
+                my @f1 = @$f1;
+                pop @f1;
+                for my $f2 (@{$out[$j][1]}) {
+                    push @nfates, [ @f1, @$f2 ];
+                }
+            }
+            my @rest = $self->_nfa_recurse($C, $cache, $ix+1, \@nfates);
+            push @{$out[$j]}, '', ::nfarebase(\@out, \@rest);;
+            $out[$j][1] = [];
+        }
+
+        @out;
+    }
+
+    sub nfa { my ($self, $C) = @_; ::here;
+        my @cache;
+        $self->_nfa_recurse($C, \@cache, 0, [[0]]);
+    }
 }
 
 { package RE_string; our @ISA = 'REbase';
@@ -465,6 +521,18 @@ sub here {
         $text = ::qm($text);
         $text =~ s/([[:alpha:]])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
         $text;
+    }
+    sub nfa { my ($self, $C) = @_;
+        my $text = $self->{'text'};
+        Encode::_utf8_on($text);
+        ::here($text);
+        $CursorBase::fakepos++ if $self->{'min'};
+        die "UNIMPL" if $self->{i};
+        my @nfa;
+        for (split //, $text) {
+            push @nfa, [ 0, [], $_, @nfa+1 ];
+        }
+        @nfa, [ 0, [[0]] ];
     }
 }
 
@@ -506,6 +574,31 @@ sub here {
         $C->deb(join("\n", @result)) if $::DEBUG & DEBUG::longest_token_pattern_generation;
         $CursorBase::fakepos = $minfakepos;  # Did all branches advance?
         @result;
+    }
+
+    sub nfa { my $self = shift; my ($C) = @_; 
+        my $alts = $self->{'zyg'};
+        ::here(0+@$alts);
+        my @out = ( [0, []] );
+        my $oldfakepos = $CursorBase::fakepos;
+        my $minfakepos = $CursorBase::fakepos + 1;
+        my $ix = 0;
+        for my $alt (@$alts) {
+            $CursorBase::fakepos = $oldfakepos;
+
+            my @subnfa = $alt->nfa($C);
+            for my $node (@subnfa) {
+                for my $fate (@{ $node->[1] }) {
+                    unshift @$fate, $self->{altname}, $ix;
+                }
+            }
+            push @{$out[0]}, '', ::nfarebase(\@out, \@subnfa);
+
+            $minfakepos = $oldfakepos if $CursorBase::fakepos == $oldfakepos;
+            $ix++;
+        }
+        $CursorBase::fakepos = $minfakepos;  # Did all branches advance?
+        @out;
     }
 }
 

@@ -7,6 +7,7 @@
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
 
+use YAML;
 use strict;
 use warnings;
 no warnings 'recursion';
@@ -503,23 +504,23 @@ sub cursor_fate { my $self = shift;
     }
 
     my $re  = $self->cursor_fate_re($pkg, $name, $lexer, $P);
-    my $dfa = $self->cursor_fate_dfa($pkg, $name, $dfalexer, $P);
+    #my $dfa = $self->cursor_fate_dfa($pkg, $name, $dfalexer, $P);
 
     my (@re, @dfa);
 
     sub {
         @re  = $re ->() unless @re;
-        @dfa = $dfa->() unless @dfa;
+        #@dfa = $dfa->() unless @dfa;
 
         return () unless @re || @dfa;
 
         my $refate  = shift @re;
-        my $dfafate = shift @dfa;
+        #my $dfafate = shift @dfa;
 
-        if (::Dump($refate) ne ::Dump($dfafate)) {
-            warn "LTM engine redundant pair failure\n";
-            warn ::Dump($refate, $dfafate);
-        }
+        #if (::Dump($refate) ne ::Dump($dfafate)) {
+        #    warn "LTM engine redundant pair failure\n";
+        #    warn ::Dump($refate, $dfafate);
+        #}
 
         defined ($refate) ? ($refate) : ();
     };
@@ -1912,6 +1913,34 @@ sub _AUTOLEXpeekDFA { my $self = shift;
     $key = 'termish' if $key eq 'EXPR';
     return $::DFALEXERS{ref $self}->{$key} //=
         $self->_AUTOLEXgenDFA($key, $retree);
+}
+
+sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
+    local $::AUTOLEXED{$key} = $fakepos;
+    my $ast = $retree->{$key};
+    warn("generating DFA lexer for $key -->\n");
+    warn(YAML::Dump($ast));
+    my @nfa = $ast->nfa($self);
+    warn("--- BEGIN NFA DUMP ---\n");
+    for my $ix (0 .. @nfa-1) {
+        my @go;
+        for (my $j = 2; $j < @{ $nfa[$ix] }; $j += 2) {
+            push @go, "'" . ::qm($nfa[$ix][$j]) . "' => " . $nfa[$ix][$j+1];
+        }
+        my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
+            ($nfa[$ix][0] ? 'I' : ' ');
+        my @fate = map { my @x = @$_;
+                         my $y = pop @x;
+                         push @x, "..." if $y;
+                         join(" ", "-->", @x) } @{ $nfa[$ix][1] };
+        @fate = ('') if !@fate;
+        for (@fate) {
+            warn($h . $_ . "\n");
+            $h = ' ' x length($h);
+        }
+    }
+    warn("---- END NFA DUMP ----\n");
+    1;
 }
 
 sub lexers { my $self = shift;
