@@ -7,7 +7,6 @@
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
 
-use YAML;
 use strict;
 use warnings;
 no warnings 'recursion';
@@ -55,6 +54,7 @@ use File::Copy;
 use YAML::XS;
 use Storable;
 use Encode;
+use Scalar::Util 'refaddr';
 
 use Term::ANSIColor;
 our $BLUE = color 'blue';
@@ -485,10 +485,7 @@ sub cursor_fate { my $self = shift;
         local %::AUTOLEXED;
         $self->_AUTOLEXpeek($name,$retree);
     };
-    my $dfalexer = $::DFALEXERS{ref $self}->{$name} // do {
-        local %::AUTOLEXED;
-        $self->_AUTOLEXpeekDFA($name,$retree);
-    };
+    my $dfalexer = $lexer->{DFA};
     if ($self->{_pos} >= $::HIGHWATER) {
         if ($self->{_pos} > $::HIGHWATER) {
             %$::HIGHEXPECT = ();
@@ -504,58 +501,58 @@ sub cursor_fate { my $self = shift;
     }
 
     my $re  = $self->cursor_fate_re($pkg, $name, $lexer, $P);
-    #my $dfa = $self->cursor_fate_dfa($pkg, $name, $dfalexer, $P);
+    my $dfa = $self->cursor_fate_dfa($pkg, $name, $dfalexer, $P);
 
     my (@re, @dfa);
 
     sub {
         @re  = $re ->() unless @re;
-        #@dfa = $dfa->() unless @dfa;
+        @dfa = $dfa->() unless @dfa;
 
         return () unless @re || @dfa;
 
         my $refate  = shift @re;
-        #my $dfafate = shift @dfa;
+        my $dfafate = shift @dfa;
 
-        #if (::Dump($refate) ne ::Dump($dfafate)) {
-        #    warn "LTM engine redundant pair failure\n";
-        #    warn ::Dump($refate, $dfafate);
-        #}
+        if (Dump($refate) ne Dump($dfafate)) {
+            say STDERR Dump($refate, $dfafate);
+            say STDERR "LTM engine redundant pair failure";
+        }
 
-        defined ($refate) ? ($refate) : ();
+        defined ($dfafate) ? ($dfafate) : ();
     };
 }
 
 sub cursor_fate_dfa {
     my ($self, $pkg, $name, $lexer, $P) = @_;
 
-    my $state = $lexer->{T};
+    my $state = $lexer->{S};
     my $p = $P;
     my @rfates;
+    my $d = $DEBUG & DEBUG::autolexer;
 
-    print ::LOG "=" x 10,"\n$p DFA for ${pkg}::$name in ", ref $self, "\n"
-            if $DEBUG & DEBUG::autolexer;
+    print ::LOG "=" x 10,"\n$p DFA for ${pkg}::$name in ", ref $self, "\n" if $d;
     CH: {
         push @rfates, @{$state->[0]};
-        my $ch = $::ORIG[$p++];
-        print ::LOG "--- ", pack("U", $ch), "\n" if $DEBUG & DEBUG::autolexer;
+        my $ch = pack("U", $::ORIG[$p++]);
+        print ::LOG "--- ", $ch, "\n" if $d;
         if ($state->[1]{$ch}) {
             $state = $state->[1]{$ch};
-            print ::LOG "specific -> ", $state->{ID}, "\n"
-                if $DEBUG & DEBUG::autolexer;
+            print ::LOG "specific -> ", $state->[1]{DESC}, "\n"
+                if $d;
             redo;
         }
 
         for (my $i = 2; $i < @$state; $i += 2) {
-            print ::LOG $state->[$i]{NAME} if $DEBUG & DEBUG::autolexer;
+            print ::LOG $state->[$i]{NAME} if $d;
 
             if ($state->[$i]{$ch}) {
                 $state = $state->[$i+1];
-                print ::LOG " -> ", $state->{ID}, "\n" if $DEBUG & DEBUG::autolexer;
+                print ::LOG " -> ", $state->{ID}, "\n" if $d;
                 redo CH;
             }
 
-            print ::LOG " -> NOT TAKEN\n" if $DEBUG & DEBUG::autolexer;
+            print ::LOG " -> NOT TAKEN\n" if $d;
         }
     }
 
@@ -1893,6 +1890,15 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 # use it to construct a characteristic mapping which can be used to efficiently
 # do Boolean algebra on Unicode propsets :>
 
+#cycle breaker
+{
+    package CursorBase::dfa;
+    sub DESTROY {
+        my $self = shift;
+        for (@$self) { @$_ = (); }
+    }
+}
+
 # This is the fast path handling for JIT DFA lexer generation (although it gets
 # short-circuited if the DFALEXERS entry exists, later).  The lexer generation
 # process sometimes recurses to this, which is tracked using %::AUTOLEXED; if
@@ -1900,50 +1906,53 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 our $fakepos = 1;
 
-sub _AUTOLEXpeekDFA { my $self = shift;
-    my $key = shift;
-    my $retree = shift;
-
-    $self->deb("AUTOLEXpeekDFA $key") if $DEBUG & DEBUG::autolexer;
-    die "Null key" if $key eq '';
-    if ($::AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
-        die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$key};
-        $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
-        # Return a faked "immediate imperative" lexer, to end the token
-        # Note that this will only happen from inside RE_ast, so the other stuff
-        # that CursorBase itself uses isn't needed
-        return { NFA => [[1, [[1]]]] };
-    }
-    $key = 'termish' if $key eq 'EXPR';
-    return $::DFALEXERS{ref $self}->{$key} //=
-        $self->_AUTOLEXgenDFA($key, $retree);
-}
+#sub _AUTOLEXpeekDFA { my $self = shift;
+#    my $key = shift;
+#    my $retree = shift;
+#
+#    $self->deb("AUTOLEXpeekDFA $key") if $DEBUG & DEBUG::autolexer;
+#    die "Null key" if $key eq '';
+#    if ($::AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
+#        die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$key};
+#        $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
+#        # Return a faked "immediate imperative" lexer, to end the token
+#        # Note that this will only happen from inside RE_ast, so the other stuff
+#        # that CursorBase itself uses isn't needed
+#        return { NFA => [[1, [[1]]]] };
+#    }
+#    $key = 'termish' if $key eq 'EXPR';
+#    return $::DFALEXERS{ref $self}->{$key} //=
+#        $self->_AUTOLEXgenDFA($key, $retree);
+#}
 
 sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     local $::AUTOLEXED{$key} = $fakepos;
     my $ast = $retree->{$key};
-    warn("generating DFA lexer for $key -->\n");
+    my $d = $DEBUG & DEBUG::autolexer;
+    print ::LOG "generating DFA lexer for $key -->\n" if $d;
     my @nfa = $ast->nfa($self);
 
-    warn("--- BEGIN NFA DUMP ---\n");
-    for my $ix (0 .. @nfa-1) {
-        my @go;
-        for (my $j = 2; $j < @{ $nfa[$ix] }; $j += 2) {
-            push @go, "'" . ::qm($nfa[$ix][$j]) . "' => " . $nfa[$ix][$j+1];
+    if ($d) {
+        print ::LOG "--- BEGIN NFA DUMP ---\n";
+        for my $ix (0 .. @nfa-1) {
+            my @go;
+            for (my $j = 2; $j < @{ $nfa[$ix] }; $j += 2) {
+                push @go, "'" . ::qm($nfa[$ix][$j]) . "' => " . $nfa[$ix][$j+1];
+            }
+            my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
+                ($nfa[$ix][0] ? 'I' : ' ');
+            my @fate = map { my @x = @$_;
+                             my $y = pop @x;
+                             push @x, "..." if $y;
+                             join(" ", "-->", @x) } @{ $nfa[$ix][1] };
+            @fate = ('') if !@fate;
+            for (@fate) {
+                print ::LOG $h . $_ . "\n";
+                $h = ' ' x length($h);
+            }
         }
-        my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
-            ($nfa[$ix][0] ? 'I' : ' ');
-        my @fate = map { my @x = @$_;
-                         my $y = pop @x;
-                         push @x, "..." if $y;
-                         join(" ", "-->", @x) } @{ $nfa[$ix][1] };
-        @fate = ('') if !@fate;
-        for (@fate) {
-            warn($h . $_ . "\n");
-            $h = ' ' x length($h);
-        }
+        print ::LOG "---- END NFA DUMP ----\n";
     }
-    warn("---- END NFA DUMP ----\n");
 
     my @edges = map { [] } @nfa;
     my @fates = map { [] } @nfa;
@@ -1986,9 +1995,11 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
         my $bf = $dfa2nfa[$ix];
 
         my %next;
+        my @nfixes;
 
         for my $nix (0 .. @nfa-1) {
             next unless vec($bf, $nix, 1);
+            push @nfixes, $nix;
 
             push @{ $node[0] }, @{ $fates[$nix] };
 
@@ -1996,6 +2007,15 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
                 $next{$edges[$nix][$i]} //= $z;
                 vec($next{$edges[$nix][$i]}, $edges[$nix][$i+1], 1) = 1;
             }
+        }
+
+        for my $fate (@{ $node[0] }) {
+            my @a = reverse @$fate;
+            my $fo = undef;
+            for (my $i = 1; $i < @a; $i += 2) {
+                $fo = [ $fo, $a[$i+1], $a[$i] ];
+            }
+            $fate = $fo;
         }
 
         for my $ch (keys %next) {
@@ -2007,33 +2027,41 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
                 push @dfa, [];
             }
 
-            $next{$ch} = $nfa2dfa{$nbm}; # TODO: use a direct ref
+            $next{$ch} = $dfa[$nfa2dfa{$nbm}];
         }
+        $next{DESC} = $dfanext . " {" . join(",", @nfixes) . "}";
         push @node, \%next;
         @{ $dfa[$dfanext] } = @node;
         $dfanext++;
     }
 
-    warn("--- BEGIN DFA DUMP ---\n");
-    for my $ix (0 .. @dfa-1) {
-        my @nfaly = grep { vec($dfa2nfa[$ix],$_,1) } (0 .. @nfa-1);
-        my $nfaly = "{" . join(",", @nfaly) . "}";
+    # set up DESTROY
+    CORE::bless (\@dfa, 'CursorBase::dfa');
 
-        my @go;
-        my @gor = %{ $dfa[$ix][1] };
-        while (my ($a, $b) = splice @gor, 0, 2) {
-            push @go, "'" . ::qm($a) . "' => " . $b;
+    my %dfa2num = map { refaddr($dfa[$_]) => $_ } (0 .. @dfa-1);
+
+    if ($d) {
+        print ::LOG "--- BEGIN DFA DUMP ---\n";
+        for my $ix (0 .. @dfa-1) {
+            my @go;
+            my @gor = %{ $dfa[$ix][1] };
+            while (my ($a, $b) = splice @gor, 0, 2) {
+                next if $a eq 'DESC';
+                push @go, "'" . ::qm($a) . "' => " . $dfa2num{refaddr $b};
+            }
+            printf ::LOG "%-30s %-30s\n", $dfa[$ix][1]{DESC} . ":", join(", ", @go);
+            for (@{ $dfa[$ix][0] }) {
+                my @arr;
+                for (my $fate = $_; $fate; $fate = $fate->[0]) {
+                    push @arr, $fate->[1], $fate->[2];
+                }
+                print ::LOG "    --> ", join(" ", @arr), "\n";
+            }
         }
-        warn sprintf "%4d: %-30s %-30s\n", $ix, $nfaly, join(", ", @go);
-        for (@{ $dfa[$ix][0] }) {
-            my @fate = @$_;
-            my $end = pop(@fate) ? " ...\n" : "\n";
-            warn "    --> ", join(" ", @fate), $end;
-        }
+        print ::LOG "---- END DFA DUMP ----\n";
     }
-    warn("---- END DFA DUMP ----\n");
 
-    1;
+    { DFA => \@dfa, NFA => \@nfa, S => $dfa[0] };
 }
 
 sub lexers { my $self = shift;
@@ -2051,10 +2079,14 @@ sub _AUTOLEXpeek { my $self = shift;
     if ($::AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
         die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$key};
         $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
-        return { PATS => ['(?#::)'] };  # (but if we advanced just assume a :: here)
+        return { PATS => ['(?#::)'], DFA => { NFA => [[1, [[1]]]] } };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
-    return $::LEXERS{ref $self}->{$key} //= $self->_AUTOLEXgen($key, $retree);
+    return $::LEXERS{ref $self}->{$key} //= do {
+        my $lex = $self->_AUTOLEXgen($key, $retree);
+        $lex->{DFA} = $self->_AUTOLEXgenDFA($key, $retree);
+        $lex;
+    };
 }
 
 
