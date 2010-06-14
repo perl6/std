@@ -1889,6 +1889,10 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 ## each NFA node, consider (a|b)*
 ## A NFA or DFA node is accepting if it has a nonempty list of fates
 
+# XXX find a minimal subset of Unicode spanning all property value combinations,
+# use it to construct a characteristic mapping which can be used to efficiently
+# do Boolean algebra on Unicode propsets :>
+
 # This is the fast path handling for JIT DFA lexer generation (although it gets
 # short-circuited if the DFALEXERS entry exists, later).  The lexer generation
 # process sometimes recurses to this, which is tracked using %::AUTOLEXED; if
@@ -1919,8 +1923,8 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     local $::AUTOLEXED{$key} = $fakepos;
     my $ast = $retree->{$key};
     warn("generating DFA lexer for $key -->\n");
-    warn(YAML::Dump($ast));
     my @nfa = $ast->nfa($self);
+
     warn("--- BEGIN NFA DUMP ---\n");
     for my $ix (0 .. @nfa-1) {
         my @go;
@@ -1940,6 +1944,95 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
         }
     }
     warn("---- END NFA DUMP ----\n");
+
+    my @edges = map { [] } @nfa;
+    my @fates = map { [] } @nfa;
+
+    for my $node (0 .. @nfa-1) {
+        my %black;
+        my @grey = ($node);
+
+        while (@grey) {
+            my $r = pop @grey;
+            next if $black{$r};
+            $black{$r} = 1;
+
+            push @{$fates[$node]}, @{ $nfa[$r][1] };
+
+            for (my $i = 2; $i < @{ $nfa[$r] }; $i += 2) {
+                if ($nfa[$r][$i] eq '') {
+                    push @grey, $nfa[$r][$i+1];
+                } else {
+                    push @{$edges[$node]}, $nfa[$r][$i], $nfa[$r][$i+1];
+                }
+            }
+        }
+    }
+
+    my $z = "\000" x int((@nfa + 7) / 8);
+    my @dfa = ([]);
+    my @dfa2nfa;
+    my %nfa2dfa;
+
+    my $o = $z;
+    vec($o,0,1) = 1;
+    push @dfa2nfa, $o;
+    $nfa2dfa{$o} = 0;
+    my $dfanext = 0;
+
+    while ($dfanext < @dfa2nfa) {
+        my @node = ( [] );
+        my $ix = $dfanext;
+        my $bf = $dfa2nfa[$ix];
+
+        my %next;
+
+        for my $nix (0 .. @nfa-1) {
+            next unless vec($bf, $nix, 1);
+
+            push @{ $node[0] }, @{ $fates[$nix] };
+
+            for (my $i = 0; $i < @{$edges[$nix]}; $i += 2) {
+                $next{$edges[$nix][$i]} //= $z;
+                vec($next{$edges[$nix][$i]}, $edges[$nix][$i+1], 1) = 1;
+            }
+        }
+
+        for my $ch (keys %next) {
+            my $nbm = $next{$ch};
+
+            if (!exists $nfa2dfa{$nbm}) {
+                $nfa2dfa{$nbm} = @dfa2nfa;
+                push @dfa2nfa, $nbm;
+                push @dfa, [];
+            }
+
+            $next{$ch} = $nfa2dfa{$nbm}; # TODO: use a direct ref
+        }
+        push @node, \%next;
+        @{ $dfa[$dfanext] } = @node;
+        $dfanext++;
+    }
+
+    warn("--- BEGIN DFA DUMP ---\n");
+    for my $ix (0 .. @dfa-1) {
+        my @nfaly = grep { vec($dfa2nfa[$ix],$_,1) } (0 .. @nfa-1);
+        my $nfaly = "{" . join(",", @nfaly) . "}";
+
+        my @go;
+        my @gor = %{ $dfa[$ix][1] };
+        while (my ($a, $b) = splice @gor, 0, 2) {
+            push @go, "'" . ::qm($a) . "' => " . $b;
+        }
+        warn sprintf "%4d: %-30s %-30s\n", $ix, $nfaly, join(", ", @go);
+        for (@{ $dfa[$ix][0] }) {
+            my @fate = @$_;
+            my $end = pop(@fate) ? " ...\n" : "\n";
+            warn "    --> ", join(" ", @fate), $end;
+        }
+    }
+    warn("---- END DFA DUMP ----\n");
+
     1;
 }
 
