@@ -286,6 +286,17 @@ sub nfarebase { my ($onto, $ary) = @_;
             return @pat;
         }
     }
+    sub nfa { my ($self, $C) = @_;
+        my $name = $self->{'name'};
+        return $IMP if $self->{'rest'};
+        Encode::_utf8_on($name);
+        ::here($name);
+
+        $name .= '__PEEK';
+        my $lexer = eval { $C->$name() };
+        return $DIMP unless $lexer and exists $lexer->{DFA}{NFA};
+        return @{$lexer->{DFA}{NFA}};
+    }
 }
 
 { package RE_method_internal; our @ISA = 'REbase';
