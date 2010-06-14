@@ -876,7 +876,16 @@ TEMPLATE
 	substr($::ORIG, 0, $self->{statementlist}{BEG}),
 	$self->{statementlist}->p5;
     }
-    sub emit_psq { $_[0]{statementlist}->psq }
+    sub emit_psq { my $self = shift;
+	local %::PRELUDE;
+	my $body = $self->{statementlist}->psq;
+	for (sort keys %::PRELUDE) {
+	    my $fn = $_;
+	    $fn =~ s#::#/#g;
+	    $body = "use \"$fn.psq\";\n$body";
+	}
+	$body;
+    }
 }
 
 { package VAST::Concatenation; our @ISA = ('VAST::Base', 'VAST::InfixCall');
@@ -2453,6 +2462,14 @@ END
 
 
 { package VAST::statement_control__S_default; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::statement_control__S_use; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	$::PRELUDE{$self->{module_name}->Str} = 1;
+	"";
+    }
 }
 
 
