@@ -380,7 +380,8 @@ sub nfadisj { my @ins = @_;
         ::here($name);
 
         $name .= '__PEEK';
-        my $lexer = eval { $C->$name() };
+        return $DIMP unless $C->can($name);
+        my $lexer = $C->$name();
         return $DIMP unless $lexer and exists $lexer->{DFA}{NFA};
         return @{$lexer->{DFA}{NFA}};
     }

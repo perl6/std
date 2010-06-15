@@ -1869,26 +1869,26 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 ##   array of (NFA node) ->
 ##     0: non extensible (imperative) flag
 ##     0: array of fate (array of fate element)
-##     array of (str len 0 or 1) at odd index, new index at even
+##     array of (label) at odd index, new index at even
 ## DFA structure:
 ##   each DFA node is array:
 ##     0: array of object fates
 ##     1: hash of specific cases (char => DFAnode)
+##        also carries some debug data
 ##    2n: reference to a uniprop hash
 ##  2n+1: DFAnode is that hash existed
+## Labels: undef is epsilon link.
+##   otherwise list - 1 positive, 0+ negative
+##   each is: 1 character, else unicode prop in "Gc/L" form
 ## "DFA" lexer structure:
-##   {DFANODES} -> array of refs to all DFA nodes
+##   {DFA} -> array of refs to all DFA nodes
 ##   {DBA}, {FILE}, {NAME} same as "RE" lexer structure
-##   {T} -> ref to DFA root
+##   {S} -> ref to DFA root
 ##   {NFA} -> NFA structure
 ## individual fates in the NFA end with a hook which can be 1 to stop adding
 ## fates on the end; it's not always possible to associate a unique fate with
 ## each NFA node, consider (a|b)*
 ## A NFA or DFA node is accepting if it has a nonempty list of fates
-
-# XXX find a minimal subset of Unicode spanning all property value combinations,
-# use it to construct a characteristic mapping which can be used to efficiently
-# do Boolean algebra on Unicode propsets :>
 
 #cycle breaker
 {
@@ -1897,6 +1897,25 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
         my $self = shift;
         for (@$self) { @$_ = (); }
     }
+}
+
+# Steal data from Perl5's Unicode maps
+my %unicode_map_cache;
+sub _get_unicode_map {
+    my $propname = shift;
+    $unicode_map_cache{$propname} //= do {
+        my @top;
+        for my $l (split("\n", (do "unicore/lib/$propname.pl"))) {
+            my ($from, $to) = split("\t", $l);
+            $from = hex $from;
+            $to = hex $to || $from;
+
+            for (my $x = $from; $x <= $to; $x++) {
+                vec($top[$x >> 10], $x & 1023, 1) = 1;
+            }
+        }
+        \@top;
+    };
 }
 
 # This is the fast path handling for JIT DFA lexer generation (although it gets
@@ -1925,6 +1944,65 @@ our $fakepos = 1;
 #        $self->_AUTOLEXgenDFA($key, $retree);
 #}
 
+sub _dump_nfa { my ($nfa) = @_;
+    print ::LOG "--- BEGIN NFA DUMP ---\n";
+    for my $ix (0 .. @$nfa-1) {
+        my @go;
+        for (my $j = 2; $j < @{ $nfa->[$ix] }; $j += 2) {
+            push @go, "'" . ::qm($nfa->[$ix][$j]) . "' => " . $nfa->[$ix][$j+1];
+        }
+        my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
+            ($nfa->[$ix][0] ? 'I' : ' ');
+        my @fate = map { my @x = @$_;
+                         my $y = pop @x;
+                         push @x, "..." if $y;
+                         join(" ", "-->", @x) } @{ $nfa->[$ix][1] };
+        @fate = ('') if !@fate;
+        for (@fate) {
+            print ::LOG $h . $_ . "\n";
+            $h = ' ' x length($h);
+        }
+    }
+    print ::LOG "---- END NFA DUMP ----\n";
+}
+
+sub _dfa_dump { my ($dfa) = @_;
+    print ::LOG "--- BEGIN DFA DUMP ---\n";
+    for my $ix (0 .. @$dfa-1) {
+        my @go;
+        my @gor = %{ $dfa->[$ix][1] };
+        while (my ($a, $b) = splice @gor, 0, 2) {
+            next if $a eq 'DESC';
+            next if $a eq 'ID';
+            push @go, "'" . ::qm($a) . "' => " . $b->[1]{ID};
+        }
+        printf ::LOG "%-30s %-30s\n", $dfa->[$ix][1]{DESC} . ":", join(", ", @go);
+        for (@{ $dfa->[$ix][0] }) {
+            my @arr;
+            for (my $fate = $_; $fate; $fate = $fate->[0]) {
+                push @arr, $fate->[1], $fate->[2];
+            }
+            print ::LOG "    --> ", join(" ", @arr), "\n";
+        }
+    }
+    print ::LOG "---- END DFA DUMP ----\n";
+}
+
+sub _tangle_edges { my ($our_edges, $thunk) = @_;
+    my %next;
+
+    for (my $i = 0; $i < @$our_edges; $i += 2) {
+        $next{$our_edges->[$i]} //= '';
+        vec($next{$our_edges->[$i]}, $our_edges->[$i+1], 1) = 1;
+    }
+
+    for my $ch (keys %next) {
+        $next{$ch} = $thunk->($next{$ch});
+    }
+
+    \%next;
+}
+
 sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     local $::AUTOLEXED{$key} = $fakepos;
     my $ast = $retree->{$key};
@@ -1932,27 +2010,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     print ::LOG "generating DFA lexer for $key -->\n" if $d;
     my @nfa = $ast->nfa($self);
 
-    if ($d) {
-        print ::LOG "--- BEGIN NFA DUMP ---\n";
-        for my $ix (0 .. @nfa-1) {
-            my @go;
-            for (my $j = 2; $j < @{ $nfa[$ix] }; $j += 2) {
-                push @go, "'" . ::qm($nfa[$ix][$j]) . "' => " . $nfa[$ix][$j+1];
-            }
-            my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
-                ($nfa[$ix][0] ? 'I' : ' ');
-            my @fate = map { my @x = @$_;
-                             my $y = pop @x;
-                             push @x, "..." if $y;
-                             join(" ", "-->", @x) } @{ $nfa[$ix][1] };
-            @fate = ('') if !@fate;
-            for (@fate) {
-                print ::LOG $h . $_ . "\n";
-                $h = ' ' x length($h);
-            }
-        }
-        print ::LOG "---- END NFA DUMP ----\n";
-    }
+    _dump_nfa(\@nfa) if $d;
 
     my @edges = map { [] } @nfa;
     my @fates = map { [] } @nfa;
@@ -1978,15 +2036,12 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
         }
     }
 
-    my $z = "\000" x int((@nfa + 7) / 8);
     my @dfa = ([]);
     my @dfa2nfa;
     my %nfa2dfa;
 
-    my $o = $z;
-    vec($o,0,1) = 1;
-    push @dfa2nfa, $o;
-    $nfa2dfa{$o} = 0;
+    push @dfa2nfa, "\001";
+    $nfa2dfa{"\001"} = 0;
     my $dfanext = 0;
 
     while ($dfanext < @dfa2nfa) {
@@ -1994,19 +2049,15 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
         my $ix = $dfanext;
         my $bf = $dfa2nfa[$ix];
 
-        my %next;
         my @nfixes;
+        my @ouredges;
 
         for my $nix (0 .. @nfa-1) {
             next unless vec($bf, $nix, 1);
             push @nfixes, $nix;
 
             push @{ $node[0] }, @{ $fates[$nix] };
-
-            for (my $i = 0; $i < @{$edges[$nix]}; $i += 2) {
-                $next{$edges[$nix][$i]} //= $z;
-                vec($next{$edges[$nix][$i]}, $edges[$nix][$i+1], 1) = 1;
-            }
+            push @ouredges, @{$edges[$nix]};
         }
 
         for my $fate (@{ $node[0] }) {
@@ -2018,19 +2069,16 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
             $fate = $fo;
         }
 
-        for my $ch (keys %next) {
-            my $nbm = $next{$ch};
-
-            if (!exists $nfa2dfa{$nbm}) {
-                $nfa2dfa{$nbm} = @dfa2nfa;
+        push @node, _tangle_edges(\@ouredges, sub {
+            my $nbm = shift;
+            $dfa[ $nfa2dfa{$nbm} //= do {
                 push @dfa2nfa, $nbm;
                 push @dfa, [];
-            }
-
-            $next{$ch} = $dfa[$nfa2dfa{$nbm}];
-        }
-        $next{DESC} = $dfanext . " {" . join(",", @nfixes) . "}";
-        push @node, \%next;
+                @dfa2nfa - 1;
+            }];
+        });
+        $node[1]{DESC} = $dfanext . " {" . join(",", @nfixes) . "}";
+        $node[1]{ID} = $dfanext;
         @{ $dfa[$dfanext] } = @node;
         $dfanext++;
     }
@@ -2038,28 +2086,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     # set up DESTROY
     CORE::bless (\@dfa, 'CursorBase::dfa');
 
-    my %dfa2num = map { refaddr($dfa[$_]) => $_ } (0 .. @dfa-1);
-
-    if ($d) {
-        print ::LOG "--- BEGIN DFA DUMP ---\n";
-        for my $ix (0 .. @dfa-1) {
-            my @go;
-            my @gor = %{ $dfa[$ix][1] };
-            while (my ($a, $b) = splice @gor, 0, 2) {
-                next if $a eq 'DESC';
-                push @go, "'" . ::qm($a) . "' => " . $dfa2num{refaddr $b};
-            }
-            printf ::LOG "%-30s %-30s\n", $dfa[$ix][1]{DESC} . ":", join(", ", @go);
-            for (@{ $dfa[$ix][0] }) {
-                my @arr;
-                for (my $fate = $_; $fate; $fate = $fate->[0]) {
-                    push @arr, $fate->[1], $fate->[2];
-                }
-                print ::LOG "    --> ", join(" ", @arr), "\n";
-            }
-        }
-        print ::LOG "---- END DFA DUMP ----\n";
-    }
+    _dfa_dump(\@dfa) if $d;
 
     { DFA => \@dfa, NFA => \@nfa, S => $dfa[0] };
 }
