@@ -18,7 +18,6 @@ proto diag is export { }
 proto is_deeply is export { }
 proto isnt is export { }
 proto like is export { }
-proto skip_rest is export { }
 proto unlike is export { }
 proto skip_rest is export { }
 proto eval_dies_ok is export { }
