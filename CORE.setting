@@ -26,6 +26,7 @@ my role Iterable { }
 # XXX does this mean anything?
 my role Matcher { }
 
+my class CallFrame { }	# or is this a role?
 my class P6opaque { }
 my class Mu { }
 my class Any { }
@@ -216,6 +217,7 @@ my proto exit { }
 my proto warn { }
 my proto note { }
 my proto caller { }
+my proto callframe { }
 my proto eval { }
 my proto evalfile { }
 my proto callsame { }
