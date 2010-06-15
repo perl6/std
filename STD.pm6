@@ -5436,7 +5436,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
         if $declaring === $old {}  # already did this, probably enum
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
-        elsif $omult eq 'proto' {}
+        elsif $omult eq 'proto' and $*MULTINESS ne 'proto' and $*MULTINESS ne 'only' {}
         elsif $*PKGDECL eq 'role' {}
         elsif $*SIGNUM and $old<signum> and $*SIGNUM != $old<signum> {
             $old<signum> = $*SIGNUM;
@@ -5535,7 +5535,7 @@ method add_our_name ($n) {
         if $declaring === $old {} # already did it somehow
         elsif $*SCOPE eq 'use' {}
         elsif $*MULTINESS eq 'multi' and $omult ne 'only' {}
-        elsif $omult eq 'proto' {}
+        elsif $omult eq 'proto' and $*MULTINESS ne 'proto' and $*MULTINESS ne 'only' {}
         elsif $*PKGDECL eq 'role' {}
         else {
             my $ofile = $old.file // 0;

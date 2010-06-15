@@ -383,7 +383,6 @@ my proto wait { }
 my proto kill { }
 my proto sleep { }
 
-my proto infix:<=> ($x,$y) { }
 my proto postfix:<i> ($x) { }
 my proto infix:<.> ($x,$y) { }
 my proto postfix:['->'] ($x) { }
