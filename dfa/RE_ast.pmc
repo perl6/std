@@ -12,6 +12,7 @@ use DEBUG;
 use Encode;
 my $IMP = '(?#::)';
 my $DIMP = [1, [[1]] ];
+my $DNULL = [0, [[0]] ];
 our $PURIFY = 0;        # ignore {*} IMPs?
 our $PREFIX = "";
 
@@ -55,13 +56,99 @@ sub nfarebase { my ($onto, $ary) = @_;
     my $offs = @$onto;
 
     for my $node (@$ary) {
-        for (my $ix = 3; $ix < @$node; $ix += 2) {
-            $node->[$ix] += $offs;
+        my $nnode = [ @$node ];
+        for (my $ix = 3; $ix < @$nnode; $ix += 2) {
+            $nnode->[$ix] += $offs;
         }
-        push @$onto, $node;
+        push @$onto, $nnode;
     }
 
     $offs;
+}
+
+sub nfaprefate { my ($fates, $nfa) = @_;
+    my @out = @$nfa;
+
+    for my $onode (@out) {
+        $onode = [ @$onode ];
+        # Non-accepting can just be copied
+        next unless @{$onode->[1]};
+
+        my @nfates;
+        for my $f1 (@$fates) {
+            if ($f1->[-1]) {
+                # Non-extensible fate makes this easy
+                push @nfates, $f1;
+                next;
+            }
+            my @f1 = @$f1;
+            pop @f1;
+            for my $f2 (@{$onode->[1]}) {
+                push @nfates, [ @f1, @$f2 ];
+            }
+        }
+
+        $onode->[1] = \@nfates;
+    }
+
+    @out;
+}
+
+
+sub nfaseq { my ($fst, $sndthunk) = @_;
+    my @out = @$fst;
+    my $max = @out - 1;
+
+    if (ref $sndthunk ne 'CODE') {
+        my $v = $sndthunk;
+        $sndthunk = sub { $v };
+    }
+
+    for my $j (0 .. $max) {
+        # Non-accepting can just be copied
+        next unless @{$out[$j][1]};
+        $out[$j] = [ @{ $out[$j] } ];
+        # Imperative acceptors stay accepting and in the same way
+        next if $out[$j][0];
+        # Otherwise, we need to glue on a copy of the sequence tail.
+        # We could share a single copy of the sequence tail if we were
+        # willing to lose deep fating... food for thought.
+        push @{$out[$j]}, '', nfarebase(\@out,
+            [nfaprefate($out[$j][1], $sndthunk->())]);
+        $out[$j][1] = [];  # not accepting any more
+    }
+
+    @out;
+}
+
+# nfaplus would be possible, but it would be a pessimization from a deep fating
+# standpoint
+sub nfastar { my ($in) = @_;
+    # we can't return fates for any of this stuff as there's no telling how many
+    # times though the loop we've gone
+    my @out = ( [0, []] );
+    nfarebase(\@out, $in);
+
+    # all nodes already cloned by nfarebase
+    for my $node (@out) {
+        next unless @{ $node->[1] };
+        $node->[1] = [];
+        push @$node, '', 0;
+    }
+
+    $out[0][1] = [[1]];
+    push @{ $out[0] }, '', 1;
+    @out;
+}
+
+sub nfadisj { my @ins = @_;
+    my @out = ( [ 0, [] ] );
+
+    for my $in (@ins) {
+        push @{ $out[0] }, '', nfarebase(\@out, $in);
+    }
+
+    @out;
 }
 
 { package REbase;
@@ -415,6 +502,30 @@ sub nfarebase { my ($onto, $ary) = @_;
         }
         return $IMP;
     }
+
+    sub nfa { my ($self, $C) = @_; ::here();
+        my $oldfakepos = $CursorBase::fakepos++;
+        my @subnfa = $self->{atom}->nfa($C);
+        #return $DIMP if $self->{quant}[1];  XXX viv omits this currently
+        # XXX S05 is not quite clear; it could be read as saying to cut LTM
+        # *after* the atom
+        return $DIMP if $self->{quant}[2]
+            && $self->{quant}[2]->isa('RE_block');
+
+        my $k = $self->{quant}[0];
+        if ($k eq '?') {
+            return ::nfadisj([$DNULL], \@subnfa);
+        } elsif ($k eq '*') {
+            return ::nfastar(\@subnfa);
+        } elsif ($k eq '+') {
+            return ::nfaseq(\@subnfa, [::nfastar(\@subnfa)]);
+        } elsif ($k eq '**') {
+            my @subnfa2 = $self->{quant}[2]->nfa($C);
+            return ::nfaseq(\@subnfa, [::nfastar([::nfaseq(\@subnfa2, \@subnfa)])]);
+        } else {
+            die "unknown quantifier $k";
+        }
+    }
 }
 
 { package RE_qw; our @ISA = 'REbase';
@@ -479,47 +590,18 @@ sub nfarebase { my ($onto, $ary) = @_;
         @$result;
     }
 
-    sub _nfa_recurse { my ($self, $C, $cache, $ix, $fates) = @_;
+    sub _nfa_recurse { my ($self, $C, $ix, $cache) = @_;
         if ($ix == @{$self->{zyg}}) {
-            return [ 0, $fates ];
+            return $DNULL;
         }
 
-        my $orig = $cache->[$ix] //= [$self->{zyg}[$ix]->nfa($C)];
-        my @out = @$orig;
-        my $max = @out - 1;
-
-        for my $j (0 .. $max) {
-            # Non-accepting can just be copied
-            next unless @{$out[$j][1]};
-            # Imperative acceptors stay accepting and in the same way
-            next if $out[$j][0];
-            # Otherwise, we need to glue on a copy of the sequence tail.
-            # We could share a single copy of the sequence tail if we were
-            # willing to lose deep fating... food for thought.
-            my @nfates;
-            for my $f1 (@$fates) {
-                if ($f1->[-1]) {
-                    # Non-extensible fate makes this easy
-                    push @nfates, $f1;
-                    next;
-                }
-                my @f1 = @$f1;
-                pop @f1;
-                for my $f2 (@{$out[$j][1]}) {
-                    push @nfates, [ @f1, @$f2 ];
-                }
-            }
-            my @rest = $self->_nfa_recurse($C, $cache, $ix+1, \@nfates);
-            push @{$out[$j]}, '', ::nfarebase(\@out, \@rest);;
-            $out[$j][1] = [];
-        }
-
-        @out;
+        ::nfaseq([$self->{zyg}[$ix]->nfa($C)],
+            sub { $cache->[$ix+1] //= [$self->_nfa_recurse($C, $ix+1, $cache)]; });
     }
 
     sub nfa { my ($self, $C) = @_; ::here;
         my @cache;
-        $self->_nfa_recurse($C, \@cache, 0, [[0]]);
+        $self->_nfa_recurse($C, 0, \@cache);
     }
 }
 
@@ -590,26 +672,21 @@ sub nfarebase { my ($onto, $ary) = @_;
     sub nfa { my $self = shift; my ($C) = @_; 
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
-        my @out = ( [0, []] );
+        my @outs;
         my $oldfakepos = $CursorBase::fakepos;
         my $minfakepos = $CursorBase::fakepos + 1;
         my $ix = 0;
+        
         for my $alt (@$alts) {
             $CursorBase::fakepos = $oldfakepos;
 
-            my @subnfa = $alt->nfa($C);
-            for my $node (@subnfa) {
-                for my $fate (@{ $node->[1] }) {
-                    unshift @$fate, $self->{altname}, $ix;
-                }
-            }
-            push @{$out[0]}, '', ::nfarebase(\@out, \@subnfa);
+            push @outs, [::nfaprefate([[$self->{altname}, $ix, 0]], [$alt->nfa($C)])];
 
             $minfakepos = $oldfakepos if $CursorBase::fakepos == $oldfakepos;
             $ix++;
         }
         $CursorBase::fakepos = $minfakepos;  # Did all branches advance?
-        @out;
+        ::nfadisj(@outs);
     }
 }
 
