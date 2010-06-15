@@ -3193,14 +3193,16 @@ grammar P6 is STD {
 
     token infix:lambda {
         <?before '{' | '->' > <!{ $*IN_META }> {{
+            my $needparens = 0;
             my $line = $¢.lineof($¢.pos);
-            for 'if', 'unless', 'while', 'until', 'for', 'loop', 'given', 'when', 'sub' {
+            for 'if', 'unless', 'while', 'until', 'for', 'given', 'when', 'loop', 'sub', 'method' {
+                $needparens++ if $_ eq 'loop';
                 my $m = %*MYSTERY{$_};
                 next unless $m;
                 if $line - ($m.<line>//-123) < 5 {
                     if $m.<ctx> eq '(' {
                         $¢.panic("Word '$_' interpreted as '$_" ~ "()' function call; please use whitespace " ~
-                        ($_ eq 'loop' ?? 'around the parens' !! 'instead of parens') ~ $m<token>.locmess ~
+                        ($needparens ?? 'around the parens' !! 'instead of parens') ~ $m<token>.locmess ~
                         "\nUnexpected block in infix position (two terms in a row)");
                     }
                     else {
