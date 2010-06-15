@@ -534,7 +534,9 @@ sub cursor_fate_dfa {
     print ::LOG "=" x 10,"\n$p DFA for ${pkg}::$name in ", ref $self, "\n" if $d;
     CH: {
         push @rfates, @{$state->[0]};
-        my $ch = pack("U", $::ORIG[$p++]);
+        last if $p == @::ORIG;
+        my $chi = $::ORIG[$p++];
+        my $ch = pack("U", $chi);
         print ::LOG "--- ", $ch, "\n" if $d;
         if ($state->[1]{$ch}) {
             $state = $state->[1]{$ch};
@@ -543,16 +545,22 @@ sub cursor_fate_dfa {
             redo;
         }
 
-        for (my $i = 2; $i < @$state; $i += 2) {
-            print ::LOG $state->[$i]{NAME} if $d;
-
-            if ($state->[$i]{$ch}) {
-                $state = $state->[$i+1];
-                print ::LOG " -> ", $state->{ID}, "\n" if $d;
+        my $dt = $state->[2];
+        while (defined $dt) {
+            if (ref $dt eq 'ARRAY') {
+                print ::LOG $dt->[0][-1], "?" if $d;
+                if (vec($dt->[0][$chi >> 10], $chi & 1023, 1)) {
+                    print ::LOG " yes\n" if $d;
+                    $dt = $dt->[1];
+                } else {
+                    print ::LOG " no\n" if $d;
+                    $dt = $dt->[2];
+                }
+            } else {
+                print ::LOG " -> ", $$dt->[1]{DESC}, "\n" if $d;
+                $state = $$dt;
                 redo CH;
             }
-
-            print ::LOG " -> NOT TAKEN\n" if $d;
         }
     }
 
@@ -1905,17 +1913,16 @@ $unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
 sub _get_unicode_map {
     my $propname = shift;
     $unicode_map_cache{$propname} //= do {
-        my @top;
+        my @top = (("") x 1088, $propname);
         for my $l (split("\n", (do "unicore/lib/$propname.pl"))) {
             my ($from, $to) = split("\t", $l);
             $from = hex $from;
             $to = hex $to || $from;
 
             for (my $x = $from; $x <= $to; $x++) {
-                vec($top[$x >> 10] //= "", $x & 1023, 1) = 1;
+                vec($top[$x >> 10], $x & 1023, 1) = 1;
             }
         }
-        $top[1088] = $propname;
         \@top;
     };
 }
