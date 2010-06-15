@@ -2166,19 +2166,13 @@ sub _tangle_edges { my ($our_edges, $thunk) = @_;
     \%next_1, _decision_tree($thunk, @$our_edges);
 }
 
-sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
-    local $::AUTOLEXED{$key} = $fakepos;
-    my $ast = $retree->{$key};
-    my $d = $DEBUG & DEBUG::autolexer;
-    print ::LOG "generating DFA lexer for $key -->\n" if $d;
-    my @nfa = @{ $ast->nfa($self) };
+sub _nfa_to_dfa { my ($nfa) = @_;
+    my @edges = map { [] } @$nfa;
+    my @fates = map { [] } @$nfa;
 
-    _dump_nfa(\@nfa) if $d;
-
-    my @edges = map { [] } @nfa;
-    my @fates = map { [] } @nfa;
-
-    for my $node (0 .. @nfa-1) {
+    # Epsilon elimation pass - find the true full set of edges and fates
+    # reachable from a given node.
+    for my $node (0 .. @$nfa-1) {
         my %black;
         my @grey = ($node);
 
@@ -2187,24 +2181,33 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
             next if $black{$r};
             $black{$r} = 1;
 
-            push @{$fates[$node]}, @{ $nfa[$r][1] };
+            push @{$fates[$node]}, @{ $nfa->[$r][1] };
 
-            for (my $i = 2; $i < @{ $nfa[$r] }; $i += 2) {
-                if (!$nfa[$r][$i]) {
-                    push @grey, $nfa[$r][$i+1];
+            for (my $i = 2; $i < @{ $nfa->[$r] }; $i += 2) {
+                if (!$nfa->[$r][$i]) {
+                    push @grey, $nfa->[$r][$i+1];
                 } else {
-                    push @{$edges[$node]}, $nfa[$r][$i], $nfa[$r][$i+1];
+                    push @{$edges[$node]}, $nfa->[$r][$i], $nfa->[$r][$i+1];
                 }
             }
         }
     }
 
-    my @dfa = ([]);
+    # The simple DFA mapping produces an expansion of 2^n; we use a breadth-
+    # first enumeration in order to only generate reachable DFA nodes.
+    my @dfa;
     my @dfa2nfa;
     my %nfa2dfa;
 
-    push @dfa2nfa, "\001";
-    $nfa2dfa{"\001"} = 0;
+    my $nfa2dfa = sub { my $nbm = shift;
+        $dfa[ $nfa2dfa{$nbm} //= do {
+            push @dfa2nfa, $nbm;
+            push @dfa, [];
+            @dfa2nfa - 1;
+        }];
+    };
+
+    $nfa2dfa->("\001"); # Inject the start state
     my $dfanext = 0;
 
     while ($dfanext < @dfa2nfa) {
@@ -2215,7 +2218,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
         my @nfixes;
         my @ouredges;
 
-        for my $nix (0 .. @nfa-1) {
+        for my $nix (0 .. @$nfa-1) {
             next unless vec($bf, $nix, 1);
             push @nfixes, $nix;
 
@@ -2232,14 +2235,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
             $fate = $fo;
         }
 
-        push @node, _tangle_edges(\@ouredges, sub {
-            my $nbm = shift;
-            $dfa[ $nfa2dfa{$nbm} //= do {
-                push @dfa2nfa, $nbm;
-                push @dfa, [];
-                @dfa2nfa - 1;
-            }];
-        });
+        push @node, _tangle_edges(\@ouredges, $nfa2dfa);
         $node[1]{DESC} = $dfanext . " {" . join(",", @nfixes) . "}";
         $node[1]{ID} = $dfanext;
         @{ $dfa[$dfanext] } = @node;
@@ -2249,9 +2245,21 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     # set up DESTROY
     CORE::bless (\@dfa, 'CursorBase::dfa');
 
-    _dfa_dump(\@dfa) if $d;
+    \@dfa;
+}
 
-    { DFA => \@dfa, NFA => \@nfa, S => $dfa[0] };
+sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
+    local $::AUTOLEXED{$key} = $fakepos;
+    my $ast = $retree->{$key};
+    my $d = $DEBUG & DEBUG::autolexer;
+    print ::LOG "generating DFA lexer for $key -->\n" if $d;
+
+    my $nfa = $ast->nfa($self);
+    _dump_nfa($nfa) if $d;
+    my $dfa = _nfa_to_dfa($nfa);
+    _dfa_dump($dfa) if $d;
+
+    { DFA => $dfa, NFA => $nfa, S => $dfa->[0] };
 }
 
 sub lexers { my $self = shift;
