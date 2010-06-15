@@ -2171,7 +2171,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     my $ast = $retree->{$key};
     my $d = $DEBUG & DEBUG::autolexer;
     print ::LOG "generating DFA lexer for $key -->\n" if $d;
-    my @nfa = $ast->nfa($self);
+    my @nfa = @{ $ast->nfa($self) };
 
     _dump_nfa(\@nfa) if $d;
 

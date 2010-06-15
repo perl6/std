@@ -11,8 +11,8 @@ use strict; use warnings;
 use DEBUG;
 use Encode;
 my $IMP = '(?#::)';
-my $DIMP = [1, [[1]] ];
-my $DNULL = [0, [[0]] ];
+my $DIMP = [[1, [[1]] ]];
+my $DNULL = [[0, [[0]] ]];
 our $PURIFY = 0;        # ignore {*} IMPs?
 our $PREFIX = "";
 
@@ -91,7 +91,7 @@ sub nfaprefate { my ($fates, $nfa) = @_;
         $onode->[1] = \@nfates;
     }
 
-    @out;
+    \@out;
 }
 
 
@@ -114,11 +114,11 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
         # We could share a single copy of the sequence tail if we were
         # willing to lose deep fating... food for thought.
         push @{$out[$j]}, undef, nfarebase(\@out,
-            [nfaprefate($out[$j][1], $sndthunk->())]);
+            nfaprefate($out[$j][1], $sndthunk->()));
         $out[$j][1] = [];  # not accepting any more
     }
 
-    @out;
+    \@out;
 }
 
 # nfaplus would be possible, but it would be a pessimization from a deep fating
@@ -138,7 +138,7 @@ sub nfastar { my ($in) = @_;
 
     $out[0][1] = [[1]];
     push @{ $out[0] }, undef, 1;
-    @out;
+    \@out;
 }
 
 sub nfadisj { my @ins = @_;
@@ -148,7 +148,12 @@ sub nfadisj { my @ins = @_;
         push @{ $out[0] }, undef, nfarebase(\@out, $in);
     }
 
-    @out;
+    \@out;
+}
+
+sub nfacclass { my @terms = @_;
+    return [ [ 0, [], map { $_, 1 } @terms ],
+             [ 0, [[0]] ] ];
 }
 
 { package REbase;
@@ -329,12 +334,10 @@ sub nfadisj { my @ins = @_;
         Encode::_utf8_on($text);
         ::here($text);
         if ($text eq '\w') {
-            return [ 0, [], ['_'], 1, ['Gc/L'], 1, ['Gc/N'], 1 ],
-                   [ 0, [[0]] ];
+            return ::nfacclass(['_'], ['Gc/L'], ['Gc/N']);
         }
         if ($text eq '\d') {
-            return [ 0, [], ['Gc/N'], 1 ],
-                   [ 0, [[0]] ];
+            return ::nfacclass(['Gc/N']);
         }
         die "unhandled meta";
     }
@@ -398,7 +401,7 @@ sub nfadisj { my @ins = @_;
         return $DIMP unless $C->can($name);
         my $lexer = $C->$name();
         return $DIMP unless $lexer and exists $lexer->{DFA}{NFA};
-        return @{$lexer->{DFA}{NFA}};
+        return $lexer->{DFA}{NFA};
     }
 }
 
@@ -521,7 +524,7 @@ sub nfadisj { my @ins = @_;
 
     sub nfa { my ($self, $C) = @_; ::here();
         my $oldfakepos = $CursorBase::fakepos++;
-        my @subnfa = $self->{atom}->nfa($C);
+        my $subnfa = $self->{atom}->nfa($C);
         #return $DIMP if $self->{quant}[1];  XXX viv omits this currently
         # XXX S05 is not quite clear; it could be read as saying to cut LTM
         # *after* the atom
@@ -530,14 +533,14 @@ sub nfadisj { my @ins = @_;
 
         my $k = $self->{quant}[0];
         if ($k eq '?') {
-            return ::nfadisj([$DNULL], \@subnfa);
+            return ::nfadisj($DNULL, $subnfa);
         } elsif ($k eq '*') {
-            return ::nfastar(\@subnfa);
+            return ::nfastar($subnfa);
         } elsif ($k eq '+') {
-            return ::nfaseq(\@subnfa, [::nfastar(\@subnfa)]);
+            return ::nfaseq($subnfa, ::nfastar($subnfa));
         } elsif ($k eq '**') {
-            my @subnfa2 = $self->{quant}[2]->nfa($C);
-            return ::nfaseq(\@subnfa, [::nfastar([::nfaseq(\@subnfa2, \@subnfa)])]);
+            my $subnfa2 = $self->{quant}[2]->nfa($C);
+            return ::nfaseq($subnfa, ::nfastar(::nfaseq($subnfa2, $subnfa)));
         } else {
             die "unknown quantifier $k";
         }
@@ -611,8 +614,8 @@ sub nfadisj { my @ins = @_;
             return $DNULL;
         }
 
-        ::nfaseq([$self->{zyg}[$ix]->nfa($C)],
-            sub { $cache->[$ix+1] //= [$self->_nfa_recurse($C, $ix+1, $cache)]; });
+        ::nfaseq($self->{zyg}[$ix]->nfa($C),
+            sub { $cache->[$ix+1] //= $self->_nfa_recurse($C, $ix+1, $cache); });
     }
 
     sub nfa { my ($self, $C) = @_; ::here;
@@ -641,7 +644,7 @@ sub nfadisj { my @ins = @_;
         for (split //, $text) {
             push @nfa, [ 0, [], [$_], @nfa+1 ];
         }
-        @nfa, [ 0, [[0]] ];
+        [ @nfa, [ 0, [[0]] ] ];
     }
 }
 
@@ -696,7 +699,7 @@ sub nfadisj { my @ins = @_;
         for my $alt (@$alts) {
             $CursorBase::fakepos = $oldfakepos;
 
-            push @outs, [::nfaprefate([[$self->{altname}, $ix, 0]], [$alt->nfa($C)])];
+            push @outs, ::nfaprefate([[$self->{altname}, $ix, 0]], $alt->nfa($C));
 
             $minfakepos = $oldfakepos if $CursorBase::fakepos == $oldfakepos;
             $ix++;
