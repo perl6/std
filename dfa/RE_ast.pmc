@@ -323,6 +323,21 @@ sub nfadisj { my @ins = @_;
             }
         }
     }
+
+    sub nfa { my $self = shift; my ($C) = @_; 
+        my $text = $self->{'text'};
+        Encode::_utf8_on($text);
+        ::here($text);
+        if ($text eq '\w') {
+            return [ 0, [], ['_'], 1, ['Gc/L'], 1, ['Gc/N'], 1 ],
+                   [ 0, [[0]] ];
+        }
+        if ($text eq '\d') {
+            return [ 0, [], ['Gc/N'], 1 ],
+                   [ 0, [[0]] ];
+        }
+        die "unhandled meta";
+    }
 }
 
 { package RE_method; our @ISA = 'REbase';
