@@ -113,7 +113,7 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
         # Otherwise, we need to glue on a copy of the sequence tail.
         # We could share a single copy of the sequence tail if we were
         # willing to lose deep fating... food for thought.
-        push @{$out[$j]}, '', nfarebase(\@out,
+        push @{$out[$j]}, undef, nfarebase(\@out,
             [nfaprefate($out[$j][1], $sndthunk->())]);
         $out[$j][1] = [];  # not accepting any more
     }
@@ -133,11 +133,11 @@ sub nfastar { my ($in) = @_;
     for my $node (@out) {
         next unless @{ $node->[1] };
         $node->[1] = [];
-        push @$node, '', 0;
+        push @$node, undef, 0;
     }
 
     $out[0][1] = [[1]];
-    push @{ $out[0] }, '', 1;
+    push @{ $out[0] }, undef, 1;
     @out;
 }
 
@@ -145,7 +145,7 @@ sub nfadisj { my @ins = @_;
     my @out = ( [ 0, [] ] );
 
     for my $in (@ins) {
-        push @{ $out[0] }, '', nfarebase(\@out, $in);
+        push @{ $out[0] }, undef, nfarebase(\@out, $in);
     }
 
     @out;
@@ -624,7 +624,7 @@ sub nfadisj { my @ins = @_;
         die "UNIMPL" if $self->{i};
         my @nfa;
         for (split //, $text) {
-            push @nfa, [ 0, [], $_, @nfa+1 ];
+            push @nfa, [ 0, [], [$_], @nfa+1 ];
         }
         @nfa, [ 0, [[0]] ];
     }

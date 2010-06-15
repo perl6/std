@@ -1901,6 +1901,7 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 # Steal data from Perl5's Unicode maps
 my %unicode_map_cache;
+$unicode_map_cache{ALL} = scalar("\377" x 128) x 1088;
 sub _get_unicode_map {
     my $propname = shift;
     $unicode_map_cache{$propname} //= do {
@@ -1949,7 +1950,7 @@ sub _dump_nfa { my ($nfa) = @_;
     for my $ix (0 .. @$nfa-1) {
         my @go;
         for (my $j = 2; $j < @{ $nfa->[$ix] }; $j += 2) {
-            push @go, "'" . ::qm($nfa->[$ix][$j]) . "' => " . $nfa->[$ix][$j+1];
+            push @go, "[" . join("-",@{$nfa->[$ix][$j] // []}) . "] => " . $nfa->[$ix][$j+1];
         }
         my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
             ($nfa->[$ix][0] ? 'I' : ' ');
@@ -1992,8 +1993,8 @@ sub _tangle_edges { my ($our_edges, $thunk) = @_;
     my %next;
 
     for (my $i = 0; $i < @$our_edges; $i += 2) {
-        $next{$our_edges->[$i]} //= '';
-        vec($next{$our_edges->[$i]}, $our_edges->[$i+1], 1) = 1;
+        $next{$our_edges->[$i][0]} //= '';
+        vec($next{$our_edges->[$i][0]}, $our_edges->[$i+1], 1) = 1;
     }
 
     for my $ch (keys %next) {
@@ -2027,7 +2028,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
             push @{$fates[$node]}, @{ $nfa[$r][1] };
 
             for (my $i = 2; $i < @{ $nfa[$r] }; $i += 2) {
-                if ($nfa[$r][$i] eq '') {
+                if (!$nfa[$r][$i]) {
                     push @grey, $nfa[$r][$i+1];
                 } else {
                     push @{$edges[$node]}, $nfa[$r][$i], $nfa[$r][$i+1];
