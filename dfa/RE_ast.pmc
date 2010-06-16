@@ -191,6 +191,16 @@ sub nfacclass { my @terms = @_;
         }
         return '';
     }
+
+    sub nfa { my ($self, $C) = @_;
+        if ($self->{assert} eq '?') {
+            my $re = $self->{re};
+            if (ref($re) eq 'RE_method_re' and $re->{name} eq 'before') {
+                return ::nfaseq($re->nfa($C), $DIMP);
+            }
+        }
+        return $DNULL;
+    }
 }
 
 { package RE_assertvar; our @ISA = 'REbase';
@@ -450,6 +460,23 @@ sub nfacclass { my @terms = @_;
                 return unless @pat;
                 return @pat;
             }
+        }
+    }
+
+    sub nfa { my ($self, $C) = @_;
+        my $name = $self->{name};
+        Encode::_utf8_on($name);
+        ::here($name);
+        my $re = $self->{re};
+        if ($name eq '') {
+            return $DIMP;
+        } elsif ($name eq 'after') {
+            return $DNULL;
+        } elsif ($name eq 'before') {
+            return ::nfaseq($re->nfa($C), $DIMP);
+        } else {
+            $name .= '__PEEK';
+            return $C->$name($re)->{NFA};
         }
     }
 }
