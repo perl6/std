@@ -513,6 +513,15 @@ sub cursor_fate_dfa {
     print ::LOG "=" x 10,"\n$p DFA for ${pkg}::$name in ", ref $self, "\n" if $d;
     CH: {
         push @rfates, @{$state->[0]};
+        if ($d) {
+            for (@{ $state->[0] }) {
+                my @b;
+                for (my $f = $_; $f; $f = $f->[0]) {
+                    push @b, @{$f}[1,2];
+                }
+                print ::LOG "    [adding fate @b]\n";
+            }
+        }
         last if $p == @::ORIG;
         my $chi = $::ORIG[$p++];
         print ::LOG "--- ", pack("U", $chi), "\n" if $d;
