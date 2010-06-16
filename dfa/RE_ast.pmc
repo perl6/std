@@ -19,6 +19,52 @@ our $PREFIX = "";
 # The DFA engine has two priorities; top priority is to generate the correct
 # pattern prefixes; second is to generate as much fate as it can.
 
+# [conjectural]
+# We use two data structures to represent NFAs.  The NFA description tree
+# (NFA::* but not NFA::Node, NFA::Lazy) is statically built; it is a near 1:1
+# mapping of the RE_ast structure.  The NFA description tree is used to
+# generate the NFA construction tree, which is lazily built.
+{
+    package NFA::Lazy;
+    sub new   { bless [ @_ ], 'NFA::Lazy' }
+    sub reify {
+        my $self = shift;
+        my ($node, $prefix, $continue) = splice @$self;
+        bless $self, 'NFA::Node';
+        $node->construct($self, $prefix, $continue);
+    }
+}
+
+{
+    package NFA::Node;
+    sub reify { }
+}
+
+{
+    package NFA::seq;
+    sub new {
+        my ($left, $right) = @_;
+        my $literal = $left->{literal};
+        my $litlen  = $left->{litlen};
+        if ($literal) {
+            $literal &&= $right->{literal};
+            $litlen  +=  ($right->{litlen} // 0);
+        }
+        bless { left => $left, right => $right, literal => $literal,
+            litlen => $litlen, fates => ($left->{fates} || $right->{fates}) },
+            'NFA::seq';
+    }
+
+    sub construct {
+        my ($self, $node, $pre_fates, $continue) = @_;
+
+        $self->{left}->construct($node, $pre_fates, sub {
+                my $mid_fates = shift;
+                NFA::Lazy->new($self->{right}, $mid_fates, $continue);
+            });
+    }
+}
+
 #############################################################
 # longest token set generator
 #############################################################
