@@ -2277,7 +2277,7 @@ sub _AUTOLEXpeek { my $self = shift;
     if ($::AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
         die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$key};
         $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
-        return { NFA => [[1, [[1]]]] };  # (but if we advanced just assume a :: here)
+        return { NFA => [[{I=>1}, [[1]]]] };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
     return $::LEXERS{ref $self}->{$key} //= do {
