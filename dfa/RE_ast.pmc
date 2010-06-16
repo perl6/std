@@ -141,7 +141,7 @@ sub nfaprefate { my ($fates, $nfa) = @_;
 }
 
 sub nfaltmprefate { my ($tag, $val, $tb, $inner) = @_;
-    my $ord = pack("NN", ($inner->[0][0]{LITLEN} // 0), $tb);
+    my $ord = pack("NN", (~($inner->[0][0]{LITLEN} // 0)), $tb);
     nfaprefate([[ $tag, $val, $ord, 0 ]], $inner);
 }
 
