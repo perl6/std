@@ -376,6 +376,9 @@ sub nfacclass { my @terms = @_;
     }
 
     my %meta_nfa = (
+        # XXX I don't think these are quite right
+        '^' => $DNULL, '^^' => $DNULL, '$$' => $DNULL, '$' => $DNULL,
+        '«' => $DNULL, '<<' => $DNULL, '>>' => $DNULL, '»' => $DNULL,
         '\\\\' => ::nfacclass(['\\']),
         '\D' => ::nfacclass(['ALL', 'Gc/N']),
         '\d' => ::nfacclass(['Gc/N']),
@@ -454,7 +457,7 @@ sub nfacclass { my @terms = @_;
     }
     sub nfa { my ($self, $C) = @_;
         my $name = $self->{'name'};
-        return $IMP if $self->{'rest'};
+        return $DIMP if $self->{'rest'};
         Encode::_utf8_on($name);
         ::here($name);
 
