@@ -275,7 +275,6 @@ sub nfastring { my ($i, $text) = @_;
     }
 
     sub _get_char {
-        $_[0] =~ s/^\s+//;
         if ($_[0] =~ s/^([^\\])//s) { return ord($1) }
         if ($_[0] =~ s/^\\n//)   { return 10 }
         if ($_[0] =~ s/^\\t//)   { return 9 }
@@ -296,8 +295,19 @@ sub nfastring { my ($i, $text) = @_;
         #XXX this ought to be pre parsed
         my ($ch, $ch2);
         my @chs;
-        while (defined ($ch = _get_char($text))) {
-            if ($text =~ s/\s*\.\.//) {
+        while (1) {
+            $text =~ s/^\s+//;
+            if ($text =~ s/^\\s//) {
+                push @chs, 'Space/Y';
+                next;
+            }
+            if ($text =~ s/^\\w//) {
+                push @chs, '_', 'Gc/L', 'Gc/N';
+                next;
+            }
+            last if $text eq '';
+            $ch = _get_char($text);
+            if ($text =~ s/^\s*\.\.//) {
                 $ch2 = _get_char($text);
             } else {
                 $ch2 = $ch;
@@ -856,7 +866,7 @@ sub nfastring { my ($i, $text) = @_;
         if (my $p = $C->_PARAMS) {
             my $text = $p->{$var} || return $DIMP;
             $CursorBase::fakepos++ if length($text);
-            return ::nfastring($text);
+            return ::nfastring($self->{i}, $text);
         }
         return $DIMP;
     }
