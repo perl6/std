@@ -400,8 +400,8 @@ sub nfacclass { my @terms = @_;
         $name .= '__PEEK';
         return $DIMP unless $C->can($name);
         my $lexer = $C->$name();
-        return $DIMP unless $lexer and exists $lexer->{DFA}{NFA};
-        return $lexer->{DFA}{NFA};
+        return $DIMP unless $lexer and exists $lexer->{NFA};
+        return $lexer->{NFA};
     }
 }
 

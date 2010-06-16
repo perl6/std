@@ -485,7 +485,6 @@ sub cursor_fate { my $self = shift;
         local %::AUTOLEXED;
         $self->_AUTOLEXpeek($name,$retree);
     };
-    my $dfalexer = $lexer->{DFA};
     if ($self->{_pos} >= $::HIGHWATER) {
         if ($self->{_pos} > $::HIGHWATER) {
             %$::HIGHEXPECT = ();
@@ -500,27 +499,7 @@ sub cursor_fate { my $self = shift;
         return sub {};
     }
 
-    my $re  = $self->cursor_fate_re($pkg, $name, $lexer, $P);
-    my $dfa = $self->cursor_fate_dfa($pkg, $name, $dfalexer, $P);
-
-    my (@re, @dfa);
-
-    sub {
-        @re  = $re ->() unless @re;
-        @dfa = $dfa->() unless @dfa;
-
-        return () unless @re || @dfa;
-
-        my $refate  = shift @re;
-        my $dfafate = shift @dfa;
-
-        if (Dump($refate) ne Dump($dfafate)) {
-            say STDERR Dump($refate, $dfafate);
-            say STDERR "LTM engine redundant pair failure";
-        }
-
-        defined ($dfafate) ? ($dfafate) : ();
-    };
+    $self->cursor_fate_dfa($pkg, $name, $lexer, $P);
 }
 
 sub cursor_fate_dfa {
@@ -2251,6 +2230,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     local $::AUTOLEXED{$key} = $fakepos;
 
     my $ast = $retree->{$key};
+    my $dba = $ast->{dba};
 
     my $d = $DEBUG & DEBUG::autolexer;
     print ::LOG "generating DFA lexer for $key -->\n" if $d;
@@ -2258,6 +2238,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
 
     if ($key =~ /(.*):\*$/) {
         my $proto = $1;
+        $dba = $proto;
         my $protopat = $1 . '__S_';
         my $protolen = length($protopat);
         my @pat;
@@ -2268,10 +2249,10 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
                     next if $method =~ /__PEEK/;
                     my $callname = $class . '::' . $method . '__PEEK';
                     my $peeklex = $self->$callname();
-                    die "$proto has no lexer!?" unless $peeklex->{DFA}{NFA};
+                    die "$proto has no lexer!?" unless $peeklex->{NFA};
 
                     push @pat, ::nfaprefate([[$proto, "${class}::$method", 0]],
-                        $peeklex->{DFA}{NFA});
+                        $peeklex->{NFA});
                 }
             }
         }
@@ -2283,11 +2264,13 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
         die "BAD KEY";
     }
 
+    die "dba unspecified" unless $dba;
+
     _dump_nfa($nfa) if $d;
     my $dfa = _nfa_to_dfa($nfa);
     _dfa_dump($dfa) if $d;
 
-    { DFA => $dfa, NFA => $nfa, S => $dfa->[0] };
+    { DBA => $dba, DFA => $dfa, NFA => $nfa, S => $dfa->[0] };
 }
 
 sub lexers { my $self = shift;
@@ -2305,13 +2288,11 @@ sub _AUTOLEXpeek { my $self = shift;
     if ($::AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
         die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$key};
         $self->deb("Suppressing lexer recursion on $key") if $DEBUG & DEBUG::autolexer;
-        return { PATS => ['(?#::)'], DFA => { NFA => [[1, [[1]]]] } };  # (but if we advanced just assume a :: here)
+        return { NFA => [[1, [[1]]]] };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
     return $::LEXERS{ref $self}->{$key} //= do {
-        my $lex = $self->_AUTOLEXgen($key, $retree);
-        $lex->{DFA} = $self->_AUTOLEXgenDFA($key, $retree);
-        $lex;
+        $self->_AUTOLEXgenDFA($key, $retree);
     };
 }
 
