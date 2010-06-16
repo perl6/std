@@ -2249,11 +2249,40 @@ sub _nfa_to_dfa { my ($nfa) = @_;
 
 sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     local $::AUTOLEXED{$key} = $fakepos;
+
     my $ast = $retree->{$key};
+
     my $d = $DEBUG & DEBUG::autolexer;
     print ::LOG "generating DFA lexer for $key -->\n" if $d;
+    my $nfa;
 
-    my $nfa = $ast->nfa($self);
+    if ($key =~ /(.*):\*$/) {
+        my $proto = $1;
+        my $protopat = $1 . '__S_';
+        my $protolen = length($protopat);
+        my @pat;
+
+        for my $class ($self->meta->linearized_isa) {
+            for my $method (sort $class->meta->get_method_list) {
+                if (substr($method,0,$protolen) eq $protopat) {
+                    next if $method =~ /__PEEK/;
+                    my $callname = $class . '::' . $method . '__PEEK';
+                    my $peeklex = $self->$callname();
+                    die "$proto has no lexer!?" unless $peeklex->{DFA}{NFA};
+
+                    push @pat, ::nfaprefate([[$proto, "${class}::$method", 0]],
+                        $peeklex->{DFA}{NFA});
+                }
+            }
+        }
+
+        $nfa = ::nfadisj(@pat);
+    } elsif ($ast) {
+        $nfa = $ast->nfa($self);
+    } else {
+        die "BAD KEY";
+    }
+
     _dump_nfa($nfa) if $d;
     my $dfa = _nfa_to_dfa($nfa);
     _dfa_dump($dfa) if $d;
