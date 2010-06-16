@@ -329,17 +329,31 @@ sub nfacclass { my @terms = @_;
         }
     }
 
+    my %meta_nfa = (
+        '\D' => ::nfacclass(['ALL', 'Gc/N']),
+        '\d' => ::nfacclass(['Gc/N']),
+        '\H' => ::nfacclass(['ALL', 'Perl/Blank']),
+        '\h' => ::nfacclass(['Perl/Blank']),
+        '\N' => ::nfacclass(['ALL', "\n"]),
+        '\n' => ::nfacclass(["\n"]),
+        '\S' => ::nfacclass(['ALL', 'Space/Y']),
+        '\s' => ::nfacclass(['Space/Y']),
+        '\V' => ::nfacclass(['ALL', 'Perl/VertSpac']),
+        '\v' => ::nfacclass(['Perl/VertSpac']),
+        '\W' => ::nfacclass(['ALL', '_', 'Gc/L', 'Gc/N']),
+        '\w' => ::nfacclass(['_'], ['Gc/L'], ['Gc/N']),
+        '.'  => ::nfacclass(['ALL']),
+        '::' => $DIMP,
+        ':::' => $DIMP,
+        '.*?' => $DIMP,
+        '.*' => [ [ 0, [[0]], ['ALL'], 0 ] ],
+    );
+
     sub nfa { my $self = shift; my ($C) = @_; 
         my $text = $self->{'text'};
         Encode::_utf8_on($text);
         ::here($text);
-        if ($text eq '\w') {
-            return ::nfacclass(['_'], ['Gc/L'], ['Gc/N']);
-        }
-        if ($text eq '\d') {
-            return ::nfacclass(['Gc/N']);
-        }
-        die "unhandled meta";
+        return $meta_nfa{$text} // die "unhandled meta";
     }
 }
 
