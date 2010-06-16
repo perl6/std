@@ -145,6 +145,22 @@ sub nfaltmprefate { my ($tag, $val, $tb, $inner) = @_;
     nfaprefate([[ $tag, $val, $ord, 0 ]], $inner);
 }
 
+# When a non-LTM alternation or quantifier is applied to a subregex, it becomes
+# impossible to control fate usage, so we can't dispense them.  But it's ok to
+# keep the fates if they're all trivial (and this is useful anyway, to prevent
+# x* and the like from blocking lexer propagation)
+sub nfacleanfates { my ($inner) = @_;
+    my $ok = 1;
+    NODE: for my $n (@$inner) {
+        for my $fate (@{ $n->[1] }) {
+            if ((@$fate > 1) || $fate->[0]) {
+                $ok = 0;
+                last NODE;
+            }
+        }
+    }
+    $ok ? $inner : ::nfaprefate([[ 1 ]], $inner);
+}
 
 sub nfaseq { my ($fst, $sndthunk) = @_;
     my @out = @$fst;
@@ -182,21 +198,18 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
 # nfaplus would be possible, but it would be a pessimization from a deep fating
 # standpoint
 sub nfastar { my ($in) = @_;
-    # we can't return fates for any of this stuff as there's no telling how many
-    # times though the loop we've gone
     my @out = ( [undef, []] );
     nfarebase(\@out, $in);
 
     # all nodes already cloned by nfarebase
     for my $node (@out) {
         next unless @{ $node->[1] };
-        $node->[1] = [];
         push @$node, undef, 0;
     }
 
-    $out[0][1] = [[1]];
+    $out[0][1] = [[0]];
     push @{ $out[0] }, undef, 1;
-    \@out;
+    nfacleanfates(\@out);
 }
 
 sub nfadisj { my @ins = @_;
@@ -660,7 +673,8 @@ sub nfastring { my ($i, $text) = @_;
     sub nfa { my ($self, $C) = @_;
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
-        $alts->[0]->nfa($C);
+        # block fate propagation
+        ::nfaprefate([[1]], $alts->[0]->nfa($C));
     }
 }
 
@@ -729,7 +743,7 @@ sub nfastring { my ($i, $text) = @_;
 
         my $k = $self->{quant}[0];
         if ($k eq '?') {
-            return ::nfadisj($DNULL, $subnfa);
+            return ::nfacleanfates(::nfadisj($DNULL, $subnfa));
         } elsif ($k eq '*') {
             return ::nfastar($subnfa);
         } elsif ($k eq '+') {
