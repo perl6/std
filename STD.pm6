@@ -4940,6 +4940,7 @@ grammar Regex is STD {
     }
 
     token metachar:mod {
+        <?before ':'>
         <mod_internal>
         { $/<sym> := $<mod_internal><sym> }
     }
@@ -5140,7 +5141,7 @@ grammar Regex is STD {
         <?before ':' ['dba'|'lang'] » > [ :lang(%*LANG<MAIN>) <quotepair> ] { $/<sym> := ':' ~ $<quotepair><k> }
     }
 
-    token mod_internal:oops { (':'\w+) <.sorry: "Unrecognized regex modifier " ~ $0.Str > }
+    token mod_internal:oops { {} (':'\w+) <.sorry: "Unrecognized regex modifier " ~ $0.Str > }
 
     token quantifier:sym<*>  { <sym> <quantmod> }
     token quantifier:sym<+>  { <sym> <quantmod> }
