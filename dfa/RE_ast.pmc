@@ -200,15 +200,20 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
 sub nfastar { my ($in) = @_;
     my @out = ( [undef, []] );
     nfarebase(\@out, $in);
+    my $fates = [[ nfahasnontrivialfates($in) ]];
 
     # all nodes already cloned by nfarebase
     for my $node (@out) {
         next unless @{ $node->[1] };
+        if ($node->[0]{I}) {
+            $node->[1] = $fates;
+            next;
+        }
         $node->[1] = [];
         push @$node, undef, 0;
     }
 
-    $out[0][1] = [[ nfahasnontrivialfates($in) ]];
+    $out[0][1] = $fates;
     push @{ $out[0] }, undef, 1;
     \@out;
 }
@@ -216,16 +221,21 @@ sub nfastar { my ($in) = @_;
 sub nfaopt { my ($in) = @_;
     my @out = ( [undef, [], undef, 1, undef, 2], [undef, []] );
 
+    my $fates = [[ nfahasnontrivialfates($in) ]];
     nfarebase(\@out, $in);
 
     # all nodes already cloned by nfarebase
     for my $node (@out) {
         next unless @{ $node->[1] };
+        if ($node->[0]{I}) {
+            $node->[1] = $fates;
+            next;
+        }
         $node->[1] = [];
         push @$node, undef, 1;
     }
 
-    $out[1][1] = [[ nfahasnontrivialfates($in) ]];
+    $out[1][1] = $fates;
     \@out;
 }
 

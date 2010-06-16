@@ -1942,15 +1942,15 @@ our $fakepos = 1;
 #        $self->_AUTOLEXgenDFA($key, $retree);
 #}
 
-sub _dump_nfa { my ($nfa) = @_;
-    print ::LOG "--- BEGIN NFA DUMP ---\n";
+sub _dump_nfa { my ($name, $nfa) = @_;
+    print ::LOG "--- BEGIN NFA DUMP ($name) ---\n";
     for my $ix (0 .. @$nfa-1) {
         my @go;
         for (my $j = 2; $j < @{ $nfa->[$ix] }; $j += 2) {
             push @go, "[" . join("-",@{$nfa->[$ix][$j] // []}) . "] => " . $nfa->[$ix][$j+1];
         }
         my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
-            ($nfa->[$ix][0] ? 'I' : ' ');
+            ($nfa->[$ix][0]{I} ? 'I' : ' ');
         my @fate = map { my @x = @$_;
                          my $y = pop @x;
                          push @x, "..." if $y;
@@ -2253,7 +2253,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
 
     die "dba unspecified" unless $dba;
 
-    _dump_nfa($nfa) if $d;
+    _dump_nfa($key, $nfa) if $d;
 
     my $dfa   = CORE::bless [], 'CursorBase::dfa';
     push @$dfa, [ undef, { BITS => "\001", ID => 0 } ];
