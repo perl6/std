@@ -156,6 +156,15 @@ sub nfacclass { my @terms = @_;
              [ 0, [[0]] ] ];
 }
 
+sub nfastring { my ($i, $text) = @_;
+    my @nfa;
+    for my $c (split //, $text) {
+        my @e = $i ? (lc($c), uc($c)) : ($c);
+        push @nfa, [ 0, [], map {[$_], @nfa+1} @e ];
+    }
+    [ @nfa, [ 0, [[0]] ] ];
+}
+
 { package REbase;
     sub longest { my $self = shift; my ($C) = @_;  ::here("UNIMPL @{[ref $self]}"); "$self" }
 }
@@ -306,6 +315,7 @@ sub nfacclass { my @terms = @_;
 
 { package RE_decl; our @ISA = 'REbase';
     sub longest { my $self = shift; my ($C) = @_;  return; }
+    sub nfa { $DNULL }
 }
 
 { package RE_double; our @ISA = 'REbase';
@@ -332,6 +342,7 @@ sub nfacclass { my @terms = @_;
         my $text = $self->{'text'};
         Encode::_utf8_on($text);
         ::here($text);
+        $Cursor::fakepos++ if $text ne '';
         my ($fixed, $imp);
         if ( $text =~ /^(.*?)[\$\@\%\&\{]/ ) {
             $fixed = $1; $imp = 1;
@@ -339,7 +350,7 @@ sub nfacclass { my @terms = @_;
         else {
             $fixed = $text;
         }
-        $fixed = RE_string::nfa({ text => $fixed, i => $self->{i} }, $C);
+        $fixed = ::nfastring($self->{i}, $fixed);
         $fixed = ::nfaseq($fixed, $DIMP) if $imp;
         $fixed;
     }
@@ -476,13 +487,14 @@ sub nfacclass { my @terms = @_;
         Encode::_utf8_on($name);
         ::here($name);
 
+        if ($name eq 'null' or $name eq 'ww') { return $DNULL }
         if ($name eq 'ws') { return $DIMP; }
         if ($name eq 'alpha') { $CursorBase::fakepos++; return ::nfacclass(['_'], ['Gc/L']); }
         if ($name eq 'sym') {
             $CursorBase::fakepos++;
             my $sym = $self->{'sym'};
             Encode::_utf8_on($sym);
-            return RE_string::nfa({ i => $self->{i}, text => $sym }, $C);
+            return ::nfastring($self->{i}, $sym);
         }
 
         $name .= '__PEEK';
@@ -549,6 +561,7 @@ sub nfacclass { my @terms = @_;
     sub longest { my $self = shift; my ($C) = @_; 
         return $IMP;
     }
+    sub nfa { $DNULL }
 }
 
 { package RE_every; our @ISA = 'REbase';
@@ -668,6 +681,17 @@ sub nfacclass { my @terms = @_;
         $text =~ s/\s+/|/;
         '(?: ' . $text . ')';
     }
+
+    sub nfa { my ($self, $C) = @_;
+        my $text = $self->{'text'};
+        Encode::_utf8_on($text);
+        ::here($text);
+        $CursorBase::fakepos++;
+        $text =~ s/^<\s*//;
+        $text =~ s/\s*>$//;
+
+        ::nfadisj(map { ::nfastring($self->{i}, $_) } split(/\s+/, $text));
+    }
 }
 
 { package RE_sequence; our @ISA = 'REbase';
@@ -749,12 +773,7 @@ sub nfacclass { my @terms = @_;
         Encode::_utf8_on($text);
         ::here($text);
         $CursorBase::fakepos++ if $text ne '';
-        die "UNIMPL" if $self->{i};
-        my @nfa;
-        for (split //, $text) {
-            push @nfa, [ 0, [], [$_], @nfa+1 ];
-        }
-        [ @nfa, [ 0, [[0]] ] ];
+        ::nfastring($self->{i}, $text);
     }
 }
 
@@ -830,6 +849,16 @@ sub nfacclass { my @terms = @_;
             return $text;
         }
         return $IMP;
+    }
+
+    sub nfa { my ($self, $C) = @_;
+        my $var = $self->{var};
+        if (my $p = $C->_PARAMS) {
+            my $text = $p->{$var} || return $DIMP;
+            $CursorBase::fakepos++ if length($text);
+            return ::nfastring($text);
+        }
+        return $DIMP;
     }
 }
 
