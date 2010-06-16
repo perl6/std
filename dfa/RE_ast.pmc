@@ -11,8 +11,8 @@ use strict; use warnings;
 use DEBUG;
 use Encode;
 my $IMP = '(?#::)';
-my $DIMP = [[1, [[1]] ]];
-my $DNULL = [[0, [[0]] ]];
+my $DIMP = [[{I=>1}, [[1]] ]];
+my $DNULL = [[undef, [[0]] ]];
 our $PURIFY = 0;        # ignore {*} IMPs?
 our $PREFIX = "";
 
@@ -94,6 +94,11 @@ sub nfaprefate { my ($fates, $nfa) = @_;
     \@out;
 }
 
+sub nfaltmprefate { my ($tag, $val, $tb, $inner) = @_;
+    my $ord = pack("NN", ($inner->[0][0]{LITLEN} // 0), $tb);
+    nfaprefate([[ $tag, $val, $ord, 0 ]], $inner);
+}
+
 
 sub nfaseq { my ($fst, $sndthunk) = @_;
     my @out = @$fst;
@@ -109,13 +114,20 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
         next unless @{$out[$j][1]};
         $out[$j] = [ @{ $out[$j] } ];
         # Imperative acceptors stay accepting and in the same way
-        next if $out[$j][0];
+        next if $out[$j][0]{I};
         # Otherwise, we need to glue on a copy of the sequence tail.
         # We could share a single copy of the sequence tail if we were
         # willing to lose deep fating... food for thought.
         push @{$out[$j]}, undef, nfarebase(\@out,
             nfaprefate($out[$j][1], $sndthunk->()));
         $out[$j][1] = [];  # not accepting any more
+    }
+
+    if ($out[0][0]{LITERAL}) {
+        $out[0][0] = { %{ $out[0][0] } } if $out[0][0];
+        my $n = $sndthunk->()->[0][0];
+        $out[0][0]{LITERAL} &&= $n->{LITERAL};
+        $out[0][0]{LITLEN} += ($n->{LITLEN} // 0);
     }
 
     \@out;
@@ -126,7 +138,7 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
 sub nfastar { my ($in) = @_;
     # we can't return fates for any of this stuff as there's no telling how many
     # times though the loop we've gone
-    my @out = ( [0, []] );
+    my @out = ( [undef, []] );
     nfarebase(\@out, $in);
 
     # all nodes already cloned by nfarebase
@@ -142,7 +154,7 @@ sub nfastar { my ($in) = @_;
 }
 
 sub nfadisj { my @ins = @_;
-    my @out = ( [ 0, [] ] );
+    my @out = ( [ undef, [] ] );
 
     for my $in (@ins) {
         push @{ $out[0] }, undef, nfarebase(\@out, $in);
@@ -152,17 +164,19 @@ sub nfadisj { my @ins = @_;
 }
 
 sub nfacclass { my @terms = @_;
-    return [ [ 0, [], map { $_, 1 } @terms ],
-             [ 0, [[0]] ] ];
+    return [ [ undef, [], map { $_, 1 } @terms ],
+             [ undef, [[0]] ] ];
 }
 
 sub nfastring { my ($i, $text) = @_;
     my @nfa;
     for my $c (split //, $text) {
         my @e = $i ? (lc($c), uc($c)) : ($c);
-        push @nfa, [ 0, [], map {[$_], @nfa+1} @e ];
+        push @nfa, [ undef, [], map {[$_], @nfa+1} @e ];
     }
-    [ @nfa, [ 0, [[0]] ] ];
+    $nfa[0][0]{LITERAL} = 1;
+    $nfa[0][0]{LITLEN} = length($text);
+    [ @nfa, [ undef, [[0]] ] ];
 }
 
 { package REbase;
@@ -432,7 +446,7 @@ sub nfastring { my ($i, $text) = @_;
         '::' => $DIMP,
         ':::' => $DIMP,
         '.*?' => $DIMP,
-        '.*' => [ [ 0, [[0]], ['ALL'], 0 ] ],
+        '.*' => [ [ undef, [[0]], ['ALL'], 0 ] ],
     );
 
     sub nfa { my $self = shift; my ($C) = @_; 
@@ -506,6 +520,9 @@ sub nfastring { my ($i, $text) = @_;
             Encode::_utf8_on($sym);
             return ::nfastring($self->{i}, $sym);
         }
+
+        # XXX
+        $name = 'termish' if $name eq 'EXPR';
 
         $name .= '__PEEK';
         return $DIMP unless $C->can($name);
@@ -838,7 +855,7 @@ sub nfastring { my ($i, $text) = @_;
         for my $alt (@$alts) {
             $CursorBase::fakepos = $oldfakepos;
 
-            push @outs, ::nfaprefate([[$self->{altname}, $ix, 0]], $alt->nfa($C));
+            push @outs, ::nfaltmprefate($self->{altname}, $ix, $ix, $alt->nfa($C));
 
             $minfakepos = $oldfakepos if $CursorBase::fakepos == $oldfakepos;
             $ix++;

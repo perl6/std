@@ -7,6 +7,8 @@
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
 
+$SIG{INT} = sub { print STDERR Carp::longmess("Oops"); exit(1); };
+
 use strict;
 use warnings;
 no warnings 'recursion';
@@ -2185,17 +2187,21 @@ sub _nfa_to_dfa { my ($nfa) = @_;
     my @dfa;
     my @dfa2nfa;
     my %nfa2dfa;
+    my $dfanext = 0;
 
     my $nfa2dfa = sub { my $nbm = shift;
         $dfa[ $nfa2dfa{$nbm} //= do {
             push @dfa2nfa, $nbm;
             push @dfa, [];
+            if ((@dfa % 1000) == 0) {
+                printf STDERR "warning: large DFA (%d/%d from %d)\n",
+                    $dfanext, scalar(@dfa), scalar(@$nfa);
+            }
             @dfa2nfa - 1;
         }];
     };
 
     $nfa2dfa->("\001"); # Inject the start state
-    my $dfanext = 0;
 
     while ($dfanext < @dfa2nfa) {
         my @node = ( [] );
@@ -2216,11 +2222,15 @@ sub _nfa_to_dfa { my ($nfa) = @_;
         for my $fate (@{ $node[0] }) {
             my @a = reverse @$fate;
             my $fo = undef;
-            for (my $i = 1; $i < @a; $i += 2) {
-                $fo = [ $fo, $a[$i+1], $a[$i] ];
+            my $tb = "";
+            for (my $i = 1; $i < @a; $i += 3) {
+                $tb = $a[$i] . $tb;
+                $fo = [ $fo, $a[$i+2], $a[$i+1] ];
             }
+            $fo = [ $tb, $fo ];
             $fate = $fo;
         }
+        @{ $node[0] } = map { $_->[1] } sort { $b->[0] cmp $a->[0] } @{ $node[0] };
 
         push @node, _tangle_edges(\@ouredges, $nfa2dfa);
         $node[1]{DESC} = $dfanext . " {" . join(",", @nfixes) . "}";
@@ -2251,6 +2261,7 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
         my $protopat = $1 . '__S_';
         my $protolen = length($protopat);
         my @pat;
+        my $j = 0;
 
         for my $class ($self->meta->linearized_isa) {
             for my $method (sort $class->meta->get_method_list) {
@@ -2260,8 +2271,8 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
                     my $peeklex = $self->$callname();
                     die "$proto has no lexer!?" unless $peeklex->{NFA};
 
-                    push @pat, ::nfaprefate([[$proto, "${class}::$method", 0]],
-                        $peeklex->{NFA});
+                    push @pat, ::nfaltmprefate($proto, "${class}::$method",
+                        $j++, $peeklex->{NFA});
                 }
             }
         }
