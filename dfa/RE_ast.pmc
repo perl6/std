@@ -149,7 +149,7 @@ sub nfaltmprefate { my ($tag, $val, $tb, $inner) = @_;
 # impossible to control fate usage, so we can't dispense them.  But it's ok to
 # keep the fates if they're all trivial (and this is useful anyway, to prevent
 # x* and the like from blocking lexer propagation)
-sub nfacleanfates { my ($inner) = @_;
+sub nfahasnontrivialfates { my ($inner) = @_;
     my $ok = 1;
     NODE: for my $n (@$inner) {
         for my $fate (@{ $n->[1] }) {
@@ -159,7 +159,7 @@ sub nfacleanfates { my ($inner) = @_;
             }
         }
     }
-    $ok ? $inner : ::nfaprefate([[ 1 ]], $inner);
+    !$ok;
 }
 
 sub nfaseq { my ($fst, $sndthunk) = @_;
@@ -204,12 +204,29 @@ sub nfastar { my ($in) = @_;
     # all nodes already cloned by nfarebase
     for my $node (@out) {
         next unless @{ $node->[1] };
+        $node->[1] = [];
         push @$node, undef, 0;
     }
 
-    $out[0][1] = [[0]];
+    $out[0][1] = [[ nfahasnontrivialfates($in) ]];
     push @{ $out[0] }, undef, 1;
-    nfacleanfates(\@out);
+    \@out;
+}
+
+sub nfaopt { my ($in) = @_;
+    my @out = ( [undef, [], undef, 1, undef, 2], [undef, []] );
+
+    nfarebase(\@out, $in);
+
+    # all nodes already cloned by nfarebase
+    for my $node (@out) {
+        next unless @{ $node->[1] };
+        $node->[1] = [];
+        push @$node, undef, 1;
+    }
+
+    $out[1][1] = [[ nfahasnontrivialfates($in) ]];
+    \@out;
 }
 
 sub nfadisj { my @ins = @_;
@@ -743,7 +760,7 @@ sub nfastring { my ($i, $text) = @_;
 
         my $k = $self->{quant}[0];
         if ($k eq '?') {
-            return ::nfacleanfates(::nfadisj($DNULL, $subnfa));
+            return ::nfaopt($subnfa);
         } elsif ($k eq '*') {
             return ::nfastar($subnfa);
         } elsif ($k eq '+') {
