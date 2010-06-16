@@ -514,7 +514,7 @@ sub cursor_fate_dfa {
 
     print ::LOG "=" x 10,"\n$p DFA for ${pkg}::$name in ", ref $self, "\n" if $d;
     CH: {
-        push @rfates, @{$state->[0]};
+        push @rfates, @{ $state->[0] // _jit_dfa_node($lexer, $state) };
         if ($d) {
             for (@{ $state->[0] }) {
                 my @b;
@@ -529,7 +529,7 @@ sub cursor_fate_dfa {
         print ::LOG "--- ", pack("U", $chi), "\n" if $d;
         if ($state->[1]{$chi}) {
             $state = $state->[1]{$chi};
-            print ::LOG "specific -> ", $state->[1]{DESC}, "\n"
+            print ::LOG "specific -> ", $state->[1]{ID}, "\n"
                 if $d;
             redo;
         }
@@ -546,7 +546,7 @@ sub cursor_fate_dfa {
                     $dt = $dt->[2];
                 }
             } else {
-                print ::LOG " -> ", $$dt->[1]{DESC}, "\n" if $d;
+                print ::LOG " -> ", $$dt->[1]{ID}, "\n" if $d;
                 $state = $$dt;
                 redo CH;
             }
@@ -1977,27 +1977,23 @@ sub _dtree_dump { my ($ord, $dt) = @_;
     }
 }
 
-sub _dfa_dump { my ($dfa) = @_;
-    print ::LOG "--- BEGIN DFA DUMP ---\n";
-    for my $ix (0 .. @$dfa-1) {
-        my @go;
-        my @gor = %{ $dfa->[$ix][1] };
-        while (my ($a, $b) = splice @gor, 0, 2) {
-            next if $a eq 'DESC';
-            next if $a eq 'ID';
-            push @go, "'" . ::qm(chr $a) . "' => " . $b->[1]{ID};
-        }
-        printf ::LOG "%-30s %-30s\n", $dfa->[$ix][1]{DESC} . ":", join(", ", @go);
-        _dtree_dump(0, $dfa->[$ix][2]);
-        for (@{ $dfa->[$ix][0] }) {
-            my @arr;
-            for (my $fate = $_; $fate; $fate = $fate->[0]) {
-                push @arr, $fate->[1], $fate->[2];
-            }
-            print ::LOG "    --> ", join(" ", @arr), "\n";
-        }
+sub _dfa_dump_node { my ($dfan) = @_;
+    my @go;
+    my @gor = %{ $dfan->[1] };
+    while (my ($a, $b) = splice @gor, 0, 2) {
+        next if $a eq 'DESC';
+        next if $a eq 'ID';
+        push @go, "'" . ::qm(chr $a) . "' => " . $b->[1]{ID};
     }
-    print ::LOG "---- END DFA DUMP ----\n";
+    printf ::LOG "%-30s %-30s\n", $dfan->[1]{DESC} . ":", join(", ", @go);
+    _dtree_dump(0, $dfan->[2]);
+    for (@{ $dfan->[0] }) {
+        my @arr;
+        for (my $fate = $_; $fate; $fate = $fate->[0]) {
+            push @arr, $fate->[1], $fate->[2];
+        }
+        print ::LOG "    --> ", join(" ", @arr), "\n";
+    }
 }
 
 sub _elem_matches { my ($char, $element) = @_;
@@ -2155,94 +2151,65 @@ sub _tangle_edges { my ($our_edges, $thunk) = @_;
     \%next_1, _decision_tree($thunk, @$our_edges);
 }
 
-sub _nfa_to_dfa { my ($nfa) = @_;
-    my @edges = map { [] } @$nfa;
-    my @fates = map { [] } @$nfa;
-
-    # Epsilon elimation pass - find the true full set of edges and fates
-    # reachable from a given node.
-    for my $node (0 .. @$nfa-1) {
-        my %black;
-        my @grey = ($node);
-
-        while (@grey) {
-            my $r = pop @grey;
-            next if $black{$r};
-            $black{$r} = 1;
-
-            push @{$fates[$node]}, @{ $nfa->[$r][1] };
-
-            for (my $i = 2; $i < @{ $nfa->[$r] }; $i += 2) {
-                if (!$nfa->[$r][$i]) {
-                    push @grey, $nfa->[$r][$i+1];
-                } else {
-                    push @{$edges[$node]}, $nfa->[$r][$i], $nfa->[$r][$i+1];
-                }
-            }
-        }
-    }
-
-    # The simple DFA mapping produces an expansion of 2^n; we use a breadth-
-    # first enumeration in order to only generate reachable DFA nodes.
-    my @dfa;
-    my @dfa2nfa;
-    my %nfa2dfa;
-    my $dfanext = 0;
-
+sub _jit_dfa_node { my ($lexer, $node) = @_;
     my $nfa2dfa = sub { my $nbm = shift;
-        $dfa[ $nfa2dfa{$nbm} //= do {
-            push @dfa2nfa, $nbm;
-            push @dfa, [];
-            if ((@dfa % 1000) == 0) {
-                printf STDERR "warning: large DFA (%d/%d from %d)\n",
-                    $dfanext, scalar(@dfa), scalar(@$nfa);
-            }
-            @dfa2nfa - 1;
-        }];
+        $lexer->{NFA2DFA}->{$nbm} //= do {
+            my @node;
+            $node[1] = { ID => scalar(@{ $lexer->{DFA} }), BITS => $nbm };
+            push @{ $lexer->{DFA} }, \@node;
+            \@node;
+        }
     };
 
-    $nfa2dfa->("\001"); # Inject the start state
+    my $bf = $node->[1]{BITS};
+    my $id = $node->[1]{ID};
+    my $nfa = $lexer->{NFA};
 
-    while ($dfanext < @dfa2nfa) {
-        my @node = ( [] );
-        my $ix = $dfanext;
-        my $bf = $dfa2nfa[$ix];
+    my %black;
+    my @nfixes = grep { vec($bf, $_, 1) } (0 .. length($bf)*8 - 1);
+    my @grey = @nfixes;
+    my @ouredges;
 
-        my @nfixes;
-        my @ouredges;
+    while (@grey) {
+        my $nix = pop @grey;
+        next if $black{$nix};
+        $black{$nix} = 1;
+        my $nfn = $nfa->[$nix];
 
-        for my $nix (0 .. @$nfa-1) {
-            next unless vec($bf, $nix, 1);
-            push @nfixes, $nix;
-
-            push @{ $node[0] }, @{ $fates[$nix] };
-            push @ouredges, @{$edges[$nix]};
-        }
-
-        for my $fate (@{ $node[0] }) {
-            my @a = reverse @$fate;
-            my $fo = undef;
-            my $tb = "";
-            for (my $i = 1; $i < @a; $i += 3) {
-                $tb = $a[$i] . $tb;
-                $fo = [ $fo, $a[$i+2], $a[$i+1] ];
+        push @{ $node->[0] }, @{ $nfn->[1] };
+        for (my $i = 2; $i < @$nfn; $i += 2) {
+            if (!$nfn->[$i]) {
+                push @grey, $nfn->[$i+1];
+            } else {
+                push @ouredges, $nfn->[$i], $nfn->[$i+1];
             }
-            $fo = [ $tb, $fo ];
-            $fate = $fo;
         }
-        @{ $node[0] } = map { $_->[1] } sort { $b->[0] cmp $a->[0] } @{ $node[0] };
-
-        push @node, _tangle_edges(\@ouredges, $nfa2dfa);
-        $node[1]{DESC} = $dfanext . " {" . join(",", @nfixes) . "}";
-        $node[1]{ID} = $dfanext;
-        @{ $dfa[$dfanext] } = @node;
-        $dfanext++;
     }
 
-    # set up DESTROY
-    CORE::bless (\@dfa, 'CursorBase::dfa');
+    for my $fate (@{ $node->[0] }) {
+        my @a = reverse @$fate;
+        my $fo = undef;
+        my $tb = "";
+        for (my $i = 1; $i < @a; $i += 3) {
+            $tb = $a[$i] . $tb;
+            $fo = [ $fo, $a[$i+2], $a[$i+1] ];
+        }
+        $fo = [ $tb, $fo ];
+        $fate = $fo;
+    }
+    @{ $node->[0] } = map { $_->[1] } sort { $b->[0] cmp $a->[0] } @{ $node->[0] };
 
-    \@dfa;
+    pop @$node;
+    push @$node, _tangle_edges(\@ouredges, $nfa2dfa);
+    $node->[1]{DESC} = $id . "{" . join(",", @nfixes) . "}";
+    $node->[1]{ID} = $id;
+
+    if ($DEBUG & DEBUG::autolexer) {
+        print ::LOG "JIT DFA node generation:\n";
+        _dfa_dump_node($node);
+    }
+
+    $node->[0];
 }
 
 sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
@@ -2287,10 +2254,12 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     die "dba unspecified" unless $dba;
 
     _dump_nfa($nfa) if $d;
-    my $dfa = _nfa_to_dfa($nfa);
-    _dfa_dump($dfa) if $d;
 
-    { DBA => $dba, DFA => $dfa, NFA => $nfa, S => $dfa->[0] };
+    my $dfa   = CORE::bless [], 'CursorBase::dfa';
+    push @$dfa, [ undef, { BITS => "\001", ID => 0 } ];
+
+    { DBA => $dba, DFA => $dfa, NFA2DFA => { "\001" => $dfa->[0] },
+        NFA => $nfa, S => $dfa->[0] };
 }
 
 sub lexers { my $self = shift;
