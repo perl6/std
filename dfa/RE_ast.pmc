@@ -195,9 +195,7 @@ sub nfacclass { my @terms = @_;
     sub nfa { my ($self, $C) = @_;
         if ($self->{assert} eq '?') {
             my $re = $self->{re};
-            if (ref($re) eq 'RE_method_re' and $re->{name} eq 'before') {
-                return ::nfaseq($re->nfa($C), $DIMP);
-            }
+            return ::nfaseq($re->nfa($C), $DIMP);
         }
         return $DNULL;
     }
@@ -265,6 +263,44 @@ sub nfacclass { my @terms = @_;
         $cc =~ s/\s*//g;
         $cc = "(?i:$cc)" if $self->{i};
         $cc;
+    }
+
+    sub _get_char {
+        $_[0] =~ s/^\s+//;
+        if ($_[0] =~ s/^([^\\])//s) { return ord($1) }
+        if ($_[0] =~ s/^\\n//)   { return 10 }
+        if ($_[0] =~ s/^\\t//)   { return 9 }
+        if ($_[0] =~ s/^\\x\{(.*?)\}//s)   { return hex($1); }
+        if ($_[0] =~ s/^\\x(..)//s)   { return hex($1); }
+        if ($_[0] =~ s/^\\(.)//s)   { return ord($1) }
+
+        return undef;
+    }
+
+    sub nfa { my ($self, $C) = @_; ::here($self->{text});
+        $CursorBase::fakepos++;
+        my $cc = $self->{'text'};
+        Encode::_utf8_on($cc);
+        my ($neg, $text) = $cc =~ /^(-?)\[(.*)\]$/s;
+        die "whoops! $cc" unless defined $text;
+
+        #XXX this ought to be pre parsed
+        my ($ch, $ch2);
+        my @chs;
+        while (defined ($ch = _get_char($text))) {
+            if ($text =~ s/\s*\.\.//) {
+                $ch2 = _get_char($text);
+            } else {
+                $ch2 = $ch;
+            }
+            push @chs, map { chr $_ } ($ch .. $ch2);
+        }
+
+        if ($self->{i}) {
+            @chs = map { uc($_), lc($_) } @chs;
+        }
+
+        $neg ? ::nfacclass(['ALL', @chs]) : ::nfacclass(map { [$_] } @chs);
     }
 }
 
@@ -340,6 +376,7 @@ sub nfacclass { my @terms = @_;
     }
 
     my %meta_nfa = (
+        '\\\\' => ::nfacclass(['\\']),
         '\D' => ::nfacclass(['ALL', 'Gc/N']),
         '\d' => ::nfacclass(['Gc/N']),
         '\H' => ::nfacclass(['ALL', 'Perl/Blank']),
@@ -420,6 +457,15 @@ sub nfacclass { my @terms = @_;
         return $IMP if $self->{'rest'};
         Encode::_utf8_on($name);
         ::here($name);
+
+        if ($name eq 'ws') { return $DIMP; }
+        if ($name eq 'alpha') { $CursorBase::fakepos++; return ::nfacclass(['_'], ['Gc/L']); }
+        if ($name eq 'sym') {
+            $CursorBase::fakepos++;
+            my $sym = $self->{'sym'};
+            Encode::_utf8_on($sym);
+            return RE_string::nfa({ i => $self->{i}, text => $sym }, $C);
+        }
 
         $name .= '__PEEK';
         return $DIMP unless $C->can($name);
