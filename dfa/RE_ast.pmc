@@ -328,6 +328,21 @@ sub nfacclass { my @terms = @_;
         $fixed =~ s/([a-zA-Z])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
         $fixed;
     }
+    sub nfa { my ($self, $C) = @_;
+        my $text = $self->{'text'};
+        Encode::_utf8_on($text);
+        ::here($text);
+        my ($fixed, $imp);
+        if ( $text =~ /^(.*?)[\$\@\%\&\{]/ ) {
+            $fixed = $1; $imp = 1;
+        }
+        else {
+            $fixed = $text;
+        }
+        $fixed = RE_string::nfa({ text => $fixed, i => $self->{i} }, $C);
+        $fixed = ::nfaseq($fixed, $DIMP) if $imp;
+        $fixed;
+    }
 }
 
 { package RE_meta; our @ISA = 'REbase';
@@ -556,6 +571,11 @@ sub nfacclass { my @terms = @_;
         $C->deb(join("\n",@result)) if $::DEBUG & DEBUG::longest_token_pattern_generation;
         @result;
     }
+    sub nfa { my ($self, $C) = @_;
+        my $alts = $self->{'zyg'};
+        ::here(0+@$alts);
+        $alts->[0]->nfa($C);
+    }
 }
 
 { package RE_paren; our @ISA = 'REbase';
@@ -719,7 +739,7 @@ sub nfacclass { my @terms = @_;
         my $text = $self->{'text'};
         Encode::_utf8_on($text);
         ::here($text);
-        $CursorBase::fakepos++ if $self->{'min'};
+        $CursorBase::fakepos++ if $text ne '';
         $text = ::qm($text);
         $text =~ s/([[:alpha:]])/'[' . $1 . chr(ord($1)^32) . ']'/eg if $self->{i};
         $text;
@@ -728,7 +748,7 @@ sub nfacclass { my @terms = @_;
         my $text = $self->{'text'};
         Encode::_utf8_on($text);
         ::here($text);
-        $CursorBase::fakepos++ if $self->{'min'};
+        $CursorBase::fakepos++ if $text ne '';
         die "UNIMPL" if $self->{i};
         my @nfa;
         for (split //, $text) {
