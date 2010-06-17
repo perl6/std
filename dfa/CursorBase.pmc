@@ -7,8 +7,6 @@
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
 
-$SIG{INT} = sub { print STDERR Carp::longmess("Oops"); exit(1); };
-
 use strict;
 use warnings;
 no warnings 'recursion';
@@ -34,8 +32,6 @@ use constant DEBUG => $::DEBUG;
 our %LEXERS;       # per language, the cache of lexers, keyed by rule identity
 our %FATECACHE; # fates we've already turned into linked lists
 my %lexer_cache = ();
-
-our %DFALEXERS = ();  # per language (class name), then keyed again by rule
 
 sub ::fatestr { my $f = shift;
     my $text = '';
@@ -543,71 +539,6 @@ sub cursor_fate_dfa {
     }
 
     sub { @rfates ? pop(@rfates) : () };
-}
-
-sub cursor_fate_re {
-    my ($self, $pkg, $name, $lexer, $P) = @_;
-    # A rudimentary trie walker.
-
-    if (my $state = $lexer->{T}) {
-        my @candidates;
-        my $p = $P;
-        my $ch = $::ORIG[$p]//32;
-        my $next;
-        print ::LOG "=" x 10,"\n$p TRIE for ${pkg}::$name in ", ref $self, "\n",
-                $p," ", pack("U",$ch), "\n" if DEBUG & DEBUG::autolexer;
-        STATE:
-        for (;;) {
-            if ($state->{'~~'}) {
-                our %RXCACHE;
-                my @x = @{$state->{'~~'}};
-                while (my ($final,$fnum) = splice(@x,0,2)) {
-                    my $pend = $p;
-                    if ($final) {
-                        print ::LOG $p,"     probing $fnum $final\n" if DEBUG & DEBUG::autolexer;
-                        pos($::ORIG) = $p;
-                        next unless &{$RXCACHE{$final} //= eval "sub { \$::ORIG =~ /\\G$final/xsgc }"};
-                        $pend = pos($::ORIG);
-                    }
-                    push(@{$candidates[$pend - $P][$p - $P]}, $fnum);
-                    print ::LOG $pend," FNUM $fnum @",$pend - $P,"\n" if DEBUG & DEBUG::autolexer;
-                }
-            }
-            { no warnings; last STATE unless $next = $state->{chr $ch}; };
-            if (DEBUG & DEBUG::autolexer) {
-                print ::LOG substr($::ORIG, $P, $p - $P), "\n";
-                print ::LOG $p," ", pack("U",$ch), "\n";
-            }
-            $ch = $::ORIG[++$p];
-            $state = $next;
-        }
-
-        my $fates = $lexer->{FATES};
-
-        # Return longest, most-specific candidate or list of tied candidates.
-        # (If the latter, candidate list itself follows original rule order).
-        # This is essentially a lazy list of LTM candidates, batched by ties.
-        # Subsequent calls return next-most specific, then next-most longest.
-        return sub {
-                    while (@candidates) {
-                        my $long = $candidates[-1];
-                        if (defined $long) {
-                            while (@$long) {
-                                my $specific = pop @$long // next;
-                                if (DEBUG & DEBUG::autolexer) {
-                                    say ::LOG "relex sez ", join ' ', @$specific;
-                                }
-                                return @$fates[@$specific];
-                            }
-                        }
-                        pop @candidates;
-                    }
-                    ();
-                };
-
-    }
-    print ::LOG "FAILED trie at $P\n" if DEBUG & DEBUG::autolexer;
-    die "TRIE failed";
 }
 
 sub cursor_all { my $self = shift;
@@ -1912,25 +1843,6 @@ sub _get_unicode_map {
 
 our $fakepos = 1;
 
-#sub _AUTOLEXpeekDFA { my $self = shift;
-#    my $key = shift;
-#    my $retree = shift;
-#
-#    $self->deb("AUTOLEXpeekDFA $key") if DEBUG & DEBUG::autolexer;
-#    die "Null key" if $key eq '';
-#    if ($::AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
-#        die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$key};
-#        $self->deb("Suppressing lexer recursion on $key") if DEBUG & DEBUG::autolexer;
-#        # Return a faked "immediate imperative" lexer, to end the token
-#        # Note that this will only happen from inside RE_ast, so the other stuff
-#        # that CursorBase itself uses isn't needed
-#        return { NFA => [[1, [[1]]]] };
-#    }
-#    $key = 'termish' if $key eq 'EXPR';
-#    return $::DFALEXERS{ref $self}->{$key} //=
-#        $self->_AUTOLEXgenDFA($key, $retree);
-#}
-
 sub _dump_nfa { my ($name, $nfa) = @_;
     print ::LOG "--- BEGIN NFA DUMP ($name) ---\n";
     for my $ix (0 .. @$nfa-1) {
@@ -2035,18 +1947,6 @@ sub _elem_dich { my ($up1, $up2) = @_;
     return 1 if $boolean_tables{$t1};
     return 0;
 }
-
-#BEGIN {
-#    for my $x (\*_elem_implies, \*_elem_excludes, \*_elem_dich) {
-#        my $y = \&{$x};
-#        my $z = *$x{NAME};
-#        *$x = sub {
-#            my @args = @_;
-#            my $ret = $y->(@args);
-#            print STDERR "$z : @args => $ret\n";
-#        };
-#    }
-#}
 
 sub _decision_tree { my ($thunk, @edges) = @_;
     my $branch;
@@ -2346,12 +2246,6 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
         NFA => $nfa, S => $dfa->[0], USED_METHODS => \%::usedmethods };
 }
 
-sub lexers { my $self = shift;
-    my $lang = ref $self;
-    $self->deb("LANG = $lang") if DEBUG & DEBUG::autolexer;
-    $::LEXERS{$lang} //= {};
-}
-
 sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
     my $retree = shift;
@@ -2364,291 +2258,12 @@ sub _AUTOLEXpeek { my $self = shift;
     if ($::AUTOLEXED{$realkey}) {   # no left recursion allowed in lexer!
         die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$realkey};
         $self->deb("Suppressing lexer recursion on $key") if DEBUG & DEBUG::autolexer;
-        return { NFA => [[{I=>1}, [[1]]]] };  # (but if we advanced just assume a :: here)
+        return { USED_METHODS => {}, NFA => [[{I=>1}, [[1]]]] };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
     return $::LEXERS{ref $self}->{$realkey} //= do {
         $self->_AUTOLEXgenDFA($realkey, $key, $retree);
     };
-}
-
-
-sub _AUTOLEXgen { my $self = shift;
-    my $key = shift;
-    my $retree = shift;
-
-    my $lang = ref $self;
-    if ($lang =~ /^ANON/) {
-        no strict 'refs';
-        my $super = join '+', @{ref($self) . '::ISA'};
-        my $category = ${ref($self) . '::CATEGORY'} // '.';
-        print ::LOG "AUTOLEXgen $key in $lang from $super without $category\n" if DEBUG & DEBUG::mixins;
-        my $superlexer = $self->cursor_fresh($super)->_AUTOLEXpeek($key,$retree);
-        my $same = 1;
-        for my $pat (@{$superlexer->{PATS}}) {
-            if ($pat =~ / $category /) {
-                print ::LOG "\tNope: $pat\n" if DEBUG & DEBUG::mixins;
-                $same = 0;
-                last;
-            }
-        }
-        # no need to regen a sublexer that will turn out the same
-        return $superlexer if $same;
-    }
-    $self->deb("AUTOLEXgen $key in $lang") if DEBUG & DEBUG::autolexer;
-    my $lexer = {};
-    (my $dir = $::TMP_PREFIX . 'lex::' . $lang) =~ s/::/\//g;
-    (my $file = $key) =~ s/::/-/g;
-    $file =~ s/:\*$//;
-    my $name = $key;
-    my $dba = $retree->{$key}{dba};
-    if (not $dba) {
-        $dba = $name;
-        $dba =~ s/_0[01]$//;
-        $dba =~ s/_(\d\d)$/ (alt $1)/;
-        $dba =~ s/:\*$//;
-    }
-
-    my $cache_key = "$dir/$file.store";
-    my $cached_lexer = $lexer_cache{$cache_key};
-    if ($STORABLE and -e $cache_key) {
-        my $lexer;
-        if ($cached_lexer) {
-            #Cache hit, Keep them coming ;-)
-            $lexer = $cached_lexer;
-#            say "GOT HERE $cache_key";
-        }
-        else {
-            # Cache miss
-            $lexer_cache{$cache_key} = $lexer = retrieve($cache_key);
-        }
-        my $pat = $lexer->{PATS};
-        my $fates;
-        my $i = 0;
-        for (@$pat) {
-            my $fstr;
-            if ( m/\(\?#FATE(\d+) +(.*?)\)/) {
-                warn "MISMATCH $i $1" unless $i == $1;
-                $fstr = $2;
-            }
-            else {
-                die "Whoops, no fate in storage";
-            }
-            my $fate;
-            if ($fate = $FATECACHE{$fstr}) {
-                $fates->[$i] = $fate;
-            }
-            else {
-                $FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
-                while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-                    $fate->[1] = $1;
-                    $fate->[2] = $2;
-                    if ($fate->[0] = $FATECACHE{$fstr}) {
-                        last;
-                    }
-                    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
-                }
-            }
-            $i++;
-        }
-        $lexer->{FATES} = $fates;
-        return $lexer;
-    }
-    elsif (open(LEX, "$dir/$file")) {
-        binmode(LEX, ":utf8");
-        $self->deb("using cached $dir/$file") if DEBUG & DEBUG::autolexer;
-
-        chomp($name = <LEX>);
-        local $/ = "";
-        my @para = <LEX>;
-        close LEX;
-        my %lexer;
-        $lexer{NAME} = $name;
-        $lexer{DBA} = $dba;
-        $lexer{FILE} = "$dir/$file";
-        my @pat = split(/\n/, $para[0]);
-        $lexer{PATS} = \@pat;
-        my $fates;
-        my $i = 0;
-        for (@pat) {
-            s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/;
-            my $fstr = $1;
-            my $fate = $fates->[$i] = [0,0,0];
-            while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-                $fate->[1] = $1;
-                $fate->[2] = $2;
-                $fate = $fate->[0] = [0,0,0] if $fstr ne '';
-            }
-            $i++;
-        }
-        $lexer{FATES} = $fates;
-        eval {
-            $lexer{T} = Load($para[1]) if $TRIE and @para > 1;
-        };
-
-        return \%lexer;
-    }
-    else {
-        { package RE_base; 1; }
-        my @pat;
-        my $oldfakepos = $::AUTOLEXED{$key} // 0;
-        $::AUTOLEXED{$key} = $fakepos;
-        my $ast = $retree->{$key};
-        if ($ast and ref $ast ne 'HASH') {
-            @pat = $ast->longest($self);
-        }
-        else {  # a protomethod, look up all methods it can call
-            my $proto = $key;
-            if ($proto =~ s/:\*$//) {
-                my $protopat = $proto . '__S_';
-                my $protolen = length($protopat);
-                my $altnum = 0;
-                for my $class ($self->meta->linearized_isa) {
-                    for my $method (sort $class->meta->get_method_list) {
-                        if (substr($method,0,$protolen) eq $protopat) {
-                            next if $method =~ /__PEEK/;
-                            my $callname = $class . '::' . $method . '__PEEK';
-                            my $peeklex = $self->$callname();
-                            if ($peeklex and $peeklex->{PATS}) {
-                                my @alts = @{$peeklex->{PATS}};
-                                for my $alt (@alts) {
-                                    $alt .= "\t(?#FATE)" unless $alt =~ /FATE/;
-                                    $alt =~ s/\(\?#FATE\d*/(?#FATE $proto ${class}::$method/;
-                                    $altnum++;
-                                }
-                                push @pat, @alts;
-                            }
-                        }
-                    }
-                }
-            }
-            else {
-                die "BAD KEY $key";
-            }
-        }
-        for (@pat) {
-            s/(\t\(\?#FATE.*?\))(.*)/$2$1/;
-            s/(\(\?#::\))+/(?#::)/;
-        }
-        my $fates;
-        my $i = 0;
-        for (@pat) {
-            my $fstr;
-            if ( s/\(\?#FATE\d* +(.*?)\)/(?#FATE$i $1)/) {
-                $fstr = $1;
-            }
-            else {
-                $_ .= "\t(?#FATE$i )";
-                $fstr = "";
-            }
-            my $fate;
-            if ($fate = $FATECACHE{$fstr}) {
-                $fates->[$i] = $fate;
-            }
-            else {
-                $FATECACHE{$fstr} = $fate = $fates->[$i] = [0,0,0];
-                while ($fstr =~ s/(\S+)\s+(\S+)\s*//) {
-                    $fate->[1] = $1;
-                    $fate->[2] = $2;
-                    if ($fate->[0] = $FATECACHE{$fstr}) {
-                        last;
-                    }
-                    $fate = $fate->[0] //= [0,0,0] if $fstr ne '';
-                }
-            }
-            $i++;
-        }
-        warn "(null pattern for $key)" unless @pat;
-        my $pat = join("\n", @pat);
-
-        $::AUTOLEXED{$key} = $oldfakepos;
-
-        my $T;
-        if ($TRIE) {
-            $T = {};
-          PAT:
-            for my $fnum (0..@pat-1) {
-                my ($chars) = $pat[$fnum];
-                $chars =~ s/\(\?#::\)//g;
-                my @chars;
-                my $final = '';
-                while ($chars ne '') {
-                    last if $chars =~ m/^\t/;
-                    if ($chars =~ s/^\\(\W)([*+?{]?)//) {
-                        if ($2) {
-                            $final = "\\$1$2$chars";
-                            last;
-                        }
-                        push(@chars, ord($1));
-                        next;
-                    }
-                    if ($chars =~ s/^(\\\w.*)//) {
-                        $final = $1;
-                        last;
-                    }
-                    if ($chars =~ /^(\[\S+)/) {
-                        $final = $1;
-                        last;
-                    }
-                    if ($chars =~ /^(\.\S*)/) {
-                        $final = $1;
-                        last;
-                    }
-                    if ($chars =~ s/^(.)([*+?{]?)//) {
-                        if ($2) {
-                            $final = "$1$2$chars";
-                            last;
-                        }
-                        push(@chars, unpack('U',$1));
-                        next;
-                    }
-                }
-                my $state = $T;
-                for my $ch (@chars) {
-                    my $char = chr($ch);
-                    if (my $next = $state->{$char}) {
-                        $state = $next;
-                    }
-                    else {
-                        $state = $state->{$char} = {};
-                    }
-                }
-                push @{$state->{'~~'}}, $final, $fnum;
-            }
-        }
-
-
-        $lexer = { "NAME" => $name, "FILE" => "$dir/$file", "PATS" => [@pat], "FATES" => $fates, "T" => $T, "DBA" => $dba};
-
-        return $lexer if $lang =~ /ANON/;
-
-        if (not -d $dir) {
-            use File::Path 'mkpath';
-            mkpath($dir);
-        }
-       if ($STORABLE) {
-            delete $lexer->{FATES};
-            store($lexer, "$dir/$file.store");
-            $lexer->{FATES} = $fates;
-            if ($file eq 'termish') {
-                copy("$dir/termish.store","$dir/EXPR.store")
-                or croak "Could not copy $dir/termish.store";
-            }
-        }
-
-        open(my $cache, '>:utf8', "$dir/$file") // die "Can't print: $!";
-        print $cache $name,"\n";
-        print $cache join("\n",@pat),"\n\n" or die "Can't print: $!";
-        print $cache Dump($T) if $T and not $STORABLE;
-        close($cache) or die "Can't close: $!";
-        $self->deb("regenerated $dir/$file") if DEBUG & DEBUG::autolexer;
-        # force operator precedence method to look like a term
-        if ($file eq 'termish') {
-            copy("$dir/termish","$dir/EXPR")
-            or croak "Could not copy $dir/termish";
-        }
-    }
-    $lexer;
 }
 
 #############################################################
