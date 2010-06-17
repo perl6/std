@@ -527,14 +527,12 @@ sub cursor_fate_dfa {
         my $dt = $state->[2];
         while (defined $dt) {
             if (ref $dt eq 'ARRAY') {
-                print ::LOG $dt->[0][-1], "?" if DEBUG & DEBUG::autolexer;
-                if (vec($dt->[0][$chi >> 10], $chi & 1023, 1)) {
-                    print ::LOG " yes\n" if DEBUG & DEBUG::autolexer;
-                    $dt = $dt->[1];
-                } else {
-                    print ::LOG " no\n" if DEBUG & DEBUG::autolexer;
-                    $dt = $dt->[2];
+                if (DEBUG & DEBUG::autolexer) {
+                    print ::LOG $dt->[2][-1],
+                        (vec($dt->[2][$chi >> 10], $chi & 1023, 1) ?
+                            "? yes\n" : "? no\n");
                 }
+                $dt = $dt->[vec($dt->[2][$chi >> 10], $chi & 1023, 1)];
             } else {
                 print ::LOG " -> ", $$dt->[1]{ID}, "\n" if DEBUG & DEBUG::autolexer;
                 $state = $$dt;
@@ -1961,9 +1959,9 @@ sub _dtree_dump { my ($ord, $dt) = @_;
     } elsif (ref $dt ne 'ARRAY') {
         print ::LOG ($$dt)->[1]{ID}, "\n";
     } else {
-        print ::LOG $dt->[0][-1], "?\n";
+        print ::LOG $dt->[2][-1], "?\n";
         _dtree_dump($ord+1, $dt->[1]);
-        _dtree_dump($ord+1, $dt->[2]);
+        _dtree_dump($ord+1, $dt->[0]);
     }
 }
 
@@ -2082,9 +2080,9 @@ sub _decision_tree { my ($thunk, @edges) = @_;
             }
         }
 
-        return [ _get_unicode_map($branch),
+        return [ _decision_tree($thunk, @false),
                  _decision_tree($thunk, @true),
-                 _decision_tree($thunk, @false) ];
+                 _get_unicode_map($branch) ];
     } else {
         # all edges are labelled [ALL]
         my $bm = "";
