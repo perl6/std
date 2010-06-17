@@ -2201,6 +2201,31 @@ sub _jit_dfa_node { my ($lexer, $node) = @_;
     $node->[0];
 }
 
+sub _scan_regexes { my ($class, $key) = @_;
+    no strict 'refs';
+    (${ $class . "::REGEXES" } //= do {
+        my $stash = \ %{ $class . "::" };
+        my %over;
+        my %proto;
+
+        for my $m (keys %$stash) {
+            next if ref $stash->{$m};  # use constant
+            next if !defined *{$stash->{$m}}{CODE};
+            my ($meth, $p) = $m =~ /^(.*?)(__S_\d\d\d.*)?__PEEK$/ or next;
+            #$self->deb("\tfound override for $meth in $m") if DEBUG & DEBUG::autolexer;
+            $over{$meth} = 1;
+            push @{$proto{$meth}}, $m if $p;
+        }
+
+        for (keys %proto) {
+            @{$proto{$_}} = sort @{$proto{$_}};
+        }
+
+        $proto{ALL} = [ keys %over ];
+        \%proto;
+    })->{$key};
+}
+
 sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
     local $::AUTOLEXED{$realkey} = $fakepos;
     local %::usedmethods;
@@ -2255,21 +2280,7 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
             last;
         }
 
-        my $ml = ${ $lang . "::LMETHODS" } //= do {
-            my $stash = \ %{ $lang . "::" };
-            my %over;
-
-            for my $m (keys %$stash) {
-                next if ref $stash->{$m};  # use constant
-                next if !defined *{$stash->{$m}}{CODE};
-                my ($meth) = $m =~ /^(.*?)(?:__S_\d\d\d.*)?__PEEK$/ or next;
-                #$self->deb("\tfound override for $meth in $m") if DEBUG & DEBUG::autolexer;
-                $over{$meth} = 1;
-
-            }
-
-            [ keys %over ]
-        };
+        my $ml = _scan_regexes($lang, 'ALL');
 
         for my $meth (@$ml) {
             if ($superlexer->{USED_METHODS}{$meth}) {
@@ -2304,11 +2315,7 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
             no strict 'refs';
             my $class = pop @stack;
             push @stack, reverse @{ $class . "::ISA" };
-            my $stash = \%{ $class . "::" };
-            my @methods = sort grep {
-                    substr ($_, 0, $protolen) eq $protopat &&
-                        substr($_, -6, 6) eq '__PEEK';
-                } keys %$stash;
+            my @methods = @{ _scan_regexes($class, $proto) // [] };
             for my $method (@methods) {
                 my $callname = $class . '::' . $method;
                 $method = substr($method, 0, length($method)-6);
