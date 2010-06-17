@@ -31,7 +31,7 @@ BEGIN {
 }
 our $DEBUG;
 use constant DEBUG => $::DEBUG;
-our %LEXERS;       # per language, the cache of lexers, keyed by rule name
+our %LEXERS;       # per language, the cache of lexers, keyed by rule identity
 our %FATECACHE; # fates we've already turned into linked lists
 my %lexer_cache = ();
 
@@ -473,8 +473,9 @@ sub cursor_fate { my $self = shift;
     # $_[0] is now ref to a $trystate;
 
     $self->deb("cursor_fate $pkg $name") if DEBUG & DEBUG::cursors;
+    my $key = refaddr($retree->{$name}) // $name;
 
-    my $lexer = $::LEXERS{ref $self}->{$name} // do {
+    my $lexer = $::LEXERS{ref $self}->{$key} // do {
         local %::AUTOLEXED;
         $self->_AUTOLEXpeek($name,$retree);
     };
@@ -2200,8 +2201,17 @@ sub _jit_dfa_node { my ($lexer, $node) = @_;
     $node->[0];
 }
 
-sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
-    local $::AUTOLEXED{$key} = $fakepos;
+sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
+    local $::AUTOLEXED{$realkey} = $fakepos;
+    local %::usedmethods;
+
+    #{
+    #    # Whenever possible, we want to share a lexer amongst as many grammars
+    #    # as we can.
+    #}
+
+    my $lang = ref $self;
+    $self->deb("AUTOLEXgen $key in $lang") if DEBUG & DEBUG::autolexer;
 
     my $ast = $retree->{$key};
     my $dba = $ast->{dba};
@@ -2212,12 +2222,14 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
 
     if ($key =~ /(.*):\*$/) {
         my $proto = $1;
+        # any change to the method needs to invalidate us
+        $::usedmethods{$proto} = 1;
         $dba = $proto;
         my $protopat = $1 . '__S_';
         my $protolen = length($protopat);
         my @pat;
         my $j = 0;
-        my @stack = ref $self;
+        my @stack = $lang;
 
         while (@stack) {
             no strict 'refs';
@@ -2249,12 +2261,13 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
     die "dba unspecified" unless $dba;
 
     _dump_nfa($key, $nfa) if $d;
+    print ::LOG "used methods: ", join " ", sort keys %::usedmethods if $d;
 
     my $dfa   = CORE::bless [], 'CursorBase::dfa';
     push @$dfa, [ undef, { BITS => "\001", ID => 0 } ];
 
     { DBA => $dba, DFA => $dfa, NFA2DFA => { "\001" => $dfa->[0] },
-        NFA => $nfa, S => $dfa->[0] };
+        NFA => $nfa, S => $dfa->[0], USED_METHODS => \%::usedmethods };
 }
 
 sub lexers { my $self = shift;
@@ -2267,16 +2280,19 @@ sub _AUTOLEXpeek { my $self = shift;
     my $key = shift;
     my $retree = shift;
 
+    # protoregexes are identified by name
+    my $realkey = refaddr($retree->{$key}) // $key;
+
     $self->deb("AUTOLEXpeek $key") if DEBUG & DEBUG::autolexer;
     die "Null key" if $key eq '';
-    if ($::AUTOLEXED{$key}) {   # no left recursion allowed in lexer!
-        die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$key};
+    if ($::AUTOLEXED{$realkey}) {   # no left recursion allowed in lexer!
+        die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$realkey};
         $self->deb("Suppressing lexer recursion on $key") if DEBUG & DEBUG::autolexer;
         return { NFA => [[{I=>1}, [[1]]]] };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
-    return $::LEXERS{ref $self}->{$key} //= do {
-        $self->_AUTOLEXgenDFA($key, $retree);
+    return $::LEXERS{ref $self}->{$realkey} //= do {
+        $self->_AUTOLEXgenDFA($realkey, $key, $retree);
     };
 }
 

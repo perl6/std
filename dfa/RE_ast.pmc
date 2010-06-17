@@ -613,6 +613,7 @@ sub nfastring { my ($i, $text) = @_;
         $name .= '__PEEK';
         return $DIMP unless $C->can($name);
         my $lexer = $C->$name();
+        %::usedmethods = (%::usedmethods, %{ $lexer->{USED_METHODS} });
         return $DIMP unless $lexer and exists $lexer->{NFA};
         return $lexer->{NFA};
     }
@@ -665,7 +666,9 @@ sub nfastring { my ($i, $text) = @_;
             return ::nfaseq($re->nfa($C), $DIMP);
         } else {
             $name .= '__PEEK';
-            return $C->$name($re)->{NFA};
+            my $lexer = $C->$name($re);
+            %::usedmethods = (%::usedmethods, %{ $lexer->{USED_METHODS} });
+            return $lexer->{NFA};
         }
     }
 }
