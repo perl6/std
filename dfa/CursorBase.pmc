@@ -216,19 +216,7 @@ sub parsefile {
     }
 
     my $result;
-    if ($STORABLE) {
-        my $store = $::TMP_PREFIX . "lex/STD.pm6.store";
-        if (-f $store and -M $file > -M $store) {
-            *::LEXERS = retrieve($store);
-        }
-        $result = $class->initparse($text,@_);
-        if (defined $result and $file eq 'STD.pm6') {
-            store(\%::LEXERS, $store);
-        }
-    }
-    else {
-        $result = $class->initparse($text,@_);
-    }
+    $result = $class->initparse($text,@_);
 
     if ($::YOU_WERE_HERE) {
         $result->you_were_here;
