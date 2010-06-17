@@ -2229,18 +2229,25 @@ sub _AUTOLEXgenDFA { my ($self, $key, $retree) = @_;
         my $protolen = length($protopat);
         my @pat;
         my $j = 0;
+        my @stack = ref $self;
 
-        for my $class ($self->meta->linearized_isa) {
-            for my $method (sort $class->meta->get_method_list) {
-                if (substr($method,0,$protolen) eq $protopat) {
-                    next if $method =~ /__PEEK/;
-                    my $callname = $class . '::' . $method . '__PEEK';
-                    my $peeklex = $self->$callname();
-                    die "$proto has no lexer!?" unless $peeklex->{NFA};
+        while (@stack) {
+            no strict 'refs';
+            my $class = pop @stack;
+            push @stack, reverse @{ $class . "::ISA" };
+            my $stash = \%{ $class . "::" };
+            my @methods = sort grep {
+                    substr ($_, 0, $protolen) eq $protopat &&
+                        substr($_, -6, 6) eq '__PEEK';
+                } keys %$stash;
+            for my $method (@methods) {
+                my $callname = $class . '::' . $method;
+                $method = substr($method, 0, length($method)-6);
+                my $peeklex = $self->$callname();
+                die "$proto has no lexer!?" unless $peeklex->{NFA};
 
-                    push @pat, ::nfaltmprefate($proto, "${class}::$method",
-                        $j++, $peeklex->{NFA});
-                }
+                push @pat, ::nfaltmprefate($proto, "${class}::$method",
+                    $j++, $peeklex->{NFA});
             }
         }
 
