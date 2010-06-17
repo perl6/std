@@ -2205,15 +2205,84 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
     local $::AUTOLEXED{$realkey} = $fakepos;
     local %::usedmethods;
 
-    #{
-    #    # Whenever possible, we want to share a lexer amongst as many grammars
-    #    # as we can.
-    #}
-
     my $lang = ref $self;
-    $self->deb("AUTOLEXgen $key in $lang") if DEBUG & DEBUG::autolexer;
 
+    $self->deb("AUTOLEXgen $key in $lang") if DEBUG & DEBUG::autolexer;
     my $ast = $retree->{$key};
+
+    UP: {
+        # Whenever possible, we want to share a lexer amongst as many grammars
+        # as we can.  So we try to float lexers up to superclasses.
+
+        no strict 'refs';
+        my $isa = \@{ $lang . "::ISA" };
+
+        # We don't support multiple inheritance (can we?)
+        if (@$isa != 1) {
+            $self->deb("\tcannot reuse $key; multiply inherited") if DEBUG & DEBUG::autolexer;
+            last;
+        }
+
+        my $super = $isa->[0];
+
+        my $dic = $ast->{dic} //= do {
+            my $i = 1; # skip _AUTOLEXpeek;
+            my $pkg = 'CursorBase';
+            $pkg = caller($i++) while $pkg eq 'CursorBase';
+            $self->deb("\tdeclared in class $pkg") if DEBUG & DEBUG::autolexer;
+            $pkg;
+        };
+
+        my $ar = ${ $lang . "::ALLROLES" } //= do {
+            +{ map { $_->name, 1 } ($lang->meta, $lang->meta->calculate_all_roles) }
+        };
+
+        # It doesn't make sense to float a lexer above Cursor, or (for 'has'
+        # regexes), the class of definition.
+        if ($ar->{$dic}) {
+            $self->deb("\tcannot reuse $key; at top") if DEBUG & DEBUG::autolexer;
+            last;
+        }
+
+        my $supercursor = $self->cursor_fresh($super);
+        my $superlexer  = eval {
+            local %::AUTOLEXED;
+            $supercursor->_AUTOLEXpeek($key, $retree)
+        };
+
+        if (!$superlexer) {
+            $self->deb("\tcannot reuse $key; failed ($@)") if DEBUG & DEBUG::autolexer;
+            last;
+        }
+
+        my $ml = ${ $lang . "::LMETHODS" } //= do {
+            my $stash = \ %{ $lang . "::" };
+            my %over;
+
+            for my $m (keys %$stash) {
+                next if ref $stash->{$m};  # use constant
+                next if !defined *{$stash->{$m}}{CODE};
+                my ($meth) = $m =~ /^(.*?)(?:__S_\d\d\d.*)?__PEEK$/ or next;
+                #$self->deb("\tfound override for $meth in $m") if DEBUG & DEBUG::autolexer;
+                $over{$meth} = 1;
+
+            }
+
+            [ keys %over ]
+        };
+
+        for my $meth (@$ml) {
+            if ($superlexer->{USED_METHODS}{$meth}) {
+                $self->deb("\tcannot reuse $key; $meth overriden/augmented")
+                    if DEBUG & DEBUG::autolexer;
+                last UP;
+            }
+        } 
+
+        $self->deb("\treusing ($key, $realkey, $lang, $super).") if DEBUG & DEBUG::autolexer;
+        return $superlexer;
+    }
+
     my $dba = $ast->{dba};
 
     my $d = DEBUG & DEBUG::autolexer;
@@ -2261,7 +2330,7 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
     die "dba unspecified" unless $dba;
 
     _dump_nfa($key, $nfa) if $d;
-    print ::LOG "used methods: ", join " ", sort keys %::usedmethods if $d;
+    print ::LOG "used methods: ", join(" ", sort keys %::usedmethods), "\n" if $d;
 
     my $dfa   = CORE::bless [], 'CursorBase::dfa';
     push @$dfa, [ undef, { BITS => "\001", ID => 0 } ];
@@ -2844,6 +2913,7 @@ moose_extends('$WHAT');
 
 my \$retree = {
     '$mangle' => bless({
+        'dba' => '$category expression',
         'kind' => 'token',
         'min' => 12345,
         're' => bless({

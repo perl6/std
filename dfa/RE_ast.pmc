@@ -515,7 +515,9 @@ sub nfastring { my ($i, $text) = @_;
         # XXX I don't think these are quite right
         '^' => $DNULL, '^^' => $DNULL, '$$' => $DNULL, '$' => $DNULL,
         '«' => $DNULL, '<<' => $DNULL, '>>' => $DNULL, '»' => $DNULL,
+        # what?
         '\\\\' => ::nfacclass(['\\']),
+        '\\"' => ::nfacclass(['"']),
         '\D' => ::nfacclass(['ALL', 'Gc/N']),
         '\d' => ::nfacclass(['Gc/N']),
         '\H' => ::nfacclass(['ALL', 'Perl/Blank']),
@@ -539,7 +541,7 @@ sub nfastring { my ($i, $text) = @_;
         my $text = $self->{'text'};
         Encode::_utf8_on($text);
         ::here($text);
-        return $meta_nfa{$text} // die "unhandled meta";
+        return $meta_nfa{$text} // die "unhandled meta $text";
     }
 }
 
@@ -610,6 +612,7 @@ sub nfastring { my ($i, $text) = @_;
         # XXX
         $name = 'termish' if $name eq 'EXPR';
 
+        $::usedmethods{$name} = 1;
         $name .= '__PEEK';
         return $DIMP unless $C->can($name);
         my $lexer = $C->$name();
@@ -665,6 +668,7 @@ sub nfastring { my ($i, $text) = @_;
         } elsif ($name eq 'before') {
             return ::nfaseq($re->nfa($C), $DIMP);
         } else {
+            $::usedmethods{$name} = 1;
             $name .= '__PEEK';
             my $lexer = $C->$name($re);
             %::usedmethods = (%::usedmethods, %{ $lexer->{USED_METHODS} });
