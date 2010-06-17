@@ -535,7 +535,7 @@ sub cursor_fate_dfa {
                 $dt = $dt->[vec($dt->[2][$chi >> 10], $chi & 1023, 1)];
             } else {
                 print ::LOG " -> ", $$dt->[1]{ID}, "\n" if DEBUG & DEBUG::autolexer;
-                $state = $$dt;
+                $state = $state->[1]{$chi} = $$dt;
                 redo CH;
             }
         }
