@@ -15,16 +15,15 @@ CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
 six: .stamp
 all: .stamp .stamp5
 .stamp: stage2/.stamp
-	rm -rf lex syml
-	cp -a stage2/lex stage2/syml stage2/STD.pmc stage2/Cursor.pmc .
+	rm -rf syml
+	cp -a stage2/syml stage2/STD.pmc stage2/Cursor.pmc .
 	touch .stamp
 .stamp5: stage2/STD_P5.pmc
-	rm -rf lex/STD/P5
 	cp stage2/STD_P5.pmc .
 	touch .stamp5
 
 clean:
-	rm -rf lex syml STD_P5.pmc $(GENERATE) stage0/lex stage0/syml stage1/*\
+	rm -rf syml STD_P5.pmc $(GENERATE) stage0/syml stage1/*\
 	    stage2/* stage3/* stage*/.stamp .stamp .stamp5
 
 stage0: stage0/.stamp
@@ -36,7 +35,7 @@ stage3: stage3/.stamp
 # stage0 is rather weird, in that it has its own copy of the invariant files
 # */.stamp indicates that the corresponding compiler is "usable"
 stage0/.stamp: $(addprefix stage0/,$(INVARIANT) $(GENERATE))
-	rm -rf stage0/lex stage0/syml
+	rm -rf stage0/syml
 	cd stage0 && ./std CORE.setting
 	touch stage0/.stamp
 
@@ -57,7 +56,7 @@ stage1/Cursor.pmc: stage1/Cursor.store stage0/.stamp
 	cd stage0 && PERL6LIB=../lib:.. ./viv -5 --no-indent \
 	    -o ../stage1/Cursor.pmc --thaw ../stage1/Cursor.store
 stage1/.stamp: stage1/STD.pmc stage1/Cursor.pmc $(FRONTEND)
-	rm -rf stage1/lex stage1/syml
+	rm -rf stage1/syml
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./std CORE.setting
 	touch stage1/.stamp
 
@@ -77,7 +76,7 @@ stage2/Cursor.pmc: stage2/Cursor.store stage1/.stamp $(BACKEND)
 	STD5PREFIX=stage1/ PERL5LIB=stage1/:. ./viv -5 --no-indent \
 		   -o stage2/Cursor.pmc --thaw stage2/Cursor.store
 stage2/.stamp: stage2/STD.pmc stage2/Cursor.pmc $(INVARIANT)
-	rm -rf stage2/lex stage2/syml
+	rm -rf stage2/syml
 	STD5PREFIX=stage2/ PERL5LIB=stage2/:. ./std CORE.setting
 	touch stage2/.stamp
 # not part of the normal stage2, but built as if it were
@@ -105,8 +104,8 @@ stage3/Cursor.pmc: stage3/Cursor.store stage2/.stamp
 stage3/.stamp: stage3/STD.pmc stage3/Cursor.pmc $(INVARIANT)
 	cmp stage2/STD.pmc stage3/STD.pmc
 	cmp stage2/Cursor.pmc stage3/Cursor.pmc
-	rm -rf stage3/lex stage3/syml
-	cp -a stage2/lex stage2/syml stage3
+	rm -rf stage3/syml
+	cp -a stage2/syml stage3
 	touch stage3/.stamp
 
 ########################################
@@ -114,13 +113,13 @@ stage3/.stamp: stage3/STD.pmc stage3/Cursor.pmc $(INVARIANT)
 reboot: stage3/.stamp
 	cp -a $(INVARIANT) stage0
 	cp -a $(addprefix stage3/,$(GENERATE)) stage0
-	rm -rf stage0/lex stage0/syml
+	rm -rf stage0/syml
 
 snap: stage3/.stamp .stamp5
 	rm -rf snap.new
 	mkdir snap.new
 	svn info |perl -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
-	cp -r $(INVARIANT) $(addprefix stage3/,$(GENERATE) lex syml) stage2/STD_P5.pmc lib tryfile teststd snap.new
+	cp -r $(INVARIANT) $(addprefix stage3/,$(GENERATE) syml) stage2/STD_P5.pmc lib tryfile teststd snap.new
 	-rm -rf snap.old
 	-mv snap snap.old
 	mv snap.new snap

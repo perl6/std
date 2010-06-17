@@ -62,6 +62,7 @@ our $OPT_thaw = 0;
 our $OPT_keep_going = 0;
 our $OPT_output_file = undef;
 my $PROG = '';
+my $U = 0;
 my @did_ws;
 
 BEGIN {
@@ -92,8 +93,9 @@ viv [switches] filename
     	-o		send output to following argument instead of STDOUT
     	--yaml		spit out a parsable abstract syntax tree
     	--concise	spit out a short syntaxe tree (default)
-    	--p5		spit out a Perl 5 representation (partially impl)
+    	--p5		spit out a Perl 5 representation
     	--p6		spit out a Perl 6 representation
+    	--psq		spit out a Perlesque representation (very incomplete)
     	--no-indent	disable output indentation for faster parsing
     	--freeze	generate a Storable representation
     	--thaw		use existing Storable of AST from filename
@@ -146,6 +148,9 @@ sub MAIN {
 	}
 	elsif ($switch eq '--p6' or $switch eq '-6') {
 	    $output = 'p6';
+	}
+	elsif ($switch eq '--psq') {
+	    $output = 'psq';
 	}
 	elsif ($switch eq '--freeze') {
 	    $output = 'store';
@@ -215,6 +220,9 @@ sub MAIN {
     }
     elsif ($output eq 'p6') {
 	spew $r->p6;
+    }
+    elsif ($output eq 'psq') {
+	spew $r->psq;
     }
     elsif ($output eq 'p5') {
 	spew fixpod($r->p5);
@@ -455,21 +463,6 @@ sub rd {
 	wantarray ? @text : join('', @text);
     }
 
-    sub p6 { my $self = shift; my $lvl = @context;
-	my @text;
-	say STDERR ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
-	$context[$lvl] = $self;
-	# print STDERR "HERE " . ref($self) . "\n";
-	splice(@context,$lvl);
-	my @bits = $self->emit_p6;
-	my $val = join '', @bits;
-	my @c = map { ref $_ } @context;
-	my $c = "@c " . ref($self);
-	$c =~ s/VAST:://g;
-	print STDERR ' ' x ($lvl-1), "$c returns $val\n" if $OPT_log;
-	wantarray ? @bits : $val;
-    }
-
     sub emit_p5 { my $self = shift;
 	my @text;
 	if (exists $self->{'.'}) {
@@ -509,7 +502,9 @@ sub rd {
 	wantarray ? @text : join('', @text);
     }
 
-    sub p5 { my $self = shift; my $lvl = @context;
+    BEGIN {
+	my $tpl = <<'TEMPLATE';
+    sub VAST::Base::FORM { my $self = shift; my $lvl = @context;
 	my @text;
 	say STDERR ' ' x $lvl, ref $self, " from ",$self->{BEG}," to ",$self->{END} if $OPT_log;
 	$context[$lvl] = $self;
@@ -519,8 +514,8 @@ sub rd {
 	    $args[-1] =~ s/ at .*? line .*?\n$//s if $args[-1] =~ /\n$/s;
 	    die Carp::longmess(@args);
 	};
-	my @bits = !$OPT_keep_going ? $self->emit_p5 : (::try {
-	    $self->emit_p5;
+	my @bits = !$OPT_keep_going ? $self->emit_FORM : (::try {
+	    $self->emit_FORM;
 	} ::catch {
 	    my $char = $self->{BEG} // $self->{_from} // 0;
 	    my $line = 1 + (substr($::ORIG, 0, $char) =~ y/\n/\n/);
@@ -536,6 +531,13 @@ sub rd {
 	# Note that we may have skipped levels, so you can't just pop
 	splice(@context,$lvl);
 	wantarray ? @bits : $val;
+    }
+TEMPLATE
+	for my $format (qw/p5 p6 psq/) {
+	    my $t = $tpl;
+	    $t =~ s/FORM/$format/g;
+	    eval $t;
+	}
     }
 
     sub gap { my $self = shift;
@@ -555,6 +557,19 @@ sub rd {
     }
 }
 
+{ package VAST::ViaDEEP;
+    sub emit_psq {  my $self = shift;
+	$self->_deep->psqexpr;
+    }
+}
+
+{ package VAST::InfixCall;
+    sub emit_psq {  my $self = shift;
+	return DEEP::call("infix:<" . $self->{infix}{SYM} . ">",
+	    map { DEEP::raw($_->psq) } $self->kids('args'))->psqexpr;
+    }
+}
+
 { package VAST::Str; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
 	return $self->{TEXT};
@@ -564,7 +579,7 @@ sub rd {
     }
 }
 
-{ package VAST::Additive; our @ISA = 'VAST::Base';
+{ package VAST::Additive; our @ISA = ('VAST::Base', 'VAST::InfixCall');
     sub emit_p5 {  my $self = shift;
 	my @t = $self->SUPER::emit_p5;
 	if ($t[0] eq '*') {	# *-1
@@ -596,6 +611,17 @@ sub rd {
 
 
 { package VAST::args; our @ISA = 'VAST::Base';
+    sub deepn { my $self = shift;
+	my $al = $self->{arglist}[0] // $self->{semiarglist}{arglist}[0];
+	return unless $al;
+	$al = $al->{EXPR} or return;
+
+	if ($al->isa('VAST::infix__S_Comma')) {
+	    return map { DEEP::raw($_->psq) } $al->kids('args');
+	} else {
+	    return DEEP::raw($al->psq);
+	}
+    }
 }
 
 
@@ -656,6 +682,10 @@ sub rd {
 	my $name = $self->{longname}->Str;
 
 	if ($self->{nibbler}[0]) {
+	    local $::DBA = $::DBA;
+	    local $::RATCHET = $::RATCHET;
+	    local $::SIGSPACE = $::SIGSPACE;
+	    local $::IGNORECASE = $::IGNORECASE;
 	    return RE_method_re->new(name => $name,
 		re => $self->{nibbler}[0]{"."}->re_ast);
 	}
@@ -785,7 +815,7 @@ sub rd {
 }
 
 
-{ package VAST::Chaining; our @ISA = 'VAST::Base';
+{ package VAST::Chaining; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
@@ -846,10 +876,19 @@ sub rd {
 	substr($::ORIG, 0, $self->{statementlist}{BEG}),
 	$self->{statementlist}->p5;
     }
-
+    sub emit_psq { my $self = shift;
+	local %::PRELUDE;
+	my $body = $self->{statementlist}->psq;
+	for (sort keys %::PRELUDE) {
+	    my $fn = $_;
+	    $fn =~ s#::#/#g;
+	    $body = "use \"$fn.psq\";\n$body";
+	}
+	$body;
+    }
 }
 
-{ package VAST::Concatenation; our @ISA = 'VAST::Base';
+{ package VAST::Concatenation; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
@@ -1086,11 +1125,11 @@ sub rd {
 }
 
 
-{ package VAST::Item_assignment; our @ISA = 'VAST::Base';
+{ package VAST::Item_assignment; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
-{ package VAST::Junctive_or; our @ISA = 'VAST::Base';
+{ package VAST::Junctive_or; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
@@ -1111,7 +1150,7 @@ sub rd {
 }
 
 
-{ package VAST::List_assignment; our @ISA = 'VAST::Base';
+{ package VAST::List_assignment; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
@@ -1126,11 +1165,11 @@ sub rd {
 }
 
 
-{ package VAST::Loose_and; our @ISA = 'VAST::Base';
+{ package VAST::Loose_and; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
-{ package VAST::Loose_or; our @ISA = 'VAST::Base';
+{ package VAST::Loose_or; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
@@ -1263,7 +1302,9 @@ sub rd {
 
 { package VAST::metachar__S_sigwhite; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	RE_method->new(name => 'ws', nobind => 1);
+	$::SIGSPACE ?
+	    RE_method->new(name => 'ws', nobind => 1) :
+	    RE_noop->new;
     }
 }
 
@@ -1414,8 +1455,8 @@ BODY
 { package VAST::mod_internal__S_Colonmy; our @ISA = 'VAST::Base';
     sub re_ast { my $self = shift;
         local $::NEEDMATCH = 0;
-        my $text = $self->{statement}->p5;
-        $text = 'my $M = $C; ' . $text if $::NEEDMATCH;
+        my $text = $self->{statement}->p5 . ";";
+        $text = "my \$M = \$C;\n" . $text if $::NEEDMATCH;
 
 	push @::DECLAST, RE_decl->new(body => $text);
 	RE_noop->new;
@@ -1424,7 +1465,6 @@ BODY
 
 
 { package VAST::mod_internal__S_Colons; our @ISA = 'VAST::Base';
-    # note that most of this is handled in the parser
     sub re_ast { my $self = shift;
 	$::SIGSPACE = 1;
 	RE_noop->new;
@@ -1433,7 +1473,6 @@ BODY
 
 
 { package VAST::mod_internal__S_ColonBangs; our @ISA = 'VAST::Base';
-    # note that most of this is handled in the parser
     sub re_ast { my $self = shift;
 	$::SIGSPACE = 0;
 	RE_noop->new;
@@ -1477,7 +1516,7 @@ BODY
 }
 
 
-{ package VAST::Multiplicative; our @ISA = 'VAST::Base';
+{ package VAST::Multiplicative; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 # We don't currently do MMD so no need for later sigs
@@ -1517,6 +1556,12 @@ BODY
 
 
 { package VAST::number; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	die "unsupported literal format" unless $self->{integer}{decint};
+	my $str = $self->{integer}{decint}->Str;
+	$str =~ y/_//d;
+	$str;
+    }
 }
 
 
@@ -1533,6 +1578,10 @@ BODY
 
 
 { package VAST::package_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq {  my $self = shift;
+	local $::PKGDECL = $self->{SYM};
+	$self->{package_def}->psq;
+    }
 }
 
 
@@ -1568,7 +1617,7 @@ BODY
 
 
 { package VAST::package_def; our @ISA = 'VAST::Base';
-    sub p5_module_name {  my $self = shift;
+    sub module_name {  my $self = shift;
 	my $def_module_name = $self->{longname}[0]{name}->Str;
 	if ($self->{decl}{inpkg}[0] =~ /GLOBAL::(.*)/) {
 	    my $mod = $1;
@@ -1578,19 +1627,27 @@ BODY
 	}
 	$def_module_name;
     }
-    sub emit_p5_header {  my $self = shift;
-	my $header = "";
-	my $name = $::PKG;
+    sub superclasses {  my $self = shift;
 	my @extends;
-	my @does;
 	for (@{$self->{trait}}) {
 	    my $t = $_->Str;
 	    push(@extends, $t =~ /^is\s+(\S+)/);
-	    push(@does,    $t =~ /^does\s+(\S+)/);
 	}
 	@extends = map { $::OUR{$_} // $_ } @extends;
-	@does    = map { $::OUR{$_} // $_ } @does;
 	@extends = 'Cursor' if $::PKGDECL eq 'grammar' && !@extends;
+	@extends;
+    }
+    sub roles { my $self = shift;
+	my @does;
+	for (@{$self->{trait}}) {
+	    my $t = $_->Str;
+	    push(@does,    $t =~ /^does\s+(\S+)/);
+	}
+	@does    = map { $::OUR{$_} // $_ } @does;
+    }
+    sub emit_p5_header {  my $self = shift;
+	my $header = "";
+	my $name = $::PKG;
 
 	my $meta = $::PKGDECL eq 'role' ? 'Moose::Role' : 'Moose';
 
@@ -1599,11 +1656,11 @@ use $meta ':all' => { -prefix => "moose_" };
 use Encode;
 END
 
-	$header .= <<"END" for @extends;
+	$header .= <<"END" for $self->superclasses;
 moose_extends('$_');
 END
 
-	$header .= <<"END" for @does;
+	$header .= <<"END" for $self->roles;
 moose_with('$_');
 END
 
@@ -1625,7 +1682,7 @@ END
     sub emit_p5 {  my $self = shift;
 	my $block = $self->{blockoid}{statementlist} // $self->{statementlist};
 	local $::RETREE = {};
-	local $::PKG = $self->p5_module_name;
+	local $::PKG = $self->module_name;
 	local $::MULTIRX_SEQUENCE = 0;
 	local %::MULTIMETHODS;
 	my $body1 = $self->emit_p5_header;
@@ -1680,6 +1737,51 @@ EOFINAL
 	}
 
 	"{ $body $finalmulti 1; }";
+    }
+
+    sub psq_finish_multis { my $self = shift;
+	die "multis not yet implemented for psq";
+    }
+
+    sub psq_retree { my $self = shift;
+	die "LTM not yet implemented for psq";
+    }
+
+    sub psq_parameterized { my $self = shift;
+	die "roles not yet implemented for psq";
+    }
+
+    sub psq_plain { my $self = shift; my $body = shift;
+	die "roles not yet implemented for psq"
+	    if $::PKGDECL eq 'role' or $self->roles;
+	die "multiple inheritance not available in psq"
+	    if $self->superclasses > 1;
+	my ($is) = $self->superclasses;
+	"class " . $::PKG . " " . ($is ? "is $is " : "") .
+	    "{\n" . ::indent($body) . "\n}";
+    }
+
+    sub emit_psq {  my $self = shift;
+	my $block = $self->{blockoid}{statementlist} // $self->{statementlist};
+	local $::RETREE = {};
+	local $::PKG = $self->module_name;
+	local $::MULTIRX_SEQUENCE = 0;
+	local %::MULTIMETHODS;
+
+	my $body = $block->psq;
+	$body = $body . $self->psq_finish_multis
+	    if %::MULTIMETHODS;
+	$body = $self->psq_retree . $body
+	    if %$::RETREE;
+
+	if (my ($sig) = $self->kids('signature')) {
+	    $body = $self->psq_parameterized($body,
+		map { $_->Str } $sig->kids('parameter'));
+	} else {
+	    $body = $self->psq_plain($body);
+	}
+
+	$body;
     }
 }
 
@@ -1830,6 +1932,10 @@ EOFINAL
 	    return $self->{atom}->re_ast;
 	}
 
+	if ($self->{quantifier}[0]{SYM} eq '~') {
+	    return $self->_tilde;
+	}
+
 	if ($self->{quantifier}[0]{SYM} eq ':') {
 	    my $ast = $self->{atom}->re_ast;
 	    $ast->{r} = 1;
@@ -1844,20 +1950,43 @@ EOFINAL
 	$r->{r} = 0 if $quant->[1] ne ':';
 	$r;
     }
+
+    sub _tilde {  my $self = shift;
+	my $opener = $self->{atom}->re_ast;
+	my $closer = $self->{quantifier}[0]{quantified_atom}[0]->re_ast;
+	my $inner  = $self->{quantifier}[0]{quantified_atom}[1]->re_ast;
+
+	my $strcloser = $closer->{text}; #XXX
+
+	my $begin = <<TEXT;
+local \$::GOAL = "${\ quotemeta $strcloser}";
+my \$goalpos = \$C;
+TEXT
+	if ($strcloser !~ /^[])}]$/) {
+	    $begin .= <<TEXT;
+my \$newlang = \$C->unbalanced(\$::GOAL);
+\$C = bless(\$C, (ref(\$newlang) || \$newlang));
+TEXT
+	}
+
+	my @expn;
+	push @expn, $opener;
+	# XXX STD break LTM for gimme5 bug-compatibility
+	push @expn, RE_block->new(body => '', context => 'void');
+	push @expn, $inner;
+	push @expn, RE_bracket->new(decl => [], re => RE_first->new(
+		RE_string->new(text => $strcloser),
+		RE_method->new(name => 'FAILGOAL', nobind => 1,
+		    rest => "(\$::GOAL, '$::DBA', \$goalpos)")));
+
+	RE_bracket->new(decl => [RE_decl->new(body => $begin)], re =>
+	    RE_sequence->new(@expn));
+    }
 }
 
 { package VAST::quant_atom_list; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
 	my @kids = map { $_->re_ast } $self->kids("quantified_atom");
-	# XXX STD work around misparsing of whitespace near quantifiers
-	for my $i (0 .. @kids - 2) {
-	    if ($kids[$i+1]->isa('RE_quantified_atom')
-		    && $kids[$i+1]{atom}->isa('RE_method')
-		    && $kids[$i+1]{atom}{name} eq 'ws') {
-		$kids[$i+1]{atom} = $kids[$i];
-		$kids[$i] = RE_noop->new;
-	    }
-	}
 	RE_sequence->new(@kids);
     }
 }
@@ -1939,6 +2068,10 @@ EOFINAL
 
 
 { package VAST::quote__S_Single_Single; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	my $str = $self->Str;
+	$str;
+    }
 }
 
 
@@ -2088,9 +2221,9 @@ EOT
 	$::RETREE->{$p5name} = $ast;
 
 	my $urbody = $ast->walk;
-	say STDERR "<<< " . $urbody . ": " . $urbody->p5 if $OPT_log;
+	say STDERR "<<< " . $urbody . ": " . $urbody->p5expr if $OPT_log;
 	my ($body, $ratchet) = $urbody->uncut;
-	say STDERR "<<< " . $body . ": " . $body->p5 if $OPT_log;
+	say STDERR "<<< " . $body . ": " . $body->p5expr if $OPT_log;
 	$ast->{dba_needed} = 1;
 	$ast->clean;
 
@@ -2119,14 +2252,14 @@ TEXT
 		       sort keys %::BINDINGS)
 	    . ($::SYM ? '$C->{sym} = "' . ::rd($::SYM) . "\";\n" : '')
 	    . <<END
-\$self->_MATCHIFY$ratchet(\$S, "$p5name", ${\ $body->p5 });
+\$self->_MATCHIFY$ratchet(\$S, "$p5name", ${\ $body->p5expr });
 END
 	    , 1) . "}\n";
     }
 }
 
 
-{ package VAST::Replication; our @ISA = 'VAST::Base';
+{ package VAST::Replication; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
@@ -2150,52 +2283,7 @@ END
 { package VAST::regex_infix; our @ISA = 'VAST::Base';
 }
 
-# This is really a tight ternary op, but XXX STD parses it as a loose infix,
-# so we need to reassociate.  Also, the backend handling is very "fossily"
 { package VAST::regex_infix__S_Tilde; our @ISA = 'VAST::Base';
-    sub re_ast {  my $self = shift;
-	my ($left, $right) = map { $_->re_ast } $self->kids('args');
-	die "internal error: erroneous optimization"
-	    unless $left->isa("RE_sequence") && $right->isa("RE_sequence");
-	my @lefts = @{ $left->{zyg} };
-	my @rights = @{ $right->{zyg} };
-
-	pop @lefts while $lefts[-1]->isa('RE_method') && $lefts[-1]{name} eq 'ws';
-	shift @rights while $rights[0]->isa('RE_method') && $rights[0]{name} eq 'ws';
-	splice @rights, 1, 1 while $rights[1]->isa('RE_method') && $rights[1]{name} eq 'ws';
-
-	my $opener = pop @lefts;
-	my ($closer, $inner) = splice @rights, 0, 2;
-
-	my @middle;
-
-	my $strcloser = $closer->{text}; #XXX
-
-	my $begin = <<TEXT;
-local \$::GOAL = "${\ quotemeta $strcloser}";
-my \$goalpos = \$C;
-TEXT
-	if ($strcloser !~ /^[])}]$/) {
-	    $begin .= <<TEXT;
-my \$newlang = \$C->unbalanced(\$::GOAL);
-\$C = bless(\$C, (ref(\$newlang) || \$newlang))
-TEXT
-	}
-
-	push @middle, $opener;
-	# XXX STD break LTM for gimme5 bug-compatibility
-	push @middle, RE_block->new(body => '', context => 'void');
-	push @middle, $inner;
-	push @middle, RE_bracket->new(decl => [], re => RE_first->new(
-		RE_string->new(text => $strcloser),
-		RE_method->new(name => 'FAILGOAL', nobind => 1,
-		    rest => "(\$::GOAL, '$::DBA', \$goalpos)")));
-
-	my $middle = RE_bracket->new(decl => [RE_decl->new(body => $begin)], re =>
-	    RE_sequence->new(@middle));
-
-	RE_sequence->new(@lefts, $middle, @rights);
-    }
 }
 
 
@@ -2347,6 +2435,25 @@ TEXT
 
 
 { package VAST::statement; our @ISA = 'VAST::Base';
+    sub emit_psq {  my $self = shift;
+	if ($self->{label}) {
+	    return $self->{label}{identifier}->Str . ":\n" .
+		$self->{statement}->psq;
+	}
+
+	if ($self->{statement_control}) {
+	    return $self->{statement_control}->psq;
+	}
+
+	return "" if !$self->{EXPR};
+
+	my $body = $self->{EXPR}->psq . ";";
+	for my $m ($self->kids('statement_mod_cond'),
+		     $self->kids('statement_mod_loop')) {
+	    $body = $m->psq . " {\n" . ::indent($body) . "\n}";
+	}
+	$body;
+    }
 }
 
 
@@ -2355,6 +2462,14 @@ TEXT
 
 
 { package VAST::statement_control__S_default; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::statement_control__S_use; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	$::PRELUDE{$self->{module_name}->Str} = 1;
+	"";
+    }
 }
 
 
@@ -2406,6 +2521,10 @@ TEXT
 	    return $stmts[0]->p5;
 	}
 	join("", map { $_->p5 . ";\n" } @stmts);
+    }
+    sub emit_psq { my $self = shift;
+	my @stmts = $self->kids('statement');
+	join("", map { $_->psq . "\n" } @stmts);
     }
 }
 
@@ -2459,7 +2578,7 @@ TEXT
 }
 
 
-{ package VAST::Structural_infix; our @ISA = 'VAST::Base';
+{ package VAST::Structural_infix; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
@@ -2521,7 +2640,7 @@ TEXT
 }
 
 
-{ package VAST::term__S_identifier; our @ISA = 'VAST::Base';
+{ package VAST::term__S_identifier; our @ISA = ('VAST::ViaDEEP', 'VAST::Base');
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
 	if ($t[0] eq 'item') {
@@ -2553,6 +2672,13 @@ TEXT
 	}
         @t;
     }
+
+    sub _deep { my $self = shift;
+	my $id = $self->{identifier}->Str;
+	my @args = $self->{args}->deepn;
+
+	DEEP::call($id, @args);
+    }
 }
 
 
@@ -2561,6 +2687,7 @@ TEXT
 
 
 { package VAST::term__S_package_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq { $_[0]{package_declarator}->psq }
 }
 
 
@@ -2588,6 +2715,7 @@ TEXT
 
 
 { package VAST::term__S_value; our @ISA = 'VAST::Base';
+    sub emit_psq { $_[0]{value}->psq}
 }
 
 
@@ -2631,7 +2759,7 @@ TEXT
 { package VAST::term; our @ISA = 'VAST::Base';
 }
 
-{ package VAST::term__S_name; our @ISA = 'VAST::Base';
+{ package VAST::term__S_name; our @ISA = ('VAST::Base');
     sub emit_p5 {  my $self = shift;
         my @t = $self->SUPER::emit_p5;
 	if (my ($pkg) = ($t[0] =~ /^::(.*)/)) {
@@ -2666,10 +2794,10 @@ TEXT
 }
 
 
-{ package VAST::Tight_or; our @ISA = 'VAST::Base';
+{ package VAST::Tight_or; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
-{ package VAST::Tight_and; our @ISA = 'VAST::Base';
+{ package VAST::Tight_and; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
 
@@ -2764,10 +2892,12 @@ TEXT
 
 
 { package VAST::value__S_number; our @ISA = 'VAST::Base';
+    sub emit_psq { $_[0]{number}->psq}
 }
 
 
 { package VAST::value__S_quote; our @ISA = 'VAST::Base';
+    sub emit_psq { $_[0]{quote}->psq}
 }
 
 
@@ -2859,7 +2989,7 @@ TEXT
 	if ($self->{r} && $exp->maybacktrack) {
 	    $exp = DEEP::cut($exp);
 	}
-	say STDERR "<-- $exp: ", $exp->p5 if $OPT_log;
+	say STDERR "<-- $exp: ", $exp->p5expr if $OPT_log;
 	$exp;
     }
 
@@ -2933,8 +3063,8 @@ TEXT
 	if ($outr) {
 	    DEEP::ratchet($inner, $out1);
 	} else {
-	    DEEP::raw(::hang("LazyMap::lazymap(" . DEEP::chunk($inner)->p5 .
-		",\n" . $outer->p5 . ")", "    "));
+	    DEEP::raw(::hang("LazyMap::lazymap(" . DEEP::chunk($inner)->p5expr .
+		",\n" . $outer->p5expr . ")", "    "));
 	}
     }
 
@@ -2980,7 +3110,7 @@ TEXT
             $result = $self->wrapone($_,$result);
         }
 	@decl ?
-	    DEEP::raw(join('', @decl, $result ? $result->p5 . "\n" : ''), isblock => 1) :
+	    DEEP::raw(join('', @decl, $result ? $result->p5expr . "\n" : ''), isblock => 1) :
 	    $result // DEEP::raw('', isblock => 1);
     }
 
@@ -3096,10 +3226,11 @@ do {
         push \@gather, ((
 END
                 for my $i (0 .. @result - 1) {
-                    $result .= ::indent(DEEP::chunk($result[$i])->p5block, 3);
+                    $result .= ::indent(DEEP::chunk($result[$i])->p5expr, 3);
                     if ($i != @result - 1) {
-                        substr($result, -1, 1) = ",\n";
+			$result .= ",";
                     }
+		    $result .= "\n";
                 }
                 $result .= <<END;
         )[\$try])->(\$C);
@@ -3167,7 +3298,7 @@ END
 	    my %B = %::BINDINGS;
             foreach my $kid (@{$$self{zyg}}) {
 		local %::BINDINGS;
-                push @result, $kid->walk->p5;
+                push @result, $kid->walk->p5expr;
 		for my $b (keys %::BINDINGS) {
 		    $B{$b} = 2 if $::BINDINGS{$b} > 1 or $B{$b};
 		}
@@ -3306,7 +3437,7 @@ END
         my $self = shift;
         if ($$self{decl}) {
             for my $decl (@{$$self{decl}}) {
-                push @::DECL, $decl->walk->p5;
+                push @::DECL, $decl->walk->p5block;
             }
         }
         if ($$self{re}) {
@@ -3366,7 +3497,7 @@ END
 		}
 		else {
 		    $rep = "_REPSEP$::REV";
-		    $rest = DEEP::chunk($rest->walk)->p5;
+		    $rest = DEEP::chunk($rest->walk)->p5expr;
 		}
 	    }
 	    else {
@@ -3374,7 +3505,7 @@ END
 	    }
 	    $quant = "\$C->$rep$hc( $rest, ";
 	}
-	return DEEP::raw($quant . ::hang(DEEP::chunk($atom)->p5, "    ") . ")", precut => ($hc eq 'r'));
+	return DEEP::raw($quant . ::hang(DEEP::chunk($atom)->p5expr, "    ") . ")", precut => ($hc eq 'r'));
     }
 
     sub kids { my $self = shift; \$self->{atom} }
@@ -3423,7 +3554,7 @@ END
 	}
         $::REV = '';
 
-        $re = DEEP::raw('$C->' . $name . "(" . ::hang(DEEP::chunk(DEEP::raw($re, isblock => 1))->p5, "    ") . ")");
+        $re = DEEP::raw('$C->' . $name . "(" . ::hang(DEEP::chunk(DEEP::raw($re, isblock => 1))->p5expr, "    ") . ")");
 	if ($name =~ /^\w/ and not $self->{nobind}) {
 	    $re = $self->bind($re, $name);
 	    $::BINDINGS{$name} += $::PLURALITY;
@@ -3439,12 +3570,12 @@ END
         my $self = shift;
         if ($$self{assert} eq '!') {
             my $re = $$self{re}->walk;
-	    DEEP::raw("\$C->_NOTBEFORE(" . ::hang(DEEP::chunk($re)->p5, "    ") .")");
+	    DEEP::raw("\$C->_NOTBEFORE(" . ::hang(DEEP::chunk($re)->p5expr, "    ") .")");
         }
         else {
             my $re = $$self{re}->walk;
-            return $re if $re->p5 =~ /^\$C->before/; #XXX
-            DEEP::raw("\$C->before(" . ::hang(DEEP::chunk($re)->p5, "    ") . ")");
+            return $re if $re->p5expr =~ /^\$C->before/; #XXX
+            DEEP::raw("\$C->before(" . ::hang(DEEP::chunk($re)->p5expr, "    ") . ")");
         }
     }
     # TODO: Investigate what the LTM engine is doing with assertions and
@@ -3639,7 +3770,7 @@ END
     }
     sub _walk {
         my $self = shift;
-	DEEP::raw($$self{body} . ";\n");
+	DEEP::raw($$self{body}, isblock => 1);
     }
 
     sub has_trailing_ws {
@@ -3689,7 +3820,7 @@ END
         my $self = shift;
 	my ($re, $r) = $$self{re}->walk->uncut;
 	my @decl = map { $_->walk } @{$$self{decl}};
-	DEEP::raw("\$C->_BRACKET$r(" . ::hang(DEEP::chunk($re, @decl)->p5, "    ") . ")");
+	DEEP::raw("\$C->_BRACKET$r(" . ::hang(DEEP::chunk($re, @decl)->p5expr, "    ") . ")");
     }
 
     sub kids { my $self = shift; \$self->{re} }
@@ -3750,7 +3881,7 @@ END
 		}
 	    }
 	}
-        $re = "\$C->_$::REV"."PAREN( " . ::hang(DEEP::chunk(DEEP::raw($re))->p5, "    ") . ")";
+        $re = "\$C->_$::REV"."PAREN( " . ::hang(DEEP::chunk(DEEP::raw($re))->p5expr, "    ") . ")";
 	DEEP::raw($re);
     }
 
@@ -3833,15 +3964,37 @@ END
     }
 }
 
+# DEEP is the lowest level of desugaring used by viv, but it still keeps a tree
+# structure.  Not all DEEP nodes are interchangable; some represent expression
+# bits, others statements with no sensible return value.
 { package DEEPbase;
+}
+
+{ package DEEPexpr;
     sub maybacktrack { 1 }
 
     sub uncut { my $self = shift; $self, ($self->maybacktrack ? '' : 'r') }
 
-    sub p5block { shift()->p5 . "\n" }
+    # p5 should return (is a block?), text; takes arguments sh (can shadow $C?)
+    # and ov (can overwrite $C?); non-block returns may not shadow
+    sub p5expr { my $self = shift;
+	my ($isbl, $text) = $self->p5(@_, sh => 1);
+	$isbl ? ("do {\n" . ::indent($text) . "\n}") : $text;
+    }
+
+    sub p5block { my $self = shift;
+	my ($isbl, $text) = $self->p5(@_);
+	$isbl ? $text : ($text . "\n");
+    }
+
+    # psq returns the same as p5 for now
+    sub psqexpr { my $self = shift;
+	my ($isbl, $text) = $self->psq(@_, sh => 1);
+	$isbl ? ("do {\n" . ::indent($text) . "\n}") : $text;
+    }
 }
 
-{ package DEEP::raw; our @ISA = 'DEEPbase';
+{ package DEEP::raw; our @ISA = 'DEEPexpr';
     sub DEEP::raw {
 	my $text = shift;
 	bless { text => $text, @_ }, "DEEP::raw";
@@ -3853,23 +4006,15 @@ END
     }
 
     sub p5 { my $self = shift;
-	$self->{isblock} ? ("do {\n" . ::indent($self->{text}) . "}")
-	    : $self->{text};
+	$self->{isblock}, $self->{text};
     }
 
-    sub p5block {
-	my $self = shift;
-	$self->{isblock} ? $self->{text} : $self->{text} . "\n";
+    sub psq { my $self = shift;
+	$self->{isblock}, $self->{text};
     }
 }
 
-{ package DEEPblockbase; our @ISA = 'DEEPbase';
-    sub p5 { my $self = shift;
-	"do {\n" . ::indent($self->p5block(sh => 1)) . "}";
-    }
-}
-
-{ package DEEP::cut; our @ISA = 'DEEPblockbase';
+{ package DEEP::cut; our @ISA = 'DEEPexpr';
     sub DEEP::cut {
 	my $child = shift;
 	if (!$child->maybacktrack) {
@@ -3881,8 +4026,8 @@ END
 	bless { child => $child }, "DEEP::cut";
     }
 
-    sub p5block { my $self = shift;
-	"if (my (\$C) = (" . ::hang($self->{child}->p5, "    ") . ")) { (\$C) } else { () }\n";
+    sub p5 { my $self = shift;
+	1, "if (my (\$C) = (" . ::hang($self->{child}->p5expr, "    ") . ")) { (\$C) } else { () }\n";
     }
 
     sub maybacktrack { 0 }
@@ -3894,7 +4039,7 @@ END
     }
 }
 
-{ package DEEP::bind; our @ISA = 'DEEPbase';
+{ package DEEP::bind; our @ISA = 'DEEPexpr';
     sub DEEP::bind {
 	my $child = shift;
 	my @names = @_;
@@ -3909,14 +4054,14 @@ END
 
     sub p5 { my $self = shift;
 	my ($chinner, $r) = $self->{child}->uncut;
-	"\$C->_SUBSUME$r([" .
+	0, "\$C->_SUBSUME$r([" .
 	    join(',', map {"'$_'"} @{$self->{names}}) .
 	    "], sub {\n" . ::indent("my \$C = shift;\n" .
 	    $chinner->p5block(cl => 1, sh => 1)) . "})";
     }
 }
 
-{ package DEEP::ratchet; our @ISA = 'DEEPblockbase';
+{ package DEEP::ratchet; our @ISA = 'DEEPexpr';
     sub DEEP::ratchet {
 	my $child = shift;
 	my @before = @_;
@@ -3936,14 +4081,14 @@ END
 
     sub maybacktrack { $_[0]{child}->maybacktrack }
 
-    sub p5block { my $self = shift; my %a = @_;
+    sub p5 { my $self = shift; my %a = @_;
 	if (@{$self->{before}} == 1) {
 	    my $pre = $self->{before}[0];
-	    return "if (my (\$C) = (" . ::hang($pre->p5, " " x 8). ")) {\n" .
+	    return 1, "if (my (\$C) = (" . ::hang($pre->p5expr, " " x 8). ")) {\n" .
 		::indent($self->{child}->p5block) . "} else { () }\n";
 	}
 	my $conditional = join ::hang("\nand ", "    "),
-	    map { "(\$C) = (" . ::hang($_->p5, " " x 8) . ")" }
+	    map { "(\$C) = (" . ::hang($_->p5expr, " " x 8) . ")" }
 	    @{$self->{before}};
 
 	my $guts = ($conditional ?
@@ -3953,11 +4098,11 @@ END
 
 	$guts = "my \$C = \$C;\n" . $guts unless $a{cl};
 	$guts = "do {\n" . ::indent($guts) . "};\n" unless $a{sh};
-	$guts;
+	1, $guts;
     }
 }
 # NOT a regex bit, but a value
-{ package DEEP::chunk; our @ISA = 'DEEPbase';
+{ package DEEP::chunk; our @ISA = 'DEEPexpr';
     sub DEEP::chunk {
 	my $child = shift;
 	bless { child => $child, decl => \@_ }, "DEEP::chunk";
@@ -3965,14 +4110,14 @@ END
 
     sub p5 {
 	my $self = shift;
-        "sub {\n" . ::indent(
+        0, "sub {\n" . ::indent(
 	    "my \$C=shift;\n" .
 	    join("", map { $_->p5block } @{ $self->{decl} }) .
 	    $self->{child}->p5block(cl => 1, sh => 1)) . "}";
     }
 }
 
-{ package DEEP::p5regex; our @ISA = 'DEEPbase';
+{ package DEEP::p5regex; our @ISA = 'DEEPexpr';
     sub DEEP::p5regex {
 	my $text = shift;
 	bless { text => $text, has_meta => 1, @_ }, "DEEP::p5regex";
@@ -3980,7 +4125,7 @@ END
 
     sub p5 {
 	my $self = shift;
-	$self->{has_meta} ?
+	0, $self->{has_meta} ?
 	    "\$C->_PATTERN(qr/\\G" . $self->{text} . "/)" :
 	    "\$C->_EXACT(\"" . $self->{text} . "\")";
     }
@@ -3995,6 +4140,46 @@ END
     }
 
     sub maybacktrack { 0 }
+}
+
+{ package DEEP::call; our @ISA = 'DEEPexpr';
+    sub DEEP::call {
+	my ($name, @args) = @_;
+	bless { name => $name, args => \@args }, "DEEP::call";
+    }
+
+    my %psq_map = (
+	'note',		=> "System.Console.Error.WriteLine"
+    );
+
+    sub psq { my $self = shift;
+	my $n = $self->{name};
+	my $np = $psq_map{$n};
+	if (!ref $np) {
+	    my $n2 = $psq_map{$n} // $n;
+	    if ($n2 =~ /infix:<(.*)>/) {
+		my $op = " $1 ";
+		$np = sub { my ($a1, $a2) = @_;
+		    "(" . $a1->psqexpr . $op . $a2->psqexpr . ")"; };
+	    }
+	    elsif ($n2 =~ /prefix:<(.*)>/) {
+		my $op = $1;
+		$np = sub { my ($a) = @_;
+		    "(" . $op . $a->psqexpr . ")"; };
+	    }
+	    elsif ($n2 =~ /postfix:<(.*)>/) {
+		my $op = $1;
+		$np = sub { my ($a) = @_;
+		    "(" . $a->psqexpr . $op . ")"; };
+	    }
+	    else {
+		$np = sub { $n2 . "(" . join(", ",
+			map { $_->psqexpr } @_) . ")" };
+	    }
+	    $psq_map{$n} = $np;
+	}
+	return 0, $np->(@{$self->{args}});
+    }
 }
 
 if ($0 eq __FILE__) {
