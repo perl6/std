@@ -69,6 +69,8 @@ our $CLEAR = color 'clear';
 use LazyMap qw(lazymap eager);
 use constant DEBUG => $::DEBUG;
 
+our $REGEXES = { ALL => [] };
+
 BEGIN {
     require Moose;
     # this prevents us from inheriting from Moose::Object, which saves a
@@ -2154,6 +2156,7 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
             my $i = 1; # skip _AUTOLEXpeek;
             my $pkg = 'CursorBase';
             $pkg = caller($i++) while $pkg eq 'CursorBase';
+            #print STDERR "dic run: $pkg\n";
             $self->deb("\tdeclared in class $pkg") if DEBUG & DEBUG::autolexer;
             $pkg;
         };

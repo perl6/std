@@ -1664,6 +1664,18 @@ END
 moose_with('$_');
 END
 
+	if (! $self->roles) {
+	    $header .= "our \$ALLROLES = { '$::PKG', 1 };\n";
+	}
+
+	$header .= "our \$REGEXES = {\n";
+	$::PROTORX_HERE{ALL} = [ sort keys %::OVERRIDERX ];
+	for my $p (sort keys %::PROTORX_HERE) {
+	    $header .= "    $p => [ qw/" . join(" ",
+		@{ $::PROTORX_HERE{$p} }) . "/ ],\n";
+	}
+	$header .= "};\n\n";
+
 	$header .= <<"END";
 
 no warnings 'qw', 'recursion';
@@ -1684,9 +1696,11 @@ END
 	local $::RETREE = {};
 	local $::PKG = $self->module_name;
 	local $::MULTIRX_SEQUENCE = 0;
+	local %::PROTORX_HERE;
+	local %::OVERRIDERX;
 	local %::MULTIMETHODS;
-	my $body1 = $self->emit_p5_header;
 	my $body3 = $block->p5;
+	my $body1 = $self->emit_p5_header;
 	my $body2 = '';
 
 	if (%{$::RETREE}) {
@@ -2129,6 +2143,7 @@ TEXT
     }
     sub protoregex {  my $self = shift;  my $name = shift;
 	$::PROTO->{$name} = 1;
+	$::RETREE->{$name . ":*"} = { dic => $::PKG };
 	$::PROTOSIG->{$name} = ($self->kids("signature"))[0];
 	<<EOT;
 sub ${name}__PEEK { \$_[0]->_AUTOLEXpeek('$name:*',\$retree); }
@@ -2189,6 +2204,7 @@ EOT
 
     sub emit_p5 {  my $self = shift;
 	my $name = $self->{deflongname}[0]{name}->Str;
+	$::OVERRIDERX{$name} = 1;
 	if (defined $::MULTINESS && $::MULTINESS eq 'proto') {
 	    return $self->protoregex($name);
 	}
@@ -2212,8 +2228,10 @@ EOT
 	if (defined $adv{sym}) {
 	    $p5name = sprintf "%s__S_%03d%s", $name, $::MULTIRX_SEQUENCE++,
 		::mangle(split " ", $adv{sym});
+	    push @{$::PROTORX_HERE{$name}}, $p5name . "__PEEK";
 	}
 	local $::DBA = $name;
+	local $::DECL_CLASS = $::PKG;
 	local $::NAME = $p5name;
 	local $::ALT = 0;
 	my $ast = $self->re_ast->optimize;
@@ -2956,7 +2974,7 @@ END
     sub new {  my $class = shift;
 	my $self = bless { a => 0, i => $::IGNORECASE ? 1 : 0,
 	    r => $::RATCHET ? 1 : 0, s => $::SIGSPACE ? 1 : 0,
-	    dba => $::DBA, @_ }, $class;
+	    dba => $::DBA, dic => $::DECL_CLASS, @_ }, $class;
 	$self->{min} //= $self->calc_min;
 	$self;
     }
@@ -2978,6 +2996,7 @@ END
 	delete $self->{i} unless $self->{i_needed};
 	delete $self->{i_needed};
 	delete $self->{dba} unless $self->{dba_needed};
+	delete $self->{dic} unless $self->{dba_needed};
 	delete $self->{dba_needed};
     }
 
