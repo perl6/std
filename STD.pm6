@@ -1162,10 +1162,10 @@ token decint {
 
 token integer {
     [
-    | 0 [ b <binint>
-        | o <octint>
-        | x <hexint>
-        | d <decint>
+    | 0 [ b '_'? <binint>
+        | o '_'? <octint>
+        | x '_'? <hexint>
+        | d '_'? <decint>
         | <decint>
             <!!{ $¢.worry("Leading 0 does not indicate octal in Perl 6") }>
         ]
