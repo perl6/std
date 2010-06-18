@@ -1870,11 +1870,10 @@ sub _dump_nfa { my ($name, $nfa) = @_;
         for (my $j = 2; $j < @{ $nfa->[$ix] }; $j += 2) {
             push @go, "[" . join("-",@{$nfa->[$ix][$j] // []}) . "] => " . $nfa->[$ix][$j+1];
         }
-        my $l = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
-            ($nfa->[$ix][0]{I} ? 'I' : ' ');
+        my $l = sprintf "%4d: %-30s ", $ix, join(", ", @go);
         if ($nfa->[$ix][1]) {
             my @x = @{ $nfa->[$ix][1] };
-            push @x, "..." if pop(@x);
+            push @x, "..." if shift(@x);
             $l .= join(" ", "-->", @x);
         }
         print ::LOG $l, "\n";
@@ -2096,7 +2095,7 @@ sub _jit_dfa_node { my ($lexer, $node) = @_;
         my @a = reverse @$fate;
         my $fo = undef;
         my $tb = "";
-        for (my $i = 1; $i < @a; $i += 3) {
+        for (my $i = 0; $i < @a - 1; $i += 3) {
             $tb = $a[$i] . $tb;
             $fo = [ $fo, $a[$i+2], $a[$i+1] ];
         }
@@ -2145,7 +2144,6 @@ sub _scan_regexes { my ($class, $key) = @_;
 
 sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
     local $::AUTOLEXED{$realkey} = $fakepos;
-    local %::usedmethods;
 
     my $lang = ref $self;
 
@@ -2220,8 +2218,6 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
 
     if ($key =~ /(.*):\*$/) {
         my $proto = $1;
-        # any change to the method needs to invalidate us
-        $::usedmethods{$proto} = 1;
         $dba = $proto;
         my $protopat = $1 . '__S_';
         my $protolen = length($protopat);
@@ -2238,13 +2234,13 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
                 my $callname = $class . '::' . $method;
                 $method = substr($method, 0, length($method)-6);
                 my $peeklex = $self->$callname();
-                die "$proto has no lexer!?" unless $peeklex->{NFA};
+                die "$proto has no lexer!?" unless $peeklex->{NFAT};
 
-                push @alts, ["${class}::$method", $peeklex->{NFA}];
+                push @alts, ["${class}::$method", $peeklex->{NFAT}];
             }
         }
 
-        $nfa = nfa::ltm($proto, @alts);
+        $nfa = nfa::method($proto, nfa::ltm($proto, @alts));
     } elsif ($ast) {
         $nfa = $ast->nfa($self);
     } else {
@@ -2253,14 +2249,20 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
 
     die "dba unspecified" unless $dba;
 
-    _dump_nfa($key, $nfa) if $d;
-    print ::LOG "used methods: ", join(" ", sort keys %::usedmethods), "\n" if $d;
+    local @::NFANODES;
+    nfa::gnode($nfa, [0], undef);
+    my $nfag = \@::NFANODES;
+    my %usedmethods = map { $_, 1 } @{ $nfa->{m} };
+    $nfa->{m} = [ sort keys %usedmethods ];
+
+    _dump_nfa($key, $nfag) if $d;
+    print ::LOG "used methods: ", join(" ", sort keys %usedmethods), "\n" if $d;
 
     my $dfa   = CORE::bless [], 'CursorBase::dfa';
     push @$dfa, [ undef, { BITS => "\001", ID => 0 } ];
 
     { DBA => $dba, DFA => $dfa, NFA2DFA => { "\001" => $dfa->[0] },
-        NFA => $nfa, S => $dfa->[0], USED_METHODS => \%::usedmethods };
+        NFA => $nfag, NFAT => $nfa, S => $dfa->[0], USED_METHODS => \%usedmethods };
 }
 
 sub _AUTOLEXpeek { my $self = shift;
@@ -2275,7 +2277,7 @@ sub _AUTOLEXpeek { my $self = shift;
     if ($::AUTOLEXED{$realkey}) {   # no left recursion allowed in lexer!
         die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$realkey};
         $self->deb("Suppressing lexer recursion on $key") if DEBUG & DEBUG::autolexer;
-        return { USED_METHODS => {}, NFA => $nfa::IMP };  # (but if we advanced just assume a :: here)
+        return { USED_METHODS => {}, NFAT => $nfa::IMP };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
     return $::LEXERS{ref $self}->{$realkey} //= do {

@@ -95,157 +95,138 @@ sub here {
 
 { package nfa;
 
-our $NULL = [[ undef,  [0] ]];
-our $IMP  = [[ {I=>1}, [1] ]];
-
-sub rebase { my ($onto, $ary) = @_;
-    my $offs = @$onto;
-
-    for my $node (@$ary) {
-        my $nnode = [ @$node ];
-        for (my $ix = 3; $ix < @$nnode; $ix += 2) {
-            $nnode->[$ix] += $offs;
-        }
-        push @$onto, $nnode;
-    }
-
-    $offs;
+sub node {
+    my $id = @::NFANODES;
+    #::deb("creating direct node $id") if $::DEBUG & DEBUG::longest_token_pattern_generation;
+    push @::NFANODES, [ $id, @_ ];
+    $id;
 }
 
-sub prefate { my ($fate, $nfa) = @_;
-    my @out = @$nfa;
-
-    for my $onode (@out) {
-        $onode = [ @$onode ];
-        # Non-accepting can just be copied
-        next unless $onode->[1];
-
-        if ($fate->[-1]) {
-            # Non-extensible fate makes this easy
-            $onode->[1] = $fate;
-        } else {
-            my @f = @$fate;
-            pop @f;
-            $onode->[1] = [ @f, @{ $onode->[1] } ];
-        }
-    }
-
-    \@out;
+sub gnode {
+    my $id = @::NFANODES;
+    #::deb("creating node $id via " . ref($_[0])) if $::DEBUG & DEBUG::longest_token_pattern_generation;
+    push @::NFANODES, [ $id ];
+    $_[0]->construct($::NFANODES[$id], $_[1], $_[2]);
+    $id;
 }
+
+sub rgnode { my ($ob, $n, $f, $c) = @_;
+    #::deb("forwarding node " . $n->[0] . " to " . ref($ob)) if $::DEBUG & DEBUG::longest_token_pattern_generation;
+    $ob->construct($n, $f, $c);
+}
+
+sub nfa::null::construct { my ($self, $node, $fate, $cont) = @_;
+    push @$node, $cont ? (undef, undef, $cont->($fate)) : ($fate);
+}
+
+sub nfa::imp::construct { my ($self, $node, $fate, $cont) = @_;
+    push @$node, $fate;
+}
+
+our $NULL = bless({ m => [], nr => 0, l => 1, ll => 0 }, 'nfa::null');
+our $IMP  = bless({ m => [], nr => 1, l => 0, ll => 0 }, 'nfa::imp');
 
 # When a non-LTM alternation or quantifier is applied to a subregex, it becomes
 # impossible to control where subsequent tokens match, so we can't copy fates.
+sub nfa::horizon::construct { my ($self, $node, $fate, $cont) = @_;
+    my @fate = @$fate;
+    $fate[0] = 1;
+    nfa::rgnode($self->{i}, $node, \@fate, $cont);
+}
 sub horizon { my ($inner) = @_;
-    prefate([ 1 ], $inner);
+    bless({ m => $inner->{m}, nr => $inner->{nr}, l => $inner->{l},
+            ll => $inner->{ll}, i => $inner }, 'nfa::horizon');
 }
 
-sub noreturn { my ($tocheck) = @_;
-    for my $n (@$tocheck) {
-        if ($n->[1] && !$n->[0]{I}) {
-            return 0;
-        }
-    }
-    return 1;
+sub method { my ($mp, $inner) = @_;
+    bless({ %$inner, m => [ @{ $inner->{m} }, $mp ] }, ref($inner));
 }
 
+sub noreturn { $_[0]{nr} }
+
+sub nfa::seq::construct { my ($self, $node, $fate, $cont) = @_;
+    nfa::rgnode($self->{fst}, $node, $fate, sub {
+            nfa::gnode($self->{snd}, $_[0], $cont) });
+}
 sub seq { my ($fst, $snd) = @_;
-    my @out = @$fst;
-    my $max = @out - 1;
-
-    for my $j (0 .. $max) {
-        # Non-accepting can just be copied
-        next unless $out[$j][1];
-        $out[$j] = [ @{ $out[$j] } ];
-        # Imperative acceptors stay accepting and in the same way
-        next if $out[$j][0]{I};
-        # Otherwise, we need to glue on a copy of the sequence tail.
-        # We could share a single copy of the sequence tail if we were
-        # willing to lose deep fating... food for thought.
-        push @{$out[$j]}, undef, rebase(\@out, prefate($out[$j][1], $snd));
-        $out[$j][1] = undef;  # not accepting any more
-    }
-
-    if ($out[0][0]{LITERAL}) {
-        $out[0][0] = { %{ $out[0][0] } } if $out[0][0];
-        my $n = $snd->[0][0];
-        $out[0][0]{LITERAL} &&= $n->{LITERAL};
-        $out[0][0]{LITLEN} += ($n->{LITLEN} // 0);
-    }
-
-    \@out;
+    bless({ m  => [ @{ $fst->{m} }, @{ $snd->{m} } ],
+            nr => $fst->{nr} || $snd->{nr}, l => $fst->{l} && $snd->{l},
+            ll => ($fst->{l} ? $fst->{ll} + $snd->{ll} : $fst->{ll}),
+            fst => $fst, snd => $snd }, 'nfa::seq');
 }
 
-# plus would be possible, but it would be a pessimization from a deep fating
-# standpoint
+sub nfa::star::construct { my ($self, $node, $fate, $cont) = @_;
+    my @fate = @$fate;
+    $fate[0] = 1;
+    push @$node, ($cont ? (undef, undef, $cont->(\@fate)) : (\@fate)),
+        undef, nfa::gnode($self->{i}, \@fate, sub { $node->[0] });
+}
 sub star { my ($in) = @_;
-    my @out = ( [undef, undef] );
-    rebase(\@out, $in);
-    my $fate = [ 1 ];
-
-    # all nodes already cloned by nfarebase
-    for my $node (@out) {
-        next unless $node->[1];
-        if ($node->[0]{I}) {
-            $node->[1] = $fate;
-            next;
-        }
-        $node->[1] = undef;
-        push @$node, undef, 0;
-    }
-
-    $out[0][1] = $fate;
-    push @{ $out[0] }, undef, 1;
-    \@out;
+    bless({ m => $in->{m}, nr => 0, l => 0, ll => 0, i => $in },
+            'nfa::star');
 }
 
+sub nfa::opt::construct { my ($self, $node, $fate, $cont) = @_;
+    my @fate = @$fate;
+    $fate[0] = 1;
+    my $end = $cont ? $cont->(\@fate) : nfa::node(\@fate);
+    push @$node, undef, undef, $end,
+        undef, nfa::gnode($self->{i}, \@fate, sub { $end });
+}
 sub opt { my ($in) = @_;
-    my @out = ( [undef, undef, undef, 1, undef, 2], [undef, undef] );
+    bless({ m => $in->{m}, nr => 0, l => 0, ll => 0, i => $in },
+            'nfa::opt');
+}
 
-    my $fate = [ 1 ];
-    rebase(\@out, $in);
-
-    # all nodes already cloned by nfarebase
-    for my $node (@out) {
-        next unless $node->[1];
-        if ($node->[0]{I}) {
-            $node->[1] = $fate;
-            next;
+sub nfa::ltm::construct { my ($self, $node, $fate, $cont) = @_;
+    push @$node, undef;
+    my $ix;
+    for my $br (@{ $self->{br} }) {
+        my @fate = @$fate;
+        if (!$fate[0]) {
+            push @fate, $self->{t}, $br->[0], pack("NN",
+                ~($br->[1]{ll}), $ix++);
         }
-        $node->[1] = undef;
-        push @$node, undef, 1;
+        push @$node, undef, nfa::gnode($br->[1], \@fate, $cont);
     }
-
-    $out[1][1] = $fate;
-    \@out;
 }
-
 sub ltm { my ($tag, @branches) = @_;
-    my @out = ( [ undef, undef ] );
-    my $index = 0;
-
-    for my $branch (@branches) {
-        my $ord = pack("NN", (~($branch->[1][0][0]{LITLEN} // 0)), $index++);
-        push @{ $out[0] }, undef, rebase(\@out,
-            prefate([ $tag, $branch->[0], $ord, 0 ], $branch->[1]));
+    my $nr = 1;
+    my @m;
+    for (@branches) {
+        $nr &&= $_->[1]{nr};
+        push @m, @{ $_->[1]{m} };
     }
-
-    \@out;
+    bless({ m => \@m, nr => $nr, l => 0, ll => 0, t => $tag, br => \@branches },
+            'nfa::ltm');
 }
 
+sub nfa::cclass::construct { my ($self, $node, $fate, $cont) = @_;
+    my $end = $cont ? $cont->($fate) : nfa::node($fate);
+    push @$node, undef, map { $_, $end } @{ $self->{t} };
+}
 sub cclass { my @terms = @_;
-    return [ [ undef, undef, map { $_, 1 } @terms ],
-             [ undef, [0] ] ];
+    bless({ m => [], nr => 0, l => 0, ll => 0, t => \@terms }, 'nfa::cclass');
 }
 
-sub string { my ($i, $text) = @_;
-    my @nfa;
-    for my $c (split //, $text) {
-        my @e = $i ? (lc($c), uc($c)) : ($c);
-        push @nfa, [ undef, undef, map {[$_], @nfa+1} @e ];
+sub nfa::string::construct { my ($self, $node, $fate, $cont) = @_;
+    my ($i, $t) = @{ $self }{ 'i', 't' };
+    if ($t eq '') {
+        nfa::rgnode($NULL, $node, $fate, $cont);
+    } else {
+        my @nexts = ((map { nfa::node() } (1 .. length($t) - 1)),
+            ($cont ? $cont->($fate) : nfa::node($fate)));
+        for my $ch (split //, $t) {
+            push @$node, undef, map { [$_], $nexts[0] }
+                ($i ? (uc($ch), lc($ch)) : $ch);
+            $node = $::NFANODES[$nexts[0]];
+            shift @nexts;
+        }
     }
-    $nfa[0][0]{LITERAL} = 1;
-    $nfa[0][0]{LITLEN} = length($text);
-    [ @nfa, [ undef, [0] ] ];
+}
+sub string { my ($i, $text) = @_;
+    bless({ m => [], nr => 0, l => 1, ll => length($text), i => $i,
+            t => $text }, 'nfa::string');
 }
 }
 
@@ -434,13 +415,9 @@ my $NULL = $nfa::NULL;
         # XXX
         $name = 'termish' if $name eq 'EXPR';
 
-        $::usedmethods{$name} = 1;
-        $name .= '__PEEK';
-        return $IMP unless $C->can($name);
-        my $lexer = $C->$name();
-        %::usedmethods = (%::usedmethods, %{ $lexer->{USED_METHODS} });
-        return $IMP unless $lexer and exists $lexer->{NFA};
-        return $lexer->{NFA};
+        my $mname = $name . '__PEEK';
+        my $lexer = $C->can($mname) ? $C->$mname()->{NFAT} : $IMP;
+        return nfa::method($name, $lexer);
     }
 }
 
@@ -461,11 +438,9 @@ my $NULL = $nfa::NULL;
         } elsif ($name eq 'before') {
             return nfa::seq($re->nfa($C), $IMP);
         } else {
-            $::usedmethods{$name} = 1;
-            $name .= '__PEEK';
-            my $lexer = $C->$name($re);
-            %::usedmethods = (%::usedmethods, %{ $lexer->{USED_METHODS} });
-            return $lexer->{NFA};
+            my $mname = $name . '__PEEK';
+            my $lexer = $C->can($mname) ? $C->$mname($re) : $IMP;
+            return nfa::method($name, $lexer->{NFAT});
         }
     }
 }
