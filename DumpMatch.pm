@@ -89,6 +89,6 @@ sub dump_match {
     my $events = [];
     local %seen;
     traverse_match($r,$name,0,$events,$opt);
-    process_events($::ORIG,$events,$opt);
+    process_events($ORIG,$events,$opt);
 }
 1;

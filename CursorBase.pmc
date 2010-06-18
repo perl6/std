@@ -203,11 +203,9 @@ sub parse {
 sub parsefile {
     my $class = shift;
     my $file = shift;
-    local $::FILE = { name => $file };
     my %args = @_;
-    my $tmp_prefix = $args{tmp_prefix} // $ENV{STD5PREFIX} // '';
-    local $::TMP_PREFIX = $tmp_prefix;
     $file =~ s/::/\//g;
+    local $::FILE = { name => $file };
     open(FILE, '<:utf8', $file) or die "Can't open $file: $!\n";
     my $text;
     {
@@ -217,14 +215,8 @@ sub parsefile {
     }
 
     my $result;
-    $result = $class->initparse($text,@_);
+    $result = $class->initparse($text,@_,filename => $file);
 
-    if ($::YOU_WERE_HERE) {
-        $result->you_were_here;
-    }
-    elsif ($file =~ /\.pm6?$/) {
-        $result->you_were_here;
-    }
     $result;
 }
 
@@ -237,11 +229,12 @@ sub initparse {
     my $tmp_prefix = $args{tmp_prefix} // $ENV{STD5PREFIX} // '';
     my $setting = $args{setting} // 'CORE';
     my $actions = $args{actions} // '';
+    my $filename = $args{filename};
 
     local $::TMP_PREFIX = $tmp_prefix;
     local $::SETTINGNAME = $setting;
     local $::ACTIONS = $actions;
-    local @::MEMOS = @::MEMOS;
+    local @::MEMOS = ();
 
     local @::ACTIVE = ();
 
@@ -254,12 +247,26 @@ sub initparse {
     local $::LAST_NIBBLE_MULTILINE = bless { firstline => 0, lastline => 0 }, 'Cursor';
     local $::GOAL = "(eof)";
     $text .= "\n" unless substr($text,-1,1) eq "\n";
-    $::ORIG = $text;           # original string
+    local $::ORIG = $text;           # original string
+    local @::ORIG;
+
+    # This isn't the way it should work; each parse node should instead carry
+    # a reference to the string.  But that's a bit tricky to make work right
+    # in perl 5.
+    if ($args{text_return}) {
+        ${$args{text_return}} = $text;
+    }
 
     my $result = $self->new()->$rule();
     delete $result->{_xact};
 
     # XXX here attach stuff that will enable :cont
+    if ($::YOU_WERE_HERE) {
+        $result->you_were_here;
+    }
+    elsif ($args{filename} && $args{filename} =~ /\.pm6?$/) {
+        $result->you_were_here;
+    }
 
     $result;
 }

@@ -62,6 +62,7 @@ our $OPT_thaw = 0;
 our $OPT_keep_going = 0;
 our $OPT_output_file = undef;
 my $PROG = '';
+my $ORIG;
 my $U = 0;
 my @did_ws;
 
@@ -186,14 +187,15 @@ sub MAIN {
     my $r;
     if ($OPT_thaw) {
 	my $raw = retrieve($_[0]);
-	$::ORIG = $raw->{ORIG};
+	$ORIG = $raw->{ORIG};
 	$r = $raw->{AST};
 	for my $cl (keys %{$raw->{GENCLASS}}) {
 	    Actions::gen_class($cl, $raw->{GENCLASS}->{$cl});
 	}
     }
     elsif (@_ and -f $_[0]) {
-	$r = STD->parsefile($_[0], actions => 'Actions')->{'_ast'};
+	$r = STD->parsefile($_[0], text_return => \$ORIG,
+	    actions => 'Actions')->{'_ast'};
     }
     else {
 	if (not $PROG) {
@@ -201,10 +203,11 @@ sub MAIN {
 	    @ARGV = @_;
 	    $PROG = <>;
 	}
+	$ORIG = $PROG;
 	$r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
     }
     unless ($OPT_thaw) {
-	$::ORIG =~ s/\n;\z//;
+	$ORIG =~ s/\n;\z//;
 	if ($OPT_stab) {
 	    no warnings;
 	    $r->{stabs} = $STD::ALL;
@@ -229,7 +232,7 @@ sub MAIN {
     }
     elsif ($output eq 'store') {
 	my $data = { AST => $r, GENCLASS => \%Actions::GENCLASS,
-	    ORIG => $::ORIG };
+	    ORIG => $ORIG };
 	defined($OPT_output_file) ? store($data, $OPT_output_file)
 	    : Storable::store_fd($data, \*STDOUT);
     }
@@ -413,8 +416,8 @@ sub rd {
     sub Str { my $self = shift;
 	my $b = $self->{BEG};
 	my $e = $self->{END};
-	return '' if $b > length($::ORIG);
-	substr($::ORIG, $b, $e - $b);
+	return '' if $b > length($ORIG);
+	substr($ORIG, $b, $e - $b);
     }
 
     sub kids { my $self = shift;
@@ -441,7 +444,7 @@ sub rd {
 	    for my $kid (sort { $a->{BEG} <=> $b->{BEG} } @kids) {
 		my $kb = $kid->{BEG};
 		if ($kb > $last) {
-		    push @text, substr($::ORIG, $last, $kb - $last);
+		    push @text, substr($ORIG, $last, $kb - $last);
 		}
 		if (ref($kid) eq 'HASH') {
 		    print STDERR ::Dump($self);
@@ -453,7 +456,7 @@ sub rd {
 	    }
 	    my $se = $self->{END};
 	    if ($se > $last) {
-		    push @text, substr($::ORIG, $last, $se - $last);
+		    push @text, substr($ORIG, $last, $se - $last);
 	    }
 	}
 	else {
@@ -480,7 +483,7 @@ sub rd {
 	    for my $kid (sort { $a->{BEG} <=> $b->{BEG} } @kids) {
 		my $kb = $kid->{BEG};
 		if ($kb > $last) {
-		    push @text, substr($::ORIG, $last, $kb - $last);
+		    push @text, substr($ORIG, $last, $kb - $last);
 		}
 		if (ref($kid) eq 'HASH') {
 		    print STDERR ::Dump($self);
@@ -492,7 +495,7 @@ sub rd {
 	    }
 	    my $se = $self->{END};
 	    if ($se > $last) {
-		    push @text, substr($::ORIG, $last, $se - $last);
+		    push @text, substr($ORIG, $last, $se - $last);
 	    }
 	}
 	else {
@@ -518,7 +521,7 @@ sub rd {
 	    $self->emit_FORM;
 	} ::catch {
 	    my $char = $self->{BEG} // $self->{_from} // 0;
-	    my $line = 1 + (substr($::ORIG, 0, $char) =~ y/\n/\n/);
+	    my $line = 1 + (substr($ORIG, 0, $char) =~ y/\n/\n/);
 	    say STDERR "!!! FAILED at $char (L$line)";
 	    print STDERR $_;
 	    "<<< ERROR >>>";
@@ -545,7 +548,7 @@ TEMPLATE
 	my $beg = $self->{END};
 	my $end = $after->{BEG};
 	return '' unless $beg && $end;
-	return substr($::ORIG, $beg, $end - $beg);
+	return substr($ORIG, $beg, $end - $beg);
     }
 
     sub base_re_quantifier { my $self = shift; my $x = shift; my $min = shift;
@@ -873,7 +876,7 @@ TEMPLATE
 	"use 5.010;\nuse utf8;\n" . $self->{statementlist}->p5, "\n";
     }
     sub emit_p6 { my $self = shift;
-	substr($::ORIG, 0, $self->{statementlist}{BEG}),
+	substr($ORIG, 0, $self->{statementlist}{BEG}),
 	$self->{statementlist}->p5;
     }
     sub emit_psq { my $self = shift;
@@ -2106,7 +2109,7 @@ TEXT
 	local $::RATCHET = 0;
 	local $::SIGSPACE = 0;
 	local $::REGEX_DECLARATOR = 'regex';
-	my $comment = substr($::ORIG, $self->{BEG},100);
+	my $comment = substr($ORIG, $self->{BEG},100);
 	$comment =~ s/\n.*//s;
         "## $comment\n" . $self->{regex_def}->p5;
     }
@@ -2118,7 +2121,7 @@ TEXT
 	local $::RATCHET = 1;
 	local $::SIGSPACE = 1;
 	local $::REGEX_DECLARATOR = 'rule';
-	my $comment = substr($::ORIG, $self->{BEG},100);
+	my $comment = substr($ORIG, $self->{BEG},100);
 	$comment =~ s/\n.*//s;
         "## $comment\n" . $self->{regex_def}->p5;
     }
@@ -2130,7 +2133,7 @@ TEXT
 	local $::RATCHET = 1;
 	local $::SIGSPACE = 0;
 	local $::REGEX_DECLARATOR = 'token';
-	my $comment = substr($::ORIG, $self->{BEG}, 100);
+	my $comment = substr($ORIG, $self->{BEG}, 100);
 	$comment =~ s/\n.*//s;
         "## $comment\n" . $self->{regex_def}->p5;
     }
@@ -2291,7 +2294,7 @@ END
 
 { package VAST::routine_declarator__S_method; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
-	my $comment = substr($::ORIG, $self->{BEG},100);
+	my $comment = substr($ORIG, $self->{BEG},100);
 	$comment =~ s/\s*\{.*//s;
         "## $comment\n" . $self->{method_def}->p5;
     }
