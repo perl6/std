@@ -1820,22 +1820,33 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 # Steal data from Perl5's Unicode maps
 my %unicode_map_cache;
-$unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
-sub _get_unicode_map {
-    my $propname = shift;
-    $unicode_map_cache{$propname} //= do {
-        my @top = (("") x 1088, $propname);
-        for my $l (split("\n", (do "unicore/lib/$propname.pl"))) {
-            my ($from, $to) = split("\t", $l);
-            $from = hex $from;
-            $to = hex $to || $from;
+BEGIN {
+    $unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
+    open MAP, "uniprops" or die "cannot open unicode maps: $!";
+    binmode MAP;
+    while (defined (my $c = getc MAP)) {
+        my $name = "";
+        my $used;
+        my $tile;
+        read MAP, $name, ord($c);
+        read MAP, $used, 136;
 
-            for (my $x = $from; $x <= $to; $x++) {
-                vec($top[$x >> 10], $x & 1023, 1) = 1;
+        $unicode_map_cache{$name} = [];
+        $unicode_map_cache{$name}[1088] = $name;
+
+        for (my $i = 0; $i < 1088; $i++) {
+            if (vec($used, $i, 1)) {
+                read MAP, $tile, 128;
+                $unicode_map_cache{$name}[$i] = $tile;
             }
         }
-        \@top;
-    };
+    }
+    close MAP or die "cannot close unicode maps: $!";
+}
+sub _get_unicode_map {
+    my $propname = shift;
+    $unicode_map_cache{$propname} //
+        die "Map $propname not found.  Edit gen-unicode-table.pl and rerun.";
 }
 
 # This is the fast path handling for JIT DFA lexer generation (although it gets
