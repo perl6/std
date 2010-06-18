@@ -157,14 +157,18 @@ sub has_nontrivial_fates { my ($inner) = @_;
     !$ok;
 }
 
-sub seq { my ($fst, $sndthunk) = @_;
+sub noreturn { my ($tocheck) = @_;
+    for my $n (@$tocheck) {
+        if ($n->[1] && !$n->[0]{I}) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+sub seq { my ($fst, $snd) = @_;
     my @out = @$fst;
     my $max = @out - 1;
-
-    if (ref $sndthunk ne 'CODE') {
-        my $v = $sndthunk;
-        $sndthunk = sub { $v };
-    }
 
     for my $j (0 .. $max) {
         # Non-accepting can just be copied
@@ -175,14 +179,13 @@ sub seq { my ($fst, $sndthunk) = @_;
         # Otherwise, we need to glue on a copy of the sequence tail.
         # We could share a single copy of the sequence tail if we were
         # willing to lose deep fating... food for thought.
-        push @{$out[$j]}, undef, rebase(\@out,
-            prefate($out[$j][1], $sndthunk->()));
+        push @{$out[$j]}, undef, rebase(\@out, prefate($out[$j][1], $snd));
         $out[$j][1] = undef;  # not accepting any more
     }
 
     if ($out[0][0]{LITERAL}) {
         $out[0][0] = { %{ $out[0][0] } } if $out[0][0];
-        my $n = $sndthunk->()->[0][0];
+        my $n = $snd->[0][0];
         $out[0][0]{LITERAL} &&= $n->{LITERAL};
         $out[0][0]{LITLEN} += ($n->{LITLEN} // 0);
     }
@@ -544,18 +547,17 @@ my $NULL = $nfa::NULL;
 }
 
 { package RE_sequence; our @ISA = 'REbase';
-    sub _nfa_recurse { my ($self, $C, $ix, $cache) = @_;
-        if ($ix == @{$self->{zyg}}) {
-            return $NULL;
-        }
-
-        nfa::seq($self->{zyg}[$ix]->nfa($C),
-            sub { $cache->[$ix+1] //= $self->_nfa_recurse($C, $ix+1, $cache); });
-    }
-
     sub nfa { my ($self, $C) = @_; ::here;
-        my @cache;
-        $self->_nfa_recurse($C, 0, \@cache);
+        my @zyg;
+        for my $k (@{ $self->{zyg} }) {
+            push @zyg, $k->nfa($C);
+            last if nfa::noreturn($zyg[-1]);
+        }
+        push @zyg, $NULL if !@zyg;
+        while (@zyg > 1) {
+            push @zyg, nfa::seq(splice(@zyg, -2, 2));
+        }
+        $zyg[0];
     }
 }
 
