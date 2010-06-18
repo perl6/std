@@ -2761,22 +2761,6 @@ END
         $lang->deb("derive $genpkg from $WHAT adding $mangle") if DEBUG & DEBUG::mixins;
         eval $e or die "Can't create $name: $@\n";
         $::LANG{'MAIN'} = $lang->cursor_fresh($genpkg);
-        my $oldlexer = $::LEXERS{$WHAT};
-        my $newlexer = $::LEXERS{$genpkg} //= {};
-        print ::LOG "=====================================\nADD $rule => $mangle\n" if DEBUG & DEBUG::mixins;;
-        for my $name (sort keys %{$oldlexer}) {
-            print ::LOG "  $name:\n" if DEBUG & DEBUG::mixins;
-            my $same = 1;
-            for my $pat (@{$oldlexer->{$name}->{PATS}}) {
-                if ($pat =~ / $category /) {
-                    print ::LOG "\t$pat\n" if DEBUG & DEBUG::mixins;
-                    $same = 0;
-                    last;
-                }
-            }
-            # no need to regen a sublexer that will turn out the same
-            $newlexer->{$name} = $oldlexer->{$name} if $same;
-        }
     }
     $lang;
 }
