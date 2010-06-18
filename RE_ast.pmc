@@ -396,6 +396,7 @@ sub nfastring { my ($i, $text) = @_;
         # what?
         '\\\\' => ::nfacclass(['\\']),
         '\\"' => ::nfacclass(['"']),
+        '\\\'' => ::nfacclass(["'"]),
         '\D' => ::nfacclass(['ALL', 'Gc/N']),
         '\d' => ::nfacclass(['Gc/N']),
         '\H' => ::nfacclass(['ALL', 'Perl/Blank']),
