@@ -1784,6 +1784,7 @@ grammar P6 is STD {
         <.ws>
 
         <trait>*
+        <post_constraint>*
         <.getdecl>
     }
 
