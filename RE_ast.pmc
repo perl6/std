@@ -197,7 +197,7 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
 sub nfastar { my ($in) = @_;
     my @out = ( [undef, []] );
     nfarebase(\@out, $in);
-    my $fates = [[ nfahasnontrivialfates($in) ]];
+    my $fates = [[ 1 ]];
 
     # all nodes already cloned by nfarebase
     for my $node (@out) {
@@ -218,7 +218,7 @@ sub nfastar { my ($in) = @_;
 sub nfaopt { my ($in) = @_;
     my @out = ( [undef, [], undef, 1, undef, 2], [undef, []] );
 
-    my $fates = [[ nfahasnontrivialfates($in) ]];
+    my $fates = [[ 1 ]];
     nfarebase(\@out, $in);
 
     # all nodes already cloned by nfarebase
@@ -537,7 +537,7 @@ sub nfastring { my ($i, $text) = @_;
         $text =~ s/^<\s*//;
         $text =~ s/\s*>$//;
 
-        ::nfadisj(map { ::nfastring($self->{i}, $_) } split(/\s+/, $text));
+        ::nfaprefate([[1]], ::nfadisj(map { ::nfastring($self->{i}, $_) } split(/\s+/, $text)));
     }
 }
 
