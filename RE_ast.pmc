@@ -10,8 +10,8 @@ use utf8;
 use strict; use warnings;
 use DEBUG;
 use Encode;
-my $DIMP = [[{I=>1}, [[1]] ]];
-my $DNULL = [[undef, [[0]] ]];
+my $DIMP = [[{I=>1}, [1] ]];
+my $DNULL = [[undef, [0] ]];
 
 # The DFA engine has two priorities; top priority is to generate the correct
 # pattern prefixes; second is to generate as much fate as it can.
@@ -109,29 +109,22 @@ sub nfarebase { my ($onto, $ary) = @_;
     $offs;
 }
 
-sub nfaprefate { my ($fates, $nfa) = @_;
+sub nfaprefate { my ($fate, $nfa) = @_;
     my @out = @$nfa;
 
     for my $onode (@out) {
         $onode = [ @$onode ];
         # Non-accepting can just be copied
-        next unless @{$onode->[1]};
+        next unless $onode->[1];
 
-        my @nfates;
-        for my $f1 (@$fates) {
-            if ($f1->[-1]) {
-                # Non-extensible fate makes this easy
-                push @nfates, $f1;
-                next;
-            }
-            my @f1 = @$f1;
-            pop @f1;
-            for my $f2 (@{$onode->[1]}) {
-                push @nfates, [ @f1, @$f2 ];
-            }
+        if ($fate->[-1]) {
+            # Non-extensible fate makes this easy
+            $onode->[1] = $fate;
+        } else {
+            my @f = @$fate;
+            pop @f;
+            $onode->[1] = [ @f, @{ $onode->[1] } ];
         }
-
-        $onode->[1] = \@nfates;
     }
 
     \@out;
@@ -139,7 +132,7 @@ sub nfaprefate { my ($fates, $nfa) = @_;
 
 sub nfaltmprefate { my ($tag, $val, $tb, $inner) = @_;
     my $ord = pack("NN", (~($inner->[0][0]{LITLEN} // 0)), $tb);
-    nfaprefate([[ $tag, $val, $ord, 0 ]], $inner);
+    nfaprefate([ $tag, $val, $ord, 0 ], $inner);
 }
 
 # When a non-LTM alternation or quantifier is applied to a subregex, it becomes
@@ -149,7 +142,7 @@ sub nfaltmprefate { my ($tag, $val, $tb, $inner) = @_;
 sub nfahasnontrivialfates { my ($inner) = @_;
     my $ok = 1;
     NODE: for my $n (@$inner) {
-        for my $fate (@{ $n->[1] }) {
+        if (my $fate = $n->[1]) {
             if ((@$fate > 1) || $fate->[0]) {
                 $ok = 0;
                 last NODE;
@@ -170,7 +163,7 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
 
     for my $j (0 .. $max) {
         # Non-accepting can just be copied
-        next unless @{$out[$j][1]};
+        next unless $out[$j][1];
         $out[$j] = [ @{ $out[$j] } ];
         # Imperative acceptors stay accepting and in the same way
         next if $out[$j][0]{I};
@@ -179,7 +172,7 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
         # willing to lose deep fating... food for thought.
         push @{$out[$j]}, undef, nfarebase(\@out,
             nfaprefate($out[$j][1], $sndthunk->()));
-        $out[$j][1] = [];  # not accepting any more
+        $out[$j][1] = undef;  # not accepting any more
     }
 
     if ($out[0][0]{LITERAL}) {
@@ -195,49 +188,49 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
 # nfaplus would be possible, but it would be a pessimization from a deep fating
 # standpoint
 sub nfastar { my ($in) = @_;
-    my @out = ( [undef, []] );
+    my @out = ( [undef, undef] );
     nfarebase(\@out, $in);
-    my $fates = [[ 1 ]];
+    my $fate = [ 1 ];
 
     # all nodes already cloned by nfarebase
     for my $node (@out) {
-        next unless @{ $node->[1] };
+        next unless $node->[1];
         if ($node->[0]{I}) {
-            $node->[1] = $fates;
+            $node->[1] = $fate;
             next;
         }
-        $node->[1] = [];
+        $node->[1] = undef;
         push @$node, undef, 0;
     }
 
-    $out[0][1] = $fates;
+    $out[0][1] = $fate;
     push @{ $out[0] }, undef, 1;
     \@out;
 }
 
 sub nfaopt { my ($in) = @_;
-    my @out = ( [undef, [], undef, 1, undef, 2], [undef, []] );
+    my @out = ( [undef, undef, undef, 1, undef, 2], [undef, undef] );
 
-    my $fates = [[ 1 ]];
+    my $fate = [ 1 ];
     nfarebase(\@out, $in);
 
     # all nodes already cloned by nfarebase
     for my $node (@out) {
-        next unless @{ $node->[1] };
+        next unless $node->[1];
         if ($node->[0]{I}) {
-            $node->[1] = $fates;
+            $node->[1] = $fate;
             next;
         }
-        $node->[1] = [];
+        $node->[1] = undef;
         push @$node, undef, 1;
     }
 
-    $out[1][1] = $fates;
+    $out[1][1] = $fate;
     \@out;
 }
 
 sub nfadisj { my @ins = @_;
-    my @out = ( [ undef, [] ] );
+    my @out = ( [ undef, undef ] );
 
     for my $in (@ins) {
         push @{ $out[0] }, undef, nfarebase(\@out, $in);
@@ -247,19 +240,19 @@ sub nfadisj { my @ins = @_;
 }
 
 sub nfacclass { my @terms = @_;
-    return [ [ undef, [], map { $_, 1 } @terms ],
-             [ undef, [[0]] ] ];
+    return [ [ undef, undef, map { $_, 1 } @terms ],
+             [ undef, [0] ] ];
 }
 
 sub nfastring { my ($i, $text) = @_;
     my @nfa;
     for my $c (split //, $text) {
         my @e = $i ? (lc($c), uc($c)) : ($c);
-        push @nfa, [ undef, [], map {[$_], @nfa+1} @e ];
+        push @nfa, [ undef, undef, map {[$_], @nfa+1} @e ];
     }
     $nfa[0][0]{LITERAL} = 1;
     $nfa[0][0]{LITLEN} = length($text);
-    [ @nfa, [ undef, [[0]] ] ];
+    [ @nfa, [ undef, [0] ] ];
 }
 
 { package REbase;
@@ -413,7 +406,7 @@ sub nfastring { my ($i, $text) = @_;
         '::' => $DIMP,
         ':::' => $DIMP,
         '.*?' => $DIMP,
-        '.*' => [ [ undef, [[0]], ['ALL'], 0 ] ],
+        '.*' => [ [ undef, [0], ['ALL'], 0 ] ],
     );
 
     sub nfa { my $self = shift; my ($C) = @_; 
@@ -493,7 +486,7 @@ sub nfastring { my ($i, $text) = @_;
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
         # block fate propagation
-        ::nfaprefate([[1]], $alts->[0]->nfa($C));
+        ::nfaprefate([1], $alts->[0]->nfa($C));
     }
 }
 
@@ -538,7 +531,7 @@ sub nfastring { my ($i, $text) = @_;
         $text =~ s/^<\s*//;
         $text =~ s/\s*>$//;
 
-        ::nfaprefate([[1]], ::nfadisj(map { ::nfastring($self->{i}, $_) } split(/\s+/, $text)));
+        ::nfaprefate([1], ::nfadisj(map { ::nfastring($self->{i}, $_) } split(/\s+/, $text)));
     }
 }
 

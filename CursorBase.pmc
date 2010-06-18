@@ -1852,17 +1852,14 @@ sub _dump_nfa { my ($name, $nfa) = @_;
         for (my $j = 2; $j < @{ $nfa->[$ix] }; $j += 2) {
             push @go, "[" . join("-",@{$nfa->[$ix][$j] // []}) . "] => " . $nfa->[$ix][$j+1];
         }
-        my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
+        my $l = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
             ($nfa->[$ix][0]{I} ? 'I' : ' ');
-        my @fate = map { my @x = @$_;
-                         my $y = pop @x;
-                         push @x, "..." if $y;
-                         join(" ", "-->", @x) } @{ $nfa->[$ix][1] };
-        @fate = ('') if !@fate;
-        for (@fate) {
-            print ::LOG $h . $_ . "\n";
-            $h = ' ' x length($h);
+        if ($nfa->[$ix][1]) {
+            my @x = @{ $nfa->[$ix][1] };
+            push @x, "..." if pop(@x);
+            $l .= join(" ", "-->", @x);
         }
+        print ::LOG $l, "\n";
     }
     print ::LOG "---- END NFA DUMP ----\n";
 }
@@ -2067,7 +2064,7 @@ sub _jit_dfa_node { my ($lexer, $node) = @_;
         $black{$nix} = 1;
         my $nfn = $nfa->[$nix];
 
-        push @{ $node->[0] }, @{ $nfn->[1] };
+        push @{ $node->[0] }, $nfn->[1] if $nfn->[1];
         for (my $i = 2; $i < @$nfn; $i += 2) {
             if (!$nfn->[$i]) {
                 push @grey, $nfn->[$i+1];
@@ -2261,7 +2258,7 @@ sub _AUTOLEXpeek { my $self = shift;
     if ($::AUTOLEXED{$realkey}) {   # no left recursion allowed in lexer!
         die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$realkey};
         $self->deb("Suppressing lexer recursion on $key") if DEBUG & DEBUG::autolexer;
-        return { USED_METHODS => {}, NFA => [[{I=>1}, [[1]]]] };  # (but if we advanced just assume a :: here)
+        return { USED_METHODS => {}, NFA => [[{I=>1}, [1]]] };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
     return $::LEXERS{ref $self}->{$realkey} //= do {
