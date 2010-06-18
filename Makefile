@@ -4,7 +4,7 @@
 # technically viv is part of the frontend too, but it's used very little.  viv
 # should probably be refactored into independant programs
 FRONTEND=Actions.pm CORE.setting CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc\
-	 NULL.pad RE_ast.pmc Stash.pmc mangle.pl std
+	 NULL.pad RE_ast.pmc Stash.pmc mangle.pl std uniprops
 BACKEND=mangle.pl Actions.pm viv
 INVARIANT=$(FRONTEND) viv
 GENERATE=STD.pmc Cursor.pmc
