@@ -2240,12 +2240,12 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
                 my $peeklex = $self->$callname();
                 die "$proto has no lexer!?" unless $peeklex->{NFA};
 
-                push @pat, ::nfaltmprefate($proto, "${class}::$method",
+                push @pat, nfa::ltmprefate($proto, "${class}::$method",
                     $j++, $peeklex->{NFA});
             }
         }
 
-        $nfa = ::nfadisj(@pat);
+        $nfa = nfa::disj(@pat);
     } elsif ($ast) {
         $nfa = $ast->nfa($self);
     } else {
@@ -2276,7 +2276,7 @@ sub _AUTOLEXpeek { my $self = shift;
     if ($::AUTOLEXED{$realkey}) {   # no left recursion allowed in lexer!
         die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$realkey};
         $self->deb("Suppressing lexer recursion on $key") if DEBUG & DEBUG::autolexer;
-        return { USED_METHODS => {}, NFA => [[{I=>1}, [1]]] };  # (but if we advanced just assume a :: here)
+        return { USED_METHODS => {}, NFA => $nfa::IMP };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
     return $::LEXERS{ref $self}->{$realkey} //= do {

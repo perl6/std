@@ -10,8 +10,6 @@ use utf8;
 use strict; use warnings;
 use DEBUG;
 use Encode;
-my $DIMP = [[{I=>1}, [1] ]];
-my $DNULL = [[undef, [0] ]];
 
 # The DFA engine has two priorities; top priority is to generate the correct
 # pattern prefixes; second is to generate as much fate as it can.
@@ -95,7 +93,12 @@ sub here {
     ::deb("\t", ':' x $lvl, ' ', $name, " [", $file, ":", $line, "]") if $::DEBUG & DEBUG::longest_token_pattern_generation;
 }
 
-sub nfarebase { my ($onto, $ary) = @_;
+{ package nfa;
+
+our $NULL = [[ undef,  [0] ]];
+our $IMP  = [[ {I=>1}, [1] ]];
+
+sub rebase { my ($onto, $ary) = @_;
     my $offs = @$onto;
 
     for my $node (@$ary) {
@@ -109,7 +112,7 @@ sub nfarebase { my ($onto, $ary) = @_;
     $offs;
 }
 
-sub nfaprefate { my ($fate, $nfa) = @_;
+sub prefate { my ($fate, $nfa) = @_;
     my @out = @$nfa;
 
     for my $onode (@out) {
@@ -130,16 +133,18 @@ sub nfaprefate { my ($fate, $nfa) = @_;
     \@out;
 }
 
-sub nfaltmprefate { my ($tag, $val, $tb, $inner) = @_;
+sub ltmprefate { my ($tag, $val, $tb, $inner) = @_;
     my $ord = pack("NN", (~($inner->[0][0]{LITLEN} // 0)), $tb);
-    nfaprefate([ $tag, $val, $ord, 0 ], $inner);
+    prefate([ $tag, $val, $ord, 0 ], $inner);
 }
 
 # When a non-LTM alternation or quantifier is applied to a subregex, it becomes
-# impossible to control fate usage, so we can't dispense them.  But it's ok to
-# keep the fates if they're all trivial (and this is useful anyway, to prevent
-# x* and the like from blocking lexer propagation)
-sub nfahasnontrivialfates { my ($inner) = @_;
+# impossible to control where subsequent tokens match, so we can't copy fates.
+sub horizon { my ($inner) = @_;
+    prefate([ 1 ], $inner);
+}
+
+sub has_nontrivial_fates { my ($inner) = @_;
     my $ok = 1;
     NODE: for my $n (@$inner) {
         if (my $fate = $n->[1]) {
@@ -152,7 +157,7 @@ sub nfahasnontrivialfates { my ($inner) = @_;
     !$ok;
 }
 
-sub nfaseq { my ($fst, $sndthunk) = @_;
+sub seq { my ($fst, $sndthunk) = @_;
     my @out = @$fst;
     my $max = @out - 1;
 
@@ -170,8 +175,8 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
         # Otherwise, we need to glue on a copy of the sequence tail.
         # We could share a single copy of the sequence tail if we were
         # willing to lose deep fating... food for thought.
-        push @{$out[$j]}, undef, nfarebase(\@out,
-            nfaprefate($out[$j][1], $sndthunk->()));
+        push @{$out[$j]}, undef, rebase(\@out,
+            prefate($out[$j][1], $sndthunk->()));
         $out[$j][1] = undef;  # not accepting any more
     }
 
@@ -185,11 +190,11 @@ sub nfaseq { my ($fst, $sndthunk) = @_;
     \@out;
 }
 
-# nfaplus would be possible, but it would be a pessimization from a deep fating
+# plus would be possible, but it would be a pessimization from a deep fating
 # standpoint
-sub nfastar { my ($in) = @_;
+sub star { my ($in) = @_;
     my @out = ( [undef, undef] );
-    nfarebase(\@out, $in);
+    rebase(\@out, $in);
     my $fate = [ 1 ];
 
     # all nodes already cloned by nfarebase
@@ -208,11 +213,11 @@ sub nfastar { my ($in) = @_;
     \@out;
 }
 
-sub nfaopt { my ($in) = @_;
+sub opt { my ($in) = @_;
     my @out = ( [undef, undef, undef, 1, undef, 2], [undef, undef] );
 
     my $fate = [ 1 ];
-    nfarebase(\@out, $in);
+    rebase(\@out, $in);
 
     # all nodes already cloned by nfarebase
     for my $node (@out) {
@@ -229,22 +234,22 @@ sub nfaopt { my ($in) = @_;
     \@out;
 }
 
-sub nfadisj { my @ins = @_;
+sub disj { my @ins = @_;
     my @out = ( [ undef, undef ] );
 
     for my $in (@ins) {
-        push @{ $out[0] }, undef, nfarebase(\@out, $in);
+        push @{ $out[0] }, undef, rebase(\@out, $in);
     }
 
     \@out;
 }
 
-sub nfacclass { my @terms = @_;
+sub cclass { my @terms = @_;
     return [ [ undef, undef, map { $_, 1 } @terms ],
              [ undef, [0] ] ];
 }
 
-sub nfastring { my ($i, $text) = @_;
+sub string { my ($i, $text) = @_;
     my @nfa;
     for my $c (split //, $text) {
         my @e = $i ? (lc($c), uc($c)) : ($c);
@@ -254,6 +259,10 @@ sub nfastring { my ($i, $text) = @_;
     $nfa[0][0]{LITLEN} = length($text);
     [ @nfa, [ undef, [0] ] ];
 }
+}
+
+my $IMP = $nfa::IMP;
+my $NULL = $nfa::NULL;
 
 { package REbase;
 }
@@ -269,18 +278,18 @@ sub nfastring { my ($i, $text) = @_;
     sub nfa { my ($self, $C) = @_;
         if ($self->{assert} eq '?') {
             my $re = $self->{re};
-            return ::nfaseq($re->nfa($C), $DIMP);
+            return nfa::seq($re->nfa($C), $IMP);
         }
-        return $DNULL;
+        return $NULL;
     }
 }
 
 { package RE_assertvar; our @ISA = 'REbase';
-    sub nfa { $DIMP }
+    sub nfa { $IMP }
 }
 
 { package RE_block; our @ISA = 'REbase';
-    sub nfa { $DIMP }
+    sub nfa { $IMP }
 }
 
 { package RE_bindvar; our @ISA = 'REbase';
@@ -353,12 +362,12 @@ sub nfastring { my ($i, $text) = @_;
             @chs = map { uc($_), lc($_) } @chs;
         }
 
-        $neg ? ::nfacclass(['ALL', @chs]) : ::nfacclass(map { [$_] } @chs);
+        $neg ? nfa::cclass(['ALL', @chs]) : nfa::cclass(map { [$_] } @chs);
     }
 }
 
 { package RE_decl; our @ISA = 'REbase';
-    sub nfa { $DNULL }
+    sub nfa { $NULL }
 }
 
 { package RE_double; our @ISA = 'REbase';
@@ -375,8 +384,8 @@ sub nfastring { my ($i, $text) = @_;
         else {
             $fixed = $text;
         }
-        $fixed = ::nfastring($self->{i}, $fixed);
-        $fixed = ::nfaseq($fixed, $DIMP) if $imp;
+        $fixed = nfa::string($self->{i}, $fixed);
+        $fixed = nfa::seq($fixed, $IMP) if $imp;
         $fixed;
     }
 }
@@ -384,29 +393,29 @@ sub nfastring { my ($i, $text) = @_;
 { package RE_meta; our @ISA = 'REbase';
     my %meta_nfa = (
         # XXX I don't think these are quite right
-        '^' => $DNULL, '^^' => $DNULL, '$$' => $DNULL, '$' => $DNULL,
-        '«' => $DNULL, '<<' => $DNULL, '>>' => $DNULL, '»' => $DNULL,
+        '^' => $NULL, '^^' => $NULL, '$$' => $NULL, '$' => $NULL,
+        '«' => $NULL, '<<' => $NULL, '>>' => $NULL, '»' => $NULL,
         # what?
-        '\\\\' => ::nfacclass(['\\']),
-        '\\"' => ::nfacclass(['"']),
-        '\\\'' => ::nfacclass(["'"]),
-        '\D' => ::nfacclass(['ALL', 'Gc/N']),
-        '\d' => ::nfacclass(['Gc/N']),
-        '\H' => ::nfacclass(['ALL', 'Perl/Blank']),
-        '\h' => ::nfacclass(['Perl/Blank']),
-        '\N' => ::nfacclass(['ALL', "\n"]),
-        '\n' => ::nfacclass(["\n"]),
-        '\S' => ::nfacclass(['ALL', 'Space/Y']),
-        '\s' => ::nfacclass(['Space/Y']),
-        '\V' => ::nfacclass(['ALL', 'Perl/VertSpac']),
-        '\v' => ::nfacclass(['Perl/VertSpac']),
-        '\W' => ::nfacclass(['ALL', '_', 'Gc/L', 'Gc/N']),
-        '\w' => ::nfacclass(['_'], ['Gc/L'], ['Gc/N']),
-        '.'  => ::nfacclass(['ALL']),
-        '::' => $DIMP,
-        ':::' => $DIMP,
-        '.*?' => $DIMP,
-        '.*' => [ [ undef, [0], ['ALL'], 0 ] ],
+        '\\\\' => nfa::cclass(['\\']),
+        '\\"' =>  nfa::cclass(['"']),
+        '\\\'' => nfa::cclass(["'"]),
+        '\D' =>   nfa::cclass(['ALL', 'Gc/N']),
+        '\d' =>   nfa::cclass(['Gc/N']),
+        '\H' =>   nfa::cclass(['ALL', 'Perl/Blank']),
+        '\h' =>   nfa::cclass(['Perl/Blank']),
+        '\N' =>   nfa::cclass(['ALL', "\n"]),
+        '\n' =>   nfa::cclass(["\n"]),
+        '\S' =>   nfa::cclass(['ALL', 'Space/Y']),
+        '\s' =>   nfa::cclass(['Space/Y']),
+        '\V' =>   nfa::cclass(['ALL', 'Perl/VertSpac']),
+        '\v' =>   nfa::cclass(['Perl/VertSpac']),
+        '\W' =>   nfa::cclass(['ALL', '_', 'Gc/L', 'Gc/N']),
+        '\w' =>   nfa::cclass(['_'], ['Gc/L'], ['Gc/N']),
+        '.'  =>   nfa::cclass(['ALL']),
+        '::' =>   $IMP,
+        ':::' =>  $IMP,
+        '.*?' =>  $IMP,
+        '.*' =>   nfa::star(nfa::cclass(['ALL'])),
     );
 
     sub nfa { my $self = shift; my ($C) = @_; 
@@ -420,18 +429,18 @@ sub nfastring { my ($i, $text) = @_;
 { package RE_method; our @ISA = 'REbase';
     sub nfa { my ($self, $C) = @_;
         my $name = $self->{'name'};
-        return $DIMP if $self->{'rest'};
+        return $IMP if $self->{'rest'};
         Encode::_utf8_on($name);
         ::here($name);
 
-        if ($name eq 'null' or $name eq 'ww') { return $DNULL }
-        if ($name eq 'ws') { return $DIMP; }
-        if ($name eq 'alpha') { $CursorBase::fakepos++; return ::nfacclass(['_'], ['Gc/L']); }
+        if ($name eq 'null' or $name eq 'ww') { return $NULL }
+        if ($name eq 'ws') { return $IMP; }
+        if ($name eq 'alpha') { $CursorBase::fakepos++; return nfa::cclass(['_'], ['Gc/L']); }
         if ($name eq 'sym') {
             $CursorBase::fakepos++;
             my $sym = $self->{'sym'};
             Encode::_utf8_on($sym);
-            return ::nfastring($self->{i}, $sym);
+            return nfa::string($self->{i}, $sym);
         }
 
         # XXX
@@ -439,16 +448,16 @@ sub nfastring { my ($i, $text) = @_;
 
         $::usedmethods{$name} = 1;
         $name .= '__PEEK';
-        return $DIMP unless $C->can($name);
+        return $IMP unless $C->can($name);
         my $lexer = $C->$name();
         %::usedmethods = (%::usedmethods, %{ $lexer->{USED_METHODS} });
-        return $DIMP unless $lexer and exists $lexer->{NFA};
+        return $IMP unless $lexer and exists $lexer->{NFA};
         return $lexer->{NFA};
     }
 }
 
 { package RE_method_internal; our @ISA = 'REbase';
-    sub nfa { $DIMP }
+    sub nfa { $IMP }
 }
 
 { package RE_method_re; our @ISA = 'REbase';
@@ -458,11 +467,11 @@ sub nfastring { my ($i, $text) = @_;
         ::here($name);
         my $re = $self->{re};
         if ($name eq '') {
-            return $DIMP;
+            return $IMP;
         } elsif ($name eq 'after') {
-            return $DNULL;
+            return $NULL;
         } elsif ($name eq 'before') {
-            return ::nfaseq($re->nfa($C), $DIMP);
+            return nfa::seq($re->nfa($C), $IMP);
         } else {
             $::usedmethods{$name} = 1;
             $name .= '__PEEK';
@@ -474,19 +483,18 @@ sub nfastring { my ($i, $text) = @_;
 }
 
 { package RE_noop; our @ISA = 'REbase';
-    sub nfa { $DNULL }
+    sub nfa { $NULL }
 }
 
 { package RE_every; our @ISA = 'REbase';
-    sub nfa { $DIMP }
+    sub nfa { $IMP }
 }
 
 { package RE_first; our @ISA = 'REbase';
     sub nfa { my ($self, $C) = @_;
         my $alts = $self->{'zyg'};
         ::here(0+@$alts);
-        # block fate propagation
-        ::nfaprefate([1], $alts->[0]->nfa($C));
+        nfa::horizon($alts->[0]->nfa($C));
     }
 }
 
@@ -500,22 +508,22 @@ sub nfastring { my ($i, $text) = @_;
     sub nfa { my ($self, $C) = @_; ::here();
         my $oldfakepos = $CursorBase::fakepos++;
         my $subnfa = $self->{atom}->nfa($C);
-        #return $DIMP if $self->{quant}[1];  XXX viv omits this currently
+        #return $IMP if $self->{quant}[1];  XXX viv omits this currently
         # XXX S05 is not quite clear; it could be read as saying to cut LTM
         # *after* the atom
-        return $DIMP if $self->{quant}[2]
+        return $IMP if $self->{quant}[2]
             && $self->{quant}[2]->isa('RE_block');
 
         my $k = $self->{quant}[0];
         if ($k eq '?') {
-            return ::nfaopt($subnfa);
+            return nfa::opt($subnfa);
         } elsif ($k eq '*') {
-            return ::nfastar($subnfa);
+            return nfa::star($subnfa);
         } elsif ($k eq '+') {
-            return ::nfaseq($subnfa, ::nfastar($subnfa));
+            return nfa::seq($subnfa, nfa::star($subnfa));
         } elsif ($k eq '**') {
             my $subnfa2 = $self->{quant}[2]->nfa($C);
-            return ::nfaseq($subnfa, ::nfastar(::nfaseq($subnfa2, $subnfa)));
+            return nfa::seq($subnfa, nfa::star(nfa::seq($subnfa2, $subnfa)));
         } else {
             die "unknown quantifier $k";
         }
@@ -531,17 +539,17 @@ sub nfastring { my ($i, $text) = @_;
         $text =~ s/^<\s*//;
         $text =~ s/\s*>$//;
 
-        ::nfaprefate([1], ::nfadisj(map { ::nfastring($self->{i}, $_) } split(/\s+/, $text)));
+        nfa::horizon(nfa::disj(map { nfa::string($self->{i}, $_) } split(/\s+/, $text)));
     }
 }
 
 { package RE_sequence; our @ISA = 'REbase';
     sub _nfa_recurse { my ($self, $C, $ix, $cache) = @_;
         if ($ix == @{$self->{zyg}}) {
-            return $DNULL;
+            return $NULL;
         }
 
-        ::nfaseq($self->{zyg}[$ix]->nfa($C),
+        nfa::seq($self->{zyg}[$ix]->nfa($C),
             sub { $cache->[$ix+1] //= $self->_nfa_recurse($C, $ix+1, $cache); });
     }
 
@@ -557,16 +565,16 @@ sub nfastring { my ($i, $text) = @_;
         Encode::_utf8_on($text);
         ::here($text);
         $CursorBase::fakepos++ if $text ne '';
-        ::nfastring($self->{i}, $text);
+        nfa::string($self->{i}, $text);
     }
 }
 
 { package RE_submatch; our @ISA = 'REbase';
-    sub nfa { $DIMP }
+    sub nfa { $IMP }
 }
 
 { package RE_all; our @ISA = 'REbase';
-    sub nfa { $DIMP }
+    sub nfa { $IMP }
 }
 
 { package RE_any; our @ISA = 'REbase';
@@ -581,13 +589,13 @@ sub nfastring { my ($i, $text) = @_;
         for my $alt (@$alts) {
             $CursorBase::fakepos = $oldfakepos;
 
-            push @outs, ::nfaltmprefate($self->{altname}, $ix, $ix, $alt->nfa($C));
+            push @outs, nfa::ltmprefate($self->{altname}, $ix, $ix, $alt->nfa($C));
 
             $minfakepos = $oldfakepos if $CursorBase::fakepos == $oldfakepos;
             $ix++;
         }
         $CursorBase::fakepos = $minfakepos;  # Did all branches advance?
-        ::nfadisj(@outs);
+        nfa::disj(@outs);
     }
 }
 
@@ -595,11 +603,11 @@ sub nfastring { my ($i, $text) = @_;
     sub nfa { my ($self, $C) = @_;
         my $var = $self->{var};
         if (my $p = $C->_PARAMS) {
-            my $text = $p->{$var} || return $DIMP;
+            my $text = $p->{$var} || return $IMP;
             $CursorBase::fakepos++ if length($text);
-            return ::nfastring($self->{i}, $text);
+            return nfa::string($self->{i}, $text);
         }
-        return $DIMP;
+        return $IMP;
     }
 }
 
