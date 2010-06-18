@@ -313,7 +313,7 @@ regex stdstopper {
 }
 
 token longname {
-    <name> [ <!before ':{'> <colonpair> ]*
+    <name> {} [ <!before ':{'> <colonpair> ]*
 }
 
 token name {
