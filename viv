@@ -2975,7 +2975,6 @@ END
 	my $self = bless { a => 0, i => $::IGNORECASE ? 1 : 0,
 	    r => $::RATCHET ? 1 : 0, s => $::SIGSPACE ? 1 : 0,
 	    dba => $::DBA, dic => $::DECL_CLASS, @_ }, $class;
-	$self->{min} //= $self->calc_min;
 	$self;
     }
 
@@ -2999,8 +2998,6 @@ END
 	delete $self->{dic} unless $self->{dba_needed};
 	delete $self->{dba_needed};
     }
-
-    sub calc_min { 0 }
 
     sub walk {  my $self = shift;
 	say STDERR "--> $self" if $OPT_log;
@@ -3037,7 +3034,6 @@ END
 }
 
 { package RE_double; use base "REbase";
-    sub calc_min { length $_[0]{text} }
     sub _walk {
         my $self = shift;
         my $text = $$self{text};
@@ -3054,7 +3050,6 @@ END
 }
 
 { package RE_string; use base "REbase";
-    sub calc_min { length $_[0]->{text} }
     sub _walk {
         my $self = shift;
 	$$self{i_needed} = 1;
@@ -3062,15 +3057,11 @@ END
 	$text = "(?<=$text)" if $::REV;
 	$text = "(?i:$text)" if $$self{i};
 	DEEP::p5regex($text, has_meta => ($::REV || $$self{i}),
-	    needs_bracket => !($::REV || $$self{i}) && $$self{min} != 1);
+	    needs_bracket => !($::REV || $$self{i}) && (length($$self{text}) != 1));
     }
 }
 
 { package RE_sequence;
-    sub calc_min { my $self = shift;
-	::sum(0, map { $_->{min} } @{ $self->{zyg} });
-    }
-
     sub new {
 	my ($class, @zyg) = @_;
 	$class->SUPER::new(zyg => \@zyg);
@@ -3184,7 +3175,6 @@ END
 }
 
 { package RE_any; use base "REbase";
-    sub calc_min { ::min(1_000_000_000, map { $_->{min} } @{$_[0]{zyg}}) }
     sub _walk {
         my $self = shift;
         my @result;
@@ -3303,8 +3293,6 @@ END
 }
 
 { package RE_first; use base "REbase";
-    sub calc_min { ::min(1_000_000_000, map { $_->{min} } @{$_[0]{zyg}}) }
-
     sub new {
 	my ($class, @zyg) = @_;
 	$class->SUPER::new(zyg => \@zyg);
@@ -3363,7 +3351,6 @@ END
 }
 
 { package RE_method; use base "REbase";
-    sub calc_min { 12345 }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{nobind};
@@ -3446,7 +3433,6 @@ END
 }
 
 { package RE_ast; use base "REbase";
-    sub calc_min { $_[0]{re}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{decl};
@@ -3468,7 +3454,6 @@ END
 }
 
 { package RE_quantified_atom; use base "REbase";
-    sub calc_min { $_[0]{quant}[3] * $_[0]{atom}{min} }
     # handles cutting itself
     sub clean { my $self = shift;
 	$self->SUPER::clean;
@@ -3552,7 +3537,6 @@ END
 }
 
 { package RE_method_re; use base "REbase";
-    sub calc_min { 12345 } # "many"
     sub _walk {
         my $self = shift;
         my $re = $$self{re};
@@ -3742,7 +3726,6 @@ END
 }
 
 { package RE_cclass; use base "REbase";
-    sub calc_min { 1 }
     sub _walk {
         my $self = shift;
         my $text = $$self{text};
@@ -3830,7 +3813,6 @@ END
 }
 
 { package RE_bracket; use base "REbase";
-    sub calc_min { $_[0]->{re}->{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{decl};
@@ -3880,7 +3862,6 @@ END
 }
 
 { package RE_paren; use base "REbase";
-    sub calc_min { $_[0]{re}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{decl};
@@ -3921,7 +3902,6 @@ END
 }
 
 { package RE_bindpos; use base "REbase";
-    sub calc_min { $_[0]{atom}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{var};
@@ -3950,7 +3930,6 @@ END
 }
 
 { package RE_bindnamed; use base "REbase";
-    sub calc_min { $_[0]{atom}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{var};
