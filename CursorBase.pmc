@@ -2102,7 +2102,16 @@ sub _jit_dfa_node { my ($lexer, $node) = @_;
         $fo = [ $tb, $fo ];
         $fate = $fo;
     }
-    @{ $node->[0] } = map { $_->[1] } sort { $b->[0] cmp $a->[0] } @{ $node->[0] };
+    # Suppose two fates are different.  They must have a first point of
+    # divergence.  This point cannot be a quantifier, because then both fates
+    # would end at the quantifier; so it must be a LTM alternation.  But any
+    # LTM alternation would generate different sort keys for the sides.
+    my @sfates = sort { $b->[0] cmp $a->[0] } @{ $node->[0] };
+    @{ $node->[0] } = ();
+    for (my $i = 0; $i < @sfates; $i++) {
+        next if ($i < @sfates-1 && $sfates[$i][0] eq $sfates[$i+1][0]);
+        push @{ $node->[0] }, $sfates[$i][1];
+    }
 
     pop @$node;
     push @$node, _tangle_edges(\@ouredges, $nfa2dfa);
