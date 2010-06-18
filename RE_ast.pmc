@@ -95,6 +95,8 @@ sub here {
 
 { package nfa;
 
+# Rules: Don't call $cont more than once with the same fate.  Don't instantiate
+# a node more than once with the same fate.
 sub node {
     my $id = @::NFANODES;
     #::deb("creating direct node $id") if $::DEBUG & DEBUG::longest_token_pattern_generation;
@@ -180,14 +182,20 @@ sub opt { my ($in) = @_;
 
 sub nfa::ltm::construct { my ($self, $node, $fate, $cont) = @_;
     push @$node, undef;
-    my $ix;
-    for my $br (@{ $self->{br} }) {
-        my @fate = @$fate;
-        if (!$fate[0]) {
+    if ($fate->[0]) {
+        my $end;
+        for my $br (@{ $self->{br} }) {
+            push @$node, undef, nfa::gnode($br->[1], $fate,
+                sub { $end //= $cont->($fate) });
+        }
+    } else {
+        my $ix;
+        for my $br (@{ $self->{br} }) {
+            my @fate = @$fate;
             push @fate, $self->{t}, $br->[0], pack("NN",
                 ~($br->[1]{ll}), $ix++);
+            push @$node, undef, nfa::gnode($br->[1], \@fate, $cont);
         }
-        push @$node, undef, nfa::gnode($br->[1], \@fate, $cont);
     }
 }
 sub ltm { my ($tag, @branches) = @_;
