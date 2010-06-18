@@ -133,28 +133,10 @@ sub prefate { my ($fate, $nfa) = @_;
     \@out;
 }
 
-sub ltmprefate { my ($tag, $val, $tb, $inner) = @_;
-    my $ord = pack("NN", (~($inner->[0][0]{LITLEN} // 0)), $tb);
-    prefate([ $tag, $val, $ord, 0 ], $inner);
-}
-
 # When a non-LTM alternation or quantifier is applied to a subregex, it becomes
 # impossible to control where subsequent tokens match, so we can't copy fates.
 sub horizon { my ($inner) = @_;
     prefate([ 1 ], $inner);
-}
-
-sub has_nontrivial_fates { my ($inner) = @_;
-    my $ok = 1;
-    NODE: for my $n (@$inner) {
-        if (my $fate = $n->[1]) {
-            if ((@$fate > 1) || $fate->[0]) {
-                $ok = 0;
-                last NODE;
-            }
-        }
-    }
-    !$ok;
 }
 
 sub noreturn { my ($tocheck) = @_;
@@ -237,11 +219,14 @@ sub opt { my ($in) = @_;
     \@out;
 }
 
-sub disj { my @ins = @_;
+sub ltm { my ($tag, @branches) = @_;
     my @out = ( [ undef, undef ] );
+    my $index = 0;
 
-    for my $in (@ins) {
-        push @{ $out[0] }, undef, rebase(\@out, $in);
+    for my $branch (@branches) {
+        my $ord = pack("NN", (~($branch->[1][0][0]{LITLEN} // 0)), $index++);
+        push @{ $out[0] }, undef, rebase(\@out,
+            prefate([ $tag, $branch->[0], $ord, 0 ], $branch->[1]));
     }
 
     \@out;
@@ -542,7 +527,7 @@ my $NULL = $nfa::NULL;
         $text =~ s/^<\s*//;
         $text =~ s/\s*>$//;
 
-        nfa::horizon(nfa::disj(map { nfa::string($self->{i}, $_) } split(/\s+/, $text)));
+        nfa::horizon(nfa::ltm("", map { ["", nfa::string($self->{i}, $_)] } split(/\s+/, $text)));
     }
 }
 
@@ -587,17 +572,16 @@ my $NULL = $nfa::NULL;
         my $oldfakepos = $CursorBase::fakepos;
         my $minfakepos = $CursorBase::fakepos + 1;
         my $ix = 0;
-        
+
         for my $alt (@$alts) {
             $CursorBase::fakepos = $oldfakepos;
 
-            push @outs, nfa::ltmprefate($self->{altname}, $ix, $ix, $alt->nfa($C));
+            push @outs, [ $ix++, $alt->nfa($C) ];
 
             $minfakepos = $oldfakepos if $CursorBase::fakepos == $oldfakepos;
-            $ix++;
         }
         $CursorBase::fakepos = $minfakepos;  # Did all branches advance?
-        nfa::disj(@outs);
+        nfa::ltm($self->{altname}, @outs);
     }
 }
 

@@ -2225,7 +2225,7 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
         $dba = $proto;
         my $protopat = $1 . '__S_';
         my $protolen = length($protopat);
-        my @pat;
+        my @alts;
         my $j = 0;
         my @stack = $lang;
 
@@ -2240,12 +2240,11 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
                 my $peeklex = $self->$callname();
                 die "$proto has no lexer!?" unless $peeklex->{NFA};
 
-                push @pat, nfa::ltmprefate($proto, "${class}::$method",
-                    $j++, $peeklex->{NFA});
+                push @alts, ["${class}::$method", $peeklex->{NFA}];
             }
         }
 
-        $nfa = nfa::disj(@pat);
+        $nfa = nfa::ltm($proto, @alts);
     } elsif ($ast) {
         $nfa = $ast->nfa($self);
     } else {
