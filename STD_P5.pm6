@@ -269,7 +269,7 @@ rule comp_unit {
     :my $*IN_DECL;
     :my $*DECLARAND;
     :my $*NEWPKG;
-    :my $*NEWPAD;
+    :my $*NEWLEX;
     :my $*QSIGIL ::= '';
     :my $*IN_META = 0;
     :my $*QUASIMODO;
@@ -278,7 +278,7 @@ rule comp_unit {
     :my %*MYSTERY = ();
     :my $*INVOCANT_OK;
     :my $*INVOCANT_IS;
-    :my $*CURPAD;
+    :my $*CURLEX;
     :my $*MULTINESS = '';
 
     :my $*CURPKG;
@@ -295,15 +295,15 @@ rule comp_unit {
         self.load_setting($*SETTINGNAME);
         my $oid = $*SETTING.id;
         my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
-        $*CURPAD = Stash.new(
+        $*CURLEX = Stash.new(
             'OUTER::' => [$oid],
             '!file' => $*FILE, '!line' => 0,
             '!id' => [$id],
         );
-        $STD::ALL.{$id} = $*CURPAD;
-        $*UNIT = $*CURPAD;
+        $STD::ALL.{$id} = $*CURLEX;
+        $*UNIT = $*CURLEX;
         $STD::ALL.<UNIT> = $*UNIT;
-        self.finishpad;
+        self.finishlex;
     }}
     <statementlist>
     [ <?unitstopper> || <.panic: "Confused"> ]
@@ -323,7 +323,7 @@ method explain_mystery() {
     my %unk_routines;
     my $m = '';
     for keys(%*MYSTERY) {
-        my $p = %*MYSTERY{$_}.<pad>;
+        my $p = %*MYSTERY{$_}.<lex>;
         if self.is_name($_, $p) {
             # types may not be post-declared
             %post_types{$_} = %*MYSTERY{$_};
@@ -373,10 +373,10 @@ token xblock {
 }
 
 token block {
-    :temp $*CURPAD;
+    :temp $*CURLEX;
     :dba('scoped block')
     [ <?before '{' > || <.panic: "Missing block"> ]
-    <.newpad>
+    <.newlex>
     <blockoid>
 }
 
@@ -384,7 +384,7 @@ token blockoid {
     # encapsulate braided languages
     :temp %*LANG;
 
-    <.finishpad>
+    <.finishlex>
     [
     | :dba('block') '{' ~ '}' <statementlist>
     | <?terminator> <.panic: 'Missing block'>
@@ -611,10 +611,10 @@ token def_module_name {
     [ :dba('generic role')
         <?before '['>
         <?{ ($*PKGDECL//'') eq 'role' }>
-        <.newpad>
+        <.newlex>
         '[' ~ ']' <signature>
         { $*IN_DECL = 0; }
-        <.finishpad>
+        <.finishlex>
     ]?
 }
 
@@ -695,7 +695,7 @@ rule package_def {
     :my $*IN_DECL = 1;
     :my $*DECLARAND;
     :my $*NEWPKG;
-    :my $*NEWPAD;
+    :my $*NEWLEX;
     { $*SCOPE ||= 'our'; }
     [
         [
@@ -750,12 +750,12 @@ method checkyada {
 }
 
 rule routine_def () {
-    :temp $*CURPAD;
+    :temp $*CURLEX;
     :my $*IN_DECL = 1;
     :my $*DECLARAND;
     [
         [ '&'<deflongname>? | <deflongname> ]?
-        <.newpad(1)>
+        <.newlex(1)>
         <parensig>?
 	<trait>*
         <!{
@@ -2196,7 +2196,7 @@ rule capture {
 
 rule param_sep { [','|':'|';'|';;'] }
 
-token signature ($padsig = 0) {
+token signature ($lexsig = 0) {
     # XXX incorrectly scopes &infix:<x> parameters to outside following block
     :my $*IN_DECL = 1;
     :my $*zone = 'posreq';
@@ -2211,9 +2211,9 @@ token signature ($padsig = 0) {
     [ '-->' <.ws> <typename> ]?
     {{
         $*LEFTSIGIL = '@';
-        if $padsig {
-            $*CURPAD.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
-            $*CURPAD.<!NEEDSIG>:delete;
+        if $lexsig {
+            $*CURLEX.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
+            $*CURLEX.<!NEEDSIG>:delete;
         }
     }}
 }

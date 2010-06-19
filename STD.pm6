@@ -37,7 +37,7 @@ our $ALL;
     my $*GLOBAL;          # the GLOBAL scope
     my $*PROCESS;         # the PROCESS scope
     my $*UNIT;            # the UNIT scope
-    my $*CURPAD;      # current lexical scope
+    my $*CURLEX;          # current lexical scope info
     my $*CURPKG;          # current package scope
 
     my %*MYSTERY;     # names we assume may be post-declared functions
@@ -50,7 +50,7 @@ our $ALL;
     my $*MULTINESS;       # (d) which multi declarator we're under
     my $*PKGDECL ::= "";         # (d) current package declarator
     my $*NEWPKG;      # (u/d) new package being declared
-    my $*NEWPAD;      # (u/d) new lexpad being declared
+    my $*NEWLEX;      # (u/d) new lex info being declared
     my $*DECLARAND;   # (u/d) new object associated with declaration
 
     my $*GOAL ::= "(eof)";  # (d) which special terminator we're most wanting
@@ -1126,12 +1126,12 @@ token embeddedblock {
     :temp %*LANG;
     :my $*SIGNUM;
     :my $*GOAL ::= '}';
-    :temp $*CURPAD;
+    :temp $*CURLEX;
 
     :dba('embedded block')
 
-    <.newpad>
-    <.finishpad>
+    <.newlex>
+    <.finishlex>
     '{' :: [ :lang(%*LANG<MAIN>) <statementlist> ]
     [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
 }
@@ -1254,7 +1254,7 @@ grammar P6 is STD {
         :my $*IN_DECL = '';
         :my $*DECLARAND;
         :my $*NEWPKG;
-        :my $*NEWPAD;
+        :my $*NEWLEX;
         :my $*QSIGIL ::= '';
         :my $*IN_META = '';
         :my $*QUASIMODO;
@@ -1264,7 +1264,7 @@ grammar P6 is STD {
         :my %*MYSTERY = ();
         :my $*INVOCANT_OK;
         :my $*INVOCANT_IS;
-        :my $*CURPAD;
+        :my $*CURLEX;
         :my $*MULTINESS = '';
         :my $*SIGNUM = 0;
         :my $*MONKEY_TYPING = False;
@@ -1287,23 +1287,23 @@ grammar P6 is STD {
             self.load_setting($*SETTINGNAME);
             my $oid = $*SETTING.id;
             my $id = 'MY:file<' ~ $*FILE<name> ~ '>';
-            $*CURPAD = Stash.new(
+            $*CURLEX = Stash.new(
                 'OUTER::' => [$oid],
                 '!file' => $*FILE, '!line' => 0,
                 '!id' => [$id],
             );
-            $ALL.{$id} = $*CURPAD;
-            $*UNIT = $*CURPAD;
+            $ALL.{$id} = $*CURLEX;
+            $*UNIT = $*CURLEX;
             $ALL.<UNIT> = $*UNIT;
-            self.finishpad;
-            # $¢ = self.cursor_fresh($*CURPAD<$?LANGNAME>);
+            self.finishlex;
+            # $¢ = self.cursor_fresh($*CURLEX<$?LANGNAME>);
         }}
         <statementlist>
         [ <?unitstopper> || <.panic: "Confused"> ]
         # "CHECK" time...
         {{
             $¢.explain_mystery();
-            $¢.<PAD> = $*CURPAD;
+            $¢.<LEX> = $*CURLEX;
             if @*WORRIES {
                 note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
             }
@@ -1319,7 +1319,7 @@ grammar P6 is STD {
     # rule.  (Could also be done in a later pass.)
 
     token pblock () {
-        :temp $*CURPAD;
+        :temp $*CURLEX;
         :dba('parameterized block')
         [<?before <.lambda> | '{' > ||
             {{
@@ -1343,12 +1343,12 @@ grammar P6 is STD {
         ]
         [
         | <lambda>
-            <.newpad(1)>
+            <.newlex(1)>
             <signature(1)>
             <blockoid>
             <.getsig>
         | <?before '{'>
-            <.newpad(1)>
+            <.newlex(1)>
             <blockoid>
             <.getsig>
         ]
@@ -1367,10 +1367,10 @@ grammar P6 is STD {
     }
 
     token block () {
-        :temp $*CURPAD;
+        :temp $*CURLEX;
         :dba('scoped block')
         [ <?before '{' > || <.panic: "Missing block"> ]
-        <.newpad>
+        <.newlex>
         <blockoid>
         <.checkyada>
     }
@@ -1380,7 +1380,7 @@ grammar P6 is STD {
         :temp %*LANG;
         :my $*SIGNUM;
 
-        <.finishpad>
+        <.finishlex>
         [
         | :dba('block') '{' ~ '}' <statementlist> :: <.curlycheck>
         | <?terminator> <.panic: 'Missing block'>
@@ -1881,14 +1881,14 @@ grammar P6 is STD {
         :my $*IN_DECL = 'package';
         :my $*DECLARAND;
         :my $*NEWPKG;
-        :my $*NEWPAD;
-        :my $outer = $*CURPAD;
+        :my $*NEWLEX;
+        :my $outer = $*CURLEX;
         :temp $*CURPKG;
-        :temp $*CURPAD;
+        :temp $*CURLEX;
         { $*SCOPE ||= 'our'; }
         [
             [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname.Str); } ]?
-            <.newpad>
+            <.newlex>
             [ :dba('generic role')
                 <?{ ($*PKGDECL//'') eq 'role' }>
                 '[' ~ ']' <signature>
@@ -1929,7 +1929,7 @@ grammar P6 is STD {
                         $*begin_compunit = 0;
 
                         # XXX throws away any role sig above
-                        $*CURPAD = $outer;
+                        $*CURLEX = $outer;
 
                         # throw out null core when compiling the real CORE
                         if $shortname eq 'CORE' and $*CORE.id ~~ /NULL/ {
@@ -2008,12 +2008,12 @@ grammar P6 is STD {
     }
 
     rule routine_def ($d) {
-        :temp $*CURPAD;
+        :temp $*CURLEX;
         :my $*IN_DECL = $d;
         :my $*DECLARAND;
         [
             [ $<sigil>=['&''*'?] <deflongname>? | <deflongname> ]?
-            <.newpad(1)>
+            <.newlex(1)>
             [ <multisig> | <trait> ]*
             [ <!before '{'> <.panic: "Malformed block"> ]?
             <!{
@@ -2027,10 +2027,10 @@ grammar P6 is STD {
     }
 
     rule method_def () {
-        :temp $*CURPAD;
+        :temp $*CURLEX;
         :my $*IN_DECL = 'method';
         :my $*DECLARAND;
-        <.newpad(1)>
+        <.newlex(1)>
         [
             [
             | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
@@ -2055,18 +2055,18 @@ grammar P6 is STD {
     }
 
     rule regex_def (:$r, :$s) {
-        :temp $*CURPAD;
+        :temp $*CURLEX;
         :my $*IN_DECL = 'regex';
         :temp %*RX;
         :my $*DECLARAND;
         { %*RX<s> = $s; %*RX<r> = $r; }
         [
             [ '&'<deflongname>? | <deflongname> ]?
-            <.newpad(1)>
+            <.newlex(1)>
             [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
             [ <!before '{'> <.panic: "Malformed block"> ]?
             { $*IN_DECL = ''; }
-            <.finishpad>
+            <.finishlex>
             <regex_block>:!s
             <.getsig>
             <.getdecl>
@@ -2074,12 +2074,12 @@ grammar P6 is STD {
     }
 
     rule macro_def () {
-        :temp $*CURPAD;
+        :temp $*CURLEX;
         :my $*IN_DECL = 'macro';
         :my $*DECLARAND;
         [
             [ '&'<deflongname>? | <deflongname> ]?
-            <.newpad(1)>
+            <.newlex(1)>
             [ <multisig> | <trait> ]*
             [ <!before '{'> <.panic: "Malformed block"> ]?
             { $*IN_DECL = ''; }
@@ -2839,17 +2839,17 @@ grammar P6 is STD {
     rule param_sep { [','|':'|';'|';;'] }
 
     token fakesignature() {
-        :temp $*CURPAD;
-        <.newpad>
+        :temp $*CURLEX;
+        <.newlex>
         <signature>
     }
 
-    token signature ($padsig = 0) {
+    token signature ($lexsig = 0) {
         :my $*IN_DECL = 'sig';
         :my $*zone = 'posreq';
         :my $startpos = self.pos;
         :my $*MULTINESS = 'only';
-        :my $*SIGNUM = $padsig;
+        :my $*SIGNUM = $lexsig;
         <.ws>
         [
         | <?before '-->' | ')' | ']' | '{' | ':'\s >
@@ -2863,10 +2863,10 @@ grammar P6 is STD {
         ]?
         {{
             $*LEFTSIGIL = '@';
-            if $padsig {
-                $*CURPAD.<$?SIGNATURE> ~= '|' if $padsig > 1;
-                $*CURPAD.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
-                $*CURPAD.<!NEEDSIG>:delete;
+            if $lexsig {
+                $*CURLEX.<$?SIGNATURE> ~= '|' if $lexsig > 1;
+                $*CURLEX.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
+                $*CURLEX.<!NEEDSIG>:delete;
             }
         }}
     }
@@ -5187,45 +5187,45 @@ method require_P6 {
 # Symbol tables #
 #################
 
-method newpad ($needsig = 0) {
-    my $oid = $*CURPAD.id;
-    $ALL.{$oid} === $*CURPAD or die "internal error: current pad id is invalid";
+method newlex ($needsig = 0) {
+    my $oid = $*CURLEX.id;
+    $ALL.{$oid} === $*CURLEX or die "internal error: current lex id is invalid";
     my $line = self.lineof(self.pos);
     my $id;
-    if $*NEWPAD {
-        $*NEWPAD.<OUTER::> = $*CURPAD.idref;
-        $*CURPAD = $*NEWPAD;
-        $*NEWPAD = 0;
-        $id = $*CURPAD.id;
+    if $*NEWLEX {
+        $*NEWLEX.<OUTER::> = $*CURLEX.idref;
+        $*CURLEX = $*NEWLEX;
+        $*NEWLEX = 0;
+        $id = $*CURLEX.id;
     }
     else {
         $id = 'MY:file<' ~ $*FILE<name> ~ '>:line(' ~ $line ~ '):pos(' ~ self.pos ~ ')';
-        $*CURPAD = Stash.new(
+        $*CURLEX = Stash.new(
             'OUTER::' => [$oid],
             '!file' => $*FILE, '!line' => $line,
             '!id' => [$id],
         );
     }
-    $*CURPAD.<!NEEDSIG> = 1 if $needsig;
-    $*CURPAD.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
-    $ALL.{$id} = $*CURPAD;
-    self.<PAD> = $*CURPAD;
+    $*CURLEX.<!NEEDSIG> = 1 if $needsig;
+    $*CURLEX.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
+    $ALL.{$id} = $*CURLEX;
+    self.<LEX> = $*CURLEX;
     self;
 }
 
-method finishpad {
+method finishlex {
     my $line = self.lineof(self.pos);
-    $*CURPAD<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line );
-    $*CURPAD<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line );
-    $*CURPAD<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line );
+    $*CURLEX<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line );
+    $*CURLEX<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line );
+    $*CURLEX<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line );
     $*SIGNUM = 0;
     self;
 }
 
 method getsig {
-    my $pv = $*CURPAD.{'%?PLACEHOLDERS'};
+    my $pv = $*CURLEX.{'%?PLACEHOLDERS'};
     my $sig;
-    if $*CURPAD.<!NEEDSIG>:delete {
+    if $*CURLEX.<!NEEDSIG>:delete {
         if $pv {
             my $h_ = $pv.<%_>:delete;
             my $a_ = $pv.<@_>:delete;
@@ -5236,13 +5236,13 @@ method getsig {
         else {
             $sig = '$_ is ref = OUTER::<$_>';
         }
-        $*CURPAD.<$?SIGNATURE> = $sig;
+        $*CURLEX.<$?SIGNATURE> = $sig;
     }
     else {
-        $sig = $*CURPAD.<$?SIGNATURE>;
+        $sig = $*CURLEX.<$?SIGNATURE>;
     }
     self.<sig> = self.makestr(TEXT => $sig);
-    self.<pad> = $*CURPAD.idref;
+    self.<lex> = $*CURLEX.idref;
     self;
 }
 
@@ -5251,7 +5251,7 @@ method getdecl {
     self;
 }
 
-method is_name ($n, $curpad = $*CURPAD) {
+method is_name ($n, $curlex = $*CURLEX) {
     my $name = $n;
     self.deb("is_name $name") if $*DEBUG +& DEBUG::symtab;
 
@@ -5275,9 +5275,9 @@ method is_name ($n, $curpad = $*CURPAD) {
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
             try {
-                my $outpadid = $curpkg.[0];
-                return False unless $outpadid;
-                $curpkg = $ALL.{$outpadid};
+                my $outlexid = $curpkg.[0];
+                return False unless $outlexid;
+                $curpkg = $ALL.{$outlexid};
                 return False unless $curpkg;
             };
             self.deb("Found $pkg okay") if $*DEBUG +& DEBUG::symtab;
@@ -5286,15 +5286,15 @@ method is_name ($n, $curpad = $*CURPAD) {
     $name = shift(@components)//'';
     self.deb("Looking for $name") if $*DEBUG +& DEBUG::symtab;
     return True if $name eq '';
-    my $pad = $curpad;
-    while $pad {
-        self.deb("Looking in ", $pad.id) if $*DEBUG +& DEBUG::symtab;
-        if $pad.{$name} {
-            self.deb("Found $name in ", $pad.id) if $*DEBUG +& DEBUG::symtab;
+    my $lex = $curlex;
+    while $lex {
+        self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
+        if $lex.{$name} {
+            self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
             return True;
         }
-        my $oid = $pad.<OUTER::>[0] || last;
-        $pad = $ALL.{$oid};
+        my $oid = $lex.<OUTER::>[0] || last;
+        $lex = $ALL.{$oid};
     }
     return True if $curpkg.{$name};
     return True if $*GLOBAL.{$name};
@@ -5302,7 +5302,7 @@ method is_name ($n, $curpad = $*CURPAD) {
     return False;
 }
 
-method find_stash ($n, $curpad = $*CURPAD) {
+method find_stash ($n, $curlex = $*CURLEX) {
     my $name = $n;
     self.deb("find_stash $name") if $*DEBUG +& DEBUG::symtab;
 
@@ -5312,37 +5312,37 @@ method find_stash ($n, $curpad = $*CURPAD) {
         return () if @components[0] eq 'COMPILING::';
         return () if @components[0] eq 'CALLER::';
         return () if @components[0] eq 'CONTEXT::';
-        if $curpad = self.find_top_pkg(@components[0]) {
+        if $curlex = self.find_top_pkg(@components[0]) {
             self.deb("Found lexical package ", @components[0]) if $*DEBUG +& DEBUG::symtab;
             shift @components;
         }
         else {
             self.deb("Looking for GLOBAL::<$name>") if $*DEBUG +& DEBUG::symtab;
-            $curpad = $*GLOBAL;
+            $curlex = $*GLOBAL;
         }
         while @components > 1 {
-            my $pad = shift @components;
-            $curpad = $curpad.{$pad};
-            return () unless $curpad;
+            my $lex = shift @components;
+            $curlex = $curlex.{$lex};
+            return () unless $curlex;
             try {
-                my $outpadid = $curpad.[0];
-                return False unless $outpadid;
-                $curpad = $ALL.{$outpadid};
-                return () unless $curpad;
+                my $outlexid = $curlex.[0];
+                return False unless $outlexid;
+                $curlex = $ALL.{$outlexid};
+                return () unless $curlex;
             };
-            self.deb("Found $pad okay") if $*DEBUG +& DEBUG::symtab;
+            self.deb("Found $lex okay") if $*DEBUG +& DEBUG::symtab;
         }
     }
     $name = shift(@components)//'';
-    return $curpad if $name eq '';
+    return $curlex if $name eq '';
 
-    my $pad = $curpad;
-    while $pad {
-        return $_ if $_ = $pad.{$name};
-        my $oid = $pad.<OUTER::>[0] || last;
-        $pad = $ALL.{$oid};
+    my $lex = $curlex;
+    while $lex {
+        return $_ if $_ = $lex.{$name};
+        my $oid = $lex.<OUTER::>[0] || last;
+        $lex = $ALL.{$oid};
     }
-    return $_ if $_ = $curpad.{$name};
+    return $_ if $_ = $curlex.{$name};
     return $_ if $_ = $*GLOBAL.{$name};
     return ();
 }
@@ -5354,10 +5354,10 @@ method find_top_pkg ($name) {
         return $*CURPKG;
     }
     elsif $name eq 'MY::' {
-        return $*CURPAD;
+        return $*CURLEX;
     }
     elsif $name eq 'OUTER::' {
-        return $ALL.{$*CURPAD.<OUTER::>[0]};
+        return $ALL.{$*CURLEX.<OUTER::>[0]};
     }
     elsif $name eq 'CORE::' {
         return $*CORE;
@@ -5369,11 +5369,11 @@ method find_top_pkg ($name) {
         return $*UNIT;
     }
     # everything is somewhere in lexical scope (we hope)
-    my $pad = $*CURPAD;
-    while $pad {
-        return $pad.{$name} if $pad.{$name};
-        my $oid = $pad.<OUTER::>[0] || last;
-        $pad = $ALL.{$oid};
+    my $lex = $*CURLEX;
+    while $lex {
+        return $lex.{$name} if $lex.{$name};
+        my $oid = $lex.<OUTER::>[0] || last;
+        $lex = $ALL.{$oid};
     }
     return 0;
 }
@@ -5402,9 +5402,9 @@ method add_name ($name) {
 
 method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optionals right
     my $name = $n;
-    self.deb("add_my_name $name in ", $*CURPAD.id) if $*DEBUG +& DEBUG::symtab;
+    self.deb("add_my_name $name in ", $*CURLEX.id) if $*DEBUG +& DEBUG::symtab;
     return self if $name ~~ /\:\:\(/;
-    my $curstash = $*CURPAD;
+    my $curstash = $*CURLEX;
     my @components = self.canonicalize_name($name);
     my $sid = $curstash.id // '???';
     while @components > 1 {
@@ -5428,7 +5428,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
     # This may just be a lexical alias to "our" and such,
     # so reuse $*DECLARAND pointer if it's there.
     my $declaring = $d // NAME.new(
-        xpad => $curstash.idref,
+        xlex => $curstash.idref,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
@@ -5458,7 +5458,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
                     $loc = " (see line $oline)";
                 }
             }
-            if $old.opad {
+            if $old.olex {
                 my $rebind = $old<rebind>;
                 my $truename = $old<varbind><truename>;
                 self.sorry("Lexical symbol '$name' is already bound to an outer symbol$loc;\n  the implicit outer binding at line $rebind must be rewritten as $truename\n  before you can unambiguously declare a new '$name' in this scope");
@@ -5477,14 +5477,14 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
         $curstash.{$shortname} = $declaring unless $shortname eq $name;
-        $*DECLARAND<inpad> = $curstash.idref;
+        $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
         $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
         if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
             $curstash.{"&$shortname"} //= $curstash.{$shortname};
             $sid ~= "::$name";
             if $name !~~ /\:\</ {
-                $*NEWPAD = $curstash.{$name ~ '::'} = ($p // Stash.new(
+                $*NEWLEX = $curstash.{$name ~ '::'} = ($p // Stash.new(
                     'PARENT::' => $curstash.idref,
                     '!file' => $*FILE, '!line' => self.line,
                     '!id' => [$sid] ));
@@ -5528,7 +5528,7 @@ method add_our_name ($n) {
     }
 
     my $declaring = $*DECLARAND // NAME.new(
-        xpad => $curstash.idref,
+        xlex => $curstash.idref,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
@@ -5587,8 +5587,8 @@ method add_mystery ($token,$pos,$ctx) {
     my $name = $token.Str;
     return self if $*IN_PANIC;
     if not self.is_known($name) {
-        self.deb("add_mystery $name $*CURPAD") if $*DEBUG +& DEBUG::symtab;
-        %*MYSTERY{$name}.<pad> = $*CURPAD;
+        self.deb("add_mystery $name $*CURLEX") if $*DEBUG +& DEBUG::symtab;
+        %*MYSTERY{$name}.<lex> = $*CURLEX;
         %*MYSTERY{$name}.<token> = $token;
         %*MYSTERY{$name}.<ctx> = $ctx;
         %*MYSTERY{$name}.<line> ~= ',' if %*MYSTERY{$name}.<line>;
@@ -5606,7 +5606,7 @@ method explain_mystery() {
     my %unk_routines;
     my $m = '';
     for keys(%*MYSTERY) {
-        my $p = %*MYSTERY{$_}.<pad>;
+        my $p = %*MYSTERY{$_}.<lex>;
         if self.is_name($_, $p) {
             # types may not be post-declared
             %post_types{$_} = %*MYSTERY{$_};
@@ -5649,13 +5649,13 @@ method explain_mystery() {
 }
 
 method load_setting ($setting) {
-    $ALL = self.load_pad($setting);
+    $ALL = self.load_lex($setting);
 
     $*CORE = $ALL<CORE>;
     $*CORE.<!id> //= ['CORE'];
 
     $*SETTING = $ALL<SETTING>;
-    $*CURPAD = $*SETTING;
+    $*CURLEX = $*SETTING;
 
     $*GLOBAL = $*CORE.<GLOBAL::> = Stash.new(
         '!file' => $*FILE, '!line' => 1,
@@ -5664,7 +5664,7 @@ method load_setting ($setting) {
     $*CURPKG = $*GLOBAL;
 }
 
-method is_known ($n, $curpad = $*CURPAD) {
+method is_known ($n, $curlex = $*CURLEX) {
     my $name = $n;
     self.deb("is_known $name") if $*DEBUG +& DEBUG::symtab;
     return True if $*QUASIMODO;
@@ -5690,9 +5690,9 @@ method is_known ($n, $curpad = $*CURPAD) {
             $curpkg = $curpkg.{$pkg};
             return False unless $curpkg;
             try {
-                my $outpadid = $curpkg.[0];
-                return False unless $outpadid;
-                $curpkg = $ALL.{$outpadid};
+                my $outlexid = $curpkg.[0];
+                return False unless $outlexid;
+                $curpkg = $ALL.{$outlexid};
                 return False unless $curpkg;
             };
             self.deb("Found $pkg okay, now in $curpkg ") if $*DEBUG +& DEBUG::symtab;
@@ -5710,40 +5710,40 @@ method is_known ($n, $curpad = $*CURPAD) {
     return False if $curpkg !=== $*CURPKG and $curpkg<!id>[0] ~~ /^GLOBAL($|\:\:)/;
 
     my $varbind = { truename => '???' };
-    return True if $n !~~ /\:\:/ and self.pad_can_find_name($curpad,$name,$varbind);
+    return True if $n !~~ /\:\:/ and self.lex_can_find_name($curlex,$name,$varbind);
     self.deb("Not Found") if $*DEBUG +& DEBUG::symtab;
 
     return False;
 }
 
-method pad_can_find_name ($pad, $name, $varbind) {
-    self.deb("Looking in ", $pad.id) if $*DEBUG +& DEBUG::symtab;
-    if $pad.{$name} {
-        self.deb("Found $name in ", $pad.id) if $*DEBUG +& DEBUG::symtab;
+method lex_can_find_name ($lex, $name, $varbind) {
+    self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
+    if $lex.{$name} {
+        self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
         return True;
     }
 
-    my $outpadid = $pad.<OUTER::>[0];
-    return False unless $outpadid;
-    my $outpad = $ALL.{$outpadid};
+    my $outlexid = $lex.<OUTER::>[0];
+    return False unless $outlexid;
+    my $outlex = $ALL.{$outlexid};
 
-    if self.pad_can_find_name($outpad,$name,$varbind) {
+    if self.lex_can_find_name($outlex,$name,$varbind) {
         # fake up an alias to outer symbol to catch reclaration
-        my $outname = $outpad.{$name}<name>;
-        my $outfile = $outpad.{$name}<file>;
-        my $outline = $outpad.{$name}<line>;
+        my $outname = $outlex.{$name}<name>;
+        my $outfile = $outlex.{$name}<file>;
+        my $outline = $outlex.{$name}<line>;
         $outname = '<' ~ $outname ~ '>' unless $outname ~~ /\:\:\</;
         $outname = "OUTER::" ~ $outname;
-        $pad.{$name} = NAME.new(
-            xpad => $pad.idref,
-            opad => $pad.idref,
+        $lex.{$name} = NAME.new(
+            xlex => $lex.idref,
+            olex => $lex.idref,
             name => $outname,
             file => $outfile, line => $outline,
             rebind => self.line,
             varbind => $varbind,
             mult => 'only',
         );
-        # the innermost pad sets this last to get correct # of OUTER::s
+        # the innermost lex sets this last to get correct # of OUTER::s
         $varbind.<truename> = $outname;
         return True;
     }
@@ -5773,7 +5773,7 @@ method add_variable ($name) {
 
 method add_constant($name,$value) {
     my $*IN_DECL = 'constant';
-    self.deb("add_constant $name = $value in", $*CURPAD.id) if $*DEBUG +& DEBUG::symtab;
+    self.deb("add_constant $name = $value in", $*CURLEX.id) if $*DEBUG +& DEBUG::symtab;
     my $*DECLARAND;
     self.add_my_name($name);
     $*DECLARAND<value> = $value;
@@ -5781,18 +5781,18 @@ method add_constant($name,$value) {
 }
 
 method add_placeholder($name) {
-    my $decl = $*CURPAD.<!IN_DECL> // '';
+    my $decl = $*CURLEX.<!IN_DECL> // '';
     $decl = ' ' ~ $decl if $decl;
     my $*IN_DECL = 'variable';
 
     if $*SIGNUM {
         return self.sorry("Placeholder variable $name is not allowed in the$decl signature");
     }
-    elsif my $siggy = $*CURPAD.<$?SIGNATURE> {
+    elsif my $siggy = $*CURLEX.<$?SIGNATURE> {
         return self.sorry("Placeholder variable $name cannot override existing signature $siggy");
     }
-    if not $*CURPAD.<!NEEDSIG> {
-        if $*CURPAD === $*UNIT {
+    if not $*CURLEX.<!NEEDSIG> {
+        if $*CURLEX === $*UNIT {
             return self.sorry("Placeholder variable $name may not be used outside of a block");
         }
         return self.sorry("Placeholder variable $name may not be used here because the surrounding$decl block takes no signature");
@@ -5807,9 +5807,9 @@ method add_placeholder($name) {
     $twigil = '^' if $varname ~~ s/\^//;
     $signame = $twigil = ':' if $varname ~~ s/\://;
     $signame ~= $varname;
-    return self if $*CURPAD.{'%?PLACEHOLDERS'}{$signame}++;
+    return self if $*CURLEX.{'%?PLACEHOLDERS'}{$signame}++;
 
-    if $*CURPAD{$varname} {
+    if $*CURLEX{$varname} {
         return self.sorry("$varname has already been used as a non-placeholder in the surrounding$decl block,\n  so you will confuse the reader if you suddenly declare $name here");
     }
  
@@ -5880,7 +5880,7 @@ method check_variable ($variable) {
 method lookup_compiler_var($name, $default = Nil) {
 
     # see if they did "constant $?FOO = something" earlier
-    my $lex = $*CURPAD.{$name};
+    my $lex = $*CURLEX.{$name};
     if defined $lex {
         if $lex.<thunk>:exists {
             return $lex.<thunk>.();
@@ -5897,7 +5897,7 @@ method lookup_compiler_var($name, $default = Nil) {
 
         when '$?LANG'     { return item %*LANG; }
 
-        when '$?LEXPAD'   { return $*CURPAD; }
+        when '$?LEXINFO'   { return $*CURLEX; }
 
         when '$?PACKAGE'  { return $*CURPKG; }
         when '$?MODULE'   { return $*CURPKG; } #  XXX should scan

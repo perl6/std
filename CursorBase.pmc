@@ -271,36 +271,36 @@ sub initparse {
     $result;
 }
 
-sub load_pad {
+sub load_lex {
     my $self = shift;
     my $setting = shift;
     my $syml = $::TMP_PREFIX . 'syml';
     my $file = "$syml/$setting.syml";
     if (-e $file) {
-        bless($self->load_yaml_pad($setting),'Stash');
+        bless($self->load_yaml_lex($setting),'Stash');
     }
     else {
-        bless($self->load_perl_pad($setting),'Stash');
+        bless($self->load_perl_lex($setting),'Stash');
     }
 }
 
-sub load_perl_pad {
+sub load_perl_lex {
     my $self = shift;
     my $setting = shift;
-    state %PADS;
-    return $PADS{$setting} if $PADS{$setting};
-    my $file = "$setting.pad";
+    state %LEXS;
+    return $LEXS{$setting} if $LEXS{$setting};
+    my $file = "$setting.lex";
     my $syml = $::TMP_PREFIX . 'syml';
-    my $store = "$syml/$setting.pad.store";
+    my $store = "$syml/$setting.lex.store";
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
-        $PADS{$setting} = retrieve($store);
+        $LEXS{$setting} = retrieve($store);
     }
     else {
-        $PADS{$setting} = require $file;
-        store($PADS{$setting}, $store);
+        $LEXS{$setting} = require $file;
+        store($LEXS{$setting}, $store);
     }
-    $PADS{$setting};
+    $LEXS{$setting};
 }
 
 sub LoadFile {
@@ -311,29 +311,29 @@ sub LoadFile {
     Load($text);
 }
 
-sub load_yaml_pad {
+sub load_yaml_lex {
     my $self = shift;
     my $setting = shift;
-    state %PADS;
-    return $PADS{$setting} if $PADS{$setting};
+    state %LEXS;
+    return $LEXS{$setting} if $LEXS{$setting};
     my $syml = $::TMP_PREFIX . 'syml';
     my $file = "$syml/$setting.syml";
     my $store = "$syml/$setting.syml.store";
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
-        $PADS{$setting} = retrieve($store);
+        $LEXS{$setting} = retrieve($store);
     }
     else {
-        $PADS{$setting} = LoadFile($file);
-        store($PADS{$setting}, $store);
+        $LEXS{$setting} = LoadFile($file);
+        store($LEXS{$setting}, $store);
     }
-    # say join ' ', sort keys %{ $PADS{$setting} };
-    $PADS{$setting};
+    # say join ' ', sort keys %{ $LEXS{$setting} };
+    $LEXS{$setting};
 }
 
 sub you_are_here {
     my $self = shift;
-    $::YOU_WERE_HERE = $::CURPAD;
+    $::YOU_WERE_HERE = $::CURLEX;
     $self;
 }
 
@@ -2348,10 +2348,10 @@ sub set_export {
     my $text = shift;
     my $textpkg = $text . '::';
     my $name = $::DECLARAND->{name};
-    my $xpad = $STD::ALL->{ (delete $::DECLARAND->{xpad})->[0] };
+    my $xlex = $STD::ALL->{ (delete $::DECLARAND->{xlex})->[0] };
     $::DECLARAND->{export} = $text;
-    my $sid = $::CURPAD->idref;
-    my $x = $xpad->{'EXPORT::'} //= Stash::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
+    my $sid = $::CURLEX->idref;
+    my $x = $xlex->{'EXPORT::'} //= Stash::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
     $x->{$textpkg} //= Stash::->new( 'PARENT::' => $x->idref, '!id' => [$sid->[0] . '::EXPORT::' . $text] );
     $x->{$textpkg}->{$name} = $::DECLARAND;
     $x->{$textpkg}->{'&'.$name} = $::DECLARAND

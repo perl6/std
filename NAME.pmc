@@ -15,6 +15,6 @@ sub new {
 sub name  { my $self = shift; return $self->{name} };
 sub file  { my $self = shift; return $self->{file} };
 sub line  { my $self = shift; return $self->{line} };
-sub xpad  { my $self = shift; return $self->{xpad} };
-sub opad  { my $self = shift; return $self->{opad} };
+sub xlex  { my $self = shift; return $self->{xlex} };
+sub olex  { my $self = shift; return $self->{olex} };
 1;

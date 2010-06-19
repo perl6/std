@@ -2588,9 +2588,9 @@ END
     }
     sub emit_psq { my $self = shift;
 	my @stmts = $self->kids('statement');
-	local @::PADVARS;
+	local @::LEXVARS;
 	my $b = join("", map { $_->psq . "\n" } @stmts);
-	join("", @::PADVARS, $b);
+	join("", @::LEXVARS, $b);
     }
 }
 
@@ -3007,10 +3007,10 @@ END
 
 	if ($scope eq 'my') {
 	    die "Variables in Perlesque *must* be typed" unless $type;
-	    push @::PADVARS, "my $type $var;\n" if $s eq '$';
-	    push @::PADVARS, "my List[$type] $var = List[$type].new();\n"
+	    push @::LEXVARS, "my $type $var;\n" if $s eq '$';
+	    push @::LEXVARS, "my List[$type] $var = List[$type].new();\n"
 		if $s eq '@';
-	    push @::PADVARS, "my Dictionary[str,$type] $var = Dictionary[str,$type].new();\n" if $s eq '%';
+	    push @::LEXVARS, "my Dictionary[str,$type] $var = Dictionary[str,$type].new();\n" if $s eq '%';
 	    return $var;
 	}
     }
