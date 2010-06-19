@@ -517,8 +517,8 @@ sub rd {
 	    $args[-1] =~ s/ at .*? line .*?\n$//s if $args[-1] =~ /\n$/s;
 	    die Carp::longmess(@args);
 	};
-	my @bits = !$OPT_keep_going ? $self->emit_FORM : (::try {
-	    $self->emit_FORM;
+	my @bits = !$OPT_keep_going ? $self->emit_FORM(@_) : (::try {
+	    $self->emit_FORM(@_);
 	} ::catch {
 	    my $char = $self->{BEG} // $self->{_from} // 0;
 	    my $line = 1 + (substr($ORIG, 0, $char) =~ y/\n/\n/);
@@ -919,6 +919,9 @@ TEMPLATE
 	} else {
 	    return $self->SUPER::emit_p5;
 	}
+    }
+
+    sub emit_psq { my $self = shift; my %args = @_;
     }
 }
 
@@ -1496,6 +1499,13 @@ BODY
 
 
 { package VAST::multi_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	if ($self->{declarator}) {
+	    $self->{declarator}->psq(@_, multiness => $self->{SYM});
+	} else {
+	    $self->{routine_def}->psq(@_, multiness => $self->{SYM});
+	}
+    }
 }
 
 
@@ -2334,10 +2344,26 @@ END
 	    $self->SUPER::emit_p5;
 	}
     }
+
+    sub emit_psq {  my $self = shift;  my $scope = shift;
+	if ($self->{multi_declarator}) {
+	    $self->{multi_declarator}->psq(scope => $scope,
+		typename => $self->{typename}[0]);
+	} elsif ($self->{regex_declarator}) {
+	    $self->{regex_declarator}->psq(scope => $scope);
+	} elsif ($self->{package_declarator}) {
+	    $self->{package_declarator}->psq(scope => $scope);
+	} else {
+	    $self->{declarator}->psq(scope => $scope);
+	}
+    }
 }
 
 
 { package VAST::scope_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	$self->{scoped}->psq($::SCOPE);
+    }
 }
 
 
@@ -2724,6 +2750,9 @@ END
 
 
 { package VAST::term__S_scope_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq {  my $self = shift;
+	$self->{scope_declarator}->psq;
+    }
 }
 
 
