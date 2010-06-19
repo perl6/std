@@ -69,6 +69,8 @@ our $CLEAR = color 'clear';
 use LazyMap qw(lazymap eager);
 use constant DEBUG => $::DEBUG;
 
+our $REGEXES = { ALL => [] };
+
 BEGIN {
     require Moose;
     # this prevents us from inheriting from Moose::Object, which saves a
@@ -201,11 +203,9 @@ sub parse {
 sub parsefile {
     my $class = shift;
     my $file = shift;
-    local $::FILE = { name => $file };
     my %args = @_;
-    my $tmp_prefix = $args{tmp_prefix} // $ENV{STD5PREFIX} // '';
-    local $::TMP_PREFIX = $tmp_prefix;
     $file =~ s/::/\//g;
+    local $::FILE = { name => $file };
     open(FILE, '<:utf8', $file) or die "Can't open $file: $!\n";
     my $text;
     {
@@ -215,14 +215,8 @@ sub parsefile {
     }
 
     my $result;
-    $result = $class->initparse($text,@_);
+    $result = $class->initparse($text,@_,filename => $file);
 
-    if ($::YOU_WERE_HERE) {
-        $result->you_were_here;
-    }
-    elsif ($file =~ /\.pm6?$/) {
-        $result->you_were_here;
-    }
     $result;
 }
 
@@ -235,11 +229,12 @@ sub initparse {
     my $tmp_prefix = $args{tmp_prefix} // $ENV{STD5PREFIX} // '';
     my $setting = $args{setting} // 'CORE';
     my $actions = $args{actions} // '';
+    my $filename = $args{filename};
 
     local $::TMP_PREFIX = $tmp_prefix;
     local $::SETTINGNAME = $setting;
     local $::ACTIONS = $actions;
-    local @::MEMOS = @::MEMOS;
+    local @::MEMOS = ();
 
     local @::ACTIVE = ();
 
@@ -252,46 +247,60 @@ sub initparse {
     local $::LAST_NIBBLE_MULTILINE = bless { firstline => 0, lastline => 0 }, 'Cursor';
     local $::GOAL = "(eof)";
     $text .= "\n" unless substr($text,-1,1) eq "\n";
-    $::ORIG = $text;           # original string
+    local $::ORIG = $text;           # original string
+    local @::ORIG;
+
+    # This isn't the way it should work; each parse node should instead carry
+    # a reference to the string.  But that's a bit tricky to make work right
+    # in perl 5.
+    if ($args{text_return}) {
+        ${$args{text_return}} = $text;
+    }
 
     my $result = $self->new()->$rule();
     delete $result->{_xact};
 
     # XXX here attach stuff that will enable :cont
+    if ($::YOU_WERE_HERE) {
+        $result->you_were_here;
+    }
+    elsif ($args{filename} && $args{filename} =~ /\.pm6?$/) {
+        $result->you_were_here;
+    }
 
     $result;
 }
 
-sub load_pad {
+sub load_lex {
     my $self = shift;
     my $setting = shift;
     my $syml = $::TMP_PREFIX . 'syml';
     my $file = "$syml/$setting.syml";
     if (-e $file) {
-        bless($self->load_yaml_pad($setting),'Stash');
+        bless($self->load_yaml_lex($setting),'Stash');
     }
     else {
-        bless($self->load_perl_pad($setting),'Stash');
+        bless($self->load_perl_lex($setting),'Stash');
     }
 }
 
-sub load_perl_pad {
+sub load_perl_lex {
     my $self = shift;
     my $setting = shift;
-    state %PADS;
-    return $PADS{$setting} if $PADS{$setting};
-    my $file = "$setting.pad";
+    state %LEXS;
+    return $LEXS{$setting} if $LEXS{$setting};
+    my $file = "$setting.lex";
     my $syml = $::TMP_PREFIX . 'syml';
-    my $store = "$syml/$setting.pad.store";
+    my $store = "$syml/$setting.lex.store";
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
-        $PADS{$setting} = retrieve($store);
+        $LEXS{$setting} = retrieve($store);
     }
     else {
-        $PADS{$setting} = require $file;
-        store($PADS{$setting}, $store);
+        $LEXS{$setting} = require $file;
+        store($LEXS{$setting}, $store);
     }
-    $PADS{$setting};
+    $LEXS{$setting};
 }
 
 sub LoadFile {
@@ -302,29 +311,29 @@ sub LoadFile {
     Load($text);
 }
 
-sub load_yaml_pad {
+sub load_yaml_lex {
     my $self = shift;
     my $setting = shift;
-    state %PADS;
-    return $PADS{$setting} if $PADS{$setting};
+    state %LEXS;
+    return $LEXS{$setting} if $LEXS{$setting};
     my $syml = $::TMP_PREFIX . 'syml';
     my $file = "$syml/$setting.syml";
     my $store = "$syml/$setting.syml.store";
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
-        $PADS{$setting} = retrieve($store);
+        $LEXS{$setting} = retrieve($store);
     }
     else {
-        $PADS{$setting} = LoadFile($file);
-        store($PADS{$setting}, $store);
+        $LEXS{$setting} = LoadFile($file);
+        store($LEXS{$setting}, $store);
     }
-    # say join ' ', sort keys %{ $PADS{$setting} };
-    $PADS{$setting};
+    # say join ' ', sort keys %{ $LEXS{$setting} };
+    $LEXS{$setting};
 }
 
 sub you_are_here {
     my $self = shift;
-    $::YOU_WERE_HERE = $::CURPAD;
+    $::YOU_WERE_HERE = $::CURLEX;
     $self;
 }
 
@@ -1818,22 +1827,33 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 # Steal data from Perl5's Unicode maps
 my %unicode_map_cache;
-$unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
-sub _get_unicode_map {
-    my $propname = shift;
-    $unicode_map_cache{$propname} //= do {
-        my @top = (("") x 1088, $propname);
-        for my $l (split("\n", (do "unicore/lib/$propname.pl"))) {
-            my ($from, $to) = split("\t", $l);
-            $from = hex $from;
-            $to = hex $to || $from;
+BEGIN {
+    $unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
+    open MAP, "uniprops" or die "cannot open unicode maps: $!";
+    binmode MAP;
+    while (defined (my $c = getc MAP)) {
+        my $name = "";
+        my $used;
+        my $tile;
+        read MAP, $name, ord($c);
+        read MAP, $used, 136;
 
-            for (my $x = $from; $x <= $to; $x++) {
-                vec($top[$x >> 10], $x & 1023, 1) = 1;
+        $unicode_map_cache{$name} = [];
+        $unicode_map_cache{$name}[1088] = $name;
+
+        for (my $i = 0; $i < 1088; $i++) {
+            if (vec($used, $i, 1)) {
+                read MAP, $tile, 128;
+                $unicode_map_cache{$name}[$i] = $tile;
             }
         }
-        \@top;
-    };
+    }
+    close MAP or die "cannot close unicode maps: $!";
+}
+sub _get_unicode_map {
+    my $propname = shift;
+    $unicode_map_cache{$propname} //
+        die "Map $propname not found.  Edit gen-unicode-table.pl and rerun.";
 }
 
 # This is the fast path handling for JIT DFA lexer generation (although it gets
@@ -1850,17 +1870,13 @@ sub _dump_nfa { my ($name, $nfa) = @_;
         for (my $j = 2; $j < @{ $nfa->[$ix] }; $j += 2) {
             push @go, "[" . join("-",@{$nfa->[$ix][$j] // []}) . "] => " . $nfa->[$ix][$j+1];
         }
-        my $h = sprintf "%4d: %-30s %s ", $ix, join(", ", @go),
-            ($nfa->[$ix][0]{I} ? 'I' : ' ');
-        my @fate = map { my @x = @$_;
-                         my $y = pop @x;
-                         push @x, "..." if $y;
-                         join(" ", "-->", @x) } @{ $nfa->[$ix][1] };
-        @fate = ('') if !@fate;
-        for (@fate) {
-            print ::LOG $h . $_ . "\n";
-            $h = ' ' x length($h);
+        my $l = sprintf "%4d: %-30s ", $ix, join(", ", @go);
+        if ($nfa->[$ix][1]) {
+            my @x = @{ $nfa->[$ix][1] };
+            push @x, "..." if shift(@x);
+            $l .= join(" ", "-->", @x);
         }
+        print ::LOG $l, "\n";
     }
     print ::LOG "---- END NFA DUMP ----\n";
 }
@@ -2065,7 +2081,7 @@ sub _jit_dfa_node { my ($lexer, $node) = @_;
         $black{$nix} = 1;
         my $nfn = $nfa->[$nix];
 
-        push @{ $node->[0] }, @{ $nfn->[1] };
+        push @{ $node->[0] }, $nfn->[1] if $nfn->[1];
         for (my $i = 2; $i < @$nfn; $i += 2) {
             if (!$nfn->[$i]) {
                 push @grey, $nfn->[$i+1];
@@ -2079,14 +2095,23 @@ sub _jit_dfa_node { my ($lexer, $node) = @_;
         my @a = reverse @$fate;
         my $fo = undef;
         my $tb = "";
-        for (my $i = 1; $i < @a; $i += 3) {
+        for (my $i = 0; $i < @a - 1; $i += 3) {
             $tb = $a[$i] . $tb;
             $fo = [ $fo, $a[$i+2], $a[$i+1] ];
         }
         $fo = [ $tb, $fo ];
         $fate = $fo;
     }
-    @{ $node->[0] } = map { $_->[1] } sort { $b->[0] cmp $a->[0] } @{ $node->[0] };
+    # Suppose two fates are different.  They must have a first point of
+    # divergence.  This point cannot be a quantifier, because then both fates
+    # would end at the quantifier; so it must be a LTM alternation.  But any
+    # LTM alternation would generate different sort keys for the sides.
+    my @sfates = sort { $b->[0] cmp $a->[0] } @{ $node->[0] };
+    @{ $node->[0] } = ();
+    for (my $i = 0; $i < @sfates; $i++) {
+        next if ($i < @sfates-1 && $sfates[$i][0] eq $sfates[$i+1][0]);
+        push @{ $node->[0] }, $sfates[$i][1];
+    }
 
     pop @$node;
     push @$node, _tangle_edges(\@ouredges, $nfa2dfa);
@@ -2128,7 +2153,6 @@ sub _scan_regexes { my ($class, $key) = @_;
 
 sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
     local $::AUTOLEXED{$realkey} = $fakepos;
-    local %::usedmethods;
 
     my $lang = ref $self;
 
@@ -2154,6 +2178,7 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
             my $i = 1; # skip _AUTOLEXpeek;
             my $pkg = 'CursorBase';
             $pkg = caller($i++) while $pkg eq 'CursorBase';
+            #print STDERR "dic run: $pkg\n";
             $self->deb("\tdeclared in class $pkg") if DEBUG & DEBUG::autolexer;
             $pkg;
         };
@@ -2202,12 +2227,10 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
 
     if ($key =~ /(.*):\*$/) {
         my $proto = $1;
-        # any change to the method needs to invalidate us
-        $::usedmethods{$proto} = 1;
         $dba = $proto;
         my $protopat = $1 . '__S_';
         my $protolen = length($protopat);
-        my @pat;
+        my @alts;
         my $j = 0;
         my @stack = $lang;
 
@@ -2220,14 +2243,13 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
                 my $callname = $class . '::' . $method;
                 $method = substr($method, 0, length($method)-6);
                 my $peeklex = $self->$callname();
-                die "$proto has no lexer!?" unless $peeklex->{NFA};
+                die "$proto has no lexer!?" unless $peeklex->{NFAT};
 
-                push @pat, ::nfaltmprefate($proto, "${class}::$method",
-                    $j++, $peeklex->{NFA});
+                push @alts, ["${class}::$method", $peeklex->{NFAT}];
             }
         }
 
-        $nfa = ::nfadisj(@pat);
+        $nfa = nfa::method($proto, nfa::ltm($proto, @alts));
     } elsif ($ast) {
         $nfa = $ast->nfa($self);
     } else {
@@ -2236,14 +2258,20 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
 
     die "dba unspecified" unless $dba;
 
-    _dump_nfa($key, $nfa) if $d;
-    print ::LOG "used methods: ", join(" ", sort keys %::usedmethods), "\n" if $d;
+    local @::NFANODES;
+    nfa::gnode($nfa, [0], undef);
+    my $nfag = \@::NFANODES;
+    my %usedmethods = map { $_, 1 } @{ $nfa->{m} };
+    $nfa->{m} = [ sort keys %usedmethods ];
+
+    _dump_nfa($key, $nfag) if $d;
+    print ::LOG "used methods: ", join(" ", sort keys %usedmethods), "\n" if $d;
 
     my $dfa   = CORE::bless [], 'CursorBase::dfa';
     push @$dfa, [ undef, { BITS => "\001", ID => 0 } ];
 
     { DBA => $dba, DFA => $dfa, NFA2DFA => { "\001" => $dfa->[0] },
-        NFA => $nfa, S => $dfa->[0], USED_METHODS => \%::usedmethods };
+        NFA => $nfag, NFAT => $nfa, S => $dfa->[0], USED_METHODS => \%usedmethods };
 }
 
 sub _AUTOLEXpeek { my $self = shift;
@@ -2258,7 +2286,7 @@ sub _AUTOLEXpeek { my $self = shift;
     if ($::AUTOLEXED{$realkey}) {   # no left recursion allowed in lexer!
         die "Left recursion in $key" if $fakepos == $::AUTOLEXED{$realkey};
         $self->deb("Suppressing lexer recursion on $key") if DEBUG & DEBUG::autolexer;
-        return { USED_METHODS => {}, NFA => [[{I=>1}, [[1]]]] };  # (but if we advanced just assume a :: here)
+        return { USED_METHODS => {}, NFAT => $nfa::IMP };  # (but if we advanced just assume a :: here)
     }
     $key = 'termish' if $key eq 'EXPR';
     return $::LEXERS{ref $self}->{$realkey} //= do {
@@ -2320,10 +2348,10 @@ sub set_export {
     my $text = shift;
     my $textpkg = $text . '::';
     my $name = $::DECLARAND->{name};
-    my $xpad = $STD::ALL->{ (delete $::DECLARAND->{xpad})->[0] };
+    my $xlex = $STD::ALL->{ (delete $::DECLARAND->{xlex})->[0] };
     $::DECLARAND->{export} = $text;
-    my $sid = $::CURPAD->idref;
-    my $x = $xpad->{'EXPORT::'} //= Stash::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
+    my $sid = $::CURLEX->idref;
+    my $x = $xlex->{'EXPORT::'} //= Stash::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
     $x->{$textpkg} //= Stash::->new( 'PARENT::' => $x->idref, '!id' => [$sid->[0] . '::EXPORT::' . $text] );
     $x->{$textpkg}->{$name} = $::DECLARAND;
     $x->{$textpkg}->{'&'.$name} = $::DECLARAND
@@ -2758,22 +2786,6 @@ END
         $lang->deb("derive $genpkg from $WHAT adding $mangle") if DEBUG & DEBUG::mixins;
         eval $e or die "Can't create $name: $@\n";
         $::LANG{'MAIN'} = $lang->cursor_fresh($genpkg);
-        my $oldlexer = $::LEXERS{$WHAT};
-        my $newlexer = $::LEXERS{$genpkg} //= {};
-        print ::LOG "=====================================\nADD $rule => $mangle\n" if DEBUG & DEBUG::mixins;;
-        for my $name (sort keys %{$oldlexer}) {
-            print ::LOG "  $name:\n" if DEBUG & DEBUG::mixins;
-            my $same = 1;
-            for my $pat (@{$oldlexer->{$name}->{PATS}}) {
-                if ($pat =~ / $category /) {
-                    print ::LOG "\t$pat\n" if DEBUG & DEBUG::mixins;
-                    $same = 0;
-                    last;
-                }
-            }
-            # no need to regen a sublexer that will turn out the same
-            $newlexer->{$name} = $oldlexer->{$name} if $same;
-        }
     }
     $lang;
 }

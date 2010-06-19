@@ -62,6 +62,7 @@ our $OPT_thaw = 0;
 our $OPT_keep_going = 0;
 our $OPT_output_file = undef;
 my $PROG = '';
+my $ORIG;
 my $U = 0;
 my @did_ws;
 
@@ -186,14 +187,16 @@ sub MAIN {
     my $r;
     if ($OPT_thaw) {
 	my $raw = retrieve($_[0]);
-	$::ORIG = $raw->{ORIG};
+	$ORIG = $raw->{ORIG};
 	$r = $raw->{AST};
+	$STD::ALL = $raw->{STABS};
 	for my $cl (keys %{$raw->{GENCLASS}}) {
 	    Actions::gen_class($cl, $raw->{GENCLASS}->{$cl});
 	}
     }
     elsif (@_ and -f $_[0]) {
-	$r = STD->parsefile($_[0], actions => 'Actions')->{'_ast'};
+	$r = STD->parsefile($_[0], text_return => \$ORIG,
+	    actions => 'Actions')->{'_ast'};
     }
     else {
 	if (not $PROG) {
@@ -201,14 +204,15 @@ sub MAIN {
 	    @ARGV = @_;
 	    $PROG = <>;
 	}
+	$ORIG = $PROG;
 	$r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
     }
     unless ($OPT_thaw) {
-	$::ORIG =~ s/\n;\z//;
-	if ($OPT_stab) {
-	    no warnings;
-	    $r->{stabs} = $STD::ALL;
-	}
+	$ORIG =~ s/\n;\z//;
+    }
+    if ($OPT_stab) {
+	no warnings;
+	$r->{stabs} = $STD::ALL;
     }
     if ($output eq 'yaml') {
 	my $x = Dump($r);
@@ -228,8 +232,9 @@ sub MAIN {
 	spew fixpod($r->p5);
     }
     elsif ($output eq 'store') {
+	delete $r->{stabs};
 	my $data = { AST => $r, GENCLASS => \%Actions::GENCLASS,
-	    ORIG => $::ORIG };
+	    ORIG => $ORIG, STABS => $STD::ALL };
 	defined($OPT_output_file) ? store($data, $OPT_output_file)
 	    : Storable::store_fd($data, \*STDOUT);
     }
@@ -413,8 +418,8 @@ sub rd {
     sub Str { my $self = shift;
 	my $b = $self->{BEG};
 	my $e = $self->{END};
-	return '' if $b > length($::ORIG);
-	substr($::ORIG, $b, $e - $b);
+	return '' if $b > length($ORIG);
+	substr($ORIG, $b, $e - $b);
     }
 
     sub kids { my $self = shift;
@@ -441,7 +446,7 @@ sub rd {
 	    for my $kid (sort { $a->{BEG} <=> $b->{BEG} } @kids) {
 		my $kb = $kid->{BEG};
 		if ($kb > $last) {
-		    push @text, substr($::ORIG, $last, $kb - $last);
+		    push @text, substr($ORIG, $last, $kb - $last);
 		}
 		if (ref($kid) eq 'HASH') {
 		    print STDERR ::Dump($self);
@@ -453,7 +458,7 @@ sub rd {
 	    }
 	    my $se = $self->{END};
 	    if ($se > $last) {
-		    push @text, substr($::ORIG, $last, $se - $last);
+		    push @text, substr($ORIG, $last, $se - $last);
 	    }
 	}
 	else {
@@ -480,7 +485,7 @@ sub rd {
 	    for my $kid (sort { $a->{BEG} <=> $b->{BEG} } @kids) {
 		my $kb = $kid->{BEG};
 		if ($kb > $last) {
-		    push @text, substr($::ORIG, $last, $kb - $last);
+		    push @text, substr($ORIG, $last, $kb - $last);
 		}
 		if (ref($kid) eq 'HASH') {
 		    print STDERR ::Dump($self);
@@ -492,7 +497,7 @@ sub rd {
 	    }
 	    my $se = $self->{END};
 	    if ($se > $last) {
-		    push @text, substr($::ORIG, $last, $se - $last);
+		    push @text, substr($ORIG, $last, $se - $last);
 	    }
 	}
 	else {
@@ -514,11 +519,11 @@ sub rd {
 	    $args[-1] =~ s/ at .*? line .*?\n$//s if $args[-1] =~ /\n$/s;
 	    die Carp::longmess(@args);
 	};
-	my @bits = !$OPT_keep_going ? $self->emit_FORM : (::try {
-	    $self->emit_FORM;
+	my @bits = !$OPT_keep_going ? $self->emit_FORM(@_) : (::try {
+	    $self->emit_FORM(@_);
 	} ::catch {
 	    my $char = $self->{BEG} // $self->{_from} // 0;
-	    my $line = 1 + (substr($::ORIG, 0, $char) =~ y/\n/\n/);
+	    my $line = 1 + (substr($ORIG, 0, $char) =~ y/\n/\n/);
 	    say STDERR "!!! FAILED at $char (L$line)";
 	    print STDERR $_;
 	    "<<< ERROR >>>";
@@ -545,7 +550,7 @@ TEMPLATE
 	my $beg = $self->{END};
 	my $end = $after->{BEG};
 	return '' unless $beg && $end;
-	return substr($::ORIG, $beg, $end - $beg);
+	return substr($ORIG, $beg, $end - $beg);
     }
 
     sub base_re_quantifier { my $self = shift; my $x = shift; my $min = shift;
@@ -873,7 +878,7 @@ TEMPLATE
 	"use 5.010;\nuse utf8;\n" . $self->{statementlist}->p5, "\n";
     }
     sub emit_p6 { my $self = shift;
-	substr($::ORIG, 0, $self->{statementlist}{BEG}),
+	substr($ORIG, 0, $self->{statementlist}{BEG}),
 	$self->{statementlist}->p5;
     }
     sub emit_psq { my $self = shift;
@@ -915,6 +920,20 @@ TEMPLATE
 		$self->{signature}->kids('parameter')) . ")";
 	} else {
 	    return $self->SUPER::emit_p5;
+	}
+    }
+
+    sub emit_psq { my $self = shift;
+	if ($self->{variable_declarator}) {
+	    $self->{variable_declarator}->psq(@_);
+	} elsif ($self->{signature}) {
+	    $self->{signature}->psq(@_, declaring => 1);
+	} elsif ($self->{routine_declarator}) {
+	    $self->{routine_declarator}->psq(@_);
+	} elsif ($self->{regex_declarator}) {
+	    $self->{regex_declarator}->psq(@_);
+	} elsif ($self->{type_declarator}) {
+	    $self->{type_declarator}->psq(@_);
 	}
     }
 }
@@ -1493,10 +1512,17 @@ BODY
 
 
 { package VAST::multi_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	if ($self->{declarator}) {
+	    $self->{declarator}->psq(@_, multiness => $self->{SYM});
+	} else {
+	    $self->{routine_def}->psq(@_, multiness => $self->{SYM});
+	}
+    }
 }
 
 
-{ package VAST::multi_declarator__S_multi; our @ISA = 'VAST::Base';
+{ package VAST::multi_declarator__S_multi; our @ISA = 'VAST::multi_declarator';
     sub emit_p5 {  my $self = shift;
 	local $::MULTINESS = 'multi';
 	$self->{"."}->p5;
@@ -1504,11 +1530,11 @@ BODY
 }
 
 
-{ package VAST::multi_declarator__S_null; our @ISA = 'VAST::Base';
+{ package VAST::multi_declarator__S_null; our @ISA = 'VAST::multi_declarator';
 }
 
 
-{ package VAST::multi_declarator__S_proto; our @ISA = 'VAST::Base';
+{ package VAST::multi_declarator__S_proto; our @ISA = 'VAST::multi_declarator';
     sub emit_p5 {  my $self = shift;
 	local $::MULTINESS = 'proto';
 	$self->{"."}->p5;
@@ -1664,6 +1690,18 @@ END
 moose_with('$_');
 END
 
+	if (! $self->roles) {
+	    $header .= "our \$ALLROLES = { '$::PKG', 1 };\n";
+	}
+
+	$header .= "our \$REGEXES = {\n";
+	$::PROTORX_HERE{ALL} = [ sort keys %::OVERRIDERX ];
+	for my $p (sort keys %::PROTORX_HERE) {
+	    $header .= "    $p => [ qw/" . join(" ",
+		@{ $::PROTORX_HERE{$p} }) . "/ ],\n";
+	}
+	$header .= "};\n\n";
+
 	$header .= <<"END";
 
 no warnings 'qw', 'recursion';
@@ -1684,9 +1722,11 @@ END
 	local $::RETREE = {};
 	local $::PKG = $self->module_name;
 	local $::MULTIRX_SEQUENCE = 0;
+	local %::PROTORX_HERE;
+	local %::OVERRIDERX;
 	local %::MULTIMETHODS;
-	my $body1 = $self->emit_p5_header;
 	my $body3 = $block->p5;
+	my $body1 = $self->emit_p5_header;
 	my $body2 = '';
 
 	if (%{$::RETREE}) {
@@ -2092,7 +2132,7 @@ TEXT
 	local $::RATCHET = 0;
 	local $::SIGSPACE = 0;
 	local $::REGEX_DECLARATOR = 'regex';
-	my $comment = substr($::ORIG, $self->{BEG},100);
+	my $comment = substr($ORIG, $self->{BEG},100);
 	$comment =~ s/\n.*//s;
         "## $comment\n" . $self->{regex_def}->p5;
     }
@@ -2104,7 +2144,7 @@ TEXT
 	local $::RATCHET = 1;
 	local $::SIGSPACE = 1;
 	local $::REGEX_DECLARATOR = 'rule';
-	my $comment = substr($::ORIG, $self->{BEG},100);
+	my $comment = substr($ORIG, $self->{BEG},100);
 	$comment =~ s/\n.*//s;
         "## $comment\n" . $self->{regex_def}->p5;
     }
@@ -2116,7 +2156,7 @@ TEXT
 	local $::RATCHET = 1;
 	local $::SIGSPACE = 0;
 	local $::REGEX_DECLARATOR = 'token';
-	my $comment = substr($::ORIG, $self->{BEG}, 100);
+	my $comment = substr($ORIG, $self->{BEG}, 100);
 	$comment =~ s/\n.*//s;
         "## $comment\n" . $self->{regex_def}->p5;
     }
@@ -2129,6 +2169,7 @@ TEXT
     }
     sub protoregex {  my $self = shift;  my $name = shift;
 	$::PROTO->{$name} = 1;
+	$::RETREE->{$name . ":*"} = { dic => $::PKG };
 	$::PROTOSIG->{$name} = ($self->kids("signature"))[0];
 	<<EOT;
 sub ${name}__PEEK { \$_[0]->_AUTOLEXpeek('$name:*',\$retree); }
@@ -2189,6 +2230,7 @@ EOT
 
     sub emit_p5 {  my $self = shift;
 	my $name = $self->{deflongname}[0]{name}->Str;
+	$::OVERRIDERX{$name} = 1;
 	if (defined $::MULTINESS && $::MULTINESS eq 'proto') {
 	    return $self->protoregex($name);
 	}
@@ -2212,8 +2254,10 @@ EOT
 	if (defined $adv{sym}) {
 	    $p5name = sprintf "%s__S_%03d%s", $name, $::MULTIRX_SEQUENCE++,
 		::mangle(split " ", $adv{sym});
+	    push @{$::PROTORX_HERE{$name}}, $p5name . "__PEEK";
 	}
 	local $::DBA = $name;
+	local $::DECL_CLASS = $::PKG;
 	local $::NAME = $p5name;
 	local $::ALT = 0;
 	my $ast = $self->re_ast->optimize;
@@ -2273,7 +2317,7 @@ END
 
 { package VAST::routine_declarator__S_method; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
-	my $comment = substr($::ORIG, $self->{BEG},100);
+	my $comment = substr($ORIG, $self->{BEG},100);
 	$comment =~ s/\s*\{.*//s;
         "## $comment\n" . $self->{method_def}->p5;
     }
@@ -2313,14 +2357,30 @@ END
 	    $self->SUPER::emit_p5;
 	}
     }
+
+    sub emit_psq {  my $self = shift;  my $scope = shift;
+	if ($self->{multi_declarator}) {
+	    $self->{multi_declarator}->psq(scope => $scope,
+		typename => $self->{typename}[0]->psq);
+	} elsif ($self->{regex_declarator}) {
+	    $self->{regex_declarator}->psq(scope => $scope);
+	} elsif ($self->{package_declarator}) {
+	    $self->{package_declarator}->psq(scope => $scope);
+	} else {
+	    $self->{declarator}->psq(scope => $scope);
+	}
+    }
 }
 
 
 { package VAST::scope_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift;
+	$self->{scoped}->psq($self->{SYM});
+    }
 }
 
 
-{ package VAST::scope_declarator__S_has; our @ISA = 'VAST::Base';
+{ package VAST::scope_declarator__S_has; our @ISA = 'VAST::scope_declarator';
     sub emit_p5 {  my $self = shift;
 	my $scoped = $self->{scoped};
 	my $typename = $scoped->{typename}[0];
@@ -2336,7 +2396,7 @@ END
 }
 
 
-{ package VAST::scope_declarator__S_my; our @ISA = 'VAST::Base';
+{ package VAST::scope_declarator__S_my; our @ISA = 'VAST::scope_declarator';
     sub emit_p5 {  my $self = shift;
         my $t = $self->SUPER::emit_p5;
 	$t =~ s/my(\s+)&(\w+)/my$1\$$2/;
@@ -2346,7 +2406,7 @@ END
 }
 
 
-{ package VAST::scope_declarator__S_our; our @ISA = 'VAST::Base';
+{ package VAST::scope_declarator__S_our; our @ISA = 'VAST::scope_declarator';
 }
 
 
@@ -2363,22 +2423,26 @@ END
 
 
 { package VAST::sigil; our @ISA = 'VAST::Base';
+    my %psq_hash = ( '$', 'S', '@', 'A', '%', 'H', '&', 'C' );
+    sub psq_mangle { my $self = shift;
+	return $psq_hash{$self->{SYM}};
+    }
 }
 
 
-{ package VAST::sigil__S_Amp; our @ISA = 'VAST::Base';
+{ package VAST::sigil__S_Amp; our @ISA = 'VAST::sigil';
 }
 
 
-{ package VAST::sigil__S_At; our @ISA = 'VAST::Base';
+{ package VAST::sigil__S_At; our @ISA = 'VAST::sigil';
 }
 
 
-{ package VAST::sigil__S_Dollar; our @ISA = 'VAST::Base';
+{ package VAST::sigil__S_Dollar; our @ISA = 'VAST::sigil';
 }
 
 
-{ package VAST::sigil__S_Percent; our @ISA = 'VAST::Base';
+{ package VAST::sigil__S_Percent; our @ISA = 'VAST::sigil';
 }
 
 
@@ -2524,7 +2588,9 @@ END
     }
     sub emit_psq { my $self = shift;
 	my @stmts = $self->kids('statement');
-	join("", map { $_->psq . "\n" } @stmts);
+	local @::LEXVARS;
+	my $b = join("", map { $_->psq . "\n" } @stmts);
+	join("", @::LEXVARS, $b);
     }
 }
 
@@ -2703,6 +2769,9 @@ END
 
 
 { package VAST::term__S_scope_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq {  my $self = shift;
+	$self->{scope_declarator}->psq;
+    }
 }
 
 
@@ -2868,6 +2937,13 @@ END
 	}
         @t;
     }
+
+    sub emit_psq { my $self = shift;
+	my $s = $self->Str;
+	$s eq 'Str' &&           return 'str';
+	$s eq 'Int' &&           return 'int';
+	$s;
+    }
 }
 
 
@@ -2915,10 +2991,29 @@ END
 	}
 	@t;
     }
+
+    sub emit_psq { my $self = shift;
+	return '$' . $self->{sigil}->psq_mangle . '_' . $self->{desigilname}->Str;
+    }
 }
 
 
 { package VAST::variable_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift; my %args = @_;
+	my $scope = $args{scope};
+	my $type  = $args{typename};
+	my $var   = $self->{variable}->psq;
+	my $s     = $self->{variable}{sigil}{SYM};
+
+	if ($scope eq 'my') {
+	    die "Variables in Perlesque *must* be typed" unless $type;
+	    push @::LEXVARS, "my $type $var;\n" if $s eq '$';
+	    push @::LEXVARS, "my List[$type] $var = List[$type].new();\n"
+		if $s eq '@';
+	    push @::LEXVARS, "my Dictionary[str,$type] $var = Dictionary[str,$type].new();\n" if $s eq '%';
+	    return $var;
+	}
+    }
 }
 
 
@@ -2956,8 +3051,7 @@ END
     sub new {  my $class = shift;
 	my $self = bless { a => 0, i => $::IGNORECASE ? 1 : 0,
 	    r => $::RATCHET ? 1 : 0, s => $::SIGSPACE ? 1 : 0,
-	    dba => $::DBA, @_ }, $class;
-	$self->{min} //= $self->calc_min;
+	    dba => $::DBA, dic => $::DECL_CLASS, @_ }, $class;
 	$self;
     }
 
@@ -2978,10 +3072,9 @@ END
 	delete $self->{i} unless $self->{i_needed};
 	delete $self->{i_needed};
 	delete $self->{dba} unless $self->{dba_needed};
+	delete $self->{dic} unless $self->{dba_needed};
 	delete $self->{dba_needed};
     }
-
-    sub calc_min { 0 }
 
     sub walk {  my $self = shift;
 	say STDERR "--> $self" if $OPT_log;
@@ -3018,7 +3111,6 @@ END
 }
 
 { package RE_double; use base "REbase";
-    sub calc_min { length $_[0]{text} }
     sub _walk {
         my $self = shift;
         my $text = $$self{text};
@@ -3035,7 +3127,6 @@ END
 }
 
 { package RE_string; use base "REbase";
-    sub calc_min { length $_[0]->{text} }
     sub _walk {
         my $self = shift;
 	$$self{i_needed} = 1;
@@ -3043,15 +3134,11 @@ END
 	$text = "(?<=$text)" if $::REV;
 	$text = "(?i:$text)" if $$self{i};
 	DEEP::p5regex($text, has_meta => ($::REV || $$self{i}),
-	    needs_bracket => !($::REV || $$self{i}) && $$self{min} != 1);
+	    needs_bracket => !($::REV || $$self{i}) && (length($$self{text}) != 1));
     }
 }
 
 { package RE_sequence;
-    sub calc_min { my $self = shift;
-	::sum(0, map { $_->{min} } @{ $self->{zyg} });
-    }
-
     sub new {
 	my ($class, @zyg) = @_;
 	$class->SUPER::new(zyg => \@zyg);
@@ -3165,7 +3252,6 @@ END
 }
 
 { package RE_any; use base "REbase";
-    sub calc_min { ::min(1_000_000_000, map { $_->{min} } @{$_[0]{zyg}}) }
     sub _walk {
         my $self = shift;
         my @result;
@@ -3284,8 +3370,6 @@ END
 }
 
 { package RE_first; use base "REbase";
-    sub calc_min { ::min(1_000_000_000, map { $_->{min} } @{$_[0]{zyg}}) }
-
     sub new {
 	my ($class, @zyg) = @_;
 	$class->SUPER::new(zyg => \@zyg);
@@ -3344,7 +3428,6 @@ END
 }
 
 { package RE_method; use base "REbase";
-    sub calc_min { 12345 }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{nobind};
@@ -3427,7 +3510,6 @@ END
 }
 
 { package RE_ast; use base "REbase";
-    sub calc_min { $_[0]{re}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{decl};
@@ -3449,7 +3531,6 @@ END
 }
 
 { package RE_quantified_atom; use base "REbase";
-    sub calc_min { $_[0]{quant}[3] * $_[0]{atom}{min} }
     # handles cutting itself
     sub clean { my $self = shift;
 	$self->SUPER::clean;
@@ -3533,7 +3614,6 @@ END
 }
 
 { package RE_method_re; use base "REbase";
-    sub calc_min { 12345 } # "many"
     sub _walk {
         my $self = shift;
         my $re = $$self{re};
@@ -3723,7 +3803,6 @@ END
 }
 
 { package RE_cclass; use base "REbase";
-    sub calc_min { 1 }
     sub _walk {
         my $self = shift;
         my $text = $$self{text};
@@ -3811,7 +3890,6 @@ END
 }
 
 { package RE_bracket; use base "REbase";
-    sub calc_min { $_[0]->{re}->{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{decl};
@@ -3861,7 +3939,6 @@ END
 }
 
 { package RE_paren; use base "REbase";
-    sub calc_min { $_[0]{re}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{decl};
@@ -3902,7 +3979,6 @@ END
 }
 
 { package RE_bindpos; use base "REbase";
-    sub calc_min { $_[0]{atom}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{var};
@@ -3931,7 +4007,6 @@ END
 }
 
 { package RE_bindnamed; use base "REbase";
-    sub calc_min { $_[0]{atom}{min} }
     sub clean { my $self = shift;
 	$self->SUPER::clean;
 	delete $self->{var};

@@ -5,6 +5,11 @@ use CursorBase;
 use Moose ':all' => { -prefix => "moose_" };
 use Encode;
 moose_extends('CursorBase');
+our $ALLROLES = { 'Cursor', 1 };
+our $REGEXES = {
+    ALL => [ qw// ],
+};
+
 
 no warnings 'qw', 'recursion';
 my $retree;
