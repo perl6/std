@@ -1303,6 +1303,7 @@ grammar P6 is STD {
         # "CHECK" time...
         {{
             $¢.explain_mystery();
+            $¢.<PAD> = $*CURPAD;
             if @*WORRIES {
                 note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
             }
@@ -5208,6 +5209,7 @@ method newpad ($needsig = 0) {
     $*CURPAD.<!NEEDSIG> = 1 if $needsig;
     $*CURPAD.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
     $ALL.{$id} = $*CURPAD;
+    self.<PAD> = $*CURPAD;
     self;
 }
 

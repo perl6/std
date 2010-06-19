@@ -189,6 +189,7 @@ sub MAIN {
 	my $raw = retrieve($_[0]);
 	$ORIG = $raw->{ORIG};
 	$r = $raw->{AST};
+	$STD::ALL = $raw->{STABS};
 	for my $cl (keys %{$raw->{GENCLASS}}) {
 	    Actions::gen_class($cl, $raw->{GENCLASS}->{$cl});
 	}
@@ -208,10 +209,10 @@ sub MAIN {
     }
     unless ($OPT_thaw) {
 	$ORIG =~ s/\n;\z//;
-	if ($OPT_stab) {
-	    no warnings;
-	    $r->{stabs} = $STD::ALL;
-	}
+    }
+    if ($OPT_stab) {
+	no warnings;
+	$r->{stabs} = $STD::ALL;
     }
     if ($output eq 'yaml') {
 	my $x = Dump($r);
@@ -231,8 +232,9 @@ sub MAIN {
 	spew fixpod($r->p5);
     }
     elsif ($output eq 'store') {
+	delete $r->{stabs};
 	my $data = { AST => $r, GENCLASS => \%Actions::GENCLASS,
-	    ORIG => $ORIG };
+	    ORIG => $ORIG, STABS => $STD::ALL };
 	defined($OPT_output_file) ? store($data, $OPT_output_file)
 	    : Storable::store_fd($data, \*STDOUT);
     }
