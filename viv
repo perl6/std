@@ -921,7 +921,18 @@ TEMPLATE
 	}
     }
 
-    sub emit_psq { my $self = shift; my %args = @_;
+    sub emit_psq { my $self = shift;
+	if ($self->{variable_declarator}) {
+	    $self->{variable_declarator}->psq(@_);
+	} elsif ($self->{signature}) {
+	    $self->{signature}->psq(@_, declaring => 1);
+	} elsif ($self->{routine_declarator}) {
+	    $self->{routine_declarator}->psq(@_);
+	} elsif ($self->{regex_declarator}) {
+	    $self->{regex_declarator}->psq(@_);
+	} elsif ($self->{type_declarator}) {
+	    $self->{type_declarator}->psq(@_);
+	}
     }
 }
 
@@ -1509,7 +1520,7 @@ BODY
 }
 
 
-{ package VAST::multi_declarator__S_multi; our @ISA = 'VAST::Base';
+{ package VAST::multi_declarator__S_multi; our @ISA = 'VAST::multi_declarator';
     sub emit_p5 {  my $self = shift;
 	local $::MULTINESS = 'multi';
 	$self->{"."}->p5;
@@ -1517,11 +1528,11 @@ BODY
 }
 
 
-{ package VAST::multi_declarator__S_null; our @ISA = 'VAST::Base';
+{ package VAST::multi_declarator__S_null; our @ISA = 'VAST::multi_declarator';
 }
 
 
-{ package VAST::multi_declarator__S_proto; our @ISA = 'VAST::Base';
+{ package VAST::multi_declarator__S_proto; our @ISA = 'VAST::multi_declarator';
     sub emit_p5 {  my $self = shift;
 	local $::MULTINESS = 'proto';
 	$self->{"."}->p5;
@@ -2348,7 +2359,7 @@ END
     sub emit_psq {  my $self = shift;  my $scope = shift;
 	if ($self->{multi_declarator}) {
 	    $self->{multi_declarator}->psq(scope => $scope,
-		typename => $self->{typename}[0]);
+		typename => $self->{typename}[0]->psq);
 	} elsif ($self->{regex_declarator}) {
 	    $self->{regex_declarator}->psq(scope => $scope);
 	} elsif ($self->{package_declarator}) {
@@ -2362,12 +2373,12 @@ END
 
 { package VAST::scope_declarator; our @ISA = 'VAST::Base';
     sub emit_psq { my $self = shift;
-	$self->{scoped}->psq($::SCOPE);
+	$self->{scoped}->psq($self->{SYM});
     }
 }
 
 
-{ package VAST::scope_declarator__S_has; our @ISA = 'VAST::Base';
+{ package VAST::scope_declarator__S_has; our @ISA = 'VAST::scope_declarator';
     sub emit_p5 {  my $self = shift;
 	my $scoped = $self->{scoped};
 	my $typename = $scoped->{typename}[0];
@@ -2383,7 +2394,7 @@ END
 }
 
 
-{ package VAST::scope_declarator__S_my; our @ISA = 'VAST::Base';
+{ package VAST::scope_declarator__S_my; our @ISA = 'VAST::scope_declarator';
     sub emit_p5 {  my $self = shift;
         my $t = $self->SUPER::emit_p5;
 	$t =~ s/my(\s+)&(\w+)/my$1\$$2/;
@@ -2393,7 +2404,7 @@ END
 }
 
 
-{ package VAST::scope_declarator__S_our; our @ISA = 'VAST::Base';
+{ package VAST::scope_declarator__S_our; our @ISA = 'VAST::scope_declarator';
 }
 
 
@@ -2410,22 +2421,26 @@ END
 
 
 { package VAST::sigil; our @ISA = 'VAST::Base';
+    my %psq_hash = ( '$', 'S', '@', 'A', '%', 'H', '&', 'C' );
+    sub psq_mangle { my $self = shift;
+	return $psq_hash{$self->{SYM}};
+    }
 }
 
 
-{ package VAST::sigil__S_Amp; our @ISA = 'VAST::Base';
+{ package VAST::sigil__S_Amp; our @ISA = 'VAST::sigil';
 }
 
 
-{ package VAST::sigil__S_At; our @ISA = 'VAST::Base';
+{ package VAST::sigil__S_At; our @ISA = 'VAST::sigil';
 }
 
 
-{ package VAST::sigil__S_Dollar; our @ISA = 'VAST::Base';
+{ package VAST::sigil__S_Dollar; our @ISA = 'VAST::sigil';
 }
 
 
-{ package VAST::sigil__S_Percent; our @ISA = 'VAST::Base';
+{ package VAST::sigil__S_Percent; our @ISA = 'VAST::sigil';
 }
 
 
@@ -2571,7 +2586,9 @@ END
     }
     sub emit_psq { my $self = shift;
 	my @stmts = $self->kids('statement');
-	join("", map { $_->psq . "\n" } @stmts);
+	local @::PADVARS;
+	my $b = join("", map { $_->psq . "\n" } @stmts);
+	join("", @::PADVARS, $b);
     }
 }
 
@@ -2918,6 +2935,13 @@ END
 	}
         @t;
     }
+
+    sub emit_psq { my $self = shift;
+	my $s = $self->Str;
+	$s eq 'Str' &&           return 'str';
+	$s eq 'Int' &&           return 'int';
+	$s;
+    }
 }
 
 
@@ -2965,10 +2989,29 @@ END
 	}
 	@t;
     }
+
+    sub emit_psq { my $self = shift;
+	return '$' . $self->{sigil}->psq_mangle . '_' . $self->{desigilname}->Str;
+    }
 }
 
 
 { package VAST::variable_declarator; our @ISA = 'VAST::Base';
+    sub emit_psq { my $self = shift; my %args = @_;
+	my $scope = $args{scope};
+	my $type  = $args{typename};
+	my $var   = $self->{variable}->psq;
+	my $s     = $self->{variable}{sigil}{SYM};
+
+	if ($scope eq 'my') {
+	    die "Variables in Perlesque *must* be typed" unless $type;
+	    push @::PADVARS, "my $type $var;\n" if $s eq '$';
+	    push @::PADVARS, "my List[$type] $var = List[$type].new();\n"
+		if $s eq '@';
+	    push @::PADVARS, "my Dictionary[str,$type] $var = Dictionary[str,$type].new();\n" if $s eq '%';
+	    return $var;
+	}
+    }
 }
 
 
