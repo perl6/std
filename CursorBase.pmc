@@ -1834,9 +1834,15 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 
 # Steal data from Perl5's Unicode maps
 my %unicode_map_cache;
-BEGIN {
+INIT {
     $unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
-    open MAP, "uniprops" or die "cannot open unicode maps: $!";
+    my @path = split ':', ($ENV{PERL6LIB} // './lib:.');
+    for (@path) {
+        open MAP, "<", "$_/uniprops" and goto OPEN;
+    }
+    die "cannot open unicode maps from @path : $!\n";
+
+  OPEN:
     binmode MAP;
     while (defined (my $c = getc MAP)) {
         my $name = "";
