@@ -6,6 +6,11 @@
 FRONTEND=Actions.pm CORE.setting CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc\
 	 NULL.lex RE_ast.pmc Stash.pmc mangle.pl std uniprops
 BACKEND=mangle.pl Actions.pm viv
+DISTSRC=Actions.pm CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc RE_ast.pmc\
+	Stash.pmc mangle.pl
+DISTSRC6=uniprops
+DISTGEN=$(GENERATE) STD_P5.pmc
+DISTSYML=syml/NULL.lex.store syml/CORE.syml
 INVARIANT=$(FRONTEND) viv
 GENERATE=STD.pmc Cursor.pmc
 STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
@@ -127,6 +132,13 @@ snap: stage3/.stamp .stamp5
 snaptest: snap
 	cd snap && ./teststd $(realpath ../../t/spec)
 
+dist: stage2 stage2/STD_P5.pmc
+	rm -rf dist
+	mkdir dist dist/lib dist/lib6 dist/syml
+	cp $(addprefix stage2/,$(DISTGEN)) $(DISTSRC) dist/lib
+	cp $(DISTSRC6) dist/lib6
+	cp $(DISTSYML) dist/syml
+
 #List all targets with brief descriptions.
 # Gradual shaving of targets with Occam's Razor would be a Good Thing.
 help:
@@ -137,6 +149,7 @@ help:
 	@echo 'all             builds viv for Perl5 too'
 	@echo 'reboot          builds third stage and updates stage0'
 	@echo 'clean           removes generated files'
+	@echo 'dist            make a minimal distribution set'
 	@echo 'stage0          prepares bootstrap for usage'
 	@echo 'stage1          prepares stage 1 compiler (fast)'
 	@echo 'stage2          prepares stage 2 compiler'
