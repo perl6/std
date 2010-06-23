@@ -2852,7 +2852,7 @@ grammar P6 is STD {
         :my $*SIGNUM = $lexsig;
         <.ws>
         [
-        | <?before '-->' | ')' | ']' | '{' | ':'\s >
+        | <?before '-->' | ')' | ']' | '{' | ':'\s | ';;' >
         | [ <parameter> || <.panic: "Malformed parameter"> ]
         ] ** <param_sep>
         <.ws>
