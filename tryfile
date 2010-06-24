@@ -10,7 +10,7 @@ if (not @ARGV) {
     s/^\s*[AU]*\s+// for @ARGV;
     my $pkgs = $ARGV[0];
     if ($pkgs =~ s[t/spec.*][t/spec/packages]) {
-	$ENV{PERL6LIB} ||= "lib:$pkgs";
+	$ENV{PERL6LIB} ||= "lib:$pkgs:.";
     }
 }
 
