@@ -1852,8 +1852,7 @@ INIT {
         read MAP, $name, ord($c);
         read MAP, $used, 136;
 
-        $unicode_map_cache{$name} = [];
-        $unicode_map_cache{$name}[1088] = $name;
+        $unicode_map_cache{$name} = [ (("") x 1088), $name ];
 
         for (my $i = 0; $i < 1088; $i++) {
             if (vec($used, $i, 1)) {
