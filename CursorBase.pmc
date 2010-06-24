@@ -348,9 +348,10 @@ sub you_were_here {
     my $self = shift;
     my $file = $::FILE->{name};
     my $all;
-    $file =~ s/(\.setting)?$/.syml/;
-    $file =~ s!.*/!!;
+    $file = $::UNIT->{'$?LONGNAME'};
     $file =~ s/::/\//g;
+    $file .= $1 if $::FILE->{name} =~ /(\.pm6?)/;
+    $file .= '.syml';
     $file = $::TMP_PREFIX . "syml/" . $file;
 
     # setting?

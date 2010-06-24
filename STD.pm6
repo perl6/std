@@ -1942,6 +1942,7 @@ grammar P6 is STD {
                                 $*UNIT.id => $*UNIT,
                             };
                         }
+                        $*UNIT<$?LONGNAME> = $longname.Str;
                     }}
                     <statementlist>     # whole rest of file, presumably
                 || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
