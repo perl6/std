@@ -3994,8 +3994,10 @@ grammar P6 is STD {
         { <sym> » <O(|%loose_unary)> }
 
     ## list item separator
-    token infix:sym<,>
-        { <sym> <O(|%comma, fiddly => 0)> }
+    token infix:sym<,> {
+        <sym> <O(|%comma, fiddly => 0)>
+        [ <?before \h*'...'> <.worry: "Comma found before apparent series operator; please remove comma (or put parens\n    around the ... listop, or use 'fail' instead of ...)"> ]?
+    }
 
     token infix:sym<:> {
         ':' <?before \s | <terminator> >
