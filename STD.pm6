@@ -3603,13 +3603,13 @@ grammar P6 is STD {
         { <sym> <O(|%symbolic_unary)> }
 
     token prefix:sym<~~>
-        { <sym> <.badinfix> <O(|%symbolic_unary)> }
+        { <sym> <.dupprefix('~~')> <O(|%symbolic_unary)> }
 
     token prefix:sym<~>
         { <sym> <O(|%symbolic_unary)> }
 
     token prefix:sym<??>
-        { <sym> <.badinfix> <O(|%symbolic_unary)> }
+        { <sym> <.dupprefix('??')> <O(|%symbolic_unary)> }
 
     token prefix:sym<?>
         { <sym> <O(|%symbolic_unary)> }
@@ -3624,7 +3624,7 @@ grammar P6 is STD {
         { <sym> <O(|%symbolic_unary)> }
 
     token prefix:sym<^^>
-        { <sym> <.badinfix> <O(|%symbolic_unary)> }
+        { <sym> <.dupprefix('^^')> <O(|%symbolic_unary)> }
 
     token prefix:sym<^>
         { <sym> <O(|%symbolic_unary)> }
@@ -6080,7 +6080,12 @@ method worryobs (Str $old, Str $new, Str $when = ' in Perl 6') {
     self;
 }
 
-method badinfix (Str $bad = $*sym) {
+method dupprefix (Str $bad) {
+    my $c = substr($bad,0,1);
+    self.panic("Expecting a term, but found either infix $bad or redundant prefix $c\n  (to suppress this message, please use space between $c $c)");
+}
+
+method badinfix (Str $bad) {
     self.panic("Preceding context expects a term, but found infix $bad instead");
 }
 
