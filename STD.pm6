@@ -3661,10 +3661,10 @@ grammar P6 is STD {
         { <sym> <O(|%multiplicative)> }
 
     token infix:sym« << »
-        { <sym> <!{ $*IN_META eq 'HYPER' }> <?before \s> <.sorryobs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
+        { <sym> <!{ $*IN_META }> <?before \s> <.sorryobs('<< to do left shift', '+< or ~<')> <O(|%multiplicative)> }
 
     token infix:sym« >> »
-        { <sym> <!{ $*IN_META eq 'HYPER' }> <?before \s> <.sorryobs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
+        { <sym> <!{ $*IN_META }> <?before \s> <.sorryobs('>> to do right shift', '+> or ~>')> <O(|%multiplicative)> }
 
     token infix:sym<~&>
         { <sym> <O(|%multiplicative)> }
@@ -3788,13 +3788,13 @@ grammar P6 is STD {
         { <sym> <?before \s> <O(|%chaining)> }
 
     token infix:sym« < »
-        { <sym> <O(|%chaining)> }
+        { <sym> <!before '<'> <O(|%chaining)> }
 
     token infix:sym« <= »
         { <sym> <O(|%chaining)> }
 
     token infix:sym« > »
-        { <sym> <O(|%chaining)> }
+        { <sym> <!before '>'> <O(|%chaining)> }
 
     token infix:sym« >= »
         { <sym> <O(|%chaining)> }
