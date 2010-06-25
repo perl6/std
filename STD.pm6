@@ -2929,6 +2929,8 @@ grammar P6 is STD {
         [
         | <value>
         | <typename>
+            [ <?{ $*OFTYPE }> <.sorry("Extra 'of' type; already declared as type " ~ $*OFTYPE.Str)> ]?
+            { $*OFTYPE = $<typename>; }
         | where <.ws> <EXPR(item %chaining)>
         ]
         <.ws>
@@ -3009,6 +3011,7 @@ grammar P6 is STD {
         :my $quant = '';
         :my $q;
         :my $*DECLARAND;
+        :my $*OFTYPE;
 
         [
         | <type_constraint>+
