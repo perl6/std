@@ -3652,7 +3652,10 @@ grammar P6 is STD {
         { <sym> <O(|%multiplicative)> }
 
     token infix:sym<%>
-        { <sym> <O(|%multiplicative, iffy => 1)> }   # Allow !% operator
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym<%%>
+        { <sym> <O(|%multiplicative, iffy => 1)> }      # "is divisible by" returns Bool
 
     token infix:sym<mod>
         { <sym> <O(|%multiplicative)> }
