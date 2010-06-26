@@ -3401,7 +3401,7 @@ grammar P6 is STD {
            <?{ $<infixish><O><iffy> }>
            <?{ $<O> = $<infixish><O>; }>
             
-        || <.sorry("Can't negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
+        || <.panic("Can't negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
         ]
     }
 
