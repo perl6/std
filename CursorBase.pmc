@@ -1844,13 +1844,14 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 my %unicode_map_cache;
 BEGIN {
     $unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
-    my @path = split ':', ($ENV{PERL6LIB} // './lib:.');
-    for (@path) {
-        open MAP, "<", "$_/uniprops" and goto OPEN;
+    OPEN_UNIPROPS: {
+        my @path = split ':', ($ENV{PERL6LIB} // './lib:.');
+        for (@path) {
+            open MAP, "<", "$_/uniprops" and last OPEN_UNIPROPS;
+        }
+        die "cannot open unicode maps from @path : $!\n";
     }
-    die "cannot open unicode maps from @path : $!\n";
 
-  OPEN:
     binmode MAP;
     while (defined (my $c = getc MAP)) {
         my $name = "";
