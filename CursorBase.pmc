@@ -304,6 +304,13 @@ sub load_perl_lex {
         $LEXS{$setting} = retrieve($store);
     }
     else {
+        if ($setting eq 'CORE') {
+            die <<EOM;
+syml/CORE.lex.store not found; CORE setting has not yet been compiled.
+This file must be generated using './std CORE.setting' or 'make' before STD.pm6
+can be used.
+EOM
+        }
         $LEXS{$setting} = require $file;
         store($LEXS{$setting}, $store);
     }
