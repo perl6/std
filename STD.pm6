@@ -1913,7 +1913,7 @@ grammar P6 is STD {
                         }
                     }
                     $*begin_compunit = 0;
-                    $*UNIT<$?LONGNAME> ||= $longname.Str;
+                    $*UNIT<$?LONGNAME> ||= $longname ?? $longname.Str !! '';
                 }}
                 <blockoid>
                 <.checkyada>
