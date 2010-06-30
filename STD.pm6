@@ -796,11 +796,11 @@ method truly ($bool,$opt) {
 token charname {
     [
     | <radint>
-    | <[a..z A..Z]><-[ \] , \# ]>*?<[a..z A..Z ) ]> <?before \s*<[ \] , \# ]>>
+    | <alpha> .*? <?before \s*[ ',' | '#' | ']']>
     ] || <.sorry: "Unrecognized character name"> .*?<?terminator>
 }
 
-token charnames { [<.ws><charname><.ws>] ** ',' }
+token charnames { [<charname><.ws>] ** [','\s*] }
 
 token charspec {
     [
@@ -2854,15 +2854,16 @@ grammar P6 is STD {
         :my $*SIGNUM = $lexsig;
         <.ws>
         [
-        | <?before '-->' | ')' | ']' | '{' | ':'\s | ';;' >
-        | [ <parameter> || <.panic: "Malformed parameter"> ]
-        ] ** <param_sep>
+        | '\|' [ <param_var> || <.panic: "\\| signature must contain one variable"> ]
+            <.ws> [ <?before '-->' | ')' | ']' > || <.panic: "\\| signature may contain only a variable"> ]
+        |   [
+            | <?before '-->' | ')' | ']' | '{' | ':'\s | ';;' >
+            | [ <parameter> || <.panic: "Malformed parameter"> ]
+            ] ** <param_sep>
+        ]
         <.ws>
         { $*IN_DECL = ''; }
-        [ '-->' <.ws> <typename> <.ws>
-            [ <?{ $*OFTYPE }> <.sorry("Extra 'of' type; already declared as type " ~ $*OFTYPE.Str)> ]?
-            { $*OFTYPE = $<typename>[0]; }
-        ]?
+        [ '-->' <.ws> [<type_constraint> || <.panic: "No type found after -->">] <.ws> ]?
         {{
             $*LEFTSIGIL = '@';
             if $lexsig {
@@ -4860,20 +4861,23 @@ grammar Regex is STD {
     token termish {
         <.ws>
         [
-        || <term=.quant_atom_list>
-        || <?before <stopper> | <[&|~]> > <.panic: "Null pattern not allowed">
-        || <?before <[ \] \) \> ]> > {{
-                my $c = substr($*ORIG,$¢.pos,1);
-                if $*GOAL eq $c {
-                    $¢.panic("Null pattern not allowed");
-                }
-                else {
-                    $¢.panic("Unmatched closing $c");
-                }
-            }}
-        || $$ <.panic: "Regex not terminated">
-        || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
-        || <.panic: "Regex not terminated">
+        || <term=.quant_atom_list> <?{ %*RX<s> or $<term>.Str ~~ /\S/ }>
+        || <normspace>
+            [
+            || <?before <stopper> | <[&|~]> > <.panic: "Null pattern not allowed">
+            || <?before <[ \] \) \> ]> > {{
+                    my $c = substr($*ORIG,$¢.pos,1);
+                    if $*GOAL eq $c {
+                        $¢.panic("Null pattern not allowed");
+                    }
+                    else {
+                        $¢.panic("Unmatched closing $c");
+                    }
+                }}
+            || $$ <.panic: "Regex not terminated">
+            || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
+            || <.panic: "Regex not terminated">
+            ]
         ]
     }
     token quant_atom_list {
