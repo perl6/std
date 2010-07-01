@@ -62,7 +62,7 @@ our $OPT_thaw = 0;
 our $OPT_keep_going = 0;
 our $OPT_output_file = undef;
 my $PROG = '';
-my $ORIG;
+our $ORIG;
 my $U = 0;
 my @did_ws;
 
