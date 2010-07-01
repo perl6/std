@@ -1276,7 +1276,6 @@ grammar P6 is STD {
         :my $*IN_SUPPOSE = False;
 
         :my $*CURPKG;
-        <.unitstart>
         {{
 
             %*LANG<MAIN>    = ::STD::P6 ;
@@ -1301,6 +1300,7 @@ grammar P6 is STD {
             self.finishlex;
             # $¢ = self.cursor_fresh($*CURLEX<$?LANGNAME>);
         }}
+        <.unitstart>
         <statementlist>
         [ <?unitstopper> || <.panic: "Confused"> ]
         # "CHECK" time...
