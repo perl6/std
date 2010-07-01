@@ -92,8 +92,10 @@ our $ALL;
 
 =end notes
 
+method p6class () { ::STD::P6 }
+
 method TOP ($STOP = '') {
-    my $lang = self.cursor_fresh( ::STD::P6 );
+    my $lang = self.cursor_fresh( self.p6class );
 
     if $STOP {
         my $*GOAL ::= $STOP;
@@ -1274,6 +1276,7 @@ grammar P6 is STD {
         :my $*IN_SUPPOSE = False;
 
         :my $*CURPKG;
+        <.unitstart>
         {{
 
             %*LANG<MAIN>    = ::STD::P6 ;
@@ -1354,6 +1357,8 @@ grammar P6 is STD {
         ]
     }
 
+    # this is a hook for subclasses
+    token unitstart { <?> }
     token lambda { '->' | '<->' }
 
     # Look for an expression followed by a required lambda.
