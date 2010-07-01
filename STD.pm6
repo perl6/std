@@ -1550,7 +1550,7 @@ grammar P6 is STD {
                 my $*IN_DECL = 'use';
                 my $*SCOPE = 'use';
                 $longname = $<module_name>[*-1]<longname>;
-                $¢.do_need($longname);
+                $¢.do_need($longname<name>);
             }}
         ] ** ','
     }
@@ -1591,9 +1591,9 @@ grammar P6 is STD {
             [
             || <.spacey> <arglist>
                 {{
-                    $¢.do_use($longname, $<arglist>);
+                    $¢.do_use($longname<name>, $<arglist>);
                 }}
-            || {{ $¢.do_use($longname, ''); }}
+            || {{ $¢.do_use($longname<name>, ''); }}
             ]
         ]
         <.ws>
@@ -1892,7 +1892,7 @@ grammar P6 is STD {
         :temp $*CURLEX;
         { $*SCOPE ||= 'our'; }
         [
-            [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname.Str); } ]?
+            [ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
             <.newlex>
             [ :dba('generic role')
                 <?{ ($*PKGDECL//'') eq 'role' }>
@@ -1918,7 +1918,7 @@ grammar P6 is STD {
                         }
                     }
                     $*begin_compunit = 0;
-                    $*UNIT<$?LONGNAME> ||= $longname ?? $longname.Str !! '';
+                    $*UNIT<$?LONGNAME> ||= $longname ?? $longname<name>.Str !! '';
                 }}
                 <blockoid>
                 <.checkyada>
@@ -1948,7 +1948,7 @@ grammar P6 is STD {
                                 $*UNIT.id => $*UNIT,
                             };
                         }
-                        $*UNIT<$?LONGNAME> = $longname.Str;
+                        $*UNIT<$?LONGNAME> = $longname<name>.Str;
                     }}
                     <statementlist>     # whole rest of file, presumably
                 || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
