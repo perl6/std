@@ -1733,7 +1733,7 @@ sub _REDUCE { my $self = shift;
     $self->{_from} = $S;
     if ($::ACTIONS) {
         eval { $::ACTIONS->$meth($self, @_) };
-        warn $@ if $@ and not $@ =~ /locate/;
+        warn $@ if $@ and not $@ =~ /locate object method "\Q$meth/;
     }
     $self->deb("REDUCE $key from " . $S . " to " . $self->{_pos}) if DEBUG & DEBUG::matchers;
     $self;
