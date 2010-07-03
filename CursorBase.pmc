@@ -335,7 +335,8 @@ sub load_yaml_lex {
     my $store = "$syml/$setting.syml.store";
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
-        $LEXS{$setting} = retrieve($store);
+        # HACK we get hashes with strangely aliased keys from Storable
+        $LEXS{$setting} = {%{retrieve($store)}};
     }
     else {
         $LEXS{$setting} = LoadFile($file);
