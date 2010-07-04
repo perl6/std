@@ -302,7 +302,7 @@ sub load_perl_lex {
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
         # HACK we get hashes with strangely aliased keys from Storable
-        $LEXS{$setting} = {%{retrieve($store)}};
+        $LEXS{$setting} = retrieve($store);
     }
     else {
         if ($setting eq 'CORE') {
@@ -336,11 +336,11 @@ sub load_yaml_lex {
     my $store = "$syml/$setting.syml.store";
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
-        # HACK we get hashes with strangely aliased keys from Storable
-        $LEXS{$setting} = {%{retrieve($store)}};
+        $LEXS{$setting} = retrieve($store);
     }
     else {
-        $LEXS{$setting} = LoadFile($file);
+        # HACK YAML::XS is horribly broken see https://rt.cpan.org/Public/Bug/Display.html?id=53278
+        $LEXS{$setting} = {%{LoadFile($file)}};
         store($LEXS{$setting}, $store);
     }
     # say join ' ', sort keys %{ $LEXS{$setting} };
