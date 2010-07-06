@@ -5884,7 +5884,7 @@ method check_variable ($variable) {
         when '?' {
             if $name ~~ /\:\:/ {
                 my ($first) = self.canonicalize_name($name);
-                $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)$/;
+                $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
             }
             else {
                 # search upward through languages to STD
