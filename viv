@@ -4260,5 +4260,6 @@ END
 if ($0 eq __FILE__) {
     ::MAIN(@ARGV);
 }
+1;
 
 # vim: ts=8 sw=4 noexpandtab smarttab
