@@ -220,6 +220,12 @@ sub parsefile {
     $result;
 }
 
+# used internally to isolate contextuals in do_need
+sub _parse_module {
+    $_[0]->parsefile($ARGV[0], setting => "CORE");
+    exit 0;
+}
+
 ## method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', :$actions = '')
 sub initparse {
     my $self = shift;
@@ -234,6 +240,7 @@ sub initparse {
     local $::TMP_PREFIX = $tmp_prefix;
     local $::SETTINGNAME = $setting;
     local $::ACTIONS = $actions;
+    local $::RECURSIVE_PERL = $args{recursive_perl};
     local @::MEMOS = ();
 
     local @::ACTIVE = ();
@@ -294,9 +301,17 @@ sub load_perl_lex {
     my $store = "$syml/$setting.lex.store";
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
+        # HACK we get hashes with strangely aliased keys from Storable
         $LEXS{$setting} = retrieve($store);
     }
     else {
+        if ($setting eq 'CORE') {
+            die <<EOM;
+syml/CORE.lex.store not found; CORE setting has not yet been compiled.
+This file must be generated using './std CORE.setting' or 'make' before STD.pm6
+can be used.
+EOM
+        }
         $LEXS{$setting} = require $file;
         store($LEXS{$setting}, $store);
     }
@@ -324,7 +339,8 @@ sub load_yaml_lex {
         $LEXS{$setting} = retrieve($store);
     }
     else {
-        $LEXS{$setting} = LoadFile($file);
+        # HACK YAML::XS is horribly broken see https://rt.cpan.org/Public/Bug/Display.html?id=53278
+        $LEXS{$setting} = {%{LoadFile($file)}};
         store($LEXS{$setting}, $store);
     }
     # say join ' ', sort keys %{ $LEXS{$setting} };
@@ -341,9 +357,10 @@ sub you_were_here {
     my $self = shift;
     my $file = $::FILE->{name};
     my $all;
-    $file =~ s/(\.setting)?$/.syml/;
-    $file =~ s!.*/!!;
+    $file = $::UNIT->{'$?LONGNAME'};
     $file =~ s/::/\//g;
+    $file .= $1 if $::FILE->{name} =~ /(\.pm6?)/;
+    $file .= '.syml';
     $file = $::TMP_PREFIX . "syml/" . $file;
 
     # setting?
@@ -1718,7 +1735,7 @@ sub _REDUCE { my $self = shift;
     $self->{_from} = $S;
     if ($::ACTIONS) {
         eval { $::ACTIONS->$meth($self, @_) };
-        warn $@ if $@ and not $@ =~ /locate/;
+        warn $@ if $@ and not $@ =~ /locate object method "\Q$meth/;
     }
     $self->deb("REDUCE $key from " . $S . " to " . $self->{_pos}) if DEBUG & DEBUG::matchers;
     $self;
@@ -1829,7 +1846,14 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 my %unicode_map_cache;
 BEGIN {
     $unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
-    open MAP, "uniprops" or die "cannot open unicode maps: $!";
+    OPEN_UNIPROPS: {
+        my @path = split ':', ($ENV{PERL6LIB} // './lib:.');
+        for (@path) {
+            open MAP, "<", "$_/uniprops" and last OPEN_UNIPROPS;
+        }
+        die "cannot open unicode maps from @path : $!\n";
+    }
+
     binmode MAP;
     while (defined (my $c = getc MAP)) {
         my $name = "";
@@ -1838,8 +1862,7 @@ BEGIN {
         read MAP, $name, ord($c);
         read MAP, $used, 136;
 
-        $unicode_map_cache{$name} = [];
-        $unicode_map_cache{$name}[1088] = $name;
+        $unicode_map_cache{$name} = [ (("") x 1088), $name ];
 
         for (my $i = 0; $i < 1088; $i++) {
             if (vec($used, $i, 1)) {
@@ -2822,7 +2845,6 @@ sub do_need { my $self = shift;
     my $modfile = $module;
     my $topsym;
     my $lib = '.';
-    my $std = -x 'std' ? './std' : 'std';
     if (not @::PERL6LIB) {
         if ($ENV{PERL6LIB}) {
             @::PERL6LIB = split ':', $ENV{PERL6LIB}
@@ -2870,7 +2892,10 @@ sub do_need { my $self = shift;
     }
     elsif (-f "$lib/$modfile$ext") {
         # say "$std $lib/$module$ext";
-        system "$std $lib/$module$ext" and die "Can't compile $lib/$module$ext";
+        local $ENV{STD5PREFIX} = $::TMP_PREFIX;
+        system($::RECURSIVE_PERL // $^X, "-MSTD", "-e", "STD->_parse_module",
+            "$lib/$module$ext") and die "Can't compile $lib/$module$ext";
+        print STDERR "Compiled $lib/$module$ext\n";
         $topsym = LoadFile("$syml/$modfile$ext.syml");
     }
     else {

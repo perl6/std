@@ -17,4 +17,5 @@ sub file  { my $self = shift; return $self->{file} };
 sub line  { my $self = shift; return $self->{line} };
 sub xlex  { my $self = shift; return $self->{xlex} };
 sub olex  { my $self = shift; return $self->{olex} };
+sub of    { my $self = shift; return $self->{of} };
 1;

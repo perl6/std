@@ -124,6 +124,9 @@ sub hoistast {
 		$r{$k} = $zyg;
 #		    $r{zygs}{$k} = $SEQ++ if @$zyg and $k ne 'sym';
 	    }
+	    elsif (ref($v) eq 'HASH') {
+		$r{$k} = $v;
+	    }
 	    elsif (ref($v)) {
 		if ($v->isa('Cursor') && !$v->{_reduced}) {
 		    $r{$k} = $v->{'_ast'} //= hoistast($v);

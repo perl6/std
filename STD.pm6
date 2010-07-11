@@ -166,114 +166,114 @@ constant $methodcall_prec = 'y=';
 my $*endsym = "null";
 my $*endargs = -1;
 
-proto token category { <...> }
+proto token category {{*}}
 
 token category:category { <sym> }
 
 token category:sigil { <sym> }
-proto token sigil { <...> }
+proto token sigil {{*}}
 
 token category:twigil { <sym> }
-proto token twigil (:$*endsym = 'begid') { <...> }
+proto token twigil (:$*endsym = 'begid') {{*}}
 
 token category:special_variable { <sym> }
-proto token special_variable { <...> }
+proto token special_variable {{*}}
 
 token category:comment { <sym> }
-proto token comment { <...> }
+proto token comment {{*}}
 
 token category:version { <sym> }
-proto token version { <...> }
+proto token version {{*}}
 
 token category:module_name { <sym> }
-proto token module_name { <...> }
+proto token module_name {{*}}
 
 token category:value { <sym> }
-proto token value { <...> }
+proto token value {{*}}
 
 token category:term { <sym> }
-proto token term { <...> }
+proto token term {{*}}
 
 token category:strtonum { <sym> }
-proto token strtonum { <...> }
+proto token strtonum {{*}}
 
 token category:quote { <sym> }
-proto token quote () { <...> }
+proto token quote () {{*}}
 
 token category:prefix { <sym> }
-proto token prefix is unary is defequiv(%symbolic_unary) { <...> }
+proto token prefix is unary is defequiv(%symbolic_unary) {{*}}
 
 token category:infix { <sym> }
-proto token infix is binary is defequiv(%additive) { <...> }
+proto token infix is binary is defequiv(%additive) {{*}}
 
 token category:postfix { <sym> }
-proto token postfix is unary is defequiv(%autoincrement) { <...> }
+proto token postfix is unary is defequiv(%autoincrement) {{*}}
 
 token category:dotty { <sym> }
-proto token dotty (:$*endsym = 'unspacey') { <...> }
+proto token dotty (:$*endsym = 'unspacey') {{*}}
 
 token category:circumfix { <sym> }
-proto token circumfix { <...> }
+proto token circumfix {{*}}
 
 token category:postcircumfix { <sym> }
-proto token postcircumfix is unary { <...> }  # unary as far as EXPR knows...
+proto token postcircumfix is unary {{*}}  # unary as far as EXPR knows...
 
 token category:quote_mod { <sym> }
-proto token quote_mod { <...> }
+proto token quote_mod {{*}}
 
 token category:trait_mod { <sym> }
-proto token trait_mod (:$*endsym = 'spacey') { <...> }
+proto token trait_mod (:$*endsym = 'spacey') {{*}}
 
 token category:type_declarator { <sym> }
-proto token type_declarator (:$*endsym = 'spacey') { <...> }
+proto token type_declarator (:$*endsym = 'spacey') {{*}}
 
 token category:scope_declarator { <sym> }
-proto token scope_declarator (:$*endsym = 'nofun') { <...> }
+proto token scope_declarator (:$*endsym = 'nofun') {{*}}
 
 token category:package_declarator { <sym> }
-proto token package_declarator (:$*endsym = 'spacey') { <...> }
+proto token package_declarator (:$*endsym = 'spacey') {{*}}
 
 token category:multi_declarator { <sym> }
-proto token multi_declarator (:$*endsym = 'spacey') { <...> }
+proto token multi_declarator (:$*endsym = 'spacey') {{*}}
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator (:$*endsym = 'nofun') { <...> }
+proto token routine_declarator (:$*endsym = 'nofun') {{*}}
 
 token category:regex_declarator { <sym> }
-proto token regex_declarator (:$*endsym = 'spacey') { <...> }
+proto token regex_declarator (:$*endsym = 'spacey') {{*}}
 
 token category:statement_prefix { <sym> }
-proto rule  statement_prefix () { <...> }
+proto rule  statement_prefix () {{*}}
 
 token category:statement_control { <sym> }
-proto rule  statement_control (:$*endsym = 'spacey') { <...> }
+proto rule  statement_control (:$*endsym = 'spacey') {{*}}
 
 token category:statement_mod_cond { <sym> }
-proto rule  statement_mod_cond (:$*endsym = 'nofun') { <...> }
+proto rule  statement_mod_cond (:$*endsym = 'nofun') {{*}}
 
 token category:statement_mod_loop { <sym> }
-proto rule  statement_mod_loop (:$*endsym = 'nofun') { <...> }
+proto rule  statement_mod_loop (:$*endsym = 'nofun') {{*}}
 
 token category:infix_prefix_meta_operator { <sym> }
-proto token infix_prefix_meta_operator is binary { <...> }
+proto token infix_prefix_meta_operator is binary {{*}}
 
 token category:infix_postfix_meta_operator { <sym> }
-proto token infix_postfix_meta_operator ($op) is binary { <...> }
+proto token infix_postfix_meta_operator ($op) is binary {{*}}
 
 token category:infix_circumfix_meta_operator { <sym> }
-proto token infix_circumfix_meta_operator is binary { <...> }
+proto token infix_circumfix_meta_operator is binary {{*}}
 
 token category:postfix_prefix_meta_operator { <sym> }
-proto token postfix_prefix_meta_operator is unary { <...> }
+proto token postfix_prefix_meta_operator is unary {{*}}
 
 token category:prefix_postfix_meta_operator { <sym> }
-proto token prefix_postfix_meta_operator is unary { <...> }
+proto token prefix_postfix_meta_operator is unary {{*}}
 
 token category:prefix_circumfix_meta_operator { <sym> }
-proto token prefix_circumfix_meta_operator is unary { <...> }
+proto token prefix_circumfix_meta_operator is unary {{*}}
 
 token category:terminator { <sym> }
-proto token terminator { <...> }
+proto token terminator {{*}}
 
 token unspacey { <.unsp>? }
 token begid { <?before \w> }
@@ -813,8 +813,8 @@ token charspec {
     ]
 }
 
-proto token backslash { <...> }
-proto token escape { <...> }
+proto token backslash {{*}}
+proto token escape {{*}}
 token starter { <!> }
 token escape:none { <!> }
 
@@ -1255,6 +1255,7 @@ grammar P6 is STD {
         :my $*PKGDECL ::= "";
         :my $*IN_DECL = '';
         :my $*DECLARAND;
+        :my $*OFTYPE;
         :my $*NEWPKG;
         :my $*NEWLEX;
         :my $*QSIGIL ::= '';
@@ -1420,9 +1421,14 @@ grammar P6 is STD {
             }
         ]*
 
-        '{'
-        <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
-        [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
+        [
+        | '{*}' <?{ $*MULTINESS eq 'proto' }> { $¢.<onlystar> = 1 }
+        | [
+            '{'
+            <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
+            [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
+          ]
+        ]
 
         <.curlycheck>
     }
@@ -1876,9 +1882,9 @@ grammar P6 is STD {
         <module_name>
     }
 
-    token package_declarator:does {
+    token package_declarator:sym<also> {
         <sym>:s
-        <typename>
+        <trait>+
     }
 
     rule package_def {
@@ -2006,11 +2012,20 @@ grammar P6 is STD {
 
     method checkyada {
         try {
-            my $startsym = self.<blockoid><statementlist><statement>[0]<EXPR><sym> // '';
-            if $startsym eq '...' or $startsym eq '!!!' or $startsym eq '???' {
-                $*DECLARAND<stub> = 1;
+            my $statements = self.<blockoid><statementlist><statement>;
+            my $startsym = $statements[0]<EXPR><sym> // '';
+            given $startsym {
+                when '...' { $*DECLARAND<stub> = 1 }
+                when '!!!' { $*DECLARAND<stub> = 1 }
+                when '???' { $*DECLARAND<stub> = 1 }
+                when '*' {
+                    if $*MULTINESS eq 'proto' and $statements.elems == 1 {
+                        self.<blockoid>:delete;
+                        self.<onlystar> = 1;
+                    }
+                }
             }
-        };
+        }
         return self;
     }
 
@@ -2128,8 +2143,8 @@ grammar P6 is STD {
 
     token trait_mod:of {
         ['of'|'returns']:s <typename>
-        [ <?{ $*OFTYPE }> <.sorry("Extra 'of' type; already declared as type " ~ $*OFTYPE.Str)> ]?
-        { $*OFTYPE = $<typename>; }
+        [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
+        { $*DECLARAND<of> = $<typename>; }
     }
     token trait_mod:as      { <sym>:s <typename> }
     token trait_mod:handles { <sym>:s <term> }
@@ -2847,6 +2862,7 @@ grammar P6 is STD {
 
     token fakesignature() {
         :temp $*CURLEX;
+        :my $*DECLARAND;
         <.newlex>
         <signature>
     }
@@ -2935,8 +2951,8 @@ grammar P6 is STD {
         [
         | <value>
         | <typename>
-            [ <?{ $*OFTYPE }> <.sorry("Extra 'of' type; already declared as type " ~ $*OFTYPE.Str)> ]?
-            { $*OFTYPE = $<typename>; }
+            [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
+            { $*DECLARAND<of> = $<typename>; }
         | where <.ws> <EXPR(item %chaining)>
         ]
         <.ws>
@@ -4826,21 +4842,21 @@ grammar Regex is STD {
     # end tweaks (DO NOT ERASE)
 
     token category:metachar { <sym> }
-    proto token metachar { <...> }
+    proto token metachar {{*}}
 
     token category:backslash { <sym> }
-    proto token backslash { <...> }
+    proto token backslash {{*}}
 
     token category:assertion { <sym> }
-    proto token assertion { <...> }
+    proto token assertion {{*}}
 
     token category:quantifier { <sym> }
-    proto token quantifier { <...> }
+    proto token quantifier {{*}}
 
     token category:mod_internal { <sym> }
-    proto token mod_internal { <...> }
+    proto token mod_internal {{*}}
 
-    proto token regex_infix { <...> }
+    proto token regex_infix {{*}}
 
     # no such thing as ignored whitespace in a normal regex
     token ws { <?> }
@@ -4945,6 +4961,8 @@ grammar Regex is STD {
         ]
     }
 
+    token metachar:sym<{*}> { <onlystar=.sym> <?{ $*MULTINESS eq 'proto' }> }
+    token metachar:sym<[*]> { <onlystar=.sym> <?{ $*MULTINESS eq 'proto' }> }
     token metachar:quant { <quantifier> <.sorry: "Quantifier quantifies nothing"> }
 
     # "normal" metachars
@@ -5451,6 +5469,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
+        of   => $*OFTYPE,
     );
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
@@ -5551,6 +5570,7 @@ method add_our_name ($n) {
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
+        of   => $*OFTYPE,
     );
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
