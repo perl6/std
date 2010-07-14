@@ -5534,6 +5534,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
         $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
         if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
             $curstash.{"&$shortname"} //= $curstash.{$shortname};
+            $curstash.{"&$shortname"}<used> = 1;
             $sid ~= "::$name";
             if $name !~~ /\:\</ {
                 $*NEWLEX = $curstash.{$name ~ '::'} = ($p // Stash.new(
@@ -5625,6 +5626,7 @@ method add_our_name ($n) {
         $*DECLARAND<inpkg> = $curstash.idref;
         if $shortname ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
             $curstash.{"&$shortname"} //= $declaring;
+            $curstash.{"&$shortname"}<used> = 1;
             $sid ~= "::$name";
             $*NEWPKG = $curstash.{$name ~ '::'} //= Stash.new(
                 'PARENT::' => $curstash.idref,
