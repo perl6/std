@@ -168,9 +168,7 @@ sub clean {
 sub dump {
     my $self = shift;
     my %copy = %$self;
-    delete $copy{_reduced};
-    delete $copy{_fate};
-    my $text = STD::Dump(\%copy);
+    my $text = YAML::XS::Dump(\%copy);
     $text;
 }
 

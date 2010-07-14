@@ -303,7 +303,7 @@ token stopper { <!> }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    :my @stub = return self if @*MEMOS[self.pos]<endstmt> :exists;
+    :temp $*STUB = return self if @*MEMOS[self.pos]<endstmt> :exists;
     :dba('standard stopper')
     [
     | <?terminator>
@@ -830,7 +830,6 @@ token nibbler {
     :my $to = $from;
     :my @nibbles = ();
     :my $multiline = 0;
-    :my $nibble;
     { $.from = self.pos; }
     [ <!before <stopper> >
         [
@@ -990,7 +989,7 @@ token circumfix:sym«< >»   { :dba('quote words') '<' ~ '>'
 ##################
 
 token ws {
-    :my @stub = return self if @*MEMOS[self.pos]<ws> :exists;
+    :temp $*STUB = return self if @*MEMOS[self.pos]<ws> :exists;
     :my $startpos = self.pos;
     :my $*HIGHEXPECT = {};
 
@@ -1562,7 +1561,6 @@ grammar P6 is STD {
     }
 
     token statement_control:import {
-        :my $longname;
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
         <sym> <.ws>
@@ -2544,7 +2542,7 @@ grammar P6 is STD {
 
     token desigilname {
         [
-        | <?before '$' > <variable> { $*VAR = $<variable> }
+        | <?before '$' > <variable> { $*VAR = $<variable>; self.check_variable($*VAR) if substr($*VAR,1,1) ne '$' }
         | <?before <[\@\%\&]> <sigil>* \w > <.panic: "Invalid hard reference syntax">
         | <longname>
         ]
@@ -2975,11 +2973,11 @@ grammar P6 is STD {
         | <name=.identifier> '(' <.ws>
             [ <named_param> | <param_var> <.ws> ]
             [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
-        | <param_var>
+        | <param_var(1)>
         ]
     }
 
-    token param_var {
+    token param_var($named = 0) {
         :dba('formal parameter')
         [
         | '[' ~ ']' <signature>
@@ -3013,6 +3011,9 @@ grammar P6 is STD {
                 given $twigil {
                     when '' {
                         self.add_my_name($vname) if $n ne '';
+                        # :$param is often used as a multi matcher without $param used in body
+                        #   so don't count as "declared but not used"
+                        $*CURLEX{$vname}<used> = 1 if $named and $n;
                     }
                     when '.' {
                     }
@@ -3031,7 +3032,6 @@ grammar P6 is STD {
     token parameter {
         :my $kind;
         :my $quant = '';
-        :my $q;
         :my $*DECLARAND;
         :my $*OFTYPE;
 
@@ -3966,8 +3966,6 @@ grammar P6 is STD {
         { <sym> <O(|%conditional)> }
 
     ## assignment
-    # There is no "--> type" because assignment may be coerced to either
-    # item assignment or list assignment at "make" time.
 
     token infix:sym<=> ()
     {
@@ -5283,6 +5281,18 @@ method getsig {
     }
     self.<sig> = self.makestr(TEXT => $sig);
     self.<lex> = $*CURLEX.idref;
+    if ($*DECLARAND<mult>//'') ne 'proto' {
+        for keys %$*CURLEX {
+            my $desc = $*CURLEX{$_};
+            next unless $_ ~~ m/(\$|\@|\%|\&)\w/;
+            next if $_ eq '$_';
+            next if $desc<used>;
+            next if $desc<rebind>;
+            next if $desc<stub>;
+            my $pos = $desc<declaredat> // self.pos;
+            self.cursor($pos).worry("$_ is declared but not used");
+        }
+    }
     self;
 }
 
@@ -5518,6 +5528,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
     else {
         $*DECLARAND = $curstash.{$name} = $declaring;
         $curstash.{$shortname} = $declaring unless $shortname eq $name;
+        $*DECLARAND<declaredat> = self.pos;
         $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
         $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
@@ -5746,6 +5757,7 @@ method is_known ($n, $curlex = $*CURLEX) {
     return True if $name eq '';
     if $curpkg.{$name} {
         self.deb("Found") if $*DEBUG +& DEBUG::symtab;
+        $curpkg.{$name}<used>++;
         return True;
     }
     # leading components take us non-lexical?  assume we can't know
@@ -5762,6 +5774,7 @@ method lex_can_find_name ($lex, $name, $varbind) {
     self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
     if $lex.{$name} {
         self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
+        $lex.{$name}<used>++;
         return True;
     }
 
@@ -5794,7 +5807,6 @@ method lex_can_find_name ($lex, $name, $varbind) {
 }
 
 method add_routine ($name) {
-    
     @*MEMOS[self.pos]<wasname> = $name if self.is_name($name);
     my $vname = '&' ~ $name;
     self.add_name($vname);
@@ -5856,6 +5868,7 @@ method add_placeholder($name) {
     }
  
     self.add_my_name($varname);
+    $*CURLEX{$varname}<used> = 1;
     self;
 }
 
@@ -5891,6 +5904,9 @@ method check_variable ($variable) {
                     }
                     return $variable.sorry("Variable $name is not predeclared");
                 }
+            }
+            elsif $*CURLEX{$name} {
+                $*CURLEX{$name}<used>++;
             }
         }
         when '^' {
