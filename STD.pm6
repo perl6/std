@@ -6099,8 +6099,23 @@ method panic (Str $s) {
     die "Parse failed\n";
 }
 
+regex is_ok {
+    \N*? '#OK' \h*? $<okif>=[\N*?] \h*? $$
+}
+
 method worry (Str $s) {
     my $m = $s ~ self.locmess;
+
+    # allow compile-time warning suppression with #OK some string
+    my ($okmaybe) = self.suppose( sub {
+        self.is_ok;
+    });
+    if $okmaybe {
+        my $okif = $okmaybe<okif>.Str;
+        say $okif;
+        return self if $okif eq '' or $s ~~ /$okif/;
+    }
+
     push @*WORRIES, $m unless %*WORRIES{$s}++;
     self;
 }
