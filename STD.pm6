@@ -2248,7 +2248,7 @@ grammar P6 is STD {
         | <coloncircumfix('')>
             { $key = ""; $value = $<coloncircumfix>; }
         | $<var> = (<sigil> {} <twigil>? <desigilname>)
-            { $key = $<var><desigilname>.Str; $value = $<var>; }
+            { $key = $<var><desigilname>.Str; $value = $<var>; $¢.check_variable($value); }
         ]
         { $<k> = $key; $<v> = $value; }
     }
