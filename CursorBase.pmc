@@ -2399,6 +2399,7 @@ sub mixin {
         # fake up mixin with MI, being sure to put "roles" in front
         my $eval = "package $NEWWHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$WHAT'); moose_with(" . join(',', map {"'$_'"} @newmix) . ");our \$CATEGORY = '.';\n";
         $self->deb($eval) if DEBUG & DEBUG::mixins;
+        local $SIG{__WARN__} = sub { die $_[0] unless $_[0] =~ /^Deep recursion/ };
         eval $eval;
         warn $@ if $@;
     }
