@@ -802,7 +802,7 @@ token charname {
     ] || <.sorry: "Unrecognized character name"> .*?<?terminator>
 }
 
-token charnames { [<charname><.ws>] ** [','\s*] }
+token charnames { \s* [<charname><.ws>] ** [','\s*] }
 
 token charspec {
     [
