@@ -5285,7 +5285,7 @@ method getsig {
         for keys %$*CURLEX {
             my $desc = $*CURLEX{$_};
             next unless $_ ~~ m/(\$|\@|\%|\&)\w/;
-            next if $_ eq '$_';
+            next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
             next if $desc<used>;
             next if $desc<rebind>;
             next if $desc<stub>;
@@ -5341,6 +5341,7 @@ method is_name ($n, $curlex = $*CURLEX) {
         self.deb("Looking in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
         if $lex.{$name} {
             self.deb("Found $name in ", $lex.id) if $*DEBUG +& DEBUG::symtab;
+            $lex.{$name}<used> = 1;
             return True;
         }
         my $oid = $lex.<OUTER::>[0] || last;
@@ -5532,6 +5533,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
         $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
         $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
+        $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %::MYSTERY{substr($name,1)};
         if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
             $curstash.{"&$shortname"} //= $curstash.{$shortname};
             $curstash.{"&$shortname"}<used> = 1;
@@ -5641,16 +5643,16 @@ method add_our_name ($n) {
 method add_mystery ($token,$pos,$ctx) {
     my $name = $token.Str;
     return self if $*IN_PANIC;
-    if not self.is_known($name) {
+    if self.is_known('&' ~ $name) or self.is_known($name) {
+        self.deb("$name is known") if $*DEBUG +& DEBUG::symtab;
+    }
+    else {
         self.deb("add_mystery $name $*CURLEX") if $*DEBUG +& DEBUG::symtab;
         %*MYSTERY{$name}.<lex> = $*CURLEX;
         %*MYSTERY{$name}.<token> = $token;
         %*MYSTERY{$name}.<ctx> = $ctx;
         %*MYSTERY{$name}.<line> ~= ',' if %*MYSTERY{$name}.<line>;
         %*MYSTERY{$name}.<line> ~= self.lineof($pos);
-    }
-    else {
-        self.deb("$name is known") if $*DEBUG +& DEBUG::symtab;
     }
     self;
 }
@@ -6112,7 +6114,6 @@ method worry (Str $s) {
     });
     if $okmaybe {
         my $okif = $okmaybe<okif>.Str;
-        say $okif;
         return self if $okif eq '' or $s ~~ /$okif/;
     }
 
