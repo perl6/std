@@ -2247,7 +2247,13 @@ grammar P6 is STD {
         | :dba('signature') '(' ~ ')' <fakesignature>
         | <coloncircumfix('')>
             { $key = ""; $value = $<coloncircumfix>; }
-        | $<var> = (<sigil> {} <twigil>? <desigilname>)
+        | $<var> = (
+                <sigil> {}
+                [
+                | <twigil>? <desigilname>
+                | '<' <desigilname> '>'
+                ]
+            )
             { $key = $<var><desigilname>.Str; $value = $<var>; $¢.check_variable($value); }
         ]
         { $<k> = $key; $<v> = $value; }
