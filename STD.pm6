@@ -5259,9 +5259,9 @@ method newlex ($needsig = 0) {
 
 method finishlex {
     my $line = self.lineof(self.pos);
-    $*CURLEX<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line );
-    $*CURLEX<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line );
-    $*CURLEX<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line );
+    $*CURLEX<$_> //= NAME.new( name => '$_', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    $*CURLEX<$/> //= NAME.new( name => '$/', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
+    $*CURLEX<$!> //= NAME.new( name => '$!', file => $*FILE, line => $line, dynamic => 1, scope => 'my' );
     $*SIGNUM = 0;
     self;
 }
@@ -5295,6 +5295,7 @@ method getsig {
             next if $desc<used>;
             next if $desc<rebind>;
             next if $desc<dynamic>;
+            next if $desc<scope> eq 'state';
             next if $desc<stub>;
             my $pos = $desc<declaredat> // self.pos;
             self.cursor($pos).worry("$_ is declared but not used");
@@ -5491,6 +5492,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
         of   => $*OFTYPE,
+        scope => $*SCOPE,
     );
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
@@ -5595,6 +5597,7 @@ method add_our_name ($n) {
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
         of   => $*OFTYPE,
+        scope => $*SCOPE,
     );
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
@@ -5808,6 +5811,7 @@ method lex_can_find_name ($lex, $name, $varbind) {
             rebind => self.line,
             varbind => $varbind,
             mult => 'only',
+            scope => $lex.{$name}<scope>,
         );
         # the innermost lex sets this last to get correct # of OUTER::s
         $varbind.<truename> = $outname;
