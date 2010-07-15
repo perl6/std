@@ -5288,6 +5288,7 @@ method getsig {
             next if $_ eq '$_' or $_ eq '@_' or $_ eq '%_';
             next if $desc<used>;
             next if $desc<rebind>;
+            next if $desc<dynamic>;
             next if $desc<stub>;
             my $pos = $desc<declaredat> // self.pos;
             self.cursor($pos).worry("$_ is declared but not used");
