@@ -56,6 +56,8 @@ use YAML::XS;
 use Storable;
 use Encode;
 use Scalar::Util 'refaddr';
+use File::ShareDir 'dist_dir';
+use Try::Tiny;
 
 use Term::ANSIColor;
 our $BLUE = color 'blue';
@@ -194,7 +196,8 @@ sub new {
 sub parse {
     my $class = shift;
     my $text = shift;
-    local $::FILE = { name => '(eval)' };
+    my %args = @_;
+    local $::FILE = { name => $args{'filename'} // '(eval)' };
     $class->initparse($text,@_);
 }
 
@@ -220,7 +223,7 @@ sub parsefile {
 
 # used internally to isolate contextuals in do_need
 sub _parse_module {
-    $_[0]->parsefile($ARGV[0], setting => "CORE");
+    $_[0]->parsefile($ARGV[0],setting=>$ENV{DEFAULT_SETTING_FOR_MODULES} // "CORE");
     exit 0;
 }
 
@@ -236,6 +239,8 @@ sub initparse {
     my $filename = $args{filename};
 
     local $::TMP_PREFIX = $tmp_prefix;
+    local $::SYML_SEARCH_PATH = $args{syml_search_path} // ($ENV{SYML_SEARCH_PATH} ? [split ':',$ENV{SYML_SEARCH_PATH}] : [$::TMP_PREFIX]);
+
     local $::SETTINGNAME = $setting;
     local $::ACTIONS = $actions;
     local $::RECURSIVE_PERL = $args{recursive_perl};
@@ -279,14 +284,14 @@ sub initparse {
 sub load_lex {
     my $self = shift;
     my $setting = shift;
-    my $syml = $::TMP_PREFIX . 'syml';
-    my $file = "$syml/$setting.syml";
-    if (-e $file) {
-        bless($self->load_yaml_lex($setting),'Stash');
+    for my $prefix (@{$::SYML_SEARCH_PATH}) {
+        my $syml = $prefix . 'syml';
+        my $file = "$syml/$setting.syml";
+        if (-e $file) {
+            return bless($self->load_yaml_lex($setting,$file),'Stash');
+        }
     }
-    else {
-        bless($self->load_perl_lex($setting),'Stash');
-    }
+    bless($self->load_perl_lex($setting),'Stash');
 }
 
 sub load_perl_lex {
@@ -299,7 +304,6 @@ sub load_perl_lex {
     my $store = "$syml/$setting.lex.store";
     mkdir $syml unless -d $syml;
     if (-f $store and -M $file and -M $file > -M $store) {
-        # HACK we get hashes with strangely aliased keys from Storable
         $LEXS{$setting} = retrieve($store);
     }
     else {
@@ -311,7 +315,8 @@ can be used.
 EOM
         }
         $LEXS{$setting} = require $file;
-        store($LEXS{$setting}, $store);
+        # store may fail if we don't have write privilages
+        try {store($LEXS{$setting}, $store)};
     }
     $LEXS{$setting};
 }
@@ -327,19 +332,17 @@ sub LoadFile {
 sub load_yaml_lex {
     my $self = shift;
     my $setting = shift;
+    my $file = shift;
     state %LEXS;
     return $LEXS{$setting} if $LEXS{$setting};
-    my $syml = $::TMP_PREFIX . 'syml';
-    my $file = "$syml/$setting.syml";
-    my $store = "$syml/$setting.syml.store";
-    mkdir $syml unless -d $syml;
+    my $store = $file.".store";
     if (-f $store and -M $file and -M $file > -M $store) {
         $LEXS{$setting} = retrieve($store);
     }
     else {
         # HACK YAML::XS is horribly broken see https://rt.cpan.org/Public/Bug/Display.html?id=53278
         $LEXS{$setting} = {%{LoadFile($file)}};
-        store($LEXS{$setting}, $store);
+        #store($LEXS{$setting}, $store);
     }
     # say join ' ', sort keys %{ $LEXS{$setting} };
     $LEXS{$setting};
@@ -1845,7 +1848,12 @@ my %unicode_map_cache;
 BEGIN {
     $unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
     OPEN_UNIPROPS: {
-        my @path = split ':', ($ENV{PERL6LIB} // './lib:.');
+        my @path;
+        try {
+            @path = dist_dir('Perl6-STD'); 
+        } catch {
+            @path = split ':', ($ENV{PERL6LIB} // './lib:.');
+        };
         for (@path) {
             open MAP, "<", "$_/uniprops" and last OPEN_UNIPROPS;
         }
@@ -2398,6 +2406,7 @@ sub mixin {
     if (not exists &{$NEWWHAT.'::meta'}) {              # never composed this one yet?
         # fake up mixin with MI, being sure to put "roles" in front
         my $eval = "package $NEWWHAT; use Moose ':all' => { -prefix => 'moose_' };  moose_extends('$WHAT'); moose_with(" . join(',', map {"'$_'"} @newmix) . ");our \$CATEGORY = '.';\n";
+
         $self->deb($eval) if DEBUG & DEBUG::mixins;
         local $SIG{__WARN__} = sub { die $_[0] unless $_[0] =~ /^Deep recursion/ };
         eval $eval;
@@ -2892,6 +2901,7 @@ sub do_need { my $self = shift;
     elsif (-f "$lib/$modfile$ext") {
         # say "$std $lib/$module$ext";
         local $ENV{STD5PREFIX} = $::TMP_PREFIX;
+        local $ENV{SYML_SEARCH_PATH} = join(':',@{$::SYML_SEARCH_PATH});
         system($::RECURSIVE_PERL // $^X, "-MSTD", "-e", "STD->_parse_module",
             "$lib/$module$ext") and die "Can't compile $lib/$module$ext";
         print STDERR "Compiled $lib/$module$ext\n";
