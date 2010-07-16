@@ -504,4 +504,4 @@ my package PROCESS {
     my %ENV is export;
 }
 
-YOU_ARE_HERE;
+{YOU_ARE_HERE};

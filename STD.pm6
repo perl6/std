@@ -1387,6 +1387,7 @@ grammar P6 is STD {
 
         <.finishlex>
         [
+        | '{YOU_ARE_HERE}' <.you_are_here>
         | :dba('block') '{' ~ '}' <statementlist> :: <.curlycheck>
         | <?terminator> <.panic: 'Missing block'>
         | <?> <.panic: "Malformed block">
@@ -3168,12 +3169,6 @@ grammar P6 is STD {
     #########
     # Terms #
     #########
-
-    # start playing with the setting stubber
-    token term:YOU_ARE_HERE {
-        <sym> <.you_are_here>
-        <O(|%term)>
-    }
 
     token term:new {
         'new' \h+ <longname> \h* <!before ':'> <.obs("C++ constructor syntax", "method call syntax")>
