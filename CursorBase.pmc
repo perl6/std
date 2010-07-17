@@ -2664,6 +2664,7 @@ moose_extends('$WHAT');
 
 my \$retree = {
  '$mangle' => bless({
+  'dba' => '$category expression',
   'kind' => 'token',
   'min' => 12347,
   'pkg' => undef,
@@ -2685,15 +2686,6 @@ my \$retree = {
           's' => 0,
           'text' => $starter,
         }, 'RE_string'),
-        bless({
-          'a' => 0,
-          'dba' => '$category expression',
-          'i' => 0,
-          'min' => 0,
-          'r' => 1,
-          's' => 0,
-          'text' => ':',
-        }, 'RE_meta'),
         bless({
           'a' => 0,
           'dba' => '$category expression',
@@ -2722,7 +2714,7 @@ my \$retree = {
                   'min' => 1,
                   'r' => 1,
                   's' => 0,
-                  'text' => ')',
+                  'text' => $stopper,
                 }, 'RE_string'),
                 bless({
                   'min' => 0,
@@ -2762,7 +2754,7 @@ sub $mangle {
     do {
       if (my (\$C) = (\$C->_EXACT($starter))) {
         do {
-          if (my (\$C) = (((local \$::GOAL = $stopper , my \$goalpos = \$C), \$C)[-1])) {
+          if (my (\$C) = (((local \$::GOAL = $stopper , my \$goalpos = \$C), \$C->unbalanced($stopper))[-1])) {
             do {
               if (my (\$C) = (\$C->_SUBSUMEr(['semilist'], sub {
                 my \$C = shift;

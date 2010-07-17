@@ -1475,6 +1475,7 @@ grammar P6 is STD {
         :my $*endargs = -1;
         :my $*QSIGIL ::= 0;
         <!before <[\)\]\}]> >
+        <!stopper>
 
         # this could either be a statement that follows a declaration
         # or a statement that is within the block of a code declaration
