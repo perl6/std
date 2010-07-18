@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
 # A script to make running STD.pmc easier,
 # by providing it input, and isolating it's Match yaml output.
 use strict;

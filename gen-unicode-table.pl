@@ -1,4 +1,4 @@
-#! /usr/local/bin/perl
+#! /usr/bin/env perl
 use 5.012;  # unicore format is unstable
 use strict;
 use warnings;
