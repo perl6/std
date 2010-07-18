@@ -1168,7 +1168,7 @@ token integer {
         | x '_'? <hexint>
         | d '_'? <decint>
         | <decint>
-            <!!{ $¢.worry("Leading 0 does not indicate octal in Perl 6") }>
+            <!!{ $¢.worry("Leading 0 does not indicate octal in Perl 6; please use 0o" ~ $<decint>.Str ~ " if you mean that") }>
         ]
     | <decint>
     ]
