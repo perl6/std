@@ -1,4 +1,4 @@
-#!/usr/bin/env perl -w
+#!/usr/bin/env perl
 # ./try5 EXPR -e '-3+2' | ./try5_post
 use strict;
 use warnings;
