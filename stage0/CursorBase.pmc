@@ -7,6 +7,8 @@
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
 
+use FindBin;
+use lib $FindBin::Bin;
 use strict;
 use warnings;
 no warnings 'recursion';
@@ -2902,7 +2904,7 @@ sub do_need { my $self = shift;
         # say "$std $lib/$module$ext";
         local $ENV{STD5PREFIX} = $::TMP_PREFIX;
         local $ENV{SYML_SEARCH_PATH} = join(':',@{$::SYML_SEARCH_PATH});
-        system($::RECURSIVE_PERL // $^X, "-MSTD", "-e", "STD->_parse_module",
+        system($::RECURSIVE_PERL // $^X, "-I$FindBin::Bin", "-MSTD", "-e", "STD->_parse_module",
             "$lib/$module$ext") and die "Can't compile $lib/$module$ext";
         print STDERR "Compiled $lib/$module$ext\n";
         $topsym = LoadFile("$syml/$modfile$ext.syml");

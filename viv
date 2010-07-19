@@ -35,6 +35,12 @@ are all almost certainly out.
 
 =cut
 
+use FindBin;
+BEGIN {
+    if (-s "$FindBin::Bin/STD.pmc") {
+        unshift @INC, $FindBin::Bin;
+    }
+}
 use strict;
 use 5.010;
 use warnings FATAL => 'all';

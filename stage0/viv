@@ -35,6 +35,8 @@ are all almost certainly out.
 
 =cut
 
+use FindBin;
+use lib $FindBin::Bin;
 use strict;
 use 5.010;
 use warnings FATAL => 'all';
