@@ -1850,7 +1850,7 @@ BEGIN {
     OPEN_UNIPROPS: {
         my @path;
         try {
-            @path = dist_dir('Perl6-STD'); 
+            @path = dist_dir('STD'); 
         } catch {
             @path = split ':', ($ENV{PERL6LIB} // './lib:.');
         };
