@@ -1,6 +1,9 @@
 #!/usr/bin/env perl
 use 5.10.0;
 
+use FindBin;
+BEGIN { unshift @INC, $FindBin::Bin if -s "$FindBin::Bin/STD.pmc"; }
+
 BEGIN { $ENV{STD5DEBUG} = -1; }
 use STD;
 use utf8;

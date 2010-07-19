@@ -1,5 +1,8 @@
 #!/usr/bin/env perl
 
+use FindBin;
+BEGIN { unshift @INC, $FindBin::Bin if -s "$FindBin::Bin/STD.pmc"; }
+
 use STD;
 use utf8;
 
