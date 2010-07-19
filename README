@@ -41,8 +41,6 @@ The following tools are provided which leverage the power of C<STD>:
 
 * C<reds> appears to be an older, non-working version of redspans.
 
-* C<STD_syntax_highlight> is a syntax highlighter with multiple output formats.
-
 * C<teststd> uses STD to check the syntax of the Perl 6 Specification Tests.
 
 * C<tloop> is an interactive STD syntax checker.
@@ -50,6 +48,8 @@ The following tools are provided which leverage the power of C<STD>:
 * C<vill> is a prototype STD-based LLVM-based Perl 6 JIT compiler.
 
 * C<viv> is a retargettable metacompiler for the static subset of Perl 6.
+
+* C<std_hilite/STD_syntax_highlight> is a syntax highlighter with multiple output formats.
 
 See the headers of the respective programs for more details, and don't hesitate
 to ask around as quite a bit of this is underdocumented.
