@@ -1942,13 +1942,12 @@ sub _dfa_dump_node { my ($dfan) = @_;
     }
 }
 
-sub _elem_matches { my ($char, $element) = @_;
-    if (length($element) == 1) {
-        return $char eq $element;
-    } else {
-        my $i = ord $char;
-        return vec(_get_unicode_map($element)->[$i >> 10], $i & 1023, 1);
-    }
+sub _elem_matches { # my ($char, $element) = @_;
+    # Optimize for the common path
+    return $_[0] eq $_[1] if length $_[1] == 1;
+
+    my $i = ord $_[0];
+    return vec(_get_unicode_map($_[1])->[$i >> 10], $i & 1023, 1);
 }
 
 my %boolean_tables = map { $_, 1 } qw/AHex Alpha BidiC BidiM CE CI CWCF CWCM
