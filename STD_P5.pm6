@@ -164,7 +164,7 @@ token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
 ##################
 
 token ws {
-    :my @stub = return self if @*MEMOS[self.pos]<ws> :exists;
+    :temp @*STUB = return self if @*MEMOS[self.pos]<ws> :exists;
     :my $startpos = self.pos;
 
     :dba('whitespace')
@@ -412,7 +412,7 @@ token regex_block {
         {
             my $kv = $<quotepair>[*-1];
             $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
+                or self.sorry("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
         }
     ]*
 
@@ -458,7 +458,7 @@ token label {
     <identifier> ':' <?before \s> <.ws>
 
     [ <?{ $¢.is_name($label = $<identifier>.Str) }>
-      <.panic("Illegal redeclaration of '$label'")>
+      <.sorry("Illegal redeclaration of '$label'")>
     ]?
 
     # add label as a pseudo type
@@ -548,8 +548,6 @@ token p5statement_control:if {
 
 token p5statement_control:while {
     <sym> :s
-    [ <?before '(' ['my'? '$'\w+ '=']? '<' '$'?\w+ '>' ')'>   #'
-        <.panic: "This appears to be Perl 5 code"> ]?
     <xblock>
 }
 
@@ -566,7 +564,6 @@ token p5statement_control:for {
             <e2=EXPR>? ';'
             <e3=EXPR>?
         ')'||<.panic: "Malformed loop spec">]
-        [ <?before '{' > <.panic: "Whitespace required before block"> ]?
     )? <.ws>
     <block>
 }
@@ -665,7 +662,7 @@ rule scoped($*SCOPE) {
     || <?before <[A..Z]>><longname>{{
             my $t = $<longname>.Str;
             if not $¢.is_known($t) {
-                $¢.panic("In \"$*SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
+                $¢.sorry("In \"$*SCOPE\" declaration, typename $t must be predeclared (or marked as declarative with :: prefix)");
             }
         }}
         <!> # drop through
@@ -843,144 +840,109 @@ token fatarrow {
 token p5special_variable:sym<$!> { <sym> <!before \w> }
 
 token p5special_variable:sym<$!{ }> {
-    ( '$!{' :: (.*?) '}' )
-    <.obs($0.Str ~ " variable", 'smart match against $!')>
+    '$!{' ~ '}' <EXPR>
 }
 
 token p5special_variable:sym<$/> {
     <sym>
-    # XXX assuming nobody ever wants to assign $/ directly anymore...
-    [ <?before \h* '=' <![=]> >
-        <.obs('$/ variable as input record separator',
-             "filehandle's :irs attribute")>
-    ]?
 }
 
 token p5special_variable:sym<$~> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$~ variable', 'Form module')>
+    <sym>
 }
 
 token p5special_variable:sym<$`> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$` variable', 'explicit pattern before <(')>
+    <sym>
 }
 
 token p5special_variable:sym<$@> {
-    <sym> ::
-    <.obs('$@ variable as eval error', '$!')>
+    <sym>
 }
 
 token p5special_variable:sym<$#> {
-    <sym> ::
-    [
-    || (\w+) <.obs("\$#" ~ $0.Str ~ " variable", '@' ~ $0.Str ~ '.end')>
-    || <.obs('$# variable', '.fmt')>
-    ]
+    <sym>
 }
 token p5special_variable:sym<$$> {
-    <sym> <!alpha> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$$ variable', '$*PID')>
+    <sym> <!alpha>
 }
 token p5special_variable:sym<$%> {
-    <sym> ::
-    <.obs('$% variable', 'Form module')>
+    <sym>
 }
 
-# Note: this works because placeholders are restricted to lowercase
 token p5special_variable:sym<$^X> {
-    <sigil=p5sigil> '^' $<letter> = [<[A..Z]>] \W
-    <.obscaret($<sigil>.Str ~ '^' ~ $<letter>.Str, $<sigil>.Str, $<letter>.Str)>
+    <sigil=p5sigil> '^' $<letter> = [<[A..Z]>] <?before \W >
 }
 
 token p5special_variable:sym<$^> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$^ variable', 'Form module')>
+    <sym>
 }
 
 token p5special_variable:sym<$&> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$& variable', '$/ or $()')>
+    <sym>
 }
 
 token p5special_variable:sym<$*> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$* variable', '^^ and $$')>
+    <sym>
 }
 
 token p5special_variable:sym<$)> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$) variable', '$*EGID')>
+    <sym>
 }
 
 token p5special_variable:sym<$-> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$- variable', 'Form module')>
+    <sym>
 }
 
 token p5special_variable:sym<$=> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$= variable', 'Form module')>
+    <sym>
 }
 
 token p5special_variable:sym<@+> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('@+ variable', '.to method')>
+    <sym>
 }
 
 token p5special_variable:sym<%+> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('%+ variable', '.to method')>
+    <sym>
 }
 
 token p5special_variable:sym<$+[ ]> {
     '$+['
-    <.obs('@+ variable', '.to method')>
 }
 
 token p5special_variable:sym<@+[ ]> {
     '@+['
-    <.obs('@+ variable', '.to method')>
 }
 
 token p5special_variable:sym<@+{ }> {
     '@+{'
-    <.obs('%+ variable', '.to method')>
 }
 
 token p5special_variable:sym<@-> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('@- variable', '.from method')>
+    <sym>
 }
 
 token p5special_variable:sym<%-> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('%- variable', '.from method')>
+    <sym>
 }
 
 token p5special_variable:sym<$-[ ]> {
     '$-['
-    <.obs('@- variable', '.from method')>
 }
 
 token p5special_variable:sym<@-[ ]> {
     '@-['
-    <.obs('@- variable', '.from method')>
 }
 
 token p5special_variable:sym<%-{ }> {
     '@-{'
-    <.obs('%- variable', '.from method')>
 }
 
 token p5special_variable:sym<$+> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$+ variable', 'Form module')>
+    <sym>
 }
 
 token p5special_variable:sym<${^ }> {
     <sigil=p5sigil> '{^' :: $<text>=[.*?] '}'
-    <.obscaret($<sigil>.Str ~ '{^' ~ $<text>.Str ~ '}', $<sigil>.Str, $<text>.Str)>
 }
 
 token p5special_variable:sym<::{ }> {
@@ -989,87 +951,58 @@ token p5special_variable:sym<::{ }> {
 
 regex p5special_variable:sym<${ }> {
     <sigil=p5sigil> '{' {} $<text>=[.*?] '}'
-    {{
-        my $sigil = $<sigil>.Str;
-        my $text = $<text>.Str;
-        my $bad = $sigil ~ '{' ~ $text ~ '}';
-        $text = $text - 1 if $text ~~ /^\d+$/;
-        if $text !~~ /^(\w|\:)+$/ {
-            $¢.obs($bad, $sigil ~ '(' ~ $text ~ ')');
-        }
-        elsif $*QSIGIL {
-            $¢.obs($bad, '{' ~ $sigil ~ $text ~ '}');
-        }
-        else {
-            $¢.obs($bad, $sigil ~ $text);
-        }
-    }}
 }
 
 token p5special_variable:sym<$[> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$[ variable', 'user-defined array indices')>
+    <sym>
 }
 
 token p5special_variable:sym<$]> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$] variable', '$*PERL_VERSION')>
+    <sym>
 }
 
 token p5special_variable:sym<$\\> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$\\ variable', "the filehandle's :ors attribute")>
+    <sym>
 }
 
 token p5special_variable:sym<$|> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$| variable', ':autoflush on open')>
+    <sym>
 }
 
 token p5special_variable:sym<$:> {
-    <sym> <?before <[\x20\t\n\],=)}]> >
-    <.obs('$: variable', 'Form module')>
+    <sym>
 }
 
 token p5special_variable:sym<$;> {
-    <sym> :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$; variable', 'real multidimensional hashes')>
+    <sym>
 }
 
 token p5special_variable:sym<$'> { #'
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
+    <sym>
 }
 
 token p5special_variable:sym<$"> {
     <sym> <!{ $*QSIGIL }>
-    :: <?before \s | ',' | '=' | <p5terminator> >
-    <.obs('$" variable', '.join() method')>
 }
 
 token p5special_variable:sym<$,> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$, variable', ".join() method")>
+    <sym>
 }
 
 token p5special_variable:sym['$<'] {
-    <sym> :: <!before \s* \w+ \s* '>' >
-    <.obs('$< variable', '$*UID')>
+    <sym>
 }
 
 token p5special_variable:sym«\$>» {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$> variable', '$*EUID')>
+    <sym>
 }
 
 token p5special_variable:sym<$.> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$. variable', "filehandle's .line method")>
+    <sym>
 }
 
 token p5special_variable:sym<$?> {
-    <sym> :: <?before \s | ',' | <p5terminator> >
-    <.obs('$? variable as child error', '$!')>
+    <sym>
 }
 
 # desigilname should only follow a sigil
@@ -1216,7 +1149,6 @@ token integer {
         ]
     | \d+[_\d+]*
     ]
-    <!!before ['.' <?before \s | ',' | '=' | <p5terminator> > <.panic: "Decimal point must be followed by digit">]? >
 }
 
 token radint {
@@ -1243,23 +1175,6 @@ token dec_number {
     | $<coeff> = [\d+[_\d+]*                ] <escale>
     ]
     <!!before [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)">]? >
-}
-
-token rad_number {
-    ':' $<radix> = [\d+] <.unsp>?      # XXX optional dot here?
-    {}           # don't recurse in lexer
-    :dba('number in radix notation')
-    [
-    || '<'
-            $<intpart> = [ <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]
-            $<fracpart> = [ '.' <[ 0..9 a..z A..Z ]>+ [ _ <[ 0..9 a..z A..Z ]>+ ]* ]?
-            [ '*' <base=radint> '**' <exp=radint> ]?
-       '>'
-#      { make radcalc($<radix>, $<intpart>, $<fracpart>, $<base>, $<exp>) }
-    || <?before '['> <circumfix=p5circumfix>
-    || <?before '('> <circumfix=p5circumfix>
-    || <.panic: "Malformed radix number">
-    ]
 }
 
 token octints { [<.ws><octint><.ws>] ** ',' }
@@ -1326,7 +1241,7 @@ token babble ($l) {
         {
             my $kv = $<quotepair>[*-1];
             $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
+                or self.sorry("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
         }
     ]*
 
@@ -1404,7 +1319,6 @@ token nibbler {
     :my $to = $from;
     :my @nibbles = ();
     :my $multiline = 0;
-    :my $nibble;
     { $<_from> = self.pos; }
     [ <!before <stopper> >
         [
@@ -1460,16 +1374,8 @@ method nibble ($lang) {
 token p5quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> "'" }
 token p5quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> '"' }
 
-token p5circumfix:sym<« »>   { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> '»' }
-token p5circumfix:sym«<< >>» { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> '>>' }
 token p5circumfix:sym«< >»   { '<'
-                              [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
-                              [ <?before '>' > <.obs('<>', 'lines() or ()')> ]?
-                              <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>' }
-
-token p5quote:sym<//>   {
-    '/'\s*'/' <.panic: "Null regex not allowed">
-}
+                              <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:w).balanced('<','>'))> '>' }
 
 token p5quote:sym</ />   {
     '/' <nibble( $¢.cursor_fresh( %*LANG<Regex> ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
@@ -1478,14 +1384,12 @@ token p5quote:sym</ />   {
 
 # handle composite forms like qww
 token quote:qq {
-    :my $qm;
     'qq'
     [
     | » <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
     ]
 }
 token quote:q {
-    :my $qm;
     'q'
     [
     | » <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
@@ -1524,401 +1428,6 @@ token p5tr_mods {
     (< c d s ] >+) 
 }
 
-# XXX should eventually be derived from current Unicode tables.
-constant %open2close = (
-"\x0028" => "\x0029",
-"\x003C" => "\x003E",
-"\x005B" => "\x005D",
-"\x007B" => "\x007D",
-"\x00AB" => "\x00BB",
-"\x0F3A" => "\x0F3B",
-"\x0F3C" => "\x0F3D",
-"\x169B" => "\x169C",
-"\x2018" => "\x2019",
-"\x201A" => "\x2019",
-"\x201B" => "\x2019",
-"\x201C" => "\x201D",
-"\x201E" => "\x201D",
-"\x201F" => "\x201D",
-"\x2039" => "\x203A",
-"\x2045" => "\x2046",
-"\x207D" => "\x207E",
-"\x208D" => "\x208E",
-"\x2208" => "\x220B",
-"\x2209" => "\x220C",
-"\x220A" => "\x220D",
-"\x2215" => "\x29F5",
-"\x223C" => "\x223D",
-"\x2243" => "\x22CD",
-"\x2252" => "\x2253",
-"\x2254" => "\x2255",
-"\x2264" => "\x2265",
-"\x2266" => "\x2267",
-"\x2268" => "\x2269",
-"\x226A" => "\x226B",
-"\x226E" => "\x226F",
-"\x2270" => "\x2271",
-"\x2272" => "\x2273",
-"\x2274" => "\x2275",
-"\x2276" => "\x2277",
-"\x2278" => "\x2279",
-"\x227A" => "\x227B",
-"\x227C" => "\x227D",
-"\x227E" => "\x227F",
-"\x2280" => "\x2281",
-"\x2282" => "\x2283",
-"\x2284" => "\x2285",
-"\x2286" => "\x2287",
-"\x2288" => "\x2289",
-"\x228A" => "\x228B",
-"\x228F" => "\x2290",
-"\x2291" => "\x2292",
-"\x2298" => "\x29B8",
-"\x22A2" => "\x22A3",
-"\x22A6" => "\x2ADE",
-"\x22A8" => "\x2AE4",
-"\x22A9" => "\x2AE3",
-"\x22AB" => "\x2AE5",
-"\x22B0" => "\x22B1",
-"\x22B2" => "\x22B3",
-"\x22B4" => "\x22B5",
-"\x22B6" => "\x22B7",
-"\x22C9" => "\x22CA",
-"\x22CB" => "\x22CC",
-"\x22D0" => "\x22D1",
-"\x22D6" => "\x22D7",
-"\x22D8" => "\x22D9",
-"\x22DA" => "\x22DB",
-"\x22DC" => "\x22DD",
-"\x22DE" => "\x22DF",
-"\x22E0" => "\x22E1",
-"\x22E2" => "\x22E3",
-"\x22E4" => "\x22E5",
-"\x22E6" => "\x22E7",
-"\x22E8" => "\x22E9",
-"\x22EA" => "\x22EB",
-"\x22EC" => "\x22ED",
-"\x22F0" => "\x22F1",
-"\x22F2" => "\x22FA",
-"\x22F3" => "\x22FB",
-"\x22F4" => "\x22FC",
-"\x22F6" => "\x22FD",
-"\x22F7" => "\x22FE",
-"\x2308" => "\x2309",
-"\x230A" => "\x230B",
-"\x2329" => "\x232A",
-"\x23B4" => "\x23B5",
-"\x2768" => "\x2769",
-"\x276A" => "\x276B",
-"\x276C" => "\x276D",
-"\x276E" => "\x276F",
-"\x2770" => "\x2771",
-"\x2772" => "\x2773",
-"\x2774" => "\x2775",
-"\x27C3" => "\x27C4",
-"\x27C5" => "\x27C6",
-"\x27D5" => "\x27D6",
-"\x27DD" => "\x27DE",
-"\x27E2" => "\x27E3",
-"\x27E4" => "\x27E5",
-"\x27E6" => "\x27E7",
-"\x27E8" => "\x27E9",
-"\x27EA" => "\x27EB",
-"\x2983" => "\x2984",
-"\x2985" => "\x2986",
-"\x2987" => "\x2988",
-"\x2989" => "\x298A",
-"\x298B" => "\x298C",
-"\x298D" => "\x298E",
-"\x298F" => "\x2990",
-"\x2991" => "\x2992",
-"\x2993" => "\x2994",
-"\x2995" => "\x2996",
-"\x2997" => "\x2998",
-"\x29C0" => "\x29C1",
-"\x29C4" => "\x29C5",
-"\x29CF" => "\x29D0",
-"\x29D1" => "\x29D2",
-"\x29D4" => "\x29D5",
-"\x29D8" => "\x29D9",
-"\x29DA" => "\x29DB",
-"\x29F8" => "\x29F9",
-"\x29FC" => "\x29FD",
-"\x2A2B" => "\x2A2C",
-"\x2A2D" => "\x2A2E",
-"\x2A34" => "\x2A35",
-"\x2A3C" => "\x2A3D",
-"\x2A64" => "\x2A65",
-"\x2A79" => "\x2A7A",
-"\x2A7D" => "\x2A7E",
-"\x2A7F" => "\x2A80",
-"\x2A81" => "\x2A82",
-"\x2A83" => "\x2A84",
-"\x2A8B" => "\x2A8C",
-"\x2A91" => "\x2A92",
-"\x2A93" => "\x2A94",
-"\x2A95" => "\x2A96",
-"\x2A97" => "\x2A98",
-"\x2A99" => "\x2A9A",
-"\x2A9B" => "\x2A9C",
-"\x2AA1" => "\x2AA2",
-"\x2AA6" => "\x2AA7",
-"\x2AA8" => "\x2AA9",
-"\x2AAA" => "\x2AAB",
-"\x2AAC" => "\x2AAD",
-"\x2AAF" => "\x2AB0",
-"\x2AB3" => "\x2AB4",
-"\x2ABB" => "\x2ABC",
-"\x2ABD" => "\x2ABE",
-"\x2ABF" => "\x2AC0",
-"\x2AC1" => "\x2AC2",
-"\x2AC3" => "\x2AC4",
-"\x2AC5" => "\x2AC6",
-"\x2ACD" => "\x2ACE",
-"\x2ACF" => "\x2AD0",
-"\x2AD1" => "\x2AD2",
-"\x2AD3" => "\x2AD4",
-"\x2AD5" => "\x2AD6",
-"\x2AEC" => "\x2AED",
-"\x2AF7" => "\x2AF8",
-"\x2AF9" => "\x2AFA",
-"\x2E02" => "\x2E03",
-"\x2E04" => "\x2E05",
-"\x2E09" => "\x2E0A",
-"\x2E0C" => "\x2E0D",
-"\x2E1C" => "\x2E1D",
-"\x2E20" => "\x2E21",
-"\x3008" => "\x3009",
-"\x300A" => "\x300B",
-"\x300C" => "\x300D",
-"\x300E" => "\x300F",
-"\x3010" => "\x3011",
-"\x3014" => "\x3015",
-"\x3016" => "\x3017",
-"\x3018" => "\x3019",
-"\x301A" => "\x301B",
-"\x301D" => "\x301E",
-"\xFD3E" => "\xFD3F",
-"\xFE17" => "\xFE18",
-"\xFE35" => "\xFE36",
-"\xFE37" => "\xFE38",
-"\xFE39" => "\xFE3A",
-"\xFE3B" => "\xFE3C",
-"\xFE3D" => "\xFE3E",
-"\xFE3F" => "\xFE40",
-"\xFE41" => "\xFE42",
-"\xFE43" => "\xFE44",
-"\xFE47" => "\xFE48",
-"\xFE59" => "\xFE5A",
-"\xFE5B" => "\xFE5C",
-"\xFE5D" => "\xFE5E",
-"\xFF08" => "\xFF09",
-"\xFF1C" => "\xFF1E",
-"\xFF3B" => "\xFF3D",
-"\xFF5B" => "\xFF5D",
-"\xFF5F" => "\xFF60",
-"\xFF62" => "\xFF63",
-);
-
-constant %close2open = invert %open2close;
-
-token opener {
-  <[
-\x0028
-\x003C
-\x005B
-\x007B
-\x00AB
-\x0F3A
-\x0F3C
-\x169B
-\x2018
-\x201A
-\x201B
-\x201C
-\x201E
-\x201F
-\x2039
-\x2045
-\x207D
-\x208D
-\x2208
-\x2209
-\x220A
-\x2215
-\x223C
-\x2243
-\x2252
-\x2254
-\x2264
-\x2266
-\x2268
-\x226A
-\x226E
-\x2270
-\x2272
-\x2274
-\x2276
-\x2278
-\x227A
-\x227C
-\x227E
-\x2280
-\x2282
-\x2284
-\x2286
-\x2288
-\x228A
-\x228F
-\x2291
-\x2298
-\x22A2
-\x22A6
-\x22A8
-\x22A9
-\x22AB
-\x22B0
-\x22B2
-\x22B4
-\x22B6
-\x22C9
-\x22CB
-\x22D0
-\x22D6
-\x22D8
-\x22DA
-\x22DC
-\x22DE
-\x22E0
-\x22E2
-\x22E4
-\x22E6
-\x22E8
-\x22EA
-\x22EC
-\x22F0
-\x22F2
-\x22F3
-\x22F4
-\x22F6
-\x22F7
-\x2308
-\x230A
-\x2329
-\x23B4
-\x2768
-\x276A
-\x276C
-\x276E
-\x2770
-\x2772
-\x2774
-\x27C3
-\x27C5
-\x27D5
-\x27DD
-\x27E2
-\x27E4
-\x27E6
-\x27E8
-\x27EA
-\x2983
-\x2985
-\x2987
-\x2989
-\x298B
-\x298D
-\x298F
-\x2991
-\x2993
-\x2995
-\x2997
-\x29C0
-\x29C4
-\x29CF
-\x29D1
-\x29D4
-\x29D8
-\x29DA
-\x29F8
-\x29FC
-\x2A2B
-\x2A2D
-\x2A34
-\x2A3C
-\x2A64
-\x2A79
-\x2A7D
-\x2A7F
-\x2A81
-\x2A83
-\x2A8B
-\x2A91
-\x2A93
-\x2A95
-\x2A97
-\x2A99
-\x2A9B
-\x2AA1
-\x2AA6
-\x2AA8
-\x2AAA
-\x2AAC
-\x2AAF
-\x2AB3
-\x2ABB
-\x2ABD
-\x2ABF
-\x2AC1
-\x2AC3
-\x2AC5
-\x2ACD
-\x2ACF
-\x2AD1
-\x2AD3
-\x2AD5
-\x2AEC
-\x2AF7
-\x2AF9
-\x2E02
-\x2E04
-\x2E09
-\x2E0C
-\x2E1C
-\x2E20
-\x3008
-\x300A
-\x300C
-\x300E
-\x3010
-\x3014
-\x3016
-\x3018
-\x301A
-\x301D
-\xFD3E
-\xFE17
-\xFE35
-\xFE37
-\xFE39
-\xFE3B
-\xFE3D
-\xFE3F
-\xFE41
-\xFE43
-\xFE47
-\xFE59
-\xFE5B
-\xFE5D
-\xFF08
-\xFF1C
-\xFF3B
-\xFF5B
-\xFF5F
-\xFF62
-  ]>
-}
-
 # assumes whitespace is eaten already
 
 method peek_delimiters {
@@ -1931,14 +1440,11 @@ method peek_delimiters {
     elsif $char ~~ /^\w$/ {
         self.panic("Alphanumeric character is not allowed as delimiter");
     }
-    elsif %close2open{$char} {
+    elsif %STD::close2open{$char} {
         self.panic("Use of a closing delimiter for an opener is reserved");
     }
-    elsif $char eq ':' {
-        self.panic("Colons may not be used to delimit quoting constructs");
-    }
 
-    my $rightbrack = %open2close{$char};
+    my $rightbrack = %STD::open2close{$char};
     if not defined $rightbrack {
         return $char, $char;
     }
@@ -2234,13 +1740,6 @@ rule p5statement_prefix:eval    {<sym> <block> }
 
 token p5term:sym<undef> {
     <sym> »
-    [ <?before \h*'$/' >
-        <.obs('$/ variable as input record separator',
-             "the filehandle's .slurp method")>
-    ]?
-    [ <?before \h*<sigil=p5sigil>\w >
-        <.obs('undef as a verb', 'undefine function')>
-    ]?
     <O(|%term)>
 }
 
@@ -2272,7 +1771,6 @@ token PRE {
 }
 
 token infixish ($in_meta = $*IN_META) {
-    :my $infix;
     :my $*IN_META = $in_meta;
     <!stdstopper>
     <!infixstopper>
@@ -2374,7 +1872,7 @@ token p5circumfix:sym<{ }> {
 ## methodcall
 
 token p5postfix:sym['->'] ()
-    { '->' <.obs('-> to call a method', '.')> }
+    { '->' }
 
 ## autoincrement
 token p5postfix:sym<++>
@@ -2412,7 +1910,7 @@ token p5infix:sym<!~>
     { <sym> <O(|%binding)> }
 
 token p5infix:sym<=~>
-    { <sym> <.obs('=~ to do pattern matching', '~~')> <O(|%binding)> }
+    { <sym> <O(|%binding)> }
 
 
 ## multiplicative
@@ -2710,7 +2208,7 @@ token stopper { <!> }
 
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
-    :my @stub = return self if @*MEMOS[self.pos]<endstmt> :exists;
+    :temp @*STUB = return self if @*MEMOS[self.pos]<endstmt> :exists;
     :dba('standard stopper')
     [
     | <?terminator>
