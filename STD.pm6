@@ -1881,7 +1881,7 @@ grammar P6 is STD {
         <.newlex(1)>
         [
             [
-            | <[ ! ^ ]>?<longname> [ <multisig> | <trait> ]*
+            | $<type>=[<[ ! ^ ]>?]<longname> [ <multisig> | <trait> ]*
             | <multisig> <trait>*
             | <sigil> '.'
                 :dba('subscript signature')
