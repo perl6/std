@@ -4801,6 +4801,16 @@ grammar Regex is STD {
     }
     token metachar:unsp   { <unsp> }
 
+    token metachar:sym<{N,M}> {
+        '{' (\d+) (','?) (\d*) '}'
+        {
+            my $all = substr($*ORIG, self.pos, $¢.pos - self.pos);
+            my $repl = chars($1.Str) ??
+                ($0.Str ~ '..' ~ ($2.Str || '*')) !! $0.Str;
+            $¢.sorryobs($all ~ " as general quantifier", 'X**' ~ $repl);
+        }
+    }
+
     token metachar:sym<{ }> {
         <?before '{'>
         <embeddedblock>
