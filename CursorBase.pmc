@@ -368,6 +368,7 @@ sub you_were_here {
     if ($::YOU_WERE_HERE) {
         $all = $STD::ALL;
         $all->{SETTING} = $::YOU_WERE_HERE;
+        $all->{CORE} = $::YOU_WERE_HERE if $::UNIT->{'$?LONGNAME'} eq 'CORE';
     }
     else {
         eval { $::UNIT->{'$?SETTING_ID'} = $STD::ALL->{SETTING}->id };

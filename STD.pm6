@@ -1769,17 +1769,6 @@ grammar P6 is STD {
                         # XXX throws away any role sig above
                         $*CURLEX = $outer;
 
-                        # throw out null core when compiling the real CORE
-                        if $shortname eq 'CORE' and $*CORE.id ~~ /NULL/ {
-                            $*UNIT<OUTER::> = [''];
-                            $*CORE = $*UNIT;
-                            $*SETTING = $*UNIT;
-                            $ALL = {
-                                CORE => $*UNIT,
-                                SETTING => $*UNIT,
-                                $*UNIT.id => $*UNIT,
-                            };
-                        }
                         $*UNIT<$?LONGNAME> = $longname<name>.Str;
                     }}
                     <statementlist>     # whole rest of file, presumably
