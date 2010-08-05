@@ -16,6 +16,9 @@ GENERATE=STD.pmc Cursor.pmc
 STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
        lib/DEBUG.pm6
 CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
+# suppress environmental PERL6LIB while bootstrapping
+PERL6LIB=./lib:.
+export PERL6LIB
 
 six: .stamp
 all: .stamp .stamp5
