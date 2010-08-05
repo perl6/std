@@ -1,5 +1,16 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    use FindBin;
+    my @inc = ($FindBin::Bin);
+    if (exists $ENV{STAGE}) {
+        unshift @inc, $FindBin::Bin . "/stage" . $ENV{STAGE};
+        $ENV{STD5PREFIX} = "stage" . $ENV{STAGE} . "/";
+    }
+    unshift @INC, @inc;
+    $ENV{PERL5LIB} = join(':', @inc); # for subbuilds
+}
+
 use STD;
 use utf8;
 
