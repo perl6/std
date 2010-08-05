@@ -1752,6 +1752,7 @@ grammar P6 is STD {
                     $*begin_compunit = 0;
                     $*UNIT<$?LONGNAME> ||= $longname ?? $longname<name>.Str !! '';
                 }}
+                { $*IN_DECL = ''; }
                 <blockoid>
                 <.checkyada>
                 ]
@@ -1771,6 +1772,7 @@ grammar P6 is STD {
 
                         $*UNIT<$?LONGNAME> = $longname<name>.Str;
                     }}
+                    { $*IN_DECL = ''; }
                     <statementlist>     # whole rest of file, presumably
                 || <.panic: "Too late for semicolon form of " ~ $*PKGDECL ~ " definition">
                 ]
