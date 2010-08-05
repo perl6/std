@@ -35,9 +35,6 @@ are all almost certainly out.
 
 =cut
 
-use FindBin;
-BEGIN { unshift @INC, $FindBin::Bin if -s "$FindBin::Bin/STD.pmc"; }
-
 use strict;
 use 5.010;
 use warnings FATAL => 'all';
