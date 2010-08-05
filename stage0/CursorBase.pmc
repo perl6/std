@@ -7,8 +7,6 @@
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
 
-use FindBin;
-use lib $FindBin::Bin;
 use strict;
 use warnings;
 no warnings 'recursion';
@@ -370,6 +368,7 @@ sub you_were_here {
     if ($::YOU_WERE_HERE) {
         $all = $STD::ALL;
         $all->{SETTING} = $::YOU_WERE_HERE;
+        $all->{CORE} = $::YOU_WERE_HERE if $::UNIT->{'$?LONGNAME'} eq 'CORE';
     }
     else {
         eval { $::UNIT->{'$?SETTING_ID'} = $STD::ALL->{SETTING}->id };
@@ -1852,7 +1851,7 @@ BEGIN {
     OPEN_UNIPROPS: {
         my @path;
         try {
-            @path = dist_dir('Perl6-STD'); 
+            @path = dist_dir('STD'); 
         } catch {
             @path = split ':', ($ENV{PERL6LIB} // './lib:.');
         };
@@ -1944,13 +1943,12 @@ sub _dfa_dump_node { my ($dfan) = @_;
     }
 }
 
-sub _elem_matches { my ($char, $element) = @_;
-    if (length($element) == 1) {
-        return $char eq $element;
-    } else {
-        my $i = ord $char;
-        return vec(_get_unicode_map($element)->[$i >> 10], $i & 1023, 1);
-    }
+sub _elem_matches { # my ($char, $element) = @_;
+    # Optimize for the common path
+    return $_[0] eq $_[1] if length $_[1] == 1;
+
+    my $i = ord $_[0];
+    return vec(_get_unicode_map($_[1])->[$i >> 10], $i & 1023, 1);
 }
 
 my %boolean_tables = map { $_, 1 } qw/AHex Alpha BidiC BidiM CE CI CWCF CWCM
@@ -2666,6 +2664,7 @@ moose_extends('$WHAT');
 
 my \$retree = {
  '$mangle' => bless({
+  'dba' => '$category expression',
   'kind' => 'token',
   'min' => 12347,
   'pkg' => undef,
@@ -2687,15 +2686,6 @@ my \$retree = {
           's' => 0,
           'text' => $starter,
         }, 'RE_string'),
-        bless({
-          'a' => 0,
-          'dba' => '$category expression',
-          'i' => 0,
-          'min' => 0,
-          'r' => 1,
-          's' => 0,
-          'text' => ':',
-        }, 'RE_meta'),
         bless({
           'a' => 0,
           'dba' => '$category expression',
@@ -2724,7 +2714,7 @@ my \$retree = {
                   'min' => 1,
                   'r' => 1,
                   's' => 0,
-                  'text' => ')',
+                  'text' => $stopper,
                 }, 'RE_string'),
                 bless({
                   'min' => 0,
@@ -2764,7 +2754,7 @@ sub $mangle {
     do {
       if (my (\$C) = (\$C->_EXACT($starter))) {
         do {
-          if (my (\$C) = (((local \$::GOAL = $stopper , my \$goalpos = \$C), \$C)[-1])) {
+          if (my (\$C) = (((local \$::GOAL = $stopper , my \$goalpos = \$C), \$C->unbalanced($stopper))[-1])) {
             do {
               if (my (\$C) = (\$C->_SUBSUMEr(['semilist'], sub {
                 my \$C = shift;
@@ -2904,7 +2894,7 @@ sub do_need { my $self = shift;
         # say "$std $lib/$module$ext";
         local $ENV{STD5PREFIX} = $::TMP_PREFIX;
         local $ENV{SYML_SEARCH_PATH} = join(':',@{$::SYML_SEARCH_PATH});
-        system($::RECURSIVE_PERL // $^X, "-I$FindBin::Bin", "-MSTD", "-e", "STD->_parse_module",
+        system($::RECURSIVE_PERL // $^X, "-MSTD", "-e", "STD->_parse_module",
             "$lib/$module$ext") and die "Can't compile $lib/$module$ext";
         print STDERR "Compiled $lib/$module$ext\n";
         $topsym = LoadFile("$syml/$modfile$ext.syml");
@@ -2969,7 +2959,6 @@ sub do_import { my $self = shift;
     else {
         return $self unless $pkg;
         eval { @imports = keys %{ $pkg->{'EXPORT::'}->{'DEFAULT::'} }; };
-        #warn YAML::XS::Dump($pkg);
         local $::SCOPE = 'my';
         $self->do_import_aliases($pkg, @imports);
     }
