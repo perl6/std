@@ -5370,7 +5370,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
             $curstash.{"&$shortname"}<used> = 1;
             $sid ~= "::$name";
             if $name !~~ /\:\</ {
-                $*NEWLEX = $curstash.{$name ~ '::'} = ($p // Stash.new(
+                $*NEWPKG = $curstash.{$name ~ '::'} = ($p // Stash.new(
                     'PARENT::' => $curstash.idref,
                     '!file' => $*FILE, '!line' => self.line,
                     '!id' => [$sid] ));
