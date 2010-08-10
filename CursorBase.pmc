@@ -685,7 +685,7 @@ sub callm { my $self = shift;
             if ($s =~ /::_/) {
                 next;
             }
-            elsif ($s =~ /^Cursor(?:Base)?::/) {
+            elsif ($s =~ /^(?:Cursor|CursorBase)?::/) {
                 next;
             }
             elsif ($s =~ /^LazyMap::/) {
