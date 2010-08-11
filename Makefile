@@ -24,7 +24,7 @@ six: .stamp
 all: .stamp .stamp5
 .stamp: stage1/.stamp
 	rm -rf syml
-	cp -a stage0/syml stage1/STD.pmc stage1/Cursor.pmc .
+	cp -pR stage0/syml stage1/STD.pmc stage1/Cursor.pmc .
 	touch .stamp
 .stamp5: .stamp
 	./viv -5 --no-indent -o STD_P5.pmc STD_P5.pm6
@@ -74,13 +74,13 @@ stage2/.stamp: stage2/STD.pmc stage2/Cursor.pmc
 	cmp stage1/STD.pmc stage2/STD.pmc
 	cmp stage1/Cursor.pmc stage2/Cursor.pmc
 	rm -rf stage2/syml
-	cp -a stage1/syml stage2
+	cp -pR stage1/syml stage2
 	touch stage2/.stamp
 
 ########################################
 
 reboot: stage2/.stamp
-	cp -a $(addprefix stage2/,$(GENERATE)) stage0
+	cp -pR $(addprefix stage2/,$(GENERATE)) stage0
 	rm -rf stage0/syml
 
 snap: stage2/.stamp .stamp5
