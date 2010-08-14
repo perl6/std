@@ -4798,19 +4798,6 @@ grammar Regex is STD {
     }
     token metachar:unsp   { <unsp> }
 
-    token metachar:sym<{N,M}> {
-        '{' (\d+) (','?) (\d*) '}'
-        {
-            my $all = substr($*ORIG, self.pos, $¢.pos - self.pos);
-            if $1.Str {
-                $¢.sorry("**$all should be written **" ~ $0.Str ~ '..' ~ ($2.Str || '*'));
-            }
-            else {
-                $¢.worry("**$all is better written **" ~ $0.Str);
-            }
-        }
-    }
-
     token metachar:sym<{ }> {
         <?before '{'>
         <embeddedblock>
@@ -5046,6 +5033,16 @@ grammar Regex is STD {
         <normspace> <quantified_atom> }
 
     token quantmod { ':'? [ '?' | '!' | '+' ]? }
+
+    token quantifier:sym<{N,M}> {
+        {} '{' (\d+) (','?) (\d*) '}'
+        {
+            my $all = substr($*ORIG, self.pos, $¢.pos - self.pos);
+            my $repl = chars($1.Str) ??
+                ($0.Str ~ '..' ~ ($2.Str || '*')) !! $0.Str;
+            $¢.sorryobs($all ~ " as general quantifier", 'X**' ~ $repl);
+        }
+    }
 
 } # end grammar
 
