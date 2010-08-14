@@ -4802,9 +4802,12 @@ grammar Regex is STD {
         '{' (\d+) (','?) (\d*) '}'
         {
             my $all = substr($*ORIG, self.pos, $¢.pos - self.pos);
-            my $repl = chars($1.Str) ??
-                ($0.Str ~ '..' ~ ($2.Str || '*')) !! $0.Str;
-            $¢.sorryobs($all ~ " as general quantifier", 'X**' ~ $repl);
+            if $1.Str {
+                $¢.sorry("**$all should be written **" ~ $0.Str ~ '..' ~ ($2.Str || '*'));
+            }
+            else {
+                $¢.worry("**$all is better written **" ~ $0.Str);
+            }
         }
     }
 
