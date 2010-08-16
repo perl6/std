@@ -87,7 +87,7 @@ snap: stage2/.stamp .stamp5
 	rm -rf snap.new
 	mkdir snap.new
 	svn info |perl -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
-	cp -r $(INVARIANT) $(addprefix stage2/,$(GENERATE) syml) stage2/STD_P5.pmc lib tryfile teststd snap.new
+	cp -r $(INVARIANT) $(addprefix stage2/,$(GENERATE) syml) STD_P5.pmc lib tryfile teststd snap.new
 	-rm -rf snap.old
 	-mv snap snap.old
 	mv snap.new snap
