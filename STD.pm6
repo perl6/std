@@ -2394,9 +2394,10 @@ grammar P6 is STD {
         || [
             | <sigil> <twigil>? <desigilname> { $name = $<desigilname>.Str }
             | <special_variable>
-            | <sigil> <index=.decint>
+            | <sigil> <index=.decint> [<?{ $*IN_DECL }> <.panic: "Can't declare a numeric variable">]?
             # Note: $() can also parse as contextualizer in an expression; should have same effect
-            | <sigil> <?before '<' | '('> <postcircumfix>
+            | <sigil> <?before '<'> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Can't declare a match variable">]?
+            | <sigil> <?before '('> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Can't declare a contextualizer">]?
             | <sigil> <?{ $*IN_DECL }>
             | <?> {{
                 if $*QSIGIL {
@@ -2821,6 +2822,7 @@ grammar P6 is STD {
 
                 # ordinary parameter name
             || <name=.identifier>
+            || <name=.decint> <.panic: "Can't declare a numeric parameter">
             || $<name> = [<[/!]>]
 
                 # bare sigil?
