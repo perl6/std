@@ -2713,7 +2713,14 @@ grammar P6 is STD {
         ]
         <.ws>
         { $*IN_DECL = ''; }
-        [ '-->' <.ws> [<type_constraint> || <.panic: "No type found after -->">] <.ws> ]?
+        [ '-->' <.ws>
+            [
+            || <type_constraint>
+            || <longname> <.panic("Typename " ~ $<longname>[0].Str ~ " must be predeclared")>
+            || <.panic: "No type found after -->">
+            ]
+            <.ws>
+        ]?
         {{
             $*LEFTSIGIL = '@';
             if $lexsig {
@@ -5090,6 +5097,7 @@ method newlex ($needsig = 0) {
     $*CURLEX.<!IN_DECL> = $*IN_DECL if $*IN_DECL;
     $ALL.{$id} = $*CURLEX;
     self.<LEX> = $*CURLEX;
+    $*DECLARAND<curlex> = $*CURLEX if $*DECLARAND;
     self;
 }
 

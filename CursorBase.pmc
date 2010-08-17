@@ -2377,7 +2377,7 @@ sub set_export {
     my $text = shift;
     my $textpkg = $text . '::';
     my $name = $::DECLARAND->{name};
-    my $xlex = $STD::ALL->{ (delete $::DECLARAND->{xlex})->[0] };
+    my $xlex = $STD::ALL->{ ($::DECLARAND->{inlex})->[0] };
     $::DECLARAND->{export} = $text;
     my $sid = $::CURLEX->idref;
     my $x = $xlex->{'EXPORT::'} //= Stash::->new( 'PARENT::' => $sid, '!id' => [$sid->[0] . '::EXPORT'] );
