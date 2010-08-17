@@ -2006,7 +2006,7 @@ grammar P6 is STD {
         [
         || <?{ $*QSIGIL }>
             [
-            || <?{ $*QSIGIL eq '$' }> [ [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > ]?
+            || <?{ $*QSIGIL eq '$' }> [ [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > || { $<POST> = [] } ]
             ||                          [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > 
             || { $*VAR = 0; }
             ]
@@ -3345,7 +3345,7 @@ grammar P6 is STD {
     token methodop {
         [
         | <longname>
-        | <?before '$' | '@' | '&' > <variable> { $*VAR = $<variable> }
+        | <?before '$' | '@' | '&' > <variable> { $¢.check_variable($<variable>) }
         | <?before <[ ' " ]> >
             [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
             <quote>
