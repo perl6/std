@@ -9,7 +9,7 @@ BACKEND=mangle.pl Actions.pm viv
 DISTSRC=Actions.pm CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc RE_ast.pmc\
 	Stash.pmc mangle.pl
 DISTSRC6=uniprops
-DISTGEN=$(GENERATE) STD_P5.pmc
+DISTGEN=$(GENERATE)
 DISTSYML=syml/NULL.lex.store syml/CORE.syml
 INVARIANT=$(FRONTEND) viv
 GENERATE=STD.pmc Cursor.pmc
@@ -95,10 +95,10 @@ snap: stage2/.stamp .stamp5
 snaptest: snap
 	cd snap && ./teststd $(realpath ../../t/spec)
 
-dist: stage2 stage2/STD_P5.pmc
+dist: stage2/.stamp .stamp5
 	rm -rf dist
 	mkdir dist dist/lib dist/lib6 dist/syml
-	cp $(addprefix stage2/,$(DISTGEN)) $(DISTSRC) dist/lib
+	cp $(addprefix stage2/,$(DISTGEN)) $(DISTSRC) STD_P5.pmc dist/lib
 	cp $(DISTSRC6) dist/lib6
 	cp $(DISTSYML) dist/syml
 
