@@ -2367,7 +2367,12 @@ grammar P6 is STD {
 
     token desigilname {
         [
-        | <?before '$' > <variable> { $*VAR = $<variable>; self.check_variable($*VAR) if substr($*VAR,1,1) ne '$' }
+        | <?before '$' >
+            [ <?{ $*IN_DECL }> <.panic: "Can't declare an indirect variable name"> ]?
+            <variable> {
+                $*VAR = $<variable>;
+                self.check_variable($*VAR) if substr($*VAR,1,1) ne '$';
+            }
         | <?before <[\@\%\&]> <sigil>* \w > <.panic: "Invalid hard reference syntax">
         | <longname>
         ]
