@@ -3,7 +3,7 @@
 BEGIN {
     use FindBin;
     use File::Spec;
-    my @inc = ($FindBin::Bin);
+    unshift @INC, $FindBin::Bin;
     if (@ARGV >= 1 && $ARGV[0] eq '--boot') {
         shift @ARGV;
         unshift @INC, File::Spec->catdir($FindBin::Bin, "boot");

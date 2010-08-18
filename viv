@@ -38,7 +38,7 @@ are all almost certainly out.
 BEGIN {
     use FindBin;
     use File::Spec;
-    my @inc = ($FindBin::Bin);
+    unshift @INC, $FindBin::Bin;
     if (@ARGV >= 1 && $ARGV[0] eq '--boot') {
         shift @ARGV;
         unshift @INC, File::Spec->catdir($FindBin::Bin, "boot");
@@ -50,6 +50,10 @@ BEGIN {
     }
     while (@ARGV >= 2 && $ARGV[0] eq '--inc') {
         push @$CursorBase::SET_PERL6LIB, $ARGV[1];
+        splice @ARGV, 0, 2;
+    }
+    if (@ARGV >= 2 && $ARGV[0] eq '--symlroot') {
+        $CursorBase::SET_STD5PREFIX = $ARGV[1];
         splice @ARGV, 0, 2;
     }
 }
