@@ -1,5 +1,5 @@
 # Makefile for STD.pm6 viv etcetera in pugs/src/perl6
-.PHONY: six all sixfast clean stage0 stage1 stage2 stage3 snap snaptest
+.PHONY: six all sixfast clean dist snap snaptest
 
 # technically viv is part of the frontend too, but it's used very little.  viv
 # should probably be refactored into independant programs
@@ -21,18 +21,10 @@ PERL6LIB=./lib:.
 export PERL6LIB
 
 six: .stamp
-all: .stamp .stamp5
-.stamp: stage1/.stamp
-	rm -rf syml
-	cp -pR stage0/syml stage1/STD.pmc stage1/Cursor.pmc .
-	touch .stamp
-.stamp5: .stamp
-	./viv -5 --no-indent -o STD_P5.pmc STD_P5.pm6
-	touch .stamp5
+all: .stamp STD_P5.pmc
 
 clean:
-	rm -rf syml STD_P5.pmc $(GENERATE) stage0/syml stage1/*\
-	    stage2/* stage3/* stage*/.stamp .stamp .stamp5
+	rm -rf syml STD_P5.pmc $(GENERATE) boot/syml boot/.stamp .stamp
 
 stage0: stage0/.stamp
 stage1: stage1/.stamp
@@ -40,50 +32,30 @@ stage2: stage2/.stamp
 
 ########################################
 # */.stamp indicates that the corresponding compiler is "usable"
-stage0/.stamp: $(INVARIANT) $(addprefix stage0/,$(GENERATE))
-	rm -rf stage0/syml
-	STAGE=0 ./std CORE.setting
-	touch stage0/.stamp
+boot/.stamp: $(INVARIANT) $(addprefix boot/,$(GENERATE))
+	rm -rf boot/syml
+	BOOT=1 ./std CORE.setting
+	touch boot/.stamp
 
-stage1/STD.store: $(STD_SOURCE) stage0/.stamp $(FRONTEND)
-	STAGE=0 ./viv -o stage1/STD.store --freeze STD.pm6
-stage1/Cursor.store: $(CURSOR_SOURCE) stage0/.stamp $(FRONTEND)
-	STAGE=0 ./viv -o stage1/Cursor.store --freeze Cursor.pm6
-stage1/STD.pmc: stage1/STD.store stage0/.stamp $(BACKEND)
-	STAGE=0 ./viv -5 --no-indent -o stage1/STD.pmc --thaw stage1/STD.store
-stage1/Cursor.pmc: stage1/Cursor.store stage0/.stamp $(BACKEND)
-	STAGE=0 ./viv -5 --no-indent -o stage1/Cursor.pmc \
-	      --thaw stage1/Cursor.store
-stage1/.stamp: stage1/STD.pmc stage1/Cursor.pmc $(FRONTEND)
-	rm -rf stage1/syml
-	STAGE=1 ./std CORE.setting
-	touch stage1/.stamp
+STD.pmc: $(STD_SOURCE) boot/.stamp $(FRONTEND) $(BACKEND)
+	BOOT=1 ./viv -5 -o STD.pm5 STD.pm6
+	perl -pe '/---/../RETREE_END/ && s/^\s*//' < STD.pm5 > STD.pmc
+STD_P5.pmc: STD_P5.pm6 boot/.stamp $(FRONTEND) $(BACKEND)
+	BOOT=1 ./viv -5 -o STD_P5.pm5 STD_P5.pm6
+	perl -pe '/---/../RETREE_END/ && s/^\s*//' < STD_P5.pm5 > STD_P5.pmc
+Cursor.pmc: $(CURSOR_SOURCE) boot/.stamp $(FRONTEND) $(BACKEND)
+	BOOT=1 ./viv -5 -o Cursor.pm5 Cursor.pm6
+	perl -pe '/---/../RETREE_END/ && s/^\s*//' < Cursor.pm5 > Cursor.pmc
+.stamp: STD.pmc Cursor.pmc $(FRONTEND)
+	rm -rf syml
+	./std CORE.setting
+	touch .stamp
 
-########################################
-# if the compiler is working correctly, stage2 will be the same as stage1
-stage2/STD.store: $(STD_SOURCE) stage1/.stamp $(FRONTEND)
-	STAGE=1 ./viv -o stage2/STD.store --freeze STD.pm6
-stage2/Cursor.store: $(CURSOR_SOURCE) stage1/.stamp $(FRONTEND)
-	STAGE=1 ./viv -o stage2/Cursor.store --freeze Cursor.pm6
-stage2/STD.pmc: stage2/STD.store stage1/.stamp $(BACKEND)
-	STAGE=1 ./viv -5 --no-indent -o stage2/STD.pmc --thaw stage2/STD.store
-stage2/Cursor.pmc: stage2/Cursor.store stage1/.stamp $(BACKEND)
-	STAGE=1 ./viv -5 --no-indent \
-	    -o stage2/Cursor.pmc --thaw stage2/Cursor.store
-stage2/.stamp: stage2/STD.pmc stage2/Cursor.pmc
-	cmp stage1/STD.pmc stage2/STD.pmc
-	cmp stage1/Cursor.pmc stage2/Cursor.pmc
-	rm -rf stage2/syml
-	cp -pR stage1/syml stage2
-	touch stage2/.stamp
+reboot: .stamp
+	cp -pR $(GENERATE) boot
+	rm -rf boot/syml
 
-########################################
-
-reboot: stage2/.stamp
-	cp -pR $(addprefix stage2/,$(GENERATE)) stage0
-	rm -rf stage0/syml
-
-snap: stage2/.stamp .stamp5
+snap: all
 	rm -rf snap.new
 	mkdir snap.new
 	svn info |perl -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
@@ -110,12 +82,9 @@ help:
 	@echo
 	@echo 'six (default)   builds viv for Perl6'
 	@echo 'all             builds viv for Perl5 too'
-	@echo 'reboot          builds third stage and updates stage0'
+	@echo 'reboot          builds and updates boot; test first!'
 	@echo 'clean           removes generated files'
 	@echo 'dist            make a minimal distribution set'
-	@echo 'stage0          prepares bootstrap for usage'
-	@echo 'stage1          prepares stage 1 compiler'
-	@echo 'stage2          prepares stage 2 compiler (testing)'
 	@echo 'help            show this list'
 	@echo 'snaptest        run snapshot teststd on pugs/t/*'
 	@echo

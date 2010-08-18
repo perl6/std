@@ -3,9 +3,9 @@
 BEGIN {
     use FindBin;
     my @inc = ($FindBin::Bin);
-    if (exists $ENV{STAGE}) {
-        unshift @inc, $FindBin::Bin . "/stage" . $ENV{STAGE};
-        $ENV{STD5PREFIX} = "stage" . $ENV{STAGE} . "/";
+    if ($ENV{BOOT}) {
+        unshift @inc, $FindBin::Bin . "/boot";
+        $ENV{STD5PREFIX} = "boot/";
     }
     unshift @INC, @inc;
     $ENV{PERL5LIB} = join(':', @inc); # for subbuilds
