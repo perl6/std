@@ -20,6 +20,8 @@ You'll need the following Perl bits to run stuff:
 
 * Moose          (eg sudo apt-get install libmoose-perl)
 
+* File::ShareDir
+
 =head1 Running Stuff
 
 You can get started by using the Makefile command, C<make>.  This will convert

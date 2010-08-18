@@ -2,14 +2,19 @@
 
 BEGIN {
     use FindBin;
+    use File::Spec;
     my @inc = ($FindBin::Bin);
-    if ($ARGV[0] eq '--boot') {
+    if (@ARGV >= 1 && $ARGV[0] eq '--boot') {
         shift @ARGV;
-        unshift @INC, $FindBin::Bin . "/boot";
-        $CursorBase::SET_STD5PREFIX = "boot/";
+        unshift @INC, File::Spec->catdir($FindBin::Bin, "boot");
+        $CursorBase::SET_STD5PREFIX = "boot";
     }
-    if (@ARGV >= 2 && $ARGV[0] eq '--perl6lib') {
-        $CursorBase::SET_PERL6LIB = $ARGV[1];
+    if (@ARGV >= 1 && $ARGV[0] eq '--clear-inc') {
+        $CursorBase::SET_PERL6LIB = [ ];
+        shift @ARGV;
+    }
+    while (@ARGV >= 2 && $ARGV[0] eq '--inc') {
+        push @$CursorBase::SET_PERL6LIB, $ARGV[1];
         splice @ARGV, 0, 2;
     }
 }

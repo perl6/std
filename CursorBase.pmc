@@ -16,6 +16,8 @@ use Stash;
 use RE_ast;
 #use Carp::Always;
 use File::Spec;
+use File::Path ();
+use Config;
 
 my $TRIE = 1;
 my $STORABLE = 1;
@@ -180,7 +182,7 @@ sub dump {
 #############################################################
 
 sub sys_compile_module {
-    my ($self, $lib, $modfile) = @_;
+    my ($self, $module, $symlfile, $modfile) = @_;
 
     # should be per-module
     local $STD::ALL;
@@ -202,11 +204,11 @@ sub sys_compile_module {
     local $::IN_REDUCE;
     local $::VAR;
 
-    $self->sys_do_compile_module("$lib/$modfile");
+    $self->sys_do_compile_module($module, $symlfile, $modfile);
 }
 
 sub sys_do_compile_module {
-    my ($self, $file) = @_;
+    my ($self, $mod, $syml, $file) = @_;
 
     $self->parsefile($file,
         setting => $ENV{DEFAULT_SETTING_FOR_MODULES} // "CORE",
@@ -221,22 +223,33 @@ sub sys_save_syml {
 
     my $file = $::FILE->{name};
     $file = $::UNIT->{'$?LONGNAME'};
-    $file =~ s/::/\//g;
-    $file .= $1 if $::FILE->{name} =~ /(\.pm6?)/;
-    $file .= '.syml';
-    $file = $::TMP_PREFIX . "syml/" . $file;
+    my @toks = split '::', $file;
+    $toks[-1] .= '.syml';
+    $file = File::Spec->catfile($::TMP_PREFIX, "syml", @toks);
+    pop @toks;
+    my $path = File::Spec->catdir($::TMP_PREFIX, "syml", @toks);
 
-    if ($file =~ /\//) {
-        my @parts = split('/',$file);
-        my $newfile = shift @parts;
-        while (@parts) {
-            mkdir $newfile unless -d $newfile;
-            $newfile .= '/' . shift @parts;
-        }
-    }
-    open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
+    File::Path::make_path($path);
+
+    open(SETTING, ">", $file) or die "Can't open new setting file $file: $!";
     print SETTING Dump($all);
     close SETTING;
+}
+
+sub sys_get_perl6lib {
+    my $self = shift;
+
+    if (not @::PERL6LIB) {
+        if ($CursorBase::SET_PERL6LIB) {
+            @::PERL6LIB = @$CursorBase::SET_PERL6LIB;
+        } elsif ($ENV{PERL6LIB}) {
+            @::PERL6LIB = split /\Q$Config::Config{path_sep}/, $ENV{PERL6LIB};
+        } else {
+            @::PERL6LIB = qw< ./lib . >;
+        }
+    }
+
+    @::PERL6LIB;
 }
 
 sub sys_find_module {
@@ -244,33 +257,25 @@ sub sys_find_module {
     my $module = shift;
     my $issetting = shift;
 
-    if (not @::PERL6LIB) {
-        my $lib = $CursorBASE::SET_PERL6LIB || $ENV{PERL6LIB} || "./lib:.";
-        @::PERL6LIB = split ':', $lib;
-    }
+    my @toks = split '::', $module;
+    my $end = pop @toks;
 
-    my $modfile = $module;
-    $modfile =~ s/::/\//g;
+    for my $d ($self->sys_get_perl6lib) {
+        for my $ext (qw( .setting .pm6 .pm )) {
+            next if ($issetting xor ($ext eq '.setting'));
 
-    for my $d (@::PERL6LIB) {
-        if ($issetting) {
-            if (-f "$d/$modfile.setting") {
-                return ($d, $modfile . ".setting");
-            }
-            next;
-        }
-        if (-f "$d/$modfile.pm6") {
-            return ($d, $modfile . ".pm6");
-        }
-        elsif (-f "$d/$modfile.pm") {
-            {
+            my $file = File::Spec->catfile($d, @toks, "$end$ext");
+            next unless -f $file;
+
+            if ($ext eq '.pm') {
                 local $/;
-                open PM, "$d/$modfile.pm" or next;
-                my $pm = <PM>;
-                close PM;
-                next if $pm =~ /^\s*package\s+\w+\s*;/m; # ignore p5 code
+                open my $pm, "<", $file or next;
+                my $pmtx = <$pm>;
+                close $pm;
+                next if $pmtx =~ /^\s*package\s+\w+\s*;/m; # ignore p5 code
             }
-            return ($d, $modfile . ".pm");
+
+            return $file;
         }
     }
 
@@ -282,17 +287,17 @@ sub sys_load_modinfo {
     my $self = shift;
     my $module = shift;
 
-    my ($lib, $modfile) = $self->sys_find_module($module, 0)
+    my @toks = split '::', $module;
+    $toks[-1] .= ".syml";
+
+    my ($symlfile) = File::Spec->catfile($::TMP_PREFIX, 'syml', @toks);
+    my ($modfile) = $self->sys_find_module($module, 0)
         or return undef;
 
-    my $syml = $::TMP_PREFIX . 'syml';
-    mkdir $syml unless -d $syml;
-
-    unless (-f "$syml/$modfile.syml" and
-            -M "$lib/$modfile" > -M "$syml/$modfile.syml") {
-        $self->sys_compile_module($lib, $modfile);
+    unless (-f $symlfile and -M $modfile > -M $symlfile) {
+        $self->sys_compile_module($module, $symlfile, $modfile);
     }
-    return LoadFile("$syml/$modfile.syml");
+    return LoadFile($symlfile);
 }
 
 sub load_lex {
@@ -308,8 +313,7 @@ sub load_lex {
     }
 
     for my $prefix (@{$::SYML_SEARCH_PATH}) {
-        my $syml = $prefix . 'syml';
-        my $file = "$syml/$setting.syml";
+        my $file = File::Spec->catfile($prefix, 'syml', "$setting.syml");
         if (-e $file) {
             return bless($self->_load_yaml_lex($setting,$file),'Stash');
         }
@@ -324,15 +328,8 @@ sub _load_yaml_lex {
     my $file = shift;
     state %LEXS;
     return $LEXS{$setting} if $LEXS{$setting};
-    my $store = $file.".store";
-    if (-f $store and -M $file and -M $file > -M $store) {
-        $LEXS{$setting} = retrieve($store);
-    }
-    else {
-        # HACK YAML::XS is horribly broken see https://rt.cpan.org/Public/Bug/Display.html?id=53278
-        $LEXS{$setting} = {%{LoadFile($file)}};
-        #store($LEXS{$setting}, $store);
-    }
+    # HACK YAML::XS is horribly broken see https://rt.cpan.org/Public/Bug/Display.html?id=53278
+    $LEXS{$setting} = {%{LoadFile($file)}};
     # say join ' ', sort keys %{ $LEXS{$setting} };
     $LEXS{$setting};
 }
@@ -398,7 +395,7 @@ sub initparse {
     my $text = shift;
     my %args = @_;
     my $rule = $args{rule} // 'TOP';
-    my $tmp_prefix = $args{tmp_prefix} // $CursorBase::SET_STD5PREFIX // $ENV{STD5PREFIX} // '';
+    my $tmp_prefix = $args{tmp_prefix} // $CursorBase::SET_STD5PREFIX // $ENV{STD5PREFIX} // '.';
     my $setting = $args{setting} // 'CORE';
     my $actions = $args{actions} // '';
     my $filename = $args{filename};
