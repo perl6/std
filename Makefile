@@ -2,7 +2,7 @@
 .PHONY: six all sixfast clean snap snaptest
 
 INVARIANT=Actions.pm CORE.setting CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc\
-	 NULL.lex RE_ast.pmc Stash.pmc mangle.pl std uniprops mangle.pl viv
+	 NULL.lex RE_ast.pmc Stash.pmc mangle.pl std uniprops viv
 GENERATE=STD.pmc Cursor.pmc
 
 STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
@@ -53,7 +53,7 @@ snap: all
 	rm -rf snap.new
 	mkdir snap.new
 	svn info |perl -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
-	cp -r $(INVARIANT) $(GENERATE) syml STD_P5.pmc lib tryfile teststd snap.new
+	cp -r $(INVARIANT) $(GENERATE) syml STD_P5.pmc lib tools/tryfile tools/teststd snap.new
 	-rm -rf snap.old
 	-mv snap snap.old
 	mv snap.new snap
