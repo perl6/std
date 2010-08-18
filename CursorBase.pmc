@@ -279,6 +279,15 @@ sub sys_load_modinfo {
 sub load_lex {
     my $self = shift;
     my $setting = shift;
+
+    if ($setting eq 'NULL') {
+        my $id = "MY:file<NULL.pad>:line(1):pos(0)";
+        my $core = Stash->new('!id' => [$id], '!file' => 'NULL.pad',
+            '!line' => 1);
+        return Stash->new('CORE' => $core, 'MY:file<NULL.pad>' => $core,
+            'SETTING' => $core, $id => $core);
+    }
+
     for my $prefix (@{$::SYML_SEARCH_PATH}) {
         my $syml = $prefix . 'syml';
         my $file = "$syml/$setting.syml";
@@ -286,34 +295,8 @@ sub load_lex {
             return bless($self->_load_yaml_lex($setting,$file),'Stash');
         }
     }
-    bless($self->_load_perl_lex($setting),'Stash');
-}
 
-sub _load_perl_lex {
-    my $self = shift;
-    my $setting = shift;
-    state %LEXS;
-    return $LEXS{$setting} if $LEXS{$setting};
-    my $file = "$setting.lex";
-    my $syml = $::TMP_PREFIX . 'syml';
-    my $store = "$syml/$setting.lex.store";
-    mkdir $syml unless -d $syml;
-    if (-f $store and -M $file and -M $file > -M $store) {
-        $LEXS{$setting} = retrieve($store);
-    }
-    else {
-        if ($setting eq 'CORE') {
-            die <<EOM;
-syml/CORE.lex.store not found; CORE setting has not yet been compiled.
-This file must be generated using './std CORE.setting' or 'make' before STD.pm6
-can be used.
-EOM
-        }
-        $LEXS{$setting} = require $file;
-        # store may fail if we don't have write privilages
-        try {store($LEXS{$setting}, $store)};
-    }
-    $LEXS{$setting};
+    die "Unable to load setting $setting.  Did you run make?";
 }
 
 sub _load_yaml_lex {

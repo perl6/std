@@ -2,11 +2,11 @@
 .PHONY: six all sixfast clean snap snaptest
 
 INVARIANT=Actions.pm CORE.setting CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc\
-	 NULL.lex RE_ast.pmc Stash.pmc mangle.pl std uniprops viv
+	  RE_ast.pmc Stash.pmc mangle.pl std uniprops viv
 GENERATE=STD.pmc Cursor.pmc
 
 STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
-       lib/DEBUG.pm6
+           lib/DEBUG.pm6
 CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
 
 six: .stamp
