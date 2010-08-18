@@ -35,22 +35,27 @@ are all almost certainly out.
 
 =cut
 
+BEGIN {
+    use FindBin;
+    my @inc = ($FindBin::Bin);
+    if ($ARGV[0] eq '--boot') {
+        shift @ARGV;
+        unshift @inc, $FindBin::Bin . "/boot";
+        $ENV{STD5PREFIX} = "boot/";
+    }
+    if (@ARGV >= 2 && $ARGV[0] eq '--perl6lib') {
+        $ENV{PERL6LIB} = $ARGV[1];
+        splice @ARGV, 0, 2;
+    }
+    unshift @INC, @inc;
+    $ENV{PERL5LIB} = join(':', @inc); # for subbuilds
+}
+
 use strict;
 use 5.010;
 use warnings FATAL => 'all';
 
 use List::Util qw/sum min/;
-
-BEGIN {
-    use FindBin;
-    my @inc = ($FindBin::Bin);
-    if ($ENV{BOOT}) {
-        unshift @inc, $FindBin::Bin . "/boot";
-        $ENV{STD5PREFIX} = "boot/";
-    }
-    unshift @INC, @inc;
-    $ENV{PERL5LIB} = join(':', @inc); # for subbuilds
-}
 
 use STD;
 use utf8;

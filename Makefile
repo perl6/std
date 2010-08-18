@@ -9,16 +9,12 @@ STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
        lib/DEBUG.pm6
 CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
 
-# suppress environmental PERL6LIB while bootstrapping
-PERL6LIB=./lib:.
-export PERL6LIB
-
 six: .stamp
 all: .stamp STD_P5.pmc
 
 clean:
 	rm -rf syml STD_P5.pmc $(GENERATE) boot/syml boot/.stamp .stamp \
-	    STD_P5.pm5 STD.pm5 Cursor.pm5
+	    STD_P5.pm5 STD.pm5 Cursor.pm5 snap snap.old snap.new
 
 stage0: stage0/.stamp
 stage1: stage1/.stamp
@@ -28,21 +24,21 @@ stage2: stage2/.stamp
 # */.stamp indicates that the corresponding compiler is "usable"
 boot/.stamp: $(INVARIANT) $(addprefix boot/,$(GENERATE))
 	rm -rf boot/syml
-	BOOT=1 ./std CORE.setting
+	./std --boot --perl6lib lib:. CORE.setting
 	touch boot/.stamp
 
 STD.pmc: $(STD_SOURCE) boot/.stamp $(INVARIANT)
-	BOOT=1 ./viv -5 -o STD.pm5 STD.pm6
+	./viv --boot --perl6lib lib:. -5 -o STD.pm5 STD.pm6
 	perl -pe '/---/../RETREE_END/ && s/^\s*//' < STD.pm5 > STD.pmc
 STD_P5.pmc: STD_P5.pm6 boot/.stamp $(INVARIANT)
-	BOOT=1 ./viv -5 -o STD_P5.pm5 STD_P5.pm6
+	./viv --boot --perl6lib lib:. -5 -o STD_P5.pm5 STD_P5.pm6
 	perl -pe '/---/../RETREE_END/ && s/^\s*//' < STD_P5.pm5 > STD_P5.pmc
 Cursor.pmc: $(CURSOR_SOURCE) boot/.stamp $(INVARIANT)
-	BOOT=1 ./viv -5 -o Cursor.pm5 Cursor.pm6
+	./viv --boot --perl6lib lib:. -5 -o Cursor.pm5 Cursor.pm6
 	perl -pe '/---/../RETREE_END/ && s/^\s*//' < Cursor.pm5 > Cursor.pmc
 .stamp: STD.pmc Cursor.pmc $(INVARIANT)
 	rm -rf syml
-	./std CORE.setting
+	./std --perl6lib lib:. CORE.setting
 	touch .stamp
 
 reboot: .stamp
