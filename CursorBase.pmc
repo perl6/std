@@ -179,10 +179,41 @@ sub dump {
 # System interface
 #############################################################
 
-# used internally to isolate contextuals in do_need
-sub _parse_module {
-    $_[0]->parsefile($ARGV[0],setting=>$ENV{DEFAULT_SETTING_FOR_MODULES} // "CORE");
-    exit 0;
+sub sys_compile_module {
+    my ($self, $lib, $modfile) = @_;
+
+    # should be per-module
+    local $STD::ALL;
+    local @STD::herestub;
+    local $::SETTING;
+    local $::CORE;
+    local $::GLOBAL;
+    local $::UNIT;
+    local $::YOU_WERE_HERE;
+
+    # should only apply to the toplevel
+    local $::moreinput;
+
+    # STD is missing contextualizers for these, at least in some cases
+    local $::CCSTATE;
+    local $::BORG;
+    local %::RX;
+    local $::XACT;
+    local $::IN_REDUCE;
+    local $::VAR;
+
+    $self->sys_do_compile_module("$lib/$modfile");
+}
+
+sub sys_do_compile_module {
+    my ($self, $file) = @_;
+
+    $self->parsefile($file,
+        setting => $ENV{DEFAULT_SETTING_FOR_MODULES} // "CORE",
+        syml_search_path => $::SYML_SEARCH_PATH,
+        tmp_prefix => $::TMP_PREFIX);
+
+    print STDERR "Compiled $file\n";
 }
 
 sub sys_save_syml {
@@ -214,12 +245,8 @@ sub sys_find_module {
     my $issetting = shift;
 
     if (not @::PERL6LIB) {
-        if ($ENV{PERL6LIB}) {
-            @::PERL6LIB = split ':', $ENV{PERL6LIB}
-        }
-        else {
-            @::PERL6LIB = qw( ./lib . );
-        }
+        my $lib = $CursorBASE::SET_PERL6LIB || $ENV{PERL6LIB} || "./lib:.";
+        @::PERL6LIB = split ':', $lib;
     }
 
     my $modfile = $module;
@@ -263,16 +290,10 @@ sub sys_load_modinfo {
 
     unless (-f "$syml/$modfile.syml" and
             -M "$lib/$modfile" > -M "$syml/$modfile.syml") {
-        # say "$std $lib/$module$ext";
-        local $ENV{STD5PREFIX} = $::TMP_PREFIX;
-        local $ENV{SYML_SEARCH_PATH} = join(':',@{$::SYML_SEARCH_PATH});
-        system($::RECURSIVE_PERL // $^X, "-MSTD", "-e", "STD->_parse_module",
-            "$lib/$modfile") and die "Can't compile $lib/$modfile";
-        print STDERR "Compiled $lib/$modfile\n";
+        $self->sys_compile_module($lib, $modfile);
     }
     return LoadFile("$syml/$modfile.syml");
 }
-
 
 sub load_lex {
     my $self = shift;
@@ -377,13 +398,13 @@ sub initparse {
     my $text = shift;
     my %args = @_;
     my $rule = $args{rule} // 'TOP';
-    my $tmp_prefix = $args{tmp_prefix} // $ENV{STD5PREFIX} // '';
+    my $tmp_prefix = $args{tmp_prefix} // $CursorBase::SET_STD5PREFIX // $ENV{STD5PREFIX} // '';
     my $setting = $args{setting} // 'CORE';
     my $actions = $args{actions} // '';
     my $filename = $args{filename};
 
     local $::TMP_PREFIX = $tmp_prefix;
-    local $::SYML_SEARCH_PATH = $args{syml_search_path} // ($ENV{SYML_SEARCH_PATH} ? [split ':',$ENV{SYML_SEARCH_PATH}] : [$::TMP_PREFIX]);
+    local $::SYML_SEARCH_PATH = $args{syml_search_path} // [$::TMP_PREFIX];
 
     local $::SETTINGNAME = $setting;
     local $::ACTIONS = $actions;
