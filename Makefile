@@ -29,13 +29,13 @@ boot/.stamp: $(INVARIANT) $(addprefix boot/,$(GENERATE))
 
 STD.pmc: $(STD_SOURCE) boot/.stamp $(INVARIANT)
 	./viv --boot --perl6lib lib:. -5 -o STD.pm5 STD.pm6
-	perl -pe '/---/../RETREE_END/ && s/^\s*//' < STD.pm5 > STD.pmc
+	perl -pe '(/^---/../^RETREE_END/) || s/^\s*//' < STD.pm5 > STD.pmc
 STD_P5.pmc: STD_P5.pm6 boot/.stamp $(INVARIANT)
 	./viv --boot --perl6lib lib:. -5 -o STD_P5.pm5 STD_P5.pm6
-	perl -pe '/---/../RETREE_END/ && s/^\s*//' < STD_P5.pm5 > STD_P5.pmc
+	perl -pe '(/^---/../^RETREE_END/) || s/^\s*//' < STD_P5.pm5 > STD_P5.pmc
 Cursor.pmc: $(CURSOR_SOURCE) boot/.stamp $(INVARIANT)
 	./viv --boot --perl6lib lib:. -5 -o Cursor.pm5 Cursor.pm6
-	perl -pe '/---/../RETREE_END/ && s/^\s*//' < Cursor.pm5 > Cursor.pmc
+	perl -pe '(/^---/../^RETREE_END/) || s/^\s*//' < Cursor.pm5 > Cursor.pmc
 .stamp: STD.pmc Cursor.pmc $(INVARIANT)
 	rm -rf syml
 	./std --perl6lib lib:. CORE.setting
