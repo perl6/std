@@ -176,6 +176,174 @@ sub dump {
 }
 
 #############################################################
+# System interface
+#############################################################
+
+# used internally to isolate contextuals in do_need
+sub _parse_module {
+    $_[0]->parsefile($ARGV[0],setting=>$ENV{DEFAULT_SETTING_FOR_MODULES} // "CORE");
+    exit 0;
+}
+
+sub sys_save_syml {
+    my ($self, $all) = @_;
+
+    my $file = $::FILE->{name};
+    $file = $::UNIT->{'$?LONGNAME'};
+    $file =~ s/::/\//g;
+    $file .= $1 if $::FILE->{name} =~ /(\.pm6?)/;
+    $file .= '.syml';
+    $file = $::TMP_PREFIX . "syml/" . $file;
+
+    if ($file =~ /\//) {
+        my @parts = split('/',$file);
+        my $newfile = shift @parts;
+        while (@parts) {
+            mkdir $newfile unless -d $newfile;
+            $newfile .= '/' . shift @parts;
+        }
+    }
+    open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
+    print SETTING Dump($all);
+    close SETTING;
+}
+
+sub sys_load_modinfo {
+    my $self = shift;
+    my $module = shift;
+
+    my $modfile = $module;
+    my $lib = '.';
+    if (not @::PERL6LIB) {
+        if ($ENV{PERL6LIB}) {
+            @::PERL6LIB = split ':', $ENV{PERL6LIB}
+        }
+        else {
+            @::PERL6LIB = qw( ./lib . );
+        }
+    }
+    $modfile =~ s/::/\//g;
+    my $ext = '';
+    for my $d (@::PERL6LIB) {
+        if (-f "$d/$modfile.pm6") {
+            $ext = '.pm6';
+            $lib = $d;
+            last;
+        }
+        elsif (-f "$d/$modfile.pm") {
+            {
+                local $/;
+                open PM, "$d/$modfile.pm" or next;
+                my $pm = <PM>;
+                close PM;
+                next if $pm =~ /^\s*package\s+\w+\s*;/m; # ignore p5 code
+            }
+            $ext = '.pm';
+            $lib = $d;
+            last;
+        }
+    }
+    my $syml = $::TMP_PREFIX . 'syml';
+    mkdir $syml unless -d $syml;
+    if (not $ext) {
+        $ext = '.pm';
+        $ext = '.pm6' unless -f "$syml/$modfile$ext.syml";
+        if (-f "$syml/$modfile$ext.syml") {
+            $self->worry("Can't locate module $module, only its symbol table file");
+            return LoadFile("$syml/$modfile$ext.syml");
+        }
+        else {
+            $self->worry("Can't locate module $module");
+            return undef;
+        }
+    }
+    elsif (-f "$syml/$modfile$ext.syml" and -M "$lib/$modfile$ext" > -M "$syml/$modfile$ext.syml") {
+        return LoadFile("$syml/$modfile$ext.syml");
+    }
+    elsif (-f "$lib/$modfile$ext") {
+        # say "$std $lib/$module$ext";
+        local $ENV{STD5PREFIX} = $::TMP_PREFIX;
+        local $ENV{SYML_SEARCH_PATH} = join(':',@{$::SYML_SEARCH_PATH});
+        system($::RECURSIVE_PERL // $^X, "-MSTD", "-e", "STD->_parse_module",
+            "$lib/$module$ext") and die "Can't compile $lib/$module$ext";
+        print STDERR "Compiled $lib/$module$ext\n";
+        return LoadFile("$syml/$modfile$ext.syml");
+    }
+    else {
+        $self->worry("Module $module disappeared during load");
+        return undef;
+    }
+}
+
+
+sub load_lex {
+    my $self = shift;
+    my $setting = shift;
+    for my $prefix (@{$::SYML_SEARCH_PATH}) {
+        my $syml = $prefix . 'syml';
+        my $file = "$syml/$setting.syml";
+        if (-e $file) {
+            return bless($self->_load_yaml_lex($setting,$file),'Stash');
+        }
+    }
+    bless($self->_load_perl_lex($setting),'Stash');
+}
+
+sub _load_perl_lex {
+    my $self = shift;
+    my $setting = shift;
+    state %LEXS;
+    return $LEXS{$setting} if $LEXS{$setting};
+    my $file = "$setting.lex";
+    my $syml = $::TMP_PREFIX . 'syml';
+    my $store = "$syml/$setting.lex.store";
+    mkdir $syml unless -d $syml;
+    if (-f $store and -M $file and -M $file > -M $store) {
+        $LEXS{$setting} = retrieve($store);
+    }
+    else {
+        if ($setting eq 'CORE') {
+            die <<EOM;
+syml/CORE.lex.store not found; CORE setting has not yet been compiled.
+This file must be generated using './std CORE.setting' or 'make' before STD.pm6
+can be used.
+EOM
+        }
+        $LEXS{$setting} = require $file;
+        # store may fail if we don't have write privilages
+        try {store($LEXS{$setting}, $store)};
+    }
+    $LEXS{$setting};
+}
+
+sub _load_yaml_lex {
+    my $self = shift;
+    my $setting = shift;
+    my $file = shift;
+    state %LEXS;
+    return $LEXS{$setting} if $LEXS{$setting};
+    my $store = $file.".store";
+    if (-f $store and -M $file and -M $file > -M $store) {
+        $LEXS{$setting} = retrieve($store);
+    }
+    else {
+        # HACK YAML::XS is horribly broken see https://rt.cpan.org/Public/Bug/Display.html?id=53278
+        $LEXS{$setting} = {%{LoadFile($file)}};
+        #store($LEXS{$setting}, $store);
+    }
+    # say join ' ', sort keys %{ $LEXS{$setting} };
+    $LEXS{$setting};
+}
+
+sub LoadFile {
+    my $file = shift;
+    open my $fh, $file or die "Can't open $file: $!";
+    my $text = do { local $/; <$fh>; };
+    close $fh;
+    Load($text);
+}
+
+#############################################################
 # Setup/Teardown
 #############################################################
 
@@ -220,12 +388,6 @@ sub parsefile {
     $result = $class->initparse($text,@_,filename => $file);
 
     $result;
-}
-
-# used internally to isolate contextuals in do_need
-sub _parse_module {
-    $_[0]->parsefile($ARGV[0],setting=>$ENV{DEFAULT_SETTING_FOR_MODULES} // "CORE");
-    exit 0;
 }
 
 ## method initparse ($text, :$rule = 'TOP', :$tmp_prefix = '', :$setting = 'CORE', :$actions = '')
@@ -282,73 +444,6 @@ sub initparse {
     $result;
 }
 
-sub load_lex {
-    my $self = shift;
-    my $setting = shift;
-    for my $prefix (@{$::SYML_SEARCH_PATH}) {
-        my $syml = $prefix . 'syml';
-        my $file = "$syml/$setting.syml";
-        if (-e $file) {
-            return bless($self->load_yaml_lex($setting,$file),'Stash');
-        }
-    }
-    bless($self->load_perl_lex($setting),'Stash');
-}
-
-sub load_perl_lex {
-    my $self = shift;
-    my $setting = shift;
-    state %LEXS;
-    return $LEXS{$setting} if $LEXS{$setting};
-    my $file = "$setting.lex";
-    my $syml = $::TMP_PREFIX . 'syml';
-    my $store = "$syml/$setting.lex.store";
-    mkdir $syml unless -d $syml;
-    if (-f $store and -M $file and -M $file > -M $store) {
-        $LEXS{$setting} = retrieve($store);
-    }
-    else {
-        if ($setting eq 'CORE') {
-            die <<EOM;
-syml/CORE.lex.store not found; CORE setting has not yet been compiled.
-This file must be generated using './std CORE.setting' or 'make' before STD.pm6
-can be used.
-EOM
-        }
-        $LEXS{$setting} = require $file;
-        # store may fail if we don't have write privilages
-        try {store($LEXS{$setting}, $store)};
-    }
-    $LEXS{$setting};
-}
-
-sub LoadFile {
-    my $file = shift;
-    open my $fh, $file or die "Can't open $file: $!";
-    my $text = do { local $/; <$fh>; };
-    close $fh;
-    Load($text);
-}
-
-sub load_yaml_lex {
-    my $self = shift;
-    my $setting = shift;
-    my $file = shift;
-    state %LEXS;
-    return $LEXS{$setting} if $LEXS{$setting};
-    my $store = $file.".store";
-    if (-f $store and -M $file and -M $file > -M $store) {
-        $LEXS{$setting} = retrieve($store);
-    }
-    else {
-        # HACK YAML::XS is horribly broken see https://rt.cpan.org/Public/Bug/Display.html?id=53278
-        $LEXS{$setting} = {%{LoadFile($file)}};
-        #store($LEXS{$setting}, $store);
-    }
-    # say join ' ', sort keys %{ $LEXS{$setting} };
-    $LEXS{$setting};
-}
-
 sub you_are_here {
     my $self = shift;
     $::YOU_WERE_HERE = $::CURLEX;
@@ -357,14 +452,7 @@ sub you_are_here {
 
 sub you_were_here {
     my $self = shift;
-    my $file = $::FILE->{name};
     my $all;
-    $file = $::UNIT->{'$?LONGNAME'};
-    $file =~ s/::/\//g;
-    $file .= $1 if $::FILE->{name} =~ /(\.pm6?)/;
-    $file .= '.syml';
-    $file = $::TMP_PREFIX . "syml/" . $file;
-
     # setting?
     if ($::YOU_WERE_HERE) {
         $all = $STD::ALL;
@@ -384,17 +472,7 @@ sub you_were_here {
         }
     }
 
-    if ($file =~ /\//) {
-        my @parts = split('/',$file);
-        my $newfile = shift @parts;
-        while (@parts) {
-            mkdir $newfile unless -d $newfile;
-            $newfile .= '/' . shift @parts;
-        }
-    }
-    open(SETTING, ">$file") or die "Can't open new setting file $file: $!";
-    print SETTING Dump($all);
-    close SETTING;
+    $self->sys_save_syml($all);
     $self;
 }
 
@@ -2441,6 +2519,7 @@ sub tweak {
     }
 }
 
+# only used for error reporting
 sub clean_id { my $self = shift;
     my ($id,$name) = @_;
     my $file = $::FILE->{name};
@@ -2853,66 +2932,7 @@ sub do_use { my $self = shift;
 sub do_need { my $self = shift;
     my $m = shift;
     my $module = $m->Str;
-    my $modfile = $module;
-    my $topsym;
-    my $lib = '.';
-    if (not @::PERL6LIB) {
-        if ($ENV{PERL6LIB}) {
-            @::PERL6LIB = split ':', $ENV{PERL6LIB}
-        }
-        else {
-            @::PERL6LIB = qw( ./lib . );
-        }
-    }
-    $modfile =~ s/::/\//g;
-    my $ext = '';
-    for my $d (@::PERL6LIB) {
-        if (-f "$d/$modfile.pm6") {
-            $ext = '.pm6';
-            $lib = $d;
-            last;
-        }
-        elsif (-f "$d/$modfile.pm") {
-            {
-                local $/;
-                open PM, "$d/$modfile.pm" or next;
-                my $pm = <PM>;
-                close PM;
-                next if $pm =~ /^\s*package\s+\w+\s*;/m; # ignore p5 code
-            }
-            $ext = '.pm';
-            $lib = $d;
-            last;
-        }
-    }
-    my $syml = $::TMP_PREFIX . 'syml';
-    mkdir $syml unless -d $syml;
-    if (not $ext) {
-        $ext = '.pm';
-        $ext = '.pm6' unless -f "$syml/$modfile$ext.syml";
-        if (-f "$syml/$modfile$ext.syml") {
-            $topsym = LoadFile("$syml/$modfile$ext.syml");
-            $self->worry("Can't locate module $module, only its symbol table file");
-        }
-        else {
-            $self->worry("Can't locate module $module");
-        }
-    }
-    elsif (-f "$syml/$modfile$ext.syml" and -M "$lib/$modfile$ext" > -M "$syml/$modfile$ext.syml") {
-        $topsym = LoadFile("$syml/$modfile$ext.syml");
-    }
-    elsif (-f "$lib/$modfile$ext") {
-        # say "$std $lib/$module$ext";
-        local $ENV{STD5PREFIX} = $::TMP_PREFIX;
-        local $ENV{SYML_SEARCH_PATH} = join(':',@{$::SYML_SEARCH_PATH});
-        system($::RECURSIVE_PERL // $^X, "-MSTD", "-e", "STD->_parse_module",
-            "$lib/$module$ext") and die "Can't compile $lib/$module$ext";
-        print STDERR "Compiled $lib/$module$ext\n";
-        $topsym = LoadFile("$syml/$modfile$ext.syml");
-    }
-    else {
-        $self->worry("Module $module disappeared during load");
-    }
+    my $topsym = $self->sys_load_modinfo($module);
     $self->add_my_name($module);
     $::DECLARAND->{really} = $topsym;
     $self;
