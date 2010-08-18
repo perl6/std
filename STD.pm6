@@ -315,7 +315,7 @@ regex stdstopper {
 }
 
 token longname {
-    <name> {} [ <!before ':{'> <colonpair> ]*
+    <name> {} [ <?before ':' <[ a..z A..Z _ \< \[ \« ]>> <colonpair> ]*
 }
 
 token name {
@@ -5331,7 +5331,6 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
     # This may just be a lexical alias to "our" and such,
     # so reuse $*DECLARAND pointer if it's there.
     my $declaring = $d // NAME.new(
-        xlex => $curstash.idref,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
@@ -5437,7 +5436,6 @@ method add_our_name ($n) {
     }
 
     my $declaring = $*DECLARAND // NAME.new(
-        xlex => $curstash.idref,
         name => $name,
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
@@ -5650,7 +5648,6 @@ method lex_can_find_name ($lex, $name, $varbind) {
         $outname = '<' ~ $outname ~ '>' unless $outname ~~ /\:\:\</;
         $outname = "OUTER::" ~ $outname;
         $lex.{$name} = NAME.new(
-            xlex => $lex.idref,
             olex => $lex.idref,
             name => $outname,
             file => $outfile, line => $outline,
