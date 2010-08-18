@@ -17,41 +17,38 @@ PERL=perl
 RM_RF=$(PERL) -MExtUtils::Command -e rm_rf
 CP=$(PERL) -MExtUtils::Command -e cp
 MV=$(PERL) -MExtUtils::Command -e mv
-TOUCH=$(PERL) -MExtUtils::Command -e touch
 MKDIR=mkdir
 SVN=svn
 # no snaptest on win32 just yet
 CP_R=cp -r
 
-six: .stamp
-all: .stamp STD_P5.pmc
+six: syml/CORE.syml
+all: syml/CORE.syml STD_P5.pmc
 
 clean:
 	$(RM_RF) syml STD_P5.pmc $(GENERATE) boot/syml boot/.stamp .stamp\
 	    STD_P5.pm5 STD.pm5 Cursor.pm5 snap snap.old snap.new
 
 ########################################
-# */.stamp indicates that the corresponding compiler is "usable"
-boot/.stamp: $(INVARIANT) $(BOOTFILES)
+# */syml/CORE.syml indicates that the corresponding compiler is "usable"
+boot/syml/CORE.syml: $(INVARIANT) $(BOOTFILES)
 	$(RM_RF) boot/syml
 	$(PERL) std --boot $(STDINC) CORE.setting
-	$(TOUCH) boot/.stamp
 
-STD.pmc: $(STD_SOURCE) boot/.stamp $(INVARIANT)
+STD.pmc: $(STD_SOURCE) boot/syml/CORE.syml $(INVARIANT)
 	$(PERL) viv --boot $(STDINC) -5 -o STD.pm5 STD.pm6
-	$(PERL) -pe '(/^---/../^RETREE_END/) || s/^\s*//' < STD.pm5 > STD.pmc
-STD_P5.pmc: STD_P5.pm6 boot/.stamp $(INVARIANT)
+	$(PERL) tools/compact_pmc < STD.pm5 > STD.pmc
+STD_P5.pmc: STD_P5.pm6 boot/syml/CORE.syml $(INVARIANT)
 	$(PERL) viv --boot $(STDINC) -5 -o STD_P5.pm5 STD_P5.pm6
-	$(PERL) -pe '(/^---/../^RETREE_END/) || s/^\s*//' < STD_P5.pm5 > STD_P5.pmc
-Cursor.pmc: $(CURSOR_SOURCE) boot/.stamp $(INVARIANT)
+	$(PERL) tools/compact_pmc < STD_P5.pm5 > STD_P5.pmc
+Cursor.pmc: $(CURSOR_SOURCE) boot/syml/CORE.syml $(INVARIANT)
 	$(PERL) viv --boot $(STDINC) -5 -o Cursor.pm5 Cursor.pm6
-	$(PERL) -pe '(/^---/../^RETREE_END/) || s/^\s*//' < Cursor.pm5 > Cursor.pmc
-.stamp: STD.pmc Cursor.pmc $(INVARIANT)
+	$(PERL) tools/compact_pmc < Cursor.pm5 > Cursor.pmc
+syml/CORE.syml: STD.pmc Cursor.pmc $(INVARIANT)
 	$(RM_RF) syml
 	$(PERL) std $(STDINC) CORE.setting
-	$(TOUCH) .stamp
 
-reboot: .stamp
+reboot: six
 	$(CP) $(GENERATE) boot
 	$(RM_RF) boot/syml
 
