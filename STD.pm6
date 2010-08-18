@@ -3838,7 +3838,7 @@ grammar P6 is STD {
         try {
             my $methop = self.<right><methodop>;
             my $name = $methop.<longname>.Str;
-            if $name eq 'new' or $name eq 'sort' or $name eq 'subst' or $name eq 'trans' or $name eq 'reverse' or $name eq 'uniq' or $name eq 'map' or $name eq 'samecase' or $name eq 'substr' or $name eq 'flip' or $name eq 'fmt' or $name eq 'pick' {
+            if grep { $_ eq $name }, <new clone sort subst trans reverse uniq map samecase substr flip fmt pick> {
                 $ok = 1;
             }
             elsif not $methop.<args>[0] {
