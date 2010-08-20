@@ -3673,7 +3673,7 @@ grammar P6 is STD {
 
     token dumbsmart {
         [ \h*
-            ('True'|'False'|'Bool::True'|'Bool::False') »
+            ('True'|'False'|'Bool::True'|'Bool::False') <?before \s>
             {
                 my $litbool = $0[0].Str;
                 my $true = $litbool ~~ /True/;
