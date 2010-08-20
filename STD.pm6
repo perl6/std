@@ -4973,8 +4973,13 @@ grammar Regex is STD {
 
     token assertion:name { [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <longname> ]
                                     [
-                                    | <?before '>' >
-                                    | <.ws> <nibbler> <.ws>
+                                    | <?before '>' > {
+                                        my $n = $<longname>.Str;
+                                        if $n eq 'before' or $n eq 'after' {
+                                            $¢.panic("$n requires an argument");
+                                        }
+                                    }
+                                    | <.normspace>? <nibbler> <.ws>
                                     | '=' <assertion>
                                     | ':' [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <.ws> <arglist> ]
                                     | '(' {}
