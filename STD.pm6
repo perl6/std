@@ -3314,11 +3314,20 @@ grammar P6 is STD {
     }
 
     token infix_postfix_meta_operator:sym<=> ($op) {
+        :my %prec;
         '='
         <.can_meta($op, "make assignment out of")>
         [ <!{ $op<O><diffy> }> || <.sorry("Can't make assignment out of " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy")> ]
-        { $<sym> = $op<sym> ~ '='; }
-        <O(|%item_assignment, $op.Opairs, dba => 'item assignment', iffy => 0)>
+        {
+            $<sym> = $op<sym> ~ '=';
+            if $op<O><prec> gt %comma<prec> {
+                %prec = %item_assignment;
+            }
+            else {
+                %prec = %list_assignment;
+            }
+        }
+        <O($op.Opairs, |%prec, dba => 'assignment operator', iffy => 0)>
     }
 
     token postcircumfix:sym<( )>
@@ -3825,10 +3834,10 @@ grammar P6 is STD {
     }
 
     token infix:sym<:=>
-        { <sym> <O(|%item_assignment)> }
+        { <sym> <O(|%list_assignment)> }
 
     token infix:sym<::=>
-        { <sym> <O(|%item_assignment)> }
+        { <sym> <O(|%list_assignment)> }
 
     token infix:sym<.=> {
         <sym>
