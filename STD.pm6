@@ -3324,8 +3324,16 @@ grammar P6 is STD {
     token postcircumfix:sym<( )>
         { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
 
-    token postcircumfix:sym<[ ]>
-        { :dba('subscript') '[' ~ ']' <semilist> { $<semilist>.Str ~~ /^\s*\-1\s*$/ and $¢.obs("[-1] subscript to access final element","[*-1]") } <O(|%methodcall)> }
+    token postcircumfix:sym<[ ]> { :dba('subscript') '[' ~ ']' <semilist> <O(|%methodcall)> 
+        {
+            my $innards = $<semilist>.Str;
+            $innards ~~ s/^\s+//;
+            $innards ~~ s/\s+$//;
+            if $innards ~~ /^\-\d+$/ {
+                $¢.obs("[$innards] subscript to access from end of array","[*$innards]");
+            }
+        }
+    }
 
     token postcircumfix:sym<{ }>
         { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> <.curlycheck> }
