@@ -4740,7 +4740,7 @@ grammar Regex is STD {
         <.ws>
         [
         || <term=.quant_atom_list> <?{ %*RX<s> or $<term>.Str ~~ /\S/ }>
-        || <normspace>
+        || <normspace>?
             [
             || <?before <stopper> | <[&|~]> > <.panic: "Null pattern not allowed">
             || <?before <[ \] \) \> ]> > {{
