@@ -2738,7 +2738,7 @@ grammar P6 is STD {
         [
             [ <longname> { $¢.add_name($<longname>[0].Str); } ]?
             <trait>*
-            [where <EXPR(item %chaining)> ]?    # (EXPR can parse multiple where clauses)
+            [where <EXPR(item %item_assignment)> ]?    # (EXPR can parse multiple where clauses)
         ] || <.panic: "Malformed subset">
     }
 
@@ -2789,7 +2789,7 @@ grammar P6 is STD {
         | <typename>
             [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
             { $*DECLARAND<of> = $<typename>; }
-        | where <.ws> <EXPR(item %chaining)>
+        | where <.ws> <EXPR(item %item_assignment)>
         ]
         <.ws>
     }
@@ -2800,7 +2800,7 @@ grammar P6 is STD {
         [
         | '[' ~ ']' <signature>
         | '(' ~ ')' <signature>
-        | where <EXPR(item %chaining)>
+        | where <EXPR(item %item_assignment)>
         ]
     }
 
