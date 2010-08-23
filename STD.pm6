@@ -4936,6 +4936,18 @@ grammar Regex is STD {
     token backslash:h { :i <sym> }
     token backslash:n { :i <sym> }
     token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
+    token backslash:p {
+        :my $s;
+        :my $m;
+        :my $p;
+        <sym=[pP]>
+        { $s = $<sym>.Str; $m = $s lt 'a' ?? '-' !! '+'; }
+        [
+        || (\w) { $p = $0.Str; $¢.obs("\\$s$p", '<' ~ $m ~ "is$p>"); }
+        || '{' $<param>=[\w+] '}' { $p = $<param>.Str; $¢.obs("\\$s\{$p\}", '<' ~ $m ~ "is$p>"); }
+        || '{' $<param>=[\w+] \= $<val>=[<-[\}]>*] '}' { $p = $<param>.Str; my $v = $<val>.Str; $¢.obs("\\$s\{$p=$v\}", '<' ~ $m ~ "is$p\('$v')>"); }
+        ]
+    }
     token backslash:Q { <sym> <.obs('\\Q as quotemeta', 'quotes or literal variable match')> }
     token backslash:r { :i <sym> }
     token backslash:s { :i <sym> }
