@@ -27,7 +27,7 @@ all: syml/CORE.syml STD_P5.pmc
 
 clean:
 	$(RM_RF) syml STD_P5.pmc $(GENERATE) boot/syml boot/.stamp .stamp\
-	    STD_P5.pm5 STD.pm5 Cursor.pm5 snap snap.old snap.new
+	    STD_P5.pm5 STD.pm5 Cursor.pm5 snap.old snap.new
 
 ########################################
 # */syml/CORE.syml indicates that the corresponding compiler is "usable"
