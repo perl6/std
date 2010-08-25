@@ -4916,9 +4916,14 @@ grammar Regex is STD {
         :my $*QSIGIL ::= substr($*ORIG,self.pos,1);
         <!before '$$'>
         <?before <sigil>>
-        [:lang(%*LANG<MAIN>) <termish> ]
-        $<binding> = ( \s* '=' \s* <quantified_atom> )?
-        { $<sym> = $<termish><term>.Str; }
+        [:lang(%*LANG<MAIN>) <variable> ]
+        { $<sym> = $<variable>.Str; }
+        [
+        || $<binding> = ( \s* '=' \s* <quantified_atom> )
+           { $¢.check_variable($<variable>) unless substr($<sym>,1,1) eq '<' }
+        || { $¢.check_variable($<variable>) }
+           [ <?before '.'? <[ \[ \{ \< ]>> <.worry: "Apparent subscript will be treated as regex"> ]?
+        ]
     }
 
     token backslash:unspace { <?before \s> <.SUPER::ws> }
