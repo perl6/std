@@ -131,11 +131,8 @@ HELP
 
     # slurp the file for parsing and redspans
     $src_text = read_file($fh);
-    local $::FILE = { name => $file || '-' };
     $loc[length($src_text) - 1] = [];
-    $parser = STD->initparse($src_text,setting=>"CORE",rule=>$what,actions => 'Actions');;
-
-    $parser->you_were_here;
+    $parser = STD->parse($src_text,rule=>$what,actions => 'Actions', syml_search_path => ['.','..']);
 
     # and finally print out the html code
     highlight_match();
