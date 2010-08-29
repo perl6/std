@@ -126,13 +126,14 @@ my $r = GetOptions(
     "boot"         => \$boot,
     "noperl6lib"   => \$CursorBase::NOPERL6LIB,
     "symlroot"     => \$symlroot,
-    "concise|c"    => sub { $OPT_output = 'concise' },
+    "concise"      => sub { $OPT_output = 'concise' },
     "yaml|y"       => sub { $OPT_output = 'yaml' },
     "output|o=s"   => \$OPT_output_file,
     "p5|5"         => sub { $OPT_output = 'p5' },
     "p6|6"         => sub { $OPT_output = 'p6' },
     "psq"          => sub { $OPT_output = 'psq' },
     "freeze"       => sub { $OPT_output = 'store' },
+    "check|c"      => sub { $OPT_output = 'none' },
     "stab|s"       => \$OPT_stab,
     "log|l"        => \$OPT_log,
     "pos|p"        => sub { },
@@ -4243,6 +4244,9 @@ unless (caller) {
     }
     elsif ($OPT_output eq 'p5') {
 	spew fixpod($r->p5);
+    }
+    elsif ($OPT_output eq 'none') {
+	say "@ARGV syntax OK";
     }
     elsif ($OPT_output eq 'store') {
 	delete $r->{stabs};
