@@ -306,6 +306,15 @@ sub sys_load_modinfo {
     my @toks = split '::', $module;
     $toks[-1] .= ".syml";
 
+    my @extra = @$::SYML_SEARCH_PATH;
+    shift @extra;
+    for my $prefix (@extra) {
+        my $file = File::Spec->catfile($prefix, 'syml', @toks);
+        if (-e $file) {
+            return LoadFile($file);
+        }
+    }
+
     my ($symlfile) = File::Spec->catfile($::TMP_PREFIX, 'syml', @toks);
     my ($modfile) = $self->sys_find_module($module, 0)
         or return undef;
