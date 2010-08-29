@@ -10,8 +10,6 @@ STD_SOURCE=STD.pm6 Cursor.pm6 CursorBase.pm6 lib/Stash.pm6 lib/NAME.pm6\
            lib/DEBUG.pm6
 CURSOR_SOURCE=Cursor.pm6 CursorBase.pm6
 
-STDINC=--clear-inc --inc lib --inc .
-
 PERL=perl
 
 RM_RF=$(PERL) -MExtUtils::Command -e rm_rf
@@ -33,20 +31,22 @@ clean:
 # */syml/CORE.syml indicates that the corresponding compiler is "usable"
 boot/syml/CORE.syml: $(INVARIANT) $(BOOTFILES)
 	$(RM_RF) boot/syml
-	$(PERL) viv --boot $(STDINC) --compile-setting CORE.setting
+	$(PERL) viv --boot --noperl6lib --compile-setting CORE.setting
 
 STD.pmc: $(STD_SOURCE) boot/syml/CORE.syml $(INVARIANT)
-	$(PERL) viv --boot $(STDINC) -5 -o STD.pm5 STD.pm6
+	$(PERL) viv --boot --noperl6lib -5 -o STD.pm5 STD.pm6
 	$(PERL) tools/compact_pmc < STD.pm5 > STD.pmc
 STD_P5.pmc: STD_P5.pm6 boot/syml/CORE.syml $(INVARIANT)
-	$(PERL) viv --boot $(STDINC) -5 -o STD_P5.pm5 STD_P5.pm6
+	$(PERL) viv --boot --noperl6lib -5 -o STD_P5.pm5 STD_P5.pm6
 	$(PERL) tools/compact_pmc < STD_P5.pm5 > STD_P5.pmc
 Cursor.pmc: $(CURSOR_SOURCE) boot/syml/CORE.syml $(INVARIANT)
-	$(PERL) viv --boot $(STDINC) -5 -o Cursor.pm5 Cursor.pm6
+	$(PERL) viv --boot --noperl6lib -5 -o Cursor.pm5 Cursor.pm6
 	$(PERL) tools/compact_pmc < Cursor.pm5 > Cursor.pmc
 syml/CORE.syml: STD.pmc Cursor.pmc $(INVARIANT)
 	$(RM_RF) syml
-	$(PERL) viv $(STDINC) --compile-setting CORE.setting
+	$(PERL) viv --noperl6lib --compile-setting CORE.setting
+	$(CP) boot/syml/CursorBase.syml boot/syml/Cursor.syml boot/syml/DEBUG.syml boot/syml/NAME.syml boot/syml/Stash.syml boot/syml/STD.syml syml
+# reboot after incompatibly changing syml format
 
 reboot: six
 	$(CP) $(GENERATE) boot

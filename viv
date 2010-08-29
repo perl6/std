@@ -115,13 +115,16 @@ use FindBin;
 use File::Spec;
 use Getopt::Long;
 
-my ($boot, $clear_inc, @inc, $symlroot);
+my ($boot, $symlroot);
+{
+    no warnings;
+    $CursorBase::NOPERL6LIB;
+}
 
 my $r = GetOptions(
     "evaluate|e=s" => sub { $PROG .= Encode::decode_utf8($_[1]) . "\n" },
     "boot"         => \$boot,
-    "clear-inc"    => \$clear_inc,
-    "inc=s"        => \@inc,
+    "noperl6lib"   => \$CursorBase::NOPERL6LIB,
     "symlroot"     => \$symlroot,
     "concise|c"    => sub { $OPT_output = 'concise' },
     "yaml|y"       => sub { $OPT_output = 'yaml' },
@@ -147,13 +150,11 @@ my $r = GetOptions(
 
 unshift @INC, $FindBin::Bin;
 if ($boot) {
+    no warnings 'once';
     unshift @INC, File::Spec->catdir($FindBin::Bin, "boot");
     $CursorBase::SET_STD5PREFIX = "boot";
+    $CursorBase::NOSTDSYML = 1;
 }
-if ($clear_inc) {
-    $CursorBase::SET_PERL6LIB = [ ];
-}
-push @$CursorBase::SET_PERL6LIB, @inc;
 if (defined $symlroot) {
     $CursorBase::SET_STD5PREFIX = $symlroot;
 }

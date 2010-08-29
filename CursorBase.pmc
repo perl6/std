@@ -15,7 +15,9 @@ use NAME;
 use Stash;
 use RE_ast;
 #use Carp::Always;
-use File::Spec;
+use File::Spec ();
+use File::Basename ();
+use File::ShareDir ();
 use File::Path ();
 use Config;
 
@@ -59,7 +61,6 @@ use YAML::XS;
 use Storable;
 use Encode;
 use Scalar::Util 'refaddr';
-use File::ShareDir 'dist_file';
 use Try::Tiny;
 
 use Term::ANSIColor;
@@ -83,6 +84,23 @@ BEGIN {
     Moose::Meta::Class->create('CursorBase');
 }
 
+our $data_dir;
+BEGIN {
+    # 2 possibilities:
+    #   * STD is installed.  CursorBase will be in the system @INC somewhere,
+    #     with nothing but other modules besides it.  Use File::ShareDir.
+    #   * STD is being used in place.  uniprops will be in the same dir as
+    #     CursorBase.pm
+
+    # yes, the INC entry always uses forward slashes and ends in .pm, always
+    my $path = __PACKAGE__;
+    $path =~ s#::#/#g;
+
+    $data_dir = File::Basename::dirname($INC{"$path.pm"});
+    if (! -e File::Spec->catfile($data_dir, "uniprops")) {
+        $data_dir = File::ShareDir::dist_dir('STD');
+    }
+}
 $::PERL6HERE = $ENV{PERL6HERE} // '⏏';
 Encode::_utf8_on($::PERL6HERE);
 
@@ -240,9 +258,7 @@ sub sys_get_perl6lib {
     my $self = shift;
 
     if (not @::PERL6LIB) {
-        if ($CursorBase::SET_PERL6LIB) {
-            @::PERL6LIB = @$CursorBase::SET_PERL6LIB;
-        } elsif ($ENV{PERL6LIB}) {
+        if ($ENV{PERL6LIB} && !$CursorBase::NOPERL6LIB) {
             @::PERL6LIB = split /\Q$Config::Config{path_sep}/, $ENV{PERL6LIB};
         } else {
             @::PERL6LIB = qw< ./lib . >;
@@ -401,7 +417,8 @@ sub initparse {
     my $filename = $args{filename};
 
     local $::TMP_PREFIX = $tmp_prefix;
-    local $::SYML_SEARCH_PATH = $args{syml_search_path} // [$::TMP_PREFIX];
+    local $::SYML_SEARCH_PATH = $args{syml_search_path} //
+        $CursorBase::NOSTDSYML ? [$::TMP_PREFIX] : [$::TMP_PREFIX, $data_dir];
 
     local $::SETTINGNAME = $setting;
     local $::ACTIONS = $actions;
@@ -1926,28 +1943,9 @@ sub bless { CORE::bless $_[1], $_[0]->WHAT }
 my %unicode_map_cache;
 BEGIN {
     $unicode_map_cache{ALL} = [scalar("\377" x 128) x 1088, "ALL"] ;
-
-    # 2 possibilities:
-    #   * STD is installed.  CursorBase will be in the system @INC somewhere,
-    #     with nothing but other modules besides it.  Use File::ShareDir.
-    #   * STD is being used in place.  uniprops will be in the same dir as
-    #     CursorBase.pm
-
-    # yes, the INC entry always uses forward slashes and ends in .pm, always
-    my $path = __PACKAGE__;
-    $path =~ s#::#/#g;
-    my ($vol, $dir, $file) = File::Spec->splitpath($INC{"$path.pm"});
-
-    my $inplace_path = File::Spec->catpath($vol, $dir, "uniprops");
-
-    if (-e $inplace_path) {
-        open MAP, "<", "$inplace_path" or
-            die "cannot open unicode maps from $inplace_path : $!\n";
-    } else {
-        my $name = dist_file('STD', 'uniprops');
-        open MAP, "<", "$name" or
-            die "cannot open unicode maps from $name : $!\n";
-    }
+    my $name = File::Spec->catfile($data_dir, "uniprops");
+    open MAP, "<", "$name" or
+        die "cannot open unicode maps from $name : $!\n";
 
     binmode MAP;
     while (defined (my $c = getc MAP)) {
