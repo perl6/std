@@ -59,6 +59,7 @@ our $OPT_log = 0;
 our $OPT_stab = 0;
 our $OPT_thaw = 0;
 our $OPT_keep_going = 0;
+our $OPT_compile_setting = 0;
 our $OPT_output_file = undef;
 my $PROG = '';
 our $ORIG;
@@ -140,6 +141,7 @@ my $r = GetOptions(
     "match|m"      => \$OPT_match,
     "thaw"         => \$OPT_thaw,
     "keep-going|k" => \$OPT_keep_going,
+    "compile-setting=s" => \$OPT_compile_setting,
     "help"         => sub { USAGE() }
 );
 
@@ -4188,6 +4190,11 @@ END
 }
 
 unless (caller) {
+    if ($OPT_compile_setting) {
+        STD->parsefile($OPT_compile_setting, setting => "NULL");
+        exit 0;
+    }
+
     USAGE() unless @ARGV || $PROG;
     my $r;
     if ($OPT_thaw) {
@@ -4199,8 +4206,8 @@ unless (caller) {
 	    Actions::gen_class($cl, $raw->{GENCLASS}->{$cl});
 	}
     }
-    elsif (@_ and -f $_[0]) {
-	$r = STD->parsefile($_[0], text_return => \$ORIG,
+    elsif (@ARGV and -f $ARGV[0]) {
+	$r = STD->parsefile($ARGV[0], text_return => \$ORIG,
 	    actions => 'Actions')->{'_ast'};
     }
     else {

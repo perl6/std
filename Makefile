@@ -2,7 +2,7 @@
 .PHONY: six all sixfast clean snap snaptest
 
 INVARIANT=Actions.pm CORE.setting CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc\
-	  RE_ast.pmc Stash.pmc mangle.pl std uniprops viv
+	  RE_ast.pmc Stash.pmc mangle.pl uniprops viv
 GENERATE=STD.pmc Cursor.pmc
 BOOTFILES=boot/STD.pmc boot/Cursor.pmc
 
@@ -33,7 +33,7 @@ clean:
 # */syml/CORE.syml indicates that the corresponding compiler is "usable"
 boot/syml/CORE.syml: $(INVARIANT) $(BOOTFILES)
 	$(RM_RF) boot/syml
-	$(PERL) std --boot $(STDINC) CORE.setting
+	$(PERL) viv --boot $(STDINC) --compile-setting CORE.setting
 
 STD.pmc: $(STD_SOURCE) boot/syml/CORE.syml $(INVARIANT)
 	$(PERL) viv --boot $(STDINC) -5 -o STD.pm5 STD.pm6
@@ -46,7 +46,7 @@ Cursor.pmc: $(CURSOR_SOURCE) boot/syml/CORE.syml $(INVARIANT)
 	$(PERL) tools/compact_pmc < Cursor.pm5 > Cursor.pmc
 syml/CORE.syml: STD.pmc Cursor.pmc $(INVARIANT)
 	$(RM_RF) syml
-	$(PERL) std $(STDINC) CORE.setting
+	$(PERL) viv $(STDINC) --compile-setting CORE.setting
 
 reboot: six
 	$(CP) $(GENERATE) boot
