@@ -35,36 +35,12 @@ are all almost certainly out.
 
 =cut
 
-BEGIN {
-    use FindBin;
-    use File::Spec;
-    unshift @INC, $FindBin::Bin;
-    if (@ARGV >= 1 && $ARGV[0] eq '--boot') {
-        shift @ARGV;
-        unshift @INC, File::Spec->catdir($FindBin::Bin, "boot");
-        $CursorBase::SET_STD5PREFIX = "boot";
-    }
-    if (@ARGV >= 1 && $ARGV[0] eq '--clear-inc') {
-        $CursorBase::SET_PERL6LIB = [ ];
-        shift @ARGV;
-    }
-    while (@ARGV >= 2 && $ARGV[0] eq '--inc') {
-        push @$CursorBase::SET_PERL6LIB, $ARGV[1];
-        splice @ARGV, 0, 2;
-    }
-    if (@ARGV >= 2 && $ARGV[0] eq '--symlroot') {
-        $CursorBase::SET_STD5PREFIX = $ARGV[1];
-        splice @ARGV, 0, 2;
-    }
-}
-
 use strict;
 use 5.010;
 use warnings FATAL => 'all';
 
 use List::Util qw/sum min/;
 
-use STD;
 use utf8;
 use YAML::XS; # An attempt to replace this with YAML::Syck passed the
               # tests but produced a different output format that
@@ -88,20 +64,6 @@ my $PROG = '';
 our $ORIG;
 my $U = 0;
 my @did_ws;
-
-BEGIN {
-    # Let's say you have a tricky optimization that breaks the build.  You want
-    # to know exactly which rewrite is culpable?  Try bisecting with
-    # VIV_OPTLIMIT, after wrapping the rewrite in if (DARE_TO_OPTIMIZE).
-    my $optlimit = $ENV{VIV_OPTLIMIT};
-    if (defined $optlimit) {
-	*DARE_TO_OPTIMIZE = Sub::Name::subname(DARE_TO_OPTIMIZE => sub {
-		$optlimit-- > 0
-	});
-    } else {
-	constant->import(DARE_TO_OPTIMIZE => 1);
-    }
-};
 
 my @context;
 $::MULTINESS = '';
@@ -132,7 +94,70 @@ END
     exit;
 }
 
-use Actions;
+BEGIN {
+    # Let's say you have a tricky optimization that breaks the build.  You want
+    # to know exactly which rewrite is culpable?  Try bisecting with
+    # VIV_OPTLIMIT, after wrapping the rewrite in if (DARE_TO_OPTIMIZE).
+    my $optlimit = $ENV{VIV_OPTLIMIT};
+    if (defined $optlimit) {
+        *DARE_TO_OPTIMIZE = Sub::Name::subname(DARE_TO_OPTIMIZE => sub {
+                $optlimit-- > 0
+        });
+    } else {
+        constant->import(DARE_TO_OPTIMIZE => 1);
+    }
+}
+
+our $OPT_output = 'concise';
+
+use FindBin;
+use File::Spec;
+use Getopt::Long;
+
+my ($boot, $clear_inc, @inc, $symlroot);
+
+my $r = GetOptions(
+    "evaluate|e=s" => sub { $PROG .= Encode::decode_utf8($_[1]) . "\n" },
+    "boot"         => \$boot,
+    "clear-inc"    => \$clear_inc,
+    "inc=s"        => \@inc,
+    "symlroot"     => \$symlroot,
+    "concise|c"    => sub { $OPT_output = 'concise' },
+    "yaml|y"       => sub { $OPT_output = 'yaml' },
+    "output|o=s"   => \$OPT_output_file,
+    "p5|5"         => sub { $OPT_output = 'p5' },
+    "p6|6"         => sub { $OPT_output = 'p6' },
+    "psq"          => sub { $OPT_output = 'psq' },
+    "freeze"       => sub { $OPT_output = 'store' },
+    "stab|s"       => \$OPT_stab,
+    "log|l"        => \$OPT_log,
+    "pos|p"        => sub { },
+    "no-indent"    => sub {
+        no warnings 'redefine';
+        *indent = \&no_indent;
+        *hang = \&no_indent;
+    },
+    "match|m"      => \$OPT_match,
+    "thaw"         => \$OPT_thaw,
+    "keep-going|k" => \$OPT_keep_going,
+    "help"         => sub { USAGE() }
+);
+
+unshift @INC, $FindBin::Bin;
+if ($boot) {
+    unshift @INC, File::Spec->catdir($FindBin::Bin, "boot");
+    $CursorBase::SET_STD5PREFIX = "boot";
+}
+if ($clear_inc) {
+    $CursorBase::SET_PERL6LIB = [ ];
+}
+push @$CursorBase::SET_PERL6LIB, @inc;
+if (defined $symlroot) {
+    $CursorBase::SET_STD5PREFIX = $symlroot;
+}
+
+require Actions;
+require STD;
 
 sub spew {
     my $bits = shift;
@@ -145,124 +170,6 @@ sub spew {
 	close $out or die "cannot close: $!";
     } else {
 	print $bits;
-    }
-}
-
-sub MAIN {
-    my $output = 'concise';
-
-    USAGE() unless @_;
-    while (@_) {
-	last unless $_[0] =~ /^-/;
-	my $switch = shift @_;
-	if ($switch eq '--eval' or $switch eq '-e') {
-	    $PROG .= Encode::decode_utf8(shift(@_)) . "\n";
-	}
-	elsif ($switch eq '--output' or $switch eq '-o') {
-	    $OPT_output_file = shift(@_);
-	}
-	elsif ($switch eq '--yaml' or $switch eq '-y') {
-	    $output = 'yaml';
-	}
-	elsif ($switch eq '--concise' or $switch eq '-c') {
-	    $output = 'concise';
-	}
-	elsif ($switch eq '--p5' or $switch eq '-5') {
-	    $output = 'p5';
-	}
-	elsif ($switch eq '--p6' or $switch eq '-6') {
-	    $output = 'p6';
-	}
-	elsif ($switch eq '--psq') {
-	    $output = 'psq';
-	}
-	elsif ($switch eq '--freeze') {
-	    $output = 'store';
-	}
-	elsif ($switch eq '--stab' or $switch eq '-s') {
-	    $OPT_stab = 1;
-	}
-	elsif ($switch eq '--log' or $switch eq '-l') {
-	    $OPT_log = 1;
-	}
-	elsif ($switch eq '--pos' or $switch eq '-p') {
-	    # obsolete, ignored
-	}
-	elsif ($switch eq '--no-indent') {
-	    no warnings 'redefine';
-	    *indent = \&no_indent;
-	    *hang = \&no_indent;
-	}
-	elsif ($switch eq '--match' or $switch eq '-m') {
-	    $OPT_match = 1;	# attach match object
-	}
-	elsif ($switch eq '--thaw') {
-	    $OPT_thaw = 1;
-	}
-	elsif ($switch eq '--keep-going' or $switch eq '-k') {
-	    $OPT_keep_going = 1;
-	}
-	elsif ($switch eq '--help') {
-	    USAGE();
-	}
-    }
-#    USAGE() unless -r $_[0];
-    my $r;
-    if ($OPT_thaw) {
-	my $raw = retrieve($_[0]);
-	$ORIG = $raw->{ORIG};
-	$r = $raw->{AST};
-	$STD::ALL = $raw->{STABS};
-	for my $cl (keys %{$raw->{GENCLASS}}) {
-	    Actions::gen_class($cl, $raw->{GENCLASS}->{$cl});
-	}
-    }
-    elsif (@_ and -f $_[0]) {
-	$r = STD->parsefile($_[0], text_return => \$ORIG,
-	    actions => 'Actions')->{'_ast'};
-    }
-    else {
-	if (not $PROG) {
-	    local $/;
-	    @ARGV = @_;
-	    $PROG = <>;
-	}
-	$ORIG = $PROG;
-	$r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
-    }
-    unless ($OPT_thaw) {
-	$ORIG =~ s/\n;\z//;
-    }
-    if ($OPT_stab) {
-	no warnings;
-	$r->{stabs} = $STD::ALL;
-    }
-    if ($output eq 'yaml') {
-	my $x = Dump($r);
-#	$x =~ s/\n.*: \[\]$//mg;
-	spew $x;
-    }
-    elsif ($output eq 'concise') {
-	spew concise($r, 80);
-    }
-    elsif ($output eq 'p6') {
-	spew $r->p6;
-    }
-    elsif ($output eq 'psq') {
-	spew $r->psq;
-    }
-    elsif ($output eq 'p5') {
-	spew fixpod($r->p5);
-    }
-    elsif ($output eq 'store') {
-	delete $r->{stabs};
-	my $data = { AST => $r, GENCLASS => \%Actions::GENCLASS,
-	    ORIG => $ORIG, STABS => $STD::ALL };
-	defined($OPT_output_file) ? store($data, $OPT_output_file)
-	    : Storable::store_fd($data, \*STDOUT);
-    }
-    else {
-	die "Unknown output mode";
     }
 }
 
@@ -4280,9 +4187,68 @@ END
     }
 }
 
-if ($0 eq __FILE__) {
-    ::MAIN(@ARGV);
+unless (caller) {
+    USAGE() unless @ARGV || $PROG;
+    my $r;
+    if ($OPT_thaw) {
+	my $raw = retrieve($_[0]);
+	$ORIG = $raw->{ORIG};
+	$r = $raw->{AST};
+	$STD::ALL = $raw->{STABS};
+	for my $cl (keys %{$raw->{GENCLASS}}) {
+	    Actions::gen_class($cl, $raw->{GENCLASS}->{$cl});
+	}
+    }
+    elsif (@_ and -f $_[0]) {
+	$r = STD->parsefile($_[0], text_return => \$ORIG,
+	    actions => 'Actions')->{'_ast'};
+    }
+    else {
+	if (not $PROG) {
+	    local $/;
+	    @ARGV = @_;
+	    $PROG = <>;
+	}
+	$ORIG = $PROG;
+	$r = STD->parse($PROG, actions => 'Actions')->{'_ast'};
+    }
+    unless ($OPT_thaw) {
+	$ORIG =~ s/\n;\z//;
+    }
+    if ($OPT_stab) {
+	no warnings;
+	$r->{stabs} = $STD::ALL;
+    }
+    if ($OPT_output eq 'yaml') {
+	my $x = Dump($r);
+#	$x =~ s/\n.*: \[\]$//mg;
+	spew $x;
+    }
+    elsif ($OPT_output eq 'concise') {
+	spew concise($r, 80);
+    }
+    elsif ($OPT_output eq 'p6') {
+	spew $r->p6;
+    }
+    elsif ($OPT_output eq 'psq') {
+	spew $r->psq;
+    }
+    elsif ($OPT_output eq 'p5') {
+	spew fixpod($r->p5);
+    }
+    elsif ($OPT_output eq 'store') {
+	delete $r->{stabs};
+        no warnings 'once';
+	my $data = { AST => $r, GENCLASS => \%Actions::GENCLASS,
+	    ORIG => $ORIG, STABS => $STD::ALL };
+	defined($OPT_output_file) ? store($data, $OPT_output_file)
+	    : Storable::store_fd($data, \*STDOUT);
+    }
+    else {
+	die "Unknown output mode";
+    }
 }
+
 1;
 
 # vim: ts=8 sw=4 noexpandtab smarttab
