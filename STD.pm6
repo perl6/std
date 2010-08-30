@@ -4722,7 +4722,7 @@ grammar Regex is STD {
         <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
     }
 
-    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr($::ORIG,$¢.pos,1) ~ "') or use a backslashed form like \\x" ~ sprintf("%02x", ord(substr($::ORIG,$¢.pos,1)))> }  # no unspace in regexen
+    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr($::ORIG,$¢.pos,1) ~ "') or use a backslashed form like \\x" ~ sprintf('%02x', ord(substr($::ORIG,$¢.pos,1)))> }  # no unspace in regexen
 
     rule nibbler {
         :temp %*RX;
