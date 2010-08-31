@@ -4853,6 +4853,10 @@ grammar Regex is STD {
         <sym>
     }
 
+    token metachar:sym«::>» {
+        <sym>
+    }
+
     token metachar:sym<:::> {
         <sym>
     }
