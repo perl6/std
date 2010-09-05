@@ -1,0 +1,1 @@
+module MONKEY_TYPING;

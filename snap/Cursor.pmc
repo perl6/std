@@ -1,0 +1,142 @@
+use 5.010;
+use utf8;
+use CursorBase;
+{ package Cursor;
+use Moose ':all' => { -prefix => "moose_" };
+use Encode;
+moose_extends('CursorBase');
+our $ALLROLES = { 'Cursor', 1 };
+our $REGEXES = {
+ALL => [ qw// ],
+};
+
+
+no warnings 'qw', 'recursion';
+my $retree;
+
+$DB::deep = $DB::deep = 1000; # suppress used-once warning
+
+use YAML::XS;
+
+$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
+" } if $::DEBUG;
+
+;
+our $BLUE    = $CursorBase::BLUE;
+our $GREEN   = $CursorBase::GREEN;
+our $CYAN    = $CursorBase::CYAN;
+our $MAGENTA = $CursorBase::MAGENTA;
+our $YELLOW  = $CursorBase::YELLOW;
+our $RED     = $CursorBase::RED;
+our $CLEAR   = $CursorBase::CLEAR;
+## method panic (Str $s)
+sub panic {
+no warnings 'recursion';
+my $self = shift;
+die 'Required argument s omitted' unless @_;
+my $s = @_ ? shift() : undef;
+$self->deb("panic $s") if $::DEBUG;
+my $m;
+my $here = $self;
+$m .= $s;
+$m .= $here->locmess;
+$m .= "\n" unless $m =~ /\n$/;
+print STDERR $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n";
+print STDERR $m;
+die "Parse failed\n";
+};
+## method worry (Str $s)
+sub worry {
+no warnings 'recursion';
+my $self = shift;
+die 'Required argument s omitted' unless @_;
+my $s = @_ ? shift() : undef;
+my $m = $s . $self->locmess;
+push @::WORRIES, $m unless $::WORRIES{$s}++;
+$self;
+};
+## method sorry (Str $s)
+sub sorry {
+no warnings 'recursion';
+my $self = shift;
+die 'Required argument s omitted' unless @_;
+my $s = @_ ? shift() : undef;
+$self->deb("sorry $s") if $::DEBUG;
+print STDERR $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
+unless $::IN_SUPPOSE or $::FATALS++;
+if ($s) {
+my $m = $s;
+$m .= $self->locmess . "\n" unless $m =~ /\n$/;
+if ($::FATALS > 10 or $::IN_SUPPOSE) {
+die $m}
+else {
+print STDERR $m unless $::WORRIES{$m}++};
+};
+$self;
+};
+## method locmess ()
+sub locmess {
+no warnings 'recursion';
+my $self = shift;
+my $pos = $self->{'_pos'};
+my $line = $self->lineof($pos);
+if ($pos >= @::MEMOS - 1) {
+$pos = $pos - 1;
+$line = $line . " (EOF)";
+};
+my $pre = substr($::ORIG, 0, $pos);
+$pre = substr($pre, -40, 40);
+1 while $pre =~ s!.*\n!!;
+$pre = '<BOL>' if $pre eq '';
+my $post = substr($::ORIG, $pos, 40);
+1 while $post =~ s!(\n.*)!!;
+$post = '<EOL>' if $post eq '';
+" at " . $::FILE->{'name'} . " line $line:\n------> " . $Cursor::GREEN . $pre . $Cursor::YELLOW . $::PERL6HERE . $Cursor::RED . 
+"$post$Cursor::CLEAR";
+};
+## method line
+sub line {
+no warnings 'recursion';
+my $self = shift;
+$self->lineof($self->{'_pos'})};
+## method lineof ($p)
+sub lineof {
+no warnings 'recursion';
+my $self = shift;
+die 'Required argument p omitted' unless @_;
+my $p = @_ ? shift() : undef;
+return 1 unless defined $p;
+my $line = $::MEMOS[$p]->{'L'};
+return $line if $line;
+$line = 0;
+my $pos = 0;
+my @text = split(/^/,$::ORIG);
+for (@text) {
+$line++;
+$::MEMOS[$pos++]->{'L'} = $line
+for 1 .. length($_);
+}
+;
+$::MEMOS[$pos++]->{'L'} = $line;
+return $::MEMOS[$p]->{'L'} // 0;
+};
+## method SETGOAL
+sub SETGOAL {
+no warnings 'recursion';
+my $self = shift;
+};
+## method FAILGOAL (Str $stop, Str $name, $startpos)
+sub FAILGOAL {
+no warnings 'recursion';
+my $self = shift;
+die 'Required argument stop omitted' unless @_;
+my $stop = @_ ? shift() : undef;
+die 'Required argument name omitted' unless @_;
+my $name = @_ ? shift() : undef;
+die 'Required argument startpos omitted' unless @_;
+my $startpos = @_ ? shift() : undef;
+my $s = "'$stop'";
+$s = '"\'"' if $s eq "'''";
+$self->panic("Unable to parse $name" . $startpos->locmess . "\nCouldn't find final $s; gave up");
+};
+1; };

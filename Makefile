@@ -62,7 +62,7 @@ snap: all
 	$(MV) snap.new snap
 
 snaptest: snap
-	cd snap && $(PERL) teststd $(realpath ../../t/spec)
+	cd snap && $(PERL) teststd $(realpath ../roast)
 
 #List all targets with brief descriptions.
 # Gradual shaving of targets with Occam's Razor would be a Good Thing.

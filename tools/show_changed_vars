@@ -9,8 +9,7 @@ use strict;
 use feature 'say';
 my $fail = 0;
 
-#my @files = qw(test1 test3 test2);#sort `find ../../t/spec/ -name '*.t'`;
-my @files = sort `find ../../t/spec/ -name '*.t'`;
+my @files = sort `find ../roast/ -name '*.t'`;
 chomp(@files);
 $| = 1;
 
