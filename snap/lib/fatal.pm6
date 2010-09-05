@@ -1,1 +1,0 @@
-my module fatal;
