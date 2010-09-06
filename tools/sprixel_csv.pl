@@ -5,7 +5,7 @@ use v5.010;
 use Actions;
 use STD;
 use Encode;
-use Scalar::Util;
+use Scalar::Util qw( blessed reftype refaddr );
 no warnings;
 
 my $PROG = '';
@@ -49,7 +49,7 @@ sub emit_csv {
 sub get_obj_id {
   my $o = shift;
   my $a;
-  my $addr = Scalar::Util::refaddr($o);
+  my $addr = refaddr($o);
   return $idmap{$addr} //= ++$lastid;
 }
 
@@ -66,18 +66,25 @@ sub emit_csv_recurse {
   say "$addr," . (ref $self) . ',' . ($parent // '""');
   for my $prop (keys %$self) {
     next if !defined $self->{$prop} || $prop eq '.' || $prop eq '_xact';
-    if (ref $self->{$prop}) {
-      if ('ARRAY' eq ref ($self->{$prop})) {
-        $self->{$prop} = bless { '.' => $self->{$prop} }, 'Array';
-        if (scalar @{$self->{$prop}->{'.'}}) {
-          say '1,' . tps($prop) . ',' . get_obj_id($self->{$prop});
+    my $p = $self->{$prop};
+    my $reftype;
+    if ($reftype = reftype($p)) {
+      my $ra = get_obj_id($p);
+      if ('ARRAY' eq $reftype) {
+        $p = $self->{$prop} = bless { '.' => $p }, 'Array';
+        if (scalar @{$p->{'.'}}) {
+          my $oid = get_obj_id($p);
+          say '1,' . tps($prop) . ',' . $oid;
+          $torun{$oid} = $p;
         }
+      } elsif ('HASH' eq $reftype) {
+        say '1,' . tps($prop) . ',' . $ra;
+        $torun{$ra} = $p;
       } else {
-        say '1,' . tps($prop) . ',' . get_obj_id($self->{$prop});
+        say '1,' . tps($prop) . ',' . tps($p);
       }
-      $torun{get_obj_id($self->{$prop})} = $self->{$prop};
     } else {
-      say '0,' . tps($prop) . ',' . tps($self->{$prop});
+      say '0,' . tps($prop) . ',' . tps($p);
     }
   }
   if (defined $self->{'.'}) {
