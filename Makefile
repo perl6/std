@@ -16,7 +16,7 @@ RM_RF=$(PERL) -MExtUtils::Command -e rm_rf
 CP=$(PERL) -MExtUtils::Command -e cp
 MV=$(PERL) -MExtUtils::Command -e mv
 MKDIR=mkdir
-SVN=svn
+GIT=git
 # no snaptest on win32 just yet
 CP_R=cp -r
 
@@ -55,7 +55,7 @@ reboot: six
 snap: all
 	$(RM_RF) snap.new
 	$(MKDIR) snap.new
-	$(SVN) info | $(PERL) -ne 'print "$$1\n" if /Revision:\s+(\d+)/' > snap.new/revision
+	$(GIT) log -1 --pretty="%h" > snap.new/revision
 	$(CP_R) $(INVARIANT) $(GENERATE) syml STD_P5.pmc lib tools/tryfile tools/teststd snap.new
 	-$(RM_RF) snap.old
 	-$(MV) snap snap.old
