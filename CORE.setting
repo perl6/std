@@ -372,7 +372,6 @@ my proto today {*}
 
 my proto gmtime {*}
 my proto localtime {*}
-my proto time {*}
 my proto times {*}
 my proto gethost {*}
 my proto getpw {*}
