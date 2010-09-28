@@ -1698,7 +1698,7 @@ grammar P6 is STD {
     token package_declarator:require {   # here because of declarational aspects
         <sym> <.ws>
         [
-        || <module_name> <EXPR>?
+        || <module_name> <.ws> <EXPR>?
         || <EXPR>
         ]
     }
