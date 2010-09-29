@@ -55,7 +55,7 @@ reboot: six
 snap: all
 	$(RM_RF) snap.new
 	$(MKDIR) snap.new
-	$(GIT) log -1 --pretty="%h" > snap.new/revision
+	$(GIT) log -1 --pretty="format:%h" > snap.new/revision
 	$(CP_R) $(INVARIANT) $(GENERATE) syml STD_P5.pmc lib tools/tryfile tools/teststd snap.new
 	-$(RM_RF) snap.old
 	-$(MV) snap snap.old
