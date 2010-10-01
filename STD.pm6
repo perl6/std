@@ -5923,6 +5923,10 @@ method panic (Str $s) {
 
     $m ~= $s;
 
+    if substr($*ORIG,$here.pos,1) ~~ /\)|\]|\}|\»/ {
+        $m ~~ s|Confused|Unexpected closing bracket| and $highvalid = False;
+    }
+
     if $highvalid {
         $m ~= $*HIGHMESS if $*HIGHMESS;
         $*HIGHMESS = $m;
