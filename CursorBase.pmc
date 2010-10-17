@@ -247,7 +247,7 @@ sub sys_save_syml {
     pop @toks;
     my $path = File::Spec->catdir($::TMP_PREFIX, "syml", @toks);
 
-    File::Path::make_path($path);
+    File::Path::mkpath($path);
 
     open(SETTING, ">", $file) or die "Can't open new setting file $file: $!";
     print SETTING Dump($all);

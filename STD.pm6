@@ -1698,7 +1698,7 @@ grammar P6 is STD {
     token package_declarator:require {   # here because of declarational aspects
         <sym> <.ws>
         [
-        || <module_name> <EXPR>?
+        || <module_name> <.ws> <EXPR>?
         || <EXPR>
         ]
     }
@@ -5922,6 +5922,10 @@ method panic (Str $s) {
     }
 
     $m ~= $s;
+
+    if substr($*ORIG,$here.pos,1) ~~ /\)|\]|\}|\»/ {
+        $m ~~ s|Confused|Unexpected closing bracket| and $highvalid = False;
+    }
 
     if $highvalid {
         $m ~= $*HIGHMESS if $*HIGHMESS;

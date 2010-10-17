@@ -230,7 +230,8 @@ my proto notdef {*}
 my proto undefine {*}
 my proto item {*}
 my proto list {*}
-my proto slice {*}
+my proto flat {*}
+my proto lol {*}
 my proto eager {*}
 my proto hyper {*}
 
@@ -372,7 +373,6 @@ my proto today {*}
 
 my proto gmtime {*}
 my proto localtime {*}
-my proto time {*}
 my proto times {*}
 my proto gethost {*}
 my proto getpw {*}
