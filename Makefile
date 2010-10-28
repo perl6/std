@@ -20,8 +20,8 @@ GIT=git
 # no snaptest on win32 just yet
 CP_R=cp -r
 
-six: syml/CORE.syml
 all: syml/CORE.syml STD_P5.pmc
+six: syml/CORE.syml
 
 clean:
 	$(RM_RF) syml STD_P5.pmc $(GENERATE) boot/syml boot/.stamp .stamp\
