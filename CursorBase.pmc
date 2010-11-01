@@ -525,9 +525,10 @@ sub delete {
 # Cursor transformations
 #############################################################
 
-sub cursor_xact { my $self = shift;
-    my $name = shift;
+sub cursor_xact { 
     if (DEBUG & DEBUG::cursors) {
+        my $self = shift;
+        my $name = shift;
         my $pedigree = '';
         for (my $x = $self->{_xact}; $x; $x = $x->[-1]) {
             my $n = $x->[0];
@@ -536,10 +537,12 @@ sub cursor_xact { my $self = shift;
             $pedigree .= ($x->[-2] ? " - " : " + ") . $n;
         }
         $self->deb("cursor_xact $name$pedigree");
+        $self->{_xact} = [$name,0,$self->{_xact}];
+        return $self;
     }
     # doing this in place is slightly dangerous, but seems to work
-    $self->{_xact} = [$name,0,$self->{_xact}];
-    $self;
+    $_[0]->{_xact} = [$_[1],0,$_[0]->{_xact}];
+    return $_[0];
 }
 
 sub cursor_fresh { my $self = shift;
@@ -2152,13 +2155,20 @@ sub _tangle_edges { my ($our_edges, $thunk) = @_;
     # First, all specifically mentioned characters are floated to the initial
     # case
     my %next_1;
+    my $edgelistref;
     for my $ch (keys %used_chars) {
         my $bm = "";
         EDGE: for (my $i = 0; $i < @$our_edges; $i += 2) {
-            next unless $our_edges->[$i];
-            next unless _elem_matches($ch, $our_edges->[$i][0]);
-            for (my $j = 1; $j < @{ $our_edges->[$i] }; $j++) {
-                next EDGE if _elem_matches($ch, $our_edges->[$i][$j]);
+            $edgelistref = $our_edges->[$i];
+            if (length $edgelistref->[0] != 1) {
+              my $o = ord $ch; # inlined from _elem_matches
+              next unless vec(_get_unicode_map($edgelistref->[0])->[$o >> 10], $o & 1023, 1);
+            } elsif ($edgelistref->[0] ne $ch) {
+              next;
+            }
+            my @edgelist = @$edgelistref;
+            for (my $j = 0; ++$j < @edgelist; ) {
+                next EDGE if _elem_matches($ch, $edgelistref->[$j]);
             }
             vec($bm, $our_edges->[$i+1], 1) = 1;
         }
