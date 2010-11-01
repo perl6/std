@@ -20,8 +20,8 @@ GIT=git
 # no snaptest on win32 just yet
 CP_R=cp -r
 
-six: syml/CORE.syml
 all: syml/CORE.syml STD_P5.pmc
+six: syml/CORE.syml
 
 clean:
 	$(RM_RF) syml STD_P5.pmc $(GENERATE) boot/syml boot/.stamp .stamp\
@@ -31,20 +31,20 @@ clean:
 # */syml/CORE.syml indicates that the corresponding compiler is "usable"
 boot/syml/CORE.syml: $(INVARIANT) $(BOOTFILES)
 	$(RM_RF) boot/syml
-	$(PERL) viv --boot --noperl6lib --compile-setting CORE.setting
+	$(PERL) ./viv --boot --noperl6lib --compile-setting CORE.setting
 
 STD.pmc: $(STD_SOURCE) boot/syml/CORE.syml $(INVARIANT)
-	$(PERL) viv --boot --noperl6lib -5 -o STD.pm5 STD.pm6
+	$(PERL) ./viv --boot --noperl6lib -5 -o STD.pm5 STD.pm6
 	$(PERL) tools/compact_pmc < STD.pm5 > STD.pmc
 STD_P5.pmc: STD_P5.pm6 boot/syml/CORE.syml $(INVARIANT)
-	$(PERL) viv --boot --noperl6lib -5 -o STD_P5.pm5 STD_P5.pm6
+	$(PERL) ./viv --boot --noperl6lib -5 -o STD_P5.pm5 STD_P5.pm6
 	$(PERL) tools/compact_pmc < STD_P5.pm5 > STD_P5.pmc
 Cursor.pmc: $(CURSOR_SOURCE) boot/syml/CORE.syml $(INVARIANT)
-	$(PERL) viv --boot --noperl6lib -5 -o Cursor.pm5 Cursor.pm6
+	$(PERL) ./viv --boot --noperl6lib -5 -o Cursor.pm5 Cursor.pm6
 	$(PERL) tools/compact_pmc < Cursor.pm5 > Cursor.pmc
 syml/CORE.syml: STD.pmc Cursor.pmc $(INVARIANT)
 	$(RM_RF) syml
-	$(PERL) viv --noperl6lib --compile-setting CORE.setting
+	$(PERL) ./viv --noperl6lib --compile-setting CORE.setting
 	$(CP) boot/syml/CursorBase.syml boot/syml/Cursor.syml boot/syml/DEBUG.syml boot/syml/NAME.syml boot/syml/Stash.syml boot/syml/STD.syml syml
 # reboot after incompatibly changing syml format
 
