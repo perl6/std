@@ -5009,6 +5009,7 @@ grammar Regex is STD {
                                     ]?
     }
 
+    token assertion:sym<:> { <?before ':'<alpha>> <cclass_elem>+ }
     token assertion:sym<[> { <?before '['> <cclass_elem>+ }
     token assertion:sym<+> { <?before '+'> <cclass_elem>+ }
     token assertion:sym<-> { <?before '-'> <cclass_elem>+ }
@@ -5027,6 +5028,7 @@ grammar Regex is STD {
         [
         | <name>
         | <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
+        | [:lang(%*LANG<MAIN>) <colonpair> ]
         ]
         <.normspace>?
     }
