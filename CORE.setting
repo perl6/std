@@ -325,6 +325,8 @@ my proto pairs {*}
 my proto invert {*}
 my proto pair {*}
 my proto enum {*}
+my proto set {*}
+my proto bag {*}
 
 my proto sign {*}
 my proto abs {*}
@@ -340,6 +342,7 @@ my proto roots {*}
 my proto rand {*}
 my proto srand {*}
 my proto pick {*}
+my proto roll {*}
 my proto cis {*}
 my proto unpolar {*}
 
