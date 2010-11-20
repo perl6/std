@@ -148,7 +148,7 @@ sub write_error_html {
     $error_html .= <<"ERROR";
 <pre>
 
-An error has occured while processing this file:
+An error has occurred while processing this file:
 
 filename: 
     $file
