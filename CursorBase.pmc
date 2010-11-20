@@ -2343,7 +2343,7 @@ sub _AUTOLEXgenDFA { my ($self, $realkey, $key, $retree) = @_;
 
         for my $meth (@$ml) {
             if ($superlexer->{USED_METHODS}{$meth}) {
-                $self->deb("\tcannot reuse $key; $meth overriden/augmented")
+                $self->deb("\tcannot reuse $key; $meth overridden/augmented")
                     if DEBUG & DEBUG::autolexer;
                 last UP;
             }

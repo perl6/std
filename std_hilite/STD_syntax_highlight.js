@@ -112,7 +112,7 @@ $(document.body).ready(function() {
             "\n1. Click on the 'Show Syntax Tree' button, and then hover over the Perl 6 code to see its syntax tree.\n" +
             "\n2. Click on the highlighted code if you need to keep the results.\n" +
             "Click again anywhere and this behavior will be reset.\n" +
-            "\nNote: Some browsers exibit problems with unloading pages with too many nodes. "+
+            "\nNote: Some browsers exhibit problems with unloading pages with too many nodes. "+
             "If you encounter that simply wait for it or kill it."
         );
     });

@@ -136,7 +136,7 @@ sub copy_resource {
 }
 
 
-# write the error log in the html file provied
+# write the error log in the html file provided
 sub write_error_html {
     my ($html_file, $file, $log, $is_full) = @ARG;
 

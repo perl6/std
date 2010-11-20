@@ -63,7 +63,7 @@ my @did_ws;
 
 my @context;
 $::MULTINESS = '';
-# XXX STD Global trait tables simulate inheritence
+# XXX STD Global trait tables simulate inheritance
 local $::PROTO = {};
 local $::PROTOSIG = {};
 
@@ -3946,7 +3946,7 @@ END
 }
 
 # DEEP is the lowest level of desugaring used by viv, but it still keeps a tree
-# structure.  Not all DEEP nodes are interchangable; some represent expression
+# structure.  Not all DEEP nodes are interchangeable; some represent expression
 # bits, others statements with no sensible return value.
 { package DEEPbase;
 }

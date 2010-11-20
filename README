@@ -16,9 +16,9 @@ You'll need the following Perl bits to run stuff:
 
 * Perl 5.10.0 or later in PATH
 
-* YAML::XS       (eg sudo apt-get install libyaml-libyaml-perl)
+* YAML::XS       (e.g. sudo apt-get install libyaml-libyaml-perl)
 
-* Moose          (eg sudo apt-get install libmoose-perl)
+* Moose          (e.g. sudo apt-get install libmoose-perl)
 
 * File::ShareDir
 
