@@ -222,31 +222,31 @@ token category:quote_mod { <sym> }
 proto token quote_mod {*}
 
 token category:trait_mod { <sym> }
-proto token trait_mod (:$*endsym = 'spacey') {*}
+proto token trait_mod (:$*endsym = 'keyspace') {*}
 
 token category:type_declarator { <sym> }
-proto token type_declarator (:$*endsym = 'spacey') {*}
+proto token type_declarator (:$*endsym = 'keyspace') {*}
 
 token category:scope_declarator { <sym> }
 proto token scope_declarator (:$*endsym = 'nofun') {*}
 
 token category:package_declarator { <sym> }
-proto token package_declarator (:$*endsym = 'spacey') {*}
+proto token package_declarator (:$*endsym = 'keyspace') {*}
 
 token category:multi_declarator { <sym> }
-proto token multi_declarator (:$*endsym = 'spacey') {*}
+proto token multi_declarator (:$*endsym = 'keyspace') {*}
 
 token category:routine_declarator { <sym> }
 proto token routine_declarator (:$*endsym = 'nofun') {*}
 
 token category:regex_declarator { <sym> }
-proto token regex_declarator (:$*endsym = 'spacey') {*}
+proto token regex_declarator (:$*endsym = 'keyspace') {*}
 
 token category:statement_prefix { <sym> }
 proto rule  statement_prefix () {*}
 
 token category:statement_control { <sym> }
-proto rule  statement_control (:$*endsym = 'spacey') {*}
+proto rule  statement_control (:$*endsym = 'keyspace') {*}
 
 token category:statement_mod_cond { <sym> }
 proto rule  statement_mod_cond (:$*endsym = 'nofun') {*}
@@ -278,7 +278,8 @@ proto token terminator {*}
 token unspacey { <.unsp>? }
 token begid { <?before \w> }
 token endid { <?before <-[ \- \' \w ]> > }
-token spacey { <?before <-[(]> > [ <?before <[ \s \# ]> > || <.panic: "Whitespace required after keyword"> ] }
+token spacey { <?before <[ \s \# ]> > }
+token keyspace { <?before <-[(]> > [ <?before <[ \s \# ]> > || <.panic: "Whitespace required after keyword"> ] }
 token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
@@ -1448,11 +1449,11 @@ grammar P6 is STD {
         [
             [
             | 'else'\h*'if' <.sorry: "Please use 'elsif'">
-            | 'elsif'<?spacey> <elsif=.xblock>
+            | 'elsif'<?keyspace> <elsif=.xblock>
             ]
         ]*
         [
-            'else'<?spacey> <else=.pblock>
+            'else'<?keyspace> <else=.pblock>
         ]?
     }
 
@@ -1481,10 +1482,10 @@ grammar P6 is STD {
     token statement_control:repeat {
         <sym> :s
         [
-            | $<wu>=['while'|'until']<.spacey>
+            | $<wu>=['while'|'until']<.keyspace>
               <xblock>
             | <pblock>
-              $<wu>=['while'|'until'][<.spacey>||<.panic: "Whitespace required after keyword">] <EXPR>
+              $<wu>=['while'|'until'][<.keyspace>||<.panic: "Whitespace required after keyword">] <EXPR>
         ]
     }
 
