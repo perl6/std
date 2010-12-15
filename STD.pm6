@@ -278,7 +278,7 @@ proto token terminator {*}
 token unspacey { <.unsp>? }
 token begid { <?before \w> }
 token endid { <?before <-[ \- \' \w ]> > }
-token spacey { <?before <[ \s \# ]> > }
+token spacey { <?before <-[(]> > [ <?before <[ \s \# ]> > || <.panic: "Whitespace required after keyword"> ] }
 token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
@@ -2992,10 +2992,13 @@ grammar P6 is STD {
 
     # accepts blocks and statements
     token blast {
-        <?before \s> <.ws>
         [
-        | <block>
-        | <statement>  # creates a dynamic scope but not lexical scope
+        | <?before \s> <.ws>
+            [
+            | <block>
+            | <statement>  # creates a dynamic scope but not lexical scope
+            ]
+        | <.panic: "Whitespace required after keyword">
         ]
     }
 
