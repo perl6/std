@@ -2737,6 +2737,7 @@ grammar P6 is STD {
         <sym> :s
         [
             [ <longname> { $¢.add_name($<longname>[0].Str); } ]?
+            { $*IN_DECL = ''; }
             <trait>*
             [where <EXPR(item %item_assignment)> ]?    # (EXPR can parse multiple where clauses)
         ] || <.panic: "Malformed subset">
