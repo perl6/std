@@ -1700,6 +1700,11 @@ grammar P6 is STD {
         <sym> <.ws>
         [
         || <module_name> <.ws> <EXPR>?
+            {
+                my $*IN_DECL = 'use';
+                my $*SCOPE = 'use';
+                $¢.add_name($<module_name><longname><name>.Str);
+            }
         || <EXPR>
         ]
     }
