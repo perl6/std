@@ -4784,7 +4784,7 @@ grammar Regex is STD {
         :dba('infix stopper')
         [
         | <?before <[\) \} \]]> >
-        | <?before '>' <-[>)]> >
+        | <?before '>' <-[>]> >
         | <?before <stopper> >
         ]
     }
