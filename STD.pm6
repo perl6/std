@@ -3915,7 +3915,7 @@ grammar P6 is STD {
         { <sym> <O(|%list_infix)> }
 
     token infix:sym<...>
-        { <sym> <O(|%list_infix)> }
+        { <sym> <O(|%list_infix)> '^'? }
 
     token term:sym<...>
         { <sym> <args>? <O(|%list_prefix)> }
