@@ -3145,7 +3145,9 @@ grammar P6 is STD {
                 %<O><dba> = 'adverb';
             }
         |   [
-            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            | :dba('bracketed infix') '[' ~ ']' <infix=.infixish('[]')>
+                                                    { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+                    [ <!before '='> { self.worry("Useless use of [] around infix op") unless $*IN_META; } ]?
             | <infix=infix_circumfix_meta_operator> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix=infix_prefix_meta_operator>    { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix>                               { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
