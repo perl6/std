@@ -2496,6 +2496,7 @@ grammar P6 is STD {
         $start <left=.nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
         [ <?{ $start ne $stop }>
             <.ws>
+            [ <?[ \[ \{ \( \< ]> <.obs('brackets around replacement', 'assignment syntax')> ]?
             [ <infixish> || <panic: "Missing assignment operator"> ]
             [ <?{ $<infixish>.Str eq '=' || $<infixish>.<infix_postfix_meta_operator> }> || <.panic: "Malformed assignment operator"> ]
             <.ws>
