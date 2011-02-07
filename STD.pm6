@@ -1282,7 +1282,7 @@ grammar P6 is STD {
         <identifier> ':' <?before \s> <.ws>
 
         [ <?{ $¢.is_name($label = $<identifier>.Str) }>
-          <.sorry("Illegal redeclaration of '$label'")>
+          <.worry("Redeclaration of '$label'")>
         ]?
 
         # add label as a pseudo constant
