@@ -4694,6 +4694,9 @@ grammar Regex is STD {
     token category:quantifier { <sym> }
     proto token quantifier {*}
 
+    token category:cclass_elem { <sym> }
+    proto token cclass_elem {*}
+
     token category:mod_internal { <sym> }
     proto token mod_internal {*}
 
@@ -4958,6 +4961,7 @@ grammar Regex is STD {
     token assertion:sym<???> { <sym> }
     token assertion:sym<!!!> { <sym> }
 
+    token assertion:sym<|> { <sym> [ <?before '>'> | <?before \w> <assertion> ] }  # assertion-like syntax, anyway
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<*> { <sym> [ <?before '>'> | <.ws> <nibbler> ] }
@@ -4993,10 +4997,10 @@ grammar Regex is STD {
                                     ]?
     }
 
-    token assertion:sym<:> { <?before ':'<alpha>> <cclass_elem>+ }
-    token assertion:sym<[> { <?before '['> <cclass_elem>+ }
-    token assertion:sym<+> { <?before '+'> <cclass_elem>+ }
-    token assertion:sym<-> { <?before '-'> <cclass_elem>+ }
+    token assertion:sym<:> { <?before ':'<alpha>> <cclass_expr> }
+    token assertion:sym<[> { <?before '['> <cclass_expr> }
+    token assertion:sym<+> { <?before '+'> <cclass_expr> }
+    token assertion:sym<-> { <?before '-'> <cclass_expr> }
     token assertion:sym<.> { <sym> }
     token assertion:sym<,> { <sym> }
     token assertion:sym<~~> { <sym> [ <?before '>'> | \d+ | <desigilname> ] }
@@ -5004,16 +5008,50 @@ grammar Regex is STD {
     token assertion:bogus { <.panic: "Unrecognized regex assertion"> }
 
     token sign { '+' | '-' | <?> }
-    token cclass_elem {
+    token cclass_expr {
+        ::
+        <.normspace>?
+        <sign>
+        <cclass_union> ** [$<op>=[ '|' | '^' ]]
+    }
+
+    token cclass_union {
+        <.normspace>?
+        <cclass_add> ** [$<op>=[ '&' ]]
+    }
+
+    token cclass_add {
+        <.normspace>?
+        <cclass_elem> ** [$<op>=[ '+' | '-' ]]
+    }
+
+    token cclass_elem:name {
+        :dba('character class element')
+        <.normspace>?
+        <name>
+        <.normspace>?
+    }
+
+    token cclass_elem:sym<[ ]> {
         :my $*CCSTATE = '';
         :dba('character class element')
-        <sign>
         <.normspace>?
-        [
-        | <name>
-        | <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
-        | [:lang(%*LANG<MAIN>) <colonpair> ]
-        ]
+        <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
+        <.normspace>?
+    }
+
+    token cclass_elem:sym<( )> {
+        :my $*CCSTATE = '';
+        :dba('character class element')
+        <.normspace>?
+        '(' ~ ')' <cclass_expr>
+        <.normspace>?
+    }
+
+    token cclass_elem:property {
+        :dba('character class element')
+        <.normspace>?
+        [:lang(%*LANG<MAIN>) <colonpair> ]
         <.normspace>?
     }
 
