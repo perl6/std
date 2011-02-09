@@ -5022,12 +5022,11 @@ grammar Regex is STD {
 
     token cclass_add {
         <.normspace>?
-        <cclass_elem> ** [$<op>=[ '+' | '-' ]]
+        <cclass_elem> ** [$<op>=[ '+' | '-' ]<.normspace>?]
     }
 
     token cclass_elem:name {
         :dba('character class element')
-        <.normspace>?
         <name>
         <.normspace>?
     }
@@ -5035,7 +5034,6 @@ grammar Regex is STD {
     token cclass_elem:sym<[ ]> {
         :my $*CCSTATE = '';
         :dba('character class element')
-        <.normspace>?
         <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
         <.normspace>?
     }
@@ -5043,15 +5041,19 @@ grammar Regex is STD {
     token cclass_elem:sym<( )> {
         :my $*CCSTATE = '';
         :dba('character class element')
-        <.normspace>?
         '(' ~ ')' <cclass_expr>
         <.normspace>?
     }
 
     token cclass_elem:property {
         :dba('character class element')
-        <.normspace>?
         [:lang(%*LANG<MAIN>) <colonpair> ]
+        <.normspace>?
+    }
+
+    token cclass_elem:quote {
+        <?before '"' | "'">
+        [:lang(%*LANG<MAIN>) <quote> ]
         <.normspace>?
     }
 
