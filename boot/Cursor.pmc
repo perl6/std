@@ -7,7 +7,7 @@ use Encode;
 moose_extends('CursorBase');
 our $ALLROLES = { 'Cursor', 1 };
 our $REGEXES = {
-    ALL => [ qw// ],
+ALL => [ qw// ],
 };
 
 
@@ -63,7 +63,7 @@ die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
 $self->deb("sorry $s") if $::DEBUG;
 print STDERR $Cursor::RED, '===', $Cursor::CLEAR, 'SORRY!', $Cursor::RED, '===', $Cursor::CLEAR, "\n"
-        unless $::IN_SUPPOSE or $::FATALS++;
+unless $::IN_SUPPOSE or $::FATALS++;
 if ($s) {
 my $m = $s;
 $m .= $self->locmess . "\n" unless $m =~ /\n$/;
@@ -92,7 +92,7 @@ my $post = substr($::ORIG, $pos, 40);
 1 while $post =~ s!(\n.*)!!;
 $post = '<EOL>' if $post eq '';
 " at " . $::FILE->{'name'} . " line $line:\n------> " . $Cursor::GREEN . $pre . $Cursor::YELLOW . $::PERL6HERE . $Cursor::RED . 
-        "$post$Cursor::CLEAR";
+"$post$Cursor::CLEAR";
 };
 ## method line
 sub line {
@@ -114,9 +114,9 @@ my @text = split(/^/,$::ORIG);
 for (@text) {
 $line++;
 $::MEMOS[$pos++]->{'L'} = $line
-            for 1 .. length($_);
+for 1 .. length($_);
 }
-    ;
+;
 $::MEMOS[$pos++]->{'L'} = $line;
 return $::MEMOS[$p]->{'L'} // 0;
 };
@@ -139,4 +139,4 @@ my $s = "'$stop'";
 $s = '"\'"' if $s eq "'''";
 $self->panic("Unable to parse $name" . $startpos->locmess . "\nCouldn't find final $s; gave up");
 };
-  1; };
+1; };

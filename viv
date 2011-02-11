@@ -802,6 +802,9 @@ TEMPLATE
 { package VAST::Concatenation; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
+{ package VAST::Assignment_operator; our @ISA = ('VAST::Base', 'VAST::InfixCall');
+}
+
 
 { package VAST::Conditional; our @ISA = 'VAST::Base';
     sub emit_p5 {  my $self = shift;
@@ -1251,7 +1254,7 @@ TEMPLATE
 	    RE_bindnamed->new(var => $1, atom =>
 		$self->{binding}{quantified_atom}->re_ast);
 	} else {
-	    RE_var->new(var => $self->{termish}->p5);
+	    RE_var->new(var => scalar $self->{variable}->p5);
 	}
     }
 }
