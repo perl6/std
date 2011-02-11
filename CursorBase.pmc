@@ -597,6 +597,28 @@ sub cursor_bind { my $self = shift;     # this is parent's match cursor
     bless \%r, ref $self;               # return new match cursor for parent
 }
 
+sub cursor_bind_value { my $self = shift;     # this is parent's match cursor
+    my $binding = shift;
+    my $value = shift;
+    delete $self->{_fate};
+
+    $self->deb("cursor_bind_value $binding") if DEBUG & DEBUG::cursors;
+    my @caps;
+    @caps = @{$self->{'~CAPS'}} if $self->{'~CAPS'};  # must copy elems
+    my %r = %$self;
+    if (ref $r{$binding} eq 'ARRAY') {
+        push(@{$r{$binding}}, $value);
+    }
+    else {
+        $r{$binding} = $value;
+    }
+    push @caps, $binding, $value
+        unless $binding eq 'PRE' or $binding eq 'POST';
+    $r{'~CAPS'} = \@caps;
+    $r{_xact} = $self->{_xact};
+    bless \%r, ref $self;               # return new match cursor for parent
+}
+
 sub cursor_fate { my $self = shift;
     my $pkg = shift;
     my $name = shift;
@@ -1332,6 +1354,15 @@ sub _SUBSUMEr { my $self = shift;
     local $CTX = $self->callm($names ? "@$names" : "") if DEBUG & DEBUG::trace_call;
     my ($var) = $block->($self->cursor_fresh()) or return ();
     $self->cursor_bind($names, $var)->retm();
+}
+
+sub _SUBSUMEblock { my $self = shift;
+    my $name = shift;
+    my $block = shift;
+    no warnings 'recursion';
+
+    local $CTX = $self->callm($name) if DEBUG & DEBUG::trace_call;
+    $self->cursor_bind_value($name, $block->($self))->retm();
 }
 
 sub _EXACT_rev { my $self = shift;

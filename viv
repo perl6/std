@@ -3929,6 +3929,9 @@ END
 	    local $::BINDINSIDE = $var;
 	    return $$self{atom}->walk;
 	}
+	if ($$self{atom}->isa('RE_block') && $$self{atom}{context} eq 'void') {
+            return DEEP::raw("\$C->_SUBSUMEblock('" . $var . "', sub {\n" . ::indent("my \$C = shift;\n" . $$self{atom}{body}) . "})", precut => 1);
+	}
         my $re = $$self{atom}->walk;
         $self->bind($re, $var);
     }
