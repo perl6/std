@@ -271,7 +271,7 @@ token unspacey { <.unsp>? }
 token begid { <?before \w> }
 token endid { <?before <-[ \- \' \w ]> > }
 token spacey { <?before <[ \s \# ]> > }
-token keyspace { <?before <-[(]> > [ <?before <[ \s \# ]> > || <.panic: "Whitespace required after keyword"> ] }
+token keyspace { <!before '('> [ <?before <[ \s \# ]> > || <.panic: "Whitespace required after keyword"> ] }
 token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
 
 # Note, don't reduce on a bare sigil unless you don't want a twigil or
