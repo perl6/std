@@ -4669,9 +4669,9 @@ grammar Regex is STD {
     multi method tweak (:ratchet(:$r)!) { %*RX<r> = $r; self; }
     multi method tweak (:global(:$g)!) { %*RX<g> = $g; self; }
     multi method tweak (:ignorecase(:$i)!) { %*RX<i> = $i; self; }
-    multi method tweak (:ignoreaccent(:$a)!) { %*RX<a> = $a; self; }
+    multi method tweak (:ignoremark(:$m)!) { %*RX<m> = $m; self; }
     multi method tweak (:samecase(:$ii)!) { %*RX<ii> = $ii; self; }
-    multi method tweak (:sameaccent(:$aa)!) { %*RX<aa> = $aa; self; }
+    multi method tweak (:samemark(:$mm)!) { %*RX<mm> = $mm; self; }
     multi method tweak (:$nth!) { %*RX<nth> = $nth; self; }
     multi method tweak (:st(:$nd)!) { %*RX<nth> = $nd; self; }
     multi method tweak (:rd(:$th)!) { %*RX<nth> = $th; self; }
@@ -5068,10 +5068,10 @@ grammar Regex is STD {
     token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { %*RX<i> = eval $<mod_arg>.Str } }
     token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { %*RX<i> = $0 } }
 
-    token mod_internal:sym<:a>    { $<sym>=[':a'|':ignoreaccent'] » { %*RX<a> = 1 } }
-    token mod_internal:sym<:!a>   { $<sym>=[':!a'|':!ignoreaccent'] » { %*RX<a> = 0 } }
-    token mod_internal:sym<:a( )> { $<sym>=[':a'|':ignoreaccent'] <mod_arg> { %*RX<a> = eval $<mod_arg>.Str } }
-    token mod_internal:sym<:0a>   { ':' (\d+) ['a'|'ignoreaccent'] { %*RX<a> = $0 } }
+    token mod_internal:sym<:m>    { $<sym>=[':m'|':ignoremark'] » { %*RX<m> = 1 } }
+    token mod_internal:sym<:!m>   { $<sym>=[':!m'|':!ignoremark'] » { %*RX<m> = 0 } }
+    token mod_internal:sym<:m( )> { $<sym>=[':m'|':ignoremark'] <mod_arg> { %*RX<m> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:0m>   { ':' (\d+) ['m'|'ignoremark'] { %*RX<m> = $0 } }
 
     token mod_internal:sym<:s>    { ':s' 'igspace'? » { %*RX<s> = 1 } }
     token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { %*RX<s> = 0 } }
