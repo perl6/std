@@ -484,16 +484,16 @@ token babble ($l) {
     [ <quotepair> <.ws>
         {
             my $kv = $<quotepair>[*-1];
-            $lang = ($lang.tweak($kv.<k>, $kv.<v>)
+            $lang = ($lang.tweak(| ($kv.<k> => $kv.<v>))
                 or $lang.sorry("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')'));
         }
     ]*
 
-    {
+    $<B> = {
         ($start,$stop) = $¢.peek_delimiters();
         $lang = $start ne $stop ?? $lang.balanced($start,$stop)
                                 !! $lang.unbalanced($stop);
-        $<B> = [$lang,$start,$stop];
+        [$lang,$start,$stop];
     }
 }
 
@@ -566,7 +566,7 @@ token quotepair {
     | $<n>=(\d+) $<id>=(<[a..z]>+) [ <?before '('> <.sorry: "2nd argument not allowed on pair"> <circumfix> ]?
         { $key = $<id>.Str; $value = $<n>.Str; }
     ]
-    { $<k> = $key; $<v> = $value; }
+    $<k> = {$key} $<v> = {$value}
 }
 
 token quote:sym<' '>   { :dba('single quotes') "'" ~ "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> }
@@ -1123,9 +1123,9 @@ grammar P6 is STD {
         <statementlist>
         [ <?unitstopper> || <.panic: "Confused"> ]
         # "CHECK" time...
+        $<LEX> = { $*CURLEX }
         {
             $¢.explain_mystery();
-            $¢.<LEX> = $*CURLEX;
             if @*WORRIES {
                 note "Potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
             }
@@ -1235,13 +1235,13 @@ grammar P6 is STD {
         [ <quotepair> <.ws>
             {
                 my $kv = $<quotepair>[*-1];
-                $lang = ($lang.tweak($kv.<k>, $kv.<v>)
+                $lang = ($lang.tweak(|($kv.<k>.Str => $kv.<v>))
                     or $lang.panic("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')'));
             }
         ]*
 
         [
-        | '{*}' <?{ $*MULTINESS eq 'proto' }> { $¢.<onlystar> = 1 }
+        | '{*}' <?{ $*MULTINESS eq 'proto' }> $<onlystar> = {1}
         | [
             '{'
             <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
@@ -1759,7 +1759,7 @@ grammar P6 is STD {
                 || <?{ $*begin_compunit }>
                     {
                         $longname orelse $¢.panic("Compilation unit cannot be anonymous");
-                        $outer == $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
+                        $outer === $*UNIT or $¢.panic("Semicolon form of " ~ $*PKGDECL ~ " definition not allowed in subscope;\n  please use block form");
                         $*PKGDECL eq 'package' and $¢.panic("Semicolon form of package definition indicates a Perl 5 module; unfortunately,\n  STD doesn't know how to parse Perl 5 code yet");
                         my $shortname = $longname.<name>.Str;
                         $*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
@@ -2073,7 +2073,7 @@ grammar P6 is STD {
             )
             { $key = $<var><desigilname>.Str; $value = $<var>; $¢.check_variable($value); }
         ]
-        { $<k> = $key; $<v> = $value; }
+        $<k> = {$key} $<v> = {$value}
     }
 
     # Most of these special variable rules are there simply to catch old p5 brainos
@@ -2554,7 +2554,7 @@ grammar P6 is STD {
         :my $qm;
         'qq'
         [
-        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak($qm => 1))>
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(|($qm => 1)))>
         | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
         ]
     }
@@ -2562,7 +2562,7 @@ grammar P6 is STD {
         :my $qm;
         'q'
         [
-        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak($qm => 1))>
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(|($qm => 1)))>
         | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
         ]
     }
@@ -2571,7 +2571,7 @@ grammar P6 is STD {
         :my $qm;
         'Q'
         [
-        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak($qm => 1))>
+        | <quote_mod> » <!before '('> { $qm = $<quote_mod>.Str } <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(|($qm => 1)))>
         | » <!before '('> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ))>
         ]
     }
@@ -2936,10 +2936,8 @@ grammar P6 is STD {
         ]?
         [<?before ':'> <?{ $kind ne '!' }> <.sorry: "Invocant is too exotic">]?
 
-        {
-            $<quant> = $quant;
-            $<kind> = $kind;
-        }
+        $<quant> = {$quant}
+        $<kind> = {$kind}
 
         # enforce zone constraints
         {
@@ -3113,9 +3111,9 @@ grammar P6 is STD {
         :dba('prefix or meta-prefix')
         [
         | <prefix>
-            { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
+            $<O> = {$<prefix><O>} $<sym> = {$<prefix><sym>}
         | <prefix_circumfix_meta_operator>
-            { $<O> = $<prefix_circumfix_meta_operator><O>; $<sym> = $<prefix_circumfix_meta_operator>.Str }
+            $<O> = {$<prefix_circumfix_meta_operator><O>} $<sym> = {$<prefix_circumfix_meta_operator>.Str}
         ]
         # XXX assuming no precedence change
         
@@ -3161,18 +3159,18 @@ grammar P6 is STD {
     # doing fancy as one rule simplifies LTM
     token dotty:sym<.*> {
         ('.' [ <[+*?=]> | '^' '!'? ]) :: <.unspacey> <dottyop>
-        { $<sym> = $0.Str; }
-        <O(%methodcall)>
+        $<sym> = {$0.Str}
+        <O(|%methodcall)>
     }
 
     token dotty:sym<.> {
         <sym> <dottyop>
-        <O(%methodcall)>
+        <O(|%methodcall)>
     }
 
     token privop {
         '!' <methodop>
-        <O(%methodcall)>
+        <O(|%methodcall)>
     }
 
     token dottyopish {
@@ -3184,7 +3182,7 @@ grammar P6 is STD {
         [
         | <methodop>
         | <colonpair>
-        | <!alpha> <postop> { $<O> = $<postop><O>; $<sym> = $<postop><sym>; }  # only non-alpha postfixes have dotty form
+        | <!alpha> <postop> $<O> = {$<postop><O>} $<sym> = {$<postop><sym>}  # only non-alpha postfixes have dotty form
         ]
     }
 
@@ -3262,7 +3260,7 @@ grammar P6 is STD {
            
         || <.can_meta($<infixish>, "negate")>    
            <?{ $<infixish><O><iffy> }>
-           <?{ $<O> = $<infixish><O>; }>
+           $<O> = {$<infixish><O>}
             
         || <.panic("Can't negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
         ]
@@ -3271,13 +3269,13 @@ grammar P6 is STD {
     token infix_prefix_meta_operator:sym<R> {
         <sym> {} <infixish('R')>
         <.can_meta($<infixish>, "reverse the args of")>
-        <?{ $<O> = $<infixish><O>; }>
+        $<O> = {$<infixish><O>}
     }
 
     token infix_prefix_meta_operator:sym<S> {
         <sym> {} <infixish('S')>
         <.can_meta($<infixish>, "sequence the args of")>
-        <?{ $<O> = $<infixish><O>; }>
+        $<O> = {$<infixish><O>}
     }
 
     token infix_prefix_meta_operator:sym<X> {
@@ -3305,7 +3303,7 @@ grammar P6 is STD {
         ]
         {} <infixish('hyper')> [ '«' | '»' || <.panic: "Missing « or »"> ]
         <.can_meta($<infixish>, "hyper with")>
-        <?{ $<O> := $<infixish><O>; }>
+        $<O> = {$<infixish><O>}
     }
 
     token infix_circumfix_meta_operator:sym«<< >>» {
@@ -3315,7 +3313,7 @@ grammar P6 is STD {
         ]
         {} <infixish('HYPER')> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
         <.can_meta($<infixish>, "hyper with")>
-        <?{ $<O> := $<infixish><O>; }>
+        $<O> = {$<infixish><O>}
     }
 
     token infix_postfix_meta_operator:sym<=> ($op) {
@@ -3372,8 +3370,8 @@ grammar P6 is STD {
         { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
 
     token postop {
-        | <postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
-        | <postcircumfix>   { $<O> := $<postcircumfix><O>; $<sym> := $<postcircumfix><sym>; }
+        | <postfix>         $<O> = {$<postfix><O>} $<sym> = {$<postfix><sym>}
+        | <postcircumfix>   $<O> = {$<postcircumfix><O>} $<sym> = {$<postcircumfix><sym>}
     }
 
     token methodop {
@@ -3894,9 +3892,9 @@ grammar P6 is STD {
         ':' <?before \s | <terminator> >
         {
             $¢.sorry("Illegal use of colon as invocant marker") unless $*INVOCANT_OK-- or $*PRECLIM ge $item_assignment_prec;
-            $<sym> = ',';
-            $<wascolon> = True;
         }
+        $<wascolon> = {True}
+        $<sym> = {','}
         <O(|%comma)>
     }
 
@@ -3975,13 +3973,13 @@ grammar P6 is STD {
         | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist>
         |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
         ]
-        { $<invocant> = $*INVOCANT_IS; }
+        $<invocant> = {$*INVOCANT_IS}
 
         :dba('extra arglist after (...):')
         [
         || <?{ $listopish }>
         || ':' <?before \s> <moreargs=.arglist>    # either switch to listopiness
-        || { $<O> = {}; }   # or allow adverbs (XXX needs hoisting?)
+        || $<O> = { {} }   # or allow adverbs (XXX needs hoisting?)
         ]
     }
 
@@ -4024,7 +4022,7 @@ grammar P6 is STD {
                 }
             }
         ]
-        <O(%term)>
+        <O(|%term)>
     }
 
     method check_nodecl($name) {
@@ -4189,35 +4187,35 @@ grammar Q is STD {
     }
 
     role p1 {
-        method postprocess ($s) { $s.parsepath }
+        method postprocessor () { 'path' }
     }
 
     role p0 {
-        method postprocess ($s) { $s }
+        method postprocessor () { 'null' }
     }
 
     role w1 {
-        method postprocess ($s) { $s.words }
+        method postprocessor () { 'words' }
     }
 
     role w0 {
-        method postprocess ($s) { $s }
+        method postprocessor () { 'null' }
     }
 
     role ww1 {
-        method postprocess ($s) { $s.words }
+        method postprocessor () { 'quotewords' }
     }
 
     role ww0 {
-        method postprocess ($s) { $s }
+        method postprocessor () { 'null' }
     }
 
     role x1 {
-        method postprocess ($s) { $s.run }
+        method postprocessor () { 'run' }
     }
 
     role x0 {
-        method postprocess ($s) { $s }
+        method postprocessor () { 'null' }
     }
 
     role q {
@@ -4752,10 +4750,8 @@ grammar Regex is STD {
         <!infixstopper>
         <!stdstopper>
         <regex_infix>
-        {
-            $<O> = $<regex_infix><O>;
-            $<sym> = $<regex_infix><sym>;
-        }
+        $<O> = {$<regex_infix><O>}
+        $<sym> = {$<regex_infix><sym>}
     }
     regex infixstopper {
         :dba('infix stopper')
@@ -4819,13 +4815,13 @@ grammar Regex is STD {
     token metachar:sym<{ }> {
         <?before '{'>
         <embeddedblock>
-        { $/<sym> := <{ }> }
+        $<sym> = { <{ }> }
     }
 
     token metachar:mod {
         <?before ':'>
         <mod_internal>
-        { $/<sym> := $<mod_internal><sym> }
+        $<sym> = {$<mod_internal><sym>}
     }
 
     token metachar:sym<-> {
@@ -4852,13 +4848,13 @@ grammar Regex is STD {
         :dba("bracketed regex")
         '[' ~ ']' <nibbler>
         { $¢.check_old_cclass($<nibbler>.Str); }
-        { $/<sym> := <[ ]>; }
+        $<sym> = {<[ ]>}
     }
 
     token metachar:sym<( )> {
         :dba("capture parens")
         '(' ~ ')' <nibbler>
-        { $/<sym> := <( )> }
+        $<sym> = {<( )>}
     }
 
     token metachar:sym« <( » { '<(' }
@@ -4908,7 +4904,7 @@ grammar Regex is STD {
         <!before '$$'>
         <?before <sigil>>
         [:lang(%*LANG<MAIN>) <variable> ]
-        { $<sym> = $<variable>.Str; }
+        $<sym> = {$<variable>.Str}
         [
         || $<binding> = ( \s* '=' \s* <quantified_atom> )
            { $¢.check_variable($<variable>) unless substr($<sym>,1,1) eq '<' }
@@ -4917,7 +4913,7 @@ grammar Regex is STD {
         ]
     }
 
-    token backslash:unspace { <?before \s> <.SUPER::ws> }
+    token backslash:unspace { <?before \s> [ :lang( %*LANG<MAIN> ) <.ws> ] }
 
     token backslash:sym<0> { '0' <!before <[0..7]> > }
 
@@ -5086,7 +5082,7 @@ grammar Regex is STD {
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] <.require_P5> [ :lang( $¢.cursor_fresh( %*LANG<P5Regex> ).unbalanced($*GOAL) ) <nibbler> ] }
 
     token mod_internal:p6adv {
-        <?before ':' ['dba'|'lang'] » > [ :lang(%*LANG<MAIN>) <quotepair> ] { $/<sym> := ':' ~ $<quotepair><k> }
+        <?before ':' ['dba'|'lang'] » > [ :lang(%*LANG<MAIN>) <quotepair> ] $<sym> = {':' ~ $<quotepair><k>}
     }
 
     token mod_internal:oops { {} (':'\w+) <.sorry: "Unrecognized regex modifier " ~ $0.Str > }
@@ -5454,10 +5450,10 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
         $*DECLARAND<inlex> = $curstash.idref;
         $*DECLARAND<signum> = $*SIGNUM if $*SIGNUM;
         $*DECLARAND<const> ||= 1 if $*IN_DECL eq 'constant';
-        $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %::MYSTERY{substr($name,1)};
+        $*DECLARAND<used> = 1 if substr($name,0,1) eq '&' and %*MYSTERY{substr($name,1)};
         if !$*DECLARAND<const> and $shortname ~~ /^\w+$/ {
-            $curstash.{"&$shortname"} //= $curstash.{$shortname};
-            $curstash.{"&$shortname"}<used> = 1;
+            $curstash.{"\&$shortname"} //= $curstash.{$shortname};
+            $curstash.{"\&$shortname"}<used> = 1;
             $sid ~= "::$name";
             if $name !~~ /\:\</ {
                 $*NEWPKG = $curstash.{$name ~ '::'} = ($p // Stash.new(
@@ -5549,8 +5545,8 @@ method add_our_name ($n) {
         $curstash.{$shortname} //= $declaring unless $shortname eq $name;
         $*DECLARAND<inpkg> = $curstash.idref;
         if $shortname ~~ /^\w+$/ and $*IN_DECL ne 'constant' {
-            $curstash.{"&$shortname"} //= $declaring;
-            $curstash.{"&$shortname"}<used> = 1;
+            $curstash.{"\&$shortname"} //= $declaring;
+            $curstash.{"\&$shortname"}<used> = 1;
             $sid ~= "::$name";
             $*NEWPKG = $curstash.{$name ~ '::'} //= Stash.new(
                 'PARENT::' => $curstash.idref,
