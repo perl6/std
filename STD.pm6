@@ -1,6 +1,6 @@
 # STD.pm
 #
-# Copyright 2007-2010, Larry Wall
+# Copyright 2007-2011, Larry Wall
 #
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
