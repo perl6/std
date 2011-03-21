@@ -1497,7 +1497,7 @@ token charspec {
 
 method truly ($bool,$opt) {
     return self if $bool;
-    self.panic("Can't negate $opt adverb");
+    self.panic("Cannot negate $opt adverb");
 }
 
 grammar Q is STD {
@@ -2291,7 +2291,7 @@ grammar Regex is STD {
         <atom>
         [ <.ws> <quantifier=p5quantifier>
 #            <?{ $<atom>.max_width }>
-#                || <.panic: "Can't quantify zero-width atom">
+#                || <.panic: "Cannot quantify zero-width atom">
         ]?
         <.ws>
     }
@@ -2336,7 +2336,7 @@ grammar Regex is STD {
 
     token p5metachar:var {
         <?before <sigil=p5sigil>\w>
-        <.panic: "Can't interpolate variable in Perl 5 regex">
+        <.panic: "Cannot interpolate variable in Perl 5 regex">
     }
 
     token p5backslash:A { <sym> }

@@ -1250,7 +1250,7 @@ TEMPLATE
 	# We don't un6 because some things need to un6 specially - backrefs
 	if ($self->{binding}) {
 	    local $::PARSENAME = 1;
-	    $self->{SYM} =~ /^\$<(.*)>$/ or die "Can't bind backref to " . $self->{SYM};
+	    $self->{SYM} =~ /^\$<(.*)>$/ or die "Cannot bind backref to " . $self->{SYM};
 	    RE_bindnamed->new(var => $1, atom =>
 		$self->{binding}{quantified_atom}->re_ast);
 	} else {
@@ -3302,7 +3302,7 @@ END
 	    DEEP::raw($result[0]);
         }
         else {
-            die("Can't reverse serial disjunction") if $::REV;
+            die("Cannot reverse serial disjunction") if $::REV;
             for (@result) { $_ = "do {\n" . ::indent("push \@gather, $_\n") . "}"; }
 	    # We need to force the scope here because of the my $C
             my $result = "do {" . ::indent(
@@ -3347,7 +3347,7 @@ END
         my $self = shift;
         local $::NEEDMATCH = 0;
         my $name = $$self{name};
-        die "Can't reverse $name" if $::REV;
+        die "Cannot reverse $name" if $::REV;
 	my $re;
 
         if ($name eq "sym") {
@@ -3527,7 +3527,7 @@ END
         my $self = shift;
         my $re = $$self{re};
         my $name = $$self{name};
-        die("Can't reverse $name") if $::REV and $name ne 'before';
+        die("Cannot reverse $name") if $::REV and $name ne 'before';
         local $::REV = $name eq 'after' ? '_rev' : '';
 	{
 	    local %::BINDINGS;
