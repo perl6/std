@@ -5203,6 +5203,7 @@ method getsig {
             next if $desc<used>;
             next if $desc<rebind>;
             next if $desc<dynamic>;
+            next if $desc<scope> eq 'our';
             next if $desc<scope> eq 'state';
             next if $desc<stub>;
             my $pos = $desc<declaredat> // self.pos;
