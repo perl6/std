@@ -1708,7 +1708,7 @@ grammar P6 is STD {
 
     token package_declarator:sym<also> {
         <sym>:s
-        <trait>+
+        [ <trait>+ || <.panic: "No valid trait found after also"> ]
     }
 
     rule package_def {
