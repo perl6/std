@@ -2932,7 +2932,7 @@ grammar P6 is STD {
                 $kind = '?' if $kind eq '!';
             }
             [<?before ':' > <.sorry: "Cannot put a default on the invocant parameter">]?
-            [<!before <[,;)\]\{\-]> > <.sorry: "Default expression must come last">]?
+            [<!before <[,;)\]\{\}\-]> > <.sorry: "Default expression must come last">]?
         ]?
         [<?before ':'> <?{ $kind ne '!' }> <.sorry: "Invocant is too exotic">]?
 
