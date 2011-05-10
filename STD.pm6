@@ -1648,10 +1648,17 @@ grammar P6 is STD {
     token scope_declarator:our       { <sym> <scoped('our')> }
     token scope_declarator:anon      { <sym> <scoped('anon')> }
     token scope_declarator:state     { <sym> <scoped('state')> }
-    token scope_declarator:has       { <sym> <scoped('has')> }
     token scope_declarator:augment   { <sym> <scoped('augment')> }
     token scope_declarator:supersede { <sym> <scoped('supersede')> }
-
+    token scope_declarator:has       {
+	<sym> {
+	    given $*PKGDECL {
+		when 'class' | 'grammar' | 'role' {}
+		default { $¢.worry("'has' declaration outside of class") }
+	    }
+	}
+	<scoped('has')>
+    }
 
     token package_declarator:class {
         :my $*PKGDECL ::= 'class';
@@ -1808,13 +1815,13 @@ grammar P6 is STD {
     }
 
     token routine_declarator:sub       { <sym> <routine_def('sub')> }
-    token routine_declarator:method    { <sym> <method_def> }
-    token routine_declarator:submethod { <sym> <method_def> }
+    token routine_declarator:method    { <sym> <method_def('method')> }
+    token routine_declarator:submethod { <sym> <method_def('submethod')> }
     token routine_declarator:macro     { <sym> <macro_def> }
 
-    token regex_declarator:regex { <sym>       <regex_def(:!r,:!s)> }
-    token regex_declarator:token { <sym>       <regex_def(:r,:!s)> }
-    token regex_declarator:rule  { <sym>       <regex_def(:r,:s)> }
+    token regex_declarator:regex { <sym> <regex_def('regex', :!r,:!s)> }
+    token regex_declarator:token { <sym> <regex_def('token', :r,:!s)> }
+    token regex_declarator:rule  { <sym> <regex_def('rule',  :r,:s)> }
 
     rule multisig {
         :my $signum = 0;
@@ -1863,10 +1870,16 @@ grammar P6 is STD {
         ] || <.panic: "Malformed routine">
     }
 
-    rule method_def () {
+    rule method_def ($d) {
         :temp $*CURLEX;
-        :my $*IN_DECL = 'method';
+        :my $*IN_DECL = $d;
         :my $*DECLARAND;
+	{
+	    given $*PKGDECL {
+		when 'class' | 'grammar' | 'role' {}
+		default {$¢.worry("'$d' declaration outside of class") unless $*SCOPE }
+	    }
+	}
         <.newlex(1)>
         [
             [
@@ -1891,11 +1904,17 @@ grammar P6 is STD {
         ] || <.panic: "Malformed method">
     }
 
-    rule regex_def (:$r, :$s) {
+    rule regex_def ($d, :$r, :$s) {
         :temp $*CURLEX;
-        :my $*IN_DECL = 'regex';
+        :my $*IN_DECL = $d;
         :temp %*RX;
         :my $*DECLARAND;
+	{
+	    given $*PKGDECL {
+		when 'grammar' | 'role' {}
+		default { $¢.worry("'$d' declaration outside of grammar") unless $*SCOPE }
+	    }
+	}
         { %*RX<s> = $s; %*RX<r> = $r; }
         [
             [ '&'<deflongname>? | <deflongname> ]?
@@ -5832,6 +5851,18 @@ method check_variable ($variable) {
                 $*CURLEX{$name}<used>++;
             }
         }
+	when '!' {
+	    given $*SCOPE {
+		when 'method' | 'submethod'  {}
+		default { $variable.worry("Variable $name used outside of method/submethod declaration"); }
+	    }
+	}
+	when '.' {
+	    given $*SCOPE {
+		when 'method' {}
+		default { $variable.worry("Variable $name used outside of method declaration"); }
+	    }
+	}
         when '^' {
             my $*MULTINESS = 'multi';
             $variable.add_placeholder($name);
