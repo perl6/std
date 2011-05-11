@@ -1653,7 +1653,9 @@ grammar P6 is STD {
     token scope_declarator:has       {
 	<sym> {
 	    given $*PKGDECL {
-		when 'class' | 'grammar' | 'role' {}
+		when 'class'   {} # XXX to be replaced by MOP queries
+		when 'grammar' {}
+		when 'role'    {}
 		default { $¢.worry("'has' declaration outside of class") }
 	    }
 	}
@@ -1876,7 +1878,9 @@ grammar P6 is STD {
         :my $*DECLARAND;
 	{
 	    given $*PKGDECL {
-		when 'class' | 'grammar' | 'role' {}
+		when 'class'   {} # XXX to be replaced by MOP queries
+		when 'grammar' {}
+		when 'role'    {}
 		default {$¢.worry("'$d' declaration outside of class") unless $*SCOPE }
 	    }
 	}
@@ -1911,7 +1915,8 @@ grammar P6 is STD {
         :my $*DECLARAND;
 	{
 	    given $*PKGDECL {
-		when 'grammar' | 'role' {}
+		when 'grammar' {} # XXX to be replaced by MOP queries
+		when 'role'    {}
 		default { $¢.worry("'$d' declaration outside of grammar") unless $*SCOPE }
 	    }
 	}
@@ -5852,14 +5857,15 @@ method check_variable ($variable) {
             }
         }
 	when '!' {
-	    given $*SCOPE {
-		when 'method' | 'submethod'  {}
+	    given $*CURLEX.<!IN_DECL>//'' {
+		when 'method'    {} # XXX to be replaced by MOP queries
+		when 'submethod' {}
 		default { $variable.worry("Variable $name used outside of method/submethod declaration"); }
 	    }
 	}
 	when '.' {
-	    given $*SCOPE {
-		when 'method' {}
+	    given $*CURLEX.<!IN_DECL>//'' {
+		when 'method' {} # XXX to be replaced by MOP queries
 		default { $variable.worry("Variable $name used outside of method declaration"); }
 	    }
 	}
