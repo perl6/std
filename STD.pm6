@@ -3562,6 +3562,12 @@ grammar P6 is STD {
     token infix:sym<mod>
         { <sym> <O(|%multiplicative)> }
 
+    token infix:sym<gcd>
+        { <sym> <O(|%multiplicative)> }
+
+    token infix:sym<lcm>
+        { <sym> <O(|%multiplicative)> }
+
     token infix:sym<+&>
         { <sym> <O(|%multiplicative)> }
 
