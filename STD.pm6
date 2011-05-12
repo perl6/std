@@ -3070,8 +3070,11 @@ grammar P6 is STD {
     token term:sym<now>
         { <sym> » <O(|%term)> }
 
-    token term:sym<self>
-        { <sym> » <O(|%term)> }
+    token term:sym<self> {
+	<sym> »
+	{ $*HAS_SELF || $¢.sorry("'self' used where no object is available") }
+	<O(|%term)>
+    }
 
     token term:sym<defer>
         { <sym> » <O(|%term)> }
