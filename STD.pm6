@@ -46,6 +46,7 @@ our $ALL;
     my %*LANG;            # (d) braided languages: MAIN, Q, Regex, etc
 
     my $*IN_DECL;     # (d) a declarator is looking for a name to declare
+    my $*HAS_SELF;     # (d) in a context where 'self' exists
     my $*SCOPE = "";      # (d) which scope declarator we're under
     my $*MULTINESS;       # (d) which multi declarator we're under
     my $*PKGDECL ::= "";         # (d) current package declarator
@@ -1072,6 +1073,7 @@ grammar P6 is STD {
         :my %*LANG;
         :my $*PKGDECL ::= "";
         :my $*IN_DECL = '';
+        :my $*HAS_SELF = '';
         :my $*DECLARAND;
         :my $*OFTYPE;
         :my $*NEWPKG;
@@ -1383,6 +1385,7 @@ grammar P6 is STD {
 
     token statement_control:import {
         :my $*IN_DECL = 'use';
+	:my $*HAS_SELF = '';
         :my $*SCOPE = 'use';
         <sym> <.ws>
         <term>
@@ -1402,6 +1405,7 @@ grammar P6 is STD {
         :my $longname;
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
+	:my $*HAS_SELF = '';
         :my %*MYSTERY;
         <sym> <.ws>
         [
@@ -1651,6 +1655,7 @@ grammar P6 is STD {
     token scope_declarator:augment   { <sym> <scoped('augment')> }
     token scope_declarator:supersede { <sym> <scoped('supersede')> }
     token scope_declarator:has       {
+	:my $*HAS_SELF = 'partial';
 	<sym> {
 	    given $*PKGDECL {
 		when 'class'   {} # XXX to be replaced by MOP queries
@@ -1723,6 +1728,7 @@ grammar P6 is STD {
     rule package_def {
         :my $longname;
         :my $*IN_DECL = 'package';
+	:my $*HAS_SELF = '';
         :my $*DECLARAND;
         :my $*NEWPKG;
         :my $*NEWLEX;
@@ -1876,6 +1882,7 @@ grammar P6 is STD {
         :temp $*CURLEX;
         :my $*IN_DECL = $d;
         :my $*DECLARAND;
+	:my $*HAS_SELF = $d eq 'submethod' ?? 'partial' !! 'complete';
 	{
 	    given $*PKGDECL {
 		when 'class'   {} # XXX to be replaced by MOP queries
@@ -1913,6 +1920,7 @@ grammar P6 is STD {
         :my $*IN_DECL = $d;
         :temp %*RX;
         :my $*DECLARAND;
+	:my $*HAS_SELF = 'complete';
 	{
 	    given $*PKGDECL {
 		when 'grammar' {} # XXX to be replaced by MOP queries
@@ -5863,16 +5871,15 @@ method check_variable ($variable) {
             }
         }
 	when '!' {
-	    given $*CURLEX.<!IN_DECL>//'' {
-		when 'method'    {} # XXX to be replaced by MOP queries
-		when 'submethod' {}
-		default { $variable.worry("Variable $name used outside of method/submethod declaration"); }
+	    if not $*HAS_SELF { # XXX to be replaced by MOP queries
+		$variable.sorry("Variable $name used where no 'self' is available");
 	    }
 	}
 	when '.' {
-	    given $*CURLEX.<!IN_DECL>//'' {
-		when 'method' {} # XXX to be replaced by MOP queries
-		default { $variable.worry("Variable $name used outside of method declaration"); }
+	    given $*HAS_SELF { # XXX to be replaced by MOP queries
+		when 'complete' {}
+		when 'partial' { $variable.sorry("Virtual call $name may not be used on partially constructed object"); }
+		default { $variable.sorry("Variable $name used where no 'self' is available"); }
 	    }
 	}
         when '^' {
