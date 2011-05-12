@@ -1385,7 +1385,7 @@ grammar P6 is STD {
 
     token statement_control:import {
         :my $*IN_DECL = 'use';
-	:my $*HAS_SELF = '';
+        :my $*HAS_SELF = '';
         :my $*SCOPE = 'use';
         <sym> <.ws>
         <term>
@@ -1405,7 +1405,7 @@ grammar P6 is STD {
         :my $longname;
         :my $*IN_DECL = 'use';
         :my $*SCOPE = 'use';
-	:my $*HAS_SELF = '';
+        :my $*HAS_SELF = '';
         :my %*MYSTERY;
         <sym> <.ws>
         [
@@ -1655,16 +1655,16 @@ grammar P6 is STD {
     token scope_declarator:augment   { <sym> <scoped('augment')> }
     token scope_declarator:supersede { <sym> <scoped('supersede')> }
     token scope_declarator:has       {
-	:my $*HAS_SELF = 'partial';
-	<sym> {
-	    given $*PKGDECL {
-		when 'class'   {} # XXX to be replaced by MOP queries
-		when 'grammar' {}
-		when 'role'    {}
-		default { $¢.worry("'has' declaration outside of class") }
-	    }
-	}
-	<scoped('has')>
+        :my $*HAS_SELF = 'partial';
+        <sym> {
+            given $*PKGDECL {
+                when 'class'   {} # XXX to be replaced by MOP queries
+                when 'grammar' {}
+                when 'role'    {}
+                default { $¢.worry("'has' declaration outside of class") }
+            }
+        }
+        <scoped('has')>
     }
 
     token package_declarator:class {
@@ -1728,7 +1728,7 @@ grammar P6 is STD {
     rule package_def {
         :my $longname;
         :my $*IN_DECL = 'package';
-	:my $*HAS_SELF = '';
+        :my $*HAS_SELF = '';
         :my $*DECLARAND;
         :my $*NEWPKG;
         :my $*NEWLEX;
@@ -1882,15 +1882,15 @@ grammar P6 is STD {
         :temp $*CURLEX;
         :my $*IN_DECL = $d;
         :my $*DECLARAND;
-	:my $*HAS_SELF = $d eq 'submethod' ?? 'partial' !! 'complete';
-	{
-	    given $*PKGDECL {
-		when 'class'   {} # XXX to be replaced by MOP queries
-		when 'grammar' {}
-		when 'role'    {}
-		default {$¢.worry("'$d' declaration outside of class") unless $*SCOPE }
-	    }
-	}
+        :my $*HAS_SELF = $d eq 'submethod' ?? 'partial' !! 'complete';
+        {
+            given $*PKGDECL {
+                when 'class'   {} # XXX to be replaced by MOP queries
+                when 'grammar' {}
+                when 'role'    {}
+                default {$¢.worry("'$d' declaration outside of class") unless $*SCOPE }
+            }
+        }
         <.newlex(1)>
         [
             [
@@ -1920,14 +1920,14 @@ grammar P6 is STD {
         :my $*IN_DECL = $d;
         :temp %*RX;
         :my $*DECLARAND;
-	:my $*HAS_SELF = 'complete';
-	{
-	    given $*PKGDECL {
-		when 'grammar' {} # XXX to be replaced by MOP queries
-		when 'role'    {}
-		default { $¢.worry("'$d' declaration outside of grammar") unless $*SCOPE }
-	    }
-	}
+        :my $*HAS_SELF = 'complete';
+        {
+            given $*PKGDECL {
+                when 'grammar' {} # XXX to be replaced by MOP queries
+                when 'role'    {}
+                default { $¢.worry("'$d' declaration outside of grammar") unless $*SCOPE }
+            }
+        }
         { %*RX<s> = $s; %*RX<r> = $r; }
         [
             [ '&'<deflongname>? | <deflongname> ]?
@@ -3071,9 +3071,9 @@ grammar P6 is STD {
         { <sym> » <O(|%term)> }
 
     token term:sym<self> {
-	<sym> »
-	{ $*HAS_SELF || $¢.sorry("'self' used where no object is available") }
-	<O(|%term)>
+        <sym> »
+        { $*HAS_SELF || $¢.sorry("'self' used where no object is available") }
+        <O(|%term)>
     }
 
     token term:sym<defer>
@@ -5873,18 +5873,18 @@ method check_variable ($variable) {
                 $*CURLEX{$name}<used>++;
             }
         }
-	when '!' {
-	    if not $*HAS_SELF { # XXX to be replaced by MOP queries
-		$variable.sorry("Variable $name used where no 'self' is available");
-	    }
-	}
-	when '.' {
-	    given $*HAS_SELF { # XXX to be replaced by MOP queries
-		when 'complete' {}
-		when 'partial' { $variable.sorry("Virtual call $name may not be used on partially constructed object"); }
-		default { $variable.sorry("Variable $name used where no 'self' is available"); }
-	    }
-	}
+        when '!' {
+            if not $*HAS_SELF { # XXX to be replaced by MOP queries
+                $variable.sorry("Variable $name used where no 'self' is available");
+            }
+        }
+        when '.' {
+            given $*HAS_SELF { # XXX to be replaced by MOP queries
+                when 'complete' {}
+                when 'partial' { $variable.sorry("Virtual call $name may not be used on partially constructed object"); }
+                default { $variable.sorry("Variable $name used where no 'self' is available"); }
+            }
+        }
         when '^' {
             my $*MULTINESS = 'multi';
             $variable.add_placeholder($name);
