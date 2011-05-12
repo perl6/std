@@ -4779,7 +4779,7 @@ grammar Regex is STD {
                     }
                 }
             || $$ <.panic: "Regex not terminated">
-            || \W <.sorry: "Unrecognized regex metacharacter (must be quoted to match literally)">
+            || (\W) <.sorry: "Unrecognized regex metacharacter " ~ $0.Str ~ " (must be quoted to match literally)">
             || <.panic: "Regex not terminated">
             ]
         ]
