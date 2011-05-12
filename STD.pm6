@@ -5838,8 +5838,10 @@ method add_placeholder($name) {
 
 method check_variable ($variable) {
     my $name = $variable.Str;
+    my $here = self.cursor($variable.from);
     self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
+    ($first,$twigil) = ($twigil, '') if $first eq '';
     given $twigil {
         when '' {
             my $ok = 0;
@@ -5852,21 +5854,21 @@ method check_variable ($variable) {
                 my $id = $name;
                 $id ~~ s/^\W\W?//;
                 if $name eq '@_' or $name eq '%_' {
-                    $variable.add_placeholder($name);
+                    $here.add_placeholder($name);
                 }
                 else {  # guaranteed fail now
                     if my $scope = @*MEMOS[$variable.from]<declend> {
-                        return $variable.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+                        return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
                     }
                     elsif $id !~~ /\:\:/ {
                         if self.is_known('@' ~ $id) {
-                            return $variable.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+                            return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
                         }
                         elsif self.is_known('%' ~ $id) {
-                            return $variable.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+                            return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
                         }
                     }
-                    return $variable.sorry("Variable $name is not predeclared");
+                    return $here.sorry("Variable $name is not predeclared");
                 }
             }
             elsif $*CURLEX{$name} {
@@ -5875,23 +5877,23 @@ method check_variable ($variable) {
         }
         when '!' {
             if not $*HAS_SELF { # XXX to be replaced by MOP queries
-                $variable.sorry("Variable $name used where no 'self' is available");
+                $here.sorry("Variable $name used where no 'self' is available");
             }
         }
         when '.' {
             given $*HAS_SELF { # XXX to be replaced by MOP queries
                 when 'complete' {}
-                when 'partial' { $variable.sorry("Virtual call $name may not be used on partially constructed object"); }
-                default { $variable.sorry("Variable $name used where no 'self' is available"); }
+                when 'partial' { $here.sorry("Virtual call $name may not be used on partially constructed object"); }
+                default { $here.sorry("Variable $name used where no 'self' is available"); }
             }
         }
         when '^' {
             my $*MULTINESS = 'multi';
-            $variable.add_placeholder($name);
+            $here.add_placeholder($name);
         }
         when ':' {
             my $*MULTINESS = 'multi';
-            $variable.add_placeholder($name);
+            $here.add_placeholder($name);
         }
         when '~' {
             return %*LANG.{substr($name,2)};
@@ -5899,11 +5901,11 @@ method check_variable ($variable) {
         when '?' {
             if $name ~~ /\:\:/ {
                 my ($first) = self.canonicalize_name($name);
-                $variable.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
+                $here.worry("Unrecognized variable: $name") unless $first ~~ /^(CALLER|CONTEXT|OUTER|MY|SETTING|CORE)\:\:$/;
             }
             else {
                 # search upward through languages to STD
-                my $v = $variable.lookup_compiler_var($name);
+                my $v = $here.lookup_compiler_var($name);
                 $variable.<value> = $v if $v;
             }
         }
