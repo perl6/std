@@ -348,6 +348,12 @@ method peek_delimiters {
     elsif $char ~~ /^\w$/ {
         self.panic("Alphanumeric character is not allowed as delimiter");
     }
+    elsif $char eq '' {
+        self.panic("No delimiter found");
+    }
+    elsif not ord $char {
+        self.panic("Null character is not allowed as delimiter");
+    }
     elsif %STD::close2open{$char} {
         self.panic("Use of a closing delimiter for an opener is reserved");
     }
