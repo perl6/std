@@ -1883,14 +1883,6 @@ grammar P6 is STD {
         :my $*IN_DECL = $d;
         :my $*DECLARAND;
         :my $*HAS_SELF = $d eq 'submethod' ?? 'partial' !! 'complete';
-        {
-            given $*PKGDECL {
-                when 'class'   {} # XXX to be replaced by MOP queries
-                when 'grammar' {}
-                when 'role'    {}
-                default {$¢.worry("'$d' declaration outside of class") unless $*SCOPE }
-            }
-        }
         <.newlex(1)>
         [
             [
@@ -1907,6 +1899,14 @@ grammar P6 is STD {
                 <trait>*
             | <?>
             ]
+            {
+                given $*PKGDECL {
+                    when 'class'   {} # XXX to be replaced by MOP queries
+                    when 'grammar' {}
+                    when 'role'    {}
+                    default {$¢.worry("'$d' declaration outside of class") if ($*SCOPE || 'has') eq 'has' && $<longname> }
+                }
+            }
             { $*IN_DECL = ''; }
             <blockoid>:!s
             <.checkyada>
@@ -1921,19 +1921,19 @@ grammar P6 is STD {
         :temp %*RX;
         :my $*DECLARAND;
         :my $*HAS_SELF = 'complete';
-        {
-            given $*PKGDECL {
-                when 'grammar' {} # XXX to be replaced by MOP queries
-                when 'role'    {}
-                default { $¢.worry("'$d' declaration outside of grammar") unless $*SCOPE }
-            }
-        }
         { %*RX<s> = $s; %*RX<r> = $r; }
         [
             [ '&'<deflongname>? | <deflongname> ]?
             <.newlex(1)>
             [ [ ':'?'(' <signature(1)> ')'] | <trait> ]*
             [ <!before '{'> <.panic: "Malformed block"> ]?
+            {
+                given $*PKGDECL {
+                    when 'grammar' {} # XXX to be replaced by MOP queries
+                    when 'role'    {}
+                    default { $¢.worry("'$d' declaration outside of grammar") if ($*SCOPE || 'has') eq 'has' && $<deflongname>[0] }
+                }
+            }
             { $*IN_DECL = ''; }
             <.finishlex>
             <regex_block>:!s
@@ -5848,6 +5848,7 @@ method check_variable ($variable) {
             $ok ||= $*IN_DECL;
             $ok ||= $sigil eq '&';
             $ok ||= $first lt 'A';
+            $ok ||= $first eq '¢';
             $ok ||= self.is_known($name);
             $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
             if not $ok {
