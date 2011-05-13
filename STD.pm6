@@ -167,7 +167,7 @@ token category:sigil { <sym> }
 proto token sigil {*}
 
 token category:twigil { <sym> }
-proto token twigil (:$*endsym = 'begid') {*}
+proto token twigil is endsym<begid> {*}
 
 token category:special_variable { <sym> }
 proto token special_variable {*}
@@ -203,7 +203,7 @@ token category:postfix { <sym> }
 proto token postfix is unary is defequiv(%autoincrement) {*}
 
 token category:dotty { <sym> }
-proto token dotty (:$*endsym = 'unspacey') {*}
+proto token dotty is endsym<unspacey> {*}
 
 token category:circumfix { <sym> }
 proto token circumfix {*}
@@ -215,37 +215,37 @@ token category:quote_mod { <sym> }
 proto token quote_mod {*}
 
 token category:trait_mod { <sym> }
-proto token trait_mod (:$*endsym = 'keyspace') {*}
+proto token trait_mod is endsym<keyspace> {*}
 
 token category:type_declarator { <sym> }
-proto token type_declarator (:$*endsym = 'keyspace') {*}
+proto token type_declarator is endsym<keyspace> {*}
 
 token category:scope_declarator { <sym> }
-proto token scope_declarator (:$*endsym = 'nofun') {*}
+proto token scope_declarator is endsym<nofun> {*}
 
 token category:package_declarator { <sym> }
-proto token package_declarator (:$*endsym = 'keyspace') {*}
+proto token package_declarator is endsym<keyspace> {*}
 
 token category:multi_declarator { <sym> }
-proto token multi_declarator (:$*endsym = 'keyspace') {*}
+proto token multi_declarator is endsym<keyspace> {*}
 
 token category:routine_declarator { <sym> }
-proto token routine_declarator (:$*endsym = 'nofun') {*}
+proto token routine_declarator is endsym<nofun> {*}
 
 token category:regex_declarator { <sym> }
-proto token regex_declarator (:$*endsym = 'keyspace') {*}
+proto token regex_declarator is endsym<keyspace> {*}
 
 token category:statement_prefix { <sym> }
 proto rule  statement_prefix () {*}
 
 token category:statement_control { <sym> }
-proto rule  statement_control (:$*endsym = 'keyspace') {*}
+proto rule  statement_control is endsym<keyspace> {*}
 
 token category:statement_mod_cond { <sym> }
-proto rule  statement_mod_cond (:$*endsym = 'nofun') {*}
+proto rule  statement_mod_cond is endsym<nofun> {*}
 
 token category:statement_mod_loop { <sym> }
-proto rule  statement_mod_loop (:$*endsym = 'nofun') {*}
+proto rule  statement_mod_loop is endsym<nofun> {*}
 
 token category:infix_prefix_meta_operator { <sym> }
 proto token infix_prefix_meta_operator is binary {*}

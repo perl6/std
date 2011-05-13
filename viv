@@ -64,7 +64,7 @@ my @did_ws;
 my @context;
 $::MULTINESS = '';
 # XXX STD Global trait tables simulate inheritance
-local $::PROTO = {};
+local $::PROTOENDSYM = {};
 local $::PROTOSIG = {};
 
 BEGIN {
@@ -2077,8 +2077,14 @@ TEXT
 	    re => $self->{regex_block}{nibble}{"."}->re_ast);
     }
     sub protoregex {  my $self = shift;  my $name = shift;
-	$::PROTO->{$name} = 1;
 	$::RETREE->{$name . ":*"} = { dic => $::PKG };
+	for my $t ($self->kids("trait")) {
+	    if ($t->{trait_mod}{longname} &&
+		$t->{trait_mod}{longname}->Str eq 'endsym') {
+		    $::PROTOENDSYM->{$name} =
+			$t->{trait_mod}{circumfix}[0]{nibble}->Str;
+	    }
+	}
 	$::PROTOSIG->{$name} = ($self->kids("signature"))[0];
 	<<EOT;
 sub ${name}__PEEK { \$_[0]->_AUTOLEXpeek('$name:*',\$retree); }
@@ -2146,7 +2152,7 @@ EOT
 	my $p5name = $name;
 	my %adv = $self->{deflongname}[0]->adverbs;
 	local $::SYM = $adv{sym};
-	local $::ENDSYM;
+	local $::ENDSYM = $::PROTOENDSYM->{$name};
 	local $::REV = '';
 	local $::PLURALITY = 1;
 	local @::DECL;
@@ -2158,8 +2164,7 @@ EOT
 
 	my $spcsig = $self->kids('signature') ?
 	    (($self->kids('signature'))[0])->p5 : '';
-	my $defsig = $::PROTO && $::PROTOSIG->{$name}
-	    ? $::PROTOSIG->{$name}->p5 : '';
+	my $defsig = $::PROTOSIG->{$name} ? $::PROTOSIG->{$name}->p5 : '';
 	if (defined $adv{sym}) {
 	    $p5name = sprintf "%s__S_%03d%s", $name, $::MULTIRX_SEQUENCE++,
 		::mangle(split " ", $adv{sym});
