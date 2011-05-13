@@ -341,7 +341,7 @@ token morename {
 method peek_delimiters {
     my $pos = self.pos;
     my $startpos = $pos;
-    my $char = substr($*ORIG,$pos++,1);
+    my $char = substr(self.orig,$pos++,1);
     if $char ~~ /^\s$/ {
         self.panic("Whitespace character is not allowed as delimiter"); # "can't happen"
     }
@@ -359,7 +359,7 @@ method peek_delimiters {
     if not defined $rightbrack {
         return $char, $char;
     }
-    while substr($*ORIG,$pos,1) eq $char {
+    while substr(self.orig,$pos,1) eq $char {
         $pos++;
     }
     my $len = $pos - $startpos;
@@ -454,7 +454,7 @@ token nibbler {
                         }
         || .
                         {
-                            my $ch = substr($*ORIG, $¢.pos-1, 1);
+                            my $ch = substr(self.orig, $¢.pos-1, 1);
                             $text ~= $ch;
                             $to = $¢.pos;
                             if $ch ~~ "\n" {
@@ -2117,7 +2117,7 @@ grammar P6 is STD {
     token special_variable:sym<$!{ }> {
         '$!' '{' ~ '}' [<identifier> | <statementlist>]
         {
-            my $all = substr($*ORIG, self.pos, $¢.pos - self.pos);
+            my $all = substr(self.orig, self.pos, $¢.pos - self.pos);
             my ($inside) = $all ~~ m!^...\s*(.*?)\s*.$!;
             $¢.obs("Perl 5's $all construct", "a smartmatch like \$! ~~ $inside" );
         }
@@ -2457,7 +2457,7 @@ grammar P6 is STD {
         :dba('new name to be defined')
         <name>
         [
-        | <colonpair>+ { $¢.add_categorical(substr($*ORIG, self.pos, $¢.pos - self.pos)) if $*IN_DECL; }
+        | <colonpair>+ { $¢.add_categorical(substr(self.orig, self.pos, $¢.pos - self.pos)) if $*IN_DECL; }
         | { $¢.add_routine($<name>.Str) if $*IN_DECL; }
         ]
     }
@@ -2756,7 +2756,7 @@ grammar P6 is STD {
             $*LEFTSIGIL = '@';
             if $lexsig {
                 $*CURLEX.<$?SIGNATURE> ~= '|' if $lexsig > 1;
-                $*CURLEX.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
+                $*CURLEX.<$?SIGNATURE> ~= '(' ~ substr(self.orig, $startpos, $¢.pos - $startpos) ~ ')';
                 $*CURLEX.<!NEEDSIG>:delete;
             }
         }
@@ -3982,7 +3982,7 @@ grammar P6 is STD {
             $¢.check_nodecl($name) if $isname;
         }
         <args($isname)>
-        { self.add_mystery($<identifier>,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
+        { self.add_mystery($<identifier>,$pos,substr(self.orig,$pos,1)) unless $<args><invocant>; }
         {
             if $*BORG and $*BORG.<block> {
                 if not $*BORG.<name> {
@@ -4748,7 +4748,7 @@ grammar Regex is STD {
         <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
     }
 
-    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr($::ORIG,$¢.pos,1) ~ "') or use a backslashed form like \\x" ~ sprintf('%02x', ord(substr($::ORIG,$¢.pos,1)))> }  # no unspace in regexen
+    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr(self.orig,$¢.pos,1) ~ "') or use a backslashed form like \\x" ~ sprintf('%02x', ord(substr(self.orig,$¢.pos,1)))> }  # no unspace in regexen
 
     rule nibbler {
         :temp %*RX;
@@ -4770,7 +4770,7 @@ grammar Regex is STD {
             [
             || <?before <stopper> | <[&|~]> > <.panic: "Null pattern not allowed">
             || <?before <[ \] \) \> ]> > {
-                    my $c = substr($*ORIG,$¢.pos,1);
+                    my $c = substr(self.orig,$¢.pos,1);
                     if $*GOAL eq $c {
                         $¢.panic("Null pattern not allowed");
                     }
@@ -4941,7 +4941,7 @@ grammar Regex is STD {
     token metachar:sym<" "> { <?before '"'> [:lang(%*LANG<MAIN>) <quote>] }
 
     token metachar:var {
-        :my $*QSIGIL ::= substr($*ORIG,self.pos,1);
+        :my $*QSIGIL ::= substr(self.orig,self.pos,1);
         <!before '$$'>
         <?before <sigil>>
         [:lang(%*LANG<MAIN>) <variable> ]
@@ -5157,7 +5157,7 @@ grammar Regex is STD {
     token quantifier:sym<{N,M}> {
         {} '{' (\d+) (','?) (\d*) '}'
         {
-            my $all = substr($*ORIG, self.pos, $¢.pos - self.pos);
+            my $all = substr(self.orig, self.pos, $¢.pos - self.pos);
             my $repl = chars($1.Str) ??
                 ($0.Str ~ '..' ~ ($2.Str || '*')) !! $0.Str;
             $¢.sorryobs($all ~ " as general quantifier", 'X**' ~ $repl);
@@ -6000,7 +6000,7 @@ method panic (Str $s) {
 
     $m ~= $s;
 
-    if substr($*ORIG,$here.pos,1) ~~ /\)|\]|\}|\»/ {
+    if substr(self.orig,$here.pos,1) ~~ /\)|\]|\}|\»/ {
         $m ~~ s|Confused|Unexpected closing bracket| and $highvalid = False;
     }
 

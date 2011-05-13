@@ -129,7 +129,7 @@ sub pos :lvalue { $_[0]->{_pos} }
 sub chars { $_[0]->{_pos} - ($_[0]->{_from} // $_[0]->{_pos}) }
 sub Str { no warnings; exists $_[0]->{_from} && defined $_[0]->{_pos} ? substr($::ORIG, $_[0]->{_from}, $_[0]->{_pos} - $_[0]->{_from})//'' : '' }
 sub xact { $_[0]->{_xact} // die "internal error: cursor has no xact!!!" }
-sub orig { \$::ORIG }
+sub orig { $::ORIG }
 sub WHAT { ref $_[0] || $_[0] }
 
 sub item { $_[0] }
