@@ -2043,7 +2043,7 @@ grammar P6 is STD {
         || <?{ $*QSIGIL }>
             [
             || <?{ $*QSIGIL eq '$' }> [ [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > || { $<POST> = [] } ]
-            ||                          [<!before '\\'> <POST>]+! <?after <[ \] } > ) ]> > 
+            ||                          [<!before '\\'> <POST>]*! <?after <[ \] } > ) ]> > 
             || { $*VAR = 0; }
             ]
         || <!{ $*QSIGIL }>
