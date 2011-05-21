@@ -817,7 +817,7 @@ token rad_number {
     {}           # don't recurse in lexer
     :dba('number in radix notation')
     [
-    || '<'
+    || '<' :s
             [
             | $<coeff> = [                '.' <frac=.alnumint> ]
             | $<coeff> = [<int=.alnumint> '.' <frac=.alnumint> ]
