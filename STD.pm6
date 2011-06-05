@@ -583,7 +583,7 @@ token circumfix:sym<« »>   { :dba('shell-quote words') '«' ~ '»' <nibble($¢
 token circumfix:sym«<< >>» { :dba('shell-quote words') '<<' ~ '>>' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> }
 token circumfix:sym«< >»   { :dba('quote words') '<' ~ '>'
     [
-        [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines')> ]?  # XXX fake out gimme5
+        [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines (or add whitespace to suppress warning)')> ]?  # XXX fake out gimme5
         [ <?before '>' > <.obs('<>', "lines() to read input,\n  or ('') to represent the null string,\n  or () to represent Nil")> ]?
         <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))>
     ]
