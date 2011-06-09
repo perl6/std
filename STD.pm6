@@ -1984,11 +1984,11 @@ grammar P6 is STD {
         }
     }
     token trait_mod:hides {
-        <sym>:s <module_name>
+        <sym>:s <typename>
     }
     token trait_mod:does {
         :my $*PKGDECL ::= 'role';
-        <sym>:s <module_name>
+        <sym>:s <typename>
     }
     token trait_mod:will {
         <sym>:s <identifier> <pblock>
