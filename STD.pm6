@@ -187,8 +187,8 @@ proto token value {*}
 token category:term { <sym> }
 proto token term {*}
 
-token category:strtonum { <sym> }
-proto token strtonum {*}
+token category:numeric { <sym> }
+proto token numeric {*}
 
 token category:quote { <sym> }
 proto token quote () {*}
@@ -2516,11 +2516,10 @@ grammar P6 is STD {
         ]
     }
 
-    # <strtonum> is (we hope) used only by Str --> Num conversions
-    #  (such as those done dwimmily by quotewords)
-    token strtonum:rational { <[+\-]>?<nu=.integer>'/'<de=.integer> }
-    token strtonum:complex { [<[+\-]>?<re=.number>]? <[+\-]><im=.number>'\\'?'i' }
-    token strtonum:number { <[+\-]>?<number> }
+    # <numeric> is used by Str.Numeric conversions such as those done by val()
+    token numeric:rational { <[+\-]>?<nu=.integer>'/'<de=.integer> }
+    token numeric:complex { [<[+\-]>?<re=.number>]? <[+\-]><im=.number>'\\'?'i' }
+    token numeric:number { <[+\-]>?<number> }
 
     ##########
     # Quotes #
