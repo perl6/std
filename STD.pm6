@@ -3970,7 +3970,9 @@ grammar P6 is STD {
         :defined, :eval, :exp, :glob, :lc, :lcfirst, :log, :lstat, :mkdir,
         :ord, :readlink, :readpipe, :require, :reverse, :rmdir, :sin,
         :split, :sqrt, :stat, :uc, :ucfirst, :unlink,
-        :WHAT, :WHICH, :WHERE, :HOW, :WHENCE, :VAR,
+        :WHAT(2), :WHICH(2), :WHERE(2), :HOW(2), :WHENCE(2), :WHO(2),
+        :VAR(2),
+        :any(2), :all(2), :none(2), :one(2),
     );
 
     # force identifier(), identifier.(), etc. to be a function call always
@@ -4001,7 +4003,14 @@ grammar P6 is STD {
                 $ok = 1 if $al and $al.from != $al.to;
                 $ok = 1 if $<args><semiarglist>;
                 if not $ok {
-                    $<identifier>.worryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
+                    given +%deftrap{$name} {
+                        when 1 {        # probably misused P5ism
+                            $<identifier>.sorryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
+                        }
+                        when 2 {        # probably misused P6ism
+                            $<identifier>.sorry("The '$name' listop may not be called without arguments (please use () or whitespace to clarify)");
+                        }
+                    }
                 }
             }
         }
