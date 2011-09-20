@@ -4826,9 +4826,13 @@ grammar Regex is STD {
         <!stopper>
         <!regex_infix>
         <atom>
-        [ <normspace>? <quantifier> ]?
+        [ <normspace>? <quantifier> <normspace>? <separator>? ]?
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Cannot quantify zero-width atom">
+    }
+
+    token separator {
+        '%' <normspace>? <quantified_atom>
     }
 
     token atom {
@@ -5151,7 +5155,7 @@ grammar Regex is STD {
         | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
         | (\d+) [ '..' [ (\d+) { $¢.panic("Empty range") if $0.Str > $1[0].Str } | '*' | <.panic: "Malformed range"> ] ]?
         | <embeddedblock>
-        | <quantified_atom>
+        | <quantified_atom> <.worryobs("atom ** " ~ $<quantified_atom>.Str ~ " as separator", "atom+ % " ~ $<quantified_atom>.Str, "nowadays")>
         ]
     }
 
