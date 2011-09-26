@@ -4833,7 +4833,7 @@ grammar Regex is STD {
     }
 
     token separator {
-        '%' <normspace>? <quantified_atom>
+        '%''%'? <normspace>? <quantified_atom>
     }
 
     token atom {
