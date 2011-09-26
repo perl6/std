@@ -3268,7 +3268,7 @@ grammar P6 is STD {
             ]
             ']' ['«'|<?>]
         )
-        { $op = $<s><op>; }
+        { $op = $<s><op>; @*MEMOS[$¢.pos]<listop> = 1; }
 
         <.can_meta($op, "reduce with")>
 
@@ -4027,7 +4027,8 @@ grammar P6 is STD {
     #    | :dba('argument list') '.(' ~ ')' <semiarglist>
         | :dba('argument list') '(' ~ ')' <semiarglist>
         | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist>
-        |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
+        |  { $listopish = 1; @*MEMOS[$¢.pos]<listop> = 1; }
+            [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
         ]
         $<invocant> = {$*INVOCANT_IS}
 
@@ -6054,6 +6055,9 @@ method panic (Str $s) {
 
             if self.lineof($startpos) != self.lineof($endpos) {
                 $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
+            }
+            elsif @*MEMOS[$here.pos]<listop> {
+                $m ~~ s|Confused|Two terms in a row (listop with args requires whitespace or parens)|;
             }
             elsif @*MEMOS[$here.pos - 1]<baremeth> {
                 $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
