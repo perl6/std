@@ -31,6 +31,7 @@ my class CallFrame { }	# or is this a role?
 my class P6opaque { }
 my class Mu { }
 my class Any { }
+my class Cool { }
 my class Junction { }
 my class junction { }
 my class Whatever { }
@@ -74,6 +75,7 @@ my class Method { }
 my class Submethod { }
 my class Regex { }
 my class Multi { }
+my class Attribute { }
 
 my role Stringy { }
 my class Str { }
@@ -186,6 +188,7 @@ my class Date { }
 my class DateTime { }
 
 my class IO { }
+my class Path { }
 
 my class KitchenSink { }
 
@@ -237,12 +240,13 @@ my proto hyper {*}
 
 my proto cat {*}
 my proto classify {*}
+my proto categorize {*}
 my proto quotemeta {*}
 my proto chr {*}
 my proto ord {*}
-my proto p5chop {*}
+my proto chrs {*}
+my proto ords {*}
 my proto chop {*}
-my proto p5chomp {*}
 my proto chomp {*}
 my proto trim {*}
 my proto trim-leading {*}
@@ -274,6 +278,7 @@ my proto bytes {*}
 
 my proto say {*}
 my proto print {*}
+my proto gist {*}
 my proto open {*}
 my proto close {*}
 my proto printf {*}
@@ -381,12 +386,14 @@ my proto gethost {*}
 my proto getpw {*}
 my proto chroot {*}
 my proto getlogin {*}
+my proto shell {*}
 my proto run {*}
 my proto runinstead {*}
 my proto fork {*}
 my proto wait {*}
 my proto kill {*}
 my proto sleep {*}
+my proto dir {*}
 
 my proto postfix:<i> ($x) {*}
 my proto infix:<.> ($x,$y) {*}
