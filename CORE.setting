@@ -74,7 +74,6 @@ my class Macro { }
 my class Method { }
 my class Submethod { }
 my class Regex { }
-my class Multi { }
 my class Attribute { }
 
 my role Stringy { }
