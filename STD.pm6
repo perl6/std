@@ -1500,7 +1500,7 @@ grammar P6 is STD {
                 <e3=.EXPR>?
             ')'||<.panic: "Malformed loop spec">]
             [ <?before '{' > <.sorry: "Whitespace required before block"> ]?
-        )? <.ws>
+        )? :s
         <block>
     }
 
