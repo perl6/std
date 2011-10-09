@@ -4001,6 +4001,7 @@ grammar P6 is STD {
             if %deftrap{$name} {
                 my $al = $<args><arglist>[0];
                 my $ok = 0;
+                $ok = 1 if $isname;
                 $ok = 1 if $al and $al.from != $al.to;
                 $ok = 1 if $<args><semiarglist>;
                 if not $ok {
