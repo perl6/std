@@ -5092,7 +5092,7 @@ grammar Regex is STD {
     token cclass_elem:sym<[ ]> {
         :my $*CCSTATE = '';
         :dba('character class element')
-        <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
+        "[" ~ "]" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc).unbalanced("]"))>
         <.normspace>?
     }
 
