@@ -2929,7 +2929,7 @@ grammar P6 is STD {
                 | <named_param> { $quant = ''; $kind = '*'; }
                 ]
                 [
-                | '?'           { $quant = '?'; $kind = '?' }
+                | '?'           { $quant = '?'; $kind = '?' if $kind eq '!' }
                 | '!'           { $quant = '!'; $kind //= '!' }
                 | <?>
                 ]
@@ -2945,7 +2945,7 @@ grammar P6 is STD {
             | <named_param> { $quant = ''; $kind = '*'; }
             ]
             [
-            | '?'           { $quant = '?'; $kind = '?' }
+            | '?'           { $quant = '?'; $kind = '?' if $kind eq '!' }
             | '!'           { $quant = '!'; $kind //= '!' }
             | <?>
             ]
