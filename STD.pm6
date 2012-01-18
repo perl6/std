@@ -1802,9 +1802,9 @@ grammar P6 is STD {
 
     token declarator {
         [
-        | <variable_declarator>
+        | <variable_declarator> <initializer>?
             [ <?before <.ws>','<.ws> { @*MEMOS[$¢.pos]<declend> = $*SCOPE; }> ]?
-        | '(' ~ ')' <signature> <trait>*
+        | '(' ~ ')' <signature> <trait>* <initializer>?
         | <routine_declarator>
         | <regex_declarator>
         | <type_declarator>
@@ -2811,7 +2811,7 @@ grammar P6 is STD {
         <trait>*
 
         [
-        || <?before '='>
+        || <initializer>
         || <?before <-[\n=]>*'='> <.panic: "Malformed constant"> # probable initializer later
         || <.sorry: "Missing initializer on constant declaration">
         ]
@@ -2819,6 +2819,9 @@ grammar P6 is STD {
         <.getdecl>
     }
 
+    token initializer {
+        <?before '=' | '.=' | ':=' | '::=' > <infix> <.ws> <EXPR($<infix><O><prec>)>
+    }
 
     token type_constraint {
         :my $*IN_DECL = '';
@@ -4915,8 +4918,8 @@ grammar Regex is STD {
     token metachar:sym<(?: )> { '(?:' <.obs("(?: ... ) for grouping", "[ ... ]")> }
     token metachar:sym<(?= )> { '(?:' <.obs("(?= ... ) for lookahead", "<?before ... >")> }
     token metachar:sym<(?! )> { '(?:' <.obs("(?! ... ) for lookahead", "<!before ... >")> }
-    token metachar:sym<(?<= )> { '(?:' <.obs("(?<= ... ) for lookbehind", "<?after ... >")> }
-    token metachar:sym<(?<! )> { '(?:' <.obs("(?<! ... ) for lookbehind", "<!after ... >")> }
+    token metachar:sym<(?\<= )> { '(?:' <.obs("(?<= ... ) for lookbehind", "<?after ... >")> }
+    token metachar:sym<(?\<! )> { '(?:' <.obs("(?<! ... ) for lookbehind", "<!after ... >")> }
     token metachar:sym<( )> {
         :dba("capture parens")
         '(' ~ ')' <nibbler>
