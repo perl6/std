@@ -1801,6 +1801,7 @@ grammar P6 is STD {
     }
 
     token declarator {
+        :my $*LEFTSIGIL = '';
         [
         | <variable_declarator> <initializer>?
             [ <?before <.ws>','<.ws> { @*MEMOS[$¢.pos]<declend> = $*SCOPE; }> ]?
@@ -2820,7 +2821,9 @@ grammar P6 is STD {
     }
 
     token initializer {
-        <?before '=' | '.=' | ':=' | '::=' > <infix> <.ws> <EXPR($<infix><O><prec>)>
+        <?before '=' | '.=' | ':=' | '::=' >
+        <infix> <.ws>
+        <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
     }
 
     token type_constraint {
