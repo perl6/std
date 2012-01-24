@@ -198,7 +198,6 @@ my proto WHICH {*}
 my proto VAR {*}
 my proto WHO {*}
 my proto WHENCE {*}
-my proto new {*}
 my proto fail {*}
 my proto temp {*}
 my proto let {*}

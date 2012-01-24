@@ -1629,13 +1629,14 @@ grammar P6 is STD {
         <.getdecl>
     }
 
-    rule scoped ($*SCOPE) {
+    token scoped ($*SCOPE) {
         :dba('scoped declarator')
+        <.ws>
         [
         | <declarator>
         | <regex_declarator>
         | <package_declarator>
-        | [<typename> ]+
+        | [<typename><.ws>]+
             {
                 my $t = $<typename>;
                 @$t > 1 and $¢.sorry("Multiple prefix constraints not yet supported");
@@ -1643,7 +1644,7 @@ grammar P6 is STD {
             }
             <multi_declarator>
         | <multi_declarator>
-        ]
+        ] <.ws>
         || <?before <[A..Z]>><longname>{
                 my $t = $<longname>.Str;
                 if not $¢.is_known($t) {
@@ -1803,6 +1804,8 @@ grammar P6 is STD {
     token declarator {
         :my $*LEFTSIGIL = '';
         [
+        | '\\' <identifier> <.ws> { $¢.add_name($<identifier>.Str); }
+            [ <initializer> || <.sorry("Term definition requires an initializer")> ]
         | <variable_declarator> <initializer>?
             [ <?before <.ws>','<.ws> { @*MEMOS[$¢.pos]<declend> = $*SCOPE; }> ]?
         | '(' ~ ')' <signature> <trait>* <initializer>?
@@ -2742,8 +2745,8 @@ grammar P6 is STD {
         :my $*SIGNUM = $lexsig;
         <.ws>
         [
-        | '\|' [ <param_var> || <.panic: "\\| signature must contain one variable"> ]
-            <.ws> [ <?before '-->' | ')' | ']' > || <.panic: "\\| signature may contain only a variable"> ]
+        | '\|' [ <identifier> || <.panic: "\\| signature must contain one identifier"> ]
+            <.ws> [ <?before '-->' | ')' | ']' > || <.panic: "\\| signature may contain only an identifier"> ]
         |   [
             | <?before '-->' | ')' | ']' | '{' | ':'\s | ';;' >
             | [ <parameter> || <.panic: "Malformed parameter"> ]
@@ -2802,7 +2805,7 @@ grammar P6 is STD {
         <sym> <.ws>
 
         [
-        | <identifier> { $¢.add_name($<identifier>.Str); }
+        | '\\'? <identifier> { $¢.add_name($<identifier>.Str); }
         | <variable> { $¢.add_variable($<variable>.Str); }
         | <?>
         ]
@@ -2813,7 +2816,6 @@ grammar P6 is STD {
 
         [
         || <initializer>
-        || <?before <-[\n=]>*'='> <.panic: "Malformed constant"> # probable initializer later
         || <.sorry: "Missing initializer on constant declaration">
         ]
 
@@ -2823,7 +2825,16 @@ grammar P6 is STD {
     token initializer {
         <?before '=' | '.=' | ':=' | '::=' >
         <infix> <.ws>
-        <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
+        [
+            :my $infix = $<infix>.Str;
+            [
+            || <?{ $infix eq '=' or $infix eq ':=' or $infix eq '::=' }>
+                [ <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
+                    || <.panic: "Malformed initializer"> ]
+            || <?{ $infix eq '.=' }>
+                [ <dottyopish> || <.panic: "Malformed method call"> ]
+            ]
+        ]
     }
 
     token type_constraint {
@@ -2856,6 +2867,7 @@ grammar P6 is STD {
             [ <named_param> | <param_var> <.ws> ]
             [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
         | <param_var(1)>
+        | '\\' <name=.identifier> { $¢.add_name($<name>.Str); }
         ]
     }
 
@@ -2928,8 +2940,11 @@ grammar P6 is STD {
             [
             | '**' <param_var>   { $quant = '**'; $kind = '*'; }
             | '*' <param_var>   { $quant = '*'; $kind = '*'; }
-            | '|' <param_var>   { $quant = '|'; $kind = '*'; }
-            | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
+            | '|' [ <identifier> { $¢.add_name($<identifier>.Str); } ]?
+                                { $quant = '|'; $kind = '!'; }
+            | '\\' <identifier> { $quant = '\\'; $kind = '!'; $¢.add_name($<identifier>.Str); }
+            | '|' <param_var>   { $quant = '|'; $kind = '!'; } <.worryobs("| with sigil","| without sigil"," nowadays")>
+            | '\\' <param_var>   { $quant = '\\'; $kind = '!'; } <.worryobs("\\ with sigil","\\ without sigil"," nowadays")>
             |   [
                 | <param_var>   { $quant = ''; $kind = '!'; }
                 | <named_param> { $quant = ''; $kind = '*'; }
@@ -2944,8 +2959,11 @@ grammar P6 is STD {
 
         | '**' <param_var>   { $quant = '**'; $kind = '*'; }
         | '*' <param_var>   { $quant = '*'; $kind = '*'; }
-        | '|' <param_var>   { $quant = '|'; $kind = '*'; }
-        | '\\' <param_var>  { $quant = '\\'; $kind = '!'; }
+        | '|' [ <identifier> { $¢.add_name($<identifier>.Str); } ]?
+                            { $quant = '|'; $kind = '!'; }
+        | '\\' <identifier> { $quant = '\\'; $kind = '!'; $¢.add_name($<identifier>.Str); }
+        | '|' <param_var>   { $quant = '|'; $kind = '!'; } <.worryobs("| with sigil","| without sigil"," nowadays")>
+        | '\\' <param_var>   { $quant = '\\'; $kind = '!'; } <.worryobs("\\ with sigil","\\ without sigil"," nowadays")>
         |   [
             | <param_var>   { $quant = ''; $kind = '!'; }
             | <named_param> { $quant = ''; $kind = '*'; }
@@ -2967,11 +2985,11 @@ grammar P6 is STD {
         [
             <default_value> {
                 given $quant {
-                  when '!' { $¢.sorry("Cannot put a default on a required parameter") }
-                  when '*' { $¢.sorry("Cannot put a default on a slurpy parameter") }
+                  when '!'  { $¢.sorry("Cannot put a default on a required parameter") }
+                  when '*'  { $¢.sorry("Cannot put a default on a slurpy parameter") }
                   when '**' { $¢.sorry("Cannot put a default on a slice parameter") }
-                  when '|' { $¢.sorry("Cannot put a default on an slurpy capture parameter") }
-                  when '\\' { $¢.sorry("Cannot put a default on a capture parameter") }
+                  when '\\' { $¢.sorry("Cannot put a default on a parcel parameter") }
+                  when '|'  { $¢.sorry("Cannot put a default on a capture snapshot parameter") }
                 }
                 $kind = '?' if $kind eq '!';
             }
