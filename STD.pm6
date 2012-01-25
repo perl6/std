@@ -217,6 +217,9 @@ proto token quote_mod {*}
 token category:trait_mod { <sym> }
 proto token trait_mod is endsym<keyspace> {*}
 
+token category:initializer { <sym> }
+proto token initializer is endsym<ws> {*}
+
 token category:type_declarator { <sym> }
 proto token type_declarator is endsym<keyspace> {*}
 
@@ -2831,21 +2834,18 @@ grammar P6 is STD {
         <.getdecl>
     }
 
-    token initializer {
-        <?before '=' | '.=' | ':=' | '::=' >
-        <infix> <.ws>
-        [
-            :my $infix = $<infix>.Str;
-            [
-            || <?{ $infix eq '=' }>
-                [ <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
-                    || <.panic: "Malformed initializer"> ]
-            || <?{ $infix eq ':=' or $infix eq '::=' }> [
-                <EXPR(item %list_prefix)> || <.panic: "Malformed binding"> ]
-            || <?{ $infix eq '.=' }>
-                [ <dottyopish> || <.panic: "Malformed mutator method call"> ]
-            ]
-        ]
+    token initializer:sym<=> {
+        <sym> <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
+                                        || <.panic: "Malformed initializer">
+    }
+    token initializer:sym<:=> {
+        <sym> <EXPR(item %list_prefix)> || <.panic: "Malformed binding">
+    }
+    token initializer:sym<::=> {
+        <sym> <EXPR(item %list_prefix)> || <.panic: "Malformed binding">
+    }
+    token initializer:sym<.=> {
+        <sym> <dottyopish>              || <.panic: "Malformed mutator method call">
     }
 
     token type_constraint {
