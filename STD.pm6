@@ -1804,7 +1804,7 @@ grammar P6 is STD {
     token declarator {
         :my $*LEFTSIGIL = '';
         [
-        | '\\' <identifier> <.ws> { $¢.add_name($<identifier>.Str); }
+        | '\\' <defterm> <.ws>
             [ <initializer> || <.sorry("Term definition requires an initializer")> ]
         | <variable_declarator> <initializer>?
             [ <?before <.ws>','<.ws> { @*MEMOS[$¢.pos]<declend> = $*SCOPE; }> ]?
@@ -2463,6 +2463,15 @@ grammar P6 is STD {
 
 
 
+    token defterm {     # XXX this is probably too general
+        :dba('new term to be defined')
+        <identifier>
+        [
+        | <colonpair>+ { $¢.add_categorical(substr(self.orig, self.pos, $¢.pos - self.pos)); }
+        | { $¢.add_name($<identifier>.Str); }
+        ]
+    }
+
     token deflongname {
         :dba('new name to be defined')
         <name>
@@ -2745,7 +2754,7 @@ grammar P6 is STD {
         :my $*SIGNUM = $lexsig;
         <.ws>
         [
-        | '\|' [ <identifier> || <.panic: "\\| signature must contain one identifier"> ]
+        | '\|' [ <defterm> || <.panic: "\\| signature must contain one identifier"> ]
             <.ws> [ <?before '-->' | ')' | ']' > || <.panic: "\\| signature may contain only an identifier"> ]
         |   [
             | <?before '-->' | ')' | ']' | '{' | ':'\s | ';;' >
@@ -2805,7 +2814,7 @@ grammar P6 is STD {
         <sym> <.ws>
 
         [
-        | '\\'? <identifier> { $¢.add_name($<identifier>.Str); }
+        | '\\'? <defterm>
         | <variable> { $¢.add_variable($<variable>.Str); }
         | <?>
         ]
@@ -2940,13 +2949,12 @@ grammar P6 is STD {
                 @t > 1 and $¢.sorry("Multiple prefix constraints not yet supported")
             }
             [
-            | '**' <param_var>   { $quant = '**'; $kind = '*'; }
+            | '**' <param_var>  { $quant = '**'; $kind = '*'; }
             | '*' <param_var>   { $quant = '*'; $kind = '*'; }
-            | '|' [ <identifier> { $¢.add_name($<identifier>.Str); } ]?
-                                { $quant = '|'; $kind = '!'; }
-            | '\\' <identifier> { $quant = '\\'; $kind = '!'; $¢.add_name($<identifier>.Str); }
+            | '|' <defterm>?    { $quant = '|'; $kind = '!'; }
+            | '\\' <defterm>?   { $quant = '\\'; $kind = '!'; }
             | '|' <param_var>   { $quant = '|'; $kind = '!'; } <.worryobs("| with sigil","| without sigil"," nowadays")>
-            | '\\' <param_var>   { $quant = '\\'; $kind = '!'; } <.worryobs("\\ with sigil","\\ without sigil"," nowadays")>
+            | '\\' <param_var>  { $quant = '\\'; $kind = '!'; } <.worryobs("\\ with sigil","\\ without sigil"," nowadays")>
             |   [
                 | <param_var>   { $quant = ''; $kind = '!'; }
                 | <named_param> { $quant = ''; $kind = '*'; }
@@ -2960,11 +2968,10 @@ grammar P6 is STD {
             ]
 
         | '**' <param_var>   { $quant = '**'; $kind = '*'; }
-        | '*' <param_var>   { $quant = '*'; $kind = '*'; }
-        | '|' [ <identifier> { $¢.add_name($<identifier>.Str); } ]?
-                            { $quant = '|'; $kind = '!'; }
-        | '\\' <identifier> { $quant = '\\'; $kind = '!'; $¢.add_name($<identifier>.Str); }
-        | '|' <param_var>   { $quant = '|'; $kind = '!'; } <.worryobs("| with sigil","| without sigil"," nowadays")>
+        | '*' <param_var>    { $quant = '*'; $kind = '*'; }
+        | '|' <defterm>?     { $quant = '|'; $kind = '!'; }
+        | '\\' <defterm>?    { $quant = '\\'; $kind = '!'; }
+        | '|' <param_var>    { $quant = '|'; $kind = '!'; } <.worryobs("| with sigil","| without sigil"," nowadays")>
         | '\\' <param_var>   { $quant = '\\'; $kind = '!'; } <.worryobs("\\ with sigil","\\ without sigil"," nowadays")>
         |   [
             | <param_var>   { $quant = ''; $kind = '!'; }
