@@ -2872,14 +2872,22 @@ grammar P6 is STD {
 
     token named_param {
         :my $*GOAL ::= ')';
+        :dba('named parameter')
         ':'
         [
-        | <name=.identifier> '(' <.ws>
-            [ <named_param> | <param_var> <.ws> ]
-            [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
+        | <name=.identifier> '(' ~ ')' <named_param_term>
         | <param_var(1)>
-        | '\\' <name=.identifier> { $¢.add_name($<name>.Str); }
+        | '\\' <defterm>
         ]
+    }
+
+    token named_param_term {
+        <.ws>
+        [
+        | <named_param>
+        | <param_var>
+        | '\\' <defterm>
+        ] <.ws>
     }
 
     token param_var($named = 0) {
