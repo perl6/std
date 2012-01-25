@@ -2828,11 +2828,13 @@ grammar P6 is STD {
         [
             :my $infix = $<infix>.Str;
             [
-            || <?{ $infix eq '=' or $infix eq ':=' or $infix eq '::=' }>
+            || <?{ $infix eq '=' }>
                 [ <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
                     || <.panic: "Malformed initializer"> ]
+            || <?{ $infix eq ':=' or $infix eq '::=' }> [
+                <EXPR(item %list_prefix)> || <.panic: "Malformed binding"> ]
             || <?{ $infix eq '.=' }>
-                [ <dottyopish> || <.panic: "Malformed method call"> ]
+                [ <dottyopish> || <.panic: "Malformed mutator method call"> ]
             ]
         ]
     }
