@@ -298,6 +298,16 @@ token twigil:sym<~> { <sym> }
 # overridden in subgrammars
 token stopper { <!> }
 
+regex liststopper {
+    [
+    | <stdstopper>
+    | '==>'
+    | '==>>'
+    | '<=='
+    | '<<=='
+    ]
+}
+
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
     :temp $*STUB = return self if @*MEMOS[self.pos]<endstmt> :exists;
@@ -3322,7 +3332,7 @@ grammar P6 is STD {
         <O($op.Opairs, |%list_prefix, assoc => 'unary', uassoc => 'left')>
         { $<sym> = $<s>.Str; }
 
-        [ <?before '('> || <?before \s+ [ <?stdstopper> { $<O><term> = 1 } ]? > || { $<O><term> = 1 } ]
+        [ <?before '('> || <?before \s+ [ <?liststopper> { $<O><term> = 1 } ]? > || { $<O><term> = 1 } ]
     }
 
     token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
@@ -4800,7 +4810,7 @@ grammar Regex is STD {
     proto token regex_infix {*}
 
     # no such thing as ignored whitespace in a normal regex
-    token ws { { note 'HUH?' } <?> }
+    token ws { <?> }
 
     token normspace {
         <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
