@@ -2410,13 +2410,13 @@ grammar P6 is STD {
 
     token desigilname {
         [
-        | <?before '$' >
+        | <?before <sigil> <sigil> > <VAR=variable> 
+        | <?before <sigil> >
             [ <?{ $*IN_DECL }> <.panic: "Cannot declare an indirect variable name"> ]?
             <variable> {
                 $*VAR = $<variable>;
-                self.check_variable($*VAR) if substr($*VAR,1,1) ne '$';
+                self.check_variable($*VAR);
             }
-        | <?before <[\@\%\&]> <sigil>* \w > <.panic: "Invalid hard reference syntax">
         | <longname>
         ]
     }
@@ -4800,7 +4800,7 @@ grammar Regex is STD {
     proto token regex_infix {*}
 
     # no such thing as ignored whitespace in a normal regex
-    token ws { <?> }
+    token ws { { note 'HUH?' } <?> }
 
     token normspace {
         <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
