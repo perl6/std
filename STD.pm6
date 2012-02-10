@@ -2049,8 +2049,8 @@ grammar P6 is STD {
         :my $*VAR;
         :dba('prefix or term')
         [
-        | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
-            [ <?{ $<term> }> || <term> || <.panic("Prefix requires an argument")> ]
+        | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1].dump; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
+            [ <?{ $<term> }> || <term> ||  <.panic("Prefix requires an argument")> ]
         | <term>
         ]
 
@@ -3306,7 +3306,7 @@ grammar P6 is STD {
         self;
     }
 
-    regex prefix_circumfix_meta_operator:reduce {
+    regex term:reduce {
         :my $*IN_REDUCE = 1;
         :my $op;
         <?before '['\S+']'>
@@ -3329,10 +3329,9 @@ grammar P6 is STD {
         || <.sorry("Cannot reduce with " ~ $op<sym> ~ " because " ~ $op<O><dba> ~ " operators are diffy and not chaining")>
         ]
 
-        <O($op.Opairs, |%list_prefix, assoc => 'unary', uassoc => 'left')>
+        <args(0)>
+        <O(|%term)>
         { $<sym> = $<s>.Str; }
-
-        [ <?before '('> || <?before \s+ [ <?liststopper> { $<O><term> = 1 } ]? > || { $<O><term> = 1 } ]
     }
 
     token prefix_postfix_meta_operator:sym< « >    { <sym> | '<<' }
