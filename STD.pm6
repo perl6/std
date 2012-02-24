@@ -1991,7 +1991,10 @@ grammar P6 is STD {
     }
 
     token trait_mod:is {
-        <sym>:s <longname><circumfix>?  # e.g. context<rw> and Array[Int]
+        <sym>:s [
+            <longname><circumfix>?  # e.g. context<rw> and Array[Int]
+            || <.panic: "Invalid trait name">
+        ]
         {
             if $*DECLARAND {
                 my $traitname = $<longname>.Str;
@@ -2001,22 +2004,21 @@ grammar P6 is STD {
         }
     }
     token trait_mod:hides {
-        <sym>:s <typename>
+        <sym>:s [<typename> || <.panic: "Invalid class name">]
     }
     token trait_mod:does {
         :my $*PKGDECL ::= 'role';
-        <sym>:s <typename>
+        <sym>:s [<typename> || <.panic: "Invalid role name">]
     }
     token trait_mod:will {
-        <sym>:s <identifier> <pblock>
+        <sym>:s [<identifier> <pblock> || <.panic: "Invalid phaser">]
     }
 
     token trait_mod:of {
-        ['of'|'returns']:s <typename>
+        ['of'|'returns']:s [<typename> || <.panic: "Invalid type name">]
         [ <?{ $*DECLARAND<of> }> <.sorry("Extra 'of' type; already declared as type " ~ $*DECLARAND<of>.Str)> ]?
         { $*DECLARAND<of> = $<typename>; }
     }
-    token trait_mod:as      { <sym>:s <typename> }
     token trait_mod:handles { <sym>:s <term> }
 
     #########
