@@ -1911,14 +1911,14 @@ grammar P6 is STD {
             [
             | $<type>=[<[ ! ^ ]>?]<longname> [ <multisig> | <trait> ]*
             | <multisig> <trait>*
-            | <sigil> '.'
+            | <sigil>'.':!s
                 :dba('subscript signature')
                 [
                 | '(' ~ ')' <signature>
                 | '[' ~ ']' <signature>
                 | '{' ~ '}' <signature> # don't need curlycheck here
                 | <?before '<'> <postcircumfix>
-                ]
+                ]:s
                 <trait>*
             | <?>
             ]
@@ -5111,7 +5111,7 @@ grammar Regex is STD {
                                     ]?
     }
 
-    token assertion:sym<:> { <?before ':'<alpha>> <cclass_expr> }
+    token assertion:sym<:> { <?before ':'> <cclass_expr> }
     token assertion:sym<[> { <?before '['> <cclass_expr> }
     token assertion:sym<+> { <?before '+'> <cclass_expr> }
     token assertion:sym<-> { <?before '-'> <cclass_expr> }
