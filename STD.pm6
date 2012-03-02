@@ -5926,7 +5926,6 @@ method check_variable ($variable) {
         when '' {
             my $ok = 0;
             $ok ||= $*IN_DECL;
-            $ok ||= $sigil eq '&';
             $ok ||= $first lt 'A';
             $ok ||= $first eq '¢';
             $ok ||= self.is_known($name);
@@ -5934,7 +5933,10 @@ method check_variable ($variable) {
             if not $ok {
                 my $id = $name;
                 $id ~~ s/^\W\W?//;
-                if $name eq '@_' or $name eq '%_' {
+                if $sigil eq '&' {
+                    $here.add_mystery($variable.<sublongname>, self.pos, 'var')
+                }
+                elsif $name eq '@_' or $name eq '%_' {
                     $here.add_placeholder($name);
                 }
                 else {  # guaranteed fail now
