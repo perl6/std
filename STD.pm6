@@ -3234,7 +3234,7 @@ grammar P6 is STD {
                                                     { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
                     [ <!before '='> { self.worry("Useless use of [] around infix op") unless $*IN_META; } ]?
             | :dba('infixed function') <?before '[' <[&\$]> <twigil>? [<alpha>|'('] > '[' ~ ']' <infix=.variable>
-                                                    { $<O> = $<infix><O> // $¢.O(%additive); $<sym> = $<infix>; }
+                                                    { $<O> = $<infix><O> // {%additive}; $<sym> = $<infix>; }
             | <infix=infix_circumfix_meta_operator> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix=infix_prefix_meta_operator>    { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix>                               { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
