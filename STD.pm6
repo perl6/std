@@ -2831,7 +2831,7 @@ grammar P6 is STD {
         [
         | '\\'? <defterm>
         | <variable> { $¢.add_variable($<variable>.Str); }
-        | <?>
+        | {} <.sorry: "Missing symbol in constant declaration">
         ]
         { $*IN_DECL = ''; }
         <.ws>
