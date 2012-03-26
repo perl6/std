@@ -1527,10 +1527,6 @@ grammar P6 is STD {
         <xblock>
     }
 
-    token statement_control:foreach {
-        <sym> <.obs("'foreach'", "'for'")>
-    }
-
     token statement_control:given {
         <sym> :s
         <xblock>
@@ -2688,17 +2684,9 @@ grammar P6 is STD {
         <!old_tr_mods>
     }
 
-    token quote:y {
-        <sym> »
-        # could be defined as a function or constant
-        <!{ self.is_known('&y') or self.is_known('y') }>
-        <!before '('> <?before \h*\W>
-        <.obs('y///','tr///')>
-    }
-
     token old_rx_mods {
         <!after \s>
-        (< i g s m x c e >+) 
+        (\w+) 
         {
             given $0.Str {
                 $_ ~~ /i/ and $¢.worryobs('/i',':i');
@@ -2708,6 +2696,12 @@ grammar P6 is STD {
                 $_ ~~ /x/ and $¢.worryobs('/x','normal default whitespace');
                 $_ ~~ /c/ and $¢.worryobs('/c',':c or :p');
                 $_ ~~ /e/ and $¢.worryobs('/e','interpolated {...} or s{} = ... form');
+                $_ ~~ /r/ and $¢.worryobs('/c','.subst');
+                $_ ~~ /a/ and $¢.worryobs('/a','Unicode');
+                $_ ~~ /d/ and $¢.worryobs('/d','Unicode');
+                $_ ~~ /l/ and $¢.worryobs('/l','Unicode');
+                $_ ~~ /u/ and $¢.worryobs('/l','normal regex');
+                $_ ~~ /p/ and $¢.worryobs('/c','substr or /$<PREMATCH>=[...] <(...)> $<POSTMATCH>=[...]');
                 $¢.obs('suffix regex modifiers','prefix adverbs');
             }
         }
@@ -3101,11 +3095,6 @@ grammar P6 is STD {
     token term:sym<::?IDENT> {
         $<sym> = [ '::?' <identifier> ] »
         <O(|%term)>
-    }
-
-    token term:sym<Object> {
-        <sym> » {}
-        <.obs('Object', 'Mu as the "most universal" object type')>
     }
 
     token term:sym<undef> {
@@ -5732,13 +5721,22 @@ method explain_mystery() {
         $m ~= "Undeclared name" ~ ('s' x (@tmp != 1)) ~ ":\n";
         for @tmp {
             $m ~= "\t'$_' used at line " ~ %unk_types{$_}.<line> ~ "\n";
+            $m ~= "\t  (in Perl 6 please use Mu as the most universal type)\n" if $_ eq 'Object';
         }
     }
     if %unk_routines {
         my @tmp = sort keys(%unk_routines);
         $m ~= "Undeclared routine" ~ ('s' x (@tmp != 1)) ~ ":\n";
+        my $obs = {
+            y => "tr",
+            qr => "rx",
+            local => "temp (or dynamic var)",
+            new => "method call syntax",
+            foreach => "for",
+        }
         for @tmp {
             $m ~= "\t'$_' used at line " ~ %unk_routines{$_}.<line> ~ "\n";
+            $m ~= "\t  (in Perl 6 please use " ~ $obs{$_} ~ " instead)\n" if $obs{$_};
         }
     }
     self.sorry($m) if $m;
