@@ -125,7 +125,7 @@ constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>);
 constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>);
 constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :fiddly);
 constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
-constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :sub<e=>, :fiddly, :!pure);
+constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :fiddly, :!pure);
 constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>, :pure);
 constant %comma           = (:dba('comma')           , :prec<g=>, :assoc<list>, :nextterm<nulltermish>, :fiddly, :pure);
 constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>, :pure);
@@ -3879,6 +3879,7 @@ grammar P6 is STD {
         <sym> ::
         [
         || <.suppose <infixish>> <.panic: "An infix may not start with !!">
+        || <?{ $*GOAL eq 'endargs' }> <.panic: "List operator is not allowed inside ??!!; please use parens">
         || <.panic: "Ternary !! seems to be missing its ??">
         ]
     }
@@ -4703,9 +4704,6 @@ method EXPR ($preclvl?) {
             }
 
             $here = $infix.cursor_fresh.ws();
-
-            # substitute precedence for listops
-            $inO<prec> = $inO<sub> if $inO<sub>;
 
             # Does new infix (or terminator) force any reductions?
             while @opstack[*-1]<O><prec> gt $inprec {
