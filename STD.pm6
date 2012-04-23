@@ -3433,8 +3433,15 @@ grammar P6 is STD {
         }
     }
 
-    token postcircumfix:sym<{ }>
-        { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> <.curlycheck> }
+    token postcircumfix:sym<{ }> {
+        :temp $*CURLEX;
+        :dba('subscript')
+        <.newlex>
+        # <.finishlex>   # XXX not sure if we need this
+        '{' ~ '}' <semilist> <O(|%methodcall)>
+        <.checkyada>
+        <.curlycheck>
+    }
 
     token postcircumfix:sym«< >» {
         :my $pos;
