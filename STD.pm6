@@ -3167,8 +3167,8 @@ grammar P6 is STD {
             if self.lineof($startpos) != self.lineof($endpos) {
                 $¢.panic("Unexpected block in infix position (previous line missing its semicolon?)");
             }
-            elsif @*MEMOS[$¢.pos-1]<baremeth> {
-                $¢.panic("Unexpected block in infix position (method call needs colon or parens to take arguments)");
+            elsif @*MEMOS[$startpos]<baremeth> {
+                $¢.cursor($startpos).panic("Unexpected block in infix position (method call with args needs colon or parens without whitespace)");
             }
             else {
                 $¢.panic("Unexpected block in infix position (two terms in a row, or previous statement missing semicolon?)");
@@ -6101,19 +6101,19 @@ method panic (Str $s) {
         $*HIGHMESS ~= $s ~ "\n";
     }
 
-    $m ~= $here.locmess;
-    $m ~= "\n" unless $m ~~ /\n$/;
+    my $x;
 
     if $highvalid and %$*HIGHEXPECT {
         my @keys = sort keys %$*HIGHEXPECT;
         if @keys > 1 {
-            $m ~= "    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT) ~ "\n";
+            $x = "    expecting any of:\n\t" ~ join("\n\t", sort keys %$*HIGHEXPECT) ~ "\n";
         }
         else {
-            $m ~= "    expecting @keys\n" unless @keys[0] eq 'whitespace';
+            $x = "    expecting @keys\n" unless @keys[0] eq 'whitespace';
         }
     }
-    if $m ~~ /infix|nofun/ and not $m ~~ /regex/ and not $m ~~ /infix_circumfix/ {
+
+    if $x ~~ /infix|nofun/ and not $x ~~ /regex/ and not $x ~~ /infix_circumfix/ {
         my @t = $here.suppose( sub { $here.term } );
         if @t {
             my $endpos = $here.pos;
@@ -6122,13 +6122,14 @@ method panic (Str $s) {
             if self.lineof($startpos) != self.lineof($endpos) {
                 $m ~~ s|Confused|Two terms in a row (previous line missing its semicolon?)|;
             }
-            elsif @*MEMOS[$here.pos]<listop> {
+            elsif @*MEMOS[$startpos]<listop> {
                 $m ~~ s|Confused|Two terms in a row (listop with args requires whitespace or parens)|;
             }
-            elsif @*MEMOS[$here.pos - 1]<baremeth> {
-                $m ~~ s|Confused|Two terms in a row (method call requires colon or parens to take arguments)|;
+            elsif @*MEMOS[$startpos]<baremeth> {
+                $here = $here.cursor($startpos);
+                $m ~~ s|Confused|Two terms in a row (method call with args requires colon or parens without whitespace)|;
             }
-            elsif @*MEMOS[$here.pos - 1]<arraycomp> {
+            elsif @*MEMOS[$startpos]<arraycomp> {
                 $m ~~ s|Confused|Two terms in a row (preceding is not a valid reduce operator)|;
             }
             else {
@@ -6151,6 +6152,10 @@ method panic (Str $s) {
         $d = "$*MULTINESS $d" if $*MULTINESS and $*MULTINESS ne $d;
         $m ~~ s|Malformed block|Return type $type is not allowed between '$d' and '$name'; please put it:\n  after the $s but before the '$d',\n  within the signature following the '-->' marker, or\n  as the argument of a 'returns' trait after the signature.|;
     }
+
+    $m ~= $here.locmess;
+    $m ~= "\n" unless $m ~~ /\n$/;
+    $m ~= $x;
 
     if @*WORRIES {
         $m ~= "Other potential difficulties:\n  " ~ join( "\n  ", @*WORRIES) ~ "\n";
