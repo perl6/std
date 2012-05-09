@@ -1,6 +1,6 @@
 # STD.pm
 #
-# Copyright 2007-2011, Larry Wall
+# Copyright 2007-2012, Larry Wall
 #
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
@@ -2662,7 +2662,7 @@ grammar P6 is STD {
         <!old_rx_mods>
     }
 
-    token quote:mm {
+    token quote:ms {
         <sym> » <!before '('>
         <quibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s))>
         <!old_rx_mods>
