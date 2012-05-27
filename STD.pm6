@@ -4920,6 +4920,7 @@ grammar Regex is STD {
 
     token metachar:sigwhite {
         <normspace>
+        [ <?quantifier> <.sorry: "Quantifier quantifies nothing"> ]?
     }
     token metachar:unsp   { <unsp> }
 
