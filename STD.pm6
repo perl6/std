@@ -674,7 +674,7 @@ token unv {
    | \h+
    | <?before \h* '=' [ \w | '\\'] > ^^ <.pod_comment>
    | \h* <comment>
-   ]
+   ]+
 }
 
 token comment:sym<#`(...)> {
