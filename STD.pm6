@@ -4964,10 +4964,10 @@ grammar Regex is STD {
     }
 
     token metachar:sym<(?: )> { '(?:' <.obs("(?: ... ) for grouping", "[ ... ]")> }
-    token metachar:sym<(?= )> { '(?:' <.obs("(?= ... ) for lookahead", "<?before ... >")> }
-    token metachar:sym<(?! )> { '(?:' <.obs("(?! ... ) for lookahead", "<!before ... >")> }
-    token metachar:sym<(?\<= )> { '(?:' <.obs("(?<= ... ) for lookbehind", "<?after ... >")> }
-    token metachar:sym<(?\<! )> { '(?:' <.obs("(?<! ... ) for lookbehind", "<!after ... >")> }
+    token metachar:sym<(?= )> { '(?=' <.obs("(?= ... ) for lookahead", "<?before ... >")> }
+    token metachar:sym<(?! )> { '(?!' <.obs("(?! ... ) for lookahead", "<!before ... >")> }
+    token metachar:sym<(?\<= )> { '(?<=' <.obs("(?<= ... ) for lookbehind", "<?after ... >")> }
+    token metachar:sym<(?\<! )> { '(?<!' <.obs("(?<! ... ) for lookbehind", "<!after ... >")> }
     token metachar:sym<( )> {
         :dba("capture parens")
         '(' ~ ')' <nibbler>
