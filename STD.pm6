@@ -5320,8 +5320,9 @@ method getsig {
             next if $desc<used>;
             next if $desc<rebind>;
             next if $desc<dynamic>;
-            next if $desc<scope> eq 'our';
-            next if $desc<scope> eq 'state';
+            my $scope = $desc<scope> // 'my';
+            next if $scope eq 'our';
+            next if $scope eq 'state';
             next if $desc<stub>;
             my $pos = $desc<declaredat> // self.pos;
             self.cursor($pos).worry("$_ is declared but not used");
@@ -5517,7 +5518,7 @@ method add_my_name ($n, $d = Nil, $p = Nil) {   # XXX gimme doesn't handle optio
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
         of   => $*OFTYPE,
-        scope => $*SCOPE,
+        scope => ($*SCOPE//'my'),
     );
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
@@ -5622,7 +5623,7 @@ method add_our_name ($n) {
         file => $*FILE, line => self.line,
         mult => ($*MULTINESS||'only'),
         of   => $*OFTYPE,
-        scope => $*SCOPE,
+        scope => ($*SCOPE//'our'),
     );
     my $old = $curstash.{$name};
     if $old and $old<line> and not $old<stub> {
@@ -5845,7 +5846,7 @@ method lex_can_find_name ($lex, $name, $varbind) {
             rebind => self.line,
             varbind => $varbind,
             mult => 'only',
-            scope => $lex.{$name}<scope>,
+            scope => ($lex.{$name}<scope>//'my'),
         );
         # the innermost lex sets this last to get correct # of OUTER::s
         $varbind.<truename> = $outname;
