@@ -6103,7 +6103,7 @@ method panic (Str $s) {
         $*HIGHMESS ~= $s ~ "\n";
     }
 
-    my $x;
+    my $x = '';
 
     if $highvalid and %$*HIGHEXPECT {
         my @keys = sort keys %$*HIGHEXPECT;
