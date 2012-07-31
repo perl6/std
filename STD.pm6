@@ -4852,6 +4852,7 @@ grammar Regex is STD {
         ]
     }
     token quant_atom_list {
+        :my $*SIGOK = False;
         <quantified_atom>+
     }
     token infixish {
@@ -4888,10 +4889,12 @@ grammar Regex is STD {
         '%''%'? <normspace>? <quantified_atom>
     }
 
+    method SIGOK { $*SIGOK = True }
+
     token atom {
         :dba('regex atom')
         [
-        | \w
+        | \w <.SIGOK>
         | <metachar> ::
         ]
     }
@@ -4918,9 +4921,14 @@ grammar Regex is STD {
 
     # "normal" metachars
 
-    token metachar:sigwhite {
-        <normspace>
+    token metachar:normspace {
+        <!{$*SIGOK}> <normspace>
         [ <?quantifier> <.sorry: "Quantifier quantifies nothing"> ]?
+    }
+    token metachar:sigwhite {
+        <?{$*SIGOK}> <normspace>
+        [ <?quantifier> <.sorry: "Quantifier quantifies nothing"> ]?
+        { $*SIGOK = False }
     }
     token metachar:unsp   { <unsp> }
 
@@ -4958,7 +4966,7 @@ grammar Regex is STD {
 
     token metachar:sym<[ ]> {
         :dba("bracketed regex")
-        '[' ~ ']' <nibbler>
+        '[' ~ ']' <nibbler> <.SIGOK>
         { $¢.check_old_cclass($<nibbler>.Str); }
         $<sym> = {<[ ]>}
     }
@@ -4970,33 +4978,34 @@ grammar Regex is STD {
     token metachar:sym<(?\<! )> { '(?<!' <.obs("(?<! ... ) for lookbehind", "<!after ... >")> }
     token metachar:sym<( )> {
         :dba("capture parens")
-        '(' ~ ')' <nibbler>
+        '(' ~ ')' <nibbler> <.SIGOK>
         $<sym> = {<( )>}
     }
 
-    token metachar:sym« <( » { '<(' }
-    token metachar:sym« )> » { ')>' }
+    token metachar:sym« <( » { '<(' <.SIGOK> }
+    token metachar:sym« )> » { ')>' <.SIGOK> }
 
-    token metachar:sym« << » { '<<' }
-    token metachar:sym« >> » { '>>' }
-    token metachar:sym< « > { '«' }
-    token metachar:sym< » > { '»' }
+    token metachar:sym« << » { '<<' <.SIGOK> }
+    token metachar:sym« >> » { '>>' <.SIGOK> }
+    token metachar:sym< « > { '«' <.SIGOK> }
+    token metachar:sym< » > { '»' <.SIGOK> }
 
     token metachar:qw {
         <?before '<' \s >  # (note required whitespace)
         <circumfix>
+        <.SIGOK>
     }
 
     token metachar:sym«< >» {
         '<' ~ '>' <assertion>
     }
 
-    token metachar:sym<\\> { <sym> <backslash> }
-    token metachar:sym<.>  { <sym> }
-    token metachar:sym<^^> { <sym> }
-    token metachar:sym<^>  { <sym> }
+    token metachar:sym<\\> { <sym> <backslash> <.SIGOK> }
+    token metachar:sym<.>  { <sym> <.SIGOK> }
+    token metachar:sym<^^> { <sym> <.SIGOK> }
+    token metachar:sym<^>  { <sym> <.SIGOK> }
     token metachar:sym<$$> {
-        <sym>
+        <sym> <.SIGOK>
         [ (\w+) <.obs("\$\$" ~ $0.Str ~ " to deref var inside a regex", "\$(\$" ~ $0.Str ~ ")")> ]?
     }
     token metachar:sym<$>  {
@@ -5011,10 +5020,11 @@ grammar Regex is STD {
         | $
         | <.stopper>
         >
+        <.SIGOK>
     }
 
-    token metachar:sym<' '> { <?before "'"> [:lang(%*LANG<MAIN>) <quote>] }
-    token metachar:sym<" "> { <?before '"'> [:lang(%*LANG<MAIN>) <quote>] }
+    token metachar:sym<' '> { <?before "'"> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
+    token metachar:sym<" "> { <?before '"'> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
 
     token metachar:var {
         :my $*QSIGIL ::= substr(self.orig,self.pos,1);
@@ -5028,23 +5038,24 @@ grammar Regex is STD {
         || { $¢.check_variable($<variable>) }
            [ <?before '.'? <[ \[ \{ \< ]>> <.worry: "Apparent subscript will be treated as regex"> ]?
         ]
+        <.SIGOK>
     }
 
     token backslash:unspace { <?before \s> [ :lang( %*LANG<MAIN> ) <.ws> ] }
 
-    token backslash:sym<0> { '0' <!before <[0..7]> > }
+    token backslash:sym<0> { '0' <!before <[0..7]> > <.SIGOK> }
 
     token backslash:A { <sym> <.obs('\\A as beginning-of-string matcher', '^')> }
     token backslash:a { <sym> <.sorry: "\\a is allowed only in strings, not regexes"> }
     token backslash:B { <sym> <.obs('\\B as word non-boundary', '<!wb>')> }
     token backslash:b { <sym> <.obs('\\b as word boundary', '<?wb> (or either of « or »)')> }
-    token backslash:c { :i <sym> <charspec> }
-    token backslash:d { :i <sym> }
-    token backslash:e { :i <sym> }
-    token backslash:f { :i <sym> }
-    token backslash:h { :i <sym> }
-    token backslash:n { :i <sym> }
-    token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
+    token backslash:c { :i <sym> <charspec> <.SIGOK> }
+    token backslash:d { :i <sym> <.SIGOK> }
+    token backslash:e { :i <sym> <.SIGOK> }
+    token backslash:f { :i <sym> <.SIGOK> }
+    token backslash:h { :i <sym> <.SIGOK> }
+    token backslash:n { :i <sym> <.SIGOK> }
+    token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] <.SIGOK> }
     token backslash:p {
         :my $s;
         :my $m;
@@ -5058,15 +5069,15 @@ grammar Regex is STD {
         ]
     }
     token backslash:Q { <sym> <.obs('\\Q as quotemeta', 'quotes or literal variable match')> }
-    token backslash:r { :i <sym> }
-    token backslash:s { :i <sym> }
-    token backslash:t { :i <sym> }
-    token backslash:v { :i <sym> }
-    token backslash:w { :i <sym> }
-    token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
+    token backslash:r { :i <sym> <.SIGOK> }
+    token backslash:s { :i <sym> <.SIGOK> }
+    token backslash:t { :i <sym> <.SIGOK> }
+    token backslash:v { :i <sym> <.SIGOK> }
+    token backslash:w { :i <sym> <.SIGOK> }
+    token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] <.SIGOK> }
     token backslash:z { <sym> <.obs('\\z as end-of-string matcher', '$')> }
     token backslash:Z { <sym> <.obs('\\Z as end-of-string matcher', '\\n?$')> }
-    token backslash:misc { $<litchar>=(\W) }
+    token backslash:misc { $<litchar>=(\W) <.SIGOK> }
     token backslash:oldbackref { (<[1..9]>\d*) { my $d = $0.Str; $¢.sorryobs("the 1-based special form '\\$d' as a backreference", "the 0-based variable '\$" ~ ($d - 1) ~ "' instead" ); } }
     token backslash:oops { <.sorry: "Unrecognized regex backslash sequence"> . }
 
@@ -5077,13 +5088,13 @@ grammar Regex is STD {
     token assertion:sym<|> { <sym> [ <?before '>'> | <?before \w> <assertion> ] }  # assertion-like syntax, anyway
     token assertion:sym<?> { <sym> [ <?before '>'> | <assertion> ] }
     token assertion:sym<!> { <sym> [ <?before '>'> | <assertion> ] }
-    token assertion:sym<*> { <sym> [ <?before '>'> | <.ws> <nibbler> ] }
+    token assertion:sym<*> { <sym> [ <?before '>'> | <.ws> <nibbler> ] <.SIGOK> }
 
     token assertion:sym<{ }> { <embeddedblock> }
 
     token assertion:variable {
         <?before <sigil>>  # note: semantics must be determined per-sigil
-        [:lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <variable=.EXPR(item %LOOSEST)>]
+        [:lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <variable=.EXPR(item %LOOSEST)>] <.SIGOK>
     }
 
     token assertion:method {
@@ -5091,6 +5102,7 @@ grammar Regex is STD {
             | <?before <alpha> > <assertion>
             | [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <dottyop> ]
             ]
+        <.SIGOK>
     }
 
     token assertion:name { [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <longname> ]
@@ -5101,12 +5113,14 @@ grammar Regex is STD {
                                             $¢.panic("$n requires an argument");
                                         }
                                     }
-                                    | <.normspace>? <nibbler> <.ws>
+                                    | <.normspace>? <nibbler> <.ws> <.SIGOK>
                                     | '=' <assertion>
                                     | ':' [ :lang($¢.cursor_fresh(%*LANG<MAIN>).unbalanced('>')) <.ws> <arglist> ]
+                                      <.SIGOK>
                                     | '(' {}
                                         [ :lang(%*LANG<MAIN>) <arglist> ]
                                         [ ')' || <.panic: "Assertion call missing right parenthesis"> ]
+                                        <.SIGOK>
                                     ]?
     }
 
@@ -5114,9 +5128,9 @@ grammar Regex is STD {
     token assertion:sym<[> { <?before '['> <cclass_expr> }
     token assertion:sym<+> { <?before '+'> <cclass_expr> }
     token assertion:sym<-> { <?before '-'> <cclass_expr> }
-    token assertion:sym<.> { <sym> }
-    token assertion:sym<,> { <sym> }
-    token assertion:sym<~~> { <sym> [ <?before '>'> | \d+ | <desigilname> ] }
+    token assertion:sym<.> { <sym> <.SIGOK> }
+    token assertion:sym<,> { <sym> <.SIGOK> }
+    token assertion:sym<~~> { <sym> [ <?before '>'> | \d+ | <desigilname> ] <.SIGOK> }
 
     token assertion:bogus { <.panic: "Unrecognized regex assertion"> }
 
@@ -5126,6 +5140,7 @@ grammar Regex is STD {
         <.normspace>?
         <sign>
         <cclass_union> ** [$<op>=[ '|' | '^' ]]
+        <.SIGOK>
     }
 
     token cclass_union {
