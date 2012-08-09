@@ -4213,7 +4213,7 @@ grammar P6 is STD {
         | <?before <stopper> >
         | <?before '!!'> <?{ $*GOAL eq '!!' }>
         | <?before '{' | <lambda> > <?{ ($*GOAL eq '{' or $*GOAL eq 'endargs') and @*MEMOS[$¢.pos]<ws> }>
-        | <?{ $*GOAL eq 'endargs' and @*MEMOS[$¢.pos]<endargs> }>
+        | <?{ $*GOAL eq 'endargs' and @*MEMOS[@*MEMOS[$¢.pos]<ws>//$¢.pos]<endargs> }>
         ]
     }
 
