@@ -1336,8 +1336,10 @@ grammar P6 is STD {
                     {
                         my $sp = $<EXPR><statement_prefix>;
                         if $sp and $sp<sym> eq 'do' {
-                           my $s = $<statement_mod_loop>[0]<sym>;
-                           $¢.obs("do...$s" ,"repeat...$s");
+                            my $s = $<statement_mod_loop>[0]<sym>;
+                            if $s eq 'while' or $s eq 'until' {
+                                $¢.obs("do...$s" ,"repeat...$s");
+                            }
                         }
                     }
                 | <statement_mod_cond>
