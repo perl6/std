@@ -4791,6 +4791,9 @@ grammar Regex is STD {
     token category:metachar { <sym> }
     proto token metachar {*}
 
+    token category:sigmaybe { <sym> }
+    proto token sigmaybe {*}
+
     token category:backslash { <sym> }
     proto token backslash {*}
 
@@ -4807,9 +4810,6 @@ grammar Regex is STD {
     proto token mod_internal {*}
 
     proto token regex_infix {*}
-
-    # no such thing as ignored whitespace in a normal regex
-    token ws { <?> }
 
     token normspace {
         <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
@@ -4830,25 +4830,22 @@ grammar Regex is STD {
     }
 
     token termish {
-        <.ws>
+        <.normspace>?
         [
         || <term=.quant_atom_list> <?{ %*RX<s> or $<term>.Str ~~ /\S/ }>
-        || <normspace>?
-            [
-            || <?before <stopper> | <[&|~]> > <.panic: "Null pattern not allowed">
-            || <?before <[ \] \) \> ]> > {
-                    my $c = substr(self.orig,$¢.pos,1);
-                    if $*GOAL eq $c {
-                        $¢.panic("Null pattern not allowed");
-                    }
-                    else {
-                        $¢.panic("Unmatched closing $c");
-                    }
+        || <?before <stopper> | <[&|~]> > <.panic: "Null pattern not allowed">
+        || <?before <[ \] \) \> ]> > {
+                my $c = substr(self.orig,$¢.pos,1);
+                if $*GOAL eq $c {
+                    $¢.panic("Null pattern not allowed");
                 }
-            || $$ <.panic: "Regex not terminated">
-            || (\W) <.sorry: "Unrecognized regex metacharacter " ~ $0.Str ~ " (must be quoted to match literally)">
-            || <.panic: "Regex not terminated">
-            ]
+                else {
+                    $¢.panic("Unmatched closing $c");
+                }
+            }
+        || $$ <.panic: "Regex not terminated">
+        || (\W) <.sorry: "Unrecognized regex metacharacter " ~ $0.Str ~ " (must be quoted to match literally)">
+        || <.panic: "Regex not terminated">
         ]
     }
     token quant_atom_list {
@@ -4879,8 +4876,8 @@ grammar Regex is STD {
     token quantified_atom {
         <!stopper>
         <!regex_infix>
-        <atom>
-        [ <normspace>? <quantifier> [<normspace>? <separator>]? ]?
+        <atom> :: <sigmaybe>
+        [ <quantifier> <sigfinal=sigmaybe> <separator>? ]?
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Cannot quantify zero-width atom">
     }
@@ -4889,7 +4886,17 @@ grammar Regex is STD {
         '%''%'? <normspace>? <quantified_atom>
     }
 
-    method SIGOK { $*SIGOK = True }
+    token sigmaybe:normspace {
+        <!{$*SIGOK}> <normspace>
+    }
+    token sigmaybe:sigwhite {
+        <?{$*SIGOK}> <normspace>
+        { $*SIGOK = False }
+    }
+    token sigmaybe:unsp { <unsp> }
+    token sigmaybe:nosp { <?> }
+
+    method SIGOK { $*SIGOK = %*RX<s>; self }
 
     token atom {
         :dba('regex atom')
@@ -4920,17 +4927,6 @@ grammar Regex is STD {
     token metachar:quant { <quantifier> <.sorry: "Quantifier quantifies nothing"> }
 
     # "normal" metachars
-
-    token metachar:normspace {
-        <!{$*SIGOK}> <normspace>
-        [ <?quantifier> <.sorry: "Quantifier quantifies nothing"> ]?
-    }
-    token metachar:sigwhite {
-        <?{$*SIGOK}> <normspace>
-        [ <?quantifier> <.sorry: "Quantifier quantifies nothing"> ]?
-        { $*SIGOK = False }
-    }
-    token metachar:unsp   { <unsp> }
 
     token metachar:sym<{ }> {
         <?before '{'>
