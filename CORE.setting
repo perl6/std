@@ -258,9 +258,11 @@ my proto comb {*}
 my proto pack {*}
 my proto unpack {*}
 my proto uc {*}
-my proto ucfirst {*}
 my proto lc {*}
-my proto lcfirst {*}
+my proto tc {*}
+my proto tclc {*}
+my proto tcuc {*}
+my proto wordcase {*}
 my proto normalize {*}
 my proto nfc {*}
 my proto nfd {*}
@@ -268,7 +270,6 @@ my proto nfkc {*}
 my proto nfkd {*}
 my proto samecase {*}
 my proto sameaccent {*}
-my proto capitalize {*}
 my proto chars {*}
 my proto graphs {*}
 my proto codes {*}
