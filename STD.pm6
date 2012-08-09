@@ -420,7 +420,7 @@ token charname {
     ] || <.sorry: "Unrecognized character name"> .*?<?terminator>
 }
 
-token charnames { \s* [<charname><.ws>] ** [','\s*] }
+token charnames { \s* [<charname><.ws>] +% [','\s*] }
 
 token charspec {
     [
@@ -755,25 +755,25 @@ token embeddedblock {
     [ '}' || <.panic: "Unable to parse statement list; couldn't find right brace"> ]
 }
 
-token binints { [<.ws><binint><.ws>] ** ',' }
+token binints { [<.ws><binint><.ws>] +% ',' }
 
 token binint {
     <[ 0..1 ]>+ [ _ <[ 0..1 ]>+ ]*
 }
 
-token octints { [<.ws><octint><.ws>] ** ',' }
+token octints { [<.ws><octint><.ws>] +% ',' }
 
 token octint {
     <[ 0..7 ]>+ [ _ <[ 0..7 ]>+ ]*
 }
 
-token hexints { [<.ws><hexint><.ws>] ** ',' }
+token hexints { [<.ws><hexint><.ws>] +% ',' }
 
 token hexint {
     <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
 }
 
-token decints { [<.ws><decint><.ws>] ** ',' }
+token decints { [<.ws><decint><.ws>] +% ',' }
 
 token decint {
     \d+ [ _ \d+ ]*
@@ -1399,7 +1399,7 @@ grammar P6 is STD {
                 $longname = $<module_name>[*-1]<longname>;
                 $¢.do_need($longname<name>);
             }
-        ] ** ','
+        ] +% ','
     }
 
     token statement_control:import {
@@ -1590,7 +1590,7 @@ grammar P6 is STD {
     }
 
     token version:sym<v> {
-        'v' <?before \d> :: <vnum> ** '.' '+'?
+        'v' <?before \d> :: <vnum> +% '.' '+'?
     }
 
     ###############
@@ -1858,7 +1858,7 @@ grammar P6 is STD {
         [
             ':'?'(' ~ ')' <signature(++$signum)>
         ]
-        ** '|'
+        +% '|'
     }
 
     method checkyada {
@@ -2770,7 +2770,7 @@ grammar P6 is STD {
         |   [
             | <?before '-->' | ')' | ']' | '{' | ':'\s | ';;' >
             | [ <parameter> || <.panic: "Malformed parameter"> ]
-            ] ** <param_sep>
+            ] +% <param_sep>
         ]
         <.ws>
         { $*IN_DECL = ''; }
@@ -3489,7 +3489,7 @@ grammar P6 is STD {
     }
 
     token semiarglist {
-        <arglist> ** ';'
+        <arglist> +% ';'
         <.ws>
     }
 
@@ -5137,18 +5137,18 @@ grammar Regex is STD {
         ::
         <.normspace>?
         <sign>
-        <cclass_union> ** [$<op>=[ '|' | '^' ]]
+        <cclass_union> +% [$<op>=[ '|' | '^' ]]
         <.SIGOK>
     }
 
     token cclass_union {
         <.normspace>?
-        <cclass_add> ** [$<op>=[ '&' ]]
+        <cclass_add> +% [$<op>=[ '&' ]]
     }
 
     token cclass_add {
         <.normspace>?
-        <cclass_elem> ** [$<op>=[ '+' | '-' ]<.normspace>?]
+        <cclass_elem> +% [$<op>=[ '+' | '-' ]<.normspace>?]
     }
 
     token cclass_elem:name {
