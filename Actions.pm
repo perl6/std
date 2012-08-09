@@ -1,3 +1,4 @@
+use v5.14;
 use YAML::XS;
 use strict;
 use warnings;
@@ -82,11 +83,12 @@ sub hoistast {
 	    # print "CAPS ref ". ref($v) . "\n";
 	    if (ref $v) {
 		for (@$v) {
-		    next unless ref $_;     # XXX skip keys?
-		    push @all, $_->{'_ast'} if defined $_->{'_ast'}
-			and !($allused{refaddr $_}++);
-		    # don't generate multiple entries for a multi-named
-		    # capture
+		    eval {	# XXX punt on non-hashes
+			push @all, $_->{'_ast'} if defined $_->{'_ast'}
+			    and !($allused{refaddr $_}++);
+			# don't generate multiple entries for a multi-named
+			# capture
+		    };
 		}
 	    }
 	}
