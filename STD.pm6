@@ -1500,7 +1500,9 @@ grammar P6 is STD {
             | $<wu>=['while'|'until']<.keyspace>
               <xblock>
             | <pblock>
-              $<wu>=['while'|'until'][<.keyspace>||<.panic: "Whitespace required after keyword">] <EXPR>
+              [$<wu>=['while'|'until'] || <.panic: '"repeat" is missing its "while" or "until"'> ]
+              [<.keyspace> || <.panic: "Whitespace required after keyword">]
+              <EXPR>
         ]
     }
 
