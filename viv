@@ -827,6 +827,11 @@ TEMPLATE
 	if ($self->{signature}) {
 	    return "(" . join(", ", map { $_->{param_var}->Str }
 		$self->{signature}->kids('parameter')) . ")";
+	}
+	elsif ($self->{variable_declarator}) {
+	    my $vd = $self->{variable_declarator}->emit_p5;
+	    $vd .= $self->{initializer}[0] ? join('', $self->{initializer}[0]->emit_p5) : "";
+	    return $vd;
 	} else {
 	    return $self->SUPER::emit_p5;
 	}
@@ -1049,6 +1054,41 @@ TEMPLATE
 }
 
 
+{ package VAST::initializer; our @ISA = 'VAST::Base';
+}
+
+{ package VAST::initializer__S_Equal; our @ISA = 'VAST::initializer';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = '= ';	# XXX oversimplified
+        @t;
+    }
+}
+
+{ package VAST::initializer__S_ColonEqual; our @ISA = 'VAST::initializer';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = '= ';	# XXX oversimplified
+        @t;
+    }
+}
+
+{ package VAST::initializer__S_ColonColonEqual; our @ISA = 'VAST::initializer';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = '= ';	# XXX oversimplified
+        @t;
+    }
+}
+
+{ package VAST::initializer__S_DotEqual; our @ISA = 'VAST::initializer';
+    sub emit_p5 {  my $self = shift;
+        my @t = $self->SUPER::emit_p5;
+	$t[0] = 'dot=';	# XXX wrong
+        @t;
+    }
+}
+
 { package VAST::integer; our @ISA = 'VAST::Base';
 }
 
@@ -1228,11 +1268,19 @@ TEMPLATE
 }
 
 
-{ package VAST::metachar__S_sigwhite; our @ISA = 'VAST::Base';
+{ package VAST::sigmaybe__S_sigwhite; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	$::SIGSPACE ?
-	    RE_method->new(name => 'ws', nobind => 1) :
-	    RE_noop->new;
+        $::SIGSPACE ?
+            RE_method->new(name => 'ws', nobind => 1) :
+            RE_noop->new;
+    }
+}
+
+{ package VAST::sigmaybe__S_normspace; our @ISA = 'VAST::Base';
+    sub re_ast {  my $self = shift;
+        $::SIGSPACE ?
+            RE_method->new(name => 'ws', nobind => 1) :
+            RE_noop->new;
     }
 }
 
@@ -1747,11 +1795,12 @@ EOFINAL
 	    $pvar = $np->{param_var};
 	    push @names, $np->{name} ? $np->{name}{TEXT}
 		: $np->{param_var}{name}[0]{TEXT};
-	    $np = $np->{named_param};
+	    $np = $np->{named_param_term}{named_param};
 	}
 	$posit = 1 unless @names;
 	my $pname = $pvar->{name}[0]{TEXT};
 	my $sigil = $pvar->{sigil}{SYM};
+	print YAML::XS::Dump($self) unless $sigil;
 	my $twigil = $pvar->{twigil}[0] ? $pvar->{twigil}[0]{SYM} : '';
 	my ($dv) = $self->kids('default_value');
 
@@ -1877,26 +1926,44 @@ EOFINAL
 
 { package VAST::quantified_atom; our @ISA = 'VAST::Base';
     sub re_ast {  my $self = shift;
-	if (!@{$self->{quantifier}}) {
-	    return $self->{atom}->re_ast;
-	}
+	my $quantifier = $self->{quantifier}[0];
+	my $sym = $quantifier ? ($quantifier->{SYM}//'') : '';
 
-	if ($self->{quantifier}[0]{SYM} eq '~') {
+	if ($quantifier and $sym eq '~') {
 	    return $self->_tilde;
 	}
 
-	if ($self->{quantifier}[0]{SYM} eq ':') {
-	    my $ast = $self->{atom}->re_ast;
+	my $ast = $self->{atom}->re_ast;
+
+	my $sigwhite = $self->{sigmaybe}[0];
+	if ($sigwhite) {
+	    if (ref($sigwhite) =~ /sigwhite/) {
+		# quantify over sigspace too
+		$ast = RE_sequence->new($ast, $sigwhite->re_ast);
+	    }
+	}
+	if (not $quantifier) {
+	    return $ast;
+	}
+
+	if ($sym eq ':') {
 	    $ast->{r} = 1;
 	    return $ast;
 	}
 
-	my $quant = $self->{quantifier}[0]->re_quantifier;
-
-	my $ast = $self->{atom}->re_ast;
+	my $quant = $quantifier->re_quantifier;
 
 	my $r = RE_quantified_atom->new(atom => $ast, quant => $quant);
 	$r->{r} = 0 if $quant->[1] ne ':';
+
+	my $sigfinal = $self->{sigfinal}[0];
+	if ($sigfinal) {
+	    if (ref($sigfinal) =~ /sigwhite/) {
+		# handle sigspace after quantifier
+		$r = RE_sequence->new($r, $sigfinal->re_ast);
+	    }
+	}
+
 	$r;
     }
 
@@ -1906,6 +1973,7 @@ EOFINAL
 	my $inner  = $self->{quantifier}[0]{quantified_atom}[1]->re_ast;
 
 	my $strcloser = $closer->{text}; #XXX
+	$strcloser = $closer->{zyg}[0]{text} unless defined $strcloser;
 
 	my $begin = <<TEXT;
 local \$::GOAL = "${\ quotemeta $strcloser}";
