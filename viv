@@ -824,17 +824,18 @@ TEMPLATE
 
 { package VAST::declarator; our @ISA = 'VAST::Base';
     sub emit_p5 { my $self = shift;
+	my $vd;
 	if ($self->{signature}) {
-	    return "(" . join(", ", map { $_->{param_var}->Str }
+	    $vd = "(" . join(", ", map { $_->{param_var}->Str }
 		$self->{signature}->kids('parameter')) . ")";
 	}
 	elsif ($self->{variable_declarator}) {
-	    my $vd = $self->{variable_declarator}->emit_p5;
-	    $vd .= $self->{initializer}[0] ? join('', $self->{initializer}[0]->emit_p5) : "";
-	    return $vd;
+	    $vd = $self->{variable_declarator}->emit_p5;
 	} else {
 	    return $self->SUPER::emit_p5;
 	}
+	$vd .= $self->{initializer}[0] ? join('', $self->{initializer}[0]->emit_p5) : "";
+	return $vd;
     }
 
     sub emit_psq { my $self = shift;
@@ -1952,6 +1953,13 @@ EOFINAL
 	}
 
 	my $quant = $quantifier->re_quantifier;
+
+	my $separator = $self->{separator}[0];
+	if ($separator) {
+	    $quant->[2] = $separator->{quantified_atom}->re_ast;
+	    # say ::Dump($separator);
+	    # say ::Dump($quant);
+	}
 
 	my $r = RE_quantified_atom->new(atom => $ast, quant => $quant);
 	$r->{r} = 0 if $quant->[1] ne ':';
@@ -3533,6 +3541,7 @@ END
 	}
 	my $atom_is_cut = !$atom->maybacktrack;
 	my ($qfer,$how,$rest) = @{$$self{quant}};
+	$qfer = '**' if ref $rest and ref $rest ne 'RE_block';
 	my $hc = $how eq '!' ? 'g' :
 		 $how eq '?' ? 'f' :
 			       'r';

@@ -625,7 +625,7 @@ token vnum {
 }
 
 token p5version:sym<v> {
-    'v' <?before \d+> :: <vnum> ** '.' '+'?
+    'v' <?before \d+> :: <vnum> +% '.' '+'?
 }
 
 ###############
@@ -1177,13 +1177,13 @@ token dec_number {
     <!!before [ '.' <?before \d> <.panic: "Number contains two decimal points (missing 'v' for version number?)">]? >
 }
 
-token octints { [<.ws><octint><.ws>] ** ',' }
+token octints { [<.ws><octint><.ws>] +% ',' }
 
 token octint {
     <[ 0..7 ]>+ [ _ <[ 0..7 ]>+ ]*
 }
 
-token hexints { [<.ws><hexint><.ws>] ** ',' }
+token hexints { [<.ws><hexint><.ws>] +% ',' }
 
 token hexint {
     <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
@@ -1484,7 +1484,7 @@ token charname {
     ] || <.panic: "Unrecognized character name">
 }
 
-token charnames { [<.ws><charname><.ws>] ** ',' }
+token charnames { [<.ws><charname><.ws>] +% ',' }
 
 token charspec {
     [
@@ -1711,7 +1711,7 @@ token signature ($lexsig = 0) {
     [
     | <?before '-->' | ')' | ']' | '{' | ':'\s >
     | [ <parameter> || <.panic: "Malformed parameter"> ]
-    ] ** <param_sep>
+    ] +% <param_sep>
     <.ws>
     { $*IN_DECL = 0; }
     [ '-->' <.ws> <typename> ]?
@@ -1838,7 +1838,7 @@ token methodop {
 }
 
 token semiarglist {
-    <arglist> ** ';'
+    <arglist> +% ';'
     <.ws>
 }
 

@@ -5220,15 +5220,15 @@ grammar Regex is STD {
     token mod_internal:oops { {} (':'\w+) <.sorry: "Unrecognized regex modifier " ~ $0.Str > }
 
     token quantifier:sym<*>  { <sym> <quantmod> }
-    token quantifier:sym<+>  { <!before '+%'> <sym> <quantmod> }
+    token quantifier:sym<+>  { <sym> <quantmod> }
     token quantifier:sym<?>  { <sym> <quantmod> }
     token quantifier:sym<:>  { <sym> {} <?before \s> }
-    token quantifier:sym<**> { $<op>=['**'|'+%'] :: <normspace>? <quantmod> <normspace>?
+    token quantifier:sym<**> { '**' :: <normspace>? <quantmod> <normspace>?
         [
         | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
         | (\d+) [ '..' [ (\d+) { $¢.panic("Empty range") if $0.Str > $1[0].Str } | '*' | <.panic: "Malformed range"> ] ]?
         | <embeddedblock>
-        | {} <quantified_atom> { if $<op>.Str eq '**' { $¢.worryobs("atom ** " ~ $<quantified_atom>.Str ~ " as separator", "atom+ % " ~ $<quantified_atom>.Str, " nowadays"); } }
+        | {} <quantified_atom> { $¢.worryobs("atom ** " ~ $<quantified_atom>.Str ~ " as separator", "atom+ % " ~ $<quantified_atom>.Str, " nowadays"); }
         ]
     }
 
