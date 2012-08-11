@@ -1504,8 +1504,7 @@ grammar P6 is STD {
             | $<wu>=['while'|'until']<.keyspace>
               <xblock>
             | <pblock>
-              [$<wu>=['while'|'until'] || <.panic: '"repeat" is missing its "while" or "until"'> ]
-              [<.keyspace> || <.panic: "Whitespace required after keyword">]
+              [$<wu>=['while'|'until']<.keyspace> || <.panic: '"repeat" is missing its "while" or "until"'> ]
               <EXPR>
         ]
     }
@@ -1518,7 +1517,8 @@ grammar P6 is STD {
                 <e2=.EXPR>? ';'
                 <e3=.EXPR>?
             ')'||<.panic: "Malformed loop spec">]
-            [ <?before '{' > <.sorry: "Whitespace required before block"> ]?
+        
+            [ <!{ @*MEMOS[$¢.pos]<ws> }> <.sorry: "Whitespace required before block"> ]?
         )?
         <block>
     }
