@@ -1230,20 +1230,20 @@ grammar P6 is STD {
         <.finishlex>
         [
         | '{YOU_ARE_HERE}' <.you_are_here>
-        | :dba('block') '{' ~ '}' <statementlist> :: <.curlycheck>
+        | :dba('block') '{' ~ '}' <statementlist> :: <.curlycheck(1)>
         | <?terminator> <.panic: 'Missing block'>
         | <?> <.panic: "Malformed block">
         ]
     }
 
-    token curlycheck {
+    token curlycheck($code) {
         [
         || <?before \h* $$>  # (usual case without comments)
             { @*MEMOS[$¢.pos]<endstmt> = 2; }
         || <?before \h* <[\\,:]>>
         || <.unv> $$
             { @*MEMOS[$¢.pos]<endstmt> = 2; }
-        || <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
+        || <.unsp>? { @*MEMOS[$¢.pos]<endargs> = $code; }
         ]
     }
 
@@ -1272,7 +1272,7 @@ grammar P6 is STD {
           ]
         ]
 
-        <.curlycheck>
+        <.curlycheck(1)>
     }
 
     # statement semantics
@@ -1633,7 +1633,7 @@ grammar P6 is STD {
                     }
                 }
             | :dba('shape definition') '[' ~ ']' <semilist>
-            | :dba('shape definition') '{' ~ '}' <semilist> <.curlycheck>
+            | :dba('shape definition') '{' ~ '}' <semilist> <.curlycheck(0)>
             | <?before '<'> <postcircumfix>
             ]*
         ]?
@@ -3448,7 +3448,7 @@ grammar P6 is STD {
         # <.finishlex>   # XXX not sure if we need this
         '{' ~ '}' <semilist> <O(|%methodcall)>
         <.checkyada>
-        <.curlycheck>
+        <.curlycheck(0)>
     }
 
     token postcircumfix:sym«< >» {
