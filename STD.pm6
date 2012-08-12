@@ -4891,7 +4891,8 @@ grammar Regex is STD {
     }
 
     token separator {
-        $<how>=['%''%'?] <normspace>? <quantified_atom>
+        $<how>=[ '%' [ '%' | <!before <[ \< * . ! ^ : ]> | \w > ] ]
+        <normspace>? <quantified_atom>
     }
 
     token sigmaybe:normspace {
