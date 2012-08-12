@@ -20,13 +20,14 @@ my role Role does Stash { }
 my role Package does Stash { }
 my role Module does Stash { }
 my role Class does Module { }
-my role Grammar does Class { }
 my role List { }
 my role Iterable { }
 
 # XXX does this mean anything?
 my role Matcher { }
 
+my class Cursor { }
+my class Grammar is Cursor { }
 my class CallFrame { }	# or is this a role?
 my class P6opaque { }
 my class Mu { }
@@ -252,6 +253,7 @@ my proto trim-trailing {*}
 my proto index {*}
 my proto rindex {*}
 my proto substr {*}
+my proto substr-rw {*}
 my proto join {*}
 my proto split {*}
 my proto comb {*}
@@ -301,6 +303,7 @@ my proto rotate {*}
 my proto reverse {*}
 my proto flip {*}
 my proto take {*}
+my proto take-rw {*}
 my proto splice {*}
 my proto slurp {*}
 my proto get {*}
@@ -314,6 +317,7 @@ my proto zip {*}
 my proto each {*}
 my proto roundrobin {*}
 my proto return {*}
+my proto return-rw {*}
 my proto leave {*}
 my proto make {*}
 my proto pop {*}
@@ -508,6 +512,40 @@ my proto infix:« <== » ($x,$y) {*}
 my proto infix:« ==> » ($x,$y) {*}
 my proto infix:« <<== » ($x,$y) {*}
 my proto infix:« ==>> » ($x,$y) {*}
+
+my proto sub infix:<∈>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:<(elem)>($a, $b --> Bool) {*}
+my proto sub infix:<∉>($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+
+my proto sub infix:<∋>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:<(cont)>($a, $b --> Bool) {*}
+my proto sub infix:<∌>($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+
+my proto sub infix:<∪>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export {*}
+my proto sub infix:<(|)>($a, $b --> Set) is equiv(&infix:<X>) is export {*}
+
+my proto sub infix:<∩>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export {*}
+my proto sub infix:<(&)>($a, $b --> Set) is equiv(&infix:<X>) is export {*}
+
+my proto sub infix:<(-)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export {*}
+
+my proto sub infix:<(^)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export {*}
+
+my proto sub infix:<⊆>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:['(<=)']($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:<⊈>($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+
+my proto sub infix:<⊂>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:['(<)']($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:<⊄>($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+
+my proto sub infix:<⊇>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:['(>=)']($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:<⊉>($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+
+my proto sub infix:<⊃>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:['(>)']($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
+my proto sub infix:<⊅>($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
 
 my package PROCESS {
     my %ENV is export;

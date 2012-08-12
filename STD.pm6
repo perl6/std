@@ -5694,6 +5694,7 @@ method add_our_name ($n) {
 }
 
 method add_mystery ($token,$pos,$ctx) {
+    return self unless $token;
     my $name = $token.Str;
     return self if $*IN_PANIC;
     if self.is_known('&' ~ $name) or self.is_known($name) {
