@@ -11479,7 +11479,7 @@ blockoid: !!perl/hash:RE_ast
             text: '::'
           - !!perl/hash:RE_method
             name: curlycheck
-            rest: ''
+            rest: 1
         - !!perl/hash:RE_sequence
           alt: blockoid_0 2
           zyg:
@@ -17157,7 +17157,7 @@ postcircumfix__S_209Cur_Ly: !!perl/hash:RE_ast
       rest: ''
     - !!perl/hash:RE_method
       name: curlycheck
-      rest: ''
+      rest: 1
 postcircumfix__S_210Lt_Gt: !!perl/hash:RE_ast
   dba: postcircumfix
   dic: STD::P6
@@ -18377,7 +18377,7 @@ regex_block: !!perl/hash:RE_ast
                   rest: 1
     - !!perl/hash:RE_method
       name: curlycheck
-      rest: ''
+      rest: 1
 regex_block_0: *67
 regex_declarator__S_065regex: !!perl/hash:RE_ast
   dba: regex_declarator
@@ -21498,10 +21498,10 @@ statement_control__S_008repeat: !!perl/hash:RE_ast
           - !!perl/hash:RE_bracket
             re: !!perl/hash:RE_first
               zyg:
-              - !!perl/hash:RE_bindnamed
-                atom: !!perl/hash:RE_sequence
-                  zyg:
-                  - !!perl/hash:RE_bracket
+              - !!perl/hash:RE_sequence
+                zyg:
+                - !!perl/hash:RE_bindnamed
+                  atom: !!perl/hash:RE_bracket
                     re: &112 !!perl/hash:RE_any
                       altname: statement_control__S_008repeat_2
                       dba: statement_control
@@ -21515,9 +21515,12 @@ statement_control__S_008repeat: !!perl/hash:RE_ast
                         alt: statement_control__S_008repeat_2 1
                         i: 0
                         text: until
-                  - !!perl/hash:RE_method
-                    name: ws
-                    rest: ''
+                - !!perl/hash:RE_method
+                  name: keyspace
+                  rest: ''
+                - !!perl/hash:RE_method
+                  name: ws
+                  rest: ''
               - !!perl/hash:RE_sequence
                 zyg:
                 - !!perl/hash:RE_method
@@ -21526,23 +21529,6 @@ statement_control__S_008repeat: !!perl/hash:RE_ast
                 - !!perl/hash:RE_method
                   name: ws
                   rest: ''
-          - !!perl/hash:RE_bracket
-            re: !!perl/hash:RE_first
-              zyg:
-              - !!perl/hash:RE_sequence
-                zyg:
-                - !!perl/hash:RE_method
-                  name: keyspace
-                  rest: ''
-                - !!perl/hash:RE_method
-                  name: ws
-                  rest: ''
-              - !!perl/hash:RE_method
-                name: panic
-                rest: 1
-          - !!perl/hash:RE_method
-            name: ws
-            rest: ''
           - !!perl/hash:RE_method
             name: EXPR
             rest: ''
@@ -21643,18 +21629,9 @@ statement_control__S_009loop: !!perl/hash:RE_ast
                   re: !!perl/hash:RE_sequence
                     zyg:
                     - !!perl/hash:RE_assertion
-                      assert: '?'
-                      re: !!perl/hash:RE_method_re
-                        name: before
+                      assert: '!'
+                      re: !!perl/hash:RE_block
                         nobind: 1
-                        re: !!perl/hash:RE_sequence
-                          zyg:
-                          - !!perl/hash:RE_string
-                            i: 0
-                            text: '{'
-                          - !!perl/hash:RE_method
-                            name: ws
-                            rest: ''
                     - !!perl/hash:RE_method
                       name: ws
                       rest: ''
@@ -24759,7 +24736,7 @@ variable_declarator: !!perl/hash:RE_ast
                               rest: 1
                     - !!perl/hash:RE_method
                       name: curlycheck
-                      rest: ''
+                      rest: 1
                   - !!perl/hash:RE_sequence
                     alt: variable_declarator_0 3
                     zyg:
@@ -25395,7 +25372,7 @@ $C
 } else { () }
 }))
 and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->curlycheck)) {
+and ($C) = ($C->curlycheck(1))) {
 $C
 } else { () }
 },
@@ -25432,12 +25409,14 @@ $C
 });
 }
 ;
-## token curlycheck {
+## token curlycheck($code) {
 sub curlycheck__PEEK { $_[0]->_AUTOLEXpeek('curlycheck', $retree) }
 sub curlycheck {
 no warnings 'recursion';
 my $self = shift;
 
+die 'Required argument code omitted' unless @_;
+my $code = @_ ? shift() : undef;
 
 local $::CTX = $self->callm() if $::DEBUG & DEBUG::trace_call;
 
@@ -25497,7 +25476,7 @@ my $C=shift;
 if (my ($C) = ($C->unsp)) { ($C) } else { () }
 }))) {
 scalar(do {
-$::MEMOS[$C->{'_pos'}]->{'endargs'} = 1}, $C)
+$::MEMOS[$C->{'_pos'}]->{'endargs'} = $code}, $C)
 } else { () }
 
 }
@@ -25626,7 +25605,7 @@ last if $xact->[-2];  # committed?
 @gather;
 };
 }))
-and ($C) = ($C->curlycheck)) {
+and ($C) = ($C->curlycheck(1))) {
 $C
 } else { () }
 
@@ -27149,9 +27128,11 @@ do {    my $C = $C->cursor_xact('ALT ||');
 my $xact = $C->xact;
 my @gather;
 do {
-push @gather, $C->_SUBSUMEr(['wu'], sub {
+push @gather, do {
+my $C = $C;
+if (($C) = ($C->_SUBSUMEr(['wu'], sub {
 my $C = shift;
-if (($C) = ($C->_BRACKETr(sub {
+$C->_BRACKETr(sub {
 my $C=shift;
 do {
 my ($tag, $try);
@@ -27200,11 +27181,14 @@ last if $xact->[-2];  # committed?
 }
 @gather;
 };
+})
 }))
+and ($C) = ($C->keyspace)
 and ($C) = ($C->ws)) {
 $C
 } else { () }
-})
+
+}
 }
 or $xact->[-2] or
 do {
@@ -27220,32 +27204,6 @@ $C
 @gather;
 }
 }))
-and ($C) = ($C->_BRACKETr(sub {
-my $C=shift;
-do {    my $C = $C->cursor_xact('ALT ||');
-my $xact = $C->xact;
-my @gather;
-do {
-push @gather, do {
-my $C = $C;
-if (($C) = ($C->keyspace)
-and ($C) = ($C->ws)) {
-$C
-} else { () }
-
-}
-}
-or $xact->[-2] or
-do {
-push @gather, do {
-if (my ($C) = ($C->panic("Whitespace required after keyword"))) { ($C) } else { () }
-
-}
-};
-@gather;
-}
-}))
-and ($C) = ($C->ws)
 and ($C) = ($C->_SUBSUMEr(['EXPR'], sub {
 my $C = shift;
 $C->EXPR
@@ -27351,18 +27309,10 @@ and ($C) = ($C->_OPTr(sub {
 my $C=shift;
 if (my ($C) = ($C->_BRACKETr(sub {
 my $C=shift;
-if (($C) = ($C->before(sub {
+if (($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-do {
-my $C = $C;
-if (($C) = ($C->_EXACT("\{"))
-and ($C) = ($C->ws)) {
-$C
-} else { () }
-};
-}))) { ($C) } else { () }
+(($C) x !!do {
+$::MEMOS[$C->{'_pos'}]->{'ws'} })
 }))
 and ($C) = ($C->ws)
 and ($C) = ($C->sorry("Whitespace required before block"))
@@ -28620,7 +28570,7 @@ if (my ($C) = ($C->FAILGOAL($::GOAL, 'shape definition', $goalpos))) { ($C) } el
 $C
 } else { () }
 }))
-and ($C) = ($C->curlycheck)) {
+and ($C) = ($C->curlycheck(0))) {
 $C
 } else { () }
 },
@@ -44747,7 +44697,7 @@ my $C = shift;
 $C->O(%methodcall)
 }))
 and ($C) = ($C->checkyada)
-and ($C) = ($C->curlycheck)) {
+and ($C) = ($C->curlycheck(0))) {
 $C
 } else { () }
 
@@ -58233,12 +58183,35 @@ separator: !!perl/hash:RE_ast
           - !!perl/hash:RE_string
             i: 0
             text: '%'
-          - !!perl/hash:RE_quantified_atom
-            atom: !!perl/hash:RE_string
-              i: 0
-              text: '%'
-            quant:
-            - '?'
+          - !!perl/hash:RE_bracket
+            re: &30 !!perl/hash:RE_any
+              altname: separator_0
+              dba: separator
+              dic: STD::Regex
+              zyg:
+              - !!perl/hash:RE_string
+                alt: separator_0 0
+                i: 0
+                text: '%'
+              - !!perl/hash:RE_assertion
+                alt: separator_0 1
+                assert: '!'
+                re: !!perl/hash:RE_method_re
+                  name: before
+                  nobind: 1
+                  re: &31 !!perl/hash:RE_any
+                    altname: separator_1
+                    dba: separator
+                    dic: STD::Regex
+                    zyg:
+                    - !!perl/hash:RE_cclass
+                      alt: separator_1 0
+                      i: 0
+                      text: '[ \< * . ! ^ : ]'
+                    - !!perl/hash:RE_meta
+                      alt: separator_1 1
+                      min: 1
+                      text: \w
     - !!perl/hash:RE_quantified_atom
       atom: !!perl/hash:RE_method
         name: normspace
@@ -58248,6 +58221,8 @@ separator: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: quantified_atom
       rest: ''
+separator_0: *30
+separator_1: *31
 sigmaybe:*:
   dic: STD::Regex
 sigmaybe__S_011normspace: !!perl/hash:RE_ast
@@ -58295,7 +58270,7 @@ sigmaybe__S_014nosp: !!perl/hash:RE_ast
 sign: !!perl/hash:RE_ast
   dba: sign
   dic: STD::Regex
-  re: &30 !!perl/hash:RE_any
+  re: &32 !!perl/hash:RE_any
     altname: sign_0
     dba: sign
     dic: STD::Regex
@@ -58313,7 +58288,7 @@ sign: !!perl/hash:RE_ast
       assert: '?'
       re: !!perl/hash:RE_noop
         nobind: 1
-sign_0: *30
+sign_0: *32
 termish: !!perl/hash:RE_ast
   dba: termish
   dic: STD::Regex
@@ -58345,7 +58320,7 @@ termish: !!perl/hash:RE_ast
             re: !!perl/hash:RE_method_re
               name: before
               nobind: 1
-              re: &31 !!perl/hash:RE_any
+              re: &33 !!perl/hash:RE_any
                 altname: termish_0
                 dba: termish
                 dic: STD::Regex
@@ -58392,7 +58367,7 @@ termish: !!perl/hash:RE_ast
         - !!perl/hash:RE_method
           name: panic
           rest: 1
-termish_0: *31
+termish_0: *33
 unsp: !!perl/hash:RE_ast
   dba: unsp
   dic: STD::Regex
@@ -58406,7 +58381,7 @@ unsp: !!perl/hash:RE_ast
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &32 !!perl/hash:RE_any
+        re: &34 !!perl/hash:RE_any
           altname: unsp_0
           dba: unsp
           dic: STD::Regex
@@ -58422,7 +58397,7 @@ unsp: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: panic
       rest: 1
-unsp_0: *32
+unsp_0: *34
 RETREE_END
 ## method tweak (:Perl5(:$P5)!)
 ;
@@ -59782,7 +59757,114 @@ if (($C) = ($C->_SUBSUMEr(['how'], sub {
 my $C = shift;
 $C->_BRACKETr(sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\%\%?+/)
+if (($C) = ($C->_EXACT("\%"))
+and ($C) = ($C->_BRACKETr(sub {
+my $C=shift;
+do {
+my ($tag, $try);
+my @try;
+my $relex;
+
+my $fate;
+my $x;
+if ($fate = $C->{'_fate'} and $fate->[1] eq 'separator_0') {
+$C->deb("Fate passed to separator_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
+($C->{'_fate'}, $tag, $try) = @$fate;
+@try = ($try);
+$x = 'ALT separator_0';    # some outer ltm is controlling us
+}
+else {
+$x = 'ALTLTM separator_0'; # we are top level ltm
+}
+my $C = $C->cursor_xact($x);
+my $xact = $C->{_xact};
+
+my @gather = ();
+for (;;) {
+unless (@try) {
+$relex //= $C->cursor_fate('STD::Regex', 'separator_0', $retree);
+@try = $relex->($C) or last;
+}
+$try = shift(@try) // next;
+
+if (ref $try) {
+($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
+}
+
+$C->deb("separator_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
+push @gather, ((
+sub {
+my $C=shift;
+$C->_EXACT("\%")
+},
+sub {
+my $C=shift;
+if (my ($C) = ($C->_NOTBEFORE(sub {
+my $C=shift;
+if (my ($C) = ($C->before(sub {
+my $C=shift;
+if (my ($C) = (do {
+do {
+my ($tag, $try);
+my @try;
+my $relex;
+
+my $fate;
+my $x;
+if ($fate = $C->{'_fate'} and $fate->[1] eq 'separator_1') {
+$C->deb("Fate passed to separator_1: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
+($C->{'_fate'}, $tag, $try) = @$fate;
+@try = ($try);
+$x = 'ALT separator_1';    # some outer ltm is controlling us
+}
+else {
+$x = 'ALTLTM separator_1'; # we are top level ltm
+}
+my $C = $C->cursor_xact($x);
+my $xact = $C->{_xact};
+
+my @gather = ();
+for (;;) {
+unless (@try) {
+$relex //= $C->cursor_fate('STD::Regex', 'separator_1', $retree);
+@try = $relex->($C) or last;
+}
+$try = shift(@try) // next;
+
+if (ref $try) {
+($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
+}
+
+$C->deb("separator_1 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
+push @gather, ((
+sub {
+my $C=shift;
+$C->_PATTERN(qr/\G[\<*.!^:]/)
+},
+sub {
+my $C=shift;
+$C->_PATTERN(qr/\G\w/)
+}
+)[$try])->($C);
+last if @gather;
+last if $xact->[-2];  # committed?
+}
+@gather;
+};
+
+})) { ($C) } else { () }
+}))) { ($C) } else { () }
+}))) { ($C) } else { () }
+}
+)[$try])->($C);
+last if @gather;
+last if $xact->[-2];  # committed?
+}
+@gather;
+};
+}))) {
+$C
+} else { () }
 })
 }))
 and ($C) = ($C->_OPTr(sub {
@@ -65277,7 +65359,7 @@ $C->quantified_atom
 }))) {
 scalar(do {
 my $M = $C;
-$C->worryobs("atom ** " . $M->{'quantified_atom'}->Str . " as separator", "atom+ % " . $M->{'quantified_atom'}->Str, " nowadays")}, $C)
+$C->worryobs("atom ** " . $M->{'quantified_atom'}->Str . " as separator", "atom +% " . $M->{'quantified_atom'}->Str, " nowadays")}, $C)
 } else { () }
 }
 )[$try])->($C);
@@ -66254,6 +66336,7 @@ die 'Required argument pos omitted' unless @_;
 my $pos = @_ ? shift() : undef;
 die 'Required argument ctx omitted' unless @_;
 my $ctx = @_ ? shift() : undef;
+return $self unless $token;
 my $name = $token->Str;
 return $self if $::IN_PANIC;
 if ($self->is_known('&' . $name) or $self->is_known($name)) {
