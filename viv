@@ -1801,7 +1801,7 @@ EOFINAL
 	$posit = 1 unless @names;
 	my $pname = $pvar->{name}[0]{TEXT};
 	my $sigil = $pvar->{sigil}{SYM};
-	print YAML::XS::Dump($self) unless $sigil;
+#	print YAML::XS::Dump($self) unless $sigil;
 	my $twigil = $pvar->{twigil}[0] ? $pvar->{twigil}[0]{SYM} : '';
 	my ($dv) = $self->kids('default_value');
 
