@@ -589,6 +589,7 @@ token quotepair {
     $<k> = {$key} $<v> = {$value}
 }
 
+token quote:sym<｢ ｣>   { :dba('perfect quotes') "｢" ~ "｣" <nibble($¢.cursor_fresh( %*LANG<Q> ).unbalanced("｣"))> }
 token quote:sym<' '>   { :dba('single quotes') "'" ~ "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> }
 token quote:sym<" ">   { :dba('double quotes') '"' ~ '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> }
 
