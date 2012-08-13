@@ -5029,6 +5029,7 @@ grammar Regex is STD {
         <.SIGOK>
     }
 
+    token metachar:sym<｢ ｣> { <?before "｢"> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
     token metachar:sym<' '> { <?before "'"> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
     token metachar:sym<" "> { <?before '"'> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
 
