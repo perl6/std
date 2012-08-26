@@ -558,7 +558,7 @@ sub cursor_herelang { my $self = shift;
     $self->deb("cursor_herelang") if DEBUG & DEBUG::cursors;
     my %r = %$self;
     $r{_herelang} = $self;
-    bless \%r, 'STD::Q';
+    bless \%r, $::LANG{Q};
 }
 
 sub prepbind {

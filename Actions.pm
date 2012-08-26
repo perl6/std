@@ -236,7 +236,7 @@ sub LIST {
     my $class =
 	$match->{delims}[0]{_ast}{infix}{_op} //
 	$match->{delims}[0]{_ast}{regex_infix}{_op} //
-	warn ::Dump($match);
+	warn ref($match);
     gen_class($class, $base);
     $r = bless $r, $class;
     $match->{'_ast'} = $r;
@@ -267,7 +267,7 @@ sub POSTFIX {
 	    $match->{_ast}{postop}{postfix}{_op} //
 	    $match->{_ast}{postop}{postcircumfix}{_op} //
 	    $match->{_ast}{dotty}{_op} //
-	    warn ::Dump($match);
+	    warn ref($match);
     }
 
     gen_class($class, $base);
@@ -301,7 +301,7 @@ sub PREFIX {
 	    $match->{_ast}{prefix}{_op} //
 	    $match->{_ast}{prefix_postfix_meta_operator}{_op} //
 	    $match->{_ast}{prefix_circumfix_meta_operator}{_op} //
-	    warn ::Dump($match);
+	    warn ref($match);
     }
 
     gen_class($class,$base);
@@ -340,7 +340,7 @@ sub INFIX {
 	$class =
 	    $match->{_ast}{infix}{_op} //
 	    $match->{_ast}{regex_infix}{_op} //
-	    warn ::Dump($match);
+	    warn ref($match);
     }
 
     gen_class($class, $base);
@@ -371,7 +371,7 @@ sub nibbler {
 		push @dot, $n->{EXPR}->{_ast};
 	    }
 	    else {
-		warn "Oops", ::Dump($n);
+		warn "Oops", ref($n);
 		exit;
 	    }
 	}

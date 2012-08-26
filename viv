@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+use v5;
+
 =head1 NAME
 
 viv - The STD.pm6 command line multitool
@@ -31,7 +33,7 @@ viv [options] [file...]
 =cut
 
 use strict;
-use 5.010;
+use v5.14;
 use warnings FATAL => 'all';
 
 use List::Util qw/sum min/;
@@ -142,7 +144,7 @@ sub spew {
 	open my $out, ">", $OPT_output_file
 	    or die "cannot open $OPT_output_file for writing: $!";
 	binmode $out, ":utf8";
-	print $out $bits or die "cannot write: $!";
+	$out->print( $bits ) or die "cannot write: $!";
 	close $out or die "cannot close: $!";
     } else {
 	print $bits;
@@ -781,7 +783,7 @@ TEMPLATE
 
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
     sub emit_p5 { my $self = shift;
-	"use 5.010;\nuse utf8;\n" . $self->{statementlist}->p5, "\n";
+	"use v5.14;\nuse utf8;\n" . $self->{statementlist}->p5, "\n";
     }
     sub emit_p6 { my $self = shift;
 	substr($ORIG, 0, $self->{statementlist}{BEG}),
@@ -1632,6 +1634,7 @@ BODY
     sub emit_p5_header {  my $self = shift;
 	my $header = "";
 	my $name = $::PKG;
+	say $name;
 
 	my $meta = $::PKGDECL eq 'role' ? 'Moose::Role' : 'Moose';
 

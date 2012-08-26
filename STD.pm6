@@ -1124,8 +1124,8 @@ grammar P6 is STD {
             %*LANG<Q>       = ::STD::Q ;
             %*LANG<Quasi>   = ::STD::Quasi ;
             %*LANG<Regex>   = ::STD::Regex ;
-            %*LANG<P5>      = ::STD::P5 ;
-            %*LANG<P5Regex> = ::STD::P5::Regex ;
+            %*LANG<P5>      = ::STD5 ;
+            %*LANG<P5Regex> = ::STD5::Regex ;
 
             @*WORRIES = ();
             self.load_setting($*SETTINGNAME);
@@ -1432,10 +1432,22 @@ grammar P6 is STD {
         :my $*SCOPE = 'use';
         :my $*HAS_SELF = '';
         :my %*MYSTERY;
-        <sym> <.ws>
+        <sym> :: <.ws>
         [
-        | <version>
-        | <module_name>
+        || <version> <?{ substr($<version>.Str,0,2) eq 'v6' }>
+        || <version> <?{ substr($<version>.Str,0,2) eq 'v5' }>
+            :my %*LANG;
+            {
+                self.require_P5;
+                %*LANG<MAIN> = ::STD5 ;
+                %*LANG<Regex> = ::STD5::Regex ;
+                %*LANG<Q> = ::STD5::Q ;
+                %*LANG<Trans> = ::STD5::Trans ;
+                $¢ = %*LANG<MAIN>.bless($¢);
+            }
+            <.ws> ';'
+            [ <statementlist> || <.panic: "Bad P5 code"> ]
+        || <module_name>
             {
                 $longname = $<module_name><longname>;
                 if $longname.Str eq 'MONKEY_TYPING' {
@@ -1449,9 +1461,9 @@ grammar P6 is STD {
                 }
             || { $¢.do_use($longname<name>, ''); }
             ]
+            <.ws>
+            <.explain_mystery>
         ]
-        <.ws>
-        <.explain_mystery>
     }
 
 
@@ -4037,6 +4049,8 @@ grammar P6 is STD {
         :VAR(2),
         :any(2), :all(2), :none(2), :one(2),
     );
+
+#    token term:funspace { <longname> \h* <?before '('> <args(0)> }
 
     # force identifier(), identifier.(), etc. to be a function call always
     token term:identifier

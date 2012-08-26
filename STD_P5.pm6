@@ -5,7 +5,7 @@
 # You may copy this software under the terms of the Artistic License,
 #     version 2.0 or later.
 
-grammar STD::P5 is STD;
+grammar STD5 is STD;
 
 use DEBUG;
 
@@ -32,7 +32,7 @@ constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>,
 constant %autoincrement   = (:dba('autoincrement')   , :prec<x=>, :assoc<unary>, :uassoc<non>);
 constant %exponentiation  = (:dba('exponentiation')  , :prec<w=>, :assoc<right>);
 constant %symbolic_unary  = (:dba('symbolic unary')  , :prec<v=>, :assoc<unary>, :uassoc<left>);
-constant %binding         = (:dba('binding')         , :prec<u=>, :assoc<unary>, :uassoc<left>);
+constant %binding         = (:dba('binding')         , :prec<u=>, :assoc<non>);
 constant %multiplicative  = (:dba('multiplicative')  , :prec<t=>, :assoc<left>);
 constant %additive        = (:dba('additive')        , :prec<s=>, :assoc<left>);
 constant %shift           = (:dba('shift')           , :prec<r=>, :assoc<left>);
@@ -75,84 +75,81 @@ constant $LOOSEST = "a=!"; # XXX preceding line is busted
 my $*endsym = "null";
 my $*endargs = -1;
 
-proto token category { <...> }
+proto token category {*}
 
 token category:category { <sym> }
 
 token category:p5sigil { <sym> }
-proto token p5sigil { <...> }
+proto token p5sigil {*}
 
 token category:p5special_variable { <sym> }
-proto token p5special_variable { <...> }
+proto token p5special_variable {*}
 
 token category:p5comment { <sym> }
-proto token p5comment { <...> }
-
-token category:p5version { <sym> }
-proto token p5version { <...> }
+proto token p5comment {*}
 
 token category:p5module_name { <sym> }
-proto token p5module_name { <...> }
+proto token p5module_name {*}
 
 token category:p5value { <sym> }
-proto token p5value { <...> }
+proto token p5value {*}
 
 token category:p5term { <sym> }
-proto token p5term { <...> }
+proto token p5term {*}
 
 token category:p5number { <sym> }
-proto token p5number { <...> }
+proto token p5number {*}
 
 token category:p5quote { <sym> }
-proto token p5quote () { <...> }
+proto token p5quote () {*}
 
 token category:p5prefix { <sym> }
-proto token p5prefix is unary is defequiv(%symbolic_unary) { <...> }
+proto token p5prefix is unary is defequiv(%symbolic_unary) {*}
 
 token category:p5infix { <sym> }
-proto token p5infix is binary is defequiv(%additive) { <...> }
+proto token p5infix is binary is defequiv(%additive) {*}
 
 token category:p5postfix { <sym> }
-proto token p5postfix is unary is defequiv(%autoincrement) { <...> }
+proto token p5postfix is unary is defequiv(%autoincrement) {*}
 
 token category:p5dotty { <sym> }
-proto token p5dotty (:$*endsym = 'unspacey') { <...> }
+proto token p5dotty (:$*endsym = 'unspacey') {*}
 
 token category:p5circumfix { <sym> }
-proto token p5circumfix { <...> }
+proto token p5circumfix {*}
 
 token category:p5postcircumfix { <sym> }
-proto token p5postcircumfix is unary { <...> }  # unary as far as EXPR knows...
+proto token p5postcircumfix is unary {*}  # unary as far as EXPR knows...
 
 token category:p5type_declarator { <sym> }
-proto token p5type_declarator (:$*endsym = 'spacey') { <...> }
+proto token p5type_declarator (:$*endsym = 'spacey') {*}
 
 token category:p5scope_declarator { <sym> }
-proto token p5scope_declarator (:$*endsym = 'nofun') { <...> }
+proto token p5scope_declarator (:$*endsym = 'nofun') {*}
 
 token category:p5package_declarator { <sym> }
-proto token p5package_declarator (:$*endsym = 'spacey') { <...> }
+proto token p5package_declarator (:$*endsym = 'spacey') {*}
 
 token category:p5routine_declarator { <sym> }
-proto token p5routine_declarator (:$*endsym = 'nofun') { <...> }
+proto token p5routine_declarator (:$*endsym = 'nofun') {*}
 
 token category:p5regex_declarator { <sym> }
-proto token p5regex_declarator (:$*endsym = 'spacey') { <...> }
+proto token p5regex_declarator (:$*endsym = 'spacey') {*}
 
 token category:p5statement_prefix { <sym> }
-proto rule  p5statement_prefix () { <...> }
+proto rule  p5statement_prefix () {*}
 
 token category:p5statement_control { <sym> }
-proto rule  p5statement_control (:$*endsym = 'spacey') { <...> }
+proto rule  p5statement_control (:$*endsym = 'spacey') {*}
 
 token category:p5statement_mod_cond { <sym> }
-proto rule  p5statement_mod_cond (:$*endsym = 'nofun') { <...> }
+proto rule  p5statement_mod_cond (:$*endsym = 'nofun') {*}
 
 token category:p5statement_mod_loop { <sym> }
-proto rule  p5statement_mod_loop (:$*endsym = 'nofun') { <...> }
+proto rule  p5statement_mod_loop (:$*endsym = 'nofun') {*}
 
 token category:p5terminator { <sym> }
-proto token p5terminator { <...> }
+proto token p5terminator {*}
 
 token unspacey { <.unsp>? }
 token endid { <?before <-[ \- \' \w ]> > }
@@ -187,7 +184,7 @@ token ws {
             @*MEMOS[$¢.pos]<ws> :delete;
         }
         else {
-            @*MEMOS[$¢.pos]<ws> :delete;
+            @*MEMOS[$¢.pos]<ws> = $startpos;
             @*MEMOS[$¢.pos]<endstmt> = @*MEMOS[$startpos]<endstmt>
                 if @*MEMOS[$startpos]<endstmt> :exists;
         }
@@ -248,10 +245,7 @@ token pod_comment {
         
     | 'for' » :: \h* [ <identifier> || $$ || '#' || <.panic: "Unrecognized token after =for"> ]
         [.*?  ^^ \h* $$ || .*]
-    | :: 
-        [ <?before .*? ^^ '=cut' » > <.panic: "Obsolete pod format, please use =begin/=end instead"> ]?
-        [<alpha>||\s||<.panic: "Illegal pod directive">]
-        \N*
+    | :: .*? ^^ '=cut' » \N*
     ]
 }
 
@@ -284,12 +278,10 @@ rule comp_unit {
     :my $*CURPKG;
     {{
 
-        %*LANG<MAIN>    = ::STD ;
-        %*LANG<Q>       = ::STD::Q ;
-        %*LANG<Regex>   = ::STD::Regex ;
-        %*LANG<Trans>   = ::STD::Trans ;
-        %*LANG<P5>      = ::STD::P5 ;
-        %*LANG<P5Regex> = ::STD::P5::Regex ;
+        %*LANG<MAIN>    = ::STD5 ;
+        %*LANG<Q>       = ::STD5::Q ;
+        %*LANG<Regex>   = ::STD5::Regex ;
+        %*LANG<Trans>   = ::STD5::Trans ;
 
         @*WORRIES = ();
         self.load_setting($*SETTINGNAME);
@@ -434,7 +426,7 @@ token regex_block {
 rule statementlist {
     :my $*INVOCANT_OK = 0;
     :dba('statement list')
-
+    ''
     [
     | $
     | <?before <[\)\]\}]> >
@@ -446,6 +438,7 @@ rule statementlist {
 rule semilist {
     :my $*INVOCANT_OK = 0;
     :dba('semicolon list')
+    ''
     [
     | <?before <[\)\]\}]> >
     | [<statement><eat_terminator> ]*
@@ -505,76 +498,75 @@ token eat_terminator {
 # statement control #
 #####################
 
-token p5statement_control:use {
+rule p5statement_control:use {
     :my $longname;
     :my $*SCOPE = 'use';
-    <sym> <.ws>
+    <sym>
     [
-    | <version=p5version>
+    | <version=p5versionish>
     | <module_name=p5module_name>
-        {{
+        {
             $longname = $<module_name><longname>;
-        }}
+        }
+	<version=p5versionish>?
         [
-        || <.spacey> <arglist>
-            {{
-                $¢.do_use($longname, $<arglist>);
-            }}
-        || {{ $¢.do_use($longname, ''); }}
+        <arglist>?
+#            {
+#                $¢.do_use($longname, $<arglist>);
+#            }
+#        || {
+#		$¢.do_use($longname, '');
+#	   }
         ]
     ]
-    <.ws>
 }
 
 
-token p5statement_control:no {
-    <sym> <.ws>
+rule p5statement_control:no {
+    <sym>
     <module_name=p5module_name>[<.spacey><arglist>]?
-    <.ws>
 }
 
 
-token p5statement_control:if {
-    $<sym>=['if'|'unless']:s
+rule p5statement_control:if {
+    $<sym>=['if'|'unless']
     <xblock>
     [
         [ <!before 'else'\s*'if'> || <.panic: "Please use 'elsif'"> ]
         'elsif'<?spacey> <elsif=xblock>
     ]*
     [
-        'else'<?spacey> <else=pblock>
+        'else'<?spacey> <else=block>
     ]?
 }
 
-token p5statement_control:while {
-    <sym> :s
-    <xblock>
+rule p5statement_control:while {
+    <sym> <xblock>
 }
 
-token p5statement_control:until {
-    <sym> :s
-    <xblock>
+rule p5statement_control:until {
+    <sym> <xblock>
 }
 
-token p5statement_control:for {
-    ['for'|'foreach'] <.ws>
-    $<eee> = (
-        '(' [ :s
-            <e1=EXPR>? ';'
-            <e2=EXPR>? ';'
-            <e3=EXPR>?
-        ')'||<.panic: "Malformed loop spec">]
-    )? <.ws>
+rule p5statement_control:for {
+    ['for'|'foreach']
+    [
+    ||  '('
+	    <e1=EXPR>? ';'
+	    <e2=EXPR>? ';'
+	    <e3=EXPR>?
+	')'
+    || ['my'? <variable_declarator>]? '(' ~ ')' <EXPR>
+    || <.panic: "Malformed loop spec">
+    ]
     <block>
 }
 
-token p5statement_control:given {
-    <sym> :s
-    <xblock>
+rule p5statement_control:given {
+    <sym> <xblock>
 }
-token p5statement_control:when {
-    <sym> :s
-    <xblock>
+rule p5statement_control:when {
+    <sym> <xblock>
 }
 rule p5statement_control:default {<sym> <block> }
 
@@ -605,14 +597,6 @@ rule p5statement_mod_loop:given {<sym> <modifier_expr> }
 
 token def_module_name {
     <longname>
-    [ :dba('generic role')
-        <?before '['>
-        <?{ ($*PKGDECL//'') eq 'role' }>
-        <.newlex>
-        '[' ~ ']' <signature>
-        { $*IN_DECL = 0; }
-        <.finishlex>
-    ]?
 }
 
 token p5module_name:normal {
@@ -621,11 +605,17 @@ token p5module_name:normal {
 }
 
 token vnum {
-    \d+ | '*'
+    \d+
 }
 
-token p5version:sym<v> {
-    'v' <?before \d+> :: <vnum> +% '.' '+'?
+token p5versionish {
+    | <p5version>
+    | <?before \d+'.'\d+> <vnum> +% '.'
+}
+
+token p5version {
+    | 'v' <?before \d+ > :: <vnum> +% '.'
+    | <?before \d+'.'\d+'.'\d+> <vnum> +% '.'
 }
 
 ###############
@@ -637,16 +627,6 @@ token variable_declarator {
     :my $*DECLARAND;
     <variable>
     { $*IN_DECL = 0; $¢.add_variable($<variable>.Str) }
-    [   # Is it a shaped array or hash declaration?
-      #  <?{ $<sigil> eq '@' | '%' }>
-        <.unsp>?
-        $<shape> = [
-        | '(' ~ ')' <signature>
-        | :dba('shape definition') '[' ~ ']' <semilist>
-        | :dba('shape definition') '{' ~ '}' <semilist>
-        | <?before '<'> <postcircumfix=p5postcircumfix>
-        ]*
-    ]?
     <.ws>
 
     <trait>*
@@ -670,17 +650,17 @@ rule scoped($*SCOPE) {
 }
 
 
-token p5scope_declarator:my        { <sym> <scoped('my')> }
-token p5scope_declarator:our       { <sym> <scoped('our')> }
-token p5scope_declarator:state     { <sym> <scoped('state')> }
+rule p5scope_declarator:my        { <sym> <scoped('my')> }
+rule p5scope_declarator:our       { <sym> <scoped('our')> }
+rule p5scope_declarator:state     { <sym> <scoped('state')> }
 
-token p5package_declarator:package {
+rule p5package_declarator:package {
     :my $*PKGDECL ::= 'package';
     <sym> <package_def>
 }
 
-token p5package_declarator:require {   # here because of declarational aspects
-    <sym> <.ws>
+rule p5package_declarator:require {   # here because of declarational aspects
+    <sym>
     [
     || <module_name=p5module_name> <EXPR>?
     || <EXPR>
@@ -689,33 +669,65 @@ token p5package_declarator:require {   # here because of declarational aspects
 
 rule package_def {
     :my $longname;
-    :my $*IN_DECL = 1;
+    :my $*IN_DECL = 'package';
+    :my $*HAS_SELF = '';
     :my $*DECLARAND;
     :my $*NEWPKG;
     :my $*NEWLEX;
+    :my $outer = $*CURLEX;
+    :temp $*CURPKG;
+    :temp $*CURLEX;
     { $*SCOPE ||= 'our'; }
+    '' # XXX
     [
-        [
-            <def_module_name>{
-                $longname = $<def_module_name>[0]<longname>;
-                $¢.add_name($longname.Str);
-            }
-        ]?
-        [
-        || <?before ';'>
-	    {{
-		$longname orelse $¢.panic("Package cannot be anonymous");
+	[ <longname> { $longname = $<longname>[0]; $¢.add_name($longname<name>.Str); } ]?
+	<.newlex>
+	<trait>*
+	<.getdecl>
+	[
+	|| <?before '{'>
+	    [
+	    {
+		# figure out the actual full package name (nested in outer package)
+		if $longname and $*NEWPKG {
+		    my $shortname = $longname.<name>.Str;
+		    if $*SCOPE eq 'our' {
+			$*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+			self.deb("added our " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
+		    }
+		    else {
+			$*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
+			self.deb("added my " ~ $*CURPKG.id) if $*DEBUG +& DEBUG::symtab;
+		    }
+		}
+		$*begin_compunit = 0;
+		$*UNIT<$?LONGNAME> ||= $longname ?? $longname<name>.Str !! '';
+	    }
+	    { $*IN_DECL = ''; }
+	    <blockoid>
+	    <.checkyada>
+	    ]
+	|| <?before ';'>
+	    {
+		$longname orelse $¢.panic("Compilation unit cannot be anonymous");
 		my $shortname = $longname.<name>.Str;
 		$*CURPKG = $*NEWPKG // $*CURPKG.{$shortname ~ '::'};
-	    }}
-        || <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
-        ]
+		$*begin_compunit = 0;
+
+		# XXX throws away any role sig above
+		$*CURLEX = $outer;
+
+		$*UNIT<$?LONGNAME> = $longname<name>.Str;
+	    }
+	    { $*IN_DECL = ''; }
+	    <statementlist>     # whole rest of file, presumably
+	|| <.panic: "Unable to parse " ~ $*PKGDECL ~ " definition">
+	]
     ] || <.panic: "Malformed $*PKGDECL">
 }
 
 token declarator {
     [
-    | <constant_declarator>
     | <variable_declarator>
     | '(' ~ ')' <signature> <trait>*
     | <routine_declarator=p5routine_declarator>
@@ -729,7 +741,7 @@ token p5multi_declarator:null {
     <declarator>
 }
 
-token p5routine_declarator:sub       { <sym> <routine_def> }
+rule p5routine_declarator:sub       { <sym> <routine_def> }
 
 rule parensig {
     :dba('signature')
@@ -751,7 +763,7 @@ rule routine_def () {
     :my $*IN_DECL = 1;
     :my $*DECLARAND;
     [
-        [ '&'<deflongname>? | <deflongname> ]?
+        <deflongname>?
         <.newlex(1)>
         <parensig>?
 	<trait>*
@@ -798,7 +810,7 @@ token termish {
     :dba('prefix or term')
     [
     | <PRE> [ <!{ my $p = $<PRE>; my @p = @$p; @p[*-1]<O><term> and $<term> = pop @$p }> <PRE> ]*
-        [ <?{ $<term> }> || <term> ]
+        [ <?{ $<term> }> || <term=p5term> ]
     | <term=p5term>
     ]
 
@@ -821,7 +833,17 @@ token termish {
 }
 
 token p5term:fatarrow           { <fatarrow> }
-token p5term:variable           { <variable> { $*VAR = $<variable> } }
+
+token p5term:variable           { <variable>
+				    [
+				    || { if $<variable><sigil>.Str ne '$'
+						     { $*VAR = $<variable> } }
+				    || <?before '['> { $<variable><really> = '@' }
+				    || <?before '{'> { $<variable><really> = '%' }
+				    ||               { $*VAR = $<variable> }
+				    ]
+				}
+
 token p5term:package_declarator { <package_declarator=p5package_declarator> }
 token p5term:scope_declarator   { <scope_declarator=p5scope_declarator> }
 token p5term:routine_declarator { <routine_declarator=p5routine_declarator> }
@@ -949,10 +971,6 @@ token p5special_variable:sym<::{ }> {
     '::' <?before '{'>
 }
 
-regex p5special_variable:sym<${ }> {
-    <sigil=p5sigil> '{' {} $<text>=[.*?] '}'
-}
-
 token p5special_variable:sym<$[> {
     <sym>
 }
@@ -1024,15 +1042,18 @@ token variable {
     [
     || '&'
         [
-        | <sublongname> { $name = $<sublongname>.Str }
+        | <subname> { $name = $<subname>.Str }
         | :dba('infix noun') '[' ~ ']' <infixish(1)>
         ]
     || [
         | <sigil=p5sigil> <desigilname> { $name = $<desigilname>.Str }
         | <special_variable=p5special_variable>
         | <sigil=p5sigil> $<index>=[\d+]
-        # Note: $() can also parse as contextualizer in an expression; should have same effect
-        | <sigil=p5sigil> <?before '<' | '('> <postcircumfix=p5postcircumfix>
+        | <sigil=p5sigil> <?before '{'>
+	    [
+	    |	'{' ~ '}' [<name> <postop>?]
+	    |	<block>
+	    ]
         | <sigil=p5sigil> <?{ $*IN_DECL }>
         | <?> {{
             if $*QSIGIL {
@@ -1055,18 +1076,17 @@ token p5sigil:sym<$>  { <sym> }
 token p5sigil:sym<@>  { <sym> }
 token p5sigil:sym<%>  { <sym> }
 token p5sigil:sym<&>  { <sym> }
+token p5sigil:sym<*>  { <sym> }
+token p5sigil:sym<$#> { <sym> }
 
 token deflongname {
     :dba('new name to be defined')
     <name>
-    [
-    | <colonpair>+ { $¢.add_macro($<name>) if $*IN_DECL; }
-    | { $¢.add_routine($<name>.Str) if $*IN_DECL; }
-    ]
+    { $¢.add_routine($<name>.Str) if $*IN_DECL; }
 }
 
 token longname {
-    <name> <colonpair>*
+    <name>
 }
 
 token name {
@@ -1088,16 +1108,8 @@ token morename {
     ]?
 }
 
-token subshortname {
-    [
-    | <category>
-        [ <colonpair>+ { $¢.add_macro($<category>) if $*IN_DECL; } ]?
-    | <desigilname>
-    ]
-}
-
-token sublongname {
-    <subshortname> <sigterm>?
+token subname {
+    <desigilname>
 }
 
 token p5value:quote   { <quote=p5quote> }
@@ -1136,7 +1148,7 @@ token numish {
     ]
 }
 
-token number:numish { <numish> }
+token p5number:numish { <numish> }
 
 token integer {
     [
@@ -1209,10 +1221,11 @@ role herestop {
 
 method heredoc () {
     my $*CTX ::= self.callm if $*DEBUG +& DEBUG::trace_call;
-    return if self.peek;
+#    return if self.peek;
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $*DELIM = $herestub.delim;
+	say "processing heredoc " ~ $*DELIM;
         my $lang = $herestub.lang.mixin( ::herestop );
         my $doc;
         if ($doc) = $here.nibble($lang) {
@@ -1222,29 +1235,22 @@ method heredoc () {
         else {
             self.panic("Ending delimiter $*DELIM not found");
         }
+	say "done with heredoc " ~ $*DELIM;
     }
     return self.cursor($here.pos);  # return to initial type
 }
 
-proto token backslash { <...> }
-proto token escape { <...> }
+proto token p5backslash {*}
+proto token p5escape {*}
 token starter { <!> }
-token escape:none { <!> }
+token p5escape:none { <!> }
 
 token babble ($l) {
     :my $lang = $l;
     :my $start;
     :my $stop;
 
-    <.ws>
-    [ <quotepair> <.ws>
-        {
-            my $kv = $<quotepair>[*-1];
-            $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.sorry("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-        }
-    ]*
-
+    \h*
     {
         ($start,$stop) = $¢.peek_delimiters();
         $lang = $start ne $stop ?? $lang.balanced($start,$stop)
@@ -1260,7 +1266,7 @@ token quibble ($l) {
 
     $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
 
-    {{
+    {
         if $lang<_herelang> {
             push @herestub_queue,
                 ::Herestub.new(
@@ -1269,7 +1275,7 @@ token quibble ($l) {
                     lang => $lang<_herelang>,
                 );
         }
-    }}
+    }
 }
 
 token sibble ($l, $lang2) {
@@ -1336,7 +1342,7 @@ token nibbler {
                             $text = '';
                             $to = $from = $¢.pos;
                         }}
-        || <escape>     {{
+        || <escape=p5escape>     {{
                             push @nibbles, $¢.makestr(TEXT => $text, _from => $from, _pos => $to ) if $from != $to;
                             push @nibbles, $<escape>[*-1];
                             $text = '';
@@ -1374,49 +1380,54 @@ method nibble ($lang) {
 token p5quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> "'" }
 token p5quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> '"' }
 
+token p5quote:sym« << »   { '<<' \h* ::
+    [
+    | <?before '"'> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).cursor_herelang)>
+    | <?before "'"> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).cursor_herelang)>
+    |               <.panic: "Non-quoted heredoc not yet implemented">
+    ] || <.panic: "Couldn't parse heredoc construct">
+}
+
 token p5circumfix:sym«< >»   { '<'
                               <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:w).balanced('<','>'))> '>' }
 
 token p5quote:sym</ />   {
-    '/' <nibble( $¢.cursor_fresh( %*LANG<Regex> ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
+    '/' :: <nibble( $¢.cursor_fresh( %*LANG<Regex> ).unbalanced("/") )> [ '/' || <.panic: "Unable to parse regex; couldn't find final '/'"> ]
     <p5rx_mods>?
 }
 
 # handle composite forms like qww
-token quote:qq {
-    'qq'
-    [
-    | » <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
-    ]
+token p5quote:qq {
+    'qq' <?before \W> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
 }
-token quote:q {
-    'q'
-    [
-    | » <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
-    ]
+token p5quote:q {
+    'q' <?before \W> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
+}
+token p5quote:qw {
+    'qw' <?before \W> <.ws> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
 }
 
-token quote:qr {
+token p5quote:qr {
     <sym> » <!before '('>
     <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
-    <p5rx_mods>
+    <p5rx_mods>?
 }
 
-token quote:m  {
+token p5quote:m  {
     <sym> » <!before '('>
     <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
-    <p5rx_mods>
+    <p5rx_mods>?
 }
 
-token quote:s {
+token p5quote:s {
     <sym> » <!before '('>
     <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
-    <p5rx_mods>
+    <p5rx_mods>?
 }
 
-token quote:tr {
+token p5quote:tr {
     <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
-    <p5tr_mods>
+    <p5tr_mods>?
 }
 
 token p5rx_mods {
@@ -1500,7 +1511,7 @@ method truly ($bool,$opt) {
     self.panic("Cannot negate $opt adverb");
 }
 
-grammar Q is STD {
+grammar Q is STD5 {
 
     role b1 {
         token p5escape:sym<\\> { <sym> <item=p5backslash> }
@@ -1536,7 +1547,7 @@ grammar Q is STD {
         token p5escape:sym<$> {
             :my $*QSIGIL ::= '$';
             <?before '$'>
-            [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> ] || <.panic: "Non-variable \$ must be backslashed">
+            [ :lang(%*LANG<MAIN>) <termish> ] || <.panic: "Non-variable \$ must be backslashed">
         }
     } # end role
 
@@ -1548,7 +1559,7 @@ grammar Q is STD {
         token p5escape:sym<@> {
             :my $*QSIGIL ::= '@';
             <?before '@'>
-            [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ] # trap ABORTBRANCH from variable's ::
+            [ :lang(%*LANG<MAIN>) <termish> | <!> ] # trap ABORTBRANCH from variable's ::
         }
     } # end role
 
@@ -1560,7 +1571,7 @@ grammar Q is STD {
         token p5escape:sym<%> {
             :my $*QSIGIL ::= '%';
             <?before '%'>
-            [ :lang(%*LANG<MAIN>) <EXPR(item %methodcall)> | <!> ]
+            [ :lang(%*LANG<MAIN>) <termish> | <!> ]
         }
     } # end role
 
@@ -1623,7 +1634,7 @@ grammar Q is STD {
 
     } # end role
 
-    role qq does b1 does c1 does s1 does a1 does h1 does f1 {
+    role qq does b1 does s1 does a1 {
         token stopper { \" }
         # in double quotes, omit backslash on random \W backslash by default
         token p5backslash:misc { {} [ (\W) { $<text> = $0.Str; } | $<x>=(\w) <.panic("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
@@ -1664,8 +1675,6 @@ grammar Q is STD {
     multi method tweak (:words(:$w)!)       { self.mixin($w ?? ::w1 !! ::w0) }
     multi method tweak (:quotewords(:$ww)!) { self.mixin($ww ?? ::ww1 !! ::ww0) }
 
-    multi method tweak (:heredoc(:$to)!) { self.truly($to, ':to'); self.cursor_herelang; }
-
     multi method tweak (:$regex!) {
         return %*LANG<Regex>;
     }
@@ -1702,26 +1711,8 @@ rule capture {
 
 rule param_sep { [','|':'|';'|';;'] }
 
-token signature ($lexsig = 0) {
-    # XXX incorrectly scopes &infix:<x> parameters to outside following block
-    :my $*IN_DECL = 1;
-    :my $*zone = 'posreq';
-    :my $startpos = self.pos;
-    <.ws>
-    [
-    | <?before '-->' | ')' | ']' | '{' | ':'\s >
-    | [ <parameter> || <.panic: "Malformed parameter"> ]
-    ] +% <param_sep>
-    <.ws>
-    { $*IN_DECL = 0; }
-    [ '-->' <.ws> <typename> ]?
-    {{
-        $*LEFTSIGIL = '@';
-        if $lexsig {
-            $*CURLEX.<$?SIGNATURE> ~= '(' ~ substr($*ORIG, $startpos, $¢.pos - $startpos) ~ ')';
-            $*CURLEX.<!NEEDSIG>:delete;
-        }
-    }}
+rule signature () {
+    <variable_declarator>+ % ','
 }
 
 token type_constraint {
@@ -1760,13 +1751,9 @@ token p5circumfix:sym<[ ]>
 #############
 
 token PRE {
-    :dba('prefix or meta-prefix')
-    [
-    | <prefix=p5prefix>
+    :dba('prefix operator')
+    <prefix=p5prefix>
         { $<O> = $<prefix><O>; $<sym> = $<prefix><sym> }
-    ]
-    # XXX assuming no precedence change
-    
     <.ws>
 }
 
@@ -1866,7 +1853,7 @@ token arglist {
 
 token p5circumfix:sym<{ }> {
     <?before '{' >
-    <pblock>
+    <block>
 <O(|%term)> }
 
 ## methodcall
@@ -1961,17 +1948,251 @@ token p5infix:sym<^>
 
 ## named unary examples
 # (need \s* to win LTM battle with listops)
-token p5prefix:sleep
-    { <sym> » <?before \s*> <O(|%named_unary)> }
+token p5term:abs
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
 
-token p5prefix:abs
-    { <sym> » <?before \s*> <O(|%named_unary)> }
+token p5term:alarm
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
 
-token p5prefix:let
-    { <sym> » <?before \s*> <O(|%named_unary)> }
+token p5term:chop
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
 
-token p5prefix:temp
-    { <sym> » <?before \s*> <O(|%named_unary)> }
+token p5term:chdir
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:close
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:closedir
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:caller
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:chr
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:cos
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:chroot
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:defined
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:delete
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:dbmclose
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:exists
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:int
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:exit
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:try
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:eval
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:eof
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:exp
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:each
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:fileno
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:gmtime
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getc
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getpgrp
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getpbyname
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getpwnam
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getpwuid
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getpeername
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:gethostbyname
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getnetbyname
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getsockname
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getgroupnam
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:getgroupgid
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:hex
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:int
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:keys
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:lc
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:lcfirst
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:length
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:localtime
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:log
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:lock
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:lstat
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:ord
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:oct
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:prototype
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:pop
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:pos
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:quotemeta
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:reset
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:rand
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:rmdir
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:readdir
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:readline
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:backtick
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:rewinddir
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:readlink
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:ref
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:chomp
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:scalar
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:sethostent
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:setnetent
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:setservent
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:setprotoent
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:shift
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:sin
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:sleep
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:sqrt
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:srand
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:stat
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:study
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:tell
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:telldir
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:tied
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:uc
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:ucfirst
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:untie
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:values
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:write
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:local
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
+token p5term:filetest
+    { '-'<[a..zA..Z]> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
 
 ## comparisons
 token p5infix:sym« <=> »
@@ -2017,6 +2238,12 @@ token p5infix:sym<==>
 
 token p5infix:sym<!=>
     { <sym> <?before \s> <O(|%equality)> }
+
+token p5infix:sym<~~>
+    { <sym> <O(|%equality)> }
+
+token p5infix:sym<!~~>
+    { <sym> <O(|%equality)> }
 
 ## tight and
 token p5infix:sym<&&>
@@ -2066,6 +2293,61 @@ method raise_middle {
 token p5infix:sym<=> ()
     { <sym> <O(|%assignment)> }
 
+## multiplicative
+token p5infix:sym<*=>
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym</=>
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym<%=>
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym« <<= »
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym« >>= »
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym<x=>
+    { <sym> <O(|%assignment)> }
+
+
+## additive
+token p5infix:sym<.=> ()
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym<+=>
+    { <sym> <O(|%additive)> }
+
+token p5infix:sym<-=>
+    { <sym> <O(|%assignment)> }
+
+## bitwise and (all)
+token p5infix:sym<&=>
+    { <sym> <O(|%assignment)> }
+
+## bitwise or (any)
+token p5infix:sym<|=>
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym<^=>
+    { <sym> <O(|%assignment)> }
+
+## tight and
+token p5infix:sym<&&=>
+    { <sym> <O(|%assignment)> }
+
+## tight or
+token p5infix:sym<||=>
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym<^^=>
+    { <sym> <O(|%assignment)> }
+
+token p5infix:sym<//=>
+    { <sym> <O(|%assignment)> }
+
 ## list item separator
 token p5infix:sym<,>
     { <sym> { $<O><fiddly> = 0; } <O(|%comma)> }
@@ -2073,21 +2355,26 @@ token p5infix:sym<,>
 token p5infix:sym« => »
     { <sym> { $<O><fiddly> = 0; } <O(|%comma)> }
 
+token p5term:blocklist
+{
+    :my $name;
+    :my $pos;
+    $<identifier> = ['map'|'grep'|'sort'] <.ws> [<?before '{'> <block> <.ws>]? <arglist>
+#    { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
+    <O(|%term)>
+}
+
 # force identifier(), identifier.(), etc. to be a function call always
 token p5term:identifier
 {
     :my $name;
     :my $pos;
-    <identifier> <?before [<unsp>|'(']? >
+    <identifier>
     { $name = $<identifier>.Str; $pos = $¢.pos; }
     <args( $¢.is_name($name) )>
-    { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
-<O(|%term)>  }
-
-token p5term:opfunc
-{
-    <category> <colonpair>+ <args>
-<O(|%term)>  }
+#    { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
+    <O(|%term)>
+}
 
 token args ($istype = 0) {
     :my $listopish = 0;
@@ -2101,13 +2388,6 @@ token args ($istype = 0) {
     |  { $listopish = 1 } [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
     ]
     { $<invocant> = $*INVOCANT_IS; }
-
-    :dba('extra arglist after (...):')
-    [
-    || <?{ $listopish }>
-    || ':' <?before \s> <moreargs=arglist>    # either switch to listopiness
-    || {{ $<O> = {}; }}   # or allow adverbs (XXX needs hoisting?)
-    ]
 }
 
 # names containing :: may or may not be function calls
@@ -2121,35 +2401,20 @@ token p5term:name
         $name = $<longname>.Str;
         $pos = $¢.pos;
     }
-    [
-    ||  <?{
-            $¢.is_name($<longname>.Str) or substr($<longname>.Str,0,2) eq '::'
-        }>
-        # parametric type?
-        <.unsp>? [ <?before '['> <postcircumfix=p5postcircumfix> ]?
-        :dba('type parameter')
-        [
-            '::'
-            <?before [ '«' | '<' | '{' | '<<' ] > <postcircumfix=p5postcircumfix>
-        ]?
+    <args> # { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
+    <O(|%term)>
+}
 
-    # unrecognized names are assumed to be post-declared listops.
-    || <args> { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
-    ]
-<O(|%term)> }
+## loose not
+token p5prefix:sym<not>
+    { <sym> <?before \s*> <O(|%loose_not)> }
 
 ## loose and
 token p5infix:sym<and>
     { <sym> <O(|%loose_and)> }
 
-token p5infix:sym<andthen>
-    { <sym> <O(|%loose_and)> }
-
 ## loose or
 token p5infix:sym<or>
-    { <sym> <O(|%loose_or)> }
-
-token p5infix:sym<orelse>
     { <sym> <O(|%loose_or)> }
 
 token p5infix:sym<xor>
@@ -2229,21 +2494,21 @@ grammar Regex is STD {
     # end tweaks (DO NOT ERASE)
 
     token category:p5metachar { <sym> }
-    proto token p5metachar { <...> }
+    proto token p5metachar {*}
 
     token category:p5backslash { <sym> }
-    proto token p5backslash { <...> }
+    proto token p5backslash {*}
 
     token category:p5assertion { <sym> }
-    proto token p5assertion { <...> }
+    proto token p5assertion {*}
 
     token category:p5quantifier { <sym> }
-    proto token p5quantifier { <...> }
+    proto token p5quantifier {*}
 
     token category:p5mod_internal { <sym> }
-    proto token p5mod_internal { <...> }
+    proto token p5mod_internal {*}
 
-    proto token p5regex_infix { <...> }
+    proto token p5regex_infix {*}
 
     # suppress fancy end-of-line checking
     token codeblock {
@@ -2257,33 +2522,25 @@ grammar Regex is STD {
         || [ <?before \s | '#'> <.nextsame> ]?   # still get all the pod goodness, hopefully
     }
 
-    rule nibbler {
+    token nibbler {
         :temp $*ignorecase;
-        <EXPR>
+        <alternation>
     }
 
-    token termish {
-        <.ws>  # XXX assuming old /x here?
-        <term=quant_atom_list>
-    }
-    token quant_atom_list {
-        <quantified_atom>+
-    }
-    token infixish {
-        <!infixstopper>
-        <!stdstopper>
-        <regex_infix=p5regex_infix>
-        {
-            $<O> = $<regex_infix><O>;
-            $<sym> = $<regex_infix><sym>;
-        }
-    }
     regex infixstopper {
         :dba('infix stopper')
         <?before <stopper> >
     }
 
     token p5regex_infix:sym<|> { <sym> <O(|%tight_or)>  }
+
+    token alternation {
+	<sequence>+ % <p5regex_infix>
+    }
+
+    token sequence {
+	<quantified_atom>*
+    }
 
     token quantified_atom {
         <!stopper>
@@ -2293,7 +2550,6 @@ grammar Regex is STD {
 #            <?{ $<atom>.max_width }>
 #                || <.panic: "Cannot quantify zero-width atom">
         ]?
-        <.ws>
     }
 
     token atom {
@@ -2301,6 +2557,7 @@ grammar Regex is STD {
         | \w
         | <metachar=p5metachar>
         | '\\' :: .
+	| :: \W
         ]
     }
 
@@ -2335,8 +2592,8 @@ grammar Regex is STD {
     }
 
     token p5metachar:var {
-        <?before <sigil=p5sigil>\w>
-        <.panic: "Cannot interpolate variable in Perl 5 regex">
+        <?before '$'>
+	<variable>
     }
 
     token p5backslash:A { <sym> }
@@ -2403,4 +2660,47 @@ grammar Regex is STD {
     token quantmod { [ '?' | '+' ]? }
 
 } # end grammar
+
+method check_variable ($variable) {
+    my $name = $variable.Str;
+    my $here = self.cursor($variable.from);
+    self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
+    if $variable<really> { $name = $variable<really> ~ substr($name,1) }
+    my ($sigil, $first) = $name ~~ /(\$|\@|\%|\&)(.?)/;
+    return self if $first eq '{';
+    my $ok = 0;
+    $ok ||= $*IN_DECL;
+    $ok ||= $first lt 'A';
+    $ok ||= $first eq '¢';
+    $ok ||= self.is_known($name);
+    $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+    if not $ok {
+	my $id = $name;
+	$id ~~ s/^\W\W?//;
+	if $sigil eq '&' {
+	    $here.add_mystery($variable.<sublongname>, self.pos, 'var')
+	}
+	elsif $name eq '@_' or $name eq '%_' {
+	    ;
+	}
+	else {  # guaranteed fail now
+	    if my $scope = @*MEMOS[$variable.from]<declend> {
+		return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+	    }
+	    elsif $id !~~ /\:\:/ {
+		if self.is_known('@' ~ $id) {
+		    return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+		}
+		elsif self.is_known('%' ~ $id) {
+		    return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+		}
+	    }
+	    return $here.sorry("Variable $name is not predeclared");
+	}
+    }
+    elsif $*CURLEX{$name} {
+	$*CURLEX{$name}<used>++;
+    }
+    self;
+}
 
