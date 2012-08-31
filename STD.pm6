@@ -556,16 +556,15 @@ token quibble ($l) {
 
     $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
 
-    {
-        if $lang<_herelang> {
-            push @herestub_queue,
-                ::Herestub.new(
-                    delim => $<nibble><nibbles>[0]<TEXT>,
-                    orignode => $¢,
-                    lang => $lang<_herelang>,
-                );
-        }
-    }
+    { $lang<_herelang> and $¢.queue_heredoc($<nibble><nibbles>[0]<TEXT>, $lang<_herelang>) }
+}
+
+method queue_heredoc($delim, $lang) {
+    push @herestub_queue, ::Herestub.new(
+                                delim => $delim,
+                                lang => $lang,
+                                orignode => self);
+    return self;
 }
 
 token quotepair {
@@ -5250,7 +5249,7 @@ grammar Regex is STD {
     }
 
     token quantifier:sym<~> {
-        <sym> :: <normspace>? <quantified_atom> <normspace>? <quantified_atom>
+        <sym> :: <sigmaybe> <quantified_atom> <sigmaybe> <quantified_atom>
     }
 
     token quantifier:sym<~~> {

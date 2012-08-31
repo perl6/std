@@ -384,6 +384,11 @@ sub nibbler {
 	$r->{BEG} = $r->{'.'}->{BEG} // $match->{_from};
 	$r->{END} = $r->{'.'}->{END} // $match->{_pos};
     }
+    elsif ($match->{alternation}) {	# regex?
+	$r->{'.'} = $match->{alternation}->{_ast};
+	$r->{BEG} = $r->{'.'}->{BEG} // $match->{_from};
+	$r->{END} = $r->{'.'}->{END} // $match->{_pos};
+    }
 
     my $class = 'VAST::nibbler';
 #	print STDERR ::Dump($r);

@@ -73,7 +73,6 @@ constant $LOOSEST = "a=!"; # XXX preceding line is busted
 # isn't called.
 
 my $*endsym = "null";
-my $*endargs = -1;
 
 proto token category {*}
 
@@ -154,7 +153,7 @@ proto token p5terminator {*}
 token unspacey { <.unsp>? }
 token endid { <?before <-[ \- \' \w ]> > }
 token spacey { <?before <[ \s \# ]> > }
-token nofun { <!before '(' | '.(' | '\\' | '\'' | '-' | "'" | \w > }
+token nofun { <!before '(' | '->(' | '\\' | '\'' | '-' | "'" | \w > }
 
 ##################
 # Lexer routines #
@@ -257,7 +256,6 @@ token pod_comment {
 # we might be embedded in something else.
 rule comp_unit {
     :my $*begin_compunit = 1;
-    :my $*endargs = -1;
     :my %*LANG;
     :my $*PKGDECL ::= "";
     :my $*IN_DECL;
@@ -361,7 +359,17 @@ token xblock {
     :my $*GOAL ::= '{';
     :dba('block expression') '(' ~ ')' <EXPR>
     <.ws>
-    <block>
+    <sblock>
+}
+
+token sblock {
+    :temp $*CURLEX;
+    :dba('scoped block')
+    [ <?before '{' > || <.panic: "Missing block"> ]
+    <.newlex>
+    <blockoid>
+    { @*MEMOS[$¢.pos]<endstmt> = 2; }
+    <.ws>
 }
 
 token block {
@@ -370,6 +378,7 @@ token block {
     [ <?before '{' > || <.panic: "Missing block"> ]
     <.newlex>
     <blockoid>
+    <.ws>
 }
 
 token blockoid {
@@ -381,44 +390,6 @@ token blockoid {
     | :dba('block') '{' ~ '}' <statementlist>
     | <?terminator> <.panic: 'Missing block'>
     | <?> <.panic: "Malformed block">
-    ]
-
-    [
-    | <?before \h* $$>  # (usual case without comments)
-        { @*MEMOS[$¢.pos]<endstmt> = 2; }
-    | \h* <?before <[\\,:]>>
-    | <.unv>? $$
-        { @*MEMOS[$¢.pos]<endstmt> = 2; }
-    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
-    ]
-}
-
-token regex_block {
-    # encapsulate braided languages
-    :temp %*LANG;
-
-    :my $lang = %*LANG<Regex>;
-    :my $*GOAL ::= '}';
-
-    [ <quotepair> <.ws>
-        {
-            my $kv = $<quotepair>[*-1];
-            $lang = $lang.tweak($kv.<k>, $kv.<v>)
-                or self.sorry("Unrecognized adverb :" ~ $kv.<k> ~ '(' ~ $kv.<v> ~ ')');
-        }
-    ]*
-
-    '{'
-    <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
-    [ '}' || <.panic: "Unable to parse regex; couldn't find right brace"> ]
-
-    [
-    | <?before \h* $$>  # (usual case without comments)
-        { @*MEMOS[$¢.pos]<endstmt> = 2; }
-    | \h* <?before <[\\,:]>>
-    | <.unv>? $$
-        { @*MEMOS[$¢.pos]<endstmt> = 2; }
-    | {} <.unsp>? { @*MEMOS[$¢.pos]<endargs> = 1; }
     ]
 }
 
@@ -460,7 +431,6 @@ token label {
 }
 
 token statement {
-    :my $*endargs = -1;
     :my $*QSIGIL ::= 0;
     <!before <[\)\]\}]> >
 
@@ -536,7 +506,7 @@ rule p5statement_control:if {
         'elsif'<?spacey> <elsif=xblock>
     ]*
     [
-        'else'<?spacey> <else=block>
+        'else'<?spacey> <else=sblock>
     ]?
 }
 
@@ -559,7 +529,7 @@ rule p5statement_control:for {
     || ['my'? <variable_declarator>]? '(' ~ ')' <EXPR>
     || <.panic: "Malformed loop spec">
     ]
-    <block>
+    <sblock>
 }
 
 rule p5statement_control:given {
@@ -568,12 +538,12 @@ rule p5statement_control:given {
 rule p5statement_control:when {
     <sym> <xblock>
 }
-rule p5statement_control:default {<sym> <block> }
+rule p5statement_control:default {<sym> <sblock> }
 
-rule p5statement_prefix:BEGIN    {<sym> <block> }
-rule p5statement_prefix:CHECK    {<sym> <block> }
-rule p5statement_prefix:INIT     {<sym> <block> }
-rule p5statement_control:END     {<sym> <block> }
+rule p5statement_prefix:BEGIN    {<sym> <sblock> }
+rule p5statement_prefix:CHECK    {<sym> <sblock> }
+rule p5statement_prefix:INIT     {<sym> <sblock> }
+rule p5statement_control:END     {<sym> <sblock> }
 
 #######################
 # statement modifiers #
@@ -763,8 +733,19 @@ rule routine_def () {
     :my $*IN_DECL = 1;
     :my $*DECLARAND;
     [
-        <deflongname>?
+    ||  <deflongname>
         <.newlex(1)>
+        <parensig>?
+	<trait>*
+        <!{
+            $*IN_DECL = 0;
+        }>
+        <blockoid>:!s
+	{ @*MEMOS[$¢.pos]<endstmt> = 2; }
+        <.checkyada>
+        <.getsig>
+    || <?before \W>
+	<.newlex(1)>
         <parensig>?
 	<trait>*
         <!{
@@ -819,8 +800,7 @@ token termish {
     [
     || <?{ $*QSIGIL }>
         [
-        || <?{ $*QSIGIL eq '$' }> [ <POST>+! <?after <[ \] } > ) ]> > ]?
-        ||                          <POST>+! <?after <[ \] } > ) ]> > 
+        || [ <?before '[' | '{' > <POST> ]*!
         || { $*VAR = 0; }
         ]
     || <!{ $*QSIGIL }>
@@ -1266,16 +1246,15 @@ token quibble ($l) {
 
     $start <nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
 
-    {
-        if $lang<_herelang> {
-            push @herestub_queue,
-                ::Herestub.new(
-                    delim => $<nibble><nibbles>[0]<TEXT>,
-                    orignode => $¢,
-                    lang => $lang<_herelang>,
-                );
-        }
-    }
+    { $lang<_herelang> and $¢.queue_heredoc($<nibble><nibbles>[0]<TEXT>, $lang<_herelang>) }
+}
+
+method queue_heredoc($delim, $lang) {
+    push @herestub_queue, ::Herestub.new(
+                                delim => $delim,
+                                lang => $lang,
+                                orignode => self);
+    return self;
 }
 
 token sibble ($l, $lang2) {
@@ -1303,18 +1282,6 @@ token tribble ($l, $lang2 = $l) {
     || 
         { $lang = $lang2.unbalanced($stop); }
         <right=nibble($lang)> $stop
-    ]
-}
-
-token quasiquibble ($l) {
-    :my ($lang, $start, $stop);
-    :my $*QUASIMODO = 0; # :COMPILING sets true
-    <babble($l)>
-    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
-
-    [
-    || <?{ $start eq '{' }> [ :lang($lang) <block> ]
-    || $start [ :lang($lang) <statementlist> ] [$stop || <.panic: "Couldn't find terminator $stop"> ]
     ]
 }
 
@@ -1380,11 +1347,16 @@ method nibble ($lang) {
 token p5quote:sym<' '>   { "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> "'" }
 token p5quote:sym<" ">   { '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> '"' }
 
-token p5quote:sym« << »   { '<<' \h* ::
+token p5quote:sym« << »   { '<<' ::
     [
     | <?before '"'> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).cursor_herelang)>
     | <?before "'"> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).cursor_herelang)>
-    |               <.panic: "Non-quoted heredoc not yet implemented">
+    | <identifier>
+    	<.queue_heredoc( $<identifier>.Str,
+			 $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).cursor_herelang )>
+    | \\ <identifier>
+    	<.queue_heredoc( $<identifier>.Str,
+			 $¢.cursor_fresh( %*LANG<Q> ).tweak(:q).cursor_herelang )>
     ] || <.panic: "Couldn't parse heredoc construct">
 }
 
@@ -1805,7 +1777,7 @@ token p5postcircumfix:sym<[ ]>
     { :dba('subscript') '[' ~ ']' <semilist>  <O(|%methodcall)> }
 
 token p5postcircumfix:sym<{ }>
-    { :dba('subscript') '{' ~ '}' <semilist> <O(|%methodcall)> }
+    { :dba('subscript') '{' ~ '}' [<identifier><?before '}'>|<semilist>] <O(|%methodcall)> }
 
 token postop {
     | <postfix=p5postfix>         { $<O> := $<postfix><O>; $<sym> := $<postfix><sym>; }
@@ -1831,7 +1803,6 @@ token semiarglist {
 
 token arglist {
     :my $inv_ok = $*INVOCANT_OK;
-    :my StrPos $*endargs = 0;
     :my $*GOAL ::= 'endargs';
     :my $*QSIGIL ::= '';
     <.ws>
@@ -1852,8 +1823,13 @@ token arglist {
 }
 
 token p5circumfix:sym<{ }> {
-    <?before '{' >
+    :: <?before '{' >
     <block>
+<O(|%term)> }
+
+token p5statement_control:sym<{ }> {
+    <?before '{' >
+    <sblock>
 <O(|%term)> }
 
 ## methodcall
@@ -2179,6 +2155,9 @@ token p5term:uc
 token p5term:ucfirst
     { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
 
+token p5term:undef
+    { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
+
 token p5term:untie
     { <sym> » <?before \s*> <.ws> <EXPR(item %named_unary)>? }
 
@@ -2369,8 +2348,9 @@ token p5term:identifier
 {
     :my $name;
     :my $pos;
-    <identifier>
+    <identifier> ::
     { $name = $<identifier>.Str; $pos = $¢.pos; }
+    [\h+ <?before '('>]?
     <args( $¢.is_name($name) )>
 #    { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
     <O(|%term)>
@@ -2396,11 +2376,12 @@ token p5term:name
 {
     :my $name;
     :my $pos;
-    <longname>
+    <longname> ::
     {
         $name = $<longname>.Str;
         $pos = $¢.pos;
     }
+    [\h+ <?before '('>]?
     <args> # { self.add_mystery($name,$pos,'termish') unless $<args><invocant>; }
     <O(|%term)>
 }
@@ -2464,7 +2445,6 @@ regex infixstopper {
     [
     | <?before <stopper> >
     | <?before ':' > <?{ $*GOAL eq ':' }>
-    | <?{ $*GOAL eq 'endargs' and @*MEMOS[$¢.pos]<endargs> }>
     ]
 }
 
@@ -2570,7 +2550,15 @@ grammar Regex is STD {
     # "normal" metachars
 
     token p5metachar:sym<[ ]> {
-        <before '['> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q))> # XXX parse as q[] for now
+	'[' {} $<neg> = [ '^' ]?
+	    $<cclass> = [
+		[
+		  [ \\ . || . ]
+		  [ '-' [ \\ . || . ]]?
+		]+?
+		[<?before ']'> || '-' <?before ']'>]
+	    ]
+	']'
     }
 
     token p5metachar:sym«(? )» {

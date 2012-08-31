@@ -1411,11 +1411,6 @@ BODY
     }
 }
 
-
-{ package VAST::mod_internal__S_ColonBangs; our @ISA = 'VAST::Base';
-}
-
-
 { package VAST::mod_internal__S_Coloni; our @ISA = 'VAST::Base';
     sub re_ast { my $self = shift;
 	$::IGNORECASE = 1;
@@ -1980,6 +1975,13 @@ EOFINAL
 
     sub _tilde {  my $self = shift;
 	my $opener = $self->{atom}->re_ast;
+	my $sigwhite = $self->{sigmaybe}[0];
+	if ($sigwhite) {
+	    if (ref($sigwhite) =~ /sigwhite/) {
+		# quantify over sigspace too
+		$opener = RE_sequence->new($opener, $sigwhite->re_ast);
+	    }
+	}
 	my $closer = $self->{quantifier}[0]{quantified_atom}[0]->re_ast;
 	my $inner  = $self->{quantifier}[0]{quantified_atom}[1]->re_ast;
 
@@ -2772,10 +2774,6 @@ END
 }
 
 
-{ package VAST::term__S_term; our @ISA = 'VAST::Base';
-}
-
-
 { package VAST::term__S_value; our @ISA = 'VAST::Base';
     sub emit_psq { $_[0]{value}->psq}
 }
@@ -2817,9 +2815,6 @@ END
 }
 
 
-
-{ package VAST::term; our @ISA = 'VAST::Base';
-}
 
 { package VAST::term__S_name; our @ISA = ('VAST::Base');
     sub emit_p5 {  my $self = shift;
@@ -4221,7 +4216,7 @@ END
     }
 
     my %psq_map = (
-	'note',		=> "System.Console.Error.WriteLine"
+	'note' 		=> "System.Console.Error.WriteLine"
     );
 
     sub psq { my $self = shift;
