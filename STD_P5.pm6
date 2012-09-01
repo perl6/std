@@ -2550,15 +2550,30 @@ grammar Regex is STD {
     # "normal" metachars
 
     token p5metachar:sym<[ ]> {
+	# Unix-style character classes are quite metafiddly.  Don't blame me.
 	'[' {} $<neg> = [ '^' ]?
+	[
 	    $<cclass> = [
 		[
-		  [ \\ <p5ccback> || . ]
-		  [ '-' [ \\ <p5ccback> || . ]]?
-		]+?
-		[<?before ']'> || '-' <?before ']'>]
+		    $<ccelem>=[    
+			[ \\ <p5ccback> || . ]
+			[ '-' [ \\ <p5ccback> || <-[ \] ]> ]]?
+		    ]
+		    {
+			given $<ccelem>.Str {
+			    if /\-/ {
+				for split('-', $_) {
+				    if /\\(d|w|s|D|W|S)/ {
+					$¢.panic("Illegal use of $_ in range");
+				    }
+				}
+			    }
+			}
+		    }
+		]+?  <?before ']'>
 	    ]
-	']'
+	]
+	']' || <.panic: "Unable to parse character class; couldn't find final ']'">
     }
 
     proto token p5ccback {*}
