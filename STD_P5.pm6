@@ -2334,8 +2334,8 @@ token p5infix:sym« => »
 
 token p5term:blocklist
 {
-    :my $name;
-    :my $pos;
+#    :my $name;
+#    :my $pos;
     $<identifier> = ['map'|'grep'|'sort'] <.ws> [<?before '{'> <block> <.ws>]? <arglist>
 #    { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
     <O(|%term)>
