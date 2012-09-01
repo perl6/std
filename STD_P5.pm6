@@ -2553,13 +2553,31 @@ grammar Regex is STD {
 	'[' {} $<neg> = [ '^' ]?
 	    $<cclass> = [
 		[
-		  [ \\ . || . ]
-		  [ '-' [ \\ . || . ]]?
+		  [ \\ <p5ccback> || . ]
+		  [ '-' [ \\ <p5ccback> || . ]]?
 		]+?
 		[<?before ']'> || '-' <?before ']'>]
 	    ]
 	']'
     }
+
+    proto token p5ccback {*}
+    token p5ccback:stopper { <text=.stopper> }
+    token p5ccback:b { :i <sym> }
+    token p5ccback:d { :i <sym> { $*CCSTATE = '' } }
+    token p5ccback:e { :i <sym> }
+    token p5ccback:f { :i <sym> }
+    token p5ccback:h { :i <sym> { $*CCSTATE = '' } }
+    token p5ccback:n {    <sym> }
+    token p5ccback:N {    <sym> '{' ~ '}' $<charname>=[.*?] }
+    token p5ccback:o { :i :dba('octal character') <sym> [ <octint> | '{' ~ '}' <octints> ] }
+    token p5ccback:r { :i <sym> }
+    token p5ccback:s { :i <sym> { $*CCSTATE = '' } }
+    token p5ccback:t { :i <sym> }
+    token p5ccback:v { :i <sym> { $*CCSTATE = '' } }
+    token p5ccback:w { :i <sym> { $*CCSTATE = '' } }
+    token p5ccback:x { :i :dba('hex character') <sym> [ <hexint> | '{' ~ '}' <hexints> ] }
+    token p5ccback:sym<0> { <sym> }
 
     token p5metachar:sym«(? )» {
         '(?' {} <assertion=p5assertion>
