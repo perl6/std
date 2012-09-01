@@ -816,12 +816,11 @@ token p5term:fatarrow           { <fatarrow> }
 
 token p5term:variable           { <variable>
 				    [
-				    || { if $<variable><sigil>.Str ne '$'
-						     { $*VAR = $<variable> } }
+				    || <?{ $<variable><sigil>.Str ne '$' }>
 				    || <?before '['> { $<variable><really> = '@' }
 				    || <?before '{'> { $<variable><really> = '%' }
-				    ||               { $*VAR = $<variable> }
-				    ]
+				    ]?
+				    { $*VAR = $<variable> }
 				}
 
 token p5term:package_declarator { <package_declarator=p5package_declarator> }
@@ -1077,15 +1076,7 @@ token name {
 }
 
 token morename {
-    :my $*QSIGIL ::= '';
-    '::'
-    [
-        <?before '(' | <alpha> >
-        [
-        | <identifier>
-        | :dba('indirect name') '(' ~ ')' <EXPR>
-        ]
-    ]?
+    '::' <identifier>?
 }
 
 token subname {
@@ -2336,7 +2327,9 @@ token p5term:blocklist
 {
 #    :my $name;
 #    :my $pos;
-    $<identifier> = ['map'|'grep'|'sort'] <.ws> [<?before '{'> <block> <.ws>]? <arglist>
+    $<identifier> = ['map'|'grep'|'sort'] <.ws>
+    [ :my $*IN_SORT = $<identifier>.Str eq 'sort'; <?before '{'> <block> <.ws>]?
+    <arglist>
 #    { self.add_mystery($name,$pos,substr($*ORIG,$pos,1)) unless $<args><invocant>; }
     <O(|%term)>
 }
@@ -2685,14 +2678,14 @@ method check_variable ($variable) {
     my $here = self.cursor($variable.from);
     self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
     if $variable<really> { $name = $variable<really> ~ substr($name,1) }
-    my ($sigil, $first) = $name ~~ /(\$|\@|\%|\&)(.?)/;
+    my ($sigil, $first) = $name ~~ /(\$|\@|\%|\&|\*)(.?)/;
     return self if $first eq '{';
     my $ok = 0;
     $ok ||= $*IN_DECL;
     $ok ||= $first lt 'A';
-    $ok ||= $first eq '¢';
+    $ok ||= $sigil eq '*';
     $ok ||= self.is_known($name);
-    $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+    $ok ||= ($*IN_SORT and $name eq '$a' || $name eq '$b');
     if not $ok {
 	my $id = $name;
 	$id ~~ s/^\W\W?//;
