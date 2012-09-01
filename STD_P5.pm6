@@ -1205,7 +1205,6 @@ method heredoc () {
     my $here = self;
     while my $herestub = shift @herestub_queue {
         my $*DELIM = $herestub.delim;
-	say "processing heredoc " ~ $*DELIM;
         my $lang = $herestub.lang.mixin( ::herestop );
         my $doc;
         if ($doc) = $here.nibble($lang) {
@@ -1215,7 +1214,6 @@ method heredoc () {
         else {
             self.panic("Ending delimiter $*DELIM not found");
         }
-	say "done with heredoc " ~ $*DELIM;
     }
     return self.cursor($here.pos);  # return to initial type
 }
