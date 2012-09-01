@@ -5803,8 +5803,11 @@ method is_known ($n, $curlex = $*CURLEX) {
     my $name = $n;
     self.deb("is_known $name") if $*DEBUG +& DEBUG::symtab;
     return True if $*QUASIMODO;
-    return True if $*CURPKG.{$name};
     return False if $name ~~ /\:\:\(/;
+
+    my $varbind = { truename => '???' };
+    return True if $n !~~ /\:\:/ and self.lex_can_find_name($curlex,$name,$varbind);
+
     my $curpkg = $*CURPKG;
     my @components = self.canonicalize_name($name);
     if @components > 1 {
@@ -5845,10 +5848,7 @@ method is_known ($n, $curlex = $*CURLEX) {
     # leading components take us non-lexical?  assume we can't know
     return False if $curpkg !=== $*CURPKG and $curpkg<!id>[0] ~~ /^GLOBAL($|\:\:)/;
 
-    my $varbind = { truename => '???' };
-    return True if $n !~~ /\:\:/ and self.lex_can_find_name($curlex,$name,$varbind);
     self.deb("Not Found") if $*DEBUG +& DEBUG::symtab;
-
     return False;
 }
 
