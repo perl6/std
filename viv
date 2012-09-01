@@ -644,7 +644,15 @@ TEMPLATE
 }
 
 
+{ package VAST::Assignment; our @ISA = 'VAST::Base';
+}
+
+
 { package VAST::Autoincrement; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::babble; our @ISA = 'VAST::Base';
 }
 
 
@@ -706,6 +714,10 @@ TEMPLATE
 
 
 { package VAST::before; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::Binding; our @ISA = 'VAST::Base';
 }
 
 
@@ -779,6 +791,13 @@ TEMPLATE
 { package VAST::Comma; our @ISA = 'VAST::Base';
 }
 
+
+{ package VAST::Comma_operator; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::Comparison; our @ISA = ('VAST::Base', 'VAST::InfixCall');
+}
 
 
 { package VAST::comp_unit; our @ISA = 'VAST::Base';
@@ -1531,6 +1550,10 @@ BODY
 }
 
 
+{ package VAST::Not_operator; our @ISA = 'VAST::Base';
+}
+
+
 
 { package VAST::nulltermish; our @ISA = 'VAST::Base';
 }
@@ -2106,6 +2129,10 @@ TEXT
 
 
 { package VAST::quote__S_Slash_Slash; our @ISA = 'VAST::Base';
+}
+
+
+{ package VAST::Range; our @ISA = 'VAST::Base';
 }
 
 

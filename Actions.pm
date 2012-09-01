@@ -22,9 +22,9 @@ sub AUTOLOAD {
     my $r = hoistast($match);
     (my $class = $AUTOLOAD) =~ s/^Actions/VAST/;
     $class =~ s/__S_\d\d\d/__S_/ and $r->{_specific} = 1;
-    if ($class =~ /::(infix|prefix|postfix|postcircumfix|dotty|regex_infix)__S_/) {
+    if ($class =~ /::((?:p5)?)(infix|prefix|postfix|postcircumfix|dotty|regex_infix)__S_/) {
 	$r->{_op} = $class;
-	$class =~ s/::(infix|prefix|postfix|postcircumfix|dotty|regex_infix)__S_/::SYM_$1__S_/;
+	$class =~ s/::((?:p5)?)(infix|prefix|postfix|postcircumfix|dotty|regex_infix)__S_/::SYM_$1$2__S_/;
     }
     gen_class($class);
     bless $r, $class unless ref($r) =~ /^VAST/;
@@ -236,7 +236,7 @@ sub LIST {
     my $class =
 	$match->{delims}[0]{_ast}{infix}{_op} //
 	$match->{delims}[0]{_ast}{regex_infix}{_op} //
-	warn ref($match);
+	exit warn ::Dump($match);
     gen_class($class, $base);
     $r = bless $r, $class;
     $match->{'_ast'} = $r;
@@ -267,7 +267,7 @@ sub POSTFIX {
 	    $match->{_ast}{postop}{postfix}{_op} //
 	    $match->{_ast}{postop}{postcircumfix}{_op} //
 	    $match->{_ast}{dotty}{_op} //
-	    warn ref($match);
+	    exit warn ::Dump($match);
     }
 
     gen_class($class, $base);
@@ -301,7 +301,7 @@ sub PREFIX {
 	    $match->{_ast}{prefix}{_op} //
 	    $match->{_ast}{prefix_postfix_meta_operator}{_op} //
 	    $match->{_ast}{prefix_circumfix_meta_operator}{_op} //
-	    warn ref($match);
+	    exit warn ::Dump($match);
     }
 
     gen_class($class,$base);
@@ -340,7 +340,7 @@ sub INFIX {
 	$class =
 	    $match->{_ast}{infix}{_op} //
 	    $match->{_ast}{regex_infix}{_op} //
-	    warn ref($match);
+	    exit warn ::Dump($match);
     }
 
     gen_class($class, $base);
