@@ -1652,7 +1652,6 @@ BODY
     sub emit_p5_header {  my $self = shift;
 	my $header = "";
 	my $name = $::PKG;
-	say $name;
 
 	my $meta = $::PKGDECL eq 'role' ? 'Moose::Role' : 'Moose';
 
