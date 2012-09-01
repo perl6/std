@@ -364,7 +364,7 @@ token xblock {
 
 token sblock {
     :temp $*CURLEX;
-    :dba('scoped block')
+    :dba('statement block')
     [ <?before '{' > || <.panic: "Missing block"> ]
     <.newlex>
     <blockoid>
@@ -799,10 +799,7 @@ token termish {
     :dba('postfix')
     [
     || <?{ $*QSIGIL }>
-        [
-        || [ <?before '[' | '{' > <POST> ]*!
-        || { $*VAR = 0; }
-        ]
+        [ <?before '[' | '{' > <POST> ]*!
     || <!{ $*QSIGIL }>
         <POST>*
     ]
@@ -820,7 +817,7 @@ token p5term:variable           { <variable>
 				    || <?before '['> { $<variable><really> = '@' }
 				    || <?before '{'> { $<variable><really> = '%' }
 				    ]?
-				    { $*VAR = $<variable> }
+				    { $*VAR ||= $<variable> }
 				}
 
 token p5term:package_declarator { <package_declarator=p5package_declarator> }
@@ -1006,7 +1003,7 @@ token p5special_variable:sym<$?> {
 
 token desigilname {
     [
-    | <?before '$' > <variable> { $*VAR = $<variable> }
+    | <?before '$' > <variable> { $*VAR = $<variable>; }
     | <longname>
     ]
 }
@@ -1854,6 +1851,9 @@ token p5prefix:sym<->
     { <sym> <O(|%symbolic_unary)> }
 
 token p5prefix:sym<~>
+    { <sym> <O(|%symbolic_unary)> }
+
+token p5prefix:sym<\\>
     { <sym> <O(|%symbolic_unary)> }
 
 

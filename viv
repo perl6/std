@@ -136,6 +136,7 @@ if (defined $symlroot) {
 
 require Actions;
 require STD;
+require STD_P5;
 
 sub spew {
     my $bits = shift;
@@ -766,7 +767,6 @@ TEMPLATE
 
 { package VAST::colonpair; our @ISA = 'VAST::Base';
     sub adverbs { my $self = shift;
-	my $val;
 	if (Scalar::Util::blessed $self->{v} &&
 		$self->{v}->isa('VAST::coloncircumfix')) {
 	    my $s = $self->{v}->Str;
@@ -1287,7 +1287,7 @@ TEMPLATE
 
 
 { package VAST::sigmaybe__S_sigwhite; our @ISA = 'VAST::Base';
-    sub re_ast {  my $self = shift;
+    sub re_ast {  # my $self = shift;
         $::SIGSPACE ?
             RE_method->new(name => 'ws', nobind => 1) :
             RE_noop->new;
@@ -1295,7 +1295,7 @@ TEMPLATE
 }
 
 { package VAST::sigmaybe__S_normspace; our @ISA = 'VAST::Base';
-    sub re_ast {  my $self = shift;
+    sub re_ast {  # my $self = shift;
         $::SIGSPACE ?
             RE_method->new(name => 'ws', nobind => 1) :
             RE_noop->new;
@@ -1427,14 +1427,14 @@ BODY
 }
 
 { package VAST::mod_internal__S_Coloni; our @ISA = 'VAST::Base';
-    sub re_ast { my $self = shift;
+    sub re_ast { # my $self = shift;
 	$::IGNORECASE = 1;
 	RE_noop->new;
     }
 }
 
 { package VAST::mod_internal__S_Colonr; our @ISA = 'VAST::Base';
-    sub re_ast { my $self = shift;
+    sub re_ast { # my $self = shift;
 	$::RATCHET = 1;
 	RE_noop->new;
     }
@@ -1454,7 +1454,7 @@ BODY
 
 
 { package VAST::mod_internal__S_Colons; our @ISA = 'VAST::Base';
-    sub re_ast { my $self = shift;
+    sub re_ast { # my $self = shift;
 	$::SIGSPACE = 1;
 	RE_noop->new;
     }
@@ -1462,7 +1462,7 @@ BODY
 
 
 { package VAST::mod_internal__S_ColonBangs; our @ISA = 'VAST::Base';
-    sub re_ast { my $self = shift;
+    sub re_ast { # my $self = shift;
 	$::SIGSPACE = 0;
 	RE_noop->new;
     }
@@ -1647,7 +1647,7 @@ BODY
     }
     sub emit_p5_header {  my $self = shift;
 	my $header = "";
-	my $name = $::PKG;
+	#my $name = $::PKG;
 
 	my $meta = $::PKGDECL eq 'role' ? 'Moose::Role' : 'Moose';
 
@@ -1753,15 +1753,15 @@ EOFINAL
 	"{ $body $finalmulti 1; }";
     }
 
-    sub psq_finish_multis { my $self = shift;
+    sub psq_finish_multis { # my $self = shift;
 	die "multis not yet implemented for psq";
     }
 
-    sub psq_retree { my $self = shift;
+    sub psq_retree { # my $self = shift;
 	die "LTM not yet implemented for psq";
     }
 
-    sub psq_parameterized { my $self = shift;
+    sub psq_parameterized { # my $self = shift;
 	die "roles not yet implemented for psq";
     }
 
@@ -1927,7 +1927,7 @@ EOFINAL
 }
 
 { package VAST::SYM_prefix__S_Vert; our @ISA = 'VAST::Symbolic_unary';
-    sub emit_p5 {  my $self = shift;
+    sub emit_p5 {  # my $self = shift;
 	('');
     }
 }
@@ -2312,7 +2312,7 @@ TEXT
 		       grep { $::BINDINGS{$_} > 1 }
 		       sort keys %::BINDINGS)
 	    . ($::SYM ? '$C->{sym} = "' . ::rd($::SYM) . "\";\n" : '')
-	    . <<END
+	    . <<"END"
 \$self->_MATCHIFY$ratchet(\$S, "$p5name", ${\ $body->p5expr });
 END
 	    , 1) . "}\n";
@@ -2806,8 +2806,7 @@ END
 
 
 { package VAST::terminator; our @ISA = 'VAST::Base';
-    sub emit_p6 {  my $self = shift;
-        my @t = $self->SUPER::emit_p6;
+    sub emit_p6 {  # my $self = shift;
         '';
     }
 }
@@ -3111,7 +3110,7 @@ END
         return DEEP::raw($result);
     }
 
-    sub bind { my $self = shift; my $re = shift;
+    sub bind { shift; my $re = shift;
 	return $re unless @_;
 	DEEP::bind($re, @_);
     }
@@ -3154,8 +3153,8 @@ END
 	$class->SUPER::new(zyg => \@zyg);
     }
 
-    sub wrapone {
-        my ($self, $outer, $inner) = @_;
+    sub wrapone { shift;
+        my ($outer, $inner) = @_;
 	my ($out1, $outr) = $outer->uncut;
 	if ($outr) {
 	    DEEP::ratchet($inner, $out1);
@@ -3548,7 +3547,6 @@ END
     }
     sub _walk {
         my $self = shift;
-        my $result;
 	local $::PLURALITY = 2;
 	my $quant = "";
 	my $rep = "_REP";
@@ -3559,8 +3557,8 @@ END
 	if ($bind) { #XXX STD
 	    $atom = $self->bind($atom, $bind);
 	}
-	my $atom_is_cut = !$atom->maybacktrack;
-	my ($qfer,$how,$rest) = @{$$self{quant}};
+#	my $atom_is_cut = !$atom->maybacktrack;
+	my ($qfer,$how,$rest) = @$q;
 	$qfer = '**' if ref $rest and ref $rest ne 'RE_block';
 	my $hc = $how eq '!' ? 'g' :
 		 $how eq '?' ? 'f' :
@@ -3672,8 +3670,7 @@ END
     # TODO: Investigate what the LTM engine is doing with assertions and
     # optimize harder.
 
-    sub has_trailing_ws {
-	my $self = shift;
+    sub has_trailing_ws { shift;
 	my $before = shift;
 
 	$before; # Transparent
@@ -3834,12 +3831,11 @@ END
 
 { package RE_noop; use base "REbase";
     sub _walk {
-        my $self = shift;
+        # my $self = shift;
 	DEEP::raw('$C', precut => 1);
     }
 
-    sub has_trailing_ws {
-	my $self = shift;
+    sub has_trailing_ws { shift;
 	my $before = shift;
 
 	$before;
@@ -3863,8 +3859,7 @@ END
 	DEEP::raw($$self{body}, isblock => 1);
     }
 
-    sub has_trailing_ws {
-	my $self = shift;
+    sub has_trailing_ws { shift;
 	my $before = shift;
 
 	$before;
@@ -3892,8 +3887,7 @@ END
         }
     }
 
-    sub has_trailing_ws {
-	my $self = shift;
+    sub has_trailing_ws { shift;
 	my $before = shift;
 
 	$before;
