@@ -656,10 +656,6 @@ TEMPLATE
 }
 
 
-{ package VAST::babble; our @ISA = 'VAST::Base';
-}
-
-
 { package VAST::backslash; our @ISA = 'VAST::Base';
 }
 
