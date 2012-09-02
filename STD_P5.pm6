@@ -1339,10 +1339,10 @@ token p5quote:sym« << »   { '<<' ::
     | <?before "'"> <quibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).cursor_herelang)>
     | <identifier>
     	<.queue_heredoc( $<identifier>.Str,
-			 $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).cursor_herelang )>
+			 $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq) )>
     | \\ <identifier>
     	<.queue_heredoc( $<identifier>.Str,
-			 $¢.cursor_fresh( %*LANG<Q> ).tweak(:q).cursor_herelang )>
+			 $¢.cursor_fresh( %*LANG<Q> ).tweak(:q) )>
     ] || <.panic: "Couldn't parse heredoc construct">
 }
 
