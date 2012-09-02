@@ -473,8 +473,21 @@ rule p5statement_control:use {
     :my $*SCOPE = 'use';
     <sym>
     [
-    | <version=p5versionish>
-    | <module_name=p5module_name>
+    || <version=p5versionish> [
+	|| <?{ substr($<version>[0].Str,0,2) eq 'v5' }>
+	|| <?{ substr($<version>[0].Str,0,2) eq 'v6' }>
+	    :my %*LANG;
+	    {
+		%*LANG<MAIN> = ::STD::P6 ;
+		%*LANG<Regex> = ::STD::Regex ;
+		%*LANG<Q> = ::STD::Q ;
+		%*LANG<Trans> = ::STD::Trans ;
+		$¢ = %*LANG<MAIN>.bless($¢);
+	    }
+	    <.ws> ';'
+	    [ <statementlist> || <.panic: "Bad P6 code"> ]
+	]
+    || <module_name=p5module_name>
         {
             $longname = $<module_name><longname>;
         }
