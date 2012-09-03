@@ -1134,11 +1134,9 @@ token p5number:numish { <numish> }
 token integer {
     [
     | 0 [ b <[01]>+           [ _ <[01]>+ ]*
-        | o <[0..7]>+         [ _ <[0..7]>+ ]*
-        | x <[0..9a..fA..F]>+ [ _ <[0..9a..fA..F]>+ ]*
+        | x <.hexdigit>+ [ _ <.hexdigit>+ ]*
         | d \d+               [ _ \d+]*
-        | \d+[_\d+]*
-            <!!{ $¢.worry("Leading 0 does not indicate octal in Perl 6") }>
+        | <[0..7]>+         [ _ <[0..7]>+ ]*
         ]
     | \d+[_\d+]*
     ]
@@ -1179,7 +1177,7 @@ token octint {
 token hexints { [<.ws><hexint><.ws>] +% ',' }
 
 token hexint {
-    <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
+    <.hexdigit>+ [ _ <.hexdigit>+ ]*
 }
 
 ##########
@@ -1270,17 +1268,22 @@ token sibble ($l, $lang2) {
     ]
 }
 
-token tribble ($l, $lang2 = $l) {
+token tribble ($l) {
     :my ($lang, $start, $stop);
+    :my $*GOAL;
     <babble($l)>
-    { my $B = $<babble><B>; ($lang,$start,$stop) = @$B; }
-
-    $start <left=nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
-    [ <?{ $start ne $stop }>
-        <.ws> <quibble($lang2)>
-    || 
-        { $lang = $lang2.unbalanced($stop); }
-        <right=nibble($lang)> $stop
+    { my $B = $<babble>[0]<B>; ($lang,$start,$stop) = @$B; $*GOAL = $stop; }
+    { say $lang.WHAT }
+    [ :lang($lang) $start ~ $stop <left=p5cc($lang)>
+	[ <?{ $start ne $stop }>
+	    <.ws>
+	    <babble($l)>
+	    { my $B = $<babble>[0]<B>; ($lang,$start,$stop) = @$B; $*GOAL = $stop; }
+	    [ :lang($lang) $start ~ $stop <right=p5cc> ]
+	|| 
+	    { say $¢.WHAT }
+	    '' ~ $stop <right=p5cc>
+	]
     ]
 }
 
@@ -1379,25 +1382,25 @@ token p5quote:qw {
 }
 
 token p5quote:qr {
-    <sym> » <!before '('>
+    <sym> » ::
     <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
     <p5rx_mods>?
 }
 
 token p5quote:m  {
-    <sym> » <!before '('>
+    <sym> » ::
     <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
     <p5rx_mods>?
 }
 
 token p5quote:s {
-    <sym> » <!before '('>
+    <sym> » ::
     <pat=sibble( $¢.cursor_fresh( %*LANG<Regex> ), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
     <p5rx_mods>?
 }
 
 token p5quote:tr {
-    <sym> » <!before '('> <pat=tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:q))>
+    <sym> » :: <pat=tribble( $¢.cursor_fresh( %*LANG<Regex> ))>
     <p5tr_mods>?
 }
 
@@ -1495,11 +1498,12 @@ grammar Q is STD5 {
         token p5backslash:e { <sym> }
         token p5backslash:f { <sym> }
         token p5backslash:n { <sym> }
-        token p5backslash:o { :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
+	token p5backslash:N { <sym> '{' ~ '}' $<charname>=[.*?] }
         token p5backslash:r { <sym> }
         token p5backslash:t { <sym> }
-        token p5backslash:x { :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
-        token p5backslash:sym<0> { <sym> }
+        token p5backslash:x { :dba('hex character') <sym> [ <.hexdigit> <.hexdigit>? | '{' ~ '}' <hexints> ] }
+	# XXX viv doesn't support ** quantifiers yet
+        token p5backslash:sym<0> { :dba('octal character') <sym> [ [<[0..7]> [<[0..7]> <[0..7]>?]?]? | '{' ~ '}' <octints> ] }
     } # end role
 
     role b0 {
@@ -2555,48 +2559,49 @@ grammar Regex is STD {
 
     token p5metachar:sym<[ ]> {
 	# Unix-style character classes are quite metafiddly.  Don't blame me.
-	'[' {} $<neg> = [ '^' ]?
+	'[' ~ ']' [ $<neg> = [ '^' ]?  <p5cc> ]
+    }
+
+    token p5cc {
+	:my $stop = $*GOAL || ']';
 	[
-	    $<cclass> = [
-		[
-		    $<ccelem>=[    
-			[ \\ <p5ccback> || . ]
-			[ '-' [ \\ <p5ccback> || <-[ \] ]> ]]?
-		    ]
-		    {
-			given $<ccelem>.Str {
-			    if /\-/ {
-				for split('-', $_) {
-				    if /\\(d|w|s|D|W|S)/ {
-					$¢.panic("Illegal use of $_ in range");
-				    }
-				}
+	    <p5ccelem>
+	    {
+		given $<p5ccelem>[*-1].Str {
+		    if /\-/ {
+			for split('-', $_) {
+			    if /\\(d|w|s|D|W|S)/ {
+				$¢.panic("Illegal use of $_ in range");
 			    }
 			}
 		    }
-		]+?  <?before ']'>
-	    ]
-	]
-	']' || <.panic: "Unable to parse character class; couldn't find final ']'">
+		}
+	    }
+	]+?  <?before $stop>
+    }
+
+    token p5ccelem {
+	[ \\ <p5ccback> || . ]
+	[ '-' [ \\ <p5ccback> || <-[ \] ]> ]]?
     }
 
     proto token p5ccback {*}
     token p5ccback:stopper { <text=.stopper> }
     token p5ccback:b { :i <sym> }
-    token p5ccback:d { :i <sym> { $*CCSTATE = '' } }
+    token p5ccback:d { :i <sym> }
     token p5ccback:e { :i <sym> }
     token p5ccback:f { :i <sym> }
-    token p5ccback:h { :i <sym> { $*CCSTATE = '' } }
+    token p5ccback:h { :i <sym> }
     token p5ccback:n {    <sym> }
     token p5ccback:N {    <sym> '{' ~ '}' $<charname>=[.*?] }
     token p5ccback:o { :i :dba('octal character') <sym> [ <octint> | '{' ~ '}' <octints> ] }
     token p5ccback:r { :i <sym> }
-    token p5ccback:s { :i <sym> { $*CCSTATE = '' } }
+    token p5ccback:s { :i <sym> }
     token p5ccback:t { :i <sym> }
-    token p5ccback:v { :i <sym> { $*CCSTATE = '' } }
-    token p5ccback:w { :i <sym> { $*CCSTATE = '' } }
-    token p5ccback:x { :i :dba('hex character') <sym> [ <hexint> | '{' ~ '}' <hexints> ] }
-    token p5ccback:sym<0> { <sym> }
+    token p5ccback:v { :i <sym> }
+    token p5ccback:w { :i <sym> }
+    token p5ccback:x { :i :dba('hex character') <sym> [ <.hexdigit> <.hexdigit>? | '{' ~ '}' <hexints> ] }
+    token p5ccback:sym<0> { :dba('octal character') <sym> [ [<[0..7]> [<[0..7]> <[0..7]>?]?]? | '{' ~ '}' <octints> ] }
 
     token p5metachar:sym«(? )» {
         '(?' {} <assertion=p5assertion>
