@@ -770,7 +770,7 @@ token octint {
 token hexints { [<.ws><hexint><.ws>] +% ',' }
 
 token hexint {
-    <[ 0..9 a..f A..F ]>+ [ _ <[ 0..9 a..f A..F ]>+ ]*
+    <.xdigit>+ [ _ <.xdigit>+ ]*
 }
 
 token decints { [<.ws><decint><.ws>] +% ',' }

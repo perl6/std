@@ -1134,7 +1134,7 @@ token p5number:numish { <numish> }
 token integer {
     [
     | 0 [ b <[01]>+           [ _ <[01]>+ ]*
-        | x <.hexdigit>+ [ _ <.hexdigit>+ ]*
+        | x <.xdigit>+ [ _ <.xdigit>+ ]*
         | d \d+               [ _ \d+]*
         | <[0..7]>+         [ _ <[0..7]>+ ]*
         ]
@@ -1177,7 +1177,7 @@ token octint {
 token hexints { [<.ws><hexint><.ws>] +% ',' }
 
 token hexint {
-    <.hexdigit>+ [ _ <.hexdigit>+ ]*
+    <.xdigit>+ [ _ <.xdigit>+ ]*
 }
 
 ##########
@@ -1501,7 +1501,7 @@ grammar Q is STD5 {
 	token p5backslash:N { <sym> '{' ~ '}' $<charname>=[.*?] }
         token p5backslash:r { <sym> }
         token p5backslash:t { <sym> }
-        token p5backslash:x { :dba('hex character') <sym> [ <.hexdigit> <.hexdigit>? | '{' ~ '}' <hexints> ] }
+        token p5backslash:x { :dba('hex character') <sym> [ <.xdigit> <.xdigit>? | '{' ~ '}' <hexints> ] }
 	# XXX viv doesn't support ** quantifiers yet
         token p5backslash:sym<0> { :dba('octal character') <sym> [ [<[0..7]> [<[0..7]> <[0..7]>?]?]? | '{' ~ '}' <octints> ] }
     } # end role
@@ -2600,7 +2600,7 @@ grammar Regex is STD {
     token p5ccback:t { :i <sym> }
     token p5ccback:v { :i <sym> }
     token p5ccback:w { :i <sym> }
-    token p5ccback:x { :i :dba('hex character') <sym> [ <.hexdigit> <.hexdigit>? | '{' ~ '}' <hexints> ] }
+    token p5ccback:x { :i :dba('hex character') <sym> [ <.xdigit> <.xdigit>? | '{' ~ '}' <hexints> ] }
     token p5ccback:sym<0> { :dba('octal character') <sym> [ [<[0..7]> [<[0..7]> <[0..7]>?]?]? | '{' ~ '}' <octints> ] }
 
     token p5metachar:sym«(? )» {
