@@ -136,7 +136,6 @@ if (defined $symlroot) {
 
 require Actions;
 require STD;
-require STD_P5;
 
 sub spew {
     my $bits = shift;
@@ -2003,14 +2002,20 @@ EOFINAL
 	my $closer = $self->{quantifier}[0]{quantified_atom}[0]->re_ast;
 	my $inner  = $self->{quantifier}[0]{quantified_atom}[1]->re_ast;
 
-	my $strcloser = $closer->{text}; #XXX
-	$strcloser = $closer->{zyg}[0]{text} unless defined $strcloser;
+	my $closertext = $closer->{text}; #XXX
+	$closertext = $closer->{zyg}[0]{text} unless defined $closertext;
+	if ($closertext) {
+	    $closertext = '"' . quotemeta($closertext) . '"';
+	}
+	else {
+	    $closertext = $closer->{var};
+	}
 
 	my $begin = <<TEXT;
-local \$::GOAL = "${\ quotemeta $strcloser}";
+local \$::GOAL = $closertext;
 my \$goalpos = \$C;
 TEXT
-	if ($strcloser !~ /^[])}]$/) {
+	if ($closertext !~ /^[])}]$/) {
 	    $begin .= <<TEXT;
 my \$newlang = \$C->unbalanced(\$::GOAL);
 \$C = bless(\$C, (ref(\$newlang) || \$newlang));
@@ -2023,7 +2028,7 @@ TEXT
 	push @expn, RE_block->new(body => '', context => 'void');
 	push @expn, $inner;
 	push @expn, RE_bracket->new(decl => [], re => RE_first->new(
-		RE_string->new(text => $strcloser),
+		RE_var->new(var => '$::GOAL'),
 		RE_method->new(name => 'FAILGOAL', nobind => 1,
 		    rest => "(\$::GOAL, '$::DBA', \$goalpos)")));
 
