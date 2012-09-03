@@ -1114,6 +1114,9 @@ TEMPLATE
 }
 
 
+{ package VAST::Junctive_and; our @ISA = ('VAST::Base', 'VAST::InfixCall');
+}
+
 { package VAST::Junctive_or; our @ISA = ('VAST::Base', 'VAST::InfixCall');
 }
 
