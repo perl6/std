@@ -1553,6 +1553,38 @@ sub ww { my $self = shift;
     }
 }
 
+sub hexdigit { my $self = shift;
+    local $CTX = $self->callm if DEBUG & DEBUG::trace_call;
+    my $P = $self->{_pos};
+    my $char = substr($::ORIG, $P, 1);
+    if ($char =~ /^[0-9a-fA-F]$/) {
+        my $r = $self->cursor($P+1);
+        return $r->retm();
+    }
+    else {
+#        say "hexdigit didn't match $char at $P";
+        return ();
+    }
+}
+
+sub hexdigit_rev { my $self = shift;
+    local $CTX = $self->callm if DEBUG & DEBUG::trace_call;
+    my $from = $self->{_pos} - 1;
+    if ($from < 0) {
+#        say "hexdigit_rev didn't match $char at $from";
+        return ();
+    }
+    my $char = substr($::ORIG, $from, 1);
+    if ($char =~ /^[0-9a-fA-F]$/) {
+        my $r = $self->cursor_rev($from);
+        return $r->retm();
+    }
+    else {
+#        say "hexdigit_rev didn't match $char at $from";
+        return ();
+    }
+}
+
 sub _ALNUM { my $self = shift;
     local $CTX = $self->callm if DEBUG & DEBUG::trace_call;
     my $P = $self->{_pos};
