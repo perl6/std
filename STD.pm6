@@ -1434,7 +1434,7 @@ grammar P6 is STD {
         <sym> :: <.ws>
         [
         || <version> <?{ substr($<version>.Str,0,2) eq 'v6' }>
-        || <version> <?{ substr($<version>.Str,0,2) eq 'v5' }>
+        || <version> <?{ substr($<version>.Str,0,2) eq 'v5' }> [
             :my %*LANG;
             {
                 self.require_P5;
@@ -1446,6 +1446,7 @@ grammar P6 is STD {
             }
             <.ws> ';'
             [ <statementlist> || <.panic: "Bad P5 code"> ]
+        ]
         || <module_name>
             {
                 $longname = $<module_name><longname>;
