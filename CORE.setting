@@ -357,6 +357,7 @@ my proto flat {*}
 my proto lol {*}
 my proto eager {*}
 my proto hyper {*}
+my proto race {*}
 
 my proto cat {*}
 my proto classify {*}
