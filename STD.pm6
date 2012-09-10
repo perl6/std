@@ -2354,7 +2354,7 @@ grammar P6 is STD {
             my $sigil = $<sigil>.Str;
             my $text = $<text>.Str;
             my $bad = $sigil ~ '{' ~ $text ~ '}';
-            $text = $text - 1 if $text ~~ /^\d+$/;
+            $text = $text - 1 if $text ~~ /^\d+$/ and $text > 0;
             if $text !~~ /^(\w|\:)+$/ {
                 return () if $*QSIGIL;
                 $¢.obs($bad, $sigil ~ '(' ~ $text ~ ')');
