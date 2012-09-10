@@ -1,5 +1,5 @@
 # Makefile for STD.pm6 viv etcetera in pugs/src/perl6
-.PHONY: six all sixfast clean snap snaptest
+.PHONY: six five all sixfast clean snap snaptest
 
 INVARIANT=Actions.pm CORE.setting CursorBase.pmc DEBUG.pmc LazyMap.pm NAME.pmc\
 	  RE_ast.pmc Stash.pmc mangle.pl uniprops viv
@@ -20,8 +20,9 @@ GIT=git
 # no snaptest on win32 just yet
 CP_R=cp -r
 
-all: syml/CORE.syml STD_P5.pmc
+all: syml/CORE.syml STD_P5.pmc syml/CORE5.syml
 six: syml/CORE.syml
+five: syml/CORE5.syml
 
 clean:
 	$(RM_RF) syml STD_P5.pmc $(GENERATE) boot/syml boot/.stamp .stamp\
@@ -46,8 +47,11 @@ syml/CORE.syml: STD.pmc Cursor.pmc $(INVARIANT)
 	$(RM_RF) syml
 	$(PERL) ./viv --noperl6lib --compile-setting CORE.setting
 	$(CP) boot/syml/CursorBase.syml boot/syml/Cursor.syml boot/syml/DEBUG.syml boot/syml/NAME.syml boot/syml/Stash.syml boot/syml/STD.syml syml
-# reboot after incompatibly changing syml format
 
+syml/CORE5.syml: STD.pmc CORE5.setting Cursor.pmc $(INVARIANT)
+	$(PERL) ./viv --noperl6lib --compile-setting CORE5.setting
+
+# reboot after incompatibly changing syml format
 reboot: six
 	$(CP) $(GENERATE) boot
 	$(RM_RF) boot/syml
