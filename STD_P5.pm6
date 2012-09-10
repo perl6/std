@@ -823,7 +823,7 @@ token termish {
     }
 }
 
-token p5term:fatarrow           { <fatarrow> }
+token p5term:fatkey             { <fatkey> }
 
 token p5term:variable           { <variable>
 				    [
@@ -843,8 +843,8 @@ token p5term:value              { <value=p5value> }
 token p5term:capterm            { <capterm> }
 token p5term:statement_prefix   { <statement_prefix=p5statement_prefix> }
 
-token fatarrow {
-    <key=identifier> \h* '=>' <.ws> <val=EXPR(item %assignment)>
+token fatkey {
+    '-'?<key=identifier> <?before \h* '=>' >
 }
 
 # Most of these special variable rules are there simply to catch old p5 brainos
