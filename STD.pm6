@@ -2174,17 +2174,17 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$~> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym> <!before \w | '('>
         <.obs('$~ variable', 'Form module')>
     }
 
     token special_variable:sym<$`> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym>
         <.obs('$` variable', 'explicit pattern before <(')>
     }
 
     token special_variable:sym<$@> {
-        <sym> <?before \W> ::
+        <sym> <!before \w | '(' | <sigil> > ::
         <.obs('$@ variable as eval error', '$!')>
     }
 
@@ -2196,11 +2196,11 @@ grammar P6 is STD {
         ]
     }
     token special_variable:sym<$$> {
-        <sym> <!alpha> :: <?before \s | ',' | <terminator> >
+        <sym> <!before \w | '(' | <sigil> >
         <.obs('$$ variable', '$*PID')>
     }
     token special_variable:sym<$%> {
-        <sym> <!before \w> <!sigil> ::
+        <sym> <!before \w | '(' | <sigil> >
         <.obs('$% variable', 'Form module')>
     }
 
@@ -2211,42 +2211,42 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$^> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym> <!before \w>
         <.obs('$^ variable', 'Form module')>
     }
 
     token special_variable:sym<$&> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym> <!before \w | '(' | <sigil> >
         <.obs('$& variable', '$/ or $()')>
     }
 
     token special_variable:sym<$*> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym> <!before \w | '(' >
         <.obs('$* variable', '^^ and $$')>
     }
 
     token special_variable:sym<$)> {
-        <sym> <?{ $*GOAL ne ')' }> <?before \s | ',' | <terminator> >
+        <sym> <?{ $*GOAL ne ')' }>
         <.obs('$) variable', '$*EGID')>
     }
 
     token special_variable:sym<$-> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym>
         <.obs('$- variable', 'Form module')>
     }
 
     token special_variable:sym<$=> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym> <!before \w | '('>
         <.obs('$= variable', 'Form module')>
     }
 
     token special_variable:sym<@+> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym>
         <.obs('@+ variable', '.to method')>
     }
 
     token special_variable:sym<%+> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym>
         <.obs('%+ variable', '.to method')>
     }
 
@@ -2369,48 +2369,47 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$[> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym> 
         <.obs('$[ variable', 'user-defined array indices')>
     }
 
     token special_variable:sym<$]> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym>
         <.obs('$] variable', '$*PERL_VERSION')>
     }
 
     token special_variable:sym<$\\> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym>
         <.obs('$\\ variable', "the filehandle's :ors attribute")>
     }
 
     token special_variable:sym<$|> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym>
         <.obs('$| variable', ':autoflush on open')>
     }
 
     token special_variable:sym<$:> {
-        <sym> <?before <[\x20\t\n\],=)}]> >
+        <sym> <!before \w>
         <.obs('$: variable', 'Form module')>
     }
 
     token special_variable:sym<$;> {
-        <sym> :: <?before \s | ',' | '=' | <terminator> >
+        <sym>
         <.obs('$; variable', 'real multidimensional hashes')>
     }
 
     token special_variable:sym<$'> { #'
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym> <!{ $*QSIGIL }>
         <.obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
     }
 
     token special_variable:sym<$"> {
         <sym> <!{ $*QSIGIL }>
-        :: <?before \s | ',' | '=' | <terminator> >
         <.obs('$" variable', '.join() method')>
     }
 
     token special_variable:sym<$,> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym>
         <.obs('$, variable', ".join() method")>
     }
 
@@ -2420,17 +2419,17 @@ grammar P6 is STD {
     }
 
     token special_variable:sym«\$>» {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym>
         <.obs('$> variable', '$*EUID')>
     }
 
     token special_variable:sym<$.> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym> <!before \w | '('>
         <.obs('$. variable', "the filehandle's .line method")>
     }
 
     token special_variable:sym<$?> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym> <!before \w | '('>
         <.obs('$? variable as child error', '$!')>
     }
 
