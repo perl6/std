@@ -2313,7 +2313,7 @@ grammar P6 is STD {
                     when 'UNICODE'       { $repl = '$?UNICODE' }  # XXX ???
                     when 'TAINT'         { $repl = '$*TAINT' }
                     when 'OPEN'          { $repl = 'filehandle introspection' }
-                    when 'N'             { $repl = '$[*-1]' }
+                    when 'N'             { $repl = '$/[*-1]' }
                     when 'L'             { $repl = 'Form module' }
                     when 'A'             { $repl = 'Form module' }
                     when 'E'             { $repl = '$!.extended_os_error' }
