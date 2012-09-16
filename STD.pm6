@@ -1674,7 +1674,6 @@ grammar P6 is STD {
         | <multi_declarator><.ws>
         | {} <longname> {
                 my $t = $<longname>.Str;
-                say "HERE $t";
                 if ord($t) < 97 and not $¢.is_known($t) {
                     $¢.sorry("In $*SCOPE declaration, typename '$t' must be predeclared (or marked as declarative with :: prefix)");
                 }
