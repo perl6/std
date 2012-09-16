@@ -1661,25 +1661,26 @@ grammar P6 is STD {
         :dba('scoped declarator')
         <.ws>
         [
-        | <declarator>
-        | <regex_declarator>
-        | <package_declarator>
+        | <declarator><.ws>
+        | <regex_declarator><.ws>
+        | <package_declarator><.ws>
         | [<typename><.ws>]+
             {
                 my $t = $<typename>;
                 @$t > 1 and $¢.sorry("Multiple prefix constraints not yet supported");
                 $*OFTYPE = $t[0];
             }
-            <multi_declarator>
-        | <multi_declarator>
-        ] <.ws>
-        || <?before <[A..Z]>><longname>{
+            <multi_declarator><.ws>
+        | <multi_declarator><.ws>
+        | {} <longname> {
                 my $t = $<longname>.Str;
-                if not $¢.is_known($t) {
+                say "HERE $t";
+                if ord($t) < 97 and not $¢.is_known($t) {
                     $¢.sorry("In $*SCOPE declaration, typename '$t' must be predeclared (or marked as declarative with :: prefix)");
                 }
             }
             <!> # drop through
+        ]
         || <.panic: "Malformed $*SCOPE">
     }
 
