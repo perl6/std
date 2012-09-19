@@ -4327,6 +4327,14 @@ grammar Q is STD {
         method postprocessor () { 'null' }
     }
 
+    role v1 {
+        method postprocessor () { 'val' }
+    }
+
+    role v0 {
+        method postprocessor () { 'null' }
+    }
+
     role w1 {
         method postprocessor () { 'words' }
     }
@@ -4459,6 +4467,7 @@ grammar Q is STD {
 
     multi method tweak (:path(:$p)!)        { self.mixin($p ?? ::p1 !! ::p0) }
     multi method tweak (:exec(:$x)!)        { self.mixin($x ?? ::x1 !! ::x0) }
+    multi method tweak (:val(:$v)!)         { self.mixin($v ?? ::v1 !! ::v0) }
     multi method tweak (:words(:$w)!)       { self.mixin($w ?? ::w1 !! ::w0) }
     multi method tweak (:quotewords(:$ww)!) { self.mixin($ww ?? ::ww1 !! ::ww0) }
 
