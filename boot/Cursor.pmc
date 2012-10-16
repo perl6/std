@@ -18,9 +18,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 ;
 our $BLUE    = $CursorBase::BLUE;
 our $GREEN   = $CursorBase::GREEN;

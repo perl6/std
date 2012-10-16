@@ -26,9 +26,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 alnumint: !!perl/hash:RE_ast
@@ -6834,9 +6831,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 starter: !!perl/hash:RE_ast
@@ -6911,9 +6905,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -6994,9 +6985,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -7745,9 +7733,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 moose_has 'delim' => (isa => 'Str', is => 'rw');
 moose_has 'orignode' => (is => 'rw');
 moose_has 'lang' => (is => 'rw');
@@ -7767,9 +7752,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -11182,9 +11164,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -19080,18 +19059,33 @@ scoped: !!perl/hash:RE_ast
           dba: scoped declarator
           dic: STD::P6
           zyg:
-          - !!perl/hash:RE_method
+          - !!perl/hash:RE_sequence
             alt: scoped_0 0
-            name: declarator
-            rest: ''
-          - !!perl/hash:RE_method
+            zyg:
+            - !!perl/hash:RE_method
+              name: declarator
+              rest: ''
+            - !!perl/hash:RE_method
+              name: ws
+              rest: ''
+          - !!perl/hash:RE_sequence
             alt: scoped_0 1
-            name: regex_declarator
-            rest: ''
-          - !!perl/hash:RE_method
+            zyg:
+            - !!perl/hash:RE_method
+              name: regex_declarator
+              rest: ''
+            - !!perl/hash:RE_method
+              name: ws
+              rest: ''
+          - !!perl/hash:RE_sequence
             alt: scoped_0 2
-            name: package_declarator
-            rest: ''
+            zyg:
+            - !!perl/hash:RE_method
+              name: package_declarator
+              rest: ''
+            - !!perl/hash:RE_method
+              name: ws
+              rest: ''
           - !!perl/hash:RE_sequence
             alt: scoped_0 3
             zyg:
@@ -19111,31 +19105,30 @@ scoped: !!perl/hash:RE_ast
             - !!perl/hash:RE_method
               name: multi_declarator
               rest: ''
-          - !!perl/hash:RE_method
+            - !!perl/hash:RE_method
+              name: ws
+              rest: ''
+          - !!perl/hash:RE_sequence
             alt: scoped_0 4
-            name: multi_declarator
-            rest: ''
-      - !!perl/hash:RE_method
-        name: ws
-        rest: ''
-    - !!perl/hash:RE_sequence
-      zyg:
-      - !!perl/hash:RE_assertion
-        assert: '?'
-        re: !!perl/hash:RE_method_re
-          name: before
-          nobind: 1
-          re: !!perl/hash:RE_cclass
-            i: 0
-            text: '[A..Z]'
-      - !!perl/hash:RE_method
-        name: longname
-        rest: ''
-      - !!perl/hash:RE_block {}
-      - !!perl/hash:RE_assertion
-        assert: '!'
-        re: !!perl/hash:RE_noop
-          nobind: 1
+            zyg:
+            - !!perl/hash:RE_method
+              name: multi_declarator
+              rest: ''
+            - !!perl/hash:RE_method
+              name: ws
+              rest: ''
+          - !!perl/hash:RE_sequence
+            alt: scoped_0 5
+            zyg:
+            - !!perl/hash:RE_block {}
+            - !!perl/hash:RE_method
+              name: longname
+              rest: ''
+            - !!perl/hash:RE_block {}
+            - !!perl/hash:RE_assertion
+              assert: '!'
+              re: !!perl/hash:RE_noop
+                nobind: 1
     - !!perl/hash:RE_method
       name: panic
       rest: 1
@@ -19588,10 +19581,8 @@ special_variable__S_093DollarTilde: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $~
-    - !!perl/hash:RE_meta
-      text: '::'
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
@@ -19603,19 +19594,11 @@ special_variable__S_093DollarTilde: !!perl/hash:RE_ast
           - !!perl/hash:RE_meta
             alt: special_variable__S_093DollarTilde_0 0
             min: 1
-            text: \s
+            text: \w
           - !!perl/hash:RE_string
             alt: special_variable__S_093DollarTilde_0 1
             i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_093DollarTilde_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_093DollarTilde_0 3
-            name: terminator
-            rest: ''
+            text: (
     - !!perl/hash:RE_method
       name: obs
       rest: 1
@@ -19630,34 +19613,9 @@ special_variable__S_094DollarGrave: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $`
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &80 !!perl/hash:RE_any
-          altname: special_variable__S_094DollarGrave_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_094DollarGrave_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_094DollarGrave_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_094DollarGrave_0 2
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_094DollarGrave_0: *80
 special_variable__S_095DollarAt: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -19669,18 +19627,33 @@ special_variable__S_095DollarAt: !!perl/hash:RE_ast
       rest: ''
       sym: $@
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: !!perl/hash:RE_meta
-          min: 1
-          text: \W
+        re: &80 !!perl/hash:RE_any
+          altname: special_variable__S_095DollarAt_0
+          dba: special_variable
+          dic: STD::P6
+          zyg:
+          - !!perl/hash:RE_meta
+            alt: special_variable__S_095DollarAt_0 0
+            min: 1
+            text: \w
+          - !!perl/hash:RE_string
+            alt: special_variable__S_095DollarAt_0 1
+            i: 0
+            text: (
+          - !!perl/hash:RE_method
+            alt: special_variable__S_095DollarAt_0 2
+            name: sigil
+            rest: ''
     - !!perl/hash:RE_meta
       text: '::'
     - !!perl/hash:RE_method
       name: obs
       rest: 1
+special_variable__S_095DollarAt_0: *80
 special_variable__S_096DollarSharp: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -19724,13 +19697,6 @@ special_variable__S_097DollarDollar: !!perl/hash:RE_ast
       sym: $$
     - !!perl/hash:RE_assertion
       assert: '!'
-      re: !!perl/hash:RE_method
-        name: alpha
-        rest: ''
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
@@ -19742,14 +19708,14 @@ special_variable__S_097DollarDollar: !!perl/hash:RE_ast
           - !!perl/hash:RE_meta
             alt: special_variable__S_097DollarDollar_0 0
             min: 1
-            text: \s
+            text: \w
           - !!perl/hash:RE_string
             alt: special_variable__S_097DollarDollar_0 1
             i: 0
-            text: ','
+            text: (
           - !!perl/hash:RE_method
             alt: special_variable__S_097DollarDollar_0 2
-            name: terminator
+            name: sigil
             rest: ''
     - !!perl/hash:RE_method
       name: obs
@@ -19770,19 +19736,27 @@ special_variable__S_098DollarPercent: !!perl/hash:RE_ast
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: !!perl/hash:RE_meta
-          min: 1
-          text: \w
-    - !!perl/hash:RE_assertion
-      assert: '!'
-      re: !!perl/hash:RE_method
-        name: sigil
-        rest: ''
-    - !!perl/hash:RE_meta
-      text: '::'
+        re: &82 !!perl/hash:RE_any
+          altname: special_variable__S_098DollarPercent_0
+          dba: special_variable
+          dic: STD::P6
+          zyg:
+          - !!perl/hash:RE_meta
+            alt: special_variable__S_098DollarPercent_0 0
+            min: 1
+            text: \w
+          - !!perl/hash:RE_string
+            alt: special_variable__S_098DollarPercent_0 1
+            i: 0
+            text: (
+          - !!perl/hash:RE_method
+            alt: special_variable__S_098DollarPercent_0 2
+            name: sigil
+            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
+special_variable__S_098DollarPercent_0: *82
 special_variable__S_099DollarCaretX: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -19815,38 +19789,17 @@ special_variable__S_100DollarCaret: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $^
-    - !!perl/hash:RE_meta
-      text: '::'
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &82 !!perl/hash:RE_any
-          altname: special_variable__S_100DollarCaret_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_100DollarCaret_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_100DollarCaret_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_100DollarCaret_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_100DollarCaret_0 3
-            name: terminator
-            rest: ''
+        re: !!perl/hash:RE_meta
+          min: 1
+          text: \w
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_100DollarCaret_0: *82
 special_variable__S_101DollarAmp: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -19857,10 +19810,8 @@ special_variable__S_101DollarAmp: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $&
-    - !!perl/hash:RE_meta
-      text: '::'
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
@@ -19872,14 +19823,14 @@ special_variable__S_101DollarAmp: !!perl/hash:RE_ast
           - !!perl/hash:RE_meta
             alt: special_variable__S_101DollarAmp_0 0
             min: 1
-            text: \s
+            text: \w
           - !!perl/hash:RE_string
             alt: special_variable__S_101DollarAmp_0 1
             i: 0
-            text: ','
+            text: (
           - !!perl/hash:RE_method
             alt: special_variable__S_101DollarAmp_0 2
-            name: terminator
+            name: sigil
             rest: ''
     - !!perl/hash:RE_method
       name: obs
@@ -19895,10 +19846,8 @@ special_variable__S_102DollarStar: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $*
-    - !!perl/hash:RE_meta
-      text: '::'
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
@@ -19910,19 +19859,11 @@ special_variable__S_102DollarStar: !!perl/hash:RE_ast
           - !!perl/hash:RE_meta
             alt: special_variable__S_102DollarStar_0 0
             min: 1
-            text: \s
+            text: \w
           - !!perl/hash:RE_string
             alt: special_variable__S_102DollarStar_0 1
             i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_102DollarStar_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_102DollarStar_0 3
-            name: terminator
-            rest: ''
+            text: (
     - !!perl/hash:RE_method
       name: obs
       rest: 1
@@ -19941,32 +19882,9 @@ special_variable__S_103DollarThesis: !!perl/hash:RE_ast
       assert: '?'
       re: !!perl/hash:RE_block
         nobind: 1
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &85 !!perl/hash:RE_any
-          altname: special_variable__S_103DollarThesis_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_103DollarThesis_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_103DollarThesis_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_103DollarThesis_0 2
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_103DollarThesis_0: *85
 special_variable__S_104DollarMinus: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -19977,38 +19895,9 @@ special_variable__S_104DollarMinus: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $-
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &86 !!perl/hash:RE_any
-          altname: special_variable__S_104DollarMinus_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_104DollarMinus_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_104DollarMinus_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_104DollarMinus_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_104DollarMinus_0 3
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_104DollarMinus_0: *86
 special_variable__S_105DollarEqual: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20019,14 +19908,12 @@ special_variable__S_105DollarEqual: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $=
-    - !!perl/hash:RE_meta
-      text: '::'
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &87 !!perl/hash:RE_any
+        re: &85 !!perl/hash:RE_any
           altname: special_variable__S_105DollarEqual_0
           dba: special_variable
           dic: STD::P6
@@ -20034,23 +19921,15 @@ special_variable__S_105DollarEqual: !!perl/hash:RE_ast
           - !!perl/hash:RE_meta
             alt: special_variable__S_105DollarEqual_0 0
             min: 1
-            text: \s
+            text: \w
           - !!perl/hash:RE_string
             alt: special_variable__S_105DollarEqual_0 1
             i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_105DollarEqual_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_105DollarEqual_0 3
-            name: terminator
-            rest: ''
+            text: (
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_105DollarEqual_0: *87
+special_variable__S_105DollarEqual_0: *85
 special_variable__S_106AtPlus: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20061,34 +19940,9 @@ special_variable__S_106AtPlus: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: '@+'
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &88 !!perl/hash:RE_any
-          altname: special_variable__S_106AtPlus_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_106AtPlus_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_106AtPlus_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_106AtPlus_0 2
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_106AtPlus_0: *88
 special_variable__S_107PercentPlus: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20099,34 +19953,9 @@ special_variable__S_107PercentPlus: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: '%+'
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &89 !!perl/hash:RE_any
-          altname: special_variable__S_107PercentPlus_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_107PercentPlus_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_107PercentPlus_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_107PercentPlus_0 2
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_107PercentPlus_0: *89
 special_variable__S_108DollarPlusBra_Ket: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20177,7 +20006,7 @@ special_variable__S_111AtMinus: !!perl/hash:RE_ast
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &90 !!perl/hash:RE_any
+        re: &86 !!perl/hash:RE_any
           altname: special_variable__S_111AtMinus_0
           dba: special_variable
           dic: STD::P6
@@ -20197,7 +20026,7 @@ special_variable__S_111AtMinus: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_111AtMinus_0: *90
+special_variable__S_111AtMinus_0: *86
 special_variable__S_112PercentMinus: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20215,7 +20044,7 @@ special_variable__S_112PercentMinus: !!perl/hash:RE_ast
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &91 !!perl/hash:RE_any
+        re: &87 !!perl/hash:RE_any
           altname: special_variable__S_112PercentMinus_0
           dba: special_variable
           dic: STD::P6
@@ -20235,7 +20064,7 @@ special_variable__S_112PercentMinus: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_112PercentMinus_0: *91
+special_variable__S_112PercentMinus_0: *87
 special_variable__S_113DollarMinusBra_Ket: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20286,7 +20115,7 @@ special_variable__S_116DollarPlus: !!perl/hash:RE_ast
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &92 !!perl/hash:RE_any
+        re: &88 !!perl/hash:RE_any
           altname: special_variable__S_116DollarPlus_0
           dba: special_variable
           dic: STD::P6
@@ -20306,7 +20135,7 @@ special_variable__S_116DollarPlus: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_116DollarPlus_0: *92
+special_variable__S_116DollarPlus_0: *88
 special_variable__S_117DollarCurCaret_Ly: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20376,38 +20205,9 @@ special_variable__S_120DollarBra: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $[
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &93 !!perl/hash:RE_any
-          altname: special_variable__S_120DollarBra_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_120DollarBra_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_120DollarBra_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_120DollarBra_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_120DollarBra_0 3
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_120DollarBra_0: *93
 special_variable__S_121DollarKet: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20418,34 +20218,9 @@ special_variable__S_121DollarKet: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $]
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &94 !!perl/hash:RE_any
-          altname: special_variable__S_121DollarKet_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_121DollarKet_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_121DollarKet_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_121DollarKet_0 2
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_121DollarKet_0: *94
 special_variable__S_122DollarBack: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20456,38 +20231,9 @@ special_variable__S_122DollarBack: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $\
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &95 !!perl/hash:RE_any
-          altname: special_variable__S_122DollarBack_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_122DollarBack_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_122DollarBack_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_122DollarBack_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_122DollarBack_0 3
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_122DollarBack_0: *95
 special_variable__S_123DollarVert: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20498,38 +20244,9 @@ special_variable__S_123DollarVert: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $|
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &96 !!perl/hash:RE_any
-          altname: special_variable__S_123DollarVert_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_123DollarVert_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_123DollarVert_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_123DollarVert_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_123DollarVert_0 3
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_123DollarVert_0: *96
 special_variable__S_124DollarColon: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20541,13 +20258,13 @@ special_variable__S_124DollarColon: !!perl/hash:RE_ast
       rest: ''
       sym: '$:'
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: !!perl/hash:RE_cclass
-          i: 0
-          text: '[\x20\t\n\],=)}]'
+        re: !!perl/hash:RE_meta
+          min: 1
+          text: \w
     - !!perl/hash:RE_method
       name: obs
       rest: 1
@@ -20561,38 +20278,9 @@ special_variable__S_125DollarSemi: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $;
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &97 !!perl/hash:RE_any
-          altname: special_variable__S_125DollarSemi_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_125DollarSemi_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_125DollarSemi_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_125DollarSemi_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_125DollarSemi_0 3
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_125DollarSemi_0: *97
 special_variable__S_126DollarSingle: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20603,34 +20291,13 @@ special_variable__S_126DollarSingle: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $'
-    - !!perl/hash:RE_meta
-      text: '::'
     - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
+      assert: '!'
+      re: !!perl/hash:RE_block
         nobind: 1
-        re: &98 !!perl/hash:RE_any
-          altname: special_variable__S_126DollarSingle_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_126DollarSingle_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_126DollarSingle_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_126DollarSingle_0 2
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_126DollarSingle_0: *98
 special_variable__S_127DollarDouble: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20645,38 +20312,9 @@ special_variable__S_127DollarDouble: !!perl/hash:RE_ast
       assert: '!'
       re: !!perl/hash:RE_block
         nobind: 1
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &99 !!perl/hash:RE_any
-          altname: special_variable__S_127DollarDouble_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_127DollarDouble_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_127DollarDouble_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_string
-            alt: special_variable__S_127DollarDouble_0 2
-            i: 0
-            text: =
-          - !!perl/hash:RE_method
-            alt: special_variable__S_127DollarDouble_0 3
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_127DollarDouble_0: *99
 special_variable__S_128DollarComma: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20687,34 +20325,9 @@ special_variable__S_128DollarComma: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $,
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &100 !!perl/hash:RE_any
-          altname: special_variable__S_128DollarComma_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_128DollarComma_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_128DollarComma_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_128DollarComma_0 2
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_128DollarComma_0: *100
 special_variable__S_129DollarLt: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20770,34 +20383,9 @@ special_variable__S_130DollarGt: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $>
-    - !!perl/hash:RE_meta
-      text: '::'
-    - !!perl/hash:RE_assertion
-      assert: '?'
-      re: !!perl/hash:RE_method_re
-        name: before
-        nobind: 1
-        re: &101 !!perl/hash:RE_any
-          altname: special_variable__S_130DollarGt_0
-          dba: special_variable
-          dic: STD::P6
-          zyg:
-          - !!perl/hash:RE_meta
-            alt: special_variable__S_130DollarGt_0 0
-            min: 1
-            text: \s
-          - !!perl/hash:RE_string
-            alt: special_variable__S_130DollarGt_0 1
-            i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_130DollarGt_0 2
-            name: terminator
-            rest: ''
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_130DollarGt_0: *101
 special_variable__S_131DollarDot: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20808,14 +20396,12 @@ special_variable__S_131DollarDot: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $.
-    - !!perl/hash:RE_meta
-      text: '::'
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &102 !!perl/hash:RE_any
+        re: &89 !!perl/hash:RE_any
           altname: special_variable__S_131DollarDot_0
           dba: special_variable
           dic: STD::P6
@@ -20823,19 +20409,15 @@ special_variable__S_131DollarDot: !!perl/hash:RE_ast
           - !!perl/hash:RE_meta
             alt: special_variable__S_131DollarDot_0 0
             min: 1
-            text: \s
+            text: \w
           - !!perl/hash:RE_string
             alt: special_variable__S_131DollarDot_0 1
             i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_131DollarDot_0 2
-            name: terminator
-            rest: ''
+            text: (
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_131DollarDot_0: *102
+special_variable__S_131DollarDot_0: *89
 special_variable__S_132DollarQuestion: !!perl/hash:RE_ast
   dba: special_variable
   dic: STD::P6
@@ -20846,14 +20428,12 @@ special_variable__S_132DollarQuestion: !!perl/hash:RE_ast
       name: sym
       rest: ''
       sym: $?
-    - !!perl/hash:RE_meta
-      text: '::'
     - !!perl/hash:RE_assertion
-      assert: '?'
+      assert: '!'
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &103 !!perl/hash:RE_any
+        re: &90 !!perl/hash:RE_any
           altname: special_variable__S_132DollarQuestion_0
           dba: special_variable
           dic: STD::P6
@@ -20861,19 +20441,15 @@ special_variable__S_132DollarQuestion: !!perl/hash:RE_ast
           - !!perl/hash:RE_meta
             alt: special_variable__S_132DollarQuestion_0 0
             min: 1
-            text: \s
+            text: \w
           - !!perl/hash:RE_string
             alt: special_variable__S_132DollarQuestion_0 1
             i: 0
-            text: ','
-          - !!perl/hash:RE_method
-            alt: special_variable__S_132DollarQuestion_0 2
-            name: terminator
-            rest: ''
+            text: (
     - !!perl/hash:RE_method
       name: obs
       rest: 1
-special_variable__S_132DollarQuestion_0: *103
+special_variable__S_132DollarQuestion_0: *90
 statement: !!perl/hash:RE_ast
   dba: statement
   dic: STD::P6
@@ -20900,7 +20476,7 @@ statement: !!perl/hash:RE_ast
         re: !!perl/hash:RE_block
           nobind: 1
     - !!perl/hash:RE_bracket
-      re: &104 !!perl/hash:RE_any
+      re: &91 !!perl/hash:RE_any
         altname: statement_0
         dba: statement end
         dic: STD::P6
@@ -20938,7 +20514,7 @@ statement: !!perl/hash:RE_ast
                   rest: ''
                 - !!perl/hash:RE_quantified_atom
                   atom: !!perl/hash:RE_bracket
-                    re: &105 !!perl/hash:RE_any
+                    re: &92 !!perl/hash:RE_any
                       altname: statement_1
                       dba: statement modifier loop
                       dic: STD::P6
@@ -21020,7 +20596,7 @@ statement: !!perl/hash:RE_ast
             re: !!perl/hash:RE_method_re
               name: before
               nobind: 1
-              re: &106 !!perl/hash:RE_any
+              re: &93 !!perl/hash:RE_any
                 altname: statement_2
                 dba: statement
                 dic: STD::P6
@@ -21052,9 +20628,9 @@ statement: !!perl/hash:RE_ast
             rest: 1
       quant:
       - '?'
-statement_0: *104
-statement_1: *105
-statement_2: *106
+statement_0: *91
+statement_1: *92
+statement_2: *93
 statement_control__S_000need: !!perl/hash:RE_ast
   dba: statement_control
   dic: STD::P6
@@ -21074,7 +20650,7 @@ statement_control__S_000need: !!perl/hash:RE_ast
       rest: ''
     - !!perl/hash:RE_quantified_atom
       atom: !!perl/hash:RE_bracket
-        re: &107 !!perl/hash:RE_any
+        re: &94 !!perl/hash:RE_any
           altname: statement_control__S_000need_0
           dba: statement_control
           dic: STD::P6
@@ -21100,7 +20676,7 @@ statement_control__S_000need: !!perl/hash:RE_ast
             - !!perl/hash:RE_block {}
       quant:
       - +
-statement_control__S_000need_0: *107
+statement_control__S_000need_0: *94
 statement_control__S_001import: !!perl/hash:RE_ast
   dba: statement_control
   dic: STD::P6
@@ -21288,7 +20864,7 @@ statement_control__S_004if: !!perl/hash:RE_ast
     - !!perl/hash:RE_quantified_atom
       atom: !!perl/hash:RE_bracket
         re: !!perl/hash:RE_bracket
-          re: &108 !!perl/hash:RE_any
+          re: &95 !!perl/hash:RE_any
             altname: statement_control__S_004if_0
             dba: statement_control
             dic: STD::P6
@@ -21370,7 +20946,7 @@ statement_control__S_004if: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: ws
       rest: ''
-statement_control__S_004if_0: *108
+statement_control__S_004if_0: *95
 statement_control__S_005unless: !!perl/hash:RE_ast
   dba: statement_control
   dic: STD::P6
@@ -21571,7 +21147,7 @@ statement_control__S_008repeat: !!perl/hash:RE_ast
       name: ws
       rest: ''
     - !!perl/hash:RE_bracket
-      re: &109 !!perl/hash:RE_any
+      re: &96 !!perl/hash:RE_any
         altname: statement_control__S_008repeat_0
         dba: statement_control
         dic: STD::P6
@@ -21581,7 +21157,7 @@ statement_control__S_008repeat: !!perl/hash:RE_ast
           zyg:
           - !!perl/hash:RE_bindnamed
             atom: !!perl/hash:RE_bracket
-              re: &110 !!perl/hash:RE_any
+              re: &97 !!perl/hash:RE_any
                 altname: statement_control__S_008repeat_1
                 dba: statement_control
                 dic: STD::P6
@@ -21622,7 +21198,7 @@ statement_control__S_008repeat: !!perl/hash:RE_ast
                 zyg:
                 - !!perl/hash:RE_bindnamed
                   atom: !!perl/hash:RE_bracket
-                    re: &111 !!perl/hash:RE_any
+                    re: &98 !!perl/hash:RE_any
                       altname: statement_control__S_008repeat_2
                       dba: statement_control
                       dic: STD::P6
@@ -21655,9 +21231,9 @@ statement_control__S_008repeat: !!perl/hash:RE_ast
           - !!perl/hash:RE_method
             name: ws
             rest: ''
-statement_control__S_008repeat_0: *109
-statement_control__S_008repeat_1: *110
-statement_control__S_008repeat_2: *111
+statement_control__S_008repeat_0: *96
+statement_control__S_008repeat_1: *97
+statement_control__S_008repeat_2: *98
 statement_control__S_009loop: !!perl/hash:RE_ast
   dba: statement_control
   dic: STD::P6
@@ -22564,7 +22140,7 @@ statementlist: !!perl/hash:RE_ast
       name: ws
       rest: ''
     - !!perl/hash:RE_bracket
-      re: &112 !!perl/hash:RE_any
+      re: &99 !!perl/hash:RE_any
         altname: statementlist_0
         dba: statement list
         dic: STD::P6
@@ -22608,7 +22184,7 @@ statementlist: !!perl/hash:RE_ast
             name: ws
             rest: ''
           - !!perl/hash:RE_block {}
-statementlist_0: *112
+statementlist_0: *99
 sublongname: !!perl/hash:RE_ast
   dba: sublongname
   dic: STD::P6
@@ -22627,7 +22203,7 @@ subshortname: !!perl/hash:RE_ast
   dba: subshortname
   dic: STD::P6
   re: !!perl/hash:RE_bracket
-    re: &113 !!perl/hash:RE_any
+    re: &100 !!perl/hash:RE_any
       altname: subshortname_0
       dba: subshortname
       dic: STD::P6
@@ -22648,7 +22224,7 @@ subshortname: !!perl/hash:RE_ast
         alt: subshortname_0 1
         name: desigilname
         rest: ''
-subshortname_0: *113
+subshortname_0: *100
 term__S_074fatarrow: !!perl/hash:RE_ast
   dba: term
   dic: STD::P6
@@ -22686,7 +22262,7 @@ term__S_078multi_declarator: !!perl/hash:RE_ast
       re: !!perl/hash:RE_method_re
         name: before
         nobind: 1
-        re: &114 !!perl/hash:RE_any
+        re: &101 !!perl/hash:RE_any
           altname: term__S_078multi_declarator_0
           dba: term
           dic: STD::P6
@@ -22706,7 +22282,7 @@ term__S_078multi_declarator: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: multi_declarator
       rest: ''
-term__S_078multi_declarator_0: *114
+term__S_078multi_declarator_0: *101
 term__S_079routine_declarator: !!perl/hash:RE_ast
   dba: term
   dic: STD::P6
@@ -23023,7 +22599,7 @@ term__S_187rand: !!perl/hash:RE_ast
                   quant:
                   - '*'
                 - !!perl/hash:RE_bracket
-                  re: &115 !!perl/hash:RE_any
+                  re: &102 !!perl/hash:RE_any
                     altname: term__S_187rand_0
                     dba: term
                     dic: STD::P6
@@ -23061,7 +22637,7 @@ term__S_187rand: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: O
       rest: 1
-term__S_187rand_0: *115
+term__S_187rand_0: *102
 term__S_188Star: !!perl/hash:RE_ast
   dba: term
   dic: STD::P6
@@ -23161,7 +22737,7 @@ term__S_196reduce: !!perl/hash:RE_ast
             i: 0
             text: ']'
           - !!perl/hash:RE_bracket
-            re: &116 !!perl/hash:RE_any
+            re: &103 !!perl/hash:RE_any
               altname: term__S_196reduce_0
               dba: term
               dic: STD::P6
@@ -23200,7 +22776,7 @@ term__S_196reduce: !!perl/hash:RE_ast
       name: O
       rest: 1
     - !!perl/hash:RE_block {}
-term__S_196reduce_0: *116
+term__S_196reduce_0: *103
 term__S_213lambda: !!perl/hash:RE_ast
   dba: term
   dic: STD::P6
@@ -23293,7 +22869,7 @@ term__S_334identifier: !!perl/hash:RE_ast
         nobind: 1
         re: !!perl/hash:RE_quantified_atom
           atom: !!perl/hash:RE_bracket
-            re: &117 !!perl/hash:RE_any
+            re: &104 !!perl/hash:RE_any
               altname: term__S_334identifier_0
               dba: term
               dic: STD::P6
@@ -23323,7 +22899,7 @@ term__S_334identifier: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: O
       rest: 1
-term__S_334identifier_0: *117
+term__S_334identifier_0: *104
 term__S_335name: !!perl/hash:RE_ast
   dba: term
   dic: STD::P6
@@ -23384,7 +22960,7 @@ term__S_335name: !!perl/hash:RE_ast
                     name: before
                     nobind: 1
                     re: !!perl/hash:RE_bracket
-                      re: &118 !!perl/hash:RE_any
+                      re: &105 !!perl/hash:RE_any
                         altname: term__S_335name_0
                         dba: namespace variable lookup
                         dic: STD::P6
@@ -23421,7 +22997,7 @@ term__S_335name: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: O
       rest: 1
-term__S_335name_0: *118
+term__S_335name_0: *105
 terminator__S_345Semi: !!perl/hash:RE_ast
   dba: terminator
   dic: STD::P6
@@ -23577,7 +23153,7 @@ termish: !!perl/hash:RE_ast
   re: !!perl/hash:RE_sequence
     zyg:
     - !!perl/hash:RE_bracket
-      re: &119 !!perl/hash:RE_any
+      re: &106 !!perl/hash:RE_any
         altname: termish_0
         dba: prefix or term
         dic: STD::P6
@@ -23708,12 +23284,12 @@ termish: !!perl/hash:RE_ast
             quant:
             - '*'
     - !!perl/hash:RE_block {}
-termish_0: *119
+termish_0: *106
 trait: !!perl/hash:RE_ast
   dba: trait
   dic: STD::P6
   re: !!perl/hash:RE_bracket
-    re: &120 !!perl/hash:RE_any
+    re: &107 !!perl/hash:RE_any
       altname: trait_0
       dba: trait
       dic: STD::P6
@@ -23736,7 +23312,7 @@ trait: !!perl/hash:RE_ast
         - !!perl/hash:RE_method
           name: ws
           rest: ''
-trait_0: *120
+trait_0: *107
 trait_mod__S_068is: !!perl/hash:RE_ast
   dba: trait_mod
   dic: STD::P6
@@ -23894,7 +23470,7 @@ trait_mod__S_072of: !!perl/hash:RE_ast
   re: !!perl/hash:RE_sequence
     zyg:
     - !!perl/hash:RE_bracket
-      re: &121 !!perl/hash:RE_any
+      re: &108 !!perl/hash:RE_any
         altname: trait_mod__S_072of_0
         dba: trait_mod
         dic: STD::P6
@@ -23950,7 +23526,7 @@ trait_mod__S_072of: !!perl/hash:RE_ast
       name: ws
       rest: ''
     - !!perl/hash:RE_block {}
-trait_mod__S_072of_0: *121
+trait_mod__S_072of_0: *108
 trait_mod__S_073handles: !!perl/hash:RE_ast
   dba: trait_mod
   dic: STD::P6
@@ -24031,7 +23607,7 @@ type_constraint: !!perl/hash:RE_ast
   re: !!perl/hash:RE_sequence
     zyg:
     - !!perl/hash:RE_bracket
-      re: &122 !!perl/hash:RE_any
+      re: &109 !!perl/hash:RE_any
         altname: type_constraint_0
         dba: type_constraint
         dic: STD::P6
@@ -24087,7 +23663,7 @@ type_constraint: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: ws
       rest: ''
-type_constraint_0: *122
+type_constraint_0: *109
 type_declarator__S_162subset: !!perl/hash:RE_ast
   dba: type_declarator
   dic: STD::P6
@@ -24195,7 +23771,7 @@ type_declarator__S_163enum: !!perl/hash:RE_ast
       name: ws
       rest: ''
     - !!perl/hash:RE_bracket
-      re: &123 !!perl/hash:RE_any
+      re: &110 !!perl/hash:RE_any
         altname: type_declarator__S_163enum_0
         dba: type_declarator
         dic: STD::P6
@@ -24246,7 +23822,7 @@ type_declarator__S_163enum: !!perl/hash:RE_ast
       name: ws
       rest: ''
     - !!perl/hash:RE_block {}
-type_declarator__S_163enum_0: *123
+type_declarator__S_163enum_0: *110
 type_declarator__S_164constant: !!perl/hash:RE_ast
   dba: type_declarator
   dic: STD::P6
@@ -24265,7 +23841,7 @@ type_declarator__S_164constant: !!perl/hash:RE_ast
       name: ws
       rest: ''
     - !!perl/hash:RE_bracket
-      re: &124 !!perl/hash:RE_any
+      re: &111 !!perl/hash:RE_any
         altname: type_declarator__S_164constant_0
         dba: type_declarator
         dic: STD::P6
@@ -24318,14 +23894,14 @@ type_declarator__S_164constant: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: getdecl
       rest: ''
-type_declarator__S_164constant_0: *124
+type_declarator__S_164constant_0: *111
 typename: !!perl/hash:RE_ast
   dba: typename
   dic: STD::P6
   re: !!perl/hash:RE_sequence
     zyg:
     - !!perl/hash:RE_bracket
-      re: &125 !!perl/hash:RE_any
+      re: &112 !!perl/hash:RE_any
         altname: typename_0
         dba: typename
         dic: STD::P6
@@ -24439,7 +24015,7 @@ typename: !!perl/hash:RE_ast
             rest: ''
       quant:
       - '?'
-typename_0: *125
+typename_0: *112
 unitstart: !!perl/hash:RE_ast
   dba: unitstart
   dic: STD::P6
@@ -24507,7 +24083,7 @@ variable: !!perl/hash:RE_ast
                   i: 0
                   text: '::'
                 - !!perl/hash:RE_bracket
-                  re: &126 !!perl/hash:RE_any
+                  re: &113 !!perl/hash:RE_any
                     altname: variable_0
                     dba: variable
                     dic: STD::P6
@@ -24533,7 +24109,7 @@ variable: !!perl/hash:RE_ast
             i: 0
             text: '&'
           - !!perl/hash:RE_bracket
-            re: &127 !!perl/hash:RE_any
+            re: &114 !!perl/hash:RE_any
               altname: variable_1
               dba: infix noun
               dic: STD::P6
@@ -24590,7 +24166,7 @@ variable: !!perl/hash:RE_ast
             name: name
             rest: ''
         - !!perl/hash:RE_bracket
-          re: &128 !!perl/hash:RE_any
+          re: &115 !!perl/hash:RE_any
             altname: variable_2
             dba: variable
             dic: STD::P6
@@ -24726,7 +24302,7 @@ variable: !!perl/hash:RE_ast
             re: !!perl/hash:RE_block
               nobind: 1
           - !!perl/hash:RE_bracket
-            re: &129 !!perl/hash:RE_any
+            re: &116 !!perl/hash:RE_any
               altname: variable_3
               dba: variable
               dic: STD::P6
@@ -24757,10 +24333,10 @@ variable: !!perl/hash:RE_ast
             rest: ''
       quant:
       - '?'
-variable_0: *126
-variable_1: *127
-variable_2: *128
-variable_3: *129
+variable_0: *113
+variable_1: *114
+variable_2: *115
+variable_3: *116
 variable_declarator: !!perl/hash:RE_ast
   dba: variable_declarator
   dic: STD::P6
@@ -24783,7 +24359,7 @@ variable_declarator: !!perl/hash:RE_ast
           - !!perl/hash:RE_bindnamed
             atom: !!perl/hash:RE_quantified_atom
               atom: !!perl/hash:RE_bracket
-                re: &130 !!perl/hash:RE_any
+                re: &117 !!perl/hash:RE_any
                   altname: variable_declarator_0
                   dba: shape definition
                   dic: STD::P6
@@ -24889,7 +24465,7 @@ variable_declarator: !!perl/hash:RE_ast
     - !!perl/hash:RE_method
       name: getdecl
       rest: ''
-variable_declarator_0: *130
+variable_declarator_0: *117
 version__S_039v: !!perl/hash:RE_ast
   dba: version
   dic: STD::P6
@@ -24923,7 +24499,7 @@ version__S_039v: !!perl/hash:RE_ast
 vnum: !!perl/hash:RE_ast
   dba: vnum
   dic: STD::P6
-  re: &131 !!perl/hash:RE_any
+  re: &118 !!perl/hash:RE_any
     altname: vnum_0
     dba: vnum
     dic: STD::P6
@@ -24939,7 +24515,7 @@ vnum: !!perl/hash:RE_ast
       alt: vnum_0 1
       i: 0
       text: '*'
-vnum_0: *131
+vnum_0: *118
 xblock: !!perl/hash:RE_ast
   dba: xblock
   dic: STD::P6
@@ -26019,9 +25595,7 @@ my $C=shift;
 if (my ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 (($C) x !!do {
-$::LASTSTATE = $C->{'_pos'};
-$C = $::LANG{'MAIN'}->bless($C);
-})
+$C = $::LANG{'MAIN'}->bless($C)})
 }))) { ($C) } else { () }
 }))
 and ($C) = ($C->_BRACKETr(sub {
@@ -28860,24 +28434,33 @@ $C->deb("scoped_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
 push @gather, ((
 sub {
 my $C=shift;
-$C->_SUBSUMEr(['declarator'], sub {
+if (($C) = ($C->_SUBSUMEr(['declarator'], sub {
 my $C = shift;
 $C->declarator
-})
+}))
+and ($C) = ($C->ws)) {
+$C
+} else { () }
 },
 sub {
 my $C=shift;
-$C->_SUBSUMEr(['regex_declarator'], sub {
+if (($C) = ($C->_SUBSUMEr(['regex_declarator'], sub {
 my $C = shift;
 $C->regex_declarator
-})
+}))
+and ($C) = ($C->ws)) {
+$C
+} else { () }
 },
 sub {
 my $C=shift;
-$C->_SUBSUMEr(['package_declarator'], sub {
+if (($C) = ($C->_SUBSUMEr(['package_declarator'], sub {
 my $C = shift;
 $C->package_declarator
-})
+}))
+and ($C) = ($C->ws)) {
+$C
+} else { () }
 },
 sub {
 my $C=shift;
@@ -28899,44 +28482,29 @@ my $M = $C;
 my $t = $M->{'typename'};
 @$t > 1 and $C->sorry("Multiple prefix constraints not yet supported");
 $::OFTYPE = $t->[0];
-}, $C))) {
-$C->_SUBSUMEr(['multi_declarator'], sub {
+}, $C))
+and ($C) = ($C->_SUBSUMEr(['multi_declarator'], sub {
 my $C = shift;
 $C->multi_declarator
-})
-} else { () }
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['multi_declarator'], sub {
-my $C = shift;
-$C->multi_declarator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
 }))
 and ($C) = ($C->ws)) {
 $C
 } else { () }
-
-}
-}
-or $xact->[-2] or
-do {
-push @gather, do {
-my $C = $C;
-if (($C) = ($C->before(sub {
+},
+sub {
 my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-$C->_PATTERN(qr/\G[A-Z]/)
-}))) { ($C) } else { () }
+if (($C) = ($C->_SUBSUMEr(['multi_declarator'], sub {
+my $C = shift;
+$C->multi_declarator
 }))
+and ($C) = ($C->ws)) {
+$C
+} else { () }
+},
+sub {
+my $C=shift;
+if (($C) = (scalar(do {
+}, $C))
 and ($C) = ($C->_SUBSUMEr(['longname'], sub {
 my $C = shift;
 $C->longname
@@ -28944,12 +28512,22 @@ $C->longname
 and ($C) = (scalar(do {
 my $M = $C;
 my $t = $M->{'longname'}->Str;
-if (not $C->is_known($t)) {
+if (ord($t) < 97 and not $C->is_known($t)) {
 $C->sorry("In $::SCOPE declaration, typename '$t' must be predeclared (or marked as declarative with :: prefix)")};
 }, $C))
 and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 $C
+}))) {
+$C
+} else { () }
+}
+)[$try])->($C);
+last if @gather;
+last if $xact->[-2];  # committed?
+}
+@gather;
+};
 }))) {
 $C
 } else { () }
@@ -33488,8 +33066,7 @@ $C->{sym} = "\$\~";
 $self->_MATCHIFYr($S, "special_variable__S_093DollarTilde", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\~"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
@@ -33529,22 +33106,11 @@ $C->deb("special_variable__S_093DollarTilde_0 trying $tag $try") if $::DEBUG & D
 push @gather, ((
 sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\s/)
+$C->_PATTERN(qr/\G\w/)
 },
 sub {
 my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
+$C->_EXACT("\(")
 }
 )[$try])->($C);
 last if @gather;
@@ -33579,70 +33145,6 @@ $C->{sym} = "\$\`";
 $self->_MATCHIFYr($S, "special_variable__S_094DollarGrave", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\`"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_094DollarGrave_0') {
-$C->deb("Fate passed to special_variable__S_094DollarGrave_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_094DollarGrave_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_094DollarGrave_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_094DollarGrave_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_094DollarGrave_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$` variable', 'explicit pattern before <('))) {
 $C
 } else { () }
@@ -33666,11 +33168,67 @@ $C->{sym} = "\$\@";
 $self->_MATCHIFYr($S, "special_variable__S_095DollarAt", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\@"))
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\W/)
+if (my ($C) = (do {
+do {
+my ($tag, $try);
+my @try;
+my $relex;
+
+my $fate;
+my $x;
+if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_095DollarAt_0') {
+$C->deb("Fate passed to special_variable__S_095DollarAt_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
+($C->{'_fate'}, $tag, $try) = @$fate;
+@try = ($try);
+$x = 'ALT special_variable__S_095DollarAt_0';    # some outer ltm is controlling us
+}
+else {
+$x = 'ALTLTM special_variable__S_095DollarAt_0'; # we are top level ltm
+}
+my $C = $C->cursor_xact($x);
+my $xact = $C->{_xact};
+
+my @gather = ();
+for (;;) {
+unless (@try) {
+$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_095DollarAt_0', $retree);
+@try = $relex->($C) or last;
+}
+$try = shift(@try) // next;
+
+if (ref $try) {
+($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
+}
+
+$C->deb("special_variable__S_095DollarAt_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
+push @gather, ((
+sub {
+my $C=shift;
+$C->_PATTERN(qr/\G\w/)
+},
+sub {
+my $C=shift;
+$C->_EXACT("\(")
+},
+sub {
+my $C=shift;
+$C->_SUBSUMEr(['sigil'], sub {
+my $C = shift;
+$C->sigil
+})
+}
+)[$try])->($C);
+last if @gather;
+last if $xact->[-2];  # committed?
+}
+@gather;
+};
+
+})) { ($C) } else { () }
 }))) { ($C) } else { () }
 }))
 and ($C) = ($C->_COMMITLTM())
@@ -33757,11 +33315,6 @@ my $C = $C;
 if (($C) = ($C->_EXACT("\$\$"))
 and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
-$C->_PATTERN(qr/\G[_[:alpha:]]/)
-}))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
 if (my ($C) = (do {
@@ -33800,17 +33353,17 @@ $C->deb("special_variable__S_097DollarDollar_0 trying $tag $try") if $::DEBUG & 
 push @gather, ((
 sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\s/)
+$C->_PATTERN(qr/\G\w/)
 },
 sub {
 my $C=shift;
-$C->_EXACT("\,")
+$C->_EXACT("\(")
 },
 sub {
 my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
+$C->_SUBSUMEr(['sigil'], sub {
 my $C = shift;
-$C->terminator
+$C->sigil
 })
 }
 )[$try])->($C);
@@ -33850,14 +33403,65 @@ and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
+if (my ($C) = (do {
+do {
+my ($tag, $try);
+my @try;
+my $relex;
+
+my $fate;
+my $x;
+if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_098DollarPercent_0') {
+$C->deb("Fate passed to special_variable__S_098DollarPercent_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
+($C->{'_fate'}, $tag, $try) = @$fate;
+@try = ($try);
+$x = 'ALT special_variable__S_098DollarPercent_0';    # some outer ltm is controlling us
+}
+else {
+$x = 'ALTLTM special_variable__S_098DollarPercent_0'; # we are top level ltm
+}
+my $C = $C->cursor_xact($x);
+my $xact = $C->{_xact};
+
+my @gather = ();
+for (;;) {
+unless (@try) {
+$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_098DollarPercent_0', $retree);
+@try = $relex->($C) or last;
+}
+$try = shift(@try) // next;
+
+if (ref $try) {
+($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
+}
+
+$C->deb("special_variable__S_098DollarPercent_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
+push @gather, ((
+sub {
+my $C=shift;
 $C->_PATTERN(qr/\G\w/)
+},
+sub {
+my $C=shift;
+$C->_EXACT("\(")
+},
+sub {
+my $C=shift;
+$C->_SUBSUMEr(['sigil'], sub {
+my $C = shift;
+$C->sigil
+})
+}
+)[$try])->($C);
+last if @gather;
+last if $xact->[-2];  # committed?
+}
+@gather;
+};
+
+})) { ($C) } else { () }
 }))) { ($C) } else { () }
 }))
-and ($C) = ($C->_NOTBEFORE(sub {
-my $C=shift;
-if (my ($C) = ($C->sigil)) { ($C) } else { () }
-}))
-and ($C) = ($C->_COMMITLTM())
 and ($C) = ($C->obs('$% variable', 'Form module'))) {
 $C
 } else { () }
@@ -33919,72 +33523,11 @@ $C->{sym} = "\$\^";
 $self->_MATCHIFYr($S, "special_variable__S_100DollarCaret", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\^"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_100DollarCaret_0') {
-$C->deb("Fate passed to special_variable__S_100DollarCaret_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_100DollarCaret_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_100DollarCaret_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_100DollarCaret_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_100DollarCaret_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
+$C->_PATTERN(qr/\G\w/)
 }))) { ($C) } else { () }
 }))
 and ($C) = ($C->obs('$^ variable', 'Form module'))) {
@@ -34010,8 +33553,7 @@ $C->{sym} = "\$\&";
 $self->_MATCHIFYr($S, "special_variable__S_101DollarAmp", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\&"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
@@ -34051,17 +33593,17 @@ $C->deb("special_variable__S_101DollarAmp_0 trying $tag $try") if $::DEBUG & DEB
 push @gather, ((
 sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\s/)
+$C->_PATTERN(qr/\G\w/)
 },
 sub {
 my $C=shift;
-$C->_EXACT("\,")
+$C->_EXACT("\(")
 },
 sub {
 my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
+$C->_SUBSUMEr(['sigil'], sub {
 my $C = shift;
-$C->terminator
+$C->sigil
 })
 }
 )[$try])->($C);
@@ -34097,8 +33639,7 @@ $C->{sym} = "\$\*";
 $self->_MATCHIFYr($S, "special_variable__S_102DollarStar", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\*"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
@@ -34138,22 +33679,11 @@ $C->deb("special_variable__S_102DollarStar_0 trying $tag $try") if $::DEBUG & DE
 push @gather, ((
 sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\s/)
+$C->_PATTERN(qr/\G\w/)
 },
 sub {
 my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
+$C->_EXACT("\(")
 }
 )[$try])->($C);
 last if @gather;
@@ -34193,69 +33723,6 @@ my $C=shift;
 (($C) x !!do {
 $::GOAL ne ')' })
 }))
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_103DollarThesis_0') {
-$C->deb("Fate passed to special_variable__S_103DollarThesis_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_103DollarThesis_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_103DollarThesis_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_103DollarThesis_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_103DollarThesis_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$) variable', '$*EGID'))) {
 $C
 } else { () }
@@ -34279,74 +33746,6 @@ $C->{sym} = "\$\-";
 $self->_MATCHIFYr($S, "special_variable__S_104DollarMinus", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\-"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_104DollarMinus_0') {
-$C->deb("Fate passed to special_variable__S_104DollarMinus_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_104DollarMinus_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_104DollarMinus_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_104DollarMinus_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_104DollarMinus_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$- variable', 'Form module'))) {
 $C
 } else { () }
@@ -34370,8 +33769,7 @@ $C->{sym} = "\$\=";
 $self->_MATCHIFYr($S, "special_variable__S_105DollarEqual", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\="))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
@@ -34411,22 +33809,11 @@ $C->deb("special_variable__S_105DollarEqual_0 trying $tag $try") if $::DEBUG & D
 push @gather, ((
 sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\s/)
+$C->_PATTERN(qr/\G\w/)
 },
 sub {
 my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
+$C->_EXACT("\(")
 }
 )[$try])->($C);
 last if @gather;
@@ -34461,70 +33848,6 @@ $C->{sym} = "\@\+";
 $self->_MATCHIFYr($S, "special_variable__S_106AtPlus", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\@\+"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_106AtPlus_0') {
-$C->deb("Fate passed to special_variable__S_106AtPlus_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_106AtPlus_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_106AtPlus_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_106AtPlus_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_106AtPlus_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('@+ variable', '.to method'))) {
 $C
 } else { () }
@@ -34548,70 +33871,6 @@ $C->{sym} = "\%\+";
 $self->_MATCHIFYr($S, "special_variable__S_107PercentPlus", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\%\+"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_107PercentPlus_0') {
-$C->deb("Fate passed to special_variable__S_107PercentPlus_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_107PercentPlus_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_107PercentPlus_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_107PercentPlus_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_107PercentPlus_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('%+ variable', '.to method'))) {
 $C
 } else { () }
@@ -35093,7 +34352,7 @@ when ('OPEN')          {
 $repl = 'filehandle introspection' }
 ;
 when ('N')             {
-$repl = '$-1' }
+$repl = '$/[*-1]' }
 ;
 when ('L')             {
 $repl = 'Form module' }
@@ -35221,7 +34480,7 @@ my $M = $C;
 my $sigil = $M->{'sigil'}->Str;
 my $text = $M->{'text'}->Str;
 my $bad = $sigil . '{' . $text . '}';
-$text = $text - 1 if $text =~ /^\d+$/;
+$text = $text - 1 if $text =~ /^\d+$/ and $text > 0;
 if ($text !~ /^(\w|\:)+$/) {
 return () if $::QSIGIL;
 $C->obs($bad, $sigil . '(' . $text . ')');
@@ -35264,74 +34523,6 @@ $C->{sym} = "\$\[";
 $self->_MATCHIFYr($S, "special_variable__S_120DollarBra", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\["))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_120DollarBra_0') {
-$C->deb("Fate passed to special_variable__S_120DollarBra_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_120DollarBra_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_120DollarBra_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_120DollarBra_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_120DollarBra_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$[ variable', 'user-defined array indices'))) {
 $C
 } else { () }
@@ -35355,70 +34546,6 @@ $C->{sym} = "\$\]";
 $self->_MATCHIFYr($S, "special_variable__S_121DollarKet", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\]"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_121DollarKet_0') {
-$C->deb("Fate passed to special_variable__S_121DollarKet_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_121DollarKet_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_121DollarKet_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_121DollarKet_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_121DollarKet_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$] variable', '$*PERL_VERSION'))) {
 $C
 } else { () }
@@ -35442,74 +34569,6 @@ $C->{sym} = "\$\\";
 $self->_MATCHIFYr($S, "special_variable__S_122DollarBack", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\\"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_122DollarBack_0') {
-$C->deb("Fate passed to special_variable__S_122DollarBack_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_122DollarBack_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_122DollarBack_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_122DollarBack_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_122DollarBack_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$\\ variable', "the filehandle's :ors attribute"))) {
 $C
 } else { () }
@@ -35533,74 +34592,6 @@ $C->{sym} = "\$\|";
 $self->_MATCHIFYr($S, "special_variable__S_123DollarVert", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\|"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_123DollarVert_0') {
-$C->deb("Fate passed to special_variable__S_123DollarVert_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_123DollarVert_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_123DollarVert_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_123DollarVert_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_123DollarVert_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$| variable', ':autoflush on open'))) {
 $C
 } else { () }
@@ -35624,11 +34615,11 @@ $C->{sym} = "\$\:";
 $self->_MATCHIFYr($S, "special_variable__S_124DollarColon", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\:"))
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
-$C->_PATTERN(qr/\G[\x20\t\n\],=)}]/)
+$C->_PATTERN(qr/\G\w/)
 }))) { ($C) } else { () }
 }))
 and ($C) = ($C->obs('$: variable', 'Form module'))) {
@@ -35654,74 +34645,6 @@ $C->{sym} = "\$\;";
 $self->_MATCHIFYr($S, "special_variable__S_125DollarSemi", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\;"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_125DollarSemi_0') {
-$C->deb("Fate passed to special_variable__S_125DollarSemi_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_125DollarSemi_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_125DollarSemi_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_125DollarSemi_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_125DollarSemi_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$; variable', 'real multidimensional hashes'))) {
 $C
 } else { () }
@@ -35745,69 +34668,10 @@ $C->{sym} = "\$\'";
 $self->_MATCHIFYr($S, "special_variable__S_126DollarSingle", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\'"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_126DollarSingle_0') {
-$C->deb("Fate passed to special_variable__S_126DollarSingle_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_126DollarSingle_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_126DollarSingle_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_126DollarSingle_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_126DollarSingle_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
+(($C) x !!do {
+$::QSIGIL })
 }))
 and ($C) = ($C->obs('$' . "'" . 'variable', "explicit pattern after )\x{3E}"))) {
 $C
@@ -35837,74 +34701,6 @@ my $C=shift;
 (($C) x !!do {
 $::QSIGIL })
 }))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_127DollarDouble_0') {
-$C->deb("Fate passed to special_variable__S_127DollarDouble_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_127DollarDouble_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_127DollarDouble_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_127DollarDouble_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_127DollarDouble_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_EXACT("\=")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$" variable', '.join() method'))) {
 $C
 } else { () }
@@ -35928,70 +34724,6 @@ $C->{sym} = "\$\,";
 $self->_MATCHIFYr($S, "special_variable__S_128DollarComma", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\,"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_128DollarComma_0') {
-$C->deb("Fate passed to special_variable__S_128DollarComma_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_128DollarComma_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_128DollarComma_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_128DollarComma_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_128DollarComma_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$, variable', ".join() method"))) {
 $C
 } else { () }
@@ -36057,70 +34789,6 @@ $C->{sym} = "\$\>";
 $self->_MATCHIFYr($S, "special_variable__S_130DollarGt", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\>"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = ($C->before(sub {
-my $C=shift;
-if (my ($C) = (do {
-do {
-my ($tag, $try);
-my @try;
-my $relex;
-
-my $fate;
-my $x;
-if ($fate = $C->{'_fate'} and $fate->[1] eq 'special_variable__S_130DollarGt_0') {
-$C->deb("Fate passed to special_variable__S_130DollarGt_0: ", ::fatestr($fate)) if $::DEBUG & DEBUG::fates;
-($C->{'_fate'}, $tag, $try) = @$fate;
-@try = ($try);
-$x = 'ALT special_variable__S_130DollarGt_0';    # some outer ltm is controlling us
-}
-else {
-$x = 'ALTLTM special_variable__S_130DollarGt_0'; # we are top level ltm
-}
-my $C = $C->cursor_xact($x);
-my $xact = $C->{_xact};
-
-my @gather = ();
-for (;;) {
-unless (@try) {
-$relex //= $C->cursor_fate('STD::P6', 'special_variable__S_130DollarGt_0', $retree);
-@try = $relex->($C) or last;
-}
-$try = shift(@try) // next;
-
-if (ref $try) {
-($C->{'_fate'}, $tag, $try) = @$try;   # next candidate fate
-}
-
-$C->deb("special_variable__S_130DollarGt_0 trying $tag $try") if $::DEBUG & DEBUG::try_processing;
-push @gather, ((
-sub {
-my $C=shift;
-$C->_PATTERN(qr/\G\s/)
-},
-sub {
-my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
-}
-)[$try])->($C);
-last if @gather;
-last if $xact->[-2];  # committed?
-}
-@gather;
-};
-
-})) { ($C) } else { () }
-}))) { ($C) } else { () }
-}))
 and ($C) = ($C->obs('$> variable', '$*EUID'))) {
 $C
 } else { () }
@@ -36144,8 +34812,7 @@ $C->{sym} = "\$\.";
 $self->_MATCHIFYr($S, "special_variable__S_131DollarDot", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\."))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
@@ -36185,18 +34852,11 @@ $C->deb("special_variable__S_131DollarDot_0 trying $tag $try") if $::DEBUG & DEB
 push @gather, ((
 sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\s/)
+$C->_PATTERN(qr/\G\w/)
 },
 sub {
 my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
+$C->_EXACT("\(")
 }
 )[$try])->($C);
 last if @gather;
@@ -36231,8 +34891,7 @@ $C->{sym} = "\$\?";
 $self->_MATCHIFYr($S, "special_variable__S_132DollarQuestion", do {
 my $C = $C;
 if (($C) = ($C->_EXACT("\$\?"))
-and ($C) = ($C->_COMMITLTM())
-and ($C) = ($C->before(sub {
+and ($C) = ($C->_NOTBEFORE(sub {
 my $C=shift;
 if (my ($C) = ($C->before(sub {
 my $C=shift;
@@ -36272,18 +34931,11 @@ $C->deb("special_variable__S_132DollarQuestion_0 trying $tag $try") if $::DEBUG 
 push @gather, ((
 sub {
 my $C=shift;
-$C->_PATTERN(qr/\G\s/)
+$C->_PATTERN(qr/\G\w/)
 },
 sub {
 my $C=shift;
-$C->_EXACT("\,")
-},
-sub {
-my $C=shift;
-$C->_SUBSUMEr(['terminator'], sub {
-my $C = shift;
-$C->terminator
-})
+$C->_EXACT("\(")
 }
 )[$try])->($C);
 last if @gather;
@@ -50880,9 +49532,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 { package STD::Q::b1;
 use Moose::Role ':all' => { -prefix => "moose_" };
 use Encode;
@@ -50900,9 +49549,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -51594,9 +50240,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 escape__S_000Back: !!perl/hash:RE_ast
@@ -51642,9 +50285,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -51723,9 +50363,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 escape__S_000Cur_Ly: !!perl/hash:RE_ast
@@ -51771,9 +50408,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -51871,9 +50505,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 escape__S_000Dollar: !!perl/hash:RE_ast
@@ -51919,9 +50550,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -52064,9 +50692,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 escape__S_000At: !!perl/hash:RE_ast
@@ -52112,9 +50737,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -52257,9 +50879,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 escape__S_000Percent: !!perl/hash:RE_ast
@@ -52305,9 +50924,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -52450,9 +51066,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 escape__S_000Amp: !!perl/hash:RE_ast
@@ -52498,9 +51111,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 ## method postprocessor ()
 sub postprocessor {
 no warnings 'recursion';
@@ -52522,8 +51132,47 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
+## method postprocessor ()
+sub postprocessor {
+no warnings 'recursion';
+my $self = shift;
+'null' }  1; };
+{ package STD::Q::v1;
+use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
+our $ALLROLES = { 'STD::Q::v1', 1 };
+our $REGEXES = {
+ALL => [ qw// ],
+};
+
+
+no warnings 'qw', 'recursion';
+my $retree;
+
+$DB::deep = $DB::deep = 1000; # suppress used-once warning
+
+use YAML::XS;
+
+## method postprocessor ()
+sub postprocessor {
+no warnings 'recursion';
+my $self = shift;
+'val' }  1; };
+{ package STD::Q::v0;
+use Moose::Role ':all' => { -prefix => "moose_" };
+use Encode;
+our $ALLROLES = { 'STD::Q::v0', 1 };
+our $REGEXES = {
+ALL => [ qw// ],
+};
+
+
+no warnings 'qw', 'recursion';
+my $retree;
+
+$DB::deep = $DB::deep = 1000; # suppress used-once warning
+
+use YAML::XS;
 
 ## method postprocessor ()
 sub postprocessor {
@@ -52546,9 +51195,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 ## method postprocessor ()
 sub postprocessor {
 no warnings 'recursion';
@@ -52569,9 +51215,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 ## method postprocessor ()
 sub postprocessor {
@@ -52594,9 +51237,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 ## method postprocessor ()
 sub postprocessor {
 no warnings 'recursion';
@@ -52617,9 +51257,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 ## method postprocessor ()
 sub postprocessor {
@@ -52642,9 +51279,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 ## method postprocessor ()
 sub postprocessor {
 no warnings 'recursion';
@@ -52665,9 +51299,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 ## method postprocessor ()
 sub postprocessor {
@@ -52691,9 +51322,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -52961,9 +51589,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
 backslash__S_000misc: !!perl/hash:RE_ast
@@ -53175,9 +51800,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -54511,9 +53133,6 @@ $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
 
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
-
 ## method tweak (:$g!)
 ;
 ## method tweak (:$i!)
@@ -54619,6 +53238,8 @@ $orig->(@_);
 ## method tweak (:path(:$p)!)
 ;
 ## method tweak (:exec(:$x)!)
+;
+## method tweak (:val(:$v)!)
 ;
 ## method tweak (:words(:$w)!)
 ;
@@ -54743,6 +53364,15 @@ local @_ = @_;
 return scalar do { # work around #38809
 my $self = shift;
 my %args = @_;
+last unless exists $args{val} || exists $args{v};
+my $v = exists $args{val} ? delete $args{val} : exists $args{v} ? delete $args{v} : undef;
+$self->mixin($v ? 'STD::Q::v1' : 'STD::Q::v0')     };
+}
+{
+local @_ = @_;
+return scalar do { # work around #38809
+my $self = shift;
+my %args = @_;
 last unless exists $args{words} || exists $args{w};
 my $w = exists $args{words} ? delete $args{words} : exists $args{w} ? delete $args{w} : undef;
 $self->mixin($w ? 'STD::Q::w1' : 'STD::Q::w0')     };
@@ -54807,9 +53437,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
@@ -55290,9 +53917,6 @@ my $retree;
 $DB::deep = $DB::deep = 1000; # suppress used-once warning
 
 use YAML::XS;
-
-$SIG{__WARN__} = sub { die @_,"   statement started at line ", 'Cursor'->lineof($::LASTSTATE), "
-" } if $::DEBUG;
 
 $retree = YAML::XS::Load(Encode::encode_utf8(<<'RETREE_END'));
 ---
