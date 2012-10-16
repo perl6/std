@@ -440,7 +440,6 @@ sub initparse {
     local $::HIGHWATER = 0;
     local $::HIGHMESS = '';
     local $::HIGHEXPECT = {};
-    local $::LASTSTATE;
     local $::LAST_NIBBLE = bless { firstline => 0, lastline => 0 }, 'Cursor';
     local $::LAST_NIBBLE_MULTILINE = bless { firstline => 0, lastline => 0 }, 'Cursor';
     local $::GOAL = "(eof)";

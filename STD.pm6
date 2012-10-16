@@ -1322,7 +1322,7 @@ grammar P6 is STD {
 
         # this could either be a statement that follows a declaration
         # or a statement that is within the block of a code declaration
-        <!!{ $*LASTSTATE = $¢.pos; $¢ = %*LANG<MAIN>.bless($¢); }>
+        <!!{ $¢ = %*LANG<MAIN>.bless($¢); }>
 
         [
         | <label> <statement>
