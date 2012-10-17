@@ -2753,8 +2753,8 @@ sub add_categorical { my $lang = shift;
         $genpkg++;
         my $e;
         if (@list == 0) {
-	    $lang->panic('Null operator is not allowed');
-	}
+            $lang->panic('Null operator is not allowed');
+        }
         elsif (@list == 1) {
             $e = <<"END";
 package $genpkg;
