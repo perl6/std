@@ -2579,9 +2579,9 @@ grammar P6 is STD {
             <.ws>
             [ <?[ \[ \{ \( \< ]> <.obs('brackets around replacement', 'assignment syntax')> ]?
             [ <infixish> || <panic: "Missing assignment operator"> ]
-            [ <?{ $<infixish>.Str eq '=' || $<infixish>.<infix_postfix_meta_operator> }> || <.panic: "Malformed assignment operator"> ]
+            [ <?{ $<infixish>.Str eq '=' || $<infixish>.<infix_postfix_meta_operator> }>.Str eq '=' || <.panic: "Malformed assignment operator"> ]
             <.ws>
-            <right=EXPR(item %item_assignment)>
+            [ <right=EXPR(item %item_assignment)> || <.panic: "Assignment operator missing its expression"> ]
         || 
             { $lang = $lang2.unbalanced($stop); }
             <right=.nibble($lang)> $stop || <.panic: "Malformed replacement part; couldn't find final $stop">
