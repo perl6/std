@@ -4414,7 +4414,7 @@ grammar Q is STD {
             { $*CCSTATE = '..'; }
         }
 
-        token escape:sym<-> { '-' <?{ $*CCSTATE ne '' }> \s* <!stopper> \S <.obs('- as character range','..')> }
+        token escape:sym<-> { '-' <?{ $*CCSTATE ne '' }> \s* <!stopper> \S <.obs('- as character range','.. (or \\- if you mean a literal hyphen)')> }
         token escape:ch { $<ch> = [\S] <.ccstate($<ch>.Str)> }
 
         token backslash:stopper { <text=.stopper> }
