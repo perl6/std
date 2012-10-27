@@ -458,9 +458,9 @@ token nibbler {
                             my $n = $<nibbler>[*-1]<nibbles>;
                             my @n = @$n;
 
-                            push @nibbles, $<starter>;
+                            push @nibbles, $<starter>[*-1];
                             push @nibbles, @n;
-                            push @nibbles, $<stopper>;
+                            push @nibbles, $<stopper>[*-1];
 
                             $text = '';
                             $to = $from = $¢.pos;
