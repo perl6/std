@@ -3247,7 +3247,14 @@ grammar P6 is STD {
                                                     { $¢.check_variable($<infix>) }
             | <infix=infix_circumfix_meta_operator> { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
             | <infix=infix_prefix_meta_operator>    { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
-            | <infix>                               { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+            | <infix> ::                            { $<O> = $<infix><O>; $<sym> = $<infix><sym>; }
+                [
+                    <?{ !$in_meta }> <!before \s> <?before <prefix>\s> {
+                        my $i = $<infix>.Str;
+                        my $p = $<prefix>[0].Str;
+                        $¢.worry("$i$p is not an infix operator (to suppress warning put space between infix $i and prefix $p)");
+                    }
+                ]?
             | <?{ $in_meta }> :: <!>
             | {} <?dotty> <.panic: "Method call found where infix expected (change whitespace?)">
             | {} <?postfix> <.panic: "Postfix found where infix expected (change whitespace?)">
