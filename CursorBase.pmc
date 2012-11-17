@@ -2719,6 +2719,8 @@ sub add_categorical { my $lang = shift;
         else {
             @list = $mangle;
         }
+        $lang->panic('Whitespace is not allowed in an operator') if grep { /\s/ } @list;
+        @list = () if grep { !length } @list;
         $mangle = ::mangle(@list);
         $mangle = $category . '__S_' . sprintf("%03d",$GEN++) . $mangle;
 
