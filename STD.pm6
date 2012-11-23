@@ -2791,14 +2791,7 @@ grammar P6 is STD {
         ]
         <.ws>
         { $*IN_DECL = ''; }
-        [ '-->' <.ws>
-            [
-            || <type_constraint>
-            || <longname> <.panic("Typename " ~ $<longname>[0].Str ~ " must be predeclared")>
-            || <.panic: "No type found after -->">
-            ]
-            <.ws>
-        ]?
+        [ '-->'<.ws> [ <returnspec=parameter><.ws> || <.panic: "No return type or value found after -->"> ] ]?
         {
             $*LEFTSIGIL = '@';
             if $lexsig {
