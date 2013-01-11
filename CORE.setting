@@ -643,15 +643,15 @@ my proto sub infix:<∋>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
 my proto sub infix:<(cont)>($a, $b --> Bool) {*}
 my proto sub infix:<∌>($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
 
-my proto sub infix:<∪>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export {*}
-my proto sub infix:<(|)>($a, $b --> Set) is equiv(&infix:<X>) is export {*}
+my proto sub infix:<∪>(Any $a, Any $b --> Set) is equiv(&infix:<|>) is export {*}
+my proto sub infix:<(|)>($a, $b --> Set) is equiv(&infix:<|>) is export {*}
 
-my proto sub infix:<∩>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export {*}
-my proto sub infix:<(&)>($a, $b --> Set) is equiv(&infix:<X>) is export {*}
+my proto sub infix:<∩>(Any $a, Any $b --> Set) is equiv(&infix:<&>) is export {*}
+my proto sub infix:<(&)>($a, $b --> Set) is equiv(&infix:<&>) is export {*}
 
-my proto sub infix:<(-)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export {*}
+my proto sub infix:<(-)>(Any $a, Any $b --> Set) is equiv(&infix:<^>) is export {*}
 
-my proto sub infix:<(^)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export {*}
+my proto sub infix:<(^)>(Any $a, Any $b --> Set) is equiv(&infix:<^>) is export {*}
 
 my proto sub infix:<⊆>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
 my proto sub infix:['(<=)']($a, $b --> Bool) is equiv(&infix:<==>) is export {*}
