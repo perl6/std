@@ -2472,7 +2472,7 @@ grammar P6 is STD {
             | <sigil> <index=.decint> [<?{ $*IN_DECL }> <.panic: "Cannot declare a numeric variable">]?
             # Note: $() can also parse as contextualizer in an expression; should have same effect
             | <sigil> <?before '<'> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Cannot declare a match variable">]?
-            | <sigil> <?before '('> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Cannot declare a contextualizer">]?
+            | :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> [<?{ $*IN_DECL }> <.panic: "Cannot declare a contextualizer">]?
             | <sigil> <?{ $*IN_DECL }>
             | <?> {
                 if $*QSIGIL {
@@ -3189,9 +3189,6 @@ grammar P6 is STD {
         }
         <O(|%term)>
     }
-
-    token circumfix:sigil
-        { :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> }
 
     token circumfix:sym<( )>
         { :dba('parenthesized expression') '(' ~ ')' <semilist> <O(|%term)> }
