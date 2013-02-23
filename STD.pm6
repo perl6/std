@@ -3801,15 +3801,17 @@ grammar P6 is STD {
 
     token dumbsmart {
         [ \h*
-            ('True'|'False'|'Bool::True'|'Bool::False') <?before \s>
+            ('True'|'False'|'Bool::True'|'Bool::False'|'Match'|'Nil')
             {
                 my $litbool = $0[0].Str;
-                my $true = $litbool ~~ /True/;
+                my $true = $litbool ~~ /True|Match/;
+                my $suggest =
+                    $true             ?? ':so or *.so or ?*'      !!
+                    $litbool ~~ /Nil/ ?? '* === Nil or :!defined' !!
+                                         ':!so or *.not or !*';
                 self.worry("Smartmatch against $litbool always " ~
                     ($true ?? 'matches' !! 'fails') ~
-                    "; if you mean to test the topic for\n    truthiness, please use " ~
-                    ($true ?? ':so or *.so or ?*' !! ':!so or *.not or !*') ~
-                    ' instead');
+                    "; perhaps you should use $suggest instead");
             }
         ]?
     }
