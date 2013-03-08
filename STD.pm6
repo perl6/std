@@ -597,7 +597,7 @@ token circumfix:sym«<< >>» { :dba('shell-quote words') '<<' ~ '>>' <nibble($¢
 token circumfix:sym«< >»   { :dba('quote words') '<' ~ '>'
     [
         [ <?before 'STDIN>' > <.obs('<STDIN>', '$' ~ '*IN.lines (or add whitespace to suppress warning)')> ]?  # XXX fake out gimme5
-        [ <?before '>' > <.obs('<>', "lines() to read input,\n  or ('') to represent the null string,\n  or () to represent Nil")> ]?
+        [ <?before '>' > <.obs('<>', "lines() to read input,\n  or ('') to represent the null string,\n  or () to represent the empty list")> ]?
         <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))>
     ]
 }
@@ -2112,7 +2112,7 @@ grammar P6 is STD {
 
     token coloncircumfix ($front) {
         [
-        | '<>' <.worry("Pair with <> really means a Nil value, not null string; use :$front" ~ "('') to represent the null string,\n  or :$front" ~ "() to represent Nil more accurately")>
+        | '<>' <.worry("Pair with <> really means an empty list, not null string; use :$front" ~ "('') to represent the null string,\n  or :$front" ~ "() to represent the empty list more accurately")>
         | <circumfix>
         ]
     }
