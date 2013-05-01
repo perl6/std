@@ -106,6 +106,11 @@ method TOP ($STOP = '') {
 # The internal precedence levels are *not* part of the public interface.
 # The current values are mere implementation; they may change at any time.
 # Users should specify precedence only in relation to existing levels.
+# Some special tags:
+#   :iffy    - operator returns a Bool or works in boolean context
+#   :diffy   - operator produces result different type from arguments
+#   :fiddly  - 
+#   :pure    - 
 
 constant %term            = (:dba('term')            , :prec<z=>);
 constant %methodcall      = (:dba('methodcall')      , :prec<y=>, :assoc<unary>, :uassoc<left>, :fiddly, :!pure);
