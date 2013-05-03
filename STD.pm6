@@ -3732,9 +3732,19 @@ grammar P6 is STD {
 
 
     ## junctive and (all)
-    token infix:sym<&>
-        { <sym> <O(|%junctive_and, iffy => 1)> }
-
+    token infix:sym<&> {
+        <sym>
+        [ <?{ %*MEMOS[$¢.pos-1]<ws> }>
+          <?before <identifier> {
+            my $id = $<identifier>[0].Str;
+            if $¢.is_known('&' ~ $id) {
+                self.sorry("Function name &$id not allowed in infix position");
+                return ();
+            }
+          }>
+        ]?
+        <O(|%junctive_and, iffy => 1)>
+    }
 
     ## junctive or (any)
     token infix:sym<|>
