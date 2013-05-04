@@ -464,6 +464,8 @@ my proto floor {*}
 my proto ceiling {*}
 my proto round {*}
 my proto truncate {*}
+my proto is-prime {*}
+my proto expmod {*}
 my proto exp {*}
 my proto log {*}
 my proto log10 {*}
@@ -519,6 +521,14 @@ my proto wait {*}
 my proto kill {*}
 my proto sleep {*}
 my proto dir {*}
+my proto mkdir {*}
+my proto rmdir {*}
+
+my proto socket {*}
+my proto listen {*}
+my proto accept {*}
+my proto connect {*}
+my proto bind {*}
 
 my proto postfix:<i> ($x) {*}
 my proto infix:<.> ($x,$y) {*}
@@ -571,6 +581,8 @@ my proto infix:<&> ($x,$y) {*}
 my proto infix:<|> ($x,$y) {*}
 my proto infix:<^> ($x,$y) {*}
 my proto infix:« <=> » ($x,$y) {*}
+my proto infix:<leg> ($x,$y) {*}
+my proto infix:<cmp> ($x,$y) {*}
 my proto infix:<..> ($x,$y) {*}
 my proto infix:<^..> ($x,$y) {*}
 my proto infix:<..^> ($x,$y) {*}
