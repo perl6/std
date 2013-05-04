@@ -3511,6 +3511,7 @@ grammar P6 is STD {
         | ':' <?before \s | '{'> <!{ $*QSIGIL }> <arglist>
         | <?[\\(]> <args>
         | { @*MEMOS[$¢.pos]<baremeth> = 1 }
+            [ <?before \s+ [ \d | <sigil><twigil>?\w ] > <.worry: "Colon (or parens) required for method name with arguments"> ]?
         ]?
     }
 
