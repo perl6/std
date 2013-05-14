@@ -4068,6 +4068,7 @@ grammar P6 is STD {
         :WHAT(2), :WHICH(2), :WHERE(2), :HOW(2), :WHENCE(2), :WHO(2),
         :VAR(2),
         :any(2), :all(2), :none(2), :one(2),
+        :set(2), :bag(2),
     );
 
 #    token term:funspace { <longname> \h* <?before '('> <args(0)> }
@@ -4102,6 +4103,7 @@ grammar P6 is STD {
                 $ok = 1 if $<args><semiarglist>;
                 if not $ok {
                     given +%deftrap{$name} {
+                        $¢.worry("Use of non-subscript <...> where postfix is expected; please use whitespace") if $_ and substr(self.orig, $¢.pos, 1) eq '<';
                         when 1 {        # probably misused P5ism
                             $<identifier>.sorryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
                         }
