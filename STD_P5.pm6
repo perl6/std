@@ -646,6 +646,7 @@ rule p5package_declarator:package {
 rule p5package_declarator:require {   # here because of declarational aspects
     <sym>
     [
+    || <version=p5versionish>
     || <module_name=p5module_name> <EXPR>?
     || <EXPR>
     ]
