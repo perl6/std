@@ -1564,6 +1564,8 @@ grammar P6 is STD {
 
     token statement_prefix:BEGIN   { :my %*MYSTERY; <sym> <blast> <.explain_mystery> }
     token statement_prefix:CHECK   { <sym> <blast> }
+    token statement_prefix:FINAL   { <sym> <blast> }
+    token statement_prefix:COMPOSE { <sym> <blast> }
     token statement_prefix:INIT    { <sym> <blast> }
     token statement_prefix:START   { <sym> <blast> }
     token statement_prefix:ENTER   { <sym> <blast> }
