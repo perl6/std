@@ -2416,7 +2416,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$,> {
-        <sym>
+        <sym> <?before \h* <[ = , ; ? : ! ) \] } ]> >
         <.obs('$, variable', ".join() method")>
     }
 
