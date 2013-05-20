@@ -4119,7 +4119,7 @@ grammar P6 is STD {
         <O(|%term)>
     }
 
-    token args ($istype = 0) {
+    token args ($isterm = 0) {
         :my $listopish = 0;
         :my $*GOAL ::= '';
         :my $*INVOCANT_OK = 1;
@@ -4128,8 +4128,9 @@ grammar P6 is STD {
     #    | :dba('argument list') '.(' ~ ')' <semiarglist>
         | :dba('argument list') '(' ~ ')' <semiarglist>
         | :dba('argument list') <.unsp> '(' ~ ')' <semiarglist>
-        |  { $listopish = 1; @*MEMOS[$¢.pos]<listop> = 1; }
-            [<?before \s> <!{ $istype }> <.ws> <!infixstopper> <arglist>]?
+        | <!{ $isterm }>
+            { $listopish = 1; @*MEMOS[$¢.pos]<listop> = 1; }
+            [<?before \s> <.ws> <!infixstopper> <arglist>]?
         ]
         $<invocant> = {$*INVOCANT_IS}
 
