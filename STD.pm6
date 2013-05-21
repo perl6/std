@@ -3452,7 +3452,13 @@ grammar P6 is STD {
     token postcircumfix:sym<( )>
         { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
 
-    token postcircumfix:sym<[ ]> { :dba('subscript') '[' ~ ']' <semilist> <O(|%methodcall)> 
+    token kvetch {
+        <!before '.kv'> ||
+           <.worry: 'Suspicious .kv after subscript; to suppress this warning, use :kv or \.kv instead'>
+    }
+
+    token postcircumfix:sym<[ ]> {
+        :dba('subscript') '[' ~ ']' <semilist> <.kvetch> <O(|%methodcall)> 
         {
             my $innards = $<semilist>.Str;
             $innards ~~ s/^\s+//;
@@ -3468,7 +3474,7 @@ grammar P6 is STD {
         :dba('subscript')
         <.newlex>
         # <.finishlex>   # XXX not sure if we need this
-        '{' ~ '}' <semilist> <O(|%methodcall)>
+        '{' ~ '}' <semilist> <.kvetch> <O(|%methodcall)>
         <.checkyada>
         <.curlycheck(0)>
     }
@@ -3478,7 +3484,7 @@ grammar P6 is STD {
         '<'
         { $pos = $¢.pos }
         [
-        || <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>'
+        || <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).tweak(:w).balanced('<','>'))> '>' <.kvetch>
         || <?before \h* [ \d | <sigil> | ':' ] >
            { $¢.cursor_force($pos).panic("Whitespace required before < operator") }
         || { $¢.cursor_force($pos).panic("Unable to parse quote-words subscript; couldn't find right angle quote") }
@@ -3487,10 +3493,10 @@ grammar P6 is STD {
     }
 
     token postcircumfix:sym«<< >>»
-        { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
+        { '<<' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> [ '>>' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <.kvetch> <O(|%methodcall)> }
 
     token postcircumfix:sym<« »>
-        { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <O(|%methodcall)> }
+        { '«' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> [ '»' || <.panic: "Unable to parse quote-words subscript; couldn't find right double-angle quote"> ] <.kvetch> <O(|%methodcall)> }
 
     token postop {
         | <postfix>         $<O> = {$<postfix><O>} $<sym> = {$<postfix><sym>}
