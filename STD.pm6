@@ -1567,7 +1567,7 @@ grammar P6 is STD {
     token statement_prefix:FINAL   { <sym> <blast> }
     token statement_prefix:COMPOSE { <sym> <blast> }
     token statement_prefix:INIT    { <sym> <blast> }
-    token statement_prefix:START   { <sym> <blast> }
+    token statement_prefix:START   { <sym> <blast> <.worryobs('START','once',' nowadays')> }
     token statement_prefix:ENTER   { <sym> <blast> }
     token statement_prefix:FIRST   { <sym> <blast> }
 
@@ -3083,6 +3083,7 @@ grammar P6 is STD {
         '=' <EXPR(item %item_assignment)>
     }
 
+    token statement_prefix:once    { <sym> <blast> }
     token statement_prefix:sink    { <sym> <blast> }
     token statement_prefix:try     { <sym> <blast> }
     token statement_prefix:quietly { <sym> <blast> }
