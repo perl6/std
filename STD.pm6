@@ -2356,7 +2356,7 @@ grammar P6 is STD {
     }
 
     regex special_variable:sym<${ }> {
-        <sigil> '{' {} $<text>=[.*?] '}'
+        <sigil> '{' {} $<text>=[.*?] '}' <!{ $*IN_DECL }>
         {
             my $sigil = $<sigil>.Str;
             my $text = $<text>.Str;
@@ -2376,7 +2376,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$[> {
-        <sym> 
+        <sym>  <!{ $*IN_DECL }>
         <.obs('$[ variable', 'user-defined array indices')>
     }
 
