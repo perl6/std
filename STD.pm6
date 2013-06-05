@@ -4285,6 +4285,10 @@ grammar Q is STD {
         token backslash:e { <sym> }
         token backslash:f { <sym> }
         token backslash:n { <sym> }
+        token backslash:N {
+            <sym>
+            [ <?before '{'> <.worryobs('\N{...}', '\c[...]')> ]?
+        }
         token backslash:o { :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
         token backslash:r { <sym> }
         token backslash:t { <sym> }
@@ -5116,7 +5120,11 @@ grammar Regex is STD {
     token backslash:e { :i <sym> <.SIGOK> }
     token backslash:f { :i <sym> <.SIGOK> }
     token backslash:h { :i <sym> <.SIGOK> }
-    token backslash:n { :i <sym> <.SIGOK> }
+    token backslash:n { <sym> <.SIGOK> }
+    token backslash:N {
+        <sym> <.SIGOK>
+        [ <?before '{'> <.worryobs('\N{...}', '\c[...], or disambiguate with whitespace')> ]?
+    }
     token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] <.SIGOK> }
     token backslash:p {
         :my $s;
