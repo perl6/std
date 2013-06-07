@@ -137,7 +137,6 @@ constant %list_infix      = (:dba('list infix')      , :prec<f=>, :assoc<list>, 
 constant %list_prefix     = (:dba('list prefix')     , :prec<e=>, :assoc<unary>, :uassoc<left>);
 constant %loose_and       = (:dba('loose and')       , :prec<d=>, :assoc<list>);
 constant %loose_or        = (:dba('loose or')        , :prec<c=>, :assoc<list>);
-constant %sequencer       = (:dba('sequencer')       , :prec<b=>, :assoc<list>, :nextterm<statement>, :fiddly);
 constant %LOOSEST         = (:dba('LOOSEST')         , :prec<a=!>);
 constant %terminator      = (:dba('terminator')      , :prec<a=>, :assoc<list>);
 
@@ -246,6 +245,9 @@ proto token regex_declarator is endsym<keyspace> {*}
 token category:statement_prefix { <sym> }
 proto rule  statement_prefix () {*}
 
+token category:feed_separator { <sym> }
+proto token feed_separator {*}
+
 token category:statement_control { <sym> }
 proto rule  statement_control is endsym<keyspace> {*}
 
@@ -303,22 +305,13 @@ token twigil:sym<~> { <sym> }
 # overridden in subgrammars
 token stopper { <!> }
 
-regex liststopper {
-    [
-    | <stdstopper>
-    | '==>'
-    | '==>>'
-    | '<=='
-    | '<<=='
-    ]
-}
-
 # hopefully we can include these tokens in any outer LTM matcher
 regex stdstopper {
     :temp $*STUB = return self if @*MEMOS[self.pos]<endstmt> :exists;
     :dba('standard stopper')
     [
     | <?terminator>
+    | <?feed_separator>
     | <?unitstopper>
     | <?before <stopper> >
     | $                                 # unlikely, check last (normal LTM behavior)
@@ -1289,7 +1282,7 @@ grammar P6 is STD {
         [
         | $
         | <?before <[\)\]\}]>>
-        | [<statement><eat_terminator> ]*
+        | [<statement> +% <feed_separator> <eat_terminator> ]*
                 { self.mark_sinks($<statement>) }
         ]
     }
@@ -4214,18 +4207,11 @@ grammar P6 is STD {
     token infix:sym<xor>
         { <sym> <O(|%loose_or, iffy => 1)> }
 
-    ## sequencer
-    token infix:sym« <== »
-        { <sym> <O(|%sequencer)> }
-
-    token infix:sym« ==> »
-        { <sym> <O(|%sequencer)> }
-
-    token infix:sym« <<== »
-        { <sym> <O(|%sequencer)> }
-
-    token infix:sym« ==>> »
-        { <sym> <O(|%sequencer)> }
+    ## feed_separator
+    token feed_separator:sym« <== » { <sym> }
+    token feed_separator:sym« ==> » { <sym> }
+    token feed_separator:sym« <<== » { <sym> }
+    token feed_separator:sym« ==>> » { <sym> }
 
     ## expression terminator
     # Note: must always be called as <?terminator> or <?before ...<terminator>...>
