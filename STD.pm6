@@ -1282,7 +1282,7 @@ grammar P6 is STD {
         [
         | $
         | <?before <[\)\]\}]>>
-        | [<statement> +% <feed_separator> <eat_terminator> ]*
+        | [ <statement> +% <feed_separator> <eat_terminator> ]*
                 { self.mark_sinks($<statement>) }
         ]
     }
@@ -2797,7 +2797,7 @@ grammar P6 is STD {
         ]
         <.ws>
         { $*IN_DECL = ''; }
-        [ '-->'<.ws> [ <returnspec=parameter><.ws> || <.panic: "No return type or value found after -->"> ] ]?
+        [ '-->'<.ws> [ <returnparam=parameter> +% <param_sep> <.ws> || <.panic: "No return type or value found after -->"> ] ]?
         {
             $*LEFTSIGIL = '@';
             if $lexsig {
