@@ -3831,7 +3831,7 @@ grammar P6 is STD {
                 my $true = $litbool ~~ /True|Match/;
                 my $suggest =
                     $true             ?? ':so or *.so or ?*'      !!
-                    $litbool ~~ /Nil/ ?? '* === Nil or :!defined' !!
+                    $litbool ~~ /Nil/ ?? '* =:= Nil or :!defined' !!
                                          ':!so or *.not or !*';
                 self.worry("Smartmatch against $litbool always " ~
                     ($true ?? 'matches' !! 'fails') ~
