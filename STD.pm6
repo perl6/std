@@ -3126,7 +3126,7 @@ grammar P6 is STD {
         [ <?before [ '(' || \h*<sigil><twigil>?\w ] >
             <.obs('undef as a verb', 'undefine function or assignment of Nil')>
         ]?
-        <.obs('undef as a value', "something more specific:\n\tAny (the \"whatever\" type object),\n\tan undefined type object such as Int,\n\t:!defined as a matcher,\n\tAny:U as a type constraint,\n\tNil as the absense of a value\n\tor fail() as a failure return\n\t   ")>
+        <.obs('undef as a value', "something more specific:\n\tan undefined type object such as Any or Int,\n\t:!defined as a matcher,\n\tAny:U as a type constraint,\n\tNil as the absense of an expected value\n\tor fail() as a failure return\n\t   ")>
     }
 
     token term:sym<proceed>
@@ -3831,7 +3831,7 @@ grammar P6 is STD {
                 my $true = $litbool ~~ /True|Match/;
                 my $suggest =
                     $true             ?? ':so or *.so or ?*'      !!
-                    $litbool ~~ /Nil/ ?? '* =:= Nil or :!defined' !!
+                    $litbool ~~ /Nil/ ?? '* === Nil or :!defined' !!
                                          ':!so or *.not or !*';
                 self.worry("Smartmatch against $litbool always " ~
                     ($true ?? 'matches' !! 'fails') ~
