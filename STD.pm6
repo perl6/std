@@ -1546,7 +1546,7 @@ grammar P6 is STD {
     }
     
     method worry_itemlist($expr) {
-        if $expr<variable> {
+        if %$expr<variable> :exists {
             my $var = $expr<variable>.Str;
             if substr($var,0,1) eq '$' {
                 self.cursor($expr.from).worry("'for $var' will never flatten a \$ variable;\n\tto force list interpolation, please use either 'for \@$var' or 'for $var\[]';\n\tif you just want item topicalization, use 'given $var' instead");
