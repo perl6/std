@@ -1113,6 +1113,7 @@ grammar P6 is STD {
         :my @*WORRIES;
         :my $*FATALS = 0;
         :my $*IN_SUPPOSE = False;
+        :my $*CCSTATE = '';
 
         :my $*CURPKG;
         {
