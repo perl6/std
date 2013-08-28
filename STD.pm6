@@ -637,13 +637,15 @@ token ws {
 }
 
 token unsp {
-    \\ <?before [\s|'#'] >
-    :dba('unspace')
     [
-    | <.vws>
-    | <.unv>
-    | $ { $¢.moreinput }
-    ]*
+        \\ <?before [\s|'#'] >
+        :dba('unspace')
+        [
+        | <.vws>
+        | <.unv>
+        | $ { $¢.moreinput }
+        ]*
+    ]+
 }
 
 token vws {
