@@ -5291,8 +5291,8 @@ grammar Regex is STD {
     token quantifier:sym<:>  { <sym> {} <?before \s> }
     token quantifier:sym<**> { '**' :: <normspace>? <quantmod> <normspace>?
         [
-        | \d+ \s+ '..' <.panic: "Spaces not allowed in bare range">
-        | (\d+) [ '..' [ (\d+) { $¢.panic("Empty range") if $0.Str > $1[0].Str } | '*' | <.panic: "Malformed range"> ] ]?
+        | <.decint> \s+ '..' <.panic: "Spaces not allowed in bare range">
+        | (<.decint>) [ '..' [ (<.decint>) { $¢.panic("Empty range") if $0.Str > $1[0].Str } | '*' | <.panic: "Malformed range"> ] ]?
         | <embeddedblock>
         | {} <quantified_atom> { $¢.worryobs("atom ** " ~ $<quantified_atom>.Str ~ " as separator", "atom +% " ~ $<quantified_atom>.Str, " nowadays"); }
         ]
