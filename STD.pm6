@@ -3590,6 +3590,7 @@ grammar P6 is STD {
 
     token postfix:sym['->'] () {
         '->'
+        <!{ $*QSIGIL }>
         [
         | <brack=[ \[ \{ \( ]> <.obs("'->" ~ $<brack>.Str ~ "' as postfix dereferencer", "'." ~ $<brack>.Str ~ "' or just '" ~ $<brack>.Str ~ "' to deref, or whitespace to delimit a pointy block")>
         | <.obs('-> as postfix', 'either . to call a method, or whitespace to delimit a pointy block')>
