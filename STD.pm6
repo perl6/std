@@ -5313,7 +5313,7 @@ grammar Regex is STD {
     token quantmod { ':'? [ '?' | '!' | '+' ]? }
 
     token quantifier:sym<{N,M}> {
-        {} '{' (\d+) (','?) (\d*) '}'
+        '{' (\d+) (','?) (\d*) '}'
         {
             my $all = substr(self.orig, self.pos, $¢.pos - self.pos);
             my $repl = chars($1.Str) ??
