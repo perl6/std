@@ -4918,6 +4918,7 @@ grammar Regex is STD {
         ]
     }
     token quant_atom_list {
+        :temp %*RX;
         :my $*SIGOK = False;
         <quantified_atom>+
     }
