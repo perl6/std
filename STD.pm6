@@ -3734,7 +3734,7 @@ grammar P6 is STD {
         { <sym> <O(|%additive, iffy => 1)> }
 
     token infix:sym<?^>
-        { <sym> <O(|%additive)> }
+        { <sym> <O(|%additive, iffy => 1)> }
 
     ## replication
     # Note: no word boundary check after x, relies on longest token for x2 xx2 etc
