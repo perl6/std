@@ -3384,7 +3384,7 @@ grammar P6 is STD {
            
         || <.can_meta($<infixish>, "negate")>    
            <?{ $<infixish><O><iffy> }>
-           $<O> = {$<infixish><O>}
+           { $<O> = $<infixish><O>; $<sym> ~= $<infixish>.Str }
             
         || <.panic("Cannot negate " ~ $<infixish>.Str ~ " because " ~ $<infixish><O><dba> ~ " operators are not iffy enough")>
         ]
@@ -3393,20 +3393,20 @@ grammar P6 is STD {
     token infix_prefix_meta_operator:sym<R> {
         <sym> {} <infixish('R')>
         <.can_meta($<infixish>, "reverse the args of")>
-        $<O> = {$<infixish><O>}
+        { $<O> = $<infixish><O>; $<sym> ~= $<infixish>.Str }
     }
 
     token infix_prefix_meta_operator:sym<S> {
         <sym> {} <infixish('S')>
         <.can_meta($<infixish>, "sequence the args of")>
-        $<O> = {$<infixish><O>}
+        { $<O> = $<infixish><O>; $<sym> ~= $<infixish>.Str }
     }
 
     token infix_prefix_meta_operator:sym<X> {
         <sym> <?before \S> {}
         [ <infixish('X')>
             <.can_meta($<infixish>[0], "cross with")>
-            <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
+            { $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }
         ]?
         <O(|%list_infix, self.Opairs)>
     }
@@ -3415,7 +3415,7 @@ grammar P6 is STD {
         <sym> <?before \S> {}
         [ <infixish('Z')>
             <.can_meta($<infixish>[0], "zip with")>
-            <?{ $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }>
+            { $<O> = $<infixish>[0]<O>; $<O><prec>:delete; $<sym> ~= $<infixish>[0].Str }
         ]?
         <O(|%list_infix, self.Opairs)>
     }
