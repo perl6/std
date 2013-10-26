@@ -128,7 +128,7 @@ constant %structural      = (:dba('structural infix'), :prec<n=>, :assoc<non>, :
 constant %chaining        = (:dba('chaining')        , :prec<m=>, :assoc<chain>, :diffy, :iffy, :pure);
 constant %tight_and       = (:dba('tight and')       , :prec<l=>, :assoc<list>);
 constant %tight_or        = (:dba('tight or')        , :prec<k=>, :assoc<list>);
-constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :fiddly);
+constant %conditional     = (:dba('conditional')     , :prec<j=>, :assoc<right>, :iffy);
 constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
 constant %list_assignment = (:dba('list assignment') , :prec<i=>, :assoc<right>, :fiddly, :!pure);
 constant %loose_unary     = (:dba('loose unary')     , :prec<h=>, :assoc<unary>, :uassoc<left>, :pure);
@@ -3938,7 +3938,7 @@ grammar P6 is STD {
         || <?before \N*? [\n\N*?]?> '!!' <.sorry("Bogus code found before the !!")> <.panic("Confused")>
         || <.sorry("Found ?? but no !!")> <.panic("Confused")>
         ]
-        <O(|%conditional, _reducecheck => 'raise_middle')>
+        <O(|%conditional, _reducecheck => 'raise_middle', fiddly => 1, iffy => 0)>
     }
 
     token infix:sym<!!> {
