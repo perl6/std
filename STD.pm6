@@ -425,6 +425,7 @@ token charspec {
     | :dba('character name') '[' ~ ']' <charnames>
     | \d+
     | <[ ?..Z \\.._ ]>
+    | <.obsbrack>
     | <?> <.sorry: "Unrecognized \\c character"> .
     ]
 }
@@ -848,6 +849,8 @@ token rad_number {
     || <.panic: "Malformed radix number">
     ]
 }
+
+token obsbrack { '{' <.obs('curly brackets','square brackets')> }
 
 token terminator:sym<)>
     { <sym> <O(|%terminator)> }
@@ -4290,10 +4293,10 @@ grammar Q is STD {
             <sym>
             [ <?before '{'> <.worryobs('\N{...}', '\c[...]')> ]?
         }
-        token backslash:o { :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
+        token backslash:o { :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] | <.obsbrack> }
         token backslash:r { <sym> }
         token backslash:t { <sym> }
-        token backslash:x { :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
+        token backslash:x { :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> | <.obsbrack> ] }
         token backslash:sym<0> { <sym> }
     }
 
@@ -4464,13 +4467,13 @@ grammar Q is STD {
         token backslash:f { :i <sym> }
         token backslash:h { :i <sym> { $*CCSTATE = '' } }
         token backslash:n { :i <sym> }
-        token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] }
+        token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> | <.obsbrack> ] }
         token backslash:r { :i <sym> }
         token backslash:s { :i <sym> { $*CCSTATE = '' } }
         token backslash:t { :i <sym> }
         token backslash:v { :i <sym> { $*CCSTATE = '' } }
         token backslash:w { :i <sym> { $*CCSTATE = '' } }
-        token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] }
+        token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] | <.obsbrack> }
         token backslash:sym<0> { <sym> }
 
         # keep random backslashes like qq does
@@ -5127,7 +5130,7 @@ grammar Regex is STD {
         <sym> <.SIGOK>
         [ <?before '{'> <.worryobs('\N{...}', '\c[...], or disambiguate with whitespace')> ]?
     }
-    token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> ] <.SIGOK> }
+    token backslash:o { :i :dba('octal character') <sym> [ <octint> | '[' ~ ']' <octints> | <.obsbrack> ] <.SIGOK> }
     token backslash:p {
         :my $s;
         :my $m;
@@ -5146,7 +5149,7 @@ grammar Regex is STD {
     token backslash:t { :i <sym> <.SIGOK> }
     token backslash:v { :i <sym> <.SIGOK> }
     token backslash:w { :i <sym> <.SIGOK> }
-    token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> ] <.SIGOK> }
+    token backslash:x { :i :dba('hex character') <sym> [ <hexint> | '[' ~ ']' <hexints> | <.obsbrack> ] <.SIGOK> }
     token backslash:z { <sym> <.obs('\\z as end-of-string matcher', '$')> }
     token backslash:Z { <sym> <.obs('\\Z as end-of-string matcher', '\\n?$')> }
     token backslash:misc { $<litchar>=(\W) <.SIGOK> }
