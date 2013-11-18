@@ -1570,7 +1570,13 @@ grammar P6 is STD {
         <?dumbsmart>
         <xblock>
     }
-    rule statement_control:default {<sym> <block> }
+    rule statement_control:default { <sym> <block> }
+
+    rule statement_control:winner  { <sym> <xblock> }
+    rule statement_control:combine { <sym> <xblock> }
+    rule statement_control:more    { <sym> <xblock> }
+    rule statement_control:done    { <sym> <xblock> }
+    rule statement_control:later   { <sym> <block> }
 
     token statement_prefix:BEGIN   { :my %*MYSTERY; <sym> <blast> <.explain_mystery> }
     token statement_prefix:CHECK   { <sym> <blast> }
