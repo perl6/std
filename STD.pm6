@@ -233,9 +233,6 @@ proto token scope_declarator is endsym<nofun> {*}
 token category:package_declarator { <sym> }
 proto token package_declarator is endsym<keyspace> {*}
 
-token category:combinator_declarator { <sym> }
-proto token combinator_declarator is endsym<keyspace> {*}
-
 token category:multi_declarator { <sym> }
 proto token multi_declarator is endsym<keyspace> {*}
 
@@ -1575,6 +1572,12 @@ grammar P6 is STD {
     }
     rule statement_control:default { <sym> <block> }
 
+    rule term:winner               { <sym> <xblock> }
+    rule term:combine              { <sym> <xblock> }
+    rule statement_control:more    { <sym> <xblock> }
+    rule statement_control:done    { <sym> <xblock> }
+    rule statement_control:wait    { <sym> <xblock> }
+
     token statement_prefix:BEGIN   { :my %*MYSTERY; <sym> <blast> <.explain_mystery> }
     token statement_prefix:CHECK   { <sym> <blast> }
     token statement_prefix:FINAL   { <sym> <blast> }
@@ -1861,16 +1864,8 @@ grammar P6 is STD {
         | <routine_declarator>
         | <regex_declarator>
         | <type_declarator>
-        | <combinator_declarator>
         ]
     }
-
-    rule combinator_declarator:winner  { <sym> <xblock> }
-    rule combinator_declarator:combine { <sym> <xblock> }
-    rule combinator_declarator:more    { <sym> <xblock> }
-    rule combinator_declarator:done    { <sym> <xblock> }
-    rule combinator_declarator:catch   { <sym> <xblock> }
-    rule combinator_declarator:wait    { <sym> <xblock> }
 
     rule multi_declarator:multi {
         :my $*MULTINESS = 'multi';
