@@ -3100,6 +3100,8 @@ grammar P6 is STD {
     }
 
     token statement_prefix:once    { <sym> <blast> }
+    token statement_prefix:eager   { <sym> <blast> }
+    token statement_prefix:lazy    { <sym> <blast> }
     token statement_prefix:sink    { <sym> <blast> }
     token statement_prefix:try     { <sym> <blast> }
     token statement_prefix:quietly { <sym> <blast> }
@@ -3107,7 +3109,6 @@ grammar P6 is STD {
     token statement_prefix:contend { <sym> <blast> }
     token statement_prefix:async   { <sym> <blast> }
     token statement_prefix:maybe   { <sym> <blast> }
-    token statement_prefix:lazy    { <sym> <blast> }
     token statement_prefix:do      { <sym> <blast> }
 
     token statement_prefix:lift    {
