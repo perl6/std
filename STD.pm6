@@ -2167,6 +2167,7 @@ grammar P6 is STD {
                 | '<' <desigilname> '>'
                 ]
             )
+            [ <?before <[ \[ \( \< \{ ]>> <.panic: "Extra argument not allowed; pair already has variable argument"> ]?
             { $key = $<var><desigilname>.Str; $value = $<var>; $¢.check_variable($value); }
         ]
         $<k> = {$key} $<v> = {$value}
@@ -2926,6 +2927,8 @@ grammar P6 is STD {
         | <param_var(1)>
         | '\\' <defterm>
         ]
+        [ <?before <[ \( \[ ]>> <.panic: "Subsignature not allowed after named parameter; please insert whitespace"> ]?
+        [ <?before <[ \{ \< ]>> <.panic: "Cannot apply this shape"> ]?
     }
 
     token named_param_term {
