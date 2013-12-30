@@ -525,7 +525,7 @@ class Herestub {
 }
 
 role herestop {
-    token stopper { ^^ {} $<ws>=(\h*?) $*DELIM \h* <.unv>?? $$ \v? }
+    regex stopper { ^^ {} $<ws>=[\h*?] :r $*DELIM \h* <.unv>?? $$ \v? }
 }
 
 # XXX be sure to temporize @herestub_queue on reentry to new line of heredocs
