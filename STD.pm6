@@ -4292,7 +4292,7 @@ grammar Q is STD {
         token escape:sym<\\> { <sym> {} <item=.backslash> }
         token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
         token backslash:sym<\\> { <text=.sym> }
-        token backslash:stopper { <text=.stopper> }
+        token backslash:delim { <text=.starter> | <text=.stopper> }
         token backslash:a { <sym> }
         token backslash:b { <sym> }
         token backslash:c { <sym> <charspec> }
@@ -4411,13 +4411,14 @@ grammar Q is STD {
     }
 
     role q {
+        token starter { \' }
         token stopper { \' }
 
         token escape:sym<\\> { <sym> <item=.backslash> }
 
         token backslash:qq { <?before 'q'> { $<quote> = $¢.cursor_fresh(%*LANG<MAIN>).quote(); } }
         token backslash:sym<\\> { <text=.sym> }
-        token backslash:stopper { <text=.stopper> }
+        token backslash:delim { <text=.starter> | <text=.stopper> }
 
         # in single quotes, keep backslash on random character by default
         token backslash:misc { {} (.) { $<text> = "\\" ~ $0.Str; } }
@@ -4428,6 +4429,7 @@ grammar Q is STD {
     }
 
     role qq does b1 does c1 does s1 does a1 does h1 does f1 {
+        token starter { \" }
         token stopper { \" }
         # in double quotes, omit backslash on random \W backslash by default
         token backslash:misc { {} [ (\W) { $<text> = $0.Str; } | $<x>=(\w) <.sorry("Unrecognized backslash sequence: '\\" ~ $<x>.Str ~ "'")> ] }
@@ -4438,6 +4440,7 @@ grammar Q is STD {
     }
 
     role cc {
+        token starter { \' }
         token stopper { \' }
 
         method ccstate ($s) {
@@ -4468,7 +4471,7 @@ grammar Q is STD {
         token escape:sym<-> { '-' <?{ $*CCSTATE ne '' }> \s* <!stopper> \S <.obs('- as character range','.. (or \\- if you mean a literal hyphen)')> }
         token escape:ch { $<ch> = [\S] <.ccstate($<ch>.Str)> }
 
-        token backslash:stopper { <text=.stopper> }
+        token backslash:delim { <text=.starter> | <text=.stopper> }
         token backslash:a { :i <sym> }
         token backslash:b { :i <sym> }
         token backslash:c { :i <sym> <charspec> }
