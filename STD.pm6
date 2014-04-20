@@ -525,6 +525,7 @@ class Herestub {
 }
 
 role herestop {
+    token starter { <!> }
     regex stopper { ^^ {} $<ws>=[\h*?] :r $*DELIM \h* <.unv>?? $$ \v? }
 }
 
