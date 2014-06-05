@@ -5249,6 +5249,21 @@ grammar Regex is STD {
         :dba('character class element')
         "[" ~ "]" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:cc).unbalanced("]"))>
         <.normspace>?
+        {
+            $_ = $<nibble>.Str;
+            1 while s/\s+|\.\.|\\//;
+
+            # XXX emulate /(.) .*? $0/ which viv flubs
+            my %seen;
+            for unpack('C*', $_) {
+                %seen{$_}++;
+            }
+            for keys %seen {
+                next if %seen{$_} < 2;
+                my $c = chr($_);
+                $¢.worry("Repeated character ($c) unexpectedly found in character class");
+            }
+        }
     }
 
     token cclass_elem:sym<( )> {
