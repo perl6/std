@@ -2256,12 +2256,12 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$-> {
-        <sym>
+        <sym> <!{ $*IN_DECL }>
         <.obs('$- variable', 'Form module')>
     }
 
     token special_variable:sym<$=> {
-        <sym> <!before \w | '('>
+        <sym> <!before \w | '('> <!{ $*IN_DECL }>
         <.obs('$= variable', 'Form module')>
     }
 
@@ -2316,7 +2316,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$+> {
-        <sym> :: <?before \s | ',' | <terminator> >
+        <sym> :: <?before \s | ',' | <terminator> > <!{ $*IN_DECL }>
         <.obs('$+ variable', 'Form module')>
     }
 
@@ -2404,7 +2404,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$\\> {
-        <sym>
+        <sym> <!{ $*IN_DECL }>
         <.obs('$\\ variable', "the filehandle's :ors attribute")>
     }
 
@@ -2419,7 +2419,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$;> {
-        <sym>
+        <sym> <!{ $*IN_DECL }>
         <.obs('$; variable', 'real multidimensional hashes')>
     }
 
