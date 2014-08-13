@@ -139,7 +139,7 @@ require STD;
 
 sub spew {
     my $bits = shift;
-    $bits .= "\n" unless $bits ~~ /\n\z/;
+    $bits .= "\n" unless $bits =~ /\n\z/;
     if (defined $OPT_output_file) {
 	open my $out, ">", $OPT_output_file
 	    or die "cannot open $OPT_output_file for writing: $!";
