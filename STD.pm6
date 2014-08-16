@@ -3111,7 +3111,7 @@ grammar P6 is STD {
     token statement_prefix:quietly { <sym> <blast> }
     token statement_prefix:gather  { <sym> <blast> }
     token statement_prefix:contend { <sym> <blast> }
-    token statement_prefix:async   { <sym> <blast> }
+    token statement_prefix:start   { <sym> <blast> }
     token statement_prefix:maybe   { <sym> <blast> }
     token statement_prefix:do      { <sym> <blast> }
 
