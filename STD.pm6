@@ -2199,13 +2199,13 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$~> {
-        <sym> <!before \w | '('>
+        <sym> <?before \h* '='>
         <.obs('$~ variable', 'Form module')>
     }
 
     token special_variable:sym<$`> {
         <sym>
-        <.obs('$` variable', 'explicit pattern before <(')>
+        <.obs('$` variable', '$/.prematch')>
     }
 
     token special_variable:sym<$@> {
@@ -2225,7 +2225,7 @@ grammar P6 is STD {
         <.obs('$$ variable', '$*PID')>
     }
     token special_variable:sym<$%> {
-        <sym> <!before \w | '(' | <sigil> >
+        <sym> <?before \h* '='>
         <.obs('$% variable', 'Form module')>
     }
 
@@ -2236,7 +2236,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$^> {
-        <sym> <!before \w>
+        <sym> <?before \h* '='>
         <.obs('$^ variable', 'Form module')>
     }
 
@@ -2246,22 +2246,12 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$*> {
-        <sym> <!before \w | '(' >
+        <sym> <?before \h* '='>
         <.obs('$* variable', '^^ and $$')>
     }
 
-    token special_variable:sym<$)> {
-        <sym> <?{ $*GOAL ne ')' }>
-        <.obs('$) variable', '$*EGID')>
-    }
-
-    token special_variable:sym<$-> {
-        <sym> <!{ $*IN_DECL }>
-        <.obs('$- variable', 'Form module')>
-    }
-
     token special_variable:sym<$=> {
-        <sym> <!before \w | '('> <!{ $*IN_DECL }>
+        <sym> <?before \h+ '='>
         <.obs('$= variable', 'Form module')>
     }
 
@@ -2313,11 +2303,6 @@ grammar P6 is STD {
     token special_variable:sym<%-{ }> {
         '@-{'
         <.obs('%- variable', '.from method')>
-    }
-
-    token special_variable:sym<$+> {
-        <sym> :: <?before \s | ',' | <terminator> > <!{ $*IN_DECL }>
-        <.obs('$+ variable', 'Form module')>
     }
 
     token special_variable:sym<${^ }> {
@@ -2393,59 +2378,39 @@ grammar P6 is STD {
         } # always fails, don't need curlycheck here
     }
 
-    token special_variable:sym<$[> {
-        <sym>  <!{ $*IN_DECL }>
-        <.obs('$[ variable', 'user-defined array indices')>
-    }
-
-    token special_variable:sym<$]> {
-        <sym>
-        <.obs('$] variable', '$*PERL_VERSION')>
-    }
-
     token special_variable:sym<$\\> {
         <sym> <!{ $*IN_DECL }>
         <.obs('$\\ variable', "the filehandle's :ors attribute")>
     }
 
     token special_variable:sym<$|> {
-        <sym>
+        <sym> <?before \h* '='>
         <.obs('$| variable', ':autoflush on open')>
     }
 
     token special_variable:sym<$:> {
-        <sym> <!before \w>
+        <sym> <?before \h* '='>
         <.obs('$: variable', 'Form module')>
     }
 
     token special_variable:sym<$;> {
-        <sym> <!{ $*IN_DECL }>
+        <sym> <?before \h* '='>
         <.obs('$; variable', 'real multidimensional hashes')>
     }
 
     token special_variable:sym<$'> { #'
         <sym> <!{ $*QSIGIL }>
-        <.obs('$' ~ "'" ~ 'variable', "explicit pattern after )\x3E")>
+        <.obs('$' ~ "'" ~ ' variable', '$/.postmatch')>
     }
 
     token special_variable:sym<$"> {
-        <sym> <!{ $*QSIGIL }>
+        <sym> <?before \h* '='>
         <.obs('$" variable', '.join() method')>
     }
 
     token special_variable:sym<$,> {
-        <sym> <?before \h* <[ = , ; ? : ! ) \] } ]> >
+        <sym> <?before \h* '='>
         <.obs('$, variable', ".join() method")>
-    }
-
-    token special_variable:sym['$<'] {
-        <sym> <?before \h* <[ = , ; ? : ! ) \] } ]> <!before \S* '>'> >
-        <.obs('$< variable', '$*UID')>
-    }
-
-    token special_variable:sym«\$>» {
-        <sym>
-        <.obs('$> variable', '$*EUID')>
     }
 
     token special_variable:sym<$.> {
@@ -2498,15 +2463,7 @@ grammar P6 is STD {
             # Note: $() can also parse as contextualizer in an expression; should have same effect
             | <sigil> <?before '<'> <postcircumfix> [<?{ $*IN_DECL }> <.panic: "Cannot declare a match variable">]?
             | :dba('contextualizer') <sigil> '(' ~ ')' <semilist> { $*LEFTSIGIL ||= $<sigil>.Str } <O(|%term)> [<?{ $*IN_DECL }> <.panic: "Cannot declare a contextualizer">]?
-            | <sigil> <?{ $*IN_DECL }>
-            | <?> {
-                if $*QSIGIL {
-                    return ();
-                }
-                else {
-                    $¢.sorry("Non-declarative sigil is missing its name");
-                }
-              }
+            | <sigil>
             ]
         ]
 
