@@ -1269,7 +1269,7 @@ grammar P6 is STD {
         ]*
 
         [
-        | '{*}' <?{ $*MULTINESS eq 'proto' }> $<onlystar> = {1}
+        | '{*}' <?{ $*MULTINESS eq 'proto' }> $<onlystar> = {1;}
         | [
             '{'
             <nibble( $¢.cursor_fresh($lang).unbalanced('}') )>
@@ -2149,9 +2149,9 @@ grammar P6 is STD {
         :dba('colon pair')
         [
         | '!' :: [ <identifier> || <.panic: "Malformed False pair; expected identifier">]
-            [ <?before <[ \[ \( \< \{ ]>> <.panic: "Extra argument not allowed; pair already has False argument"> ]?
+            [ <?before <[ [ ( < { ]>> <.panic: "Extra argument not allowed; pair already has False argument"> ]?
             { $key = $<identifier>.Str; $value = 0; }
-        | $<num> = [\d+] <identifier> [ <?before <[ \[ \( \< \{ ]>> <.sorry("Extra argument not allowed; pair already has argument of " ~ $<num>.Str)> <.circumfix> ]?
+        | $<num> = [\d+] <identifier> [ <?before <[ [ ( < { ]>> <.sorry("Extra argument not allowed; pair already has argument of " ~ $<num>.Str)> <.circumfix> ]?
         | <identifier>
             { $key = $<identifier>.Str; }
             [
@@ -2168,7 +2168,7 @@ grammar P6 is STD {
                 | '<' <desigilname> '>'
                 ]
             )
-            [ <?before <[ \[ \( \< \{ ]>> <.panic: "Extra argument not allowed; pair already has variable argument"> ]?
+            [ <?before <[ [ ( < { ]>> <.panic: "Extra argument not allowed; pair already has variable argument"> ]?
             { $key = $<var><desigilname>.Str; $value = $<var>; $¢.check_variable($value); }
         ]
         $<k> = {$key} $<v> = {$value}
@@ -2559,7 +2559,7 @@ grammar P6 is STD {
         $start <left=.nibble($lang)> [ $stop || <.panic: "Couldn't find terminator $stop"> ]
         [ <?{ $start ne $stop }>
             <.ws>
-            [ <?[ \[ \{ \( \< ]> <.obs('brackets around replacement', 'assignment syntax')> ]?
+            [ <?[ [ { ( < ]> <.obs('brackets around replacement', 'assignment syntax')> ]?
             [ <infixish> || <panic: "Missing assignment operator"> ]
             [ <?{ $<infixish>.Str eq '=' || $<infixish>.<infix_postfix_meta_operator>[0] }> || <.panic: "Malformed assignment operator"> ]
             <.ws>
@@ -2885,8 +2885,8 @@ grammar P6 is STD {
         | <param_var(1)>
         | '\\' <defterm>
         ]
-        [ <?before <[ \( \[ ]>> <.panic: "Subsignature not allowed after named parameter; please insert whitespace"> ]?
-        [ <?before <[ \{ \< ]>> <.panic: "Cannot apply this shape"> ]?
+        [ <?before <[ ( [ ]>> <.panic: "Subsignature not allowed after named parameter; please insert whitespace"> ]?
+        [ <?before <[ { < ]>> <.panic: "Cannot apply this shape"> ]?
     }
 
     token named_param_term {
@@ -2912,7 +2912,7 @@ grammar P6 is STD {
             ||  # Is it a shaped array or hash declaration?
                 <?{ $<sigil>.Str eq '@' || $<sigil>.Str eq '%' }>
                 <name=.identifier>?
-                <?before <[ \< \( \[ \{ ]> >
+                <?before <[ < ( [ { ]> >
                 <postcircumfix>
 
                 # ordinary parameter name
@@ -3020,7 +3020,7 @@ grammar P6 is STD {
                 $kind = '?' if $kind eq '!';
             }
             [<?before ':' > <.sorry: "Cannot put a default on the invocant parameter">]?
-            [<!before <[,;)\]\{\}\-]> > <.sorry: "Default expression must come last">]?
+            [<!before <[,;)\]{\}\-]> > <.sorry: "Default expression must come last">]?
         ]?
         [<?before ':'> <?{ $kind ne '!' }> <.sorry: "Invocant is too exotic">]?
 
@@ -3425,7 +3425,7 @@ grammar P6 is STD {
                 %prec = %list_assignment;
             }
         }
-        <O($op.Opairs, |%prec, dba => 'assignment operator', iffy => 0)>
+        <O($op.Opairs, |%prec, dba => 'assignment operator', iffy => 0, _pos => $¢.pos)>
     }
 
     token postcircumfix:sym<( )>
@@ -3563,7 +3563,7 @@ grammar P6 is STD {
         '->'
         <!{ $*QSIGIL }>
         [
-        | <brack=[ \[ \{ \( ]> <.obs("'->" ~ $<brack>.Str ~ "' as postfix dereferencer", "'." ~ $<brack>.Str ~ "' or just '" ~ $<brack>.Str ~ "' to deref, or whitespace to delimit a pointy block")>
+        | <brack=[ [ { ( ]> <.obs("'->" ~ $<brack>.Str ~ "' as postfix dereferencer", "'." ~ $<brack>.Str ~ "' or just '" ~ $<brack>.Str ~ "' to deref, or whitespace to delimit a pointy block")>
         | <.obs('-> as postfix', 'either . to call a method, or whitespace to delimit a pointy block')>
         ]
     }
@@ -5078,7 +5078,7 @@ grammar Regex is STD {
         || $<binding> = ( \s* '=' \s* <quantified_atom> )
            { $¢.check_variable($<variable>) unless substr($<sym>,1,1) eq '<' }
         || { $¢.check_variable($<variable>) }
-           [ <?before '.'? <[ \[ \{ \< ]>> <.worry: "Apparent subscript will be treated as regex"> ]?
+           [ <?before '.'? <[ [ { < ]>> <.worry: "Apparent subscript will be treated as regex"> ]?
         ]
         <.SIGOK>
     }
@@ -5110,8 +5110,8 @@ grammar Regex is STD {
         { $s = $<sym>.Str; $m = $s lt 'a' ?? '-' !! ''; }
         [
         || (\w) { $p = $0.Str; $¢.obs("\\$s$p", '<' ~ $m ~ ":$p>"); }
-        || '{' $<param>=[\w+] '}' { $p = $<param>.Str; $¢.obs("\\$s\{$p\}", '<' ~ $m ~ ":$p>"); }
-        || '{' $<param>=[\w+] \= $<val>=[<-[\}]>*] '}' { $p = $<param>.Str; my $v = $<val>.Str; $¢.obs("\\$s\{$p=$v\}", '<' ~ $m ~ ":$p\('$v')>"); }
+        || '{' $<param>=[\w+] '}' { $p = $<param>.Str; $¢.obs("\\$s" ~ '{' ~ $p ~ '}', '<' ~ $m ~ ":$p>"); }
+        || '{' $<param>=[\w+] \= $<val>=[<-[\}]>*] '}' { $p = $<param>.Str; my $v = $<val>.Str; $¢.obs("\\$s" ~ '{' ~ "$p=$v\}", '<' ~ $m ~ ":$p\('$v')>"); }
         ]
     }
     token backslash:Q { <sym> <.obs('\\Q as quotemeta', 'quotes or literal variable match')> }
@@ -5208,7 +5208,7 @@ grammar Regex is STD {
         <.normspace>?
         {
             $_ = $<nibble>.Str;
-            1 while s/\s+|\.\.|\\//;
+            1 while s/\s+|\.\.|\\x\w+|\\//;
 
             # XXX emulate /(.) .*? $0/ which viv flubs
             my %seen;

@@ -1389,7 +1389,7 @@ EOT
 	($name eq 'EXPR' ? # XXX STD
 	    "sub EXPR__PEEK { \$_[0]->_AUTOLEXpeek(\'EXPR\',\$retree) }\n" : '').
 	"sub " . $name . "{\n" . 
-	    ::indent("no warnings 'recursion';\nmy \$self = shift;\n" .
+	    ::indent("no warnings 'recursion', 'experimental';\nmy \$self = shift;\n" .
 		$sig . $body, 1)
 	. "}";
     }
@@ -1741,7 +1741,7 @@ EOT
 	my $finalmulti = '';
 
 	for my $mm (sort keys %::MULTIMETHODS) {
-	    $finalmulti .= "moose_around $mm => sub {\n    my \$orig = shift;\n    no warnings 'recursion';\n" .
+	    $finalmulti .= "moose_around $mm => sub {\n    my \$orig = shift;\n    no warnings 'recursion', 'experimental';\n" .
 		::indent($::MULTIMETHODS{$mm}, 1) . <<EOFINAL
     \$orig->(\@_);
 };
@@ -2299,7 +2299,7 @@ sub ${p5name}__PEEK { \$_[0]->_AUTOLEXpeek('$p5name', \$retree) }
 sub $p5name {
 HDR
 	. ::indent(<<IHDR
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my \$self = shift;
 
 IHDR
@@ -2855,6 +2855,33 @@ END
 	    } else {
 		$t[0] = "'$pkg'";
 	    }
+	}
+	if ($t[0] eq 'item') {
+	    $t[0] = '\\';
+	    $t[1] =~ s/^\s+//;
+	}
+	if ($t[0] eq 'map' || $t[0] eq 'grep' || $t[0] eq 'sort') {
+	    # XXX this should be more robust, but it belongs in DEEP after
+	    # all arguments are collected anyway
+	    $t[1] =~ s/}\s*,/} /;
+	}
+	if ($t[0] eq 'invert') {
+	    $t[0] = 'reverse';
+	}
+	if ($t[0] eq 'chars') {
+	    $t[0] = 'length';
+	}
+	if ($t[0] eq 'note') {
+	    $t[0] = 'print STDERR';
+	}
+	if ($t[0] eq 'False') {
+	    $t[0] = '0';
+	}
+	if ($t[0] eq 'True') {
+	    $t[0] = '1';
+	}
+	if ($t[0] eq 'Nil') {
+	    $t[0] = '()';
 	}
         @t;
     }

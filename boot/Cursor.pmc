@@ -28,7 +28,7 @@ our $RED     = $CursorBase::RED;
 our $CLEAR   = $CursorBase::CLEAR;
 ## method panic (Str $s)
 sub panic {
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my $self = shift;
 die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
@@ -44,7 +44,7 @@ die "Parse failed\n";
 };
 ## method worry (Str $s)
 sub worry {
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my $self = shift;
 die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
@@ -54,7 +54,7 @@ $self;
 };
 ## method sorry (Str $s)
 sub sorry {
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my $self = shift;
 die 'Required argument s omitted' unless @_;
 my $s = @_ ? shift() : undef;
@@ -73,7 +73,7 @@ $self;
 };
 ## method locmess ()
 sub locmess {
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my $self = shift;
 my $pos = $self->{'_pos'};
 my $line = $self->lineof($pos);
@@ -93,12 +93,12 @@ $post = '<EOL>' if $post eq '';
 };
 ## method line
 sub line {
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my $self = shift;
 $self->lineof($self->{'_pos'})};
 ## method lineof ($p)
 sub lineof {
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my $self = shift;
 die 'Required argument p omitted' unless @_;
 my $p = @_ ? shift() : undef;
@@ -119,12 +119,12 @@ return $::MEMOS[$p]->{'L'} // 0;
 };
 ## method SETGOAL
 sub SETGOAL {
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my $self = shift;
 };
 ## method FAILGOAL (Str $stop, Str $name, $startpos)
 sub FAILGOAL {
-no warnings 'recursion';
+no warnings 'recursion', 'experimental';
 my $self = shift;
 die 'Required argument stop omitted' unless @_;
 my $stop = @_ ? shift() : undef;

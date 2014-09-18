@@ -2497,7 +2497,7 @@ sub _AUTOLEXpeek { my $self = shift;
 sub O {
     my $self = shift;
     my %args = @_;
-    @$self{keys %args} = values %args;
+    $$self{$_} = $args{$_} for keys %args;
     $self;
 }
 
