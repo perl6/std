@@ -1631,7 +1631,7 @@ grammar P6 is STD {
     }
 
     token version:sym<v> {
-        'v' <?before \d> :: <vnum> +% '.' '+'?
+        <?before v\d+> 'v' <vnum> +% '.' '+'?
     }
 
     ###############
