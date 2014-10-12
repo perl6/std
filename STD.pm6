@@ -5250,22 +5250,22 @@ grammar Regex is STD {
 
     token mod_internal:sym<:i>    { $<sym>=[':i'|':ignorecase'] » { %*RX<i> = 1 } }
     token mod_internal:sym<:!i>   { $<sym>=[':!i'|':!ignorecase'] » { %*RX<i> = 0 } }
-    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { %*RX<i> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:i( )> { $<sym>=[':i'|':ignorecase'] <mod_arg> { %*RX<i> = EVAL $<mod_arg>.Str } }
     token mod_internal:sym<:0i>   { ':' (\d+) ['i'|'ignorecase'] { %*RX<i> = $0 } }
 
     token mod_internal:sym<:m>    { $<sym>=[':m'|':ignoremark'] » { %*RX<m> = 1 } }
     token mod_internal:sym<:!m>   { $<sym>=[':!m'|':!ignoremark'] » { %*RX<m> = 0 } }
-    token mod_internal:sym<:m( )> { $<sym>=[':m'|':ignoremark'] <mod_arg> { %*RX<m> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:m( )> { $<sym>=[':m'|':ignoremark'] <mod_arg> { %*RX<m> = EVAL $<mod_arg>.Str } }
     token mod_internal:sym<:0m>   { ':' (\d+) ['m'|'ignoremark'] { %*RX<m> = $0 } }
 
     token mod_internal:sym<:s>    { ':s' 'igspace'? » { %*RX<s> = 1 } }
     token mod_internal:sym<:!s>   { ':!s' 'igspace'? » { %*RX<s> = 0 } }
-    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { %*RX<s> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:s( )> { ':s' 'igspace'? <mod_arg> { %*RX<s> = EVAL $<mod_arg>.Str } }
     token mod_internal:sym<:0s>   { ':' (\d+) 's' 'igspace'? » { %*RX<s> = $0 } }
 
     token mod_internal:sym<:r>    { ':r' 'atchet'? » { %*RX<r> = 1 } }
     token mod_internal:sym<:!r>   { ':!r' 'atchet'? » { %*RX<r> = 0 } }
-    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { %*RX<r> = eval $<mod_arg>.Str } }
+    token mod_internal:sym<:r( )> { ':r' 'atchet'? » <mod_arg> { %*RX<r> = EVAL $<mod_arg>.Str } }
     token mod_internal:sym<:0r>   { ':' (\d+) 'r' 'atchet'? » { %*RX<r> = $0 } }
  
     token mod_internal:sym<:Perl5>    { [':Perl5' | ':P5'] <.require_P5> [ :lang( $¢.cursor_fresh( %*LANG<P5Regex> ).unbalanced($*GOAL) ) <nibbler> ] }

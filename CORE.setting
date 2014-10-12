@@ -343,7 +343,7 @@ my proto warn {*}
 my proto note {*}
 my proto caller {*}
 my proto callframe {*}
-my proto eval {*}
+my proto EVAL {*}
 my proto evalfile {*}
 my proto callsame {*}
 my proto callwith {*}
