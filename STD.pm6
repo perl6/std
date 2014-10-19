@@ -1573,7 +1573,7 @@ grammar P6 is STD {
     }
     rule statement_control:default { <sym> <block> }
 
-    rule term:winner               { <sym> <xblock> }
+    rule term:earliest             { <sym> <xblock> }
     rule term:combine              { <sym> <xblock> }
     rule statement_control:more    { <sym> <xblock> }
     rule statement_control:done    { <sym> <xblock> }
