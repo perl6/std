@@ -1193,6 +1193,7 @@ grammar P6 is STD {
         [
         | <lambda>
             <.newlex(1)>
+            :my $*GOAL := '{';
             <signature(1)>
             <blockoid>
             <.getsig>
