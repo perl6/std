@@ -3430,7 +3430,12 @@ grammar P6 is STD {
     }
 
     token postcircumfix:sym<( )>
-        { :dba('argument list') '(' ~ ')' <semiarglist> <O(|%methodcall)> }
+        {
+            :my $*IN_DECL = 0;
+            :dba('argument list')
+            '(' ~ ')' <semiarglist>
+            <O(|%methodcall)>
+        }
 
     token kvetch {
         <!before '.kv'> ||
@@ -3438,6 +3443,7 @@ grammar P6 is STD {
     }
 
     token postcircumfix:sym<[ ]> {
+        :my $*IN_DECL = 0;
         :dba('subscript') '[' ~ ']' <semilist> <.kvetch> <O(|%methodcall)> 
         {
             my $innards = $<semilist>.Str;
@@ -3450,6 +3456,7 @@ grammar P6 is STD {
     }
 
     token postcircumfix:sym<{ }> {
+        :my $*IN_DECL = 0;
         :temp $*CURLEX;
         :dba('subscript')
         <.newlex>
@@ -3460,6 +3467,7 @@ grammar P6 is STD {
     }
 
     token postcircumfix:sym«< >» {
+        :my $*IN_DECL = 0;
         :my $pos;
         '<'
         { $pos = $¢.pos }
