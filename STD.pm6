@@ -590,7 +590,9 @@ token quotepair {
 
 token quote:sym<｢ ｣>   { :dba('perfect quotes') "｢" ~ "｣" <nibble($¢.cursor_fresh( %*LANG<Q> ).unbalanced("｣"))> }
 token quote:sym<' '>   { :dba('single quotes') "'" ~ "'" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("'"))> }
+token quote:sym<‘ ’>   { :dba('single quotes') "‘" ~ "’" <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:q).unbalanced("’"))> }
 token quote:sym<" ">   { :dba('double quotes') '"' ~ '"' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('"'))> }
+token quote:sym<“ ”>   { :dba('double quotes') '“' ~ '”' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).unbalanced('”'))> }
 
 token circumfix:sym<« »>   { :dba('shell-quote words') '«' ~ '»' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('«','»'))> }
 token circumfix:sym«<< >>» { :dba('shell-quote words') '<<' ~ '>>' <nibble($¢.cursor_fresh( %*LANG<Q> ).tweak(:qq).tweak(:ww).balanced('<<','>>'))> }
@@ -4867,7 +4869,7 @@ grammar Regex is STD {
         <?before \s | '#'> [ :lang(%*LANG<MAIN>) <.ws> ]
     }
 
-    token unsp { '\\' <?before \s | '#'> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr(self.orig,$¢.pos,1) ~ "') or use a backslashed form like \\x" ~ sprintf('%02x', ord(substr(self.orig,$¢.pos,1)))> }  # no unspace in regexen
+    token unsp { '\\' <?before \s> <.panic: "No unspace allowed in regex; if you meant to match the literal character, please enclose in single quotes ('" ~ substr(self.orig,$¢.pos,1) ~ "') or use a backslashed form like \\x" ~ sprintf('%02x', ord(substr(self.orig,$¢.pos,1)))> }  # no unspace in regexen
 
     rule nibbler {
         :temp %*RX;
@@ -5075,7 +5077,9 @@ grammar Regex is STD {
 
     token metachar:sym<｢ ｣> { <?before "｢"> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
     token metachar:sym<' '> { <?before "'"> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
+    token metachar:sym<‘ ’> { <?before "‘"> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
     token metachar:sym<" "> { <?before '"'> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
+    token metachar:sym<“ ”> { <?before '“'> [:lang(%*LANG<MAIN>) <quote>] <.SIGOK> }
 
     token metachar:var {
         :my $*QSIGIL ::= substr(self.orig,self.pos,1);
