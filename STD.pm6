@@ -4104,12 +4104,13 @@ grammar P6 is STD {
                     given +%deftrap{$name} {
                         $¢.worry("Use of non-subscript <...> where postfix is expected; please use whitespace") if $_ and substr(self.orig, $¢.pos, 1) eq '<';
                         when 1 {        # probably misused P5ism
-                            $<identifier>.sorryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
+                            $<identifier>.worryobs("bare '$name'", ".$name if you meant \$_, or use an explicit invocant or argument");
                         }
                         when 2 {        # probably misused P6ism
-                            $<identifier>.sorry("The '$name' listop may not be called without arguments (please use () or whitespace to clarify)");
+                            $<identifier>.worry("The '$name' listop may not be called without arguments (please use () or whitespace to clarify)");
                         }
                     }
+                    $<identifier>.sorry("No valid term seen where one is required");
                 }
             }
         }
